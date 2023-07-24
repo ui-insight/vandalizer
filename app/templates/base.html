@@ -1,0 +1,58 @@
+{% extends "bootstrap/base.html" %}
+
+{%block title%}Base{%endblock%}
+
+
+{% block head %}
+{{super()}}
+<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+
+{% endblock %}
+
+{% block styles %}
+{{super()}}
+
+
+{% endblock %}
+
+{% block scripts %}
+{{super()}}
+
+<script src="https://kit.fontawesome.com/5b8fb1c54e.js" crossorigin="anonymous"></script>
+
+{% endblock %}
+
+{% block navbar %}
+
+<nav class="navbar navbar-default">
+	<div class="container-fluid">
+		{% include "sitewide/header.html" %}
+	</div><!-- /.container-fluid -->
+</nav>
+
+{% endblock %}
+
+{%block content %}
+
+<div class="container" style="margin-bottom: 60px; min-height: 60vh;">
+
+    {% with messages = get_flashed_messages() %}
+	    {% if messages %}
+	    <div class="row">
+	    	<div class="col-md-4">
+			    <ul>
+			    {% for message in messages %}
+			        <li>{{ message }} </li>
+			    {% endfor %}
+			    </ul>
+			</div>
+		</div>
+	    {% endif %}
+    {% endwith %}
+
+	{%block main_content%}{%endblock%}
+
+</div>
+
+{%endblock%}
+

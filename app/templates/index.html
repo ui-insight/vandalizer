@@ -1,0 +1,108 @@
+{% extends "base.html" %} {%block title%}Base{%endblock%} {% block head %}
+{{super()}}
+<link
+  rel="shortcut icon"
+  href="{{ url_for('static', filename='images/favicon.ico') }}"
+/>
+
+{% endblock %} {% block styles %} {{super()}}
+
+<link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='rightpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
+<link
+  rel="stylesheet"
+  href="{{url_for('static', filename='datepicker.css')}}"
+/>
+
+{% endblock %} {% block navbar %}
+
+<nav class="navbar navbar-default">
+  <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+  <!-- /.container-fluid -->
+</nav>
+
+{% endblock %} {%block content %}
+
+<div class="main-panel">
+    <div class="header">
+        <div class="header-left">
+            <div class="row" style="height:100%;">
+                <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
+                    <a style="padding-left: 30px; margin-top: 5px;" href="#">
+                    <span style="font-size: 2em;  color: #687786;">
+                        <i class="fa-solid fa-arrow-left"></i>
+                      </span>
+                    </a>
+                </div>
+                <div class="col-md-6">
+                    <p style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">Contract Name</p>
+                </div>
+                <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
+                    <div style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                    </div>
+                    <a style="padding-left: 15px; padding-right: 15px; float: right;" href="#">
+                        <span style="font-size: 2em;  color: #7D8B99;">
+                            <i class="fa-regular fa-circle-down"></i>
+                        </span>
+                    </a>
+                    <div style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="row">
+                <div class="col-md-4">
+                    <a href="/home" class="secondary-btn active">Compliance</a>	
+                </div>	
+                <div class="col-md-4">
+                    <a href="/account" class="secondary-btn">Proofread</a>
+                </div>
+                <div class="col-md-4">
+                <a href="/account" class="secondary-btn">Scan</a>
+                </div>
+          
+            </div>
+        </div>
+    </div>
+  <div class="left-panel">
+    <div class="document">
+        {% include 'document.html' %}
+    </div>
+
+    <div class="ask-question-container">
+        <div class="ask-question">
+            <input type="text" placeholder="Ask Document Question...">
+            <button class="primary-btn">
+                <span style="font-size: 2em; color: #2976E8;">
+                    <i class="fa-solid fa-paper-plane"></i>
+                  </span>
+            </button>
+        </div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="answer-card">
+
+    </div>
+    <div class="answer-card">
+        
+    </div>
+    <div class="bottom-toolbar">
+        <div style="width: 100%; height: 100%;">
+            Hello
+        </div>
+    </div>
+  </div>
+</div>
+
+
+{%endblock%} {% block scripts %}
+{{super()}}
+
+<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+
+{% endblock %}

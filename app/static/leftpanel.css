@@ -1,0 +1,41 @@
+
+
+.left-panel .ask-question-container {
+    position: fixed;
+    bottom: 0;
+    background-color: transparent;
+    width: 60%;
+    height: 60px;
+    z-index: 100;
+    padding-left: 30px;
+    padding-right: 30px;
+    padding-bottom: 10px;
+}
+
+.left-panel .ask-question {
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    border-radius: 6px;
+    
+    box-shadow: 0 0 29px 4px rgb(171, 171, 171);
+}
+
+.left-panel .ask-question input {
+    width: 100%;
+    height: 100%;
+    padding-left: 30px;
+    padding-right: 90px;
+    border-width: 0px;
+    border-radius: 6px;
+}
+
+.left-panel .ask-question button {
+    position: absolute;
+    right: 30px;
+    top: 0;
+    height: 50px;
+    width: 50px;
+    border-width: 0px;
+    background-color: transparent;
+}
