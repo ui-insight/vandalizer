@@ -1,0 +1,29 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+flask = "*"
+flask-admin = "*"
+flask-bootstrap = "*"
+flask-cache = "*"
+flask-flatpages = "*"
+flask-gravatar = "*"
+flask-login = "*"
+flask-mail = "*"
+flask-pymongo = "*"
+flask-restless = "*"
+flask-sqlalchemy = "*"
+flask-themes = "*"
+flask-uploads = "*"
+flask-wtf = "*"
+psycopg2 = "*"
+flask-migrate = "*"
+wtforms = "*"
+
+
+[dev-packages]
+
+[requires]
+python_version = "3.10.6"
