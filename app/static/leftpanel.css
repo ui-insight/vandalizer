@@ -1,4 +1,20 @@
+.left-panel {
+    position: relative;
+    width: 60%;
+    height: 100%;
+    float: left;
+    overflow: scroll;
+}
 
+.left-panel .document {
+    position: relative;
+    margin: 60px;
+    margin-top: 30px;
+    padding: 60px;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+}
 
 .left-panel .ask-question-container {
     position: fixed;
@@ -39,3 +55,16 @@
     border-width: 0px;
     background-color: transparent;
 }
+
+.left-panel .chat-window {
+    position: absolute;
+    z-index: 1000;
+    bottom: 80px;
+    left: 0;
+    width: 100%;
+    overflow: scroll;
+    height: calc(100%);
+    backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
+        -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
+        background-color: rgba(255, 255, 255, 0.3); 
+  }

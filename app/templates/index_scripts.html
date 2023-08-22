@@ -1,0 +1,210 @@
+<script>
+var askingDocument = '';
+
+
+$('#ask-question-btn').on('click', function(e) {
+    e.preventDefault()
+    let question = $('#ask-question-input')[0].value;
+    askQuestion(question);
+    
+});
+
+
+
+function askQuestion(question) {
+// Call API to get answer
+if (askingDocument != '') {
+    askDocumentQuestion(question);
+    return;
+}
+
+showChatLoading();
+$.ajax({
+        url: '/api/ask',
+        type: 'POST',
+        data: JSON.stringify({
+            question: question
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            let answer = msg.answer;
+            $('#ask-question-input')[0].value = ''
+            openChatWindow();
+            removeChatLoading();
+            console.log(answer);
+            $('.chat-window').append(`
+            <div class="answer-card" style="padding: 30px; ">
+                <p style="font-size: 30; color: #5D6F81;">
+                    Question: <i>${question}</i>
+                </p>
+                <p style="font-size: 30; color: #5D6F81;">
+                    ${answer}
+                </p>
+            </div>
+        `) 
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
+function askDocumentQuestion(question) {
+// Call API to get answer
+showChatLoading();
+$.ajax({
+        url: '/api/ask',
+        type: 'POST',
+        data: JSON.stringify({
+            question: "Considering the document " + askingDocument + ", answer this question: " + question
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            let answer = msg.answer;
+            $('#ask-question-input')[0].value = ''
+            openChatWindow();
+            removeChatLoading();
+            console.log(answer);
+            $('.chat-window').append(`
+            <div class="answer-card" style="padding: 30px; ">
+                <p style="font-size: 30; color: #5D6F81;">
+                    Asking ${askingDocument }: <i>${question}</i>
+                </p>
+                <p style="font-size: 30; color: #5D6F81;">
+                    ${answer}
+                </p>
+            </div>
+        `)
+           
+            
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
+function askDocument(documentName) {
+    $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
+    askingDocument = documentName;
+}
+
+function summarizeDocument(documentName) {
+    showChatLoading();
+    $.ajax({
+        url: '/api/ask',
+        type: 'POST',
+        data: JSON.stringify({
+            question: "Summarize the document: " + documentName
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            let answer = msg.answer;
+            $('#ask-question-input')[0].value = ''
+            openChatWindow();
+           
+            console.log(answer);
+            removeChatLoading();
+            const newBox = $(`
+            <div class="answer-card" style="padding: 30px; ">
+                <p style="font-size: 30; color: #5D6F81;">
+                    SUMMARIZE: <i>${documentName}</i>
+                </p>
+                <p style="font-size: 30; color: #5D6F81;">
+                    ${answer}
+                </p>
+            </div>
+        `).hide(); 
+            $('.chat-window').append(newBox);
+
+            //newBox.scrollIntoView();
+            newBox.fadeIn();
+ 
+           
+            
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
+function showChatLoading() {
+    $('.chat-window').append(`
+    <div id="loading-area" style="display: flex; height: 100px;">
+            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+        </div>`);
+}
+
+function removeChatLoading() {
+    $('.chat-window #loading-area').remove();
+}
+
+$('.rescan-button').on('click', function(e) {
+    e.preventDefault()
+    $('.document')[0].classList.add('scanning')
+});
+
+$('#chat-button').on('click', function(e) {
+    e.preventDefault()
+    if ($('.chat-window')[0].classList.contains('open')) {
+        closeChatWindow();
+    } else {
+        $('#ask-question-input')[0].focus()
+        openChatWindow();
+    }
+});
+
+$('#close-chat-dismiss-btn').on('click', function(e) {
+    e.preventDefault()
+    closeChatWindow();
+});
+
+
+function closeChatWindow() {
+    $('.chat-window')[0].classList.remove('open')
+    $('.chat-window')[0].classList.add('closed')
+    $('#chat-button-span')[0].style.color = "#5D6F81";
+    $('#chat-button-icon')[0].classList.remove('fa-solid')
+    $('#chat-button-icon')[0].classList.add('fa-regular')
+    $('#ask-question-input').attr("placeholder", "Ask all documents a question...");
+    askingDocument = false;
+}
+
+function openChatWindow() {
+    $('.chat-window')[0].classList.add('open')
+    $('.chat-window')[0].classList.remove('closed')
+    $('#chat-button-icon')[0].classList.add('fa-solid')
+    $('#chat-button-icon')[0].classList.remove('fa-regular')
+    $('#chat-button-span')[0].style.color = "#2976E8";
+}
+
+$(document).ready(function() {
+    // Change event handler for the select element
+    $("select").on("change", function() {
+        var selectedOption = $(this).val(); // Get the selected option's value
+        var documentName = $(this).data("document-name"); // Get the document name
+
+        if (selectedOption == "Ask Document") {
+            openChatWindow();
+            askDocument(documentName);
+        } else if (selectedOption == "Summarize") {
+            openChatWindow();
+            summarizeDocument(documentName);
+        }
+        console.log("Selected option:", selectedOption);
+        console.log("Document:", documentName);
+    });    
+});
+
+
+</script>

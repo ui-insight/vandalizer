@@ -1,26 +1,27 @@
-{% extends "base.html" %} {%block title%}Base{%endblock%} {% block head %}
+{% extends "base.html" %} 
+{%block title%}Documents | Doc Scanner{%endblock%} 
+{% block head %}
 {{super()}}
-<link
-  rel="shortcut icon"
-  href="{{ url_for('static', filename='images/favicon.ico') }}"
-/>
+<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
-{% endblock %} {% block styles %} {{super()}}
+{% endblock %} 
 
+{% block styles %} {{super()}}
+
+<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
-<link rel="stylesheet" href="{{url_for('static', filename='rightpanel.css')}}" />
-<link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
-<link
-  rel="stylesheet"
-  href="{{url_for('static', filename='datepicker.css')}}"
-/>
+<link rel="stylesheet" href="{{url_for('static', filename='styles/filebrowser.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='datepicker.css')}}" />
 
-{% endblock %} {% block navbar %}
+{% endblock %}
+
+{% block navbar %}
 
 <nav class="navbar navbar-default">
-  <div class="container-fluid">{% include "sitewide/header.html" %}</div>
-  <!-- /.container-fluid -->
+    <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+    <!-- /.container-fluid -->
 </nav>
 
 {% endblock %} {%block content %}
@@ -30,79 +31,108 @@
         <div class="header-left">
             <div class="row" style="height:100%;">
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
-                    <a style="padding-left: 30px; margin-top: 5px;" href="#">
-                    <span style="font-size: 2em;  color: #687786;">
-                        <i class="fa-solid fa-arrow-left"></i>
-                      </span>
-                    </a>
+                    
                 </div>
                 <div class="col-md-6">
-                    <p style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">Contract Name</p>
+                    <p
+                        style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">
+                        Uploaded PDFs</p>
                 </div>
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
-                    <div style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                    <div
+                        style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
                     </div>
-                    <a style="padding-left: 15px; padding-right: 15px; float: right;" href="#">
-                        <span style="font-size: 2em;  color: #7D8B99;">
-                            <i class="fa-regular fa-circle-down"></i>
-                        </span>
-                    </a>
-                    <div style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
-                    </div>
-                    
                 </div>
             </div>
         </div>
         <div class="header-right">
             <div class="row">
-                <div class="col-md-4">
-                    <a href="/home" class="secondary-btn active">Compliance</a>	
-                </div>	
-                <div class="col-md-4">
-                    <a href="/account" class="secondary-btn">Proofread</a>
+                <div class="col-md-12" style="height:100%; padding-top: 15px; float: right;">
+                    <span style="float: right; width: 100%; text-align: center; font-size: 18px; font-weight: 600; color: #465056;"> New Document</span>
                 </div>
-                <div class="col-md-4">
-                <a href="/account" class="secondary-btn">Scan</a>
-                </div>
-          
+                
+
             </div>
         </div>
     </div>
-  <div class="left-panel">
-    <div class="document">
-        {% include 'document.html' %}
-    </div>
+    <div class="left-panel">
+            <table class="styled-table" style="position: relative;
+            margin: 60px;
+            width: calc(100% - 120px);
+            margin-top: 30px;
+            padding: 60px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0px 23px -8px rgb(211, 211, 211);">
+                <tbody id="doc-body">
+            {% for doc in docs %}
+                <tr><td><a href="/review/{{doc.uuid}}">{{ doc.title }}</a>
+                    <select style="float: right;" data-document-name="{{ doc.title|safe }}">
+                        <option disabled selected>Actions</option>
+                         
+                        <option>
+                            Ask Document
+                        </option>
+                        <option>
+                            Summarize
+                        </option>
+                        <option>
+                            Delete
+                        </option>
+                    </select>
+                </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+            </table>
 
-    <div class="ask-question-container">
-        <div class="ask-question">
-            <input type="text" placeholder="Ask Document Question...">
-            <button class="primary-btn">
+        <div class="ask-question-container">
+            <div class="ask-question" style="width: calc(100% - 60px)">
+                <input type="text" id="ask-question-input" placeholder="Ask Documents Question...">
+                <button class="primary-btn" id="ask-question-btn" style="right: 100px;">
+                    <span style="font-size: 2em; color: #2976E8;">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </span>
+                </button>
+            </div>
+            <div style="position: absolute; bottom: 0; right: 0;">
+                <a style="padding-left: 15px; padding-right: 30px; padding-bottom: 15px; float: right;" href="#" id="chat-button">
+                    <span style="font-size: 2em;  color: #7D8B99;" id="chat-button-span">
+                        <i class="fa-regular fa-comments" id="chat-button-icon"></i>
+                    </span>
+                </a>
+            </div>
+        </div>
+        <div class="chat-window closed" style="padding-top: 70px;">
+            <a href="#" id="close-chat-dismiss-btn" style="position: absolute; right: 30px; top: 30px; ">
                 <span style="font-size: 2em; color: #2976E8;">
-                    <i class="fa-solid fa-paper-plane"></i>
-                  </span>
-            </button>
+                    <i class="fa-solid fa-xmark"></i>
+                </span> 
+                </a>
         </div>
     </div>
-  </div>
-  <div class="right-panel">
-    <div class="answer-card">
-
-    </div>
-    <div class="answer-card">
-        
-    </div>
-    <div class="bottom-toolbar">
-        <div style="width: 100%; height: 100%;">
-            Hello
+    <div class="right-panel" style="padding:30px;">
+        <div id="loading-area">
+            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+            <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
         </div>
+        <div class="drag-area" id="drag-area">
+        <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
+        <header>Drag & Drop to Upload File</header>
+        <span>OR</span>
+        <button>Browse File</button>
+        <input type="file" hidden style="display:none;">
     </div>
-  </div>
+    </div>
+    
 </div>
 
 
 {%endblock%} {% block scripts %}
 {{super()}}
-
+{% include "index_scripts.html" %}
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
+
 
 {% endblock %}
