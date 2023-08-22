@@ -1,0 +1,169 @@
+{% extends "base.html" %} {%block title%}Review | Document Scanner{%endblock%} {% block head %}
+{{super()}}
+<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
+
+{% endblock %} {% block styles %} {{super()}}
+
+<link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='rightpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='datepicker.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
+
+{% endblock %}
+
+{% block navbar %}
+
+<nav class="navbar navbar-default">
+    <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+    <!-- /.container-fluid -->
+</nav>
+
+{% endblock %} {%block content %}
+
+<div class="main-panel">
+    
+    <div class="left-panel">
+        <div class="header">
+            
+                <div class="row" style="height:100%;">
+                    <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
+                        <a style="padding-left: 30px; margin-top: 5px;" href="/">
+                            <span style="font-size: 2em;  color: #687786;">
+                                <i class="fa-solid fa-arrow-left"></i>
+                            </span>
+                        </a>
+                    </div>
+                    <div class="col-md-6">
+                        <p
+                            id="document-title" style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">
+                            {{ document.title }}</p>
+                    </div>
+                    <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
+                        <div
+                            style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                        </div>
+                        <a style="padding-left: 15px; padding-right: 15px; float: right;" href="#">
+                            <span style="font-size: 2em;  color: #7D8B99;">
+                                <i class="fa-regular fa-circle-down"></i>
+                            </span>
+                        </a>
+                        <div
+                            style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                        </div>
+    
+                    </div>
+          
+            </div>
+            
+        </div>
+        <div class="document" id = "document">
+            
+        </div>
+
+        <div class="ask-question-container">
+            <div class="ask-question">
+                <input type="text" id="ask-question-input" placeholder="Ask Document Question...">
+                <button class="primary-btn" id="ask-question-btn">
+                    <span style="font-size: 2em; color: #2976E8;">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="right-panel">
+        <div id = "right-panel-content">
+        <div class="card" style="margin: 30px 60px 30px 60px; padding: 15px; text-align: center; background-color: #F3F4F8;">
+            <p style="font-size: 24px; font-weight: 600;">What can we help you with?</p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-compliance">Compliance Issues</a></p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-proofreading">Proofreading</a></p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-scanning">Scan Document</a></p>
+        </div>
+
+        {% for issue in compliance_issues %}
+        <div class="answer-card" style="padding: 30px;">
+            <p style="font-size: 24px; font-weight: 600; padding-bottom: 10px; color: #5D6F81;">Section {{ issue[0] }}
+            </p>
+            <p style="font-size: 22px; font-weight: 400; padding-bottom: 10px; color: #5D6F81;">Issue</p>
+            <p style="font-size: 30; color: #5D6F81;">
+                {{ issue[1] }}
+            </p>
+        </div>
+
+        {% endfor %}
+    </div>
+        <div class="bottom-toolbar">
+            <div class="button-container">
+                <button class="button-left shadow-button rescan-button">Restart</button>
+            </div>
+            <div class="button-container">
+                <button class="button-right shadow-button">Suggest</button>
+            </div>
+            <div class="">
+                <a style="padding-left: 15px; padding-right: 15px; padding-top: 7.5px; float: right;" href="#"
+                    id="chat-button">
+                    <span style="font-size: 2em;  color: #7D8B99;" id="chat-button-span">
+                        <i class="fa-regular fa-comments" id="chat-button-icon"></i>
+                    </span>
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="chat-window closed">
+    </div>
+</div>
+
+
+{%endblock%} {% block scripts %}
+{{super()}}
+{% include "review/compliance_scripts.html" %}
+{% include "review/review_scripts.html" %}
+
+<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
+
+<script>
+    var container = document.getElementById('document');
+    var loadingTask = pdfjsLib.getDocument('/static/uploads/{{ document.path }}');
+    loadingTask.promise.then(function (pdf) {
+        // you can now use *pdf* here
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      // Create a canvas element for each page
+      const canvas = document.createElement('canvas');
+      container.appendChild(canvas);
+        pdf.getPage(pageNumber).then(function (page) {
+            var scale = 1.5;
+            var viewport = page.getViewport({ scale: scale, });
+            // Support HiDPI-screens.
+            var outputScale = window.devicePixelRatio || 1;
+
+            
+            var context = canvas.getContext('2d');
+
+            canvas.width = Math.floor(viewport.width * outputScale);
+            canvas.height = Math.floor(viewport.height * outputScale);
+            canvas.style.width = Math.floor(viewport.width - 90.0)  + "px";
+            canvas.style.height = Math.floor(viewport.height) + "px";
+
+            var transform = outputScale !== 1
+                ? [outputScale, 0, 0, outputScale, 0, 0]
+                : null;
+
+            var renderContext = {
+                canvasContext: context,
+                transform: transform,
+                viewport: viewport
+            };
+            page.render(renderContext);
+        })
+    }
+    });
+
+
+
+
+</script>
+
+{% endblock %}

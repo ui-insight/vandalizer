@@ -12,8 +12,10 @@ class User(me.Document):
     
     password_hash = me.StringField(required=True, max_length=200)
     
- 
-    
+class SmartDocument(me.Document):
+    path = me.StringField(required=True, max_length=200)
+    title = me.StringField(required=True, max_length=200)
+    uuid = me.StringField(required=True, max_length=200)
 
 
 

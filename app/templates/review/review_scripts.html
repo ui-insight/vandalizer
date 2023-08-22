@@ -1,0 +1,147 @@
+<script>
+
+    $('#ask-question-btn').on('click', function(e) {
+        e.preventDefault()
+        $('.document')[0].classList.add('scanning')
+        let question = $('#ask-question-input')[0].value;
+        askQuestion(question);
+        
+    });
+    
+    $('.rescan-button').on('click', function(e) {
+        e.preventDefault()
+        reset();
+    });
+
+    $('#begin-compliance').on('click', function(e) {
+        e.preventDefault()
+
+        beginCompliance();
+        
+    });
+
+    
+
+
+
+    $('#begin-proofreading').on('click', function(e) {
+        e.preventDefault()
+        beginProofreading();
+    });
+
+    function beginProofreading() {
+        reset();
+    }
+
+    $('#begin-scanning').on('click', function(e) {
+        e.preventDefault()
+        beginScanning();
+    });
+
+    function beginScanning() {
+        reset();
+    }
+
+    function reset() {
+        $('#right-panel-content').empty();
+
+        const newBox = $(`<div class="card" style="margin: 30px 60px 30px 60px; padding: 15px; text-align: center; background-color: #F3F4F8;">
+            <p style="font-size: 24px; font-weight: 600;">What can we help you with?</p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-compliance">Compliance Issues</a></p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-proofreading">Proofreading</a></p>
+            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-scanning">Scan Document</a></p>
+        </div>`).hide(); 
+            $('#right-panel-content').append(newBox);
+            $('#begin-scanning').on('click', beginScanning);
+            $('#begin-proofreading').on('click', beginProofreading);
+            $('#begin-compliance').on('click', beginCompliance);
+            //newBox.scrollIntoView();
+            newBox.fadeIn();
+    }
+
+    function showLLMLoading() {
+    $('#right-panel-content').append(`
+    <div id="loading-area" style="display: flex; height: 100px; padding-top: 30px; justify-content: center;">
+            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+            
+            </div>`);
+}
+
+    function removeLLMLoading() {
+        $('#right-panel-content #loading-area').remove();
+    }
+    
+    function askQuestion(question, showquestion=true) {
+    // Call API to get answer
+    $.ajax({
+            url: '/api/ask',
+            type: 'POST',
+            data: JSON.stringify({
+                question: question
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg.answer;
+                $('.document')[0].classList.remove('scanning')
+                $('#ask-question-input')[0].value = ''
+                openChatWindow();
+               
+                console.log(answer);
+                if (showquestion) {
+                    $('.chat-window').append(`
+                    <div class="answer-card" style="padding: 30px; ">
+                        <p style="font-size: 30; color: #5D6F81;">
+                            Question: <i>${question}</i>
+                        </p>
+                        <p style="font-size: 30; color: #5D6F81;">
+                            ${answer}
+                        </p>
+                    </div>
+                `)
+                } else {
+                    $('.chat-window').append(`
+                    <div class="answer-card" style="padding: 30px; ">
+                        <p style="font-size: 30; color: #5D6F81;">
+                            ${answer}
+                        </p>
+                    </div>
+                `)
+                }
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+    
+    $('#chat-button').on('click', function(e) {
+        e.preventDefault()
+        if ($('.chat-window')[0].classList.contains('open')) {
+            closeChatWindow();
+        } else {
+            $('#ask-question-input')[0].focus()
+            openChatWindow();
+        }
+    });
+    
+    function closeChatWindow() {
+        $('.chat-window')[0].classList.remove('open')
+        $('.chat-window')[0].classList.add('closed')
+        $('#chat-button-span')[0].style.color = "#5D6F81";
+        $('#chat-button-icon')[0].classList.remove('fa-solid')
+        $('#chat-button-icon')[0].classList.add('fa-regular')
+    }
+    
+    function openChatWindow() {
+        $('.chat-window')[0].classList.add('open')
+        $('.chat-window')[0].classList.remove('closed')
+        $('#chat-button-icon')[0].classList.add('fa-solid')
+        $('#chat-button-icon')[0].classList.remove('fa-regular')
+        $('#chat-button-span')[0].style.color = "#2976E8";
+    }
+    
+    </script>

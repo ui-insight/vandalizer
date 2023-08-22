@@ -1,20 +1,55 @@
 
+.right-panel {
+    position: relative;
+    background-color: white;
+    width: 40%;
+    height: 100%;
+    float: left;
+    overflow: scroll;
+    padding-top: 15px;
+    padding-bottom: 120px;
+    box-shadow: -7px 20px 25px -16px rgb(211, 211, 211);
+}
 
 .right-panel .bottom-toolbar {
     position: fixed;
     bottom: 0;
-    width: 100%;
+    padding: 15px;
+    right: 0;
+    width: 40%;
     height: 80px;
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     z-index: 100;
-}
+    display: flex;
+  }
+  .right-panel .bottom-toolbar .button-container {
+    flex-basis: 45%;
+    padding-left: 30px;
+    padding-right: 30px;
+  }
 
-.right-panel .bottom-toolbar a.shadow-button {
+  .right-panel .bottom-toolbar .button-left {
+    color: #2976E8;
+    font-weight: 600;
+    width: 100%;
+    height: 100%;
+  }
+  
+  .right-panel .bottom-toolbar .button-right {
+    color: #58B768;
+    font-weight: 600;
+    width: 100%;
+    height: 100%;
+  }
+
+.right-panel .bottom-toolbar button.shadow-button {
     border-radius: 30px;
+    border-width: 0px;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     font-size: 20px;
     font-weight: 600;
+    background-color: white;
 }
 
 .right-panel .bottom-toolbar a.rescan-button {
@@ -22,7 +57,7 @@
     left: 30px;
     top: 15px;
     bottom: 15px;
-    width: 15%;
+    width: 14%;
     color: #2976E8;
 }
 
@@ -31,17 +66,37 @@
     right: -30px;
     top: 15px;
     bottom: 15px;
-    width: 15%;
+    width: 14%;
     color: #58B768;
 }
 
-.right-panel .answer-card {
+.answer-card {
     margin-left: 60px;
     margin-right: 60px;
-    margin-top: 60px;
-    aspect-ratio: 1.5;
+    margin-top: 30px;
     background-color: white;
     border-radius: 16px;
     
     box-shadow: 0 0 29px 4px rgb(211, 211, 211);
+}
+
+.chat-window {
+  position: absolute;
+  z-index: 1000;
+  bottom: 80px;
+  right: 0;
+  width: 40%;
+  overflow: scroll;
+  height: calc(100% - 165px);
+  backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
+      -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
+      background-color: rgba(255, 255, 255, 0.5); 
+}
+
+.open {
+  display: block;
+}
+
+.closed {
+  display: none;
 }
