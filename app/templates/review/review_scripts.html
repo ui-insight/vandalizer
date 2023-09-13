@@ -1,8 +1,20 @@
 <script>
+    var scanning = false;
+    var extraction = false;
+
+    function showScanningAnimation() {
+        $('.document')[0].classList.add('scanning');
+        $('#navbar-img')[0].classList.add('spin');
+    }
+
+    function endScanningAnimation() {
+        $('.document')[0].classList.remove('scanning')
+        $('#navbar-img')[0].classList.remove('spin');
+    }
 
     $('#ask-question-btn').on('click', function(e) {
         e.preventDefault()
-        $('.document')[0].classList.add('scanning')
+        showScanningAnimation()
         let question = $('#ask-question-input')[0].value;
         askQuestion(question);
         
@@ -20,18 +32,11 @@
         
     });
 
-    
-
-
-
     $('#begin-proofreading').on('click', function(e) {
         e.preventDefault()
-        beginProofreading();
-    });
-
-    function beginProofreading() {
         reset();
-    }
+        beginExtraction();
+    });
 
     $('#begin-scanning').on('click', function(e) {
         e.preventDefault()
@@ -40,51 +45,148 @@
 
     function beginScanning() {
         reset();
+        $('#ask-question-input').attr("placeholder", "What would you like to scan for?");
+        $('#ask-question-input')[0].focus();
+        $('#right-panel-content').empty();
+        scanning = true;
+        const newBox = $(`
+        <div style="margin: 30px 60px 0px 60px; padding: 15px 15px 0px 15px; text-align: center;">
+        <p style="font-size: 24px; font-weight: 600;">Scan Document</p>
+        </div>
+            `).hide(); 
+            $('#right-panel-content').append(newBox);
+            newBox.fadeIn();
+
+    }
+
+    function beginExtraction() {
+        reset();
+        $('#ask-question-input').attr("placeholder", "Write entities seperated by commas. Eg: Name,Title,Budget");
+        $('#ask-question-input')[0].focus();
+        $('#right-panel-content').empty();
+        scanning = false;
+        extraction = true
+        const newBox = $(`
+        <div style="margin: 30px 60px 0px 60px; padding: 15px 15px 0px 15px; text-align: center;">
+        <p style="font-size: 24px; font-weight: 600;">Extract Information</p>
+        </div>
+            `).hide(); 
+            $('#right-panel-content').append(newBox);
+            newBox.fadeIn();
+
+    }
+
+    function performExtraction() {
+        $('#right-panel-content').empty();
+        $('.document')[0].classList.add('scanning');
+        showLLMLoading();
+        let question = $('#ask-question-input')[0].value;
+        $.ajax({
+            url: '/api/extract',
+            type: 'POST',
+            data: JSON.stringify({
+                question: question,
+                document: "{{ document.path }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg;
+                console.log(msg);
+                removeLLMLoading();
+                for (var i = 0; i<answer.length; i++) {
+                    const newBox = dictToDiv(answer[i]).hide();
+
+                    $('#right-panel-content').append(newBox);
+                    newBox.fadeIn();
+                }
+
+                endScanningAnimation();
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function dictToDiv(dict) {
+        let $div = $('<div class="answer-card" style="padding: 30px; ">');
+
+        $.each(dict, function(key, value) {
+            let $boldKey = $('<b>').text(key); 
+            $div.append($boldKey);
+            $div.append(`: ${value}`); 
+            $div.append('<br>');
+        });
+        $div.append('</div>');
+
+    return $div;
     }
 
     function reset() {
         $('#right-panel-content').empty();
+        $('.chat-window').empty();
+        closeChatWindow();
+        scanning = false;
+        extraction = false;
+        $('#ask-question-input').attr("placeholder", "Ask Document Question...");
+        
 
-        const newBox = $(`<div class="card" style="margin: 30px 60px 30px 60px; padding: 15px; text-align: center; background-color: #F3F4F8;">
-            <p style="font-size: 24px; font-weight: 600;">What can we help you with?</p>
-            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-compliance">Compliance Issues</a></p>
-            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-proofreading">Proofreading</a></p>
-            <p style="font-size: 22px; font-weight: 400;"><a href="#" id="begin-scanning">Scan Document</a></p>
+        const newBox = $(`<div style="margin: 30px 60px 30px 60px; padding: 15px; text-align: center;">
+            <p style="font-size: 24px; font-weight: 600; padding-bottom: 30px;">What can we help you with?</p>
+            <p style="font-size: 22px; font-weight: 400;"><button class="shadow-button" id="begin-compliance" style="margin: 10px 0px; padding: 10px 30px; color: #2976E8;">Compliance Issues</button></p>
+            <p style="font-size: 22px; font-weight: 400;"><button class="shadow-button" id="begin-proofreading" style="margin: 10px 0px; padding: 10px 30px; color: #2976E8;">Extract Information</button></p>
+            <p style="font-size: 22px; font-weight: 400;"><button class="shadow-button" id="begin-scanning" style="margin: 10px 0px; padding: 10px 30px; color: #2976E8;">Scan Document</button></p>
         </div>`).hide(); 
             $('#right-panel-content').append(newBox);
             $('#begin-scanning').on('click', beginScanning);
-            $('#begin-proofreading').on('click', beginProofreading);
+            $('#begin-proofreading').on('click', beginExtraction);
             $('#begin-compliance').on('click', beginCompliance);
             //newBox.scrollIntoView();
             newBox.fadeIn();
     }
 
     function showLLMLoading() {
+        $('#navbar-img')[0].classList.add('spin');
     $('#right-panel-content').append(`
-    <div id="loading-area" style="display: flex; height: 100px; padding-top: 30px; justify-content: center;">
-            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
-            
-            </div>`);
+    <lottie-player src="https://lottie.host/e82fff05-a767-4dd2-bb8d-830c7b3f52cd/n2UFOUSPuE.json" background="#FFFFFF" speed="1" style="width: 300px; height: 300px; margin: auto;" loop autoplay direction="1" mode="normal"></lottie-player>
+    `);
 }
 
     function removeLLMLoading() {
+        $('lottie-player')[0].remove();
+        $('#navbar-img')[0].classList.remove('spin');
         $('#right-panel-content #loading-area').remove();
     }
     
     function askQuestion(question, showquestion=true) {
     // Call API to get answer
+        if (scanning) {
+            performScanning();
+            return;
+        }
+
+        if (extraction) {
+            performExtraction();
+            return;
+        }
+
     $.ajax({
-            url: '/api/ask',
+            url: '/api/ask_document',
             type: 'POST',
             data: JSON.stringify({
-                question: question
+                question: question,
+                document: "{{ document.title }}"
             }),
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
             success: function(msg) {
                 let answer = msg.answer;
-                $('.document')[0].classList.remove('scanning')
+                endScanningAnimation();
                 $('#ask-question-input')[0].value = ''
                 openChatWindow();
                

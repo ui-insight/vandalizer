@@ -5,6 +5,10 @@ function beginCompliance() {
     $('#right-panel-content').empty();
     $('.document')[0].classList.add('scanning');
     showLLMLoading();
+    getCompliance();
+    return;
+
+
     $.ajax({
         url: '/api/sections',
         type: 'POST',
@@ -30,42 +34,40 @@ function beginCompliance() {
 }
 
 function getCompliance() {
-    if(sections.length == 0) {
-        $('#document-title')[0].innerHTML = "{{  document.title }}"
-        $('.document')[0].classList.remove('scanning')
-        return;
-    }
+    // if(sections.length == 0) {
+    //     $('#document-title')[0].innerHTML = "{{  document.title }}"
+    //     $('.document')[0].classList.remove('scanning')
+    //     return;
+    // }
 
     section = sections[0];
-    $('#document-title')[0].innerHTML = "Scanning: " + section
+    $('#document-title')[0].innerHTML = "Preparing Documents"
 
     $.ajax({
         url: '/api/compliance',
         type: 'POST',
         data: JSON.stringify({
-            uuid: "{{ document.uuid }}",
-            section: section
+            uuid: "{{ document.uuid }}"
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
         async: true,
         success: function(msg) {
-            let post = msg;
+            console.log(msg);
+            let text = msg.replace(/\n/g, '<br>');
             const newBox = $(`
-                <div class="answer-card" style="padding: 30px; ">
-                    <p style="font-size: 30; color: #5D6F81;">
-                        Section: ${post[0]} <i></i>
-                    </p>
-                    <p style="font-size: 30; color: #5D6F81;">
-                        ${post[1]}
-                    </p>
+                <div class="answer-card" style="padding: 30px;">
+                    <p style="font-size: 20px;">${text}</p>
                 </div>
             `).hide();
             $('#right-panel-content').append(newBox);
             newBox.fadeIn();
             
             sections.shift();
-            getCompliance()
+            $('#document-title')[0].innerHTML = "{{  document.title }}"
+            $('.document')[0].classList.remove('scanning')
+            removeLLMLoading();
+            
         },
         error: function(xhr, ajaxOptions, thrownError) {
             console.log(xhr.status);

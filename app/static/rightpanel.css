@@ -43,13 +43,20 @@
     height: 100%;
   }
 
-.right-panel .bottom-toolbar button.shadow-button {
+button.shadow-button {
     border-radius: 30px;
     border-width: 0px;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     font-size: 20px;
     font-weight: 600;
     background-color: white;
+    transition: 1s;
+    animation-timing-function:cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+button.shadow-button:hover {
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    transform: translateY(-3px);
 }
 
 .right-panel .bottom-toolbar a.rescan-button {
@@ -59,7 +66,10 @@
     bottom: 15px;
     width: 14%;
     color: #2976E8;
+    
 }
+
+
 
 .right-panel .bottom-toolbar a.suggest-button {
     position: absolute;

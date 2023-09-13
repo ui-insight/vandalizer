@@ -18,12 +18,16 @@ if (askingDocument != '') {
     return;
 }
 
+console.log("askQuestion");
+openChatWindow();
 showChatLoading();
 $.ajax({
         url: '/api/ask',
         type: 'POST',
         data: JSON.stringify({
-            question: question
+            question: question,
+            model: 'gpt-4',
+            space: $('#current-space-id')[0].innerHTML
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -56,10 +60,12 @@ function askDocumentQuestion(question) {
 // Call API to get answer
 showChatLoading();
 $.ajax({
-        url: '/api/ask',
+        url: '/api/ask_document',
         type: 'POST',
         data: JSON.stringify({
-            question: "Considering the document " + askingDocument + ", answer this question: " + question
+            question: "Considering the document, answer this question: " + question,
+            document: askingDocument,
+            model: 'gpt-4'
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -98,10 +104,12 @@ function askDocument(documentName) {
 function summarizeDocument(documentName) {
     showChatLoading();
     $.ajax({
-        url: '/api/ask',
+        url: '/api/ask_document',
         type: 'POST',
         data: JSON.stringify({
-            question: "Summarize the document: " + documentName
+            question: "Summarize the document text",
+            document: documentName,
+            model: 'gpt-4'
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -110,6 +118,10 @@ function summarizeDocument(documentName) {
             let answer = msg.answer;
             $('#ask-question-input')[0].value = ''
             openChatWindow();
+
+            // Switch to document question mode
+            $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
+            askingDocument = documentName;
            
             console.log(answer);
             removeChatLoading();
@@ -139,6 +151,7 @@ function summarizeDocument(documentName) {
 }
 
 function showChatLoading() {
+    $('#navbar-img')[0].classList.add('spin');
     $('.chat-window').append(`
     <div id="loading-area" style="display: flex; height: 100px;">
             <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
@@ -146,12 +159,21 @@ function showChatLoading() {
 }
 
 function removeChatLoading() {
+    $('#navbar-img')[0].classList.remove('spin');
     $('.chat-window #loading-area').remove();
+}
+
+function showScanning() {
+    $('.document')[0].classList.add('scanning')
+}
+
+function stopScanning() {
+
 }
 
 $('.rescan-button').on('click', function(e) {
     e.preventDefault()
-    $('.document')[0].classList.add('scanning')
+    showScanning();
 });
 
 $('#chat-button').on('click', function(e) {
@@ -168,6 +190,8 @@ $('#close-chat-dismiss-btn').on('click', function(e) {
     e.preventDefault()
     closeChatWindow();
 });
+
+
 
 
 function closeChatWindow() {
@@ -189,8 +213,21 @@ function openChatWindow() {
 }
 
 $(document).ready(function() {
+
+    $('#space-select').on('change', function(e) {
+        e.preventDefault()
+        var selectedOption = $(this).val(); 
+        console.log(selectedOption);
+
+        if (selectedOption == "Create New Space") {
+            window.location.href = "/spaces/new";
+        } else {
+            window.location.href = "/?id=" + selectedOption;
+        }
+    });
+
     // Change event handler for the select element
-    $("select").on("change", function() {
+    $(".action-select").on("change", function() {
         var selectedOption = $(this).val(); // Get the selected option's value
         var documentName = $(this).data("document-name"); // Get the document name
 
@@ -203,6 +240,10 @@ $(document).ready(function() {
         }
         console.log("Selected option:", selectedOption);
         console.log("Document:", documentName);
+
+        for (var i = 0; i < $('select').length; i++) {
+            $('select')[i].selectedIndex = 0;
+        }
     });    
 });
 

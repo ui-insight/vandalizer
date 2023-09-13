@@ -190,7 +190,7 @@ footer .footer-poweredby {
     margin-top: 15px;
     margin-bottom: 15px;
     margin-left: 10px;
-    padding-left: 20px;
+    padding-left: 30px;
 }
 
 .navbar-brand {
@@ -500,3 +500,17 @@ tr {
     padding: .1em .25em;
     font-size: 150%;
 }
+
+
+
+@keyframes HeroAnimation {
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0px);
+    }
+  }

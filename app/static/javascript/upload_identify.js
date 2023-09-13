@@ -1,12 +1,13 @@
 //selecting all required elements
 const dropArea = document.querySelector(".drag-area"),
 dragText = dropArea.querySelector("header"),
-button = dropArea.querySelector("button"),
-input = dropArea.querySelector("input");
+//button = dropArea.querySelector("button"),
+input = dropArea.querySelector("input"),
+dragArea = document.querySelector(".drop-area");
 let file; //this is a global variable and we'll use it inside multiple functions
-button.onclick = ()=>{
-  input.click(); //if user click on the button then the input also clicked
-}
+//button.onclick = ()=>{
+//  input.click(); //if user click on the button then the input also clicked
+//}
 input.addEventListener("change", function(){
   //getting user select file and [0] this means if user select multiple files then we'll select only the first one
   file = this.files[0];
@@ -23,6 +24,7 @@ dropArea.addEventListener("dragover", (event)=>{
 
 //If user leave dragged File from DropArea
 dropArea.addEventListener("dragleave", ()=>{
+  console.log("leave");
   dropArea.classList.remove("active");
   dragText.textContent = "Drag & Drop to Upload File";
 });
@@ -31,6 +33,7 @@ dropArea.addEventListener("dragleave", ()=>{
 dropArea.addEventListener("drop", (event)=>{
   event.preventDefault(); //preventing from default behaviour
   //getting user select file and [0] this means if user select multiple files then we'll select only the first one
+  dragText.textContent = "Drag & Drop to Upload File";
   file = event.dataTransfer.files[0];
   showFile(); //calling function
 });
@@ -64,7 +67,8 @@ function showFile(){
       var model = {
           contentType: filetype,
           contentAsBase64String: base64String,
-          fileName: filename
+          fileName: filename,
+          space: $('#current-space-id')[0].innerHTML
       };
 
       $.ajax({

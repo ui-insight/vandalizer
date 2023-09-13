@@ -1,0 +1,175 @@
+<script>
+    var sections = [];
+    
+
+    
+
+    function beginProofreading() {
+        beginSpellingCheck();
+    }
+
+    function beginSpellingCheck() {
+        $('#right-panel-content').empty();
+        $('.document')[0].classList.add('scanning');
+
+        const newBox = $(`
+        <div style="margin: 30px 60px 0px 60px; padding: 15px 15px 0px 15px; text-align: center;">
+        <p style="font-size: 24px; font-weight: 600;">Checking Spelling</p>
+        </div>
+            `).hide(); 
+            $('#right-panel-content').append(newBox);
+            newBox.fadeIn();
+        
+        $.ajax({
+            url: '/api/proofread_spelling',
+            type: 'POST',
+            data: JSON.stringify({
+                document: "{{ document.path }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg;
+                const newBox = $(`
+                <div style="text-align: center;">
+                <p style="font-size: 16px; font-weight: 400; padding-bottom: 10px;"> ${answer.trim() == "None" ? "No spelling mistakes" : answer}</p>
+                <div>
+                    `).hide(); 
+                    $('#right-panel-content').append(newBox);
+                    newBox.fadeIn();
+                
+                    const n = 1; // Replace with the number of seconds you want
+                    const milliseconds = n * 1000;
+                    setTimeout(beginGrammarCheck, milliseconds);
+
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function beginGrammarCheck() {
+        const newBox = $(`
+        <div style="margin: 0px 60px 0px 60px; padding: 15px 15px 0px 15px; text-align: center;">
+        <p style="font-size: 24px; font-weight: 600;">Checking Grammar</p>
+        </div>
+            `).hide(); 
+            $('#right-panel-content').append(newBox);
+            newBox.fadeIn();
+        
+        $.ajax({
+            url: '/api/proofread_grammar',
+            type: 'POST',
+            data: JSON.stringify({
+                document: "{{ document.path }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg;
+                const newBox = $(`
+                <div style="text-align: center;">
+                <p style="font-size: 16px; font-weight: 400; padding-bottom: 10px;"> ${answer.trim() == "None" ? "Everything looks good" : answer}</p>
+                <div>
+                    `).hide(); 
+                    $('#right-panel-content').append(newBox);
+                    newBox.fadeIn();
+
+                    const n = 1.5; // Replace with the number of seconds you want
+                    const milliseconds = n * 1000;
+                    setTimeout(beginSuggestionCheck, milliseconds);
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function beginSuggestionCheck() {
+        const newBox = $(`
+        <div style="margin: 30px 60px 0px 60px; padding: 15px 15px 0px 15px; text-align: center;">
+        <p style="font-size: 24px; font-weight: 600;">Generating Suggestions</p>
+        </div>
+            `).hide(); 
+            $('#right-panel-content').append(newBox);
+            newBox.fadeIn();
+        
+        $.ajax({
+            url: '/api/proofread_suggestions',
+            type: 'POST',
+            data: JSON.stringify({
+                document: "{{ document.path }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg;
+                const splitStr = answer.split(",");
+                console.log(splitStr);
+                for (let i = 0; i < splitStr.length; i++) {
+                    let answer = splitStr[i];
+                    const newBox = $(`
+                    <div style="text-align: center; margin: 0px 60px;">
+                    <p style="font-size: 16px; font-weight: 400; padding-bottom: 5px;"> ${answer.trim() == "None" ? "Everything looks good" : answer}</p>
+                    <div>
+                        `).hide(); 
+                        $('#right-panel-content').append(newBox);
+                        newBox.fadeIn();
+                }
+
+                endScanningAnimation();
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function performScanning() {
+        let question = $('#ask-question-input')[0].value;
+        $.ajax({
+            url: '/api/scan_document',
+            type: 'POST',
+            data: JSON.stringify({
+                question: question,
+                document: "{{ document.path }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg;
+                const splitStr = answer.split(",");
+                console.log(splitStr);
+                for (let i = 0; i < splitStr.length; i++) {
+                    let answer = splitStr[i];
+                    const newBox = $(`
+                    <div style="text-align: center; margin: 0px 60px;">
+                    <p style="font-size: 16px; font-weight: 400; padding-bottom: 5px;"> ${answer.trim() == "None" ? "Everything looks good" : answer}</p>
+                    <div>
+                        `).hide(); 
+                        $('#right-panel-content').append(newBox);
+                        newBox.fadeIn();
+                }
+
+                endScanningAnimation();
+                
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+    
+    </script>

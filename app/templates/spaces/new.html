@@ -1,0 +1,44 @@
+{% extends "base.html" %} 
+{%block title%}New Space | Doc Scanner{%endblock%} 
+{% block head %}
+{{super()}}
+<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
+
+{% endblock %} 
+
+{% block styles %} {{super()}}
+
+<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/filebrowser.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='datepicker.css')}}" />
+
+{% endblock %}
+
+{% block navbar %}
+
+<nav class="navbar navbar-default">
+    <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+    <!-- /.container-fluid -->
+</nav>
+
+{% endblock %} {%block content %}
+
+<div class="main-panel">
+        <div style="width: 50%; margin: 0 auto;">
+            <div class="card" style="margin-top: 30px; padding: 15px 30px;">
+                <h1>Create a New Space</h1>
+                <br>
+    <form method="POST" action="/spaces/new">
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required>
+        <br>
+        <input type="submit" value="Create Space">
+    </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

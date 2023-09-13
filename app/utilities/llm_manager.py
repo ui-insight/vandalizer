@@ -1,3 +1,4 @@
+from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
 from langchain.document_loaders import PyPDFLoader # pdf loading
 from langchain.embeddings import OpenAIEmbeddings # embeddings
@@ -8,12 +9,18 @@ from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chains import ConversationalRetrievalChain
+from langchain.chains.summarize import load_summarize_chain
+from langchain.chains import AnalyzeDocumentChain
+from langchain.chains.question_answering import load_qa_chain
 
 class LLMManager:
     pdf_loaded = False
     vectordb = None
+    singlevectordb = None
     root_path = ""
     embeddings = None
+    single_document = False
+    document_name = ""
 
     def __init__(self):
         # Load in Vector Database
@@ -23,29 +30,112 @@ class LLMManager:
         print("There are", self.vectordb._collection.count(), "in the collection")
 
     def ask_openai(self):
-        llm = OpenAI(openai_api_key="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")
+        llm = ChatOpenAI(openai_api_key="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")
         text = "What is the meaning of life?"
         llm.predict(text)
         pass
     
-    def ask_document(self, question):
-        #if self.pdf_loaded == False:
-        #    self.load_documents()
-        llm = OpenAI(openai_api_key="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")
+    def test_documents(self):
+        llm = ChatOpenAI(openai_api_key="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")
+        
+        query = "What is the title?"
+        print(query)
+        path1 = os.path.join(self.root_path, "static", "uploads", "93004C.pdf")
+        
+        retreiver = self.vectordb.as_retriever(search_kwargs={'k': 1 })
+        #retreiver.get(where={'source': path1})
+        print(retreiver.get_relevant_documents(query)[0])
+
+        print("\n\n")
+        pdf_qa = ConversationalRetrievalChain.from_llm(llm, retreiver, return_source_documents=True)
+
+        result = pdf_qa({"question": query, "chat_history": ""})
+        print("\n\n")
+        print(result["answer"])
+
+
+        query = "What is the title?"
+        path = os.path.join(self.root_path, "static", "uploads", "6B66AA.pdf")
+        print(query)
+        retreiver = self.vectordb.as_retriever(search_kwargs={'source': path})
+        print(retreiver.get_relevant_documents(query)[0])
+        print("\n\n")
+        pdf_qa = ConversationalRetrievalChain.from_llm(llm, retreiver, return_source_documents=True)
+
+        result = pdf_qa({"question": query, "chat_history": ""})
+        print(result["answer"])
+
+    def ask_all_documents(self, space, question):
+        llm = ChatOpenAI(model_name="gpt-3.5-turbo-16k", openai_api_key="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")
         pdf_qa = ConversationalRetrievalChain.from_llm(llm, self.vectordb.as_retriever(search_kwargs={'k': 6}), return_source_documents=True)
 
         result = pdf_qa({"question": question, "chat_history": ""})
         return result["answer"]
+    
+    def ask_single_document(self, question, document, model_name="text-davinci-003"):
+        if self.document_name != document or self.singlevectordb is None:
+            print("Loading document into LLM", document)
+            loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", document))
+            loader.load()
+            pages = loader.load_and_split()
+            # New vector store code
+            if self.singlevectordb is not None:
+                self.singlevectordb._collection.delete()
+                self.singlevectordb.delete_collection()
+            self.singlevectordb = Chroma.from_documents(
+                pages,
+                embedding=self.embeddings
+            )
+            self.document_name = document
+        else:
+            print("Document already loaded into LLM", document)
+        
+        if model_name == "gpt-4" or model_name == "gpt-3.5-turbo-16k":
+            llm = ChatOpenAI(model_name=model_name, openai_api_key="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")
+        else:
+            llm = OpenAI(model_name=model_name, openai_api_key="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")
+        
+        pdf_qa = ConversationalRetrievalChain.from_llm(llm, self.singlevectordb.as_retriever(search_kwargs={'k': 1}))
 
-    def load_pdf(self, pdf_path=""):
-        loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", pdf_path))
+        result = pdf_qa({"question": question, "chat_history": ""})
+        return result["answer"]
+
+    def summarize_document(self, document, model_name="text-davinci-003"):
+        loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", document))
+        loader.load()
+        pages = loader.load()
+        llm = OpenAI(model_name=model_name, openai_api_key="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")
+        summary_chain = load_summarize_chain(llm, chain_type="map_reduce")
+        summarize_document_chain = AnalyzeDocumentChain(combine_docs_chain=summary_chain)
+        str = ""
+        for page in pages:
+            str += page + " "
+        
+        summarize_document_chain.run(str)
+    
+    def ask_single_document_chained(self, question, document):
+        loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", document))
+        loader.load()
+        pages = loader.load()
+        llm = OpenAI(model_name="text-davinci-003", openai_api_key="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")
+        qa_chain = load_qa_chain(llm, chain_type="map_reduce")
+        qa_document_chain = AnalyzeDocumentChain(combine_docs_chain=qa_chain)
+        str = ""
+        for page in pages:
+            str += page + " "
+        
+        qa_document_chain.run(input_document=str, question=question)
+
+
+    def load_pdf(self, document=""):
+        loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", document.path))
         loader.load()
         pages = loader.load_and_split()
         # New vector store code
         self.vectordb = Chroma.from_documents(
             pages,
             embedding=self.embeddings,
-            persist_directory='./vectordb'
+            persist_directory='./datastores/' + document.space
         )
         self.vectordb.persist()
         
@@ -56,6 +146,8 @@ class LLMManager:
 
     def delete_db(self):
         self.vectordb._collection.delete()
+        self.vectordb.delete_collection()
+        self.vectordb.persist()
 
     def load_documents(self):
         documents = []

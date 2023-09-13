@@ -1,10 +1,10 @@
-{% extends "base.html" %} 
-{%block title%}Documents | Doc Scanner{%endblock%} 
+{% extends "base.html" %}
+{%block title%}Documents | Doc Scanner{%endblock%}
 {% block head %}
 {{super()}}
 <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
-{% endblock %} 
+{% endblock %}
 
 {% block styles %} {{super()}}
 
@@ -18,45 +18,59 @@
 {% endblock %}
 
 {% block navbar %}
-
+<div style="display: none" id="current-space-id">{{ current_space_id }}</div>
 <nav class="navbar navbar-default">
-    <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+    <div class="navbar-header">
+        <img id="navbar-img" style="float: left; width: 50px; height: 50px; margin-top: 15px; "
+            src="/static/images/logo.png">
+        <a class="navbar-brand" id="navbar-img" href="/">University of Idaho Document Scanner</a>
+    </div>
+
+    <select class="custom-select" id="space-select" style="float: right; margin-top: 20px;">
+        {% for space in spaces %}
+        <option value="{{ space.uuid }}">{{ space.title }}</option>
+        {% endfor %}
+
+        <option value="Create New Space">
+            <i>Create New Space</i>
+        </option>
+    </select>
+    </div>
     <!-- /.container-fluid -->
 </nav>
 
 {% endblock %} {%block content %}
 
 <div class="main-panel">
-    <div class="header">
-        <div class="header-left">
+    <div class="header" style="width: 100%;">
+        <div class="header-left" style="width: 75%;">
             <div class="row" style="height:100%;">
-                <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
-                    
-                </div>
-                <div class="col-md-6">
+                <div class="col-md-12">
                     <p
                         style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">
                         Uploaded PDFs</p>
-                </div>
-                <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
                     <div
-                        style="padding-top: 5px; padding-bottom: 5px; width: 1px; height: calc(100% - 10px); background-color: #EAEEF1; float: right;">
+                        style="position: absolute; width: 1px; top: 30px; bottom: 5px; background-color: #EAEEF1; right: 15px; top: 0; z-index: 100;">
                     </div>
                 </div>
+
+
             </div>
         </div>
-        <div class="header-right">
+        <div class="header-right" style="width: 25%;">
             <div class="row">
                 <div class="col-md-12" style="height:100%; padding-top: 15px; float: right;">
-                    <span style="float: right; width: 100%; text-align: center; font-size: 18px; font-weight: 600; color: #465056;"> New Document</span>
+                    <span
+                        style="float: right; width: 100%; text-align: center; font-size: 18px; font-weight: 600; color: #465056;">
+                        New Document</span>
                 </div>
-                
+
 
             </div>
         </div>
     </div>
-    <div class="left-panel">
-            <table class="styled-table" style="position: relative;
+    <div class="left-panel" style="margin-top: 50px;">
+        <table class="styled-table" style="position: relative;
             margin: 60px;
             width: calc(100% - 120px);
             margin-top: 30px;
@@ -64,27 +78,29 @@
             background-color: white;
             border-radius: 10px;
             box-shadow: 0 0px 23px -8px rgb(211, 211, 211);">
-                <tbody id="doc-body">
-            {% for doc in docs %}
-                <tr><td><a href="/review/{{doc.uuid}}">{{ doc.title }}</a>
-                    <select style="float: right;" data-document-name="{{ doc.title|safe }}">
-                        <option disabled selected>Actions</option>
-                         
-                        <option>
-                            Ask Document
-                        </option>
-                        <option>
-                            Summarize
-                        </option>
-                        <option>
-                            Delete
-                        </option>
-                    </select>
-                </td>
+            <tbody id="doc-body">
+                {% for doc in docs %}
+                <tr>
+                    <td><a href="/review/{{doc.uuid}}">{{ doc.title }}</a>
+                        <select class="custom-select action-select" id="action-select" style="float: right;"
+                            data-document-name="{{ doc.title|safe }}">
+                            <option disabled selected>Actions</option>
+
+                            <option>
+                                Ask Document
+                            </option>
+                            <option>
+                                Summarize
+                            </option>
+                            <option>
+                                Delete
+                            </option>
+                        </select>
+                    </td>
                 </tr>
-            {% endfor %}
-        </tbody>
-            </table>
+                {% endfor %}
+            </tbody>
+        </table>
 
         <div class="ask-question-container">
             <div class="ask-question" style="width: calc(100% - 60px)">
@@ -96,35 +112,48 @@
                 </button>
             </div>
             <div style="position: absolute; bottom: 0; right: 0;">
-                <a style="padding-left: 15px; padding-right: 30px; padding-bottom: 15px; float: right;" href="#" id="chat-button">
+                <a style="padding-left: 15px; padding-right: 30px; padding-bottom: 15px; float: right;" href="#"
+                    id="chat-button">
                     <span style="font-size: 2em;  color: #7D8B99;" id="chat-button-span">
                         <i class="fa-regular fa-comments" id="chat-button-icon"></i>
                     </span>
                 </a>
             </div>
         </div>
-        <div class="chat-window closed" style="padding-top: 70px;">
+        <div class="chat-window closed" style="padding-top: 70px; padding-bottom: 120px;">
             <a href="#" id="close-chat-dismiss-btn" style="position: absolute; right: 30px; top: 30px; ">
                 <span style="font-size: 2em; color: #2976E8;">
                     <i class="fa-solid fa-xmark"></i>
-                </span> 
-                </a>
+                </span>
+            </a>
         </div>
     </div>
-    <div class="right-panel" style="padding:30px;">
-        <div id="loading-area">
-            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+    <div class="right-panel" style="padding:30px; margin-top: 50px; margin: 50px auto 0px auto;">
+        <div id="loading-area" style="margin: 0px auto; display: flex;">
+            <div class="lds-grid">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
             <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
         </div>
-        <div class="drag-area" id="drag-area">
-        <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
-        <header>Drag & Drop to Upload File</header>
-        <span>OR</span>
-        <button>Browse File</button>
-        <input type="file" hidden style="display:none;">
+        <div class="drag-area">
+            <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
+            <header style="padding: 0 15px; text-align: center;">Drag & Drop to Upload File</header>
+            <input type="file" hidden style="display:none;">
+            <div class="drop-area"
+                style="background-color: transparent; position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
+
+            </div>
+        </div>
+
     </div>
-    </div>
-    
 </div>
 
 
