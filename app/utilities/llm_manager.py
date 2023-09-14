@@ -80,7 +80,6 @@ class LLMManager:
             pages = loader.load_and_split()
             # New vector store code
             if self.singlevectordb is not None:
-                self.singlevectordb._collection.delete()
                 self.singlevectordb.delete_collection()
             self.singlevectordb = Chroma.from_documents(
                 pages,
@@ -145,7 +144,6 @@ class LLMManager:
         print("There are", self.vectordb._collection.count(), "in the collection")
 
     def delete_db(self):
-        self.vectordb._collection.delete()
         self.vectordb.delete_collection()
         self.vectordb.persist()
 

@@ -11,7 +11,7 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from datetime import timedelta
 from app.utilities.llm_manager import LLMManager
-
+from flask_basicauth import BasicAuth
 
 app = Flask(__name__)
 
@@ -24,5 +24,10 @@ me.connect('osp')
 bs = Bootstrap(app) #flask-bootstrap
 llm = LLMManager()
 llm.root_path = app.root_path
+
+app.config['BASIC_AUTH_USERNAME'] = 'admin'
+app.config['BASIC_AUTH_PASSWORD'] = 'rcds'
+app.config['BASIC_AUTH_FORCE'] = True
+basic_auth = BasicAuth(app)
 
 from app import views, models
