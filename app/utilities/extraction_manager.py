@@ -15,7 +15,6 @@ import re
 import csv
 from io import StringIO
 
-
 class ExtractionManager:
     llmManager = None;
     review_vector_db = None

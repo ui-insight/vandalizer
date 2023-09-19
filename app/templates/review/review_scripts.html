@@ -19,6 +19,14 @@
         askQuestion(question);
         
     });
+
+    $('#ask-question-input')[0].addEventListener("keydown", function(event) {
+      if (event.key === "Enter" || event.keyCode === 13) {
+        showScanningAnimation()
+        let question = $('#ask-question-input')[0].value;
+        askQuestion(question);
+      }
+    });
     
     $('.rescan-button').on('click', function(e) {
         e.preventDefault()

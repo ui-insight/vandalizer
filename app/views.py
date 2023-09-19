@@ -173,6 +173,13 @@ def ask_document():
 	return jsonify({'answer': answer})
 	pass
 
+@app.route('/api/delete', methods=['POST'])
+def delete_documents():
+	data = request.get_json()
+	document_path = data['document']
+
+	return "Success"
+
 @app.route('/api/test', methods=['GET'])
 def test_db():
 	#llm.delete_db()
@@ -190,3 +197,8 @@ def new_space():
 		space.save()
 		return redirect('/?id=' + space.uuid)
 	return render_template('spaces/new.html')
+
+@app.route('/download', methods=['GET'])
+def download():
+	document_path = request.args.get('document')
+	return send_file(os.path.join(app.root_path, 'static', 'uploads', document_path), as_attachment=True)

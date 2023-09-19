@@ -6,8 +6,15 @@ $('#ask-question-btn').on('click', function(e) {
     e.preventDefault()
     let question = $('#ask-question-input')[0].value;
     askQuestion(question);
-    
 });
+
+$('#ask-question-input')[0].addEventListener("keydown", function(event) {
+    console.log("here");
+      if (event.key === "Enter" || event.keyCode === 13) {
+        let question = $('#ask-question-input')[0].value;
+        askQuestion(question);
+      }
+    });
 
 
 
