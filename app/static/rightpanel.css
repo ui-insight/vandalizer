@@ -17,11 +17,10 @@
     padding: 15px;
     right: 0;
     width: 40%;
-    height: 80px;
+    height: 160px;
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     z-index: 100;
-    display: flex;
   }
   .right-panel .bottom-toolbar .button-container {
     flex-basis: 45%;
@@ -109,4 +108,95 @@ button.shadow-button:hover {
 
 .closed {
   display: none;
+}
+
+.segmented-control {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 5px;  
+}
+
+.segmented-control input[type="radio"] {
+  display: none;  
+}
+
+.segmented-control label {
+  flex: 1;
+  text-align: center;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: white;
+  margin-bottom: 0px;
+}
+
+.segmented-control input[type="radio"]:checked + label {
+  background: #5c21d2bc;
+  color: white;
+  border-bottom: 1px solid #5c21d2bc;
+}
+
+.segmented-control label:first-of-type {
+  border-radius: 5px 0 0 5px;
+}
+
+.segmented-control label:last-of-type {
+  border-radius: 0 5px 5px 0;
+}
+
+
+.ask-question-container {
+  position: relative;
+  width: 100%;
+  height: 60px;
+  z-index: 100;
+  padding-top: 10px;
+}
+
+.ask-question {
+  width: 100%;
+  height: 100%;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid #d3d3d3;
+}
+
+.ask-question input {
+  width: 100%;
+  height: 100%;
+  padding-left: 15px;
+  padding-right: 90px;
+  border-width: 0px;
+  border-radius: 6px;
+}
+
+.ask-question .search-button {
+  position: absolute;
+  right: 50px;
+  top: 15px;
+  height: 40px;
+  width: 40px;
+  border-width: 0px;
+  background-color: transparent;
+  border-radius: 6px;
+  border-width: 0px;
+  box-shadow: 1 1px 23px -8px rgb(211, 211, 211);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ask-question .add-button {
+  position: absolute;
+  
+  right: 5px;
+  top: 15px;
+  height: 40px;
+  width: 40px;
+  border-width: 0px;
+  background-color: transparent;
+  border-radius: 6px;
+  border-width: 0px;
+  box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+  font-size: 12px;
+  font-weight: 600;
 }

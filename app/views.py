@@ -12,10 +12,12 @@ from app.utilities.contract_review_manager import ContractReviewManager
 from app.utilities.contract_review_manager_chained import ContractReviewManagerChained
 from app.utilities.proofreading_manager import ProofreadingManager
 from app.utilities.extraction_manager import ExtractionManager
+from app.utilities.prompt_lab_manager import PromptLabManager
 import uuid
 
 @app.route('/')
 def index():
+	document = SmartDocument.objects().first()
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
 		space = Space(title="Default Space", uuid=uuid.uuid4().hex)
@@ -31,7 +33,25 @@ def index():
 	spaces.insert(0, current_space)
 
 	docs = SmartDocument.objects(space=current_space.uuid).all()
-	return render_template('index.html', docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
+	return render_template('review/review.html', document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
+
+@app.route('/playground', methods=['GET'])
+def playground():
+	spaces = list(Space.objects())
+	if len(spaces) == 0:
+		space = Space(title="Default Space", uuid=uuid.uuid4().hex)
+		space.save()
+		spaces = list(Space.objects())
+
+	if request.args.get('id'):
+		current_space = Space.objects(uuid=request.args.get('id')).first()
+	else:
+		current_space = spaces[0]
+
+	spaces.remove(current_space)
+	spaces.insert(0, current_space)
+	docs = SmartDocument.objects(space=current_space.uuid).all()
+	return render_template('playground/playground.html', docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
 
 @app.route('/stats')
 def stats():
@@ -179,6 +199,24 @@ def delete_documents():
 	document_path = data['document']
 
 	return "Success"
+
+@app.route('/api/prompt_lab', methods=['POST'])
+def prompt_lab():
+	data = request.get_json()
+	model = data['model']
+	documents = data['documents']
+	promptchain = data['promptchain']
+	vector = data['vector']
+	
+	print(model)
+	print(documents)
+	print(promptchain)
+	print(vector)
+	manager = PromptLabManager()
+	manager.root_path = app.root_path
+	result, details = manager.run(model, promptchain, documents, vector)
+	return jsonify({"result": result, "details": details})
+	pass
 
 @app.route('/api/test', methods=['GET'])
 def test_db():

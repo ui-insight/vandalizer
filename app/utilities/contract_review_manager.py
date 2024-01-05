@@ -19,8 +19,6 @@ class ContractReviewManager:
     def __init__(self, manager):
         self.llmManager = manager
     
-    
-
     def scan(self, document):
         self.compliance_results = []
         return self.fetch_sections(document)

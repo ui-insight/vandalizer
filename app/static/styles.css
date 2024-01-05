@@ -2,18 +2,16 @@ img { width: 100%; }
 
 body {
     background-color: #F3F4F8;
-    color: #0A0F53;
+    color: #17181abb;
 
-    font-family: 'Public Sans', serif;
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    line-height: 1.25;
     min-height: 100vh;
 }
 
-h1,h2,h3,h4,h5 {
-    font-family: 'Public Sans', serif;
-}
 
 a {
-    color: #2976E8;
+    color: #5c21d2bc;
 }
 
 .navbar-default {
