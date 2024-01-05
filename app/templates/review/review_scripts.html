@@ -16,8 +16,7 @@
         e.preventDefault()
         showScanningAnimation()
         let question = $('#ask-question-input')[0].value;
-        askQuestion(question);
-        
+        askQuestion(question); 
     });
 
     $('#ask-question-input')[0].addEventListener("keydown", function(event) {
@@ -140,7 +139,7 @@
         closeChatWindow();
         scanning = false;
         extraction = false;
-        $('#ask-question-input').attr("placeholder", "Ask Document Question...");
+        $('#ask-question-input').attr("placeholder", "Enter word or phrase...");
         
 
         const newBox = $(`<div style="margin: 30px 60px 30px 60px; padding: 15px; text-align: center;">

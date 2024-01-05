@@ -25,7 +25,7 @@
             src="/static/images/logo.png">
         <a class="navbar-brand" id="navbar-img" href="/">University of Idaho Document Scanner</a>
     </div>
-
+    
     <select class="custom-select" id="space-select" style="float: right; margin-top: 20px;">
         {% for space in spaces %}
         <option value="{{ space.uuid }}">{{ space.title }}</option>
@@ -35,6 +35,7 @@
             <i>Create New Space</i>
         </option>
     </select>
+    <a href="/playground" style="float: right; padding: 30px 30px; font-weight: 600; color: black;">Prompt Lab</a>
     </div>
     <!-- /.container-fluid -->
 </nav>

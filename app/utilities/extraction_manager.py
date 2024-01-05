@@ -8,6 +8,7 @@ from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.chat_models import ChatOpenAI
 from langchain.chains import create_extraction_chain
+from langchain.callbacks import get_openai_callback
 import time
 
 import os
@@ -43,11 +44,14 @@ class ExtractionManager:
         print(schema)
 
         llm = ChatOpenAI(model_name="gpt-3.5-turbo-16k", temperature=0, openai_api_key="***REMOVED***")
-        chain=create_extraction_chain(schema, llm)
+        
+        with get_openai_callback() as cb:
+            chain=create_extraction_chain(schema, llm, verbose=True)
 
-        result = chain.run(input)
-        print(result)
-        return result
+            result = chain.run(input)
+            print(cb)
+            print(result)
+            return result
 
     
 

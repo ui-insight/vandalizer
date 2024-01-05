@@ -1,6 +1,6 @@
 .main-panel {
     width: 100%;
-    height: calc(100vh - 140px);
+    height: calc(100vh - 80px);
 }
 
 .main-panel .header {
