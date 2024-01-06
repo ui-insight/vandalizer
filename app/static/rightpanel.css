@@ -1,4 +1,15 @@
 
+.search-results-panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 180px;
+  background-color: white;
+  z-index: 5000;
+  padding: 15px 30px;;
+}
+
 .right-panel {
     position: relative;
     background-color: white;
@@ -9,6 +20,7 @@
     padding-top: 15px;
     padding-bottom: 120px;
     box-shadow: -7px 20px 25px -16px rgb(211, 211, 211);
+    z-index: 3000;
 }
 
 .right-panel .bottom-toolbar {

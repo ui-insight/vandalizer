@@ -10,6 +10,8 @@
 <link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='datepicker.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
+
 
 {% endblock %}
 
@@ -19,7 +21,7 @@
     <div class="navbar-header">
         <img id="navbar-img" style="float: left; width: 50px; height: 50px; margin-top: 15px; "
             src="/static/images/logo.png">
-        <a class="navbar-brand" id="navbar-img" href="/">Smarter Document</a>
+        <a class="navbar-brand" id="navbar-img" href="/">DocuWise</a>
     </div>
 
     <select class="custom-select" id="space-select" style="float: right; margin-top: 20px;">
@@ -53,7 +55,11 @@
                 <div class="col-md-6">
                     <p id="document-title"
                         style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">
+                        {% if (document != None) %}
                         {{ document.title }}</p>
+                    {% else %}
+                    Select or Upload PDFs</p>
+                    {% endif %}
                 </div>
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
 
@@ -63,9 +69,68 @@
             </div>
 
         </div>
+        {% if (document != None) %}
         <div class="document" id="document">
 
         </div>
+        {% else %}
+        <div class="file-selection" style="padding-top: 60px;">
+            <div id="loading-area" style="margin: 0px auto; display: flex;">
+            <div class="lds-grid">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+            <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
+        </div>
+        <div class="drag-area">
+            <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
+            <header style="padding: 0 15px; text-align: center;">Drag & Drop to Upload File</header>
+            <input type="file" hidden style="display:none;">
+            <div class="drop-area"
+                style="background-color: transparent; position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
+
+            </div>
+        </div>
+        <table class="styled-table" style="position: relative;
+            margin: 60px;
+            width: calc(100% - 120px);
+            margin-top: 30px;
+            padding: 60px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0px 23px -8px rgb(211, 211, 211);">
+            <tbody id="doc-body">
+                {% for doc in docs %}
+                <tr>
+                    <td><a href="?docid={{doc.uuid}}">{{ doc.title }}</a>
+                        <select class="custom-select action-select" id="action-select" style="float: right;"
+                            data-document-name="{{ doc.title|safe }}">
+                            <option disabled selected>Actions</option>
+
+                            <option>
+                                Ask Document
+                            </option>
+                            <option>
+                                Summarize
+                            </option>
+                            <option>
+                                Delete
+                            </option>
+                        </select>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+        {% endif %}
 
 
     </div>
@@ -83,6 +148,27 @@
                             </span>
                         </button>
                     </div>
+                </div>
+                <div class="search-set-container">
+                    {% for search_set in searchsets %}
+                    <div class="expandable-container">
+                        <div class="set-item">
+                            
+                            <div class="set-content" style="padding: 30px 0px; ">
+                                <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </span>
+                                <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{ search_set.title }}</p>
+                                <p class="set-items" style="text-align: right; ">15 items 
+                                    <button class="set-dropdown-button" style="float: right; margin-left: 15px;">
+                                        <span style="font-size: 1em; color: #5c21d2bc;">
+                                            <i class="fa-brands fa-searchengin"></i>
+                                        </span>
+                                    </button></p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -110,11 +196,9 @@
                     </button>
                     <button class="search-button shadow-button" id="ask-question-btn">
                         <span style="font-size: 2em; color: #5c21d2bc;">
-
                             <i class="fa-brands fa-searchengin"></i>
                         </span>
                     </button>
-
                 </div>
             </div>
         </div>
@@ -132,39 +216,42 @@
 <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
 
 <script>
-    var container = $('.document')[0];
-    var loadingTask = pdfjsLib.getDocument('/static/uploads/{{ document.path }}');
-    loadingTask.promise.then(function (pdf) {
-        // you can now use *pdf* here
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            // Create a canvas element for each page
-            const canvas = document.createElement('canvas');
-            container.appendChild(canvas);
-            pdf.getPage(pageNumber).then(function (page) {
-                var scale = 1.2;
-                var viewport = page.getViewport({ scale: scale, });
-                var context = canvas.getContext('2d');
-                console.log(viewport.width);
-                console.log(viewport.height);
-                var aspect = viewport.width / viewport.height;
+    {% if (document != None) %}
+        var container = $('.document')[0];
+        var loadingTask = pdfjsLib.getDocument('/static/uploads/{{ document.path }}');
+        loadingTask.promise.then(function (pdf) {
+            // you can now use *pdf* here
+            for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+                // Create a canvas element for each page
+                const canvas = document.createElement('canvas');
+                container.appendChild(canvas);
+                pdf.getPage(pageNumber).then(function (page) {
+                    var scale = 1.2;
+                    var viewport = page.getViewport({ scale: scale, });
+                    var context = canvas.getContext('2d');
+                    console.log(viewport.width);
+                    console.log(viewport.height);
+                    var aspect = viewport.width / viewport.height;
 
-                canvas.width = Math.floor(container.clientWidth - 100.0);
-                canvas.height = Math.floor((container.clientWidth - 100.0) / aspect);
-                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
-                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
+                    canvas.width = Math.floor(container.clientWidth - 100.0);
+                    canvas.height = Math.floor((container.clientWidth - 100.0) / aspect);
+                    //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
+                    //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
 
 
-                var renderContext = {
-                    canvasContext: context,
+                    var renderContext = {
+                        canvasContext: context,
 
-                    viewport: viewport
-                };
-                page.render(renderContext);
-            })
-        }
-    });
+                        viewport: viewport
+                    };
+                    page.render(renderContext);
+                })
+            }
+        });
+    {% endif %}
 
 
 
