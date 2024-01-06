@@ -1,0 +1,131 @@
+<script>
+    var is_adding_term = false;
+    var search_set_add_uuid = "";
+
+    function showWorking() {
+        $('#navbar-img')[0].classList.add('spin');
+    }
+
+    function hideWorking() {
+        $('#navbar-img')[0].classList.remove('spin');
+    }
+
+    $(document).ready(function() {
+        $('.set-item').on("click", function() {
+            if (is_adding_term) {
+                search_set_add_uuid = $(this).attr("data-uuid");
+                
+                $('#adding-search-set-title').text($(this).attr("data-title"));
+            } else {
+                showWorking();
+                $.ajax({
+                url: '/api/search_results',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: $(this).attr("data-uuid"),
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function(data) {
+                    console.log(data);
+                    $('#search-results-panel').show();
+                    $('#search-results-panel').empty();
+                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                },
+                error: function(xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+                $.ajax({
+                url: '/api/begin_search',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: $(this).attr("data-uuid"),
+                    document: "{{ document.path }}"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function(data) {
+                    console.log(data);
+                    hideWorking();
+                    $('#search-results-panel').show();
+                    $('#search-results-panel').empty();
+                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                },
+                error: function(xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+            }
+        });
+
+        $('#add-term-button').on("click", function() {
+            $('#add-item-panel').hide();
+            $('#add-term-panel').show();
+            $('#adding-search-term-title').text($("#add-search-term-input")[0].value);
+            is_adding_term = true;
+            if (search_set_add_uuid == "") {
+                $('#adding-search-set-title').text("Please select search set");
+            }
+        });
+
+        $('#cancel-add-term-btn').on("click", function() {
+            $('#add-item-panel').show();
+            $('#add-term-panel').hide();
+            search_set_add_uuid = "";
+            is_adding_term = false
+        });
+
+        $('#finalize-add-term-btn').on("click", function() {
+            $.ajax({
+                url: '/api/add_search_term',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: search_set_add_uuid,
+                    term: $("#add-search-term-input")[0].value,
+                    space_id: "{{ current_space_id }}",
+                    searchtype: $('#segment-1')[0].checked ? "search" : "extraction"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function(msg) {
+                    // reload page
+                    location.reload();
+                },
+                error: function(xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+            search_set_add_uuid = "";
+            is_adding_term = false
+        });
+
+        $("#add-search-set-button").on("click", function() {
+            $.ajax({
+            url: '/api/add_search_set',
+            type: 'POST',
+            data: JSON.stringify({
+                title: $("#add-search-set-input")[0].value,
+                space_id: "{{ current_space_id }}"
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                // reload page
+                location.reload();
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    });
+});
+</script>

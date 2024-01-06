@@ -29,3 +29,13 @@
         -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
         background-color: rgba(255, 255, 255, 0.3); 
   }
+
+  .set-item {
+    padding: 5px 5px;
+    height: 40px;
+  }
+
+  .set-item:hover {
+    background-color: #efefef;
+    cursor: pointer;
+  }

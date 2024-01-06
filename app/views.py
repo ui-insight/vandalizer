@@ -1,6 +1,6 @@
 from flask import url_for, redirect, render_template, flash, g, session, jsonify, Response, send_file
 from app import app, llm
-from app.models import User, SmartDocument, Space
+from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem
 from app.forms import LoginForm, SpaceForm
 import os
 import json
@@ -13,11 +13,12 @@ from app.utilities.contract_review_manager_chained import ContractReviewManagerC
 from app.utilities.proofreading_manager import ProofreadingManager
 from app.utilities.extraction_manager import ExtractionManager
 from app.utilities.prompt_lab_manager import PromptLabManager
+from app.utilities.extraction_manager2 import ExtractionManager2
 import uuid
 
 @app.route('/')
 def index():
-	document = SmartDocument.objects().first()
+	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
 		space = Space(title="Default Space", uuid=uuid.uuid4().hex)
@@ -29,11 +30,15 @@ def index():
 	else:
 		current_space = spaces[0]
 
+	if request.args.get('docid'):
+		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
+
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
 
+	searchsets = SearchSet.objects(space=current_space.uuid).all()
 	docs = SmartDocument.objects(space=current_space.uuid).all()
-	return render_template('review/review.html', document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
+	return render_template('index.html', searchsets=searchsets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
 
 @app.route('/playground', methods=['GET'])
 def playground():
@@ -105,6 +110,73 @@ def request_sections():
 	splits = splits.split(',')
 	print(splits)
 	return jsonify(splits)
+
+@app.route('/api/add_search_set', methods=['POST'])
+def add_search_set():
+	data = request.get_json()
+	title = data['title']
+	space = data['space_id']
+	searchset = SearchSet(title=title, uuid=uuid.uuid4().hex, space=space, user="admin", status="active")
+	searchset.save()
+	return jsonify({"complete": True})
+
+@app.route('/api/add_search_term', methods=['POST'])
+def add_search_term():
+	data = request.get_json()
+	searchphrase = data['term']
+	searchset_uuid = data['search_set_uuid']
+	searchtype = data['searchtype']
+	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
+	searchsetitem.save()
+	return jsonify({"complete": True})
+
+@app.route('/api/search_results', methods=['POST'])
+def grab_template():
+	data = request.get_json()
+	searchset_uuid = data['search_set_uuid']
+	search_set = SearchSet.objects(uuid=searchset_uuid).first()
+	template = render_template('search_results.html', 
+						search_set=search_set
+						)
+	response = {
+			'template': template,
+		}
+	return jsonify(response)
+
+@app.route('/api/begin_search', methods=['POST'])
+def begin_search():
+	data = request.get_json()
+	searchset_uuid = data['search_set_uuid']
+	document_path = data['document']
+
+	search_set = SearchSet.objects(uuid=searchset_uuid).first()
+	keys = []
+	items = search_set.items()
+	for item in items:
+		if item.searchtype == "extraction":
+			keys.append(item.searchphrase)
+
+	if len(keys) > 0:
+		em = ExtractionManager2()
+		em.root_path = app.root_path
+		results = em.extract(keys, document_path)
+		print(results)
+		template = render_template('search_results.html', 
+							search_set=search_set,
+							results=results
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
+	else:
+		template = render_template('search_results.html', 
+							search_set=search_set
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
 
 @app.route('/api/compliance', methods=['POST'])
 def review_compliance():

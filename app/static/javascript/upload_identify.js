@@ -83,8 +83,11 @@ function showFile(){
           $('#drag-area').show();
           let newRow = $("<tr>");
           let newCell = $("<td>");
-          let newLink = $("<a>").attr("href", "/review/" + result.uuid).text(filename);
-            
+          let newLink = $("<a>").attr("href", "/?docid=" + result.uuid).text(filename);
+          let href = "/?docid=" + result.uuid
+          window.location.href = href;
+          return
+          
           newCell.append(newLink);
           newRow.append(newCell);
             

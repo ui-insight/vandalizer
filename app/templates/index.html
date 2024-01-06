@@ -1,19 +1,17 @@
-{% extends "base.html" %}
-{%block title%}Documents | Doc Scanner{%endblock%}
-{% block head %}
+{% extends "base.html" %} {%block title%}Review | Document Scanner{%endblock%} {% block head %}
 {{super()}}
 <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
-{% endblock %}
+{% endblock %} {% block styles %} {{super()}}
 
-{% block styles %} {{super()}}
-
-<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
-<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
-<link rel="stylesheet" href="{{url_for('static', filename='styles/filebrowser.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='rightpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='datepicker.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
+
 
 {% endblock %}
 
@@ -23,9 +21,9 @@
     <div class="navbar-header">
         <img id="navbar-img" style="float: left; width: 50px; height: 50px; margin-top: 15px; "
             src="/static/images/logo.png">
-        <a class="navbar-brand" id="navbar-img" href="/">University of Idaho Document Scanner</a>
+        <a class="navbar-brand" id="navbar-img" href="/">SuperDocs</a>
     </div>
-    
+
     <select class="custom-select" id="space-select" style="float: right; margin-top: 20px;">
         {% for space in spaces %}
         <option value="{{ space.uuid }}">{{ space.title }}</option>
@@ -35,7 +33,6 @@
             <i>Create New Space</i>
         </option>
     </select>
-    <a href="/playground" style="float: right; padding: 30px 30px; font-weight: 600; color: black;">Prompt Lab</a>
     </div>
     <!-- /.container-fluid -->
 </nav>
@@ -43,35 +40,67 @@
 {% endblock %} {%block content %}
 
 <div class="main-panel">
-    <div class="header" style="width: 100%;">
-        <div class="header-left" style="width: 75%;">
+
+    <div class="left-panel">
+        <div class="header">
+
             <div class="row" style="height:100%;">
-                <div class="col-md-12">
-                    <p
+                <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
+                    {% if (document != None) %}
+                    <a style="padding-left: 30px; margin-top: 5px;" href="/">
+                        <span style="font-size: 2em;  color: #687786;">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </span>
+                    </a>
+                    {% endif %}
+                </div>
+                <div class="col-md-6">
+                    <p id="document-title"
                         style="text-align: center; padding-top: 15px; font-size: 18px; font-weight: 600; color: #465056;">
-                        Uploaded PDFs</p>
-                    <div
-                        style="position: absolute; width: 1px; top: 30px; bottom: 5px; background-color: #EAEEF1; right: 15px; top: 0; z-index: 100;">
-                    </div>
+                        {% if (document != None) %}
+                        {{ document.title }}</p>
+                    {% else %}
+                    Select or Upload PDFs</p>
+                    {% endif %}
+                </div>
+                <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
+
+
                 </div>
 
-
             </div>
+
         </div>
-        <div class="header-right" style="width: 25%;">
-            <div class="row">
-                <div class="col-md-12" style="height:100%; padding-top: 15px; float: right;">
-                    <span
-                        style="float: right; width: 100%; text-align: center; font-size: 18px; font-weight: 600; color: #465056;">
-                        New Document</span>
+        {% if (document != None) %}
+        <div class="document" id="document">
+
+        </div>
+        {% else %}
+        <div class="file-selection" style="padding-top: 60px;">
+            <div id="loading-area" style="margin: 0px auto; display: flex;">
+                <div class="lds-grid">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                    <div></div>
                 </div>
-
-
+                <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
             </div>
-        </div>
-    </div>
-    <div class="left-panel" style="margin-top: 50px;">
-        <table class="styled-table" style="position: relative;
+            <div class="drag-area" id="drag-area">
+                <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                <header style="padding: 0 15px; text-align: center;">Drag & Drop to Upload File</header>
+                <input type="file" hidden style="display:none;">
+                <div class="drop-area"
+                    style="background-color: transparent; position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
+
+                </div>
+            </div>
+            <table class="styled-table" style="position: relative;
             margin: 60px;
             width: calc(100% - 120px);
             margin-top: 30px;
@@ -79,90 +108,178 @@
             background-color: white;
             border-radius: 10px;
             box-shadow: 0 0px 23px -8px rgb(211, 211, 211);">
-            <tbody id="doc-body">
-                {% for doc in docs %}
-                <tr>
-                    <td><a href="/review/{{doc.uuid}}">{{ doc.title }}</a>
-                        <select class="custom-select action-select" id="action-select" style="float: right;"
-                            data-document-name="{{ doc.title|safe }}">
-                            <option disabled selected>Actions</option>
+                <tbody id="doc-body">
+                    {% for doc in docs %}
+                    <tr>
+                        <td><a href="?docid={{doc.uuid}}">{{ doc.title }}</a>
+                            <select class="custom-select action-select" id="action-select" style="float: right;"
+                                data-document-name="{{ doc.title|safe }}">
+                                <option disabled selected>Actions</option>
 
-                            <option>
-                                Ask Document
-                            </option>
-                            <option>
-                                Summarize
-                            </option>
-                            <option>
-                                Delete
-                            </option>
-                        </select>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="ask-question-container">
-            <div class="ask-question" style="width: calc(100% - 60px)">
-                <input type="text" id="ask-question-input" placeholder="Ask Documents Question...">
-                <button class="primary-btn" id="ask-question-btn" style="right: 100px;">
-                    <span style="font-size: 2em; color: #2976E8;">
-                        <i class="fa-solid fa-paper-plane"></i>
-                    </span>
-                </button>
-            </div>
-            <div style="position: absolute; bottom: 0; right: 0;">
-                <a style="padding-left: 15px; padding-right: 30px; padding-bottom: 15px; float: right;" href="#"
-                    id="chat-button">
-                    <span style="font-size: 2em;  color: #7D8B99;" id="chat-button-span">
-                        <i class="fa-regular fa-comments" id="chat-button-icon"></i>
-                    </span>
-                </a>
-            </div>
+                                <option>
+                                    Ask Document
+                                </option>
+                                <option>
+                                    Summarize
+                                </option>
+                                <option>
+                                    Delete
+                                </option>
+                            </select>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        <div class="chat-window closed" style="padding-top: 70px; padding-bottom: 120px;">
-            <a href="#" id="close-chat-dismiss-btn" style="position: absolute; right: 30px; top: 30px; ">
-                <span style="font-size: 2em; color: #2976E8;">
-                    <i class="fa-solid fa-xmark"></i>
-                </span>
-            </a>
+        {% endif %}
+
+
+    </div>
+    <div class="right-panel">
+        <div id="right-panel-content">
+            <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+                <p style="font-size: 24px; font-weight: 600;">Search Sets</p>
+                <div class="ask-question-container">
+                    <div class="ask-question">
+                        <input type="text" id="add-search-set-input" placeholder="Find or create a search set...">
+
+
+                        <button class="add-button shadow-button" id="add-search-set-button">
+                            <span style="font-size: 2em; color: #5c21d2bc;">
+                                <i class="fa-solid fa-plus"></i>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <div class="search-set-container" style="padding: 30px 0px;">
+                    {% for search_set in searchsets %}
+                    <div class="expandable-container">
+                        <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+                            <div class="set-content">
+                                <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <i class="fa-solid fa-chevron-right"></i>
+                                </span>
+                                <p class="set-title"
+                                    style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+                                    search_set.title }}</p>
+                                <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }} items
+                                    
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div style="display: none" class="search-results-panel" id="search-results-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+                
+
+
+        </div>
+
+        <div class="bottom-toolbar">
+            <div id="add-item-panel">
+                <p style="font-size: 24px; font-weight: 600;">Add Item</p>
+                <div class="segmented-control">
+                    <input type="radio" name="segment" id="segment-1" checked>
+                    <label for="segment-1">Smart Search</label>
+
+                    <input type="radio" name="segment" id="segment-2">
+                    <label for="segment-2">Extract</label>
+                </div>
+                <div class="ask-question-container">
+                    <div class="ask-question">
+                        <input type="text" id="add-search-term-input" placeholder="Term or Phrase...">
+
+                        <button class="add-button shadow-button" id="add-term-button">
+                            <span style="font-size: 2em; color: #5c21d2bc;">
+                                <i class="fa-solid fa-plus"></i>
+                            </span>
+                        </button>
+                        <button class="search-button shadow-button" id="ask-question-btn">
+                            <span style="font-size: 2em; color: #5c21d2bc;">
+                                <i class="fa-brands fa-searchengin"></i>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div id="add-term-panel" style="display: none;">
+                <p style="font-size: 18px; font-weight: 700;">Adding: <span style="font-size: 16px; font-weight: 400;" id="adding-search-term-title">search term</span></p>
+                <p style="font-size: 18px; font-weight: 700;">To search set: <span style="font-size: 16px; font-weight: 400;" id="adding-search-set-title">search set</span></p>
+                
+                <div class="add-term-button-container" style="display: flex; justify-content: space-between; gap: 20px; margin-top: 30px;">
+                    <button class="add-button shadow-button" id="cancel-add-term-btn" style="flex: 1; padding-top: 10px; padding-bottom: 10px;">
+                        <span style="font-size: 1em; color: #414141bc;">
+                            Cancel
+                        </span>
+                    </button>
+                    <button class="add-button shadow-button" id="finalize-add-term-btn" style="flex: 1; padding-top: 10px; padding-bottom: 10px;">
+                        <span style="font-size: 1em; color: #5c21d2bc;">
+                            Add
+                        </span>
+                    </button>
+                </div>
+                
+            </div>
         </div>
     </div>
-    <div class="right-panel" style="padding:30px; margin-top: 50px; margin: 50px auto 0px auto;">
-        <div id="loading-area" style="margin: 0px auto; display: flex;">
-            <div class="lds-grid">
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-                <div></div>
-            </div>
-            <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
-        </div>
-        <div class="drag-area">
-            <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
-            <header style="padding: 0 15px; text-align: center;">Drag & Drop to Upload File</header>
-            <input type="file" hidden style="display:none;">
-            <div class="drop-area"
-                style="background-color: transparent; position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
-
-            </div>
-        </div>
-
+    <div class="chat-window closed">
     </div>
 </div>
 
 
 {%endblock%} {% block scripts %}
 {{super()}}
+{% include "review/proofreading_scripts.html" %}
+{% include "review/compliance_scripts.html" %}
+{% include "review/review_scripts.html" %}
 {% include "index_scripts.html" %}
+{% include "panel_scripts.html" %}
+<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
 
+<script>
+    {% if (document != None) %}
+    var container = $('.document')[0];
+    var loadingTask = pdfjsLib.getDocument('/static/uploads/{{ document.path }}');
+    loadingTask.promise.then(function (pdf) {
+        // you can now use *pdf* here
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+            // Create a canvas element for each page
+            const canvas = document.createElement('canvas');
+            container.appendChild(canvas);
+            pdf.getPage(pageNumber).then(function (page) {
+                var scale = 1.2;
+                var viewport = page.getViewport({ scale: scale, });
+                var context = canvas.getContext('2d');
+                console.log(viewport.width);
+                console.log(viewport.height);
+                var aspect = viewport.width / viewport.height;
+
+                canvas.width = Math.floor(container.clientWidth - 100.0);
+                canvas.height = Math.floor((container.clientWidth - 100.0) / aspect);
+                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
+                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
+
+
+                var renderContext = {
+                    canvasContext: context,
+
+                    viewport: viewport
+                };
+                page.render(renderContext);
+            })
+        }
+    });
+    {% endif %}
+
+
+
+
+</script>
 
 {% endblock %}

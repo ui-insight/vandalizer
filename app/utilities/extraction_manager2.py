@@ -1,0 +1,58 @@
+
+import time
+import openai
+from pypdf import PdfReader
+import os
+import re
+import csv
+from io import StringIO
+import json
+
+class ExtractionManager2:
+    root_path = ""
+    def getPrompt(self, context, features):
+        return """Human: Extract and save the relevant entities mentioned in the following passage together with their properties.
+        """ + "\n".join(features) + """
+
+        If a property is not present, represent it as "Not Found".
+
+        Format the output as JSON, with a single string as the key and a single string as the value. Do not include any additional text. Do not nest json values.
+        
+        Passage: 
+
+        """ + context + """
+        """
+
+    def extract(self, extract_keys, pdf_path):
+        openai.api_key = "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"
+        pdf = PdfReader(os.path.join(self.root_path, "static", "uploads", pdf_path))
+        number_of_pages = len(pdf.pages)
+        full_text = ""
+        for i in range(number_of_pages):
+            full_text = full_text + pdf.pages[i].extract_text() + " "
+
+        prompt = self.getPrompt(full_text, extract_keys)
+        completion = openai.ChatCompletion.create(model="gpt-4-1106-preview", 
+                                                messages=[{"role": "user", "content": prompt}],
+                                                response_format={"type": "json_object"})
+        output = completion.choices[0].message.content
+        output = output.replace('\\n', '') 
+        output = output.replace('```json', '')
+        output = output.replace('```', '')
+        print(output)
+
+
+        if "{" in output and "}" in output:
+            output_data = json.loads(output.strip())
+            return output_data
+        else:
+            print("Threw out: " + output)
+            return
+
+    
+
+
+
+    
+        
+        
