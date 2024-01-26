@@ -1,33 +1,53 @@
-<p style="font-size: 24px; font-weight: 600;">{{ search_set.title }}</p>
-{% for item in search_set.items() %}
-<div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+<p style="font-size: 24px; font-weight: 600;">
+
+    {{ search_set.title }}
+
+    <span id="set-close-button" style="float: right; font-size: 1em; color: #5c21d2bc;">
+        <a>
+            <i class="fa-solid fa-circle-xmark"></i>
+        </a>
+    </span>
+</p>
+
+<p><b>Searches</b></p>
+{% for item in search_set.search_items() %}
+<div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}" data-search-type="{{ search_set.searchtype }}">
     <div class="set-content">
         <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-            {% if item.searchtype == "search" %}
             <i class="fa-brands fa-searchengin"></i>
-            {%else %}
-            <i class="fa-solid fa-filter"></i>
-            {% endif %}
         </span>
         <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
             item.searchphrase }}</p>
-        
-        {% if item.searchtype == "extraction" and results == null %}
+    </div>
+</div>
+{% endfor %}
+
+<p><b>Extractions</b></p>
+{% for item in search_set.extraction_items() %}
+    <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
+    <div class="set-content">
+        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+            <i class="fa-solid fa-filter"></i>
+        </span>
+        <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+            item.searchphrase }}</p>
+
+        {% if results == null and document != None %}
         <p class="set-items" style="text-align: right; ">processing</p>
         {% endif %}
     </div>
 </div>
 
-{% if item.searchtype == "extraction" and results != null %}
-            {% if results[item.searchphrase] != null %}
-            <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
-                <div class="set-content">
-            
-            <p style="margin-left: 45px; font-weight: 700; ">{{ results[item.searchphrase] }}</p>
-            {% endif %}
-            </div>
-            </div>
+{% if results != null %}
+{% if results[item.searchphrase] != null %}
+<div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+    <div class="set-content ">
+
+        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}</p>
         {% endif %}
+    </div>
+</div>
+{% endif %}
 
 
 {% endfor %}

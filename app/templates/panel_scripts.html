@@ -1,6 +1,7 @@
 <script>
     var is_adding_term = false;
     var search_set_add_uuid = "";
+    var document_uuid = "{{ document.uuid }}";
 
     function showWorking() {
         $('#navbar-img')[0].classList.add('spin');
@@ -10,60 +11,129 @@
         $('#navbar-img')[0].classList.remove('spin');
     }
 
-    $(document).ready(function() {
-        $('.set-item').on("click", function() {
+    
+
+    $(document).ready(function () {
+        function performSemanticSearch(searchTerm) {
+            console.log("semantic search");
+            $.ajax({
+                url: '/api/semantic_search',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_term: $("#add-search-term-input")[0].value,
+                    document_uuid: document_uuid,
+                    space_id: "{{ current_space_id }}"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (msg) {
+                    documents = msg.results.documents[0];
+                    highlightTerms = documents;
+                    renderPDF();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+        
+        $('.set-item').on("click", function () {
+            search_set_add_uuid = $(this).attr("data-uuid");
+            $('#adding-search-set-title').text($(this).attr("data-title"));
             if (is_adding_term) {
-                search_set_add_uuid = $(this).attr("data-uuid");
-                
                 $('#adding-search-set-title').text($(this).attr("data-title"));
             } else {
+                updateSearchSetPanel($(this).attr("data-uuid"));
+
+                if (document_uuid == null || document_uuid == "") {
+                    return;
+                }
+
                 showWorking();
                 $.ajax({
-                url: '/api/search_results',
-                type: 'POST',
-                data: JSON.stringify({
-                    search_set_uuid: $(this).attr("data-uuid"),
-                }),
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function(data) {
-                    console.log(data);
-                    $('#search-results-panel').show();
-                    $('#search-results-panel').empty();
-                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
-                },
-                error: function(xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
-                $.ajax({
-                url: '/api/begin_search',
-                type: 'POST',
-                data: JSON.stringify({
-                    search_set_uuid: $(this).attr("data-uuid"),
-                    document: "{{ document.path }}"
-                }),
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function(data) {
-                    console.log(data);
-                    hideWorking();
-                    $('#search-results-panel').show();
-                    $('#search-results-panel').empty();
-                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
-                },
-                error: function(xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
+                    url: '/api/begin_search',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        search_set_uuid: $(this).attr("data-uuid"),
+                        document: "{{ document.path }}"
+                    }),
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    async: true,
+                    success: function (data) {
+                        console.log(data);
+                        hideWorking();
+                        $('#search-results-panel').show();
+                        $('#search-results-panel').empty();
+                        $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                        addResultListeners();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log(xhr.status);
+                        console.log(thrownError);
+                    }
+                });
             }
         });
 
-        $('#add-term-button').on("click", function() {
+        function addResultListeners() {
+            $('#set-close-button').on("click", function () {
+                $('#search-results-panel').fadeOut();
+            });
+            $('.semantic-entry').on("click", function () {
+                console.log("clicked");
+                searchTerm = $(this).attr("data-title");
+                performSemanticSearch(searchTerm);
+            });
+
+            $('.extraction-result').on("click", function () {
+                // get text content
+                searchTerm = $(this).text();
+                showToast();
+                navigator.clipboard.writeText(searchTerm);
+                console.log(searchTerm);
+            });
+
+            function showToast() {
+                var x = document.getElementById("snackbar");
+                x.className = "show";
+                setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+            }
+        }
+
+        function updateSearchSetPanel(set_uuid) {
+            $.ajax({
+                url: '/api/search_results',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: set_uuid,
+                    document_uuid: document_uuid
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data);
+                    $('#search-results-panel').show();
+                    $('#search-results-panel').empty();
+                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                    
+                    console.log($('.semantic-entry'))
+                    addResultListeners();
+                    
+                    
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+
+
+        $('#add-term-button').on("click", function () {
             $('#add-item-panel').hide();
             $('#add-term-panel').show();
             $('#adding-search-term-title').text($("#add-search-term-input")[0].value);
@@ -73,14 +143,14 @@
             }
         });
 
-        $('#cancel-add-term-btn').on("click", function() {
+        $('#cancel-add-term-btn').on("click", function () {
             $('#add-item-panel').show();
             $('#add-term-panel').hide();
             search_set_add_uuid = "";
             is_adding_term = false
         });
 
-        $('#finalize-add-term-btn').on("click", function() {
+        $('#finalize-add-term-btn').on("click", function () {
             $.ajax({
                 url: '/api/add_search_term',
                 type: 'POST',
@@ -93,11 +163,11 @@
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
                 async: true,
-                success: function(msg) {
+                success: function (msg) {
                     // reload page
                     location.reload();
                 },
-                error: function(xhr, ajaxOptions, thrownError) {
+                error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
                     console.log(thrownError);
                 }
@@ -106,26 +176,91 @@
             is_adding_term = false
         });
 
-        $("#add-search-set-button").on("click", function() {
+        $("#add-search-set-button").on("click", function () {
             $.ajax({
-            url: '/api/add_search_set',
-            type: 'POST',
-            data: JSON.stringify({
-                title: $("#add-search-set-input")[0].value,
-                space_id: "{{ current_space_id }}"
-            }),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function(msg) {
-                // reload page
-                location.reload();
-            },
-            error: function(xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
+                url: '/api/add_search_set',
+                type: 'POST',
+                data: JSON.stringify({
+                    title: $("#add-search-set-input")[0].value,
+                    space_id: "{{ current_space_id }}"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (msg) {
+                    // reload page
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $("#semantic-search-button").on("click", function (e) {
+            e.preventDefault();
+            performSemanticSearch($("#add-search-term-input")[0].value);
+        });
+
+        
+
+        $('#add-search-term-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                performSemanticSearch($("#add-search-term-input")[0].value);
             }
         });
+
+        $('#next-semantic-button').on('click', function(e) {
+            e.preventDefault(); 
+        });
+
+        $(document).on('keyup', function(e) {
+            if (e.key === 'ArrowRight') {
+                nextHighlight();
+            }
+        });
+
+        function nextHighlight() {
+            current_search_item += 1;
+            if (current_search_item >= highlights.length) {
+                current_search_item = 0;
+            }
+
+            updateHighlights();
+        }
+
+        $('#prev-semantic-button').on('click', function(e) {
+            e.preventDefault();
+            previousHighlight();
+        });
+
+        $(document).on('keyup', function(e) {
+            if (e.key === 'ArrowLeft') {
+                previousHighlight();
+            }
+        });
+
+        function previousHighlight() {
+            current_search_item -= 1;
+            if (current_search_item == -1) {
+                current_search_item =  highlights.length - 1;
+            }
+
+            updateHighlights();
+        }
+
+        function updateHighlights() {
+            highlights = $('.highlight');
+            highlights[current_search_item].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+            $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
+            for (var i = 0; i < highlights.length; i++) {
+                highlights[i].style.backgroundColor = 'yellow';
+                highlights[i].style.opacity = 0.5;
+            }
+
+            highlights[current_search_item].style.backgroundColor = 'red';
+        }
+        
     });
-});
 </script>

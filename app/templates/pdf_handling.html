@@ -1,0 +1,126 @@
+<script>
+    $('#semantic-panel').hide();
+    var highlightTerms = [];
+    var searchTerm = "";
+    var current_search_item = 0;
+    needsScroll = true;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'static/javascript/pdf.worker.js';
+
+    var pdfDoc = null,
+        pageNum = 1,
+        pageRendering = false,
+        pdfContainer = document.getElementById('document');
+
+    function renderPage(num) {
+        pageRendering = true;
+        pdfDoc.getPage(num).then(function (page) {
+            const container = document.createElement('div');
+            container.style.position = "relative";
+            const canvas = document.createElement('canvas');
+            container.appendChild(canvas);
+            container.appendChild(document.createElement('div'));
+            pdfContainer.appendChild(container);
+            pdfDoc.getPage(num).then(function (page) {
+                var scale = 1.2;
+                var viewport = page.getViewport({ scale: scale, });
+                var context = canvas.getContext('2d');
+                var aspect = viewport.width / viewport.height;
+
+                canvas.width = Math.floor(pdfContainer.clientWidth - 100.0);
+                canvas.height = Math.floor((pdfContainer.clientWidth - 100.0) / aspect);
+                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
+                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
+
+
+                var renderContext = {
+                    canvasContext: context,
+
+                    viewport: viewport
+                };
+                var renderTask = page.render(renderContext);
+
+                renderTask.promise.then(function () {
+                    pageRendering = false;
+                    highlightText(page, highlightTerms, viewport, container);
+                });
+            })
+
+
+
+
+        });
+    }
+
+    function highlightText(page, highlightTerms, viewport, canvas) {
+        if (highlightTerms == []) {
+            return;
+        }
+        page.getTextContent().then(function (textContent) {
+            textContent.items.forEach(function (textItem) {
+                textString = textItem.str;
+                // Check if textString includes anything in highlightTerms array
+                var phrase = highlightTerms.find(function (phrase) {
+                    return textString.includes(phrase);
+                });
+
+                if (phrase != undefined) {
+                    console.log(phrase);
+                    // Create highlight div
+                    var highlight = document.createElement('div');
+                    highlight.style.position = 'absolute';
+
+                    // Adjust the position and size according to the scale of the viewport
+                    var adjustedX = textItem.transform[4] * viewport.scale;
+                    var adjustedY = viewport.height - (textItem.transform[5] * viewport.scale) - (textItem.height * viewport.scale);
+
+                    highlight.style.left = adjustedX + 'px';
+                    highlight.style.top = adjustedY + 'px';
+                    highlight.style.width = (textItem.width * viewport.scale) + 'px';
+                    highlight.style.height = (textItem.height * viewport.scale) + 'px';
+                    highlight.style.backgroundColor = 'yellow';
+                    highlight.style.opacity = 0.5; // Making it semi-transparent
+                    highlight.className = 'highlight';
+                    // Append to the container
+                    canvas.appendChild(highlight);
+                }
+            });
+
+            highlights = $('.highlight');
+            if (highlights.length == 0) {
+                $('#semantic-panel').hide();
+            } else {
+                $('#semantic-panel').show();
+                $('#semantic-panel-term').text(searchTerm);
+                $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
+                
+                if (needsScroll) {
+                    needsScroll = false;
+                    $('.left-panel').animate({
+                        scrollTop: highlights[current_search_item].style.top
+                    }, 1000);
+                }
+            }
+        });
+    }
+
+
+    pdfjsLib.getDocument('/static/uploads/{{ document.path }}').promise.then(function (pdfDoc_) {
+        pdfDoc = pdfDoc_;
+        
+        renderPDF();
+    });
+
+    function renderPDF() {
+        pdfContainer.innerHTML = '';
+        current_search_item = 0;
+        needsScroll = true;
+
+        if (pdfDoc == null) {
+            return;
+        }
+        
+        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+            renderPage(pageNumber);
+        }
+    }
+</script>

@@ -7,13 +7,20 @@
 }
 
 .left-panel .document {
+  height: calc(100vh - 120px);
     position: relative;
-    margin: 60px;
-    margin-top: 30px;
-    padding: 60px;
-    background-color: white;
+    margin: 0px;
+    margin-top: 50px;
+    padding: 0px;
+    background-color: transparent;
     border-radius: 10px;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+}
+
+
+.highlight {
+  background-color: yellow;
+  position: absolute;
 }
 
 
@@ -30,6 +37,16 @@
         background-color: rgba(255, 255, 255, 0.3); 
   }
 
+  .set-entry {
+    padding: 5px 5px;
+    height: 40px;
+  }
+
+  .semantic-entry:hover {
+    background-color: #efefef;
+    cursor: pointer;
+  }
+
   .set-item {
     padding: 5px 5px;
     height: 40px;
@@ -38,4 +55,41 @@
   .set-item:hover {
     background-color: #efefef;
     cursor: pointer;
+  }
+
+  .left-panel .semantic-panel {
+    position: fixed;
+    z-index: 300;
+    bottom: 30px;
+    height: 50px;
+    left: 30px;
+    width: calc(60% - 60px);
+    border-radius: 25px;
+    border: 1px solid #efefef;
+    backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
+        -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
+        background-color: rgba(255, 255, 255, 0.3); 
+        box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+  }
+
+  .semantic-panel {
+    display: flex;
+    align-items: center;
+  }
+  
+  .semantic-panel button {
+    flex: 0 0 auto;
+  } 
+  
+  .semantic-panel button:first-child {
+    margin-right: auto;
+  }
+  
+  .semantic-panel button:last-child {
+    margin-left: auto; 
+  }
+  
+  .semantic-panel span {
+    flex: 1;
+    text-align: center;
   }

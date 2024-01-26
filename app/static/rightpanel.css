@@ -7,7 +7,8 @@
   bottom: 180px;
   background-color: white;
   z-index: 5000;
-  padding: 15px 30px;;
+  padding: 15px 30px 60px 30px;
+  overflow: scroll;
 }
 
 .right-panel {
@@ -32,7 +33,7 @@
     height: 160px;
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
-    z-index: 100;
+    z-index: 20000;
   }
   .right-panel .bottom-toolbar .button-container {
     flex-basis: 45%;

@@ -72,8 +72,22 @@
 
         </div>
         {% if (document != None) %}
-        <div class="document" id="document">
-
+        <div class="document" id="document"></div>
+        <div class="semantic-panel" id="semantic-panel">
+            <button class="shadow-button" id="prev-semantic-button" style="margin: 10px;">
+                <span style="font-size: 1em; color: #5c21d2bc;">
+                    <i class="fa-solid fa-arrow-left"></i>
+                </span>
+            </button>
+            <span style="flex: 1;">
+            <span style="font-weight: 700; font-size: 18px;" id="semantic-panel-term">Search term</span>
+            <span style="font-weight: 400; margin-left: 5px; color: #00000041;" id="semantic-panel-count">num results</span>
+            </span>
+            <button class="shadow-button" id="next-semantic-button" style="margin: 10px;">
+                <span style="font-size: 1em; color: #5c21d2bc;">
+                    <i class="fa-solid fa-arrow-right"></i>
+                </span>
+            </button>
         </div>
         {% else %}
         <div class="file-selection" style="padding-top: 60px;">
@@ -89,7 +103,7 @@
                     <div></div>
                     <div></div>
                 </div>
-                <h5><i style="color: #dfdfdf;">Recognizing</i></h5>
+                <h5><i style="color: #dfdfdf;">Preparing Document</i></h5>
             </div>
             <div class="drag-area" id="drag-area">
                 <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
@@ -183,10 +197,10 @@
                 <p style="font-size: 24px; font-weight: 600;">Add Item</p>
                 <div class="segmented-control">
                     <input type="radio" name="segment" id="segment-1" checked>
-                    <label for="segment-1">Smart Search</label>
+                    <label for="segment-1">Super Search</label>
 
                     <input type="radio" name="segment" id="segment-2">
-                    <label for="segment-2">Extract</label>
+                    <label for="segment-2">Super Extract</label>
                 </div>
                 <div class="ask-question-container">
                     <div class="ask-question">
@@ -197,7 +211,7 @@
                                 <i class="fa-solid fa-plus"></i>
                             </span>
                         </button>
-                        <button class="search-button shadow-button" id="ask-question-btn">
+                        <button class="search-button shadow-button" id="semantic-search-button">
                             <span style="font-size: 2em; color: #5c21d2bc;">
                                 <i class="fa-brands fa-searchengin"></i>
                             </span>
@@ -227,6 +241,7 @@
     </div>
     <div class="chat-window closed">
     </div>
+    <div id="snackbar">Copied</div>
 </div>
 
 
@@ -240,46 +255,10 @@
 <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
+
+
+<!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
 <script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
-
-<script>
-    {% if (document != None) %}
-    var container = $('.document')[0];
-    var loadingTask = pdfjsLib.getDocument('/static/uploads/{{ document.path }}');
-    loadingTask.promise.then(function (pdf) {
-        // you can now use *pdf* here
-        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-            // Create a canvas element for each page
-            const canvas = document.createElement('canvas');
-            container.appendChild(canvas);
-            pdf.getPage(pageNumber).then(function (page) {
-                var scale = 1.2;
-                var viewport = page.getViewport({ scale: scale, });
-                var context = canvas.getContext('2d');
-                console.log(viewport.width);
-                console.log(viewport.height);
-                var aspect = viewport.width / viewport.height;
-
-                canvas.width = Math.floor(container.clientWidth - 100.0);
-                canvas.height = Math.floor((container.clientWidth - 100.0) / aspect);
-                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
-                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
-
-
-                var renderContext = {
-                    canvasContext: context,
-
-                    viewport: viewport
-                };
-                page.render(renderContext);
-            })
-        }
-    });
-    {% endif %}
-
-
-
-
-</script>
+{% include "pdf_handling.html" %}
 
 {% endblock %}

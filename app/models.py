@@ -39,6 +39,12 @@ class SearchSet(me.Document):
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
     
+    def search_items(self):
+        return SearchSetItem.objects(searchset=self.uuid, searchtype="search")
+
+    def extraction_items(self):
+        return SearchSetItem.objects(searchset=self.uuid, searchtype="extraction")
+
     def items(self):
         return SearchSetItem.objects(searchset=self.uuid)
 
