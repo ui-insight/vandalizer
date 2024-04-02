@@ -30,6 +30,7 @@
                 success: function (msg) {
                     documents = msg.results.documents[0];
                     highlightTerms = documents;
+                    console.log(documents);
                     renderPDF();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
@@ -91,9 +92,17 @@
             $('.extraction-result').on("click", function () {
                 // get text content
                 searchTerm = $(this).text();
+                highlightTerms = [searchTerm];
+                    
                 showToast();
                 navigator.clipboard.writeText(searchTerm);
                 console.log(searchTerm);
+
+                renderPDF();
+                setTimeout(function() {
+                    console.log("showing next");
+                    nextHighlight();
+                }, 500);
             });
 
             function showToast() {
