@@ -126,20 +126,11 @@
                     {% for doc in docs %}
                     <tr>
                         <td><a href="?docid={{doc.uuid}}">{{ doc.title }}</a>
-                            <select class="custom-select action-select" id="action-select" style="float: right;"
-                                data-document-name="{{ doc.title|safe }}">
-                                <option disabled selected>Actions</option>
-
-                                <option>
-                                    Ask Document
-                                </option>
-                                <option>
-                                    Summarize
-                                </option>
-                                <option>
-                                    Delete
-                                </option>
-                            </select>
+                            <a href="/delete_document?docid={{doc.uuid}}" style="float: right; color: red;">
+                                <span style="font-size: 1em; color: #5c21d2bc;">
+                                    <i class="fa-solid fa-trash"></i>
+                                </span>
+                            </a>
                         </td>
                     </tr>
                     {% endfor %}
@@ -180,6 +171,7 @@
                                 <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }} items
                                     
                                 </p>
+                                
                             </div>
                         </div>
                     </div>
@@ -195,13 +187,13 @@
         <div class="bottom-toolbar">
             <div id="add-item-panel">
                 <p style="font-size: 24px; font-weight: 600;">Add Item</p>
-                <div class="segmented-control">
+                <!-- <div class="segmented-control">
                     <input type="radio" name="segment" id="segment-1" checked>
                     <label for="segment-1">Super Search</label>
 
                     <input type="radio" name="segment" id="segment-2">
                     <label for="segment-2">Super Extract</label>
-                </div>
+                </div> -->
                 <div class="ask-question-container">
                     <div class="ask-question">
                         <input type="text" id="add-search-term-input" placeholder="Term or Phrase...">
@@ -219,11 +211,10 @@
                     </div>
                 </div>
             </div>
-            <div id="add-term-panel" style="display: none;">
-                <p style="font-size: 18px; font-weight: 700;">Adding: <span style="font-size: 16px; font-weight: 400;" id="adding-search-term-title">search term</span></p>
-                <p style="font-size: 18px; font-weight: 700;">To search set: <span style="font-size: 16px; font-weight: 400;" id="adding-search-set-title">search set</span></p>
+            <div id="add-term-panel" style="display: none; ">
+                <p style="font-size: 18px; font-weight: 400; padding-top: 10px;">Add <b id="adding-search-term-title"></b> to <span style="font-size: 16px; font-weight: 700;" id="adding-search-set-title"><b>search set</b></span></p>
                 
-                <div class="add-term-button-container" style="display: flex; justify-content: space-between; gap: 20px; margin-top: 30px;">
+                <div class="add-term-button-container" style="display: flex; justify-content: space-between; gap: 20px; margin-top: 20px;">
                     <button class="add-button shadow-button" id="cancel-add-term-btn" style="flex: 1; padding-top: 10px; padding-bottom: 10px;">
                         <span style="font-size: 1em; color: #414141bc;">
                             Cancel

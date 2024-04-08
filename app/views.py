@@ -1,6 +1,6 @@
 from flask import url_for, redirect, render_template, flash, g, session, jsonify, Response, send_file
 from app import app, llm
-from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem
+from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem, ExtractionQualityRecord
 from app.forms import LoginForm, SpaceForm
 import os
 import base64
@@ -8,6 +8,8 @@ from flask import request
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid
+import threading
+import json
 
 @app.route('/')
 def index():
@@ -49,11 +51,15 @@ def upload():
 	
 	document = SmartDocument(title=filename, path=f"{uid}.pdf", uuid=uid, space=space)
 	document.save()
-	semantics = SemanticIngest()
-	semantics.ingest(document=document)
+	
+	# Create a new thread and start it
+	thread = threading.Thread(target=ingest_semantics, args=(document,))
+	thread.start()
 	return jsonify({"complete": True, "uuid": uid})
 
-
+def ingest_semantics(document):
+		semantics = SemanticIngest()
+		semantics.ingest(document=document)
 
 @app.route('/api/add_search_set', methods=['POST'])
 def add_search_set():
@@ -144,12 +150,30 @@ def begin_search():
 		return jsonify(response)
 
 
-@app.route('/api/delete', methods=['POST'])
+@app.route('/delete_document', methods=['GET'])
 def delete_documents():
-	data = request.get_json()
-	document_path = data['document']
+	document_uuid = request.args.get('docid')
+	document = SmartDocument.objects(uuid=document_uuid).first()
+	document.delete()
+	semantics = SemanticIngest()
+	semantics.delete(document)
+	return redirect('/')
 
-	return "Success"
+@app.route('/delete_search_set', methods=['GET'])
+def delete_search_set():
+	search_set_uuid = request.args.get('uuid')
+	print(search_set_uuid)
+	search_set = SearchSet.objects(id=search_set_uuid).first()
+	search_set.delete()
+	return redirect('/')
+
+@app.route('/delete_search_set_item', methods=['GET'])
+def delete_search_set_item():
+	search_set_uuid = request.args.get('uuid')
+	print(search_set_uuid)
+	search_set = SearchSetItem.objects(id=search_set_uuid).first()
+	search_set.delete()
+	return redirect('/')
 
 
 ##################
@@ -163,3 +187,16 @@ def new_space():
 		space.save()
 		return redirect('/?id=' + space.uuid)
 	return render_template('spaces/new.html')
+
+@app.route('/submit_rating', methods=['POST'])
+def submit_rating():
+	data = request.get_json()
+	print(data)
+	pdf_title = data['pdf_title']
+	rating = data['rating']
+	comment = data['comment']
+	result_json = data['result_json']
+	result_json_str = json.dumps(result_json)
+	record = ExtractionQualityRecord(pdf_title=pdf_title, star_rating=rating, comment=comment, result_json=result_json_str)
+	record.save()
+	return jsonify({"complete": True})
