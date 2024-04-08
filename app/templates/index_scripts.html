@@ -227,24 +227,24 @@ $(document).ready(function() {
     });
 
     // Change event handler for the select element
-    $(".action-select").on("change", function() {
-        var selectedOption = $(this).val(); // Get the selected option's value
-        var documentName = $(this).data("document-name"); // Get the document name
+    // $(".action-select").on("change", function() {
+    //     var selectedOption = $(this).val(); // Get the selected option's value
+    //     var documentName = $(this).data("document-name"); // Get the document name
 
-        if (selectedOption == "Ask Document") {
-            openChatWindow();
-            askDocument(documentName);
-        } else if (selectedOption == "Summarize") {
-            openChatWindow();
-            summarizeDocument(documentName);
-        }
-        console.log("Selected option:", selectedOption);
-        console.log("Document:", documentName);
+    //     if (selectedOption == "Ask Document") {
+    //         openChatWindow();
+    //         askDocument(documentName);
+    //     } else if (selectedOption == "Summarize") {
+    //         openChatWindow();
+    //         summarizeDocument(documentName);
+    //     }
+    //     console.log("Selected option:", selectedOption);
+    //     console.log("Document:", documentName);
 
-        for (var i = 0; i < $('select').length; i++) {
-            $('select')[i].selectedIndex = 0;
-        }
-    });    
+    //     for (var i = 0; i < $('select').length; i++) {
+    //         $('select')[i].selectedIndex = 0;
+    //     }
+    // });    
 });
 
 

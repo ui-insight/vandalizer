@@ -9,7 +9,7 @@
     </span>
 </p>
 
-<p><b>Searches</b></p>
+<!-- <p><b>Searches</b></p> -->
 {% for item in search_set.search_items() %}
 <div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}" data-search-type="{{ search_set.searchtype }}">
     <div class="set-content">
@@ -18,12 +18,18 @@
         </span>
         <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
             item.searchphrase }}</p>
+
+            {% if results == null and document == None %}
+            <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
+                <i class="fa-solid fa-circle-xmark"></i></a>
+            {% endif %}
     </div>
 </div>
 {% endfor %}
-
+<br>
 <p><b>Extractions</b></p>
 {% for item in search_set.extraction_items() %}
+<div class="set-entry-group">
     <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
     <div class="set-content">
         <span style="float: left; font-size: 1em; color: #5c21d2bc;">
@@ -35,6 +41,12 @@
         {% if results == null and document != None %}
         <p class="set-items" style="text-align: right; ">processing</p>
         {% endif %}
+
+        {% if results == null and document == None %}
+        <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
+            <i class="fa-solid fa-circle-xmark"></i></a>
+        {% endif %}
+        
     </div>
 </div>
 
@@ -45,9 +57,38 @@
 
         <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}</p>
         {% endif %}
+        
     </div>
 </div>
 {% endif %}
-
+</div>
 
 {% endfor %}
+
+{% if results != null %}
+{% if document != None %}
+<div>
+    <h4>Help us, please rate these results</h4>
+        <div class="rate">
+            <input type="radio" id="star5" name="rate" value="5" />
+    <label for="star5" title="text">5 stars</label>
+    <input type="radio" id="star4" name="rate" value="4" />
+    <label for="star4" title="text">4 stars</label>
+    <input type="radio" id="star3" name="rate" value="3" />
+    <label for="star3" title="text">3 stars</label>
+    <input type="radio" id="star2" name="rate" value="2" />
+    <label for="star2" title="text">2 stars</label>
+    <input type="radio" id="star1" name="rate" value="1" />
+    <label for="star1" title="text">1 star</label>
+        </div>
+        <input type="text" class="comment" id="comment-input" placeholder="Leave a comment if you want...">
+        <button class="btn btn-primary" id="submit-comment" style="float: right; margin-top: 15px;" type="submit">Submit</button>
+
+</div>
+{% endif %}
+{% endif %}
+
+
+<br><br>
+<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;">
+    <i>delete set</i></a></p>

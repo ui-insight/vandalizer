@@ -14,7 +14,7 @@
     
 
     $(document).ready(function () {
-        function performSemanticSearch(searchTerm) {
+        function performSemanticSearch(term) {
             console.log("semantic search");
             $.ajax({
                 url: '/api/semantic_search',
@@ -28,10 +28,19 @@
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
+                    searchTerm = term;
+                    highlightTerms = [term];
                     documents = msg.results.documents[0];
                     highlightTerms = documents;
                     console.log(documents);
+                    
+
                     renderPDF();
+                    setTimeout(function() {
+                    console.log("showing next");
+                    nextHighlight();
+                }, 500);
+
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -89,6 +98,33 @@
                 performSemanticSearch(searchTerm);
             });
 
+            $('#submit-comment').on("click", function () {
+                rating = getRating();
+                searchDict = createSearchTermDictionary();
+
+                $.ajax({
+                    url: '/submit_rating',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        pdf_title: $('#document-title')[0].innerText,
+                        rating: rating,
+                        comment: $("#comment-input")[0].value,
+                        result_json: searchDict
+                    }),
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    async: true,
+                    success: function (msg) {
+                        // reload page
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log(xhr.status);
+                        console.log(thrownError);
+                    }
+                });
+            });
+
             $('.extraction-result').on("click", function () {
                 // get text content
                 searchTerm = $(this).text();
@@ -143,12 +179,17 @@
 
 
         $('#add-term-button').on("click", function () {
+            if (search_set_add_uuid != "") {
+                addSearchSetItem();
+                return;
+            }
+
             $('#add-item-panel').hide();
             $('#add-term-panel').show();
             $('#adding-search-term-title').text($("#add-search-term-input")[0].value);
             is_adding_term = true;
             if (search_set_add_uuid == "") {
-                $('#adding-search-set-title').text("Please select search set");
+                $('#adding-search-set-title').text("Select set");
             }
         });
 
@@ -160,6 +201,11 @@
         });
 
         $('#finalize-add-term-btn').on("click", function () {
+            console.log("Finalize");
+            addSearchSetItem();
+        });
+
+        function addSearchSetItem () {
             $.ajax({
                 url: '/api/add_search_term',
                 type: 'POST',
@@ -167,7 +213,7 @@
                     search_set_uuid: search_set_add_uuid,
                     term: $("#add-search-term-input")[0].value,
                     space_id: "{{ current_space_id }}",
-                    searchtype: $('#segment-1')[0].checked ? "search" : "extraction"
+                    searchtype: "extraction"//$('#segment-1')[0].checked ? "search" : "extraction"
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
@@ -183,7 +229,7 @@
             });
             search_set_add_uuid = "";
             is_adding_term = false
-        });
+        }
 
         $("#add-search-set-button").on("click", function () {
             $.ajax({
@@ -222,6 +268,7 @@
 
         $('#next-semantic-button').on('click', function(e) {
             e.preventDefault(); 
+            nextHighlight();
         });
 
         $(document).on('keyup', function(e) {
@@ -269,6 +316,34 @@
             }
 
             highlights[current_search_item].style.backgroundColor = 'red';
+        }
+
+        function getRating() {
+            const ratingInputs = document.querySelectorAll('input[name="rate"]');
+            let selectedValue;
+
+            for (const input of ratingInputs) {
+                if (input.checked) {
+                selectedValue = input.value;
+                break;
+                }
+            }
+
+            return selectedValue;
+        }
+
+        function createSearchTermDictionary() {
+            const searchTermDictionary = {};
+
+            const setEntries = document.querySelectorAll('.set-entry-group');
+            setEntries.forEach((entry) => {
+                const searchPhrase = entry.querySelector('.set-title').textContent.trim();
+                const result = entry.querySelector('.extraction-result').textContent.trim();
+                searchTermDictionary[searchPhrase] = result;
+            });
+
+
+            return searchTermDictionary;
         }
         
     });

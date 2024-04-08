@@ -29,6 +29,12 @@ class User(me.Document):
     email = me.StringField(required=True, max_length=200)
     password_hash = me.StringField(required=True, max_length=200)
 
+class ExtractionQualityRecord(me.Document):
+    pdf_title = me.StringField(required=True, max_length=200)
+    result_json = me.StringField(required=True, max_length=5000)
+    star_rating = me.FloatField(required=True)
+    comment = me.StringField(required=False, max_length=5000)
+
 class SearchSet(me.Document):
     title = me.StringField(required=True, max_length=200)
     uuid = me.StringField(required=True, max_length=200)
