@@ -8,7 +8,7 @@ import nltk
 
 class SemanticIngest:
     def search(self, search_term, document):
-        client = chromadb.PersistentClient(path="db/tickbase.db")
+        client = chromadb.HttpClient(host='localhost', port=5028)
         collection = client.get_collection(name=document.uuid)
         results = collection.query(
             query_texts=[search_term],
@@ -17,11 +17,11 @@ class SemanticIngest:
         return results
     
     def delete(self, document):
-        client = chromadb.PersistentClient(path="db/tickbase.db")
+        client = chromadb.HttpClient(host='localhost', port=5028)
         client.delete_collection(name=document.uuid)
 
     def ingest(self, document):
-        client = chromadb.PersistentClient(path="db/tickbase.db")
+        client = chromadb.HttpClient(host='localhost', port=5028)
         collection = client.create_collection(name=document.uuid)
         
         print("Ingesting " + str(document.uuid))
