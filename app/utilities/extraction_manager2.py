@@ -32,7 +32,7 @@ class ExtractionManager2:
             full_text = full_text + pdf.pages[i].extract_text() + " "
 
         prompt = self.getPrompt(full_text, extract_keys)
-        completion = openai.ChatCompletion.create(model="gpt-4-1106-preview", 
+        completion = openai.chat.completions.create(model="gpt-4-1106-preview", 
                                                 messages=[{"role": "user", "content": prompt}],
                                                 response_format={"type": "json_object"})
         output = completion.choices[0].message.content
