@@ -24,6 +24,7 @@ class ExtractionManager2:
         """
 
     def extract(self, extract_keys, pdf_path):
+        start_time = time.time()
         openai.api_key = "***REMOVED***"
         pdf = PdfReader(os.path.join(self.root_path, "static", "uploads", pdf_path))
         number_of_pages = len(pdf.pages)
@@ -31,7 +32,14 @@ class ExtractionManager2:
         for i in range(number_of_pages):
             full_text = full_text + pdf.pages[i].extract_text() + " "
 
+        print(f"PDF processing time: {time.time() - start_time:.2f} seconds")
+        start_time = time.time()
+
         prompt = self.getPrompt(full_text, extract_keys)
+
+        print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
+        start_time = time.time()
+
         completion = openai.chat.completions.create(model="gpt-4-1106-preview", 
                                                 messages=[{"role": "user", "content": prompt}],
                                                 response_format={"type": "json_object"})
@@ -40,6 +48,8 @@ class ExtractionManager2:
         output = output.replace('```json', '')
         output = output.replace('```', '')
         print(output)
+
+        print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
 
 
         if "{" in output and "}" in output:
