@@ -11,7 +11,7 @@ import json
 class ExtractionManager2:
     root_path = ""
     def getPrompt(self, context, features):
-        return """Human: Extract and save the relevant entities mentioned in the following passage together with their properties.
+        return """Extract and save the relevant entities mentioned in the following passage together with their properties.
         """ + "\n".join(features) + """
 
         If a property is not present, represent it as "Not Found".
@@ -21,6 +21,13 @@ class ExtractionManager2:
         Passage: 
 
         """ + context + """
+        Remember: Extract and save the relevant entities mentioned in the following passage together with their properties.
+        """ + "\n".join(features) + """
+
+        If a property is not present, represent it as "Not Found".
+
+        Format the output as JSON, with a single string as the key and a single string as the value. Do not include any additional text. Do not nest json values.
+       
         """
 
     def extract(self, extract_keys, pdf_path):
@@ -40,9 +47,12 @@ class ExtractionManager2:
         print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()
 
-        completion = openai.chat.completions.create(model="gpt-4-1106-preview", 
-                                                messages=[{"role": "user", "content": prompt}],
-                                                response_format={"type": "json_object"})
+        completion = openai.chat.completions.create(model="gpt-3.5-turbo-0125", 
+                                                    response_format={"type": "json_object"},
+                                                messages=[
+                                                    {"role": "system", "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage."},
+                                                    {"role": "user", "content": prompt}],
+                                                )
         output = completion.choices[0].message.content
         output = output.replace('\\n', '') 
         output = output.replace('```json', '')
