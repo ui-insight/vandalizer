@@ -1,4 +1,4 @@
-from flask import url_for, redirect, render_template, flash, g, session, jsonify, Response, send_file
+from flask import url_for, send_file, redirect, render_template, flash, g, session, jsonify, Response, send_file
 from app import app, llm
 from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem, ExtractionQualityRecord
 from app.forms import LoginForm, SpaceForm
@@ -10,6 +10,7 @@ from app.utilities.semantic_ingest import SemanticIngest
 import uuid
 import threading
 import json
+import csv
 
 @app.route('/')
 def index():
@@ -27,6 +28,7 @@ def index():
 
 	if request.args.get('docid'):
 		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
+		current_space = Space.objects(uuid=document.space).first()
 
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
@@ -200,3 +202,27 @@ def submit_rating():
 	record = ExtractionQualityRecord(pdf_title=pdf_title, star_rating=rating, comment=comment, result_json=result_json_str)
 	record.save()
 	return jsonify({"complete": True})
+
+
+@app.route('/export_extraction', methods=['GET'])
+def export_extraction():
+	result_json = request.args.to_dict()
+	#result_json = data['result_json']
+	
+	# Convert the dictionary to a list of rows
+	rows = []
+	for key, value in result_json.items():
+		rows.append([key, value])
+	
+	# Define the file path for the CSV file
+	csv_file_path = os.path.join(app.root_path, 'static', 'extraction.csv')
+	
+	# Write the rows to the CSV file
+	with open(csv_file_path, 'w', newline='') as f:
+		writer = csv.writer(f)
+		writer.writerows(rows)
+	
+	# Return the path to the CSV file
+	return send_file('static/extraction.csv', 
+                     mimetype='text/csv',
+                     as_attachment=True)

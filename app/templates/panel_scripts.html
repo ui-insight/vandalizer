@@ -98,6 +98,33 @@
                 performSemanticSearch(searchTerm);
             });
 
+            $('#export').on("click", function (e) {
+                e.preventDefault();
+                searchDict = createSearchTermDictionary();
+
+                var form = $('<form>', {
+                    'action': '/export_extraction',
+                    'method': 'GET'
+                });
+
+                $.each(searchDict, function (key, value) {
+                    form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': key,
+                    'value': value
+                    }));
+                });
+
+                form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': 'pdf_title',
+                    'value': $('#document-title')[0].innerText
+                }));
+
+                $('body').append(form);
+                form.submit();
+            });
+
             $('#submit-comment').on("click", function () {
                 rating = getRating();
                 searchDict = createSearchTermDictionary();
