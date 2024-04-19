@@ -91,9 +91,12 @@ def add_search_set():
 @app.route('/api/add_search_term', methods=['POST'])
 def add_search_term():
 	data = request.get_json()
+	print(data)
 	searchphrase = data['term']
 	searchset_uuid = data['search_set_uuid']
 	searchtype = data['searchtype']
+	print(searchphrase)
+
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
 	searchsetitem.save()
 	return jsonify({"complete": True})
@@ -193,11 +196,13 @@ def begin_prompt_search():
 			keys.append(item.searchphrase)
 
 	if len(keys) > 0:
-		em = ExtractionManager2()
-		em.root_path = app.root_path
-		results = em.extract(keys, document_path)
+		llm = OpenAIInterface()
+		llm.load_document(app.root_path, document_path)
+		results = {}
+		for key in keys:
+			results[key] = llm.ask_question_to_loaded_document(key)
 		print(results)
-		template = render_template('search_results.html', 
+		template = render_template('prompt_results.html', 
 							search_set=search_set,
 							results=results
 							)

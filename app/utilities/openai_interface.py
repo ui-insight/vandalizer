@@ -16,8 +16,20 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 class OpenAIInterface:
-    
+    loaded_doc = ""
 
+    def load_document(self, root_path, document_path):
+        full_path = os.path.join(root_path, "static", "uploads", document_path)
+        self.loaded_doc = extract_text_from_pdf(full_path)
+
+    def ask_question_to_loaded_document(self, question):
+        openai.api_key = "***REMOVED***"
+        prompt = """Given the following document, answer the following question:""" + question + "\n" + self.loaded_doc
+        completion = openai.chat.completions.create(model="gpt-3.5-turbo-0125", 
+                                              messages=[{"role": "user", "content": prompt}],
+                                             )
+        return completion.choices[0].message.content
+    
     def ask_question_to_document(self, root_path, document_path, question):
         full_path = os.path.join(root_path, "static", "uploads", document_path)
         
