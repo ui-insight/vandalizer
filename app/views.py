@@ -1,5 +1,5 @@
 from flask import url_for, send_file, redirect, render_template, flash, g, session, jsonify, Response, send_file
-from app import app, llm
+from app import app
 from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem, ExtractionQualityRecord
 from app.forms import LoginForm, SpaceForm
 import os
@@ -7,6 +7,7 @@ import base64
 from flask import request
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.semantic_ingest import SemanticIngest
+from app.utilities.openai_interface import OpenAIInterface
 import uuid
 import threading
 import json
@@ -33,9 +34,10 @@ def index():
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
 
-	searchsets = SearchSet.objects(space=current_space.uuid).all()
+	extraction_sets = SearchSet.objects(space=current_space.uuid, set_type="extraction").all()
+	prompt_sets = SearchSet.objects(space=current_space.uuid, set_type="prompt").all()
 	docs = SmartDocument.objects(space=current_space.uuid).all()
-	return render_template('index.html', searchsets=searchsets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
+	return render_template('index.html', extraction_sets=extraction_sets, prompt_sets=prompt_sets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -63,12 +65,26 @@ def ingest_semantics(document):
 		semantics = SemanticIngest()
 		semantics.ingest(document=document)
 
+
+@app.route('/api/chat', methods=['POST'])
+def chat():
+	data = request.get_json()
+	message = data['message']
+	document_uuid = data['document_uuid']
+	document = SmartDocument.objects(uuid=document_uuid).first()
+	print(message)
+	print(document.path)
+	response = OpenAIInterface().ask_question_to_document(app.root_path, document.path, message)
+	print(response)
+	return jsonify(response)
+
 @app.route('/api/add_search_set', methods=['POST'])
 def add_search_set():
 	data = request.get_json()
 	title = data['title']
 	space = data['space_id']
-	searchset = SearchSet(title=title, uuid=uuid.uuid4().hex, space=space, user="admin", status="active")
+	search_type = data['search_type']
+	searchset = SearchSet(title=title, uuid=uuid.uuid4().hex, space=space, user="admin", status="active", set_type=search_type)
 	searchset.save()
 	return jsonify({"complete": True})
 
@@ -87,18 +103,29 @@ def grab_template():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_uuid = data['document_uuid']
-	
+	print("Fetch loading template")
 	document = SmartDocument.objects(uuid=document_uuid).first()
 	print(document)
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
-	template = render_template('search_results.html', 
-						search_set=search_set,
-						document=document
-						)
-	response = {
-			'template': template,
-		}
-	return jsonify(response)
+
+	if search_set.set_type == "extraction":	
+		template = render_template('search_results.html', 
+							search_set=search_set,
+							document=document
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
+	else:
+		template = render_template('prompt_results.html', 
+							search_set=search_set,
+							document=document
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
 
 @app.route('/api/semantic_search', methods=['POST'])
 def semantic_search():
@@ -151,6 +178,41 @@ def begin_search():
 			}
 		return jsonify(response)
 
+
+@app.route('/api/begin_prompt_search', methods=['POST'])
+def begin_prompt_search():
+	data = request.get_json()
+	searchset_uuid = data['search_set_uuid']
+	document_path = data['document']
+
+	search_set = SearchSet.objects(uuid=searchset_uuid).first()
+	keys = []
+	items = search_set.items()
+	for item in items:
+		if item.searchtype == "prompt":
+			keys.append(item.searchphrase)
+
+	if len(keys) > 0:
+		em = ExtractionManager2()
+		em.root_path = app.root_path
+		results = em.extract(keys, document_path)
+		print(results)
+		template = render_template('search_results.html', 
+							search_set=search_set,
+							results=results
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
+	else:
+		template = render_template('prompt_results.html', 
+							search_set=search_set
+							)
+		response = {
+				'template': template,
+			}
+		return jsonify(response)
 
 @app.route('/delete_document', methods=['GET'])
 def delete_documents():

@@ -57,6 +57,16 @@
     cursor: pointer;
   }
 
+  .prompt-set-item {
+    padding: 5px 5px;
+    height: 40px;
+  }
+
+  .prompt-set-item:hover {
+    background-color: #efefef;
+    cursor: pointer;
+  }
+
   .left-panel .semantic-panel {
     position: fixed;
     z-index: 300;

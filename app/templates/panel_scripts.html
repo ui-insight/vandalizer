@@ -3,6 +3,17 @@
     var search_set_add_uuid = "";
     var document_uuid = "{{ document.uuid }}";
 
+    function showToast(message) {
+        var x = document.getElementById("snackbar");
+        if (message) {
+            x.innerText = message;
+        } else {
+            x.innerText = "Copied to clipboard";
+        }
+        x.className = "show";
+        setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+    }
+
     function showWorking() {
         $('#navbar-img')[0].classList.add('spin');
     }
@@ -10,6 +21,34 @@
     function hideWorking() {
         $('#navbar-img')[0].classList.remove('spin');
     }
+
+    const tabMenu = document.querySelector('.tab-menu');
+        const tabMenuItems = tabMenu.querySelectorAll('li');
+
+        tabMenuItems.forEach(item => {
+            item.addEventListener('click', function() {
+                tabMenuItems.forEach(item => item.classList.remove('active'));
+                this.classList.add('active');
+
+                $('.tab-content').hide();
+                $('.bottom-toolbar').hide();
+                var tabTitle = $(this).text();
+                console.log(tabTitle);
+                // Use the tabTitle variable as needed
+                if (tabTitle == " Extract") {
+                    console.log("Show extract");
+                    $('#extraction-panel').show();
+                    $('#bottom-toolbar-extraction').show();
+                } else if (tabTitle == " Prompt") {
+                    $('#prompt-panel').show();
+                    $('#bottom-toolbar-prompt').show();
+                } else if (tabTitle == " Chat") {
+                    $('#chat-panel').show();
+                    $('#bottom-toolbar-chat').show();
+                }
+
+            });
+        });
 
     
 
@@ -50,6 +89,7 @@
         }
         
         $('.set-item').on("click", function () {
+            console.log("Set item tapped");
             search_set_add_uuid = $(this).attr("data-uuid");
             $('#adding-search-set-title').text($(this).attr("data-title"));
             if (is_adding_term) {
@@ -157,7 +197,7 @@
                 searchTerm = $(this).text();
                 highlightTerms = [searchTerm];
                     
-                showToast();
+                showToast("Copied to clipboard");
                 navigator.clipboard.writeText(searchTerm);
                 console.log(searchTerm);
 
@@ -168,11 +208,7 @@
                 }, 500);
             });
 
-            function showToast() {
-                var x = document.getElementById("snackbar");
-                x.className = "show";
-                setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
-            }
+            
         }
 
         function updateSearchSetPanel(set_uuid) {
@@ -204,32 +240,24 @@
             });
         }
 
+        $('#add-search-term-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                if (search_set_add_uuid != "") {
+                addSearchSetItem();
+                return;
+            } else {
+                showToast("Please select an extraction group to add to");
+            }
+            }
+        });
 
         $('#add-term-button').on("click", function () {
             if (search_set_add_uuid != "") {
                 addSearchSetItem();
                 return;
+            } else {
+                showToast("Please select an extraction group to add to");
             }
-
-            $('#add-item-panel').hide();
-            $('#add-term-panel').show();
-            $('#adding-search-term-title').text($("#add-search-term-input")[0].value);
-            is_adding_term = true;
-            if (search_set_add_uuid == "") {
-                $('#adding-search-set-title').text("Select set");
-            }
-        });
-
-        $('#cancel-add-term-btn').on("click", function () {
-            $('#add-item-panel').show();
-            $('#add-term-panel').hide();
-            search_set_add_uuid = "";
-            is_adding_term = false
-        });
-
-        $('#finalize-add-term-btn').on("click", function () {
-            console.log("Finalize");
-            addSearchSetItem();
         });
 
         function addSearchSetItem () {
@@ -264,7 +292,8 @@
                 type: 'POST',
                 data: JSON.stringify({
                     title: $("#add-search-set-input")[0].value,
-                    space_id: "{{ current_space_id }}"
+                    space_id: "{{ current_space_id }}",
+                    search_type: "extraction"
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
@@ -287,11 +316,7 @@
 
         
 
-        $('#add-search-term-input').on('keyup', function(e) {
-            if (e.key === 'Enter') {
-                performSemanticSearch($("#add-search-term-input")[0].value);
-            }
-        });
+
 
         $('#next-semantic-button').on('click', function(e) {
             e.preventDefault(); 

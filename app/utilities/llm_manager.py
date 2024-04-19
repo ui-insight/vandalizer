@@ -12,6 +12,9 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chains import AnalyzeDocumentChain
 from langchain.chains.question_answering import load_qa_chain
+from langchain.document_loaders import TextLoader
+from langchain.chains.question_answering import load_qa_chain
+from langchain.llms import OpenAI
 
 class LLMManager:
     pdf_loaded = False
@@ -34,6 +37,21 @@ class LLMManager:
         text = "What is the meaning of life?"
         llm.predict(text)
         pass
+
+    def ask_question_no_langchain(self, document_path, question):
+        # Load the document from the given path
+        full_path = os.path.join(self.root_path, "static", "uploads", document_path)
+        loader = TextLoader(full_path)
+        documents = loader.load()
+
+        # Create a question-answering chain using OpenAI's language model
+        llm = OpenAI()
+        qa_chain = load_qa_chain(llm, chain_type="stuff")
+
+        # Ask the question and get the answer
+        answer = qa_chain.run(input_documents=documents, question=question)
+
+        return answer
     
     def test_documents(self):
         llm = ChatOpenAI(openai_api_key="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")
@@ -72,7 +90,7 @@ class LLMManager:
         result = pdf_qa({"question": question, "chat_history": ""})
         return result["answer"]
     
-    def ask_single_document(self, question, document, model_name="text-davinci-003"):
+    def ask_single_document(self, question, document, model_name="gpt-3.5-turbo-16k"):
         if self.document_name != document or self.singlevectordb is None:
             print("Loading document into LLM", document)
             loader = PyPDFLoader(os.path.join(self.root_path, "static", "uploads", document))

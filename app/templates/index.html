@@ -21,7 +21,7 @@
     <div class="navbar-header">
         <img id="navbar-img" style="float: left; width: 25px; height: 40px; margin-top: 20px; "
             src="/static/images/joevandal.png">
-            <img id="navbar-img" style="float: left; width: 200px; height: 50px; margin-top: 15px; "
+        <img id="navbar-img" style="float: left; width: 200px; height: 50px; margin-top: 15px; "
             src="/static/images/vandalizer.png">
     </div>
 
@@ -81,8 +81,9 @@
                 </span>
             </button>
             <span style="flex: 1;">
-            <span style="font-weight: 700; font-size: 18px;" id="semantic-panel-term">Search term</span>
-            <span style="font-weight: 400; margin-left: 5px; color: #00000041;" id="semantic-panel-count">num results</span>
+                <span style="font-weight: 700; font-size: 18px;" id="semantic-panel-term">Search term</span>
+                <span style="font-weight: 400; margin-left: 5px; color: #00000041;" id="semantic-panel-count">num
+                    results</span>
             </span>
             <button class="shadow-button" id="next-semantic-button" style="margin: 10px;">
                 <span style="font-size: 1em; color: #5c21d2bc;">
@@ -144,113 +145,174 @@
     </div>
     <div class="right-panel">
         <div id="right-panel-content">
-            <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-                <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
-                <div class="ask-question-container">
-                    <div class="ask-question">
-                        <input type="text" id="add-search-set-input" placeholder="Find or create a search set...">
+            <div class="tab-container">
+                <ul class="tab-menu">
+                    <li class="active"><i class="fas fa-file-alt"></i> Extract</li>
+                    <li><i class="fas fa-keyboard"></i> Prompt</li>
+                    <li><i class="fas fa-comments"></i> Chat</li>
+                </ul>
+                <div class="tab-content" id="extraction-panel">
+                    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+                        <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
+                        <div class="ask-question-container">
+                            <div class="ask-question">
+                                <input type="text" id="add-search-set-input"
+                                    placeholder="Find or create a extraction set...">
 
 
-                        <button class="add-button shadow-button" id="add-search-set-button">
-                            <span style="font-size: 2em; color: #5c21d2bc;">
-                                <i class="fa-solid fa-plus"></i>
-                            </span>
-                        </button>
-                    </div>
-                </div>
-                <div class="search-set-container" style="padding: 30px 0px;">
-                    {% for search_set in searchsets %}
-                    <div class="expandable-container">
-                        <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
-                            <div class="set-content">
-                                <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                                    <i class="fa-solid fa-chevron-right"></i>
-                                </span>
-                                <p class="set-title"
-                                    style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
-                                    search_set.title }}</p>
-                                <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }} items
-                                    
-                                </p>
-                                
+                                <button class="add-button shadow-button" id="add-search-set-button">
+                                    <span style="font-size: 2em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </span>
+                                </button>
                             </div>
                         </div>
+                        <div class="search-set-container" style="padding: 30px 0px;">
+                            {% for search_set in extraction_sets %}
+                            <div class="expandable-container">
+                                <div class="set-item" data-uuid="{{ search_set.uuid }}"
+                                    data-title="{{ search_set.title }}">
+                                    <div class="set-content">
+                                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                            <i class="fa-solid fa-chevron-right"></i>
+                                        </span>
+                                        <p class="set-title"
+                                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                            {{
+                                            search_set.title }}</p>
+                                        <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }}
+                                            items
+
+                                        </p>
+
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
                     </div>
-                    {% endfor %}
-                </div>
-            </div>
-            <div style="display: none" class="search-results-panel" id="search-results-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-                
-
-
-        </div>
-
-        <div class="bottom-toolbar">
-            <div id="add-item-panel">
-                <p style="font-size: 24px; font-weight: 600;">Add Item</p>
-                <!-- <div class="segmented-control">
-                    <input type="radio" name="segment" id="segment-1" checked>
-                    <label for="segment-1">Super Search</label>
-
-                    <input type="radio" name="segment" id="segment-2">
-                    <label for="segment-2">Super Extract</label>
-                </div> -->
-                <div class="ask-question-container">
-                    <div class="ask-question">
-                        <input type="text" id="add-search-term-input" placeholder="Term or Phrase...">
-
-                        <button class="add-button shadow-button" id="add-term-button">
-                            <span style="font-size: 2em; color: #5c21d2bc;">
-                                <i class="fa-solid fa-plus"></i>
-                            </span>
-                        </button>
-                        <button class="search-button shadow-button" id="semantic-search-button">
-                            <span style="font-size: 2em; color: #5c21d2bc;">
-                                <i class="fa-brands fa-searchengin"></i>
-                            </span>
-                        </button>
+                    <div style="display: none" class="search-results-panel" id="search-results-panel"
+                        style="margin: 0px 30px 30px 30px; text-align: left;">
                     </div>
                 </div>
-            </div>
-            <div id="add-term-panel" style="display: none; ">
-                <p style="font-size: 18px; font-weight: 400; padding-top: 10px;">Add <b id="adding-search-term-title"></b> to <span style="font-size: 16px; font-weight: 700;" id="adding-search-set-title"><b>search set</b></span></p>
-                
-                <div class="add-term-button-container" style="display: flex; justify-content: space-between; gap: 20px; margin-top: 20px;">
-                    <button class="add-button shadow-button" id="cancel-add-term-btn" style="flex: 1; padding-top: 10px; padding-bottom: 10px;">
-                        <span style="font-size: 1em; color: #414141bc;">
-                            Cancel
-                        </span>
-                    </button>
-                    <button class="add-button shadow-button" id="finalize-add-term-btn" style="flex: 1; padding-top: 10px; padding-bottom: 10px;">
-                        <span style="font-size: 1em; color: #5c21d2bc;">
-                            Add
-                        </span>
-                    </button>
+                <div class="tab-content" id="prompt-panel" style="display: none;">
+                    <div id="prompt-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+                        <p style="font-size: 24px; font-weight: 600;">Prompt Groups</p>
+                        <div class="ask-question-container">
+                            <div class="ask-question">
+                                <input type="text" id="add-prompt-set-input"
+                                    placeholder="Find or create a prompt set...">
+
+
+                                <button class="add-button shadow-button" id="add-prompt-set-button">
+                                    <span style="font-size: 2em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-plus"></i>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="search-set-container" style="padding: 30px 0px;">
+                            {% for search_set in prompt_sets %}
+                            <div class="expandable-container">
+                                <div class="prompt-set-item" data-uuid="{{ search_set.uuid }}"
+                                    data-title="{{ search_set.title }}">
+                                    <div class="set-content">
+                                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                            <i class="fa-solid fa-chevron-right"></i>
+                                        </span>
+                                        <p class="set-title"
+                                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                            {{
+                                            search_set.title }}</p>
+                                        <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }}
+                                            items
+
+                                        </p>
+
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div style="display: none" class="search-results-panel" id="prompt-search-results-panel"
+                        style="margin: 0px 30px 30px 30px; text-align: left;">
+                    </div>
                 </div>
-                
+                <div class="tab-content" id="chat-panel" style="display: none;"></div>
+            </div>
+
+            <div class="bottom-toolbar"  id="bottom-toolbar-extraction">
+                <div id="add-item-panel">
+                    <p style="font-size: 24px; font-weight: 600;">Add Extraction</p>
+
+                    <div class="ask-question-container">
+                        <div class="ask-question">
+                            <input type="text" id="add-search-term-input" placeholder="Term or phrase to extract...">
+
+                            <button class="add-button shadow-button" id="add-term-button">
+                                <span style="font-size: 2em; color: #5c21d2bc;">
+                                    <i class="fa-solid fa-plus"></i>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-toolbar" id="bottom-toolbar-prompt" style="display: none;">
+                <div id="add-item-panel">
+                    <p style="font-size: 24px; font-weight: 600;">Add Prompt</p>
+
+                    <div class="ask-question-container">
+                        <div class="ask-question">
+                            <input type="text" id="add-search-term-input" placeholder="Prompt to ask document...">
+
+                            <button class="add-button shadow-button" id="add-term-button">
+                                <span style="font-size: 2em; color: #5c21d2bc;">
+                                    <i class="fa-solid fa-plus"></i>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bottom-toolbar"  id="bottom-toolbar-chat" style="display: none;">
+                <div id="add-item-panel">
+                    <p style="font-size: 24px; font-weight: 600;">How can I help?</p>
+
+                    <div class="ask-question-container">
+                        <div class="ask-question">
+                            <input type="text" id="chat-input" placeholder="Chat with document...">
+
+                            <button class="add-button shadow-button" id="chat-button">
+                                <span style="font-size: 2em; color: #5c21d2bc;">
+                                    <i class="fa-brands fa-searchengin"></i>
+                                </span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+        <div class="chat-window closed">
+        </div>
+        <div id="snackbar">Copied</div>
     </div>
-    <div class="chat-window closed">
-    </div>
-    <div id="snackbar">Copied</div>
-</div>
 
 
-{%endblock%} {% block scripts %}
-{{super()}}
-{% include "review/proofreading_scripts.html" %}
-{% include "review/compliance_scripts.html" %}
-{% include "review/review_scripts.html" %}
-{% include "index_scripts.html" %}
-{% include "panel_scripts.html" %}
-<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
-<script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
+    {%endblock%} {% block scripts %}
+    {{super()}}
+    {% include "index_scripts.html" %}
+    {% include "panel_scripts.html" %}
+    {% include "prompt_set_scripts.html" %}
+    {% include "chat_scripts.html" %}
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+    <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+    <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
 
 
-<!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
-<script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
-{% include "pdf_handling.html" %}
+    <!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
+    <script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
+    {% include "pdf_handling.html" %}
 
-{% endblock %}
+    {% endblock %}

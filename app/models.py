@@ -41,6 +41,7 @@ class SearchSet(me.Document):
     space = me.StringField(required=True, max_length=200)
     user = me.StringField(required=True, max_length=200)
     status = me.StringField(required=True, max_length=200)
+    set_type = me.StringField(required=True, max_length=200)
 
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
@@ -58,3 +59,6 @@ class SearchSetItem(me.Document):
     searchphrase = me.StringField(required=True, max_length=200)
     searchset = me.StringField(required=True, max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
+
+
+    
