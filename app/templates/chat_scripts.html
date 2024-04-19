@@ -1,0 +1,51 @@
+<script>
+    $('#chat-button').on("click", function (e) {
+            e.preventDefault();
+        console.log("chat button clicked");
+            if (document_uuid != "") {
+                chat();
+                return;
+            } else {
+                showToast("Select a document to chat");
+            }
+        });
+
+        $('#chat-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                console.log("keyup on chat");
+                if (document_uuid != "") {
+                chat();
+                return;
+            } else {
+                showToast("Select a document to chat");
+            }
+            }
+        });
+
+        function chat () {
+            $("#chat-panel").append("<p><div class='message'><b>You:</b> " + $("#chat-input").val() + "</div></p>");
+            question = $("#chat-input").val();
+            $("#chat-input").val(""); 
+            $.ajax({
+                url: '/api/chat',
+                type: 'POST',
+                data: JSON.stringify({
+                    document_uuid: document_uuid,
+                    message: question
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (response) {
+                    // reload page
+                    $("#chat-panel").append("<p><div class='message'><b>Response:</b> " + response + "</div></p>");
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+            search_set_add_uuid = "";
+            is_adding_term = false
+        }
+</script>

@@ -176,41 +176,6 @@ $('.rescan-button').on('click', function(e) {
     showScanning();
 });
 
-$('#chat-button').on('click', function(e) {
-    e.preventDefault()
-    if ($('.chat-window')[0].classList.contains('open')) {
-        closeChatWindow();
-    } else {
-        $('#ask-question-input')[0].focus()
-        openChatWindow();
-    }
-});
-
-$('#close-chat-dismiss-btn').on('click', function(e) {
-    e.preventDefault()
-    closeChatWindow();
-});
-
-
-
-
-function closeChatWindow() {
-    $('.chat-window')[0].classList.remove('open')
-    $('.chat-window')[0].classList.add('closed')
-    $('#chat-button-span')[0].style.color = "#5D6F81";
-    $('#chat-button-icon')[0].classList.remove('fa-solid')
-    $('#chat-button-icon')[0].classList.add('fa-regular')
-    $('#ask-question-input').attr("placeholder", "Ask all documents a question...");
-    askingDocument = false;
-}
-
-function openChatWindow() {
-    $('.chat-window')[0].classList.add('open')
-    $('.chat-window')[0].classList.remove('closed')
-    $('#chat-button-icon')[0].classList.add('fa-solid')
-    $('#chat-button-icon')[0].classList.remove('fa-regular')
-    $('#chat-button-span')[0].style.color = "#2976E8";
-}
 
 $(document).ready(function() {
 

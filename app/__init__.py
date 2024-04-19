@@ -22,8 +22,8 @@ app.config.from_object('app.configuration.DevelopmentConfig')
 me.connect('osp')
 
 bs = Bootstrap(app) #flask-bootstrap
-llm = LLMManager()
-llm.root_path = app.root_path
+# llm = LLMManager()
+# llm.root_path = app.root_path
 
 app.config['BASIC_AUTH_USERNAME'] = 'admin'
 app.config['BASIC_AUTH_PASSWORD'] = 'rcds'

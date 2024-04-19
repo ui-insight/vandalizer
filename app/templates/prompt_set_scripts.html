@@ -1,0 +1,246 @@
+<script>
+    var is_adding_prompt_term = false;
+    var prompt_set_add_uuid = "";
+    
+    $(document).ready(function () {
+        $('.prompt-set-item').on("click", function () {
+            console.log("Prompt item tapped");
+            search_set_add_uuid = $(this).attr("data-uuid");
+            $('#adding-prompt-set-title').text($(this).attr("data-title"));
+            if (is_adding_prompt_term) {
+                $('#adding-prompt-set-title').text($(this).attr("data-title"));
+            } else {
+                updateSearchSetPanel($(this).attr("data-uuid"));
+
+                if (document_uuid == null || document_uuid == "") {
+                    return;
+                }
+
+                showWorking();
+                $.ajax({
+                    url: '/api/begin_prompt_search',
+                    type: 'POST',
+                    data: JSON.stringify({
+                        search_set_uuid: $(this).attr("data-uuid"),
+                        document: "{{ document.path }}"
+                    }),
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    async: true,
+                    success: function (data) {
+                        console.log(data);
+                        hideWorking();
+                        $('#prompt-search-results-panel').show();
+                        $('#prompt-search-results-panel').empty();
+                        $(data.template).hide().appendTo('#prompt-search-results-panel').fadeIn();
+                        addResultListeners();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log(xhr.status);
+                        console.log(thrownError);
+                    }
+                });
+            }
+        });
+
+        function addResultListeners() {
+            $('#prompt-set-close-button').on("click", function () {
+                $('#prompt-search-results-panel').fadeOut();
+            });
+            
+
+            $('.prompt-result').on("click", function () {
+                // get text content
+                searchTerm = $(this).text();
+                highlightTerms = [searchTerm];
+                    
+                showToast();
+                navigator.clipboard.writeText(searchTerm);
+                console.log(searchTerm);
+
+                renderPDF();
+                setTimeout(function() {
+                    console.log("showing next");
+                    nextHighlight();
+                }, 500);
+            });
+        }
+
+        function updateSearchSetPanel(set_uuid) {
+            $.ajax({
+                url: '/api/search_results',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: set_uuid,
+                    document_uuid: document_uuid
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    $('#prompt-search-results-panel').show();
+                    $('#prompt-search-results-panel').empty();
+                    $(data.template).hide().appendTo('#prompt-search-results-panel').fadeIn();
+                    addResultListeners();
+                    
+                    
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+
+
+        $('#add-prompt-term-button').on("click", function () {
+            if (search_set_add_uuid != "") {
+                addSearchSetItem();
+                return;
+            }
+        });
+
+        function addPromptSetItem () {
+            $.ajax({
+                url: '/api/add_search_term',
+                type: 'POST',
+                data: JSON.stringify({
+                    search_set_uuid: search_set_add_uuid,
+                    term: $("#add-search-term-input")[0].value,
+                    space_id: "{{ current_space_id }}",
+                    searchtype: "prompt"//$('#segment-1')[0].checked ? "search" : "extraction"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (msg) {
+                    // reload page
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+            search_set_add_uuid = "";
+            is_adding_prompt_term = false
+        }
+
+        $("#add-prompt-set-button").on("click", function () {
+            $.ajax({
+                url: '/api/add_search_set',
+                type: 'POST',
+                data: JSON.stringify({
+                    title: $("#add-prompt-set-input")[0].value,
+                    space_id: "{{ current_space_id }}",
+                    search_type: "prompt"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (msg) {
+                    // reload page
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $("#semantic-search-button").on("click", function (e) {
+            e.preventDefault();
+            performSemanticSearch($("#add-search-term-input")[0].value);
+        });
+
+        
+
+        $('#add-search-term-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                performSemanticSearch($("#add-search-term-input")[0].value);
+            }
+        });
+
+        $('#next-semantic-button').on('click', function(e) {
+            e.preventDefault(); 
+            nextHighlight();
+        });
+
+        $(document).on('keyup', function(e) {
+            if (e.key === 'ArrowRight') {
+                nextHighlight();
+            }
+        });
+
+        function nextHighlight() {
+            current_search_item += 1;
+            if (current_search_item >= highlights.length) {
+                current_search_item = 0;
+            }
+
+            updateHighlights();
+        }
+
+        $('#prev-semantic-button').on('click', function(e) {
+            e.preventDefault();
+            previousHighlight();
+        });
+
+        $(document).on('keyup', function(e) {
+            if (e.key === 'ArrowLeft') {
+                previousHighlight();
+            }
+        });
+
+        function previousHighlight() {
+            current_search_item -= 1;
+            if (current_search_item == -1) {
+                current_search_item =  highlights.length - 1;
+            }
+
+            updateHighlights();
+        }
+
+        function updateHighlights() {
+            highlights = $('.highlight');
+            highlights[current_search_item].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+            $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
+            for (var i = 0; i < highlights.length; i++) {
+                highlights[i].style.backgroundColor = 'yellow';
+                highlights[i].style.opacity = 0.5;
+            }
+
+            highlights[current_search_item].style.backgroundColor = 'red';
+        }
+
+        function getRating() {
+            const ratingInputs = document.querySelectorAll('input[name="rate"]');
+            let selectedValue;
+
+            for (const input of ratingInputs) {
+                if (input.checked) {
+                selectedValue = input.value;
+                break;
+                }
+            }
+
+            return selectedValue;
+        }
+
+        function createSearchTermDictionary() {
+            const searchTermDictionary = {};
+
+            const setEntries = document.querySelectorAll('.set-entry-group');
+            setEntries.forEach((entry) => {
+                const searchPhrase = entry.querySelector('.set-title').textContent.trim();
+                const result = entry.querySelector('.extraction-result').textContent.trim();
+                searchTermDictionary[searchPhrase] = result;
+            });
+
+
+            return searchTermDictionary;
+        }
+        
+    });
+</script>
