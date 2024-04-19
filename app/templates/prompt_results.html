@@ -8,28 +8,10 @@
         </a>
     </span>
 </p>
-
-<!-- <p><b>Searches</b></p> -->
-{% for item in search_set.search_items() %}
-<div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}" data-search-type="{{ search_set.searchtype }}">
-    <div class="set-content">
-        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-            <i class="fa-brands fa-searchengin"></i>
-        </span>
-        <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
-            item.searchphrase }}</p>
-
-            {% if results == null and document == None %}
-            <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
-                <i class="fa-solid fa-circle-xmark"></i></a>
-            {% endif %}
-    </div>
-</div>
-{% endfor %}
 <br>
-<p><b>Prompt Results</b>{% if results != null %}<span style="float: right;"><a id="export" href="#">Export all</a></span> {% endif %}</p>
+<p><b>Prompts</b>{% if results != null %}<span style="float: right;"><a id="export" href="#">Export all</a></span> {% endif %}</p>
 
-{% for item in search_set.extraction_items() %}
+{% for item in search_set.items() %}
 <div class="set-entry-group">
     <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
     <div class="set-content">
