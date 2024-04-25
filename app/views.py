@@ -15,6 +15,10 @@ import csv
 
 @app.route('/')
 def index():
+	return render_template('landing.html')
+
+@app.route('/home')
+def home():
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
@@ -30,6 +34,13 @@ def index():
 	if request.args.get('docid'):
 		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
 		current_space = Space.objects(uuid=document.space).first()
+		semantics = SemanticIngest()
+		# try:
+		# 	if not semantics.check_for_collection(document):
+		# 		thread = threading.Thread(target=ingest_semantics, args=(document,))
+		# 		thread.start()
+		# except:
+		# 	print("Error checking for collection")
 
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)

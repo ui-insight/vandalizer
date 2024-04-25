@@ -195,6 +195,7 @@
             $('.extraction-result').on("click", function () {
                 // get text content
                 searchTerm = $(this).text();
+                console.log("search term: " + searchTerm);
                 highlightTerms = [searchTerm];
                     
                 showToast("Copied to clipboard");
@@ -286,6 +287,13 @@
             is_adding_term = false
         }
 
+        $('#add-search-set-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                console.log("triggering click");
+                $('#add-search-set-button').click();
+            }
+        });
+
         $("#add-search-set-button").on("click", function () {
             $.ajax({
                 url: '/api/add_search_set',
@@ -360,6 +368,8 @@
 
         function updateHighlights() {
             highlights = $('.highlight');
+            console.log(highlights);
+
             highlights[current_search_item].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
             $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
             for (var i = 0; i < highlights.length; i++) {

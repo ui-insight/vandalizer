@@ -45,7 +45,8 @@
 
         {% if results == null and document == None %}
         <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
-            <i class="fa-solid fa-circle-xmark"></i></a>
+            <i class="fa-solid fa-circle-xmark"></i>
+          </a>
         {% endif %}
         
     </div>
@@ -56,9 +57,9 @@
 <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
     <div class="set-content ">
 
-        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}
+        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}</p>
         <!-- <span style="float:right;"><i class="fa-regular fa-flag"></i></i></span> -->
-        </p>
+        
         {% endif %}
         
     </div>
@@ -91,7 +92,7 @@
 {% endif %}
 {% endif %}
 
-
 <br><br>
-<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;">
+
+<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;" onclick="return confirm('Are you sure you want to delete this item?');">
     <i>delete set</i></a></p>

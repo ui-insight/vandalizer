@@ -60,5 +60,10 @@ class SearchSetItem(me.Document):
     searchset = me.StringField(required=True, max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
 
+class WhiteList(me.Document):
+    email = me.StringField(required=True, max_length=200)
+
+    def check_email(self):
+        return WhiteList.objects(email=self.email).first()
 
     
