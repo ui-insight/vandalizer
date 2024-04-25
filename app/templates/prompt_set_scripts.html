@@ -46,6 +46,8 @@
         function addResultListeners() {
             $('#prompt-set-close-button').on("click", function () {
                 $('#prompt-search-results-panel').fadeOut();
+                prompt_set_add_uuid = "";
+                is_adding_prompt_term = false
             });
             
 
@@ -130,15 +132,13 @@
                 async: true,
                 success: function (msg) {
                     // reload page
-                    location.reload();
+                    $('.set-entry-group').append(msg.template);
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
                     console.log(thrownError);
                 }
             });
-            prompt_set_add_uuid = "";
-            is_adding_prompt_term = false
         }
 
         $("#add-prompt-set-button").on("click", function () {

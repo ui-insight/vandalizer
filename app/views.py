@@ -13,12 +13,19 @@ import threading
 import json
 import csv
 
+@app.after_request
+def after_request(response):
+  response.headers.add('Access-Control-Allow-Origin', 'http://127.0.0.1:5000')  # Replace with your frontend origin
+  return response
+
+
 @app.route('/')
 def index():
 	return render_template('landing.html')
 
 @app.route('/home')
 def home():
+	
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
@@ -35,12 +42,12 @@ def home():
 		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
 		current_space = Space.objects(uuid=document.space).first()
 		semantics = SemanticIngest()
-		# try:
-		# 	if not semantics.check_for_collection(document):
-		# 		thread = threading.Thread(target=ingest_semantics, args=(document,))
-		# 		thread.start()
-		# except:
-		# 	print("Error checking for collection")
+		try:
+			if not semantics.check_for_collection(document):
+				thread = threading.Thread(target=ingest_semantics, args=(document,))
+				thread.start()
+		except:
+			print("Error checking for collection")
 
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
@@ -105,21 +112,26 @@ def add_search_term():
 	print(data)
 	searchphrase = data['term']
 	searchset_uuid = data['search_set_uuid']
+	searchset = SearchSet.objects(uuid=searchset_uuid).first()
 	searchtype = data['searchtype']
 	print(searchphrase)
 
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
 	searchsetitem.save()
-	return jsonify({"complete": True})
+
+
+	template = render_template('search_set_item.html', search_set=searchset, item=searchsetitem)
+	response = {
+				'template': template,
+			}
+	return jsonify(response)
 
 @app.route('/api/search_results', methods=['POST'])
 def grab_template():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_uuid = data['document_uuid']
-	print("Fetch loading template")
 	document = SmartDocument.objects(uuid=document_uuid).first()
-	print(document)
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
 	if search_set.set_type == "extraction":	
@@ -162,6 +174,7 @@ def begin_search():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_path = data['document']
+	print("Fetch loading template:" + searchset_uuid + " " + document_path)
 
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 	keys = []
