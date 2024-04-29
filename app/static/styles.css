@@ -3,8 +3,7 @@ img { width: 100%; }
 body {
     background-color: #F3F4F8;
     color: #17181abb;
-
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    font-family: "Public Sans",Arial,sans-serif;
     line-height: 1.25;
     min-height: 100vh;
 }
@@ -189,6 +188,38 @@ footer .footer-poweredby {
     margin-bottom: 15px;
     margin-left: 10px;
     padding-left: 30px;
+}
+
+.hero-content {
+    background: #191919;
+    padding: 4rem;
+    -webkit-box-shadow: -0.7rem 0 0 #f1b300;
+    box-shadow: -0.7rem 0 0 #f1b300;
+}
+
+.hero-content a:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    background: none;
+    color: white;
+    text-decoration: none;
+    border-bottom: 0.1em solid #f1b300;
+}
+
+.hero-content a, .hero-content  button {
+    display: inline-block;
+    width: 100%;
+    color: #191919;
+    border: 0.1em solid #f1b300;
+    background: #f1b300;
+    margin: 1.5rem 0 0;
+    padding: .5em 1em .5em;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+    vertical-align: top;
 }
 
 .navbar-brand {
@@ -615,7 +646,7 @@ tr {
   
   .hero-group {
     margin: 0 auto;
-    max-width: 500px;  
+    max-width: 600px;  
     padding: 150px 50px;
     text-align: center;
   }
