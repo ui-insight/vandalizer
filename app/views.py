@@ -24,16 +24,9 @@ blueprint = make_azure_blueprint(
         client_id=app.config['CLIENT_ID'],
         client_secret=app.config['CLIENT_SECRET'],
         tenant=app.config['TENANT_NAME'],
-<<<<<<< HEAD
-        redirect_to = 'home',
-       
-    )
-app.register_blueprint(blueprint, url_prefix="/login")
-=======
        
     )
 app.register_blueprint(blueprint, url_prefix="/azure_login")
->>>>>>> cc12ef28b535ba1b43b518c949c595eacb1701b6
 
 @app.errorhandler(MismatchingStateError)
 def mismatching_state(e):
