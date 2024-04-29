@@ -13,15 +13,46 @@ import threading
 import json
 import csv
 
-@app.after_request
-def after_request(response):
-  response.headers.add('Access-Control-Allow-Origin', 'http://127.0.0.1:5000')  # Replace with your frontend origin
-  return response
+#OAuth
+import secrets
+from oauthlib.oauth2.rfc6749.errors import TokenExpiredError
+from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
+from flask_dance.contrib.azure import azure, make_azure_blueprint
+
+
+blueprint = make_azure_blueprint(
+        client_id=app.config['CLIENT_ID'],
+        client_secret=app.config['CLIENT_SECRET'],
+        tenant=app.config['TENANT_NAME'],
+        redirect_url = '/azure-redirect',
+       
+    )
+app.register_blueprint(blueprint, url_prefix="/home")
+
+@app.errorhandler(MismatchingStateError)
+def mismatching_state(e):
+    return redirect(url_for("azure.login"))
+
+@app.route('/azure-redirect', methods=['GET'])
+def ui_sso_redirect():
+    if session.get('next_url'):
+        next_url = session.get('next_url')
+        session.pop('next_url')
+        return redirect(next_url)
+    else:
+        return redirect(url_for('index'))
 
 
 @app.route('/')
 def index():
 	return render_template('landing.html')
+
+@app.route('/login')
+def login():
+	if not azure.authorized:
+		return redirect(url_for("azure.login"))
+	else:
+		redirect_url = url_for('home')
 
 @app.route('/home')
 def home():
