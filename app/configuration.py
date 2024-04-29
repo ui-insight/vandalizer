@@ -14,6 +14,10 @@ class Config(object):
 	CSRF_ENABLED = True
 	UPLOAD_FOLDER = "uploads"
 
+	CLIENT_ID = "d135cfa9-546c-48f6-a5be-a0a97955bc61"#os.getenv('CLIENT_ID')
+	CLIENT_SECRET = "iRr8Q~wUZCIi0AkTmO1uTlsvWgYMtvms2yzdvaEN"#os.getenv('CLIENT_SECRET')
+	TENANT_NAME = "7ebc6b63-5792-4a19-b20b-04b826048853"#os.getenv('TENANT_NAME')
+
 	# Pagination
 	PER_PAGE = 25
 

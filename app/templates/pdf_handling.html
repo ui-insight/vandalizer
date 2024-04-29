@@ -39,15 +39,13 @@
                 };
                 var renderTask = page.render(renderContext);
 
+               
+
                 renderTask.promise.then(function () {
                     pageRendering = false;
                     highlightText(page, highlightTerms, viewport, container);
                 });
             })
-
-
-
-
         });
     }
 
@@ -55,6 +53,7 @@
         if (highlightTerms == []) {
             return;
         }
+
         page.getTextContent().then(function (textContent) {
             textContent.items.forEach(function (textItem) {
                 textString = textItem.str;

@@ -3,8 +3,7 @@ img { width: 100%; }
 body {
     background-color: #F3F4F8;
     color: #17181abb;
-
-    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    font-family: "Public Sans",Arial,sans-serif;
     line-height: 1.25;
     min-height: 100vh;
 }
@@ -189,6 +188,38 @@ footer .footer-poweredby {
     margin-bottom: 15px;
     margin-left: 10px;
     padding-left: 30px;
+}
+
+.hero-content {
+    background: #191919;
+    padding: 4rem;
+    -webkit-box-shadow: -0.7rem 0 0 #f1b300;
+    box-shadow: -0.7rem 0 0 #f1b300;
+}
+
+.hero-content a:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
+    -webkit-box-shadow: none;
+    box-shadow: none;
+    background: none;
+    color: white;
+    text-decoration: none;
+    border-bottom: 0.1em solid #f1b300;
+}
+
+.hero-content a, .hero-content  button {
+    display: inline-block;
+    width: 100%;
+    color: #191919;
+    border: 0.1em solid #f1b300;
+    background: #f1b300;
+    margin: 1.5rem 0 0;
+    padding: .5em 1em .5em;
+    font-size: 2rem;
+    line-height: 1;
+    font-weight: 900;
+    text-align: center;
+    text-transform: uppercase;
+    vertical-align: top;
 }
 
 .navbar-brand {
@@ -605,3 +636,90 @@ tr {
     padding-left: 15px;
   }
   
+  .hero {
+    background: url("images/wallpaper.png");
+    height: 920px;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+  }
+  
+  .hero-group {
+    margin: 0 auto;
+    max-width: 600px;  
+    padding: 150px 50px;
+    text-align: center;
+  }
+  
+  .hero h1 {
+    margin: 0;
+    color: #fff;
+    font-size: 60px;
+    font-weight: 900;
+    line-height: 1.2;  
+    animation: hero-animation;
+    animation-duration: 3s;
+    opacity: 0;
+    animation-fill-mode: forwards;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);  
+    animation-delay: 0.1s;  
+  }
+  
+  .hero p {
+    margin: 30px 0;
+    color: rgba(255,255,255,0.8);
+    font-size: 30px;
+    line-height: 1.5;
+    opacity: 0;
+    animation: hero-animation 3s 0.2s forwards cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  
+  
+  
+  @media (max-width: 640px) {
+    .hero-group {
+      padding: 100px 20px;
+    }
+    
+    .hero h1 {
+      font-size: 40px;
+    }
+    
+    .hero p {
+      font-size: 24px; 
+    }
+  }
+  
+  @keyframes hero-animation {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }  
+  }
+  
+  .hero svg {
+    position: absolute;
+    left: 0;
+    bottom: -2px; 
+    z-index: 50;
+  }
+  
+  .hero .logos {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    grid-gap: 40px;
+    margin: 100px 0;
+    justify-items: center;
+    z-index: 150;  
+  }
+  
+  @media (max-width: 640px) {
+    .hero .logos {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }

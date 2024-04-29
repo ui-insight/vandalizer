@@ -13,8 +13,50 @@ import threading
 import json
 import csv
 
+#OAuth
+import secrets
+from oauthlib.oauth2.rfc6749.errors import TokenExpiredError
+from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
+from flask_dance.contrib.azure import azure, make_azure_blueprint
+
+
+blueprint = make_azure_blueprint(
+        client_id=app.config['CLIENT_ID'],
+        client_secret=app.config['CLIENT_SECRET'],
+        tenant=app.config['TENANT_NAME'],
+        redirect_url = '/azure-redirect',
+       
+    )
+app.register_blueprint(blueprint, url_prefix="/home")
+
+@app.errorhandler(MismatchingStateError)
+def mismatching_state(e):
+    return redirect(url_for("azure.login"))
+
+@app.route('/azure-redirect', methods=['GET'])
+def ui_sso_redirect():
+    if session.get('next_url'):
+        next_url = session.get('next_url')
+        session.pop('next_url')
+        return redirect(next_url)
+    else:
+        return redirect(url_for('index'))
+
+
 @app.route('/')
 def index():
+	return render_template('landing.html')
+
+@app.route('/login')
+def login():
+	if not azure.authorized:
+		return redirect(url_for("azure.login"))
+	else:
+		redirect_url = url_for('home')
+
+@app.route('/home')
+def home():
+	
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
@@ -30,6 +72,13 @@ def index():
 	if request.args.get('docid'):
 		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
 		current_space = Space.objects(uuid=document.space).first()
+		semantics = SemanticIngest()
+		try:
+			if not semantics.check_for_collection(document):
+				thread = threading.Thread(target=ingest_semantics, args=(document,))
+				thread.start()
+		except:
+			print("Error checking for collection")
 
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
@@ -94,21 +143,26 @@ def add_search_term():
 	print(data)
 	searchphrase = data['term']
 	searchset_uuid = data['search_set_uuid']
+	searchset = SearchSet.objects(uuid=searchset_uuid).first()
 	searchtype = data['searchtype']
 	print(searchphrase)
 
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
 	searchsetitem.save()
-	return jsonify({"complete": True})
+
+
+	template = render_template('search_set_item.html', search_set=searchset, item=searchsetitem)
+	response = {
+				'template': template,
+			}
+	return jsonify(response)
 
 @app.route('/api/search_results', methods=['POST'])
 def grab_template():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_uuid = data['document_uuid']
-	print("Fetch loading template")
 	document = SmartDocument.objects(uuid=document_uuid).first()
-	print(document)
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
 	if search_set.set_type == "extraction":	
@@ -151,6 +205,7 @@ def begin_search():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_path = data['document']
+	print("Fetch loading template:" + searchset_uuid + " " + document_path)
 
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 	keys = []

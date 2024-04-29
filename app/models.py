@@ -4,13 +4,7 @@ from flask_login import UserMixin
 import datetime
 
 class User(me.Document):
-    firstname = me.StringField(required=True, max_length=200)
-    lastname = me.StringField(required=True, max_length=200)
-    email = me.StringField(required=True, max_length=200)
-    affiliation = me.StringField(required=True, max_length=500)
-    wildmarkerid = me.StringField(required=True, max_length=200)
-    
-    password_hash = me.StringField(required=True, max_length=200)
+    user_id = me.StringField(required=True, max_length=200)
     
 class SmartDocument(me.Document):
     path = me.StringField(required=True, max_length=200)
@@ -42,6 +36,9 @@ class SearchSet(me.Document):
     user = me.StringField(required=True, max_length=200)
     status = me.StringField(required=True, max_length=200)
     set_type = me.StringField(required=True, max_length=200)
+    user_id = me.StringField(required=False, max_length=200)
+    is_global = me.BooleanField(default=False)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
 
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
@@ -60,5 +57,10 @@ class SearchSetItem(me.Document):
     searchset = me.StringField(required=True, max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
 
+class WhiteList(me.Document):
+    email = me.StringField(required=True, max_length=200)
+
+    def check_email(self):
+        return WhiteList.objects(email=self.email).first()
 
     

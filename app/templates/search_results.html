@@ -27,7 +27,8 @@
 </div>
 {% endfor %}
 <br>
-<p><b>Extractions</b>{% if results != null %}<span style="float: right;"><a id="export" href="#">Export all</a></span> {% endif %}</p>
+<p><b>Extractions</b>{% if results != null %}<span style="float: right; padding-left: 15px;"><a id="rerun" href="#" data-uuid="{{ search_set.uuid }}"
+    data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export</a></span> {% endif %}</p>
 
 {% for item in search_set.extraction_items() %}
 <div class="set-entry-group">
@@ -45,7 +46,8 @@
 
         {% if results == null and document == None %}
         <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
-            <i class="fa-solid fa-circle-xmark"></i></a>
+            <i class="fa-solid fa-circle-xmark"></i>
+          </a>
         {% endif %}
         
     </div>
@@ -56,9 +58,9 @@
 <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
     <div class="set-content ">
 
-        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}
+        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase] }}</p>
         <!-- <span style="float:right;"><i class="fa-regular fa-flag"></i></i></span> -->
-        </p>
+        
         {% endif %}
         
     </div>
@@ -91,7 +93,7 @@
 {% endif %}
 {% endif %}
 
-
 <br><br>
-<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;">
+
+<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;" onclick="return confirm('Are you sure you want to delete this item?');">
     <i>delete set</i></a></p>

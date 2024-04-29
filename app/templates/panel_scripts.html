@@ -89,13 +89,21 @@
         }
         
         $('.set-item').on("click", function () {
-            console.log("Set item tapped");
-            search_set_add_uuid = $(this).attr("data-uuid");
-            $('#adding-search-set-title').text($(this).attr("data-title"));
+            let uuid = $(this).attr("data-uuid");
+            let datatitle = $(this).attr("data-title");
+            performSearch(uuid, datatitle);
+        });
+
+        
+
+        function performSearch(search_set_uuid, datatitle) {
+            console.log("Set item tapped: " + search_set_uuid);
+            search_set_add_uuid = search_set_uuid;
+            $('#adding-search-set-title').text(datatitle);
             if (is_adding_term) {
-                $('#adding-search-set-title').text($(this).attr("data-title"));
+                $('#adding-search-set-title').text(datatitle);
             } else {
-                updateSearchSetPanel($(this).attr("data-uuid"));
+                updateSearchSetPanel(search_set_uuid);
 
                 if (document_uuid == null || document_uuid == "") {
                     return;
@@ -106,7 +114,7 @@
                     url: '/api/begin_search',
                     type: 'POST',
                     data: JSON.stringify({
-                        search_set_uuid: $(this).attr("data-uuid"),
+                        search_set_uuid: search_set_add_uuid,
                         document: "{{ document.path }}"
                     }),
                     contentType: 'application/json; charset=utf-8',
@@ -126,16 +134,24 @@
                     }
                 });
             }
-        });
+        }
 
         function addResultListeners() {
             $('#set-close-button').on("click", function () {
                 $('#search-results-panel').fadeOut();
+                search_set_add_uuid = "";
+                is_adding_term = false
             });
             $('.semantic-entry').on("click", function () {
                 console.log("clicked");
                 searchTerm = $(this).attr("data-title");
                 performSemanticSearch(searchTerm);
+            });
+
+            $('#rerun').on("click", function () {
+                let uuid = $(this).attr("data-uuid");
+                let datatitle = $(this).attr("data-title");
+                performSearch(uuid, datatitle);
             });
 
             $('#export').on("click", function (e) {
@@ -195,6 +211,7 @@
             $('.extraction-result').on("click", function () {
                 // get text content
                 searchTerm = $(this).text();
+                console.log("search term: " + searchTerm);
                 highlightTerms = [searchTerm];
                     
                 showToast("Copied to clipboard");
@@ -274,17 +291,22 @@
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
-                    // reload page
-                    location.reload();
+                    $('.set-entry-group').append(msg.template);
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
                     console.log(thrownError);
                 }
             });
-            search_set_add_uuid = "";
-            is_adding_term = false
+            
         }
+
+        $('#add-search-set-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                console.log("triggering click");
+                $('#add-search-set-button').click();
+            }
+        });
 
         $("#add-search-set-button").on("click", function () {
             $.ajax({
@@ -360,6 +382,8 @@
 
         function updateHighlights() {
             highlights = $('.highlight');
+            console.log(highlights);
+
             highlights[current_search_item].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
             $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
             for (var i = 0; i < highlights.length; i++) {

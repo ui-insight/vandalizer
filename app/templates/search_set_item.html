@@ -1,0 +1,15 @@
+<div class="set-entry-group">
+    <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
+    <div class="set-content">
+        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+            <i class="fa-solid fa-filter"></i>
+        </span>
+        <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+            item.searchphrase }}</p>
+
+        <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </a>
+        
+    </div>
+</div>
