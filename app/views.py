@@ -24,27 +24,26 @@ blueprint = make_azure_blueprint(
         client_id=app.config['CLIENT_ID'],
         client_secret=app.config['CLIENT_SECRET'],
         tenant=app.config['TENANT_NAME'],
+<<<<<<< HEAD
         redirect_to = 'home',
        
     )
 app.register_blueprint(blueprint, url_prefix="/login")
+=======
+       
+    )
+app.register_blueprint(blueprint, url_prefix="/azure_login")
+>>>>>>> cc12ef28b535ba1b43b518c949c595eacb1701b6
 
 @app.errorhandler(MismatchingStateError)
 def mismatching_state(e):
     return redirect(url_for("azure.login"))
 
-@app.route('/azure-redirect', methods=['GET'])
-def ui_sso_redirect():
-    if session.get('next_url'):
-        next_url = session.get('next_url')
-        session.pop('next_url')
-        return redirect(next_url)
-    else:
-        return redirect(url_for('index'))
-
-
 @app.route('/')
 def index():
+	if azure.authorized:
+		return redirect(url_for('home'))
+	
 	return render_template('landing.html')
 
 @app.route('/login')
@@ -52,11 +51,12 @@ def login():
 	if not azure.authorized:
 		return redirect(url_for("azure.login"))
 	else:
-		redirect_url = url_for('home')
+		return redirect(url_for('home'))
 
 @app.route('/home')
 def home():
-	
+	if not azure.authorized:
+		return redirect(url_for("azure.login"))
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
