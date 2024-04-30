@@ -50,6 +50,11 @@
                 is_adding_prompt_term = false
             });
             
+            $('#rerun').on("click", function () {
+                let uuid = $(this).attr("data-uuid");
+                let datatitle = $(this).attr("data-title");
+                performSearch(uuid, datatitle);
+            });
 
             $('.prompt-result').on("click", function () {
                 // get text content
@@ -132,7 +137,7 @@
                 async: true,
                 success: function (msg) {
                     // reload page
-                    $('.set-entry-group').append(msg.template);
+                    $('.set-items').append(msg.template);
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

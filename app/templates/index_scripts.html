@@ -186,6 +186,8 @@ $(document).ready(function() {
 
         if (selectedOption == "Create New Space") {
             window.location.href = "/spaces/new";
+        } else if (selectedOption == "Logout") {
+            window.location.href = "/logout";
         } else {
             window.location.href = "/?id=" + selectedOption;
         }

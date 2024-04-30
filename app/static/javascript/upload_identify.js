@@ -1,12 +1,12 @@
 //selecting all required elements
-
+var file;
 let dropArea = document.querySelector(".drag-area");
 if (dropArea) {
   let dragText = dropArea.querySelector("header"),
   //button = dropArea.querySelector("button"),
   input = dropArea.querySelector("input"),
   dragArea = document.querySelector(".drop-area");
-  let file; //this is a global variable and we'll use it inside multiple functions
+   //this is a global variable and we'll use it inside multiple functions
   //button.onclick = ()=>{
   //  input.click(); //if user click on the button then the input also clicked
   //}
@@ -36,7 +36,9 @@ if (dropArea) {
     event.preventDefault(); //preventing from default behaviour
     //getting user select file and [0] this means if user select multiple files then we'll select only the first one
     dragText.textContent = "Drag & Drop to Upload File";
+    console.log("Looking for ifle");
     file = event.dataTransfer.files[0];
+    console.log(file);
     showFile(); //calling function
   });
 }

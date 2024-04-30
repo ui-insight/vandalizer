@@ -5,23 +5,20 @@ import datetime
 
 class User(me.Document):
     user_id = me.StringField(required=True, max_length=200)
+    is_admin = me.BooleanField(default=False)
     
 class SmartDocument(me.Document):
     path = me.StringField(required=True, max_length=200)
     title = me.StringField(required=True, max_length=200)
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
+    user_id = me.StringField(required=True, max_length=200)
 
 class Space(me.Document):
     uuid = me.StringField(required=True, max_length=200)
     title = me.StringField(required=True, max_length=200)
     user = me.StringField(required=False, max_length=200)
 
-class User(me.Document):
-    firstname = me.StringField(required=True, max_length=200)
-    lastname = me.StringField(required=True, max_length=200)
-    email = me.StringField(required=True, max_length=200)
-    password_hash = me.StringField(required=True, max_length=200)
 
 class ExtractionQualityRecord(me.Document):
     pdf_title = me.StringField(required=True, max_length=200)
@@ -33,7 +30,6 @@ class SearchSet(me.Document):
     title = me.StringField(required=True, max_length=200)
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
-    user = me.StringField(required=True, max_length=200)
     status = me.StringField(required=True, max_length=200)
     set_type = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=False, max_length=200)

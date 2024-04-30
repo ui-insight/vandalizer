@@ -35,6 +35,9 @@
         <option value="Create New Space">
             <i>Create New Space</i>
         </option>
+        <option value="Logout">
+            <i>Logout</i>
+        </option>
     </select>
     </div>
     <!-- /.container-fluid -->
@@ -72,13 +75,12 @@
                 </div>
 
             </div>
-
         </div>
         {% if (document != None) %}
         <div class="document" id="document"></div>
         <div class="semantic-panel" id="semantic-panel">
             <button class="shadow-button" id="prev-semantic-button" style="margin: 10px;">
-                <span style="font-size: 1em; color: #f1b300;">
+                <span style="font-size: 1em; color: #5c21d2bc;">
                     <i class="fa-solid fa-arrow-left"></i>
                 </span>
             </button>
@@ -182,8 +184,13 @@
                                             style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                             {{
                                             search_set.title }}</p>
-                                        <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }}
-                                            items
+
+                                        <p class="set-items" style="text-align: right; ">
+                                            <span>{{ search_set.item_count() }}
+                                            items</span>
+                                            {% if search_set.is_global %}
+                                            <span><i class="fa-solid fa-globe"></i></span>
+                                            {% endif %}
 
                                         </p>
 
@@ -226,11 +233,13 @@
                                             style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                             {{
                                             search_set.title }}</p>
-                                        <p class="set-items" style="text-align: right; ">{{ search_set.item_count() }}
-                                            items
-
+                                        <p class="set-items" style="text-align: right; ">
+                                            <span>{{ search_set.item_count() }}
+                                                items</span>
+                                                {% if search_set.is_global %}
+                                                <span><i class="fa-solid fa-globe"></i></span>
+                                                {% endif %}
                                         </p>
-
                                     </div>
                                 </div>
                             </div>

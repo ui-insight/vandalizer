@@ -12,6 +12,7 @@ import uuid
 import threading
 import json
 import csv
+from itertools import chain
 
 #OAuth
 import secrets
@@ -23,9 +24,9 @@ from flask_dance.contrib.azure import azure, make_azure_blueprint
 blueprint = make_azure_blueprint(
         client_id=app.config['CLIENT_ID'],
         client_secret=app.config['CLIENT_SECRET'],
-        tenant=app.config['TENANT_NAME'],
-       
+        tenant=app.config['TENANT_NAME'],  
     )
+
 app.register_blueprint(blueprint, url_prefix="/azure_login")
 
 @app.errorhandler(MismatchingStateError)
@@ -45,11 +46,29 @@ def login():
 		return redirect(url_for("azure.login"))
 	else:
 		return redirect(url_for('home'))
+	
+@app.route('/logout')
+def logout():
+	session.clear()
+	return redirect(url_for('azure.logout'))
+
 
 @app.route('/home')
 def home():
-	if not azure.authorized:
-		return redirect(url_for("azure.login"))
+	if "user_id" not in session:
+		print("No user session")
+		resp = azure.get("/v1.0/me")
+		user_info = resp.json()
+		if "id" not in user_info:
+			session["user_id"] = "admin"
+		else:
+			user_id = user_info["id"]
+			session["user_id"] = user_id
+
+	user = load_user()
+    
+	#if not azure.authorized:
+	#	return redirect(url_for("azure.login"))
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
@@ -76,18 +95,27 @@ def home():
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
 
-	extraction_sets = SearchSet.objects(space=current_space.uuid, set_type="extraction").all()
-	prompt_sets = SearchSet.objects(space=current_space.uuid, set_type="prompt").all()
-	docs = SmartDocument.objects(space=current_space.uuid).all()
+	global_extraction_sets = SearchSet.objects(space=current_space.uuid, is_global=True, set_type="extraction").all()
+	user_extraction_sets = SearchSet.objects(user_id=user.user_id, space=current_space.uuid, is_global=False, set_type="extraction").all()
+	extraction_sets = chain(global_extraction_sets, user_extraction_sets)
+
+	global_prompt_sets = SearchSet.objects(space=current_space.uuid, is_global=True, set_type="prompt").all()
+	user_prompt_sets = SearchSet.objects(user_id=user.user_id, space=current_space.uuid, is_global=False,  set_type="prompt").all()
+	prompt_sets = chain(global_prompt_sets, user_prompt_sets)
+	docs = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid).all()
 	return render_template('index.html', extraction_sets=extraction_sets, prompt_sets=prompt_sets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
+	user = load_user()
+	if user is None:
+		return redirect(url_for('login'))
+
 	json_data = request.get_json()
 	blob = json_data['contentAsBase64String']
 	filename = json_data['fileName']
 	space = json_data['space']
-	if SmartDocument.objects(title=filename, space=space).count() > 0:
+	if SmartDocument.objects(title=filename, space=space, user_id=user.user_id).count() > 0:
 		return jsonify({"complete": True})
 
 	imgdata = base64.b64decode(blob)
@@ -95,7 +123,7 @@ def upload():
 	with open(os.path.join(app.root_path, 'static', 'uploads', f"{uid}.pdf"), 'wb') as f:
 		f.write(imgdata)
 	
-	document = SmartDocument(title=filename, path=f"{uid}.pdf", uuid=uid, space=space)
+	document = SmartDocument(title=filename, path=f"{uid}.pdf", uuid=uid, user_id=user.user_id, space=space)
 	document.save()
 	
 	# Create a new thread and start it
@@ -122,11 +150,17 @@ def chat():
 
 @app.route('/api/add_search_set', methods=['POST'])
 def add_search_set():
+	user = load_user()
+	if user is None:
+		return redirect(url_for('login'))
+	
 	data = request.get_json()
 	title = data['title']
 	space = data['space_id']
 	search_type = data['search_type']
-	searchset = SearchSet(title=title, uuid=uuid.uuid4().hex, space=space, user="admin", status="active", set_type=search_type)
+	searchset = SearchSet(title=title, uuid=uuid.uuid4().hex, space=space, user_id=user.user_id, status="active", set_type=search_type)
+	if user.is_admin:
+		searchset.is_global = True
 	searchset.save()
 	return jsonify({"complete": True})
 
@@ -341,3 +375,21 @@ def export_extraction():
 	return send_file('static/extraction.csv', 
                      mimetype='text/csv',
                      as_attachment=True)
+
+
+@app.route('/build_admin')
+def build_admin():
+	user = User(user_id="admin", is_admin=True)
+	user.save()
+	session["user_id"] = "admin"
+
+def load_user():
+	if "user_id" in session:
+		user = User.objects(user_id=session["user_id"]).first()
+		if user:
+			return user
+		else:
+			user = User(user_id=session["user_id"], is_admin=False)
+			user.save()
+			return user
+	return None

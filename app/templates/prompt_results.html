@@ -9,8 +9,10 @@
     </span>
 </p>
 <br>
-<p><b>Prompts</b>{% if results != null %}<span style="float: right;"><a id="export" href="#">Export all</a></span> {% endif %}</p>
+<p><b>Prompts</b>{% if results != null %}<span style="float: right; padding-left: 15px;"><a id="rerun-prompt" href="#" data-uuid="{{ search_set.uuid }}"
+    data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export all</a></span> {% endif %}</p>
 
+<div class="set-items">
 {% for item in search_set.items() %}
 <div class="set-entry-group">
     <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
@@ -49,6 +51,7 @@
 </div>
 
 {% endfor %}
+</div>
 
 {% if results != null %}
 {% if document != None %}
