@@ -50,7 +50,7 @@ def login():
 @app.route('/logout')
 def logout():
 	session.clear()
-	return redirect(url_for('azure.logout'))
+	return redirect(url_for('index'))
 
 
 @app.route('/home')
@@ -60,8 +60,10 @@ def home():
 		resp = azure.get("/v1.0/me")
 		user_info = resp.json()
 		if "id" not in user_info:
+			print("Got nothing from azure")
 			session["user_id"] = "admin"
 		else:
+			print("Got user info from azure")
 			user_id = user_info["id"]
 			session["user_id"] = user_id
 
@@ -387,9 +389,11 @@ def load_user():
 	if "user_id" in session:
 		user = User.objects(user_id=session["user_id"]).first()
 		if user:
+			print("User found")
 			return user
 		else:
 			user = User(user_id=session["user_id"], is_admin=False)
 			user.save()
+			print("Built new user" + user.user_id)
 			return user
 	return None
