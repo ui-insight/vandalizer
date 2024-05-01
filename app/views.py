@@ -27,7 +27,7 @@ blueprint = make_azure_blueprint(
         tenant=app.config['TENANT_NAME'],  
     )
 
-app.register_blueprint(blueprint, url_prefix="/azure_login")
+app.register_blueprint(blueprint, url_prefix="/login")
 
 @app.errorhandler(MismatchingStateError)
 def mismatching_state(e):
