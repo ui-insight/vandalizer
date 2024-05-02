@@ -36,8 +36,10 @@ def mismatching_state(e):
 @app.route('/')
 def index():
 	if azure.authorized:
+		print("Already authorized")
 		return redirect(url_for('home'))
 	
+	print("Not authorized")
 	return render_template('landing.html')
 
 @app.route('/login')
@@ -55,6 +57,8 @@ def logout():
 
 @app.route('/home')
 def home():
+	#if not azure.authorized:
+	#	return redirect(url_for("azure.login"))
 	if "user_id" not in session:
 		print("No user session")
 		resp = azure.get("/v1.0/me")
@@ -68,9 +72,7 @@ def home():
 			session["user_id"] = user_id
 
 	user = load_user()
-    
-	#if not azure.authorized:
-	#	return redirect(url_for("azure.login"))
+	
 	document = None
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
@@ -338,7 +340,7 @@ def new_space():
 		title = request.form['title']
 		space = Space(title=title, uuid=uuid.uuid4().hex)
 		space.save()
-		return redirect('/?id=' + space.uuid)
+		return redirect('/home?id=' + space.uuid)
 	return render_template('spaces/new.html')
 
 @app.route('/submit_rating', methods=['POST'])
@@ -366,7 +368,7 @@ def export_extraction():
 		rows.append([key, value])
 	
 	# Define the file path for the CSV file
-	csv_file_path = os.path.join(app.root_path, 'static', 'extraction.csv')
+	csv_file_path = os.path.join(app.root_path, 'static', 'export.csv')
 	
 	# Write the rows to the CSV file
 	with open(csv_file_path, 'w', newline='') as f:

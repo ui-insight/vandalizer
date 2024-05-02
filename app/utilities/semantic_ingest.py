@@ -18,7 +18,10 @@ class SemanticIngest:
     
     def delete(self, document):
         client = chromadb.HttpClient(host='localhost', port=5028)
-        client.delete_collection(name=document.uuid)
+        try:
+            client.delete_collection(name=document.uuid)
+        except:
+            pass
 
     def check_for_collection(self, document):
         client = chromadb.HttpClient(host='localhost', port=5028)
