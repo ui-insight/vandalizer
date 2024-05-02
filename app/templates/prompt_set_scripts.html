@@ -3,14 +3,33 @@
     var prompt_set_add_uuid = "";
     
     $(document).ready(function () {
+
+        function createSearchTermDictionary() {
+            const searchTermDictionary = {};
+
+            const setEntries = document.querySelectorAll('.set-entry-group');
+            setEntries.forEach((entry) => {
+                const searchPhrase = entry.querySelector('.set-title').textContent.trim();
+                const result = entry.querySelector('.extraction-result').textContent.trim();
+                searchTermDictionary[searchPhrase] = result;
+            });
+
+
+            return searchTermDictionary;
+        }
+        
         $('.prompt-set-item').on("click", function () {
             console.log("Prompt item tapped");
-            prompt_set_add_uuid = $(this).attr("data-uuid");
-            $('#adding-prompt-set-title').text($(this).attr("data-title"));
+            performPromptSearch($(this).attr("data-uuid"), $(this).attr("data-title"));
+        });
+
+        function performPromptSearch(datauuid, datatitle) {
+            prompt_set_add_uuid = datauuid;
+            $('#adding-prompt-set-title').text(datatitle);
             if (is_adding_prompt_term) {
-                $('#adding-prompt-set-title').text($(this).attr("data-title"));
+                $('#adding-prompt-set-title').text(datatitle);
             } else {
-                updateSearchSetPanel($(this).attr("data-uuid"));
+                updateSearchSetPanel(datauuid);
 
                 if (document_uuid == null || document_uuid == "") {
                     return;
@@ -21,7 +40,7 @@
                     url: '/api/begin_prompt_search',
                     type: 'POST',
                     data: JSON.stringify({
-                        search_set_uuid: $(this).attr("data-uuid"),
+                        search_set_uuid: datauuid,
                         document: "{{ document.path }}"
                     }),
                     contentType: 'application/json; charset=utf-8',
@@ -41,7 +60,7 @@
                     }
                 });
             }
-        });
+        }
 
         function addResultListeners() {
             $('#prompt-set-close-button').on("click", function () {
@@ -50,10 +69,37 @@
                 is_adding_prompt_term = false
             });
             
-            $('#rerun').on("click", function () {
+            $('#rerun-prompt').on("click", function () {
                 let uuid = $(this).attr("data-uuid");
                 let datatitle = $(this).attr("data-title");
-                performSearch(uuid, datatitle);
+                performPromptSearch(uuid, datatitle);
+            });
+
+            $('#export-prompt').on("click", function (e) {
+                e.preventDefault();
+                searchDict = createSearchTermDictionary();
+
+                var form = $('<form>', {
+                    'action': '/export_extraction',
+                    'method': 'GET'
+                });
+
+                $.each(searchDict, function (key, value) {
+                    form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': key,
+                    'value': value
+                    }));
+                });
+
+                form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': 'pdf_title',
+                    'value': $('#document-title')[0].innerText
+                }));
+
+                $('body').append(form);
+                form.submit();
             });
 
             $('.prompt-result').on("click", function () {
@@ -145,6 +191,13 @@
                 }
             });
         }
+
+        $('#add-prompt-set-input').on('keyup', function(e) {
+            if (e.key === 'Enter') {
+                console.log("triggering click");
+                $('#add-prompt-set-button').click();
+            }
+        });
 
         $("#add-prompt-set-button").on("click", function () {
             $.ajax({
