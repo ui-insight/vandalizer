@@ -183,7 +183,7 @@
                 async: true,
                 success: function (msg) {
                     // reload page
-                    $('.set-items').append(msg.template);
+                    $('.set-result-items').append(msg.template);
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

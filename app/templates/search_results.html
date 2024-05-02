@@ -30,7 +30,7 @@
 <p><b>Extractions</b>{% if results != null %}<span style="float: right; padding-left: 15px;"><a id="rerun" href="#" data-uuid="{{ search_set.uuid }}"
     data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export</a></span> {% endif %}</p>
 
-<div class="set-items">
+<div class="set-items set-result-items">
 {% for item in search_set.extraction_items() %}
 <div class="set-entry-group">
     <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}" data-search-type="{{ search_set.searchtype }}">
