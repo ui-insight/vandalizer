@@ -292,6 +292,7 @@
                 async: true,
                 success: function (msg) {
                     $('.set-result-items').append(msg.template);
+                    $("#add-search-term-input")[0].value = "";
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
