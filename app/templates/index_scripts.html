@@ -164,10 +164,18 @@ function removeChatLoading() {
 }
 
 function showScanning() {
+    if ($('.document')[0] == undefined) {
+        return;
+    }
+
     $('.document')[0].classList.add('scanning')
 }
 
 function stopScanning() {
+    if ($('.document')[0] == undefined) {
+        return;
+    }
+    
     $('.document')[0].classList.remove('scanning')
 }
 
