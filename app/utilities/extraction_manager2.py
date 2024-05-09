@@ -43,11 +43,15 @@ class ExtractionManager2:
         start_time = time.time()
 
         prompt = self.getPrompt(full_text, extract_keys)
+        model = "gpt-3.5-turbo-0125"
+        if len(prompt) > 50000:
+            model = "gpt-4-turbo"
+
 
         print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()
 
-        completion = openai.chat.completions.create(model="gpt-4-turbo", 
+        completion = openai.chat.completions.create(model=model, 
                                                     response_format={"type": "json_object"},
                                                 messages=[
                                                     {"role": "system", "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage."},

@@ -97,6 +97,7 @@
         
 
         function performSearch(search_set_uuid, datatitle) {
+            showScanning();
             console.log("Set item tapped: " + search_set_uuid);
             search_set_add_uuid = search_set_uuid;
             $('#adding-search-set-title').text(datatitle);
@@ -123,6 +124,7 @@
                     success: function (data) {
                         console.log(data);
                         hideWorking();
+                        stopScanning();
                         $('#search-results-panel').show();
                         $('#search-results-panel').empty();
                         $(data.template).hide().appendTo('#search-results-panel').fadeIn();
