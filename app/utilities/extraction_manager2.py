@@ -43,10 +43,10 @@ class ExtractionManager2:
         start_time = time.time()
 
         prompt = self.getPrompt(full_text, extract_keys)
-        model = "gpt-3.5-turbo-0125"
-        if len(prompt) > 50000:
-            model = "gpt-4-turbo"
-
+        #model = "gpt-3.5-turbo-0125"
+        #if len(prompt) > 50000:
+        #    model = "gpt-4-turbo"
+        model = "gpt-4o"
 
         print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()

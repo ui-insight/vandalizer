@@ -25,7 +25,7 @@ class OpenAIInterface:
     def ask_question_to_loaded_document(self, question):
         openai.api_key = "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"
         prompt = """Given the following document, answer the following question:""" + question + "\n" + self.loaded_doc
-        completion = openai.chat.completions.create(model="gpt-3.5-turbo-0125", 
+        completion = openai.chat.completions.create(model="gpt-4o", 
                                               messages=[{"role": "user", "content": prompt}],
                                              )
         return completion.choices[0].message.content

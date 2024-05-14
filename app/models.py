@@ -35,6 +35,7 @@ class SearchSet(me.Document):
     user_id = me.StringField(required=False, max_length=200)
     is_global = me.BooleanField(default=False)
     created_at = me.DateTimeField(default=datetime.datetime.now)
+    user = me.StringField(required=False, max_length=200)
 
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
