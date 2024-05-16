@@ -26,7 +26,7 @@ $.ajax({
         type: 'POST',
         data: JSON.stringify({
             question: question,
-            model: 'gpt-4',
+            model: 'gpt-4o',
             space: $('#current-space-id')[0].innerHTML
         }),
         contentType: 'application/json; charset=utf-8',
@@ -65,7 +65,7 @@ $.ajax({
         data: JSON.stringify({
             question: "Considering the document, answer this question: " + question,
             document: askingDocument,
-            model: 'gpt-4'
+            model: 'gpt-4o'
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
@@ -109,7 +109,7 @@ function summarizeDocument(documentName) {
         data: JSON.stringify({
             question: "Summarize the document text",
             document: documentName,
-            model: 'gpt-4'
+            model: 'gpt-4o'
         }),
         contentType: 'application/json; charset=utf-8',
         dataType: 'json',
