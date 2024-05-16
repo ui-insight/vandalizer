@@ -72,6 +72,8 @@ def home():
 			session["user_id"] = user_id
 
 	user = load_user()
+	section = request.args.get('section', default="Extract").strip()
+	print(section)
 	
 	document = None
 	spaces = list(Space.objects())
@@ -107,7 +109,7 @@ def home():
 	user_prompt_sets = SearchSet.objects(user_id=user.user_id, space=current_space.uuid, is_global=False,  set_type="prompt").all()
 	prompt_sets = chain(global_prompt_sets, user_prompt_sets)
 	docs = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid).all()
-	return render_template('index.html', extraction_sets=extraction_sets, prompt_sets=prompt_sets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid)
+	return render_template('index.html', extraction_sets=extraction_sets, prompt_sets=prompt_sets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid, section=section)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():

@@ -168,23 +168,26 @@
     -moz-appearance: none;
     appearance: none;
     height: 40px;
-    padding: 8px 5px 10px 16px;
+    padding: 10px 15px 10px 16px;
     font-size: 15px;
     font-weight: 600;
-    background: #fff url("/static/images/select-arrows.svg") no-repeat right 16px center;
+    text-align: right;
+    background: #fff url("/static/images/select-arrows.svg") no-repeat right 0px center;
     background-size: 10px;
-    transition: border-color .1s ease-in-out,box-shadow .1s ease-in-out;
-    border: 1px solid #ddd;
-    border-radius: 20px;
-    
+    border: none;
+    direction: rtl;
+    align-items: right;
 }
 .custom-select:hover {
-    border: 1px solid #999;
+    border: none;
+    color:rgba(57, 22, 163, 1);
+    cursor: pointer;
 }
 .custom-select:focus {
-    border: 1px solid #999;
-    box-shadow: 0 3px 5px 0 rgba(0,0,0,.2);
+    border: none;
     outline: none;
+    cursor: pointer;
+    color:rgba(57, 22, 163, 1);
 }
 /* remove default arrow in IE */
 select::-ms-expand {

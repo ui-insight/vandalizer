@@ -30,7 +30,7 @@
     padding: 15px;
     right: 0;
     width: 40%;
-    height: 135px;
+    /* height: 135px; */
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     z-index: 20000;
@@ -161,7 +161,7 @@ button.shadow-button:hover {
 .ask-question-container {
   position: relative;
   width: 100%;
-  height: 60px;
+  /* height: 60px; */
   z-index: 100;
   padding-top: 10px;
 }
@@ -198,11 +198,23 @@ button.shadow-button:hover {
   font-weight: 600;
 }
 
-.ask-question .add-button {
+.ask-question .add-button-2 {
   position: absolute;
   
   right: 5px;
   top: 15px;
+  height: 40px;
+  width: 40px;
+  border-width: 0px;
+  background-color: transparent;
+  border-radius: 6px;
+  border-width: 0px;
+  box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ask-question .add-button {
   height: 40px;
   width: 40px;
   border-width: 0px;
@@ -247,4 +259,12 @@ button.shadow-button:hover {
 
 .tab-content {
   padding: 20px;
+}
+
+.sticky {
+  position: sticky;
+}
+
+.bottom-0 {
+  bottom: 0;
 }

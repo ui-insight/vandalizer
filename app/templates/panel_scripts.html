@@ -35,6 +35,15 @@
                 var tabTitle = $(this).text();
                 console.log(tabTitle);
                 // Use the tabTitle variable as needed
+                let href = window.location.href;
+                const qs = new URLSearchParams(href.split('?')[1]);
+                qs.delete('section');
+                qs.append('section', tabTitle);
+                const newQs = qs.toString();
+                console.log(newQs);
+                const newhref = `/home?${newQs}`;
+                window.history.pushState({}, '', newhref);
+
                 if (tabTitle == " Extract") {
                     console.log("Show extract");
                     $('#extraction-panel').show();
