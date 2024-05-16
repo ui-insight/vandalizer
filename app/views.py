@@ -183,8 +183,7 @@ def add_search_term():
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
 	searchsetitem.save()
 
-
-	template = render_template('search_set_item.html', search_set=searchset, item=searchsetitem)
+	template = render_template('toolpanel/search_set_item.html', search_set=searchset, item=searchsetitem)
 	response = {
 				'template': template,
 			}
@@ -199,7 +198,7 @@ def grab_template():
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
 	if search_set.set_type == "extraction":	
-		template = render_template('search_results.html', 
+		template = render_template('toolpanel/search_results.html', 
 							search_set=search_set,
 							document=document
 							)
@@ -208,7 +207,7 @@ def grab_template():
 			}
 		return jsonify(response)
 	else:
-		template = render_template('prompt_results.html', 
+		template = render_template('toolpanel/prompt_results.html', 
 							search_set=search_set,
 							document=document
 							)
@@ -252,7 +251,7 @@ def begin_search():
 		em.root_path = app.root_path
 		results = em.extract(keys, document_path)
 		print(results)
-		template = render_template('search_results.html', 
+		template = render_template('toolpanel/search_results.html', 
 							search_set=search_set,
 							results=results
 							)
@@ -261,7 +260,7 @@ def begin_search():
 			}
 		return jsonify(response)
 	else:
-		template = render_template('search_results.html', 
+		template = render_template('toolpanel/search_results.html', 
 							search_set=search_set
 							)
 		response = {
@@ -290,7 +289,7 @@ def begin_prompt_search():
 		for key in keys:
 			results[key] = llm.ask_question_to_loaded_document(key)
 		print(results)
-		template = render_template('prompt_results.html', 
+		template = render_template('toolpanel/prompt_results.html', 
 							search_set=search_set,
 							results=results
 							)
@@ -299,7 +298,7 @@ def begin_prompt_search():
 			}
 		return jsonify(response)
 	else:
-		template = render_template('prompt_results.html', 
+		template = render_template('toolpanel/prompt_results.html', 
 							search_set=search_set
 							)
 		response = {
@@ -372,13 +371,14 @@ def export_extraction():
 	# Define the file path for the CSV file
 	csv_file_path = os.path.join(app.root_path, 'static', 'export.csv')
 	
+	print(rows)
 	# Write the rows to the CSV file
 	with open(csv_file_path, 'w', newline='') as f:
 		writer = csv.writer(f)
 		writer.writerows(rows)
 	
 	# Return the path to the CSV file
-	return send_file('static/extraction.csv', 
+	return send_file('static/export.csv', 
                      mimetype='text/csv',
                      as_attachment=True)
 

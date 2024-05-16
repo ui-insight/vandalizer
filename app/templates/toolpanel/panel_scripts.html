@@ -44,14 +44,14 @@
                 const newhref = `/home?${newQs}`;
                 window.history.pushState({}, '', newhref);
 
-                if (tabTitle == " Extract") {
+                if (tabTitle == "Extract") {
                     console.log("Show extract");
                     $('#extraction-panel').show();
                     $('#bottom-toolbar-extraction').show();
-                } else if (tabTitle == " Prompt") {
+                } else if (tabTitle == "Prompt") {
                     $('#prompt-panel').show();
                     $('#bottom-toolbar-prompt').show();
-                } else if (tabTitle == " Chat") {
+                } else if (tabTitle == "Chat") {
                     $('#chat-panel').show();
                     $('#bottom-toolbar-chat').show();
                 }
@@ -149,9 +149,7 @@
 
         function addResultListeners() {
             $('#set-close-button').on("click", function () {
-                $('#search-results-panel').fadeOut();
-                search_set_add_uuid = "";
-                is_adding_term = false
+                location.reload();
             });
             $('.semantic-entry').on("click", function () {
                 console.log("clicked");
@@ -168,7 +166,7 @@
             $('#export').on("click", function (e) {
                 e.preventDefault();
                 searchDict = createSearchTermDictionary();
-
+                console.log("Exporting");
                 var form = $('<form>', {
                     'action': '/export_extraction',
                     'method': 'GET'
@@ -422,15 +420,14 @@
 
         function createSearchTermDictionary() {
             const searchTermDictionary = {};
-
-            const setEntries = document.querySelectorAll('.set-entry-group');
-            setEntries.forEach((entry) => {
-                const searchPhrase = entry.querySelector('.set-title').textContent.trim();
-                const result = entry.querySelector('.extraction-result').textContent.trim();
+            let searchItems = $('.set-result-items').children();
+            searchItems.each(function() {
+                const searchPhrase = $(this).find('.set-title').text().trim();
+                const result = $(this).find('.extraction-result').text().trim();
                 searchTermDictionary[searchPhrase] = result;
             });
 
-
+            console.log(searchTermDictionary);
             return searchTermDictionary;
         }
         

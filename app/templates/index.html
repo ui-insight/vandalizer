@@ -148,233 +148,26 @@
         <div id="right-panel-content">
             <div class="tab-container">
                 <ul class="tab-menu">
-                    <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt"></i> Extract
-                    </li>
-                    <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard"></i> Prompt
-                    </li>
-                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"></i> Chat</li>
+                    <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt" style="padding-right: 5px;"></i>Extract</li>
+                    <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard" style="padding-right: 5px;"></i>Prompt</li>
+                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments" style="padding-right: 5px;"></i>Chat</li>
                 </ul>
-                <div class="tab-content" id="extraction-panel"
-                    style="{% if section != 'Extract' %}display: none;{% endif %}">
-                    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-                        <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
-                        <div class="ask-question-container">
-                            <div class="ask-question">
-                                <input type="text" id="add-search-set-input"
-                                    placeholder="Find or create a extraction set...">
 
-
-                                <button class="add-button-2 shadow-button" id="add-search-set-button">
-                                    <span style="font-size: 2em; color: #5c21d2bc;">
-                                        <i class="fa-solid fa-plus"></i>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="search-set-container" style="padding: 30px 0px;">
-                            {% for search_set in extraction_sets %}
-                            <div class="expandable-container">
-                                <div class="set-item" data-uuid="{{ search_set.uuid }}"
-                                    data-title="{{ search_set.title }}">
-                                    <div class="set-content">
-                                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                                            <i class="fa-solid fa-chevron-right"></i>
-                                        </span>
-                                        <p class="set-title"
-                                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                                            {{
-                                            search_set.title }}</p>
-
-                                        <p class="set-items" style="text-align: right; ">
-                                            <span>{{ search_set.item_count() }}
-                                                items</span>
-                                            {% if search_set.is_global %}
-                                            <span><i class="fa-solid fa-globe"></i></span>
-                                            {% endif %}
-
-                                        </p>
-
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div style="display: none" class="search-results-panel" id="search-results-panel"
-                        style="margin: 0px 30px 30px 30px; text-align: left;">
-                    </div>
-                </div>
-                <div class="tab-content" id="prompt-panel"
-                    style="{% if section != 'Prompt' %}display: none;{% endif %}">
-                    <div id="prompt-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-                        <p style="font-size: 24px; font-weight: 600;">Prompt Groups</p>
-                        <div class="ask-question-container">
-                            <div class="ask-question">
-                                <input type="text" id="add-prompt-set-input"
-                                    placeholder="Find or create a prompt set...">
-
-
-                                <button class="add-button-2 shadow-button" id="add-prompt-set-button">
-                                    <span style="font-size: 2em; color: #5c21d2bc;">
-                                        <i class="fa-solid fa-plus"></i>
-                                    </span>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="search-set-container" style="padding: 30px 0px;">
-                            {% for search_set in prompt_sets %}
-                            <div class="expandable-container">
-                                <div class="prompt-set-item" data-uuid="{{ search_set.uuid }}"
-                                    data-title="{{ search_set.title }}">
-                                    <div class="set-content">
-                                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                                            <i class="fa-solid fa-chevron-right"></i>
-                                        </span>
-                                        <p class="set-title"
-                                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                                            {{
-                                            search_set.title }}</p>
-                                        <p class="set-items" style="text-align: right; ">
-                                            <span>{{ search_set.item_count() }}
-                                                items</span>
-                                            {% if search_set.is_global %}
-                                            <span><i class="fa-solid fa-globe"></i></span>
-                                            {% endif %}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    <div style="display: none" class="search-results-panel" id="prompt-search-results-panel"
-                        style="margin: 0px 30px 30px 30px; text-align: left;">
-                    </div>
-                </div>
-                <div class="tab-content" id="chat-panel" style="{% if section != 'Chat' %}display: none;{% endif %}">
-                </div>
+                {% include "toolpanel/resultpanels/extraction_panel.html" %}
+                {% include "toolpanel/resultpanels/prompt_panel.html" %}
+                {% include "toolpanel/resultpanels/chat_panel.html" %}
+                
+               
             </div>
 
-            <div class="bottom-toolbar" id="bottom-toolbar-extraction"
-                style="{% if section != 'Extract' %}display: none;{% endif %}">
-                <div id="add-item-panel">
-                    <p style="font-size: 24px; font-weight: 600;">Add Extraction</p>
-
-                    <div class="ask-question-container">
-                        <div class="ask-question">
-                            <div class="w-full sticky bottom-0  mx-auto">
-                                <div class="relative px-2 md:px-1">
-                                    <div>
-                                        <div class="relative z-10">
-                                            <div>
-                                                <fieldset data-has-accessory-warning="false"
-                                                    class="bg-bg-000  rounded-t-2xl  border-t-0.5  border-x-0.5  border-border-300  pl-3.5  sm:pl-5  pr-2.5  pb-2  sm:pb-3  mt-6  -mx-1  sm:mx-0  flex  items-start  transition-all  focus-within:border-border-200  relative  z-[5]  shadow-[0_0.25rem_1.25rem_rgba(0,0,0,0.05),0_0_0.75rem_0.5rem_hsl(var(--bg-100))]  focus-within:shadow-[0_0.25rem_2rem_rgba(0,0,0,0.075),0_0_1rem_0.75rem_hsl(var(--bg-100))]  data-[has-accessory-warning=&quot;true&quot;]:shadow-[0_0.25rem_1.75rem_rgba(0,0,0,0.05),0_0_1.25rem_1.5rem_hsl(var(--bg-100))]  data-[has-accessory-warning=&quot;true&quot;]:focus-within:shadow-[0_0.25rem_2rem_rgba(0,0,0,0.075),0_0_1.25rem_1.75rem_hsl(var(--bg-100))]  max-[400px]:data-[has-accessory-warning=&quot;true&quot;]:mt-10  max-[400px]:data-[has-accessory-warning=&quot;true&quot;]:shadow-[0_0.25rem_1.75rem_rgba(0,0,0,0.05),0_0_1.5rem_2.75rem_hsl(var(--bg-100))]">
-                                                    <div
-                                                        class="absolute  bottom-full  left-0  w-full  text-center  pb-1  px-2  sm:px-5  leading-tight  [text-shadow:_0_0_0.25rem_hsl(var(--bg-200))]">
-
-                                                    </div>
-                                                    <div class="flex flex-col flex-1">
-                                                        <div class="flex items-start gap-4">
-                                                            <div class="flex-1">
-                                                                <div
-                                                                    class="flex items-center flex-grow break-words min-w-0">
-                                                                    <div class="flex flex-col w-full">
-                                                                        <div
-                                                                            class="overflow-y-auto w-full max-h-96 break-words py-4">
-                                                                            <div contenteditable="true" translate="no"
-                                                                                enterkeyhint="enter" tabindex="0"
-                                                                                class="ProseMirror break-words max-w-[60ch]">
-                                                                                <p data-placeholder="Simple term or phrase..."
-                                                                                    class="is-empty is-editor-empty before:!text-text-500 before:whitespace-nowrap">
-                                                                                    <br
-                                                                                        class="ProseMirror-trailingBreak">
-                                                                                </p>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div
-                                                                class="grid  grid-flow-col  items-center  mt-3  -mr-1.5">
-                                                                <div class="mr-1.5 h-8 w-8">
-                                                                    <label data-state="closed"
-                                                                        class="relative  grid  place-content-center  aspect-square  rounded-xl  cursor-pointer  bg-bg-200  transition  [fieldset:not(:disabled)_&amp;]:hover:bg-bg-400  [fieldset:disabled_&amp;]:opacity-50  [fieldset:disabled_&amp;]:pointer-events-none  focus-within:ring">
-                                                                        <input data-testid="file-upload"
-                                                                            class="opacity-0 absolute inset-0 rounded-xl -z-10 overflow-hidden"
-                                                                            accept=".pdf,.doc,.docx,.rtf,.epub,.odt,.odp,.pptx,.txt,.py,.ipynb,.js,.jsx,.html,.css,.java,.cs,.php,.c,.cpp,.cxx,.h,.hpp,.rs,.R,.Rmd,.swift,.go,.rb,.kt,.kts,.ts,.tsx,.m,.scala,.rs,.dart,.lua,.pl,.pm,.t,.sh,.bash,.zsh,.csv,.log,.ini,.config,.json,.yaml,.yml,.toml,.lua,.sql,.bat,.md,.coffee,.tex,.latex,.jpg,.jpeg,.png,.gif,.webp"
-                                                                            multiple="" aria-label="Upload files"
-                                                                            type="file"><svg
-                                                                            xmlns="http://www.w3.org/2000/svg"
-                                                                            width="18" height="18" fill="currentColor"
-                                                                            viewBox="0 0 256 256">
-                                                                            <path
-                                                                                d="M208.25,123.76a6,6,0,0,1,0,8.49l-82.06,82a54,54,0,0,1-76.36-76.39L149.1,37.14a38,38,0,1,1,53.77,53.72L103.59,191.54a22,22,0,1,1-31.15-31.09l83.28-84.67a6,6,0,0,1,8.56,8.42L81,168.91a10,10,0,1,0,14.11,14.18L194.35,82.4a26,26,0,1,0-36.74-36.8L58.33,146.28a42,42,0,1,0,59.37,59.44l82.06-82A6,6,0,0,1,208.25,123.76Z">
-                                                                            </path>
-                                                                        </svg></label>
-                                                                </div><button class="add-button shadow-button" id="add-term-button">
-                                                                    <span style="font-size: 2em; color: #5c21d2bc;">
-                                                                        <i class="fa-solid fa-plus"></i>
-                                                                    </span>
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        
-                                                </fieldset>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- <input type="text" id="add-search-term-input" placeholder="Term or phrase to extract...">
-
-                            <button class="add-button shadow-button" id="add-term-button">
-                                <span style="font-size: 2em; color: #5c21d2bc;">
-                                    <i class="fa-solid fa-plus"></i>
-                                </span>
-                            </button> -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bottom-toolbar" id="bottom-toolbar-prompt"
-                style="{% if section != 'Prompt' %}display: none;{% endif %}">
-                <div id="add-item-panel">
-                    <p style="font-size: 24px; font-weight: 600;">Add Prompt</p>
-
-                    <div class="ask-question-container">
-                        <div class="ask-question">
-                            <input type="text" id="add-prompt-term-input" placeholder="Prompt to ask document...">
-
-                            <button class="add-button shadow-button" id="add-prompt-term-button">
-                                <span style="font-size: 2em; color: #5c21d2bc;">
-                                    <i class="fa-solid fa-plus"></i>
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="bottom-toolbar" id="bottom-toolbar-chat"
-                style="{% if section != 'Chat' %}display: none;{% endif %}">
-                <div id="add-item-panel">
-                    <p style="font-size: 24px; font-weight: 600;">How can I help?</p>
-
-                    <div class="ask-question-container">
-                        <div class="ask-question">
-                            <input type="text" id="chat-input" placeholder="Chat with document...">
-
-                            <button class="add-button shadow-button" id="chat-button">
-                                <span style="font-size: 2em; color: #5c21d2bc;">
-                                    <i class="fa-brands fa-searchengin"></i>
-                                </span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            
         </div>
-        <div class="chat-window closed">
-        </div>
+ 
+        {% include "toolpanel/searchpanels/extraction_search_panel.html" %}
+        {% include "toolpanel/searchpanels/prompt_search_panel.html" %}
+        {% include "toolpanel/searchpanels/chat_search_panel.html" %}
+ 
+ 
         <div id="snackbar">Copied</div>
     </div>
 
@@ -382,9 +175,9 @@
     {%endblock%} {% block scripts %}
     {{super()}}
     {% include "index_scripts.html" %}
-    {% include "panel_scripts.html" %}
-    {% include "prompt_set_scripts.html" %}
-    {% include "chat_scripts.html" %}
+    {% include "toolpanel/panel_scripts.html" %}
+    {% include "toolpanel/prompt_set_scripts.html" %}
+    {% include "toolpanel/chat_scripts.html" %}
     <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
     <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
     <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>

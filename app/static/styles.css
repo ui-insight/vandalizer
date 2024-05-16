@@ -723,3 +723,7 @@ tr {
       grid-template-columns: repeat(3, 1fr);
     }
   }
+
+  .ProseMirror:focus {
+    outline: none;
+  }

@@ -157,11 +157,18 @@ button.shadow-button:hover {
   border-radius: 0 5px 5px 0;
 }
 
-
 .ask-question-container {
   position: relative;
   width: 100%;
   /* height: 60px; */
+  z-index: 100;
+  padding-top: 10px;
+}
+
+.input-container {
+  position: relative;
+  width: 100%;
+  height: 60px;
   z-index: 100;
   padding-top: 10px;
 }

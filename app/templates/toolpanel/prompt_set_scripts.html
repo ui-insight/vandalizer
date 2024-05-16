@@ -64,9 +64,7 @@
 
         function addResultListeners() {
             $('#prompt-set-close-button').on("click", function () {
-                $('#prompt-search-results-panel').fadeOut();
-                prompt_set_add_uuid = "";
-                is_adding_prompt_term = false
+                location.reload();
             });
             
             $('#rerun-prompt').on("click", function () {

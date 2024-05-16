@@ -1,0 +1,42 @@
+<div class="tab-content" id="prompt-panel" style="{% if section != 'Prompt' %}display: none;{% endif %}">
+    <div id="prompt-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+        <p style="font-size: 24px; font-weight: 600;">Prompt Groups</p>
+        <div class="input-container">
+            <div class="ask-question">
+                <input type="text" id="add-prompt-set-input" placeholder="Find or create a prompt set...">
+                <button class="add-button-2 shadow-button" id="add-prompt-set-button">
+                    <span style="font-size: 2em; color: #5c21d2bc;">
+                        <i class="fa-solid fa-plus"></i>
+                    </span>
+                </button>
+            </div>
+        </div>
+        <div class="search-set-container" style="padding: 30px 0px;">
+            {% for search_set in prompt_sets %}
+            <div class="expandable-container">
+                <div class="prompt-set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+                    <div class="set-content">
+                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </span>
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                            {{
+                            search_set.title }}</p>
+                        <p class="set-items" style="text-align: right; ">
+                            <span>{{ search_set.item_count() }}
+                                items</span>
+                            {% if search_set.is_global %}
+                            <span><i class="fa-solid fa-globe"></i></span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div style="display: none" class="search-results-panel" id="prompt-search-results-panel"
+        style="margin: 0px 30px 30px 30px; text-align: left;">
+    </div>
+</div>
