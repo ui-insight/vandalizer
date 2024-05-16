@@ -6,14 +6,14 @@
 
         function createSearchTermDictionary() {
             const searchTermDictionary = {};
-
-            const setEntries = document.querySelectorAll('.set-entry-group');
-            setEntries.forEach((entry) => {
-                const searchPhrase = entry.querySelector('.set-title').textContent.trim();
-                const result = entry.querySelector('.extraction-result').textContent.trim();
+            let searchItems = $('.set-result-items').children();
+            searchItems.each(function() {
+                const searchPhrase = $(this).find('.set-title').text().trim();
+                const result = $(this).find('.extraction-result').text().trim();
                 searchTermDictionary[searchPhrase] = result;
             });
 
+            return searchTermDictionary;
 
             return searchTermDictionary;
         }
