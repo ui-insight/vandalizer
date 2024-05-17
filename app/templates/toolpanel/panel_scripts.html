@@ -300,6 +300,11 @@
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
+                    if (msg.complete == false) {
+                        showToast(msg.error);
+                        return;
+                    }
+
                     $('.set-result-items').append(msg.template);
                     $("#add-search-term-input")[0].value = "";
                 },

@@ -180,6 +180,10 @@
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
+                    if (msg.complete == false) {
+                        showToast(msg.error);
+                        return;
+                    }
                     // reload page
                     $('.set-result-items').append(msg.template);
                     $("#add-prompt-term-input")[0].value = "";

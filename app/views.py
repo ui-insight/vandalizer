@@ -180,11 +180,18 @@ def add_search_term():
 	searchtype = data['searchtype']
 	print(searchphrase)
 
+
+	if searchset.is_global:
+		user = load_user()
+		if not user.is_admin:
+			return jsonify({"complete": False, "error": "You do not have permission to add to this search set."})
+
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
 	searchsetitem.save()
 
 	template = render_template('toolpanel/search_set_item.html', search_set=searchset, item=searchsetitem)
 	response = {
+				'complete': True,
 				'template': template,
 			}
 	return jsonify(response)
