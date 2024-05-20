@@ -376,6 +376,7 @@ def clone_search_set():
 	new_search_set = deepcopy(search_set)
 	new_search_set.id = None
 	new_search_set.uuid = uuid.uuid4().hex
+	new_search_set.is_global = False
 	new_search_set.title = "Copy of " + new_search_set.title
 	new_search_set.save()
 
