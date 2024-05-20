@@ -101,6 +101,72 @@ function askDocument(documentName) {
     askingDocument = documentName;
 }
 
+function cloneSearchSet(uuid) {
+    $.ajax({
+        url: '/api/clone_search_set',
+        type: 'POST',
+        data: JSON.stringify({
+            search_set_uuid: uuid
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            console.log(msg);
+            location.reload();
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+
+}
+
+function renameSearchSet(uuid, title) {
+    $.ajax({
+        url: '/api/rename_search_set',
+        type: 'POST',
+        data: JSON.stringify({
+            search_set_uuid: uuid,
+            new_title: title
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            console.log(msg);
+            location.reload();
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
+function deleteSearchSetItem(uuid) {
+    $.ajax({
+        url: '/api/delete_search_set_item',
+        type: 'POST',
+        data: JSON.stringify({
+            uuid: uuid
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function(msg) {
+            console.log(uuid);
+            // Get the set entry group with data-uuid equal to uuid and delete parent
+            $(`.set-entry[data-item-uuid=${uuid}]`).parent().remove();
+        },
+        error: function(xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
 function summarizeDocument(documentName) {
     showChatLoading();
     $.ajax({
@@ -198,6 +264,18 @@ $(document).ready(function() {
             window.location.href = "/logout";
         } else {
             window.location.href = "/home?id=" + selectedOption;
+        }
+    });
+
+    // When the user clicks on <span> (x), close the modal
+        $('.close-modal').on('click', function() {
+            $('#renameModal').hide();
+    });
+
+    // When the user clicks anywhere outside of the modal, close it
+    $(window).on('click', function(event) {
+        if ($(event.target).is($('#renameModal'))) {
+            $('#renameModal').hide();
         }
     });
 
