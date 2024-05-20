@@ -163,6 +163,36 @@
                 performSearch(uuid, datatitle);
             });
 
+            $('#clone').on("click", function () {
+                let uuid = $(this).attr("data-uuid");
+                console.log(uuid);
+                cloneSearchSet(uuid);
+            });
+
+            $('#editset').on("click", function () {
+                let uuid = $(this).attr("data-uuid");
+                updateSearchSetPanel(uuid, true);
+                console.log("here");
+            });
+
+            $('.delete-set-item-button').on("click", function () {
+                let uuid = $(this).attr("data-uuid");
+                deleteSearchSetItem(uuid);
+                console.log("here");
+            });
+
+            $('#renameset').on("click", function () {
+                $('#renameModal').show();
+                let uuid = $(this).attr("data-uuid");
+
+                $('#renameBtn').off('click').on('click', function() {
+                    let newName = $('#newName')[0].value;
+                    console.log(uuid);
+                    console.log(newName);
+                    renameSearchSet(uuid, newName);
+                });
+            });
+
             $('#export').on("click", function (e) {
                 e.preventDefault();
                 searchDict = createSearchTermDictionary();
@@ -237,13 +267,14 @@
             
         }
 
-        function updateSearchSetPanel(set_uuid) {
+        function updateSearchSetPanel(set_uuid, edit_mode=false) {
             $.ajax({
                 url: '/api/search_results',
                 type: 'POST',
                 data: JSON.stringify({
                     search_set_uuid: set_uuid,
-                    document_uuid: document_uuid
+                    document_uuid: document_uuid,
+                    edit_mode: edit_mode
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',

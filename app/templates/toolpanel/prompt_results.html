@@ -10,7 +10,10 @@
 </p>
 <br>
 <p><b>Prompts</b>{% if results != null %}<span style="float: right; padding-left: 15px;"><a id="rerun-prompt" href="#" data-uuid="{{ search_set.uuid }}"
-    data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export-prompt" href="#">Export all</a></span> {% endif %}</p>
+    data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export-prompt" href="#">Export all</a></span> {% endif %}
+    <span style="float: right; padding-left: 15px;"><a id="edit-prompt" href="#" data-uuid="{{ search_set.uuid }}"
+        data-title="{{ search_set.title }}">Edit mode</a></span>
+</p>
 
 <div class="set-items set-result-items">
 {% for item in search_set.items() %}
@@ -25,13 +28,7 @@
 
         {% if results == null and document != None %}
         <p class="set-items" style="text-align: right; ">processing</p>
-        {% endif %}
-
-        {% if results == null and document == None %}
-        <a href="/delete_search_set_item?uuid={{ item.id }}" style="float: right; font-size: 1em; color: #5c21d246;">
-            <i class="fa-solid fa-circle-xmark"></i></a>
-        {% endif %}
-        
+        {% endif %}        
     </div>
 </div>
 
@@ -75,8 +72,3 @@
 </div>
 {% endif %}
 {% endif %}
-
-
-<br><br>
-<p style="text-align: center; margin-top: 30px; margin-bottom: 30px;"><a href="/delete_search_set?uuid={{ search_set.id }}" style="float: center; font-size: 1em; color: #ff5858;">
-    <i>delete set</i></a></p>

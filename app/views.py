@@ -13,6 +13,7 @@ import threading
 import json
 import csv
 from itertools import chain
+from copy import deepcopy
 
 #OAuth
 import secrets
@@ -201,27 +202,51 @@ def grab_template():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
 	document_uuid = data['document_uuid']
+	edit_mode = data['edit_mode']
 	document = SmartDocument.objects(uuid=document_uuid).first()
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
 	if search_set.set_type == "extraction":	
-		template = render_template('toolpanel/search_results.html', 
+		if edit_mode:
+			template = render_template('toolpanel/edit_search_results.html', 
 							search_set=search_set,
 							document=document
 							)
-		response = {
+			
+			response = {
 				'template': template,
 			}
-		return jsonify(response)
+			
+			return jsonify(response)
+		else:
+			template = render_template('toolpanel/search_results.html', 
+							search_set=search_set,
+							document=document
+							)
+			response = {
+				'template': template,
+			}
+
+			return jsonify(response)
 	else:
-		template = render_template('toolpanel/prompt_results.html', 
-							search_set=search_set,
-							document=document
-							)
-		response = {
-				'template': template,
-			}
-		return jsonify(response)
+		if edit_mode:
+			template = render_template('toolpanel/edit_prompt_results.html', 
+								search_set=search_set,
+								document=document
+								)
+			response = {
+					'template': template,
+				}
+			return jsonify(response)
+		else:
+			template = render_template('toolpanel/prompt_results.html', 
+								search_set=search_set,
+								document=document
+								)
+			response = {
+					'template': template,
+				}
+			return jsonify(response)
 
 @app.route('/api/semantic_search', methods=['POST'])
 def semantic_search():
@@ -330,13 +355,48 @@ def delete_search_set():
 	search_set.delete()
 	return redirect('/')
 
-@app.route('/delete_search_set_item', methods=['GET'])
-def delete_search_set_item():
-	search_set_uuid = request.args.get('uuid')
+@app.route('/api/rename_search_set', methods=['POST'])
+def rename_search_set():
+	data = request.get_json()
+	search_set_uuid = data['search_set_uuid']
+	new_title = data['new_title']
 	print(search_set_uuid)
-	search_set = SearchSetItem.objects(id=search_set_uuid).first()
+	search_set = SearchSet.objects(uuid=search_set_uuid).first()
+	search_set.title = new_title
+	search_set.save()
+
+	return jsonify({"complete": True})
+
+@app.route('/api/clone_search_set', methods=['POST'])
+def clone_search_set():
+	data = request.get_json()
+	search_set_uuid = data['search_set_uuid']
+	print(search_set_uuid)
+	search_set = SearchSet.objects(uuid=search_set_uuid).first()
+	new_search_set = deepcopy(search_set)
+	new_search_set.id = None
+	new_search_set.uuid = uuid.uuid4().hex
+	new_search_set.title = "Copy of " + new_search_set.title
+	new_search_set.save()
+
+	# Clone the search set items
+	for item in search_set.items():
+		new_item = deepcopy(item)
+		new_item.id = None
+		new_item.searchset = new_search_set.uuid
+		new_item.save()
+
+	return jsonify({"complete": True})
+
+@app.route('/api/delete_search_set_item', methods=['POST'])
+def delete_search_set_item():
+	data = request.get_json()
+	print("Deleting search set item")
+	search_set_item_uuid = data['uuid']
+	print(search_set_item_uuid)
+	search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
 	search_set.delete()
-	return redirect('/')
+	return jsonify({"complete": True})
 
 
 ##################
