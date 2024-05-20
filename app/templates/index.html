@@ -168,14 +168,8 @@
         {% include "toolpanel/searchpanels/chat_search_panel.html" %}
  
         <div id="snackbar">Copied</div>
-         <!-- Rename Modal Structure -->
-        <div id="renameModal" class="modal">
-        <div class="modal-content">
-            <span class="close-modal">&times;</span>
-            <h2>Rename Item</h2>
-            <input type="text" id="newName" placeholder="Enter new name">
-            <button id="renameBtn" style= "background-color: #5c21d2bc;"class="btn btn-primary">Rename</button>
-        </div>
+        {% include "toolpanel/rename_modal.html" %}
+        {% include "toolpanel/attachment_modal.html" %}
     </div>
     </div>
 

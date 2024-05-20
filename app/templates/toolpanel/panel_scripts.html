@@ -2,6 +2,7 @@
     var is_adding_term = false;
     var search_set_add_uuid = "";
     var document_uuid = "{{ document.uuid }}";
+    var attachments = [];
 
     function showToast(message) {
         var x = document.getElementById("snackbar");
@@ -62,6 +63,43 @@
     
 
     $(document).ready(function () {
+        
+
+        $('#promptinput').on('keydown', function(event) {
+            $('#promptplaceholder').attr("data-placeholder", "");
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // Prevent the default behavior of adding a newline
+                // Trigger your JavaScript event here
+                if (document_uuid != "") {
+                    chat();
+                    return;
+                } else {
+                    showToast("Select a document to chat");
+                }
+            }
+        });
+
+        $('#add-attachment-button').on("click", function () {
+            $('#attachmentModal').show();
+            let uuid = $(this).attr("data-uuid");
+            console.log("here");
+            $('#attachBtn').off('click').on('click', function() {
+                let attachment = $('#attachmentText')[0].value;
+                $('#attachmentModal').hide();
+                attachments.push(attachment);
+                console.log(attachments);
+                updateAttachmentUI();
+                $('#attachmentText')[0].value = "";
+            });
+        });
+
+        function updateAttachmentUI() {
+            $('#attachment-list').empty();
+            for (var i = 0; i < attachments.length; i++) {
+                $('#attachment-list').append('<li>Attachment</li>');
+            }
+        }
+
         function performSemanticSearch(term) {
             console.log("semantic search");
             $.ajax({
@@ -192,6 +230,8 @@
                     renameSearchSet(uuid, newName);
                 });
             });
+
+
 
             $('#export').on("click", function (e) {
                 e.preventDefault();

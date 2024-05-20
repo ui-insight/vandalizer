@@ -1,4 +1,21 @@
 <script>
+    const placeholderText = "Chat with document...";
+
+    // Handle Enter and Shift+Enter keydown events
+    $('#chatinput').on('keydown', function(event) {
+        $('#chatplaceholder').attr("data-placeholder", "");
+        if (event.key === 'Enter' && !event.shiftKey) {
+            event.preventDefault(); // Prevent the default behavior of adding a newline
+            // Trigger your JavaScript event here
+            if (document_uuid != "") {
+                chat();
+                return;
+            } else {
+                showToast("Select a document to chat");
+            }
+        }
+    });
+
     $('#chat-button').on("click", function (e) {
             e.preventDefault();
         console.log("chat button clicked");
@@ -10,22 +27,12 @@
             }
         });
 
-        $('#chat-input').on('keyup', function(e) {
-            if (e.key === 'Enter') {
-                console.log("keyup on chat");
-                if (document_uuid != "") {
-                chat();
-                return;
-            } else {
-                showToast("Select a document to chat");
-            }
-            }
-        });
 
         function chat () {
-            $("#chat-panel").append("<p><div class='message'><b>You:</b> " + $("#chat-input").val() + "</div></p>");
-            question = $("#chat-input").val();
-            $("#chat-input").val(""); 
+            let question = $("#chatinput").find('p').text();
+            $("#chat-panel").append("<p><div class='message'><b>You:</b> " + question + "</div></p>");
+            // reset the chat
+            $("#chatinput").find('p').text("");
             $.ajax({
                 url: '/api/chat',
                 type: 'POST',
@@ -39,6 +46,8 @@
                 success: function (response) {
                     // reload page
                     $("#chat-panel").append("<p><div class='message'><b>Response:</b> " + response + "</div></p>");
+                    $('#chatplaceholder').attr("data-placeholder", "Chat with document...");
+            
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

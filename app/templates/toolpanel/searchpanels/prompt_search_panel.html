@@ -22,10 +22,10 @@
                                                                     <div class="flex flex-col w-full">
                                                                         <div
                                                                             class="overflow-y-auto w-full max-h-96 break-words py-4">
-                                                                            <div contenteditable="true" translate="no"
+                                                                            <div id="promptinput" contenteditable="true" translate="no"
                                                                                 enterkeyhint="enter" tabindex="0"
                                                                                 class="ProseMirror break-words max-w-[60ch]">
-                                                                                <p data-placeholder="Prompt to ask document..."
+                                                                                <p id="promptplaceholder" data-placeholder="Prompt to ask document..."
                                                                                     class="is-empty is-editor-empty before:!text-text-500 before:whitespace-nowrap">
                                                                                     <br
                                                                                         class="ProseMirror-trailingBreak">
@@ -37,7 +37,7 @@
                                                             </div>
                                                             <div
                                                                 class="grid  grid-flow-col  items-center  mt-3  -mr-1.5">
-                                                                <button class="add-button shadow-button" id="add-term-button">
+                                                                <button class="add-button shadow-button" id="add-attachment-button">
                                                                     <span style="font-size: 2em; color: #5c21d2bc;">
                                                                         <i class="fa-solid fa-paperclip"></i>
                                                                     </span>
@@ -51,6 +51,7 @@
                                                         </div>
                                                         
                                                 </fieldset>
+                                                <div id="attachment-list"></div>
                                             </div>
                                         </div>
                                     </div>
