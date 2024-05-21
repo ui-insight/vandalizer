@@ -4,6 +4,8 @@
     // Handle Enter and Shift+Enter keydown events
     $('#chatinput').on('keydown', function(event) {
         $('#chatplaceholder').attr("data-placeholder", "");
+        $('#chatplaceholder').css("color", "black");
+        
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault(); // Prevent the default behavior of adding a newline
             // Trigger your JavaScript event here
@@ -27,9 +29,8 @@
             }
         });
 
-
         function chat () {
-            let question = $("#chatinput").find('p').text();
+            let question = $("#chatinput")[0].textContent;
             $("#chat-panel").append("<p><div class='message'><b>You:</b> " + question + "</div></p>");
             // reset the chat
             $("#chatinput").find('p').text("");
@@ -47,6 +48,7 @@
                     // reload page
                     $("#chat-panel").append("<p><div class='message'><b>Response:</b> " + response + "</div></p>");
                     $('#chatplaceholder').attr("data-placeholder", "Chat with document...");
+                    $('#chatplaceholder').css("color", "darkgray");
             
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
