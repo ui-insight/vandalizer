@@ -148,45 +148,44 @@
         <div id="right-panel-content">
             <div class="tab-container">
                 <ul class="tab-menu">
-                    <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt" style="padding-right: 5px;"></i>Extract</li>
-                    <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard" style="padding-right: 5px;"></i>Prompt</li>
-                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments" style="padding-right: 5px;"></i>Chat</li>
+                    <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt"
+                            style="padding-right: 5px;"></i>Extract</li>
+                    <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard"
+                            style="padding-right: 5px;"></i>Prompt</li>
+                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"
+                            style="padding-right: 5px;"></i>Chat</li>
                 </ul>
 
-                {% include "toolpanel/resultpanels/extraction_panel.html" %}
-                {% include "toolpanel/resultpanels/prompt_panel.html" %}
-                {% include "toolpanel/resultpanels/chat_panel.html" %}
-                
-               
+                {% include "toolpanel/extractions/extraction_panel.html" %}
+                {% include "toolpanel/prompts/prompt_panel.html" %}
+                {% include "toolpanel/chat/chat_panel.html" %}
             </div>
-
-            
         </div>
- 
-        {% include "toolpanel/searchpanels/extraction_search_panel.html" %}
-        {% include "toolpanel/searchpanels/prompt_search_panel.html" %}
-        {% include "toolpanel/searchpanels/chat_search_panel.html" %}
- 
+
+        {% include "toolpanel/extractions/extraction_search_panel.html" %}
+        {% include "toolpanel/prompts/prompt_search_panel.html" %}
+        {% include "toolpanel/chat/chat_search_panel.html" %}
+
         <div id="snackbar">Copied</div>
         {% include "toolpanel/rename_modal.html" %}
         {% include "toolpanel/attachment_modal.html" %}
     </div>
-    </div>
+</div>
 
 
-    {%endblock%} {% block scripts %}
-    {{super()}}
-    {% include "index_scripts.html" %}
-    {% include "toolpanel/panel_scripts.html" %}
-    {% include "toolpanel/prompt_set_scripts.html" %}
-    {% include "toolpanel/chat_scripts.html" %}
-    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
-    <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
-    <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
+{%endblock%} {% block scripts %}
+{{super()}}
+{% include "index_scripts.html" %}
+{% include "toolpanel/extractions/panel_scripts.html" %}
+{% include "toolpanel/prompts/prompt_set_scripts.html" %}
+{% include "toolpanel/chat/chat_scripts.html" %}
+<script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
 
 
-    <!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
-    <script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
-    {% include "pdf_handling.html" %}
+<!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
+<script src="{{url_for('static', filename='javascript/upload_identify.js')}}"></script>
+{% include "pdf_handling.html" %}
 
-    {% endblock %}
+{% endblock %}

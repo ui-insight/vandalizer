@@ -26,6 +26,14 @@
         <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
             item.searchphrase }}</p>
 
+            {% if item.text_blocks|length > 0 %}
+            {% for block in item.text_blocks %}
+            <span style="float: left; padding-left: 5px; font-size: 1em; color: #00000031;">
+                <i class="fa-regular fa-file"></i>
+            </span>
+            {% endfor %}
+            {% endif %}
+
         {% if results == null and document != None %}
         <p class="set-items" style="text-align: right; ">processing</p>
         {% endif %}        

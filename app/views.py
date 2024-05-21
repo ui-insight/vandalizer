@@ -179,7 +179,10 @@ def add_search_term():
 	searchset_uuid = data['search_set_uuid']
 	searchset = SearchSet.objects(uuid=searchset_uuid).first()
 	searchtype = data['searchtype']
+
+	attachments = data['attachments'] if 'attachments' in data else None
 	print(searchphrase)
+	print(attachments)
 
 
 	if searchset.is_global:
@@ -188,8 +191,12 @@ def add_search_term():
 			return jsonify({"complete": False, "error": "You do not have permission to add to this search set."})
 
 	searchsetitem = SearchSetItem(searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype)
+	if attachments:
+		searchsetitem.text_blocks = attachments
+	
 	searchsetitem.save()
 
+	print(searchsetitem)
 	template = render_template('toolpanel/search_set_item.html', search_set=searchset, item=searchsetitem)
 	response = {
 				'complete': True,
@@ -208,7 +215,7 @@ def grab_template():
 
 	if search_set.set_type == "extraction":	
 		if edit_mode:
-			template = render_template('toolpanel/edit_search_results.html', 
+			template = render_template('toolpanel/extractions/edit_search_results.html', 
 							search_set=search_set,
 							document=document
 							)
@@ -219,7 +226,7 @@ def grab_template():
 			
 			return jsonify(response)
 		else:
-			template = render_template('toolpanel/search_results.html', 
+			template = render_template('toolpanel/extractions/search_results.html', 
 							search_set=search_set,
 							document=document
 							)
@@ -230,7 +237,7 @@ def grab_template():
 			return jsonify(response)
 	else:
 		if edit_mode:
-			template = render_template('toolpanel/edit_prompt_results.html', 
+			template = render_template('toolpanel/prompts/edit_prompt_results.html', 
 								search_set=search_set,
 								document=document
 								)
@@ -239,7 +246,7 @@ def grab_template():
 				}
 			return jsonify(response)
 		else:
-			template = render_template('toolpanel/prompt_results.html', 
+			template = render_template('toolpanel/prompts/prompt_results.html', 
 								search_set=search_set,
 								document=document
 								)
@@ -283,7 +290,7 @@ def begin_search():
 		em.root_path = app.root_path
 		results = em.extract(keys, document_path)
 		print(results)
-		template = render_template('toolpanel/search_results.html', 
+		template = render_template('toolpanel/extractions/search_results.html', 
 							search_set=search_set,
 							results=results
 							)
@@ -292,7 +299,7 @@ def begin_search():
 			}
 		return jsonify(response)
 	else:
-		template = render_template('toolpanel/search_results.html', 
+		template = render_template('toolpanel/extractions/search_results.html', 
 							search_set=search_set
 							)
 		response = {
@@ -310,18 +317,15 @@ def begin_prompt_search():
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 	keys = []
 	items = search_set.items()
-	for item in items:
-		if item.searchtype == "prompt":
-			keys.append(item.searchphrase)
 
-	if len(keys) > 0:
+	if len(items) > 0:
 		llm = OpenAIInterface()
 		llm.load_document(app.root_path, document_path)
 		results = {}
-		for key in keys:
-			results[key] = llm.ask_question_to_loaded_document(key)
+		for item in items:
+			results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
 		print(results)
-		template = render_template('toolpanel/prompt_results.html', 
+		template = render_template('toolpanel/prompts/prompt_results.html', 
 							search_set=search_set,
 							results=results
 							)
@@ -330,7 +334,7 @@ def begin_prompt_search():
 			}
 		return jsonify(response)
 	else:
-		template = render_template('toolpanel/prompt_results.html', 
+		template = render_template('toolpanel/prompts/prompt_results.html', 
 							search_set=search_set
 							)
 		response = {

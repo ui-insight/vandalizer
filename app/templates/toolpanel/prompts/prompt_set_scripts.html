@@ -166,15 +166,19 @@
             });
         }
 
-
-        $('#add-prompt-term-input').on('keyup', function(e) {
-            if (e.key === 'Enter') {
+        $('#promptinput').on('keydown', function(event) {
+            $('#promptplaceholder').attr("data-placeholder", "");
+            $('#promptplaceholder').css("color", "black");
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault(); // Prevent the default behavior of adding a newline
+                // Trigger your JavaScript event here
                 if (prompt_set_add_uuid != "") {
                     addPromptSetItem();
-                return;
-            } else {
-                showToast("Please select an prompt group to add to");
-            }
+
+                    return;
+                } else {
+                    showToast("Please select an prompt group to add to");
+                }
             }
         });
 
@@ -188,26 +192,36 @@
         });
 
         function addPromptSetItem () {
+
             console.log("Adding prompt term");
-            console.log($("#add-prompt-term-input")[0].value);
+            let question = $("#promptinput").find('p').text();
+            $("#promptinput").find('p').text("");
+
             $.ajax({
                 url: '/api/add_search_term',
                 type: 'POST',
                 data: JSON.stringify({
                     search_set_uuid: prompt_set_add_uuid,
-                    term: $("#add-prompt-term-input")[0].value,
+                    term: question,
                     space_id: "{{ current_space_id }}",
-                    searchtype: "prompt"//$('#segment-1')[0].checked ? "search" : "extraction"
+                    searchtype: "prompt",
+                    attachments: attachments//$('#segment-1')[0].checked ? "search" : "extraction"
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
+                    attachments = []
+                    
                     if (msg.complete == false) {
                         showToast(msg.error);
                         return;
                     }
+
+                    updateAttachmentUI();
                     // reload page
+                    $('#promptplaceholder').attr("data-placeholder", "Prompt to ask document...");
+                    $('#promptplaceholder').css("color", "darkgray");
                     $('.set-result-items').append(msg.template);
                     $("#add-prompt-term-input")[0].value = "";
                 },
