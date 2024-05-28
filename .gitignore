@@ -1,3 +1,4 @@
+app/static/temp/*
 venv/*
 app/app.db
 app/static/images/uploads/*
