@@ -95,6 +95,12 @@
                 });
             });
 
+            $('.delete-set-item-button').on("click", function () {
+                console.log("delete set item");
+                let uuid = $(this).attr("data-uuid");
+                deleteSearchSetItem(uuid);
+            });
+
             $('#export-prompt').on("click", function (e) {
                 e.preventDefault();
                 searchDict = createSearchTermDictionary();
