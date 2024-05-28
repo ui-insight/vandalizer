@@ -3,14 +3,9 @@ var file;
 let attachArea = document.querySelector(".attach-area");
 if (attachArea) {
   let dragText = attachArea.querySelector("header"),
-  //button = attachArea.querySelector("button"),
   input = attachArea.querySelector("input");
-   //this is a global variable and we'll use it inside multiple functions
-  //button.onclick = ()=>{
-  //  input.click(); //if user click on the button then the input also clicked
-  //}
+
   input.addEventListener("change", function(){
-    //getting user select file and [0] this means if user select multiple files then we'll select only the first one
     file = this.files[0];
     attachArea.classList.add("active");
     showFile(); //calling function
@@ -49,11 +44,6 @@ function showFile(){
     let fileReader = new FileReader(); //creating new FileReader object
     fileReader.onload = ()=>{
       let fileURL = fileReader.result; //passing user file source in fileURL variable
-        // UNCOMMENT THIS BELOW LINE. I GOT AN ERROR WHILE UPLOADING THIS POST SO I COMMENTED IT
-      //let imgTag = `<img id="image" src="/static/images/images.jpeg" alt="image">`; //creating an img tag and passing user selected file source inside src attribute
-      //attachArea.innerHTML = imgTag;
-      $('#loading-area').show();
-      $('#drag-area').hide();
        var filetype = file.type;
           var filename = file.name;
       var base64String = getB64Str(fileURL);
