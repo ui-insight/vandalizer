@@ -796,6 +796,15 @@ tr {
     background-color: #45a049;
 }
 
+#closeRenameBtn {
+    background-color: #ffffff;
+    color: #465056;
+    padding: 10px 20px;
+    border: 1px solid #465056;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
 
 #attachmentText {
     width: calc(100% - 20px);
@@ -815,4 +824,17 @@ tr {
 
 #attachBtn:hover {
     background-color: #45a049;
+}
+
+#closeAttachBtn {
+    background-color: #ffffff;
+    color: #465056;
+    padding: 10px 20px;
+    border: 1px solid #465056;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.delete-set-item-button {
+    cursor: pointer;
 }

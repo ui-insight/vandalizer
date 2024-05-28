@@ -201,10 +201,11 @@
                 console.log("here");
             });
 
+            
             $('.delete-set-item-button').on("click", function () {
+                console.log("delete set item");
                 let uuid = $(this).attr("data-uuid");
                 deleteSearchSetItem(uuid);
-                console.log("here");
             });
 
             $('#renameset').on("click", function () {

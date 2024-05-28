@@ -266,10 +266,14 @@ $(document).ready(function() {
             window.location.href = "/home?id=" + selectedOption;
         }
     });
-
+    
     // When the user clicks on <span> (x), close the modal
-        $('.close-modal').on('click', function() {
-            $('#renameModal').hide();
+    $('#closeRenameBtn').on('click', function() {
+        $('#renameModal').hide();
+    });
+
+    $('#closeAttachBtn').on('click', function() {
+        $('#attachmentModal').hide();
     });
 
     // When the user clicks anywhere outside of the modal, close it
