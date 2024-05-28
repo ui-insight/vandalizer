@@ -14,6 +14,7 @@ import json
 import csv
 from itertools import chain
 from copy import deepcopy
+from pypdf import PdfReader
 
 #OAuth
 import secrets
@@ -137,6 +138,30 @@ def upload():
 	thread = threading.Thread(target=ingest_semantics, args=(document,))
 	thread.start()
 	return jsonify({"complete": True, "uuid": uid})
+
+@app.route('/read_pdf', methods=['POST'])
+def read_pdf():
+	# user = load_user()
+	# if user is None:
+	# 	return redirect(url_for('login'))
+
+	json_data = request.get_json()
+	blob = json_data['contentAsBase64String']
+	filename = json_data['fileName']
+
+	imgdata = base64.b64decode(blob)
+	uid = uuid.uuid4().hex.upper()
+	with open(os.path.join(app.root_path, 'static', 'temp', f"{uid}.pdf"), 'wb') as f:
+		f.write(imgdata)
+	
+	pdf = PdfReader(os.path.join(app.root_path, "static", 'temp', f"{uid}.pdf"))
+	number_of_pages = len(pdf.pages)
+	full_text = ""
+	for i in range(number_of_pages):
+		full_text = full_text + pdf.pages[i].extract_text() + " "
+
+	print(full_text)
+	return jsonify({"full_text": full_text})
 
 def ingest_semantics(document):
 		semantics = SemanticIngest()

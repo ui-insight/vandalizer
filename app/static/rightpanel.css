@@ -33,7 +33,7 @@
     /* height: 135px; */
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
-    z-index: 20000;
+    z-index: 500;
   }
   .right-panel .bottom-toolbar .button-container {
     flex-basis: 45%;
