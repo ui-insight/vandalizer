@@ -50,7 +50,7 @@ class SearchSet(me.Document):
         return SearchSetItem.objects(searchset=self.uuid)
 
 class SearchSetItem(me.Document):
-    searchphrase = me.StringField(required=True, max_length=200)
+    searchphrase = me.StringField(required=True)
     searchset = me.StringField(required=True, max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
     text_blocks = me.ListField(me.StringField(), required=False)

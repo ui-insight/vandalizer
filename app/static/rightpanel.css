@@ -6,7 +6,7 @@
   right: 0;
   bottom: 140px;
   background-color: white;
-  z-index: 5000;
+  z-index: 450;
   padding: 15px 30px 60px 30px;
   overflow: scroll;
 }
@@ -21,7 +21,7 @@
     padding-top: 0px;
     padding-bottom: 120px;
     box-shadow: -7px 20px 25px -16px rgb(211, 211, 211);
-    z-index: 3000;
+    z-index: 400;
 }
 
 .right-panel .bottom-toolbar {

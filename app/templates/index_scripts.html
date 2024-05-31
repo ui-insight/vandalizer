@@ -250,6 +250,13 @@ $('.rescan-button').on('click', function(e) {
     showScanning();
 });
 
+function updateAttachmentUI() {
+    $('#attachment-list').empty();
+    for (var i = 0; i < attachments.length; i++) {
+        $('#attachment-list').append('<button style="float: left; padding: 5px 15px; font-size: 12px; font-weight: 600; margin-top: 15px;" class="shadow-button">Attachment</button>');
+    }
+}
+
 
 $(document).ready(function() {
 

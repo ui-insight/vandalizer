@@ -37,6 +37,29 @@
         background-color: rgba(255, 255, 255, 0.3); 
   }
 
+  .set-content {
+    display: flex;
+    align-items: center;
+}
+
+.filter-icon {
+    font-size: 1em;
+    color: #5c21d2bc;
+    margin-right: 10px;
+}
+
+.set-title {
+    flex: 1;
+    margin: 0;
+    font-weight: 500;
+}
+
+.delete-set-item-button {
+    font-size: 1em;
+    color: #5c21d2bc;
+    margin-left: 10px;
+}
+
   .set-entry {
     padding: 5px 5px;
     height: 40px;

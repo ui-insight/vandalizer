@@ -228,8 +228,10 @@
                     // reload page
                     $('#promptplaceholder').attr("data-placeholder", "Prompt to ask document...");
                     $('#promptplaceholder').css("color", "darkgray");
+
+                    console.log(msg.template);
+
                     $('.set-result-items').append(msg.template);
-                    $("#add-prompt-term-input")[0].value = "";
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
