@@ -54,6 +54,7 @@ $('#loading-area')
 ;
 
 function showFile(){
+  console.log('beginning upload');
   let fileType = file.type; //getting selected file type
   let validExtensions = ["application/pdf"]; //adding some valid image extensions in array
   if(validExtensions.includes(fileType)){ //if user selected file is an image file
@@ -84,6 +85,7 @@ function showFile(){
          contentType: "application/json",
          dataType: 'json',
          success: function(result) {
+          console.log('upload succeeded');
           $('#loading-area').hide();
           $('#drag-area').show();
           let newRow = $("<tr>");
