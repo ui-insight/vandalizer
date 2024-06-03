@@ -8,7 +8,7 @@ if (attachArea) {
   input.addEventListener("change", function(){
     file = this.files[0];
     attachArea.classList.add("active");
-    showFile(); //calling function
+    attachFile(); //calling function
   });
 
   //If user Drag File Over DropArea
@@ -33,11 +33,12 @@ if (attachArea) {
     console.log("Looking for ifle");
     file = event.dataTransfer.files[0];
     console.log(file);
-    showFile(); //calling function
+    attachFile(); //calling function
   });
 }
 
-function showFile(){
+function attachFile(){
+  console.log('beginning attachment');
   let fileType = file.type; //getting selected file type
   let validExtensions = ["application/pdf"]; //adding some valid image extensions in array
   if(validExtensions.includes(fileType)){ //if user selected file is an image file
@@ -64,7 +65,7 @@ function showFile(){
          dataType: 'json',
          success: function(result) {
             console.log(result);
-
+            console.log("attachment succeeded");
             $('#attachmentText').val(result.full_text)
 
          } 
