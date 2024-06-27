@@ -43,11 +43,15 @@ class OpenAIInterface:
                                              )
         return completion.choices[0].message.content
     
-    def ask_question_to_document(self, root_path, document_path, question):
-        full_path = os.path.join(root_path, "static", "uploads", document_path)
+    def ask_question_to_documents(self, root_path, documents, question):
+
+        full_text = ""
+        for document in documents:
+            full_path = os.path.join(root_path, "static", "uploads", document.path)
+            full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
         
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
-        prompt = """Given the following document, answer the following question:""" + question + "\n" + extract_text_from_pdf(full_path)
+        prompt = """Given the following document(s), answer the following question:""" + question + "\n" + full_text
         completion = openai.chat.completions.create(model="gpt-4o", 
                                               messages=[{"role": "user", "content": prompt}],
                                              )

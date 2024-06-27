@@ -1,6 +1,7 @@
 <div class="tab-content" id="extraction-panel" style="{% if section != 'Extract' %}display: none;{% endif %}">
     <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
         <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
+        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></p>
         <div class="input-container">
             <div class="ask-question">
                 <input type="text" id="add-search-set-input" placeholder="Find or create a extraction set...">

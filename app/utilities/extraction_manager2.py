@@ -11,33 +11,35 @@ import json
 class ExtractionManager2:
     root_path = ""
     def getPrompt(self, context, features):
-        return """Extract and save the relevant entities mentioned in the following passage together with their properties.
+        return """Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
         """ + "\n".join(features) + """
 
         If a property is not present, represent it as "Not Found".
 
-        Format the output as JSON, with a single string as the key and a single string as the value. Do not include any additional text. Do not nest json values.
+        Format the output as JSON, with the entity name as the key and a single string as the value. Make sure the entity name is exactly as it is listed. Do not include any additional text. Do not nest json values format it as {"entity": "value"}.
         
         Passage: 
 
         """ + context + """
-        Remember: Extract and save the relevant entities mentioned in the following passage together with their properties.
+        Remember: Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
         """ + "\n".join(features) + """
 
         If a property is not present, represent it as "Not Found".
 
-        Format the output as JSON, with a single string as the key and a single string as the value. Do not include any additional text. Do not nest json values.
+        ormat the output as JSON, with the entity name as the key and a single string as the value. Make sure the entity name is exactly as it is listed. Do not include any additional text. Do not nest json values format it as {"entity": "value"}.
        
         """
 
-    def extract(self, extract_keys, pdf_path):
+    def extract(self, extract_keys, pdf_paths):
         start_time = time.time()
         openai.api_key = "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"
-        pdf = PdfReader(os.path.join(self.root_path, "static", "uploads", pdf_path))
-        number_of_pages = len(pdf.pages)
         full_text = ""
-        for i in range(number_of_pages):
-            full_text = full_text + pdf.pages[i].extract_text() + " "
+        for pdf_path in pdf_paths:
+            pdf = PdfReader(os.path.join(self.root_path, "static", "uploads", pdf_path))
+            number_of_pages = len(pdf.pages)
+            
+            for i in range(number_of_pages):
+                full_text = full_text + pdf.pages[i].extract_text() + " "
 
         print(f"PDF processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()

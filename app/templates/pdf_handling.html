@@ -102,12 +102,14 @@
         });
     }
 
+    {% if documents|length > 0 %}
 
-    pdfjsLib.getDocument('/static/uploads/{{ document.path }}').promise.then(function (pdfDoc_) {
+    pdfjsLib.getDocument('/static/uploads/{{ documents[0].path }}').promise.then(function (pdfDoc_) {
         pdfDoc = pdfDoc_;
         
         renderPDF();
     });
+    {% endif %}
 
     function renderPDF() {
         pdfContainer.innerHTML = '';

@@ -44,7 +44,7 @@
         <div>
             <h3>Select Documents</h3>
             <div id="documents">
-                {% for doc in docs %}
+                {% for doc in folder_docs %}
                 <label  style="font-size: 12px; font-weight: 300;"><input type="checkbox" name="{{ doc.title }}" value="{{ doc.path }}" style="margin-right: 5px;"> {{ doc.title }}</label><br>
                 {% endfor %}
                 
