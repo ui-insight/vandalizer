@@ -10,24 +10,24 @@
   
   .drag-area{
     border: 2px dashed #17181a50;
-    height: 200px;
+    height: 100px;
     border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
-    margin: 30px 60px;
+    margin: 30px 45px;
   }
   .drag-area.active{
     border: 2px solid #efefef;
   }
   .drag-area .icon{
-    font-size: 30px;
+    font-size: 24px;
     font-weight: 400;
     color: #17181abb;
   }
   .drag-area header{
-    font-size: 30px;
+    font-size: 22px;
     font-weight: 500;
     color: #17181abb;
   }

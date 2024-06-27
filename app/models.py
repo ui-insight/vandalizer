@@ -13,6 +13,22 @@ class SmartDocument(me.Document):
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+    folder = me.StringField(required=False, max_length=200)
+
+class SmartFolder(me.Document):
+    parent_id = me.StringField(required=True, max_length=200)
+    title = me.StringField(required=True, max_length=200)
+    uuid = me.StringField(required=True, max_length=200)
+    space = me.StringField(required=True, max_length=200)
+    user_id = me.StringField(required=True, max_length=200)
+
+    def number_of_documents(self):
+        return SmartDocument.objects(folder=self.uuid).count()
+    
+    def document_uuids(self):
+        return SmartDocument.objects(folder=self.uuid).values_list('uuid')
 
 class Space(me.Document):
     uuid = me.StringField(required=True, max_length=200)

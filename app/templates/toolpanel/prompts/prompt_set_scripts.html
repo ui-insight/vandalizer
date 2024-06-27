@@ -31,7 +31,7 @@
             } else {
                 updateSearchSetPanel(datauuid);
 
-                if (document_uuid == null || document_uuid == "") {
+                if (document_uuids == null || document_uuids == "") {
                     return;
                 }
 
@@ -41,13 +41,12 @@
                     type: 'POST',
                     data: JSON.stringify({
                         search_set_uuid: datauuid,
-                        document: "{{ document.path }}"
+                        documents: "{{ document_uuids }}"
                     }),
                     contentType: 'application/json; charset=utf-8',
                     dataType: 'json',
                     async: true,
                     success: function (data) {
-                        console.log(data);
                         hideWorking();
                         $('#prompt-search-results-panel').show();
                         $('#prompt-search-results-panel').empty();
@@ -89,8 +88,6 @@
 
                 $('#renameBtn').off('click').on('click', function() {
                     let newName = $('#newName')[0].value;
-                    console.log(uuid);
-                    console.log(newName);
                     renameSearchSet(uuid, newName);
                 });
             });
@@ -135,7 +132,6 @@
                     
                 showToast();
                 navigator.clipboard.writeText(searchTerm);
-                console.log(searchTerm);
 
                 renderPDF();
                 setTimeout(function() {
@@ -151,7 +147,7 @@
                 type: 'POST',
                 data: JSON.stringify({
                     search_set_uuid: set_uuid,
-                    document_uuid: document_uuid,
+                    document_uuids: document_uuids,
                     edit_mode: edit_mode
                 }),
                 contentType: 'application/json; charset=utf-8',
@@ -228,9 +224,6 @@
                     // reload page
                     $('#promptplaceholder').attr("data-placeholder", "Prompt to ask document...");
                     $('#promptplaceholder').css("color", "darkgray");
-
-                    console.log(msg.template);
-
                     $('.set-result-items').append(msg.template);
                 },
                 error: function (xhr, ajaxOptions, thrownError) {

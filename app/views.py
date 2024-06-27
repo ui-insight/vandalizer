@@ -1,6 +1,6 @@
 from flask import url_for, send_file, redirect, render_template, flash, g, session, jsonify, Response, send_file
 from app import app
-from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem, ExtractionQualityRecord
+from app.models import User, SmartDocument, Space, SearchSet, SearchSetItem, ExtractionQualityRecord, SmartFolder
 from app.forms import LoginForm, SpaceForm
 import os
 import base64
@@ -57,6 +57,11 @@ def logout():
 	return redirect(url_for('index'))
 
 
+
+#######################################
+######## HOME ######
+#######################################
+
 @app.route('/home')
 def home():
 	#if not azure.authorized:
@@ -78,6 +83,8 @@ def home():
 	print(section)
 	
 	document = None
+
+	# Get the space
 	spaces = list(Space.objects())
 	if len(spaces) == 0:
 		space = Space(title="Default Space", uuid=uuid.uuid4().hex)
@@ -89,29 +96,72 @@ def home():
 	else:
 		current_space = spaces[0]
 
+	documents = []
+	# Check for documents
 	if request.args.get('docid'):
-		document = SmartDocument.objects(uuid=request.args.get('docid')).first()
+		doc_id = request.args.get('docid')
+		document = SmartDocument.objects(uuid=doc_id).first()
+		documents.append(document)
 		current_space = Space.objects(uuid=document.space).first()
 		semantics = SemanticIngest()
-		try:
-			if not semantics.check_for_collection(document):
-				thread = threading.Thread(target=ingest_semantics, args=(document,))
-				thread.start()
-		except:
-			print("Error checking for collection")
+		if not semantics.check_for_collection(document):
+			thread = threading.Thread(target=ingest_semantics, args=(document,))
+			thread.start()
+
+	if request.args.get('docids'):
+		doc_ids = request.args.get('docids').split(",")
+		for doc_id in doc_ids:
+			document = SmartDocument.objects(uuid=doc_id).first()
+			documents.append(document)
+		
+		current_space = Space.objects(uuid=document.first.space).first()
+		semantics = SemanticIngest()
+		if documents.count == 1:
+			try:
+				if not semantics.check_for_collection(documents.first):
+					thread = threading.Thread(target=ingest_semantics, args=(documents.first,))
+					thread.start()
+			except:
+				print("Error checking for collection")
 
 	spaces.remove(current_space)
 	spaces.insert(0, current_space)
 
+	# Get the extraction and prompt sets
 	global_extraction_sets = SearchSet.objects(space=current_space.uuid, is_global=True, set_type="extraction").all()
 	user_extraction_sets = SearchSet.objects(user_id=user.user_id, space=current_space.uuid, is_global=False, set_type="extraction").all()
 	extraction_sets = chain(global_extraction_sets, user_extraction_sets)
 
+	# Get the prompt sets
 	global_prompt_sets = SearchSet.objects(space=current_space.uuid, is_global=True, set_type="prompt").all()
 	user_prompt_sets = SearchSet.objects(user_id=user.user_id, space=current_space.uuid, is_global=False,  set_type="prompt").all()
 	prompt_sets = chain(global_prompt_sets, user_prompt_sets)
-	docs = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid).all()
-	return render_template('index.html', extraction_sets=extraction_sets, prompt_sets=prompt_sets, document=document, docs=docs, spaces=spaces, current_space_id=spaces[0].uuid, section=section)
+	
+	# Get the folders
+	current_folder_id = "0"
+	current_folder_parent_id = "0"
+	if request.args.get('folder_id'):
+		current_folder_id = request.args.get('folder_id')
+	folder_docs = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid, folder="0").all()
+	if current_folder_id != 0 and current_folder_id != "0":
+		folder_docs = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid, folder=current_folder_id).all()
+		folder = SmartFolder.objects(uuid=current_folder_id).first()
+		current_folder_parent_id = folder.parent_id
+	folders = SmartFolder.objects(user_id=user.user_id, space=current_space.uuid, parent_id="0").all()
+	if current_folder_id != 0:
+		folders = SmartFolder.objects(user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id).all()
+	
+
+	return render_template('index.html', extraction_sets=extraction_sets, 
+						prompt_sets=prompt_sets, 
+						folders=folders, 
+						current_folder_parent_id=current_folder_parent_id, 
+						current_folder_id=current_folder_id, 
+						documents=documents, 
+						folder_docs=folder_docs, 
+						spaces=spaces, 
+						current_space_id=spaces[0].uuid, 
+						section=section)
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
@@ -123,21 +173,31 @@ def upload():
 	blob = json_data['contentAsBase64String']
 	filename = json_data['fileName']
 	space = json_data['space']
-	if SmartDocument.objects(title=filename, space=space, user_id=user.user_id).count() > 0:
+	folder = json_data['folder']
+
+		
+	print("Folder is")
+	print(folder)
+	if folder is None or folder == "":
+		folder = "0"
+
+	if SmartDocument.objects(title=filename, space=space, user_id=user.user_id, folder=folder).count() > 0:
 		return jsonify({"complete": True})
+
+
 
 	imgdata = base64.b64decode(blob)
 	uid = uuid.uuid4().hex.upper()
 	with open(os.path.join(app.root_path, 'static', 'uploads', f"{uid}.pdf"), 'wb') as f:
 		f.write(imgdata)
 	
-	document = SmartDocument(title=filename, path=f"{uid}.pdf", uuid=uid, user_id=user.user_id, space=space)
+	document = SmartDocument(title=filename, path=f"{uid}.pdf", uuid=uid, user_id=user.user_id, space=space, folder=folder)
 	document.save()
 	
 	# Create a new thread and start it
 	thread = threading.Thread(target=ingest_semantics, args=(document,))
 	thread.start()
-	return jsonify({"complete": True, "uuid": uid})
+	return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
 @app.route('/read_pdf', methods=['POST'])
 def read_pdf():
@@ -172,12 +232,17 @@ def ingest_semantics(document):
 def chat():
 	data = request.get_json()
 	message = data['message']
-	document_uuid = data['document_uuid']
-	document = SmartDocument.objects(uuid=document_uuid).first()
-	print(message)
-	print(document.path)
-	response = OpenAIInterface().ask_question_to_document(app.root_path, document.path, message)
-	print(response)
+	document_uuids = data['document_uuids']
+	documents = []
+	print(document_uuids)
+	for doc_uuid in document_uuids:
+		document = SmartDocument.objects(uuid=doc_uuid).first()
+		if document != None:
+			documents.append(document)
+
+	
+	response = OpenAIInterface().ask_question_to_documents(app.root_path, documents, message)
+	response
 	return jsonify(response)
 
 @app.route('/api/add_search_set', methods=['POST'])
@@ -233,16 +298,24 @@ def add_search_term():
 def grab_template():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
-	document_uuid = data['document_uuid']
+	document_uuids = data['document_uuids']
+	
 	edit_mode = data['edit_mode']
-	document = SmartDocument.objects(uuid=document_uuid).first()
+	documents = []
+	for doc_uuid in document_uuids:
+		document = SmartDocument.objects(uuid=doc_uuid).first()
+		documents.append(document)
+
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
+
+
+	print("Document count: " + str(len(documents)))
 
 	if search_set.set_type == "extraction":	
 		if edit_mode:
 			template = render_template('toolpanel/extractions/edit_search_results.html', 
 							search_set=search_set,
-							document=document
+							documents=documents
 							)
 			
 			response = {
@@ -253,7 +326,7 @@ def grab_template():
 		else:
 			template = render_template('toolpanel/extractions/search_results.html', 
 							search_set=search_set,
-							document=document
+							documents=documents
 							)
 			response = {
 				'template': template,
@@ -264,7 +337,7 @@ def grab_template():
 		if edit_mode:
 			template = render_template('toolpanel/prompts/edit_prompt_results.html', 
 								search_set=search_set,
-								document=document
+								documents=documents
 								)
 			response = {
 					'template': template,
@@ -273,7 +346,7 @@ def grab_template():
 		else:
 			template = render_template('toolpanel/prompts/prompt_results.html', 
 								search_set=search_set,
-								document=document
+								documents=documents
 								)
 			response = {
 					'template': template,
@@ -284,11 +357,15 @@ def grab_template():
 def semantic_search():
 	data = request.get_json()
 	search_term = data['search_term']
-	document_uuid = data['document_uuid']
+	document_uuids = data['document_uuids']
 	
-	document = SmartDocument.objects(uuid=document_uuid).first()
+	documents = []
+	for doc_uuid in document_uuids:
+		document = SmartDocument.objects(uuid=doc_uuid).first()
+		documents.append(document)
+
 	semantics = SemanticIngest()
-	results = semantics.search(search_term, document)
+	results = semantics.search(search_term, documents.first)
 	print(results)
 
 	response = {
@@ -300,8 +377,17 @@ def semantic_search():
 def begin_search():
 	data = request.get_json()
 	searchset_uuid = data['search_set_uuid']
-	document_path = data['document']
-	print("Fetch loading template:" + searchset_uuid + " " + document_path)
+	document_uuids = data['document_uuids']
+
+	documents = []
+	document_paths = []
+	for doc_uuid in document_uuids:
+		document = SmartDocument.objects(uuid=doc_uuid).first()
+		documents.append(document)
+		document_paths.append(document.path)
+
+	
+	print("Fetch loading template:" + searchset_uuid)
 
 	search_set = SearchSet.objects(uuid=searchset_uuid).first()
 	keys = []
@@ -313,11 +399,12 @@ def begin_search():
 	if len(keys) > 0:
 		em = ExtractionManager2()
 		em.root_path = app.root_path
-		results = em.extract(keys, document_path)
+		results = em.extract(keys, document_paths)
 		print(results)
 		template = render_template('toolpanel/extractions/search_results.html', 
 							search_set=search_set,
-							results=results
+							results=results,
+							documents=documents
 							)
 		response = {
 				'template': template,
@@ -325,7 +412,8 @@ def begin_search():
 		return jsonify(response)
 	else:
 		template = render_template('toolpanel/extractions/search_results.html', 
-							search_set=search_set
+							search_set=search_set,
+							documents=documents
 							)
 		response = {
 				'template': template,
@@ -367,6 +455,31 @@ def begin_prompt_search():
 			}
 		return jsonify(response)
 
+@app.route('/rename_document', methods=['POST'])
+def rename_document():
+	data = request.get_json()
+	document_uuid = data['uuid']
+	new_title = data['newName']
+
+	document = SmartDocument.objects(uuid=document_uuid).first()
+	document.title = new_title
+	document.save()
+	return jsonify({"complete": True})
+
+@app.route('/rename_folder', methods=['POST'])
+def rename_folder():
+	data = request.get_json()
+	document_uuid = data['uuid']
+	new_title = data['newName']
+
+	print(document_uuid)
+	print(new_title)
+
+	document = SmartFolder.objects(uuid=document_uuid).first()
+	document.title = new_title
+	document.save()
+	return jsonify({"complete": True})
+
 @app.route('/delete_document', methods=['GET'])
 def delete_documents():
 	document_uuid = request.args.get('docid')
@@ -374,7 +487,7 @@ def delete_documents():
 	document.delete()
 	semantics = SemanticIngest()
 	semantics.delete(document)
-	return redirect('/')
+	return redirect('/home')
 
 @app.route('/delete_search_set', methods=['GET'])
 def delete_search_set():
@@ -498,3 +611,37 @@ def load_user():
 			print("Built new user" + user.user_id)
 			return user
 	return None
+
+
+
+
+
+@app.route('/files/delete_folder', methods=['POST'])
+def delete_folder():
+    folder_id = request.GET.get('folder_id')
+    SmartFolder.objects.filter(id=folder_id).delete()
+    return redirect('file_browser')
+
+
+@app.route('/files/move_item', methods=['POST'])
+def move_item():
+    item_type = request.POST.get('item_type')
+    item_id = request.POST.get('item_id')
+    target_folder_id = request.POST.get('target_folder_id')
+    
+    if item_type == 'folder':
+        SmartFolder.objects.filter(id=item_id).update(parent_id=target_folder_id)
+    elif item_type == 'document':
+        SmartDocument.objects.filter(uuid=item_id).update(folder_id=target_folder_id)
+    
+    return redirect('file_browser')
+
+
+####### File Browser #######
+@app.route('/files/create_folder', methods=['GET', 'POST'])
+def create_folder():
+	parent_id = request.form['parent_id']
+	name = request.form['name']
+	space_id = request.form['space_id']
+	SmartFolder.objects.create(title=name, parent_id=parent_id, space=space_id, user_id=session["user_id"], uuid=uuid.uuid4().hex)
+	return redirect('/home')

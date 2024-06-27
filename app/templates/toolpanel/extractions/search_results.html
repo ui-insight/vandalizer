@@ -8,6 +8,7 @@
         </a>
     </span>
 </p>
+<p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></p>
 
 
 
@@ -25,12 +26,13 @@
 {% endfor %}
 <br>
 <p><b>Extractions</b>
+    <span style="float: right; padding-left: 15px;"><a id="editset" href="#" data-uuid="{{ search_set.uuid }}"
+        data-title="{{ search_set.title }}">Edit mode</a></span>
     {% if results != null %}
         <span style="float: right; padding-left: 15px;"><a id="rerun" href="#" data-uuid="{{ search_set.uuid }}"
     data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export</a></span> 
     {% endif %}
-    <span style="float: right; padding-left: 15px;"><a id="editset" href="#" data-uuid="{{ search_set.uuid }}"
-        data-title="{{ search_set.title }}">Edit mode</a></span>
+    
     
 </p>
 
@@ -45,7 +47,7 @@
         <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
             item.searchphrase }}</p>
 
-        {% if results == null and document != None %}
+        {% if results == null and documents != None and documents|length > 0 %}
         <p class="set-items" style="text-align: right; ">processing</p>
         {% endif %}
         
@@ -70,26 +72,3 @@
 
 {% endfor %}
 </div>
-
-{% if results != null %}
-{% if document != None %}
-<div>
-    <h4>Help us, please rate these results</h4>
-        <div class="rate">
-            <input type="radio" id="star5" name="rate" value="5" />
-    <label for="star5" title="text">5 stars</label>
-    <input type="radio" id="star4" name="rate" value="4" />
-    <label for="star4" title="text">4 stars</label>
-    <input type="radio" id="star3" name="rate" value="3" />
-    <label for="star3" title="text">3 stars</label>
-    <input type="radio" id="star2" name="rate" value="2" />
-    <label for="star2" title="text">2 stars</label>
-    <input type="radio" id="star1" name="rate" value="1" />
-    <label for="star1" title="text">1 star</label>
-        </div>
-        <input type="text" class="comment" id="comment-input" placeholder="Leave a comment if you want...">
-        <button class="btn btn-primary" id="submit-comment" style="float: right; margin-top: 15px;" type="submit">Submit</button>
-
-</div>
-{% endif %}
-{% endif %}

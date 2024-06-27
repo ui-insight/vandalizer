@@ -1,7 +1,6 @@
 <script>
     var is_adding_term = false;
     var search_set_add_uuid = "";
-    var document_uuid = "{{ document.uuid }}";
     var attachments = [];
 
     function showToast(message) {
@@ -15,6 +14,7 @@
         setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
     }
 
+    // LOADING
     function showWorking() {
         $('#navbar-img')[0].classList.add('spin');
     }
@@ -23,6 +23,7 @@
         $('#navbar-img')[0].classList.remove('spin');
     }
 
+    // TAB MENU
     const tabMenu = document.querySelector('.tab-menu');
         const tabMenuItems = tabMenu.querySelectorAll('li');
 
@@ -34,19 +35,16 @@
                 $('.tab-content').hide();
                 $('.bottom-toolbar').hide();
                 var tabTitle = $(this).text();
-                console.log(tabTitle);
                 // Use the tabTitle variable as needed
                 let href = window.location.href;
                 const qs = new URLSearchParams(href.split('?')[1]);
                 qs.delete('section');
                 qs.append('section', tabTitle);
                 const newQs = qs.toString();
-                console.log(newQs);
                 const newhref = `/home?${newQs}`;
                 window.history.pushState({}, '', newhref);
 
                 if (tabTitle == "Extract") {
-                    console.log("Show extract");
                     $('#extraction-panel').show();
                     $('#bottom-toolbar-extraction').show();
                 } else if (tabTitle == "Prompt") {
@@ -62,35 +60,30 @@
 
     
 
-    $(document).ready(function () {
-        
-
-        
-
+    $(document).ready(function () {        
+        // ADD ATTACHMENT
         $('#add-attachment-button').on("click", function () {
             $('#attachmentModal').show();
             let uuid = $(this).attr("data-uuid");
-            console.log("here");
+
             $('#attachBtn').off('click').on('click', function() {
                 let attachment = $('#attachmentText')[0].value;
                 $('#attachmentModal').hide();
                 attachments.push(attachment);
-                console.log(attachments);
                 updateAttachmentUI();
                 $('#attachmentText')[0].value = "";
             });
         });
 
 
-
+        // PERFORM SEARCH
         function performSemanticSearch(term) {
-            console.log("semantic search");
             $.ajax({
                 url: '/api/semantic_search',
                 type: 'POST',
                 data: JSON.stringify({
                     search_term: $("#add-search-term-input")[0].value,
-                    document_uuid: document_uuid,
+                    document_uuids: document_uuids,
                     space_id: "{{ current_space_id }}"
                 }),
                 contentType: 'application/json; charset=utf-8',
@@ -101,12 +94,9 @@
                     highlightTerms = [term];
                     documents = msg.results.documents[0];
                     highlightTerms = documents;
-                    console.log(documents);
-                    
 
                     renderPDF();
                     setTimeout(function() {
-                    console.log("showing next");
                     nextHighlight();
                 }, 500);
 
@@ -128,7 +118,7 @@
 
         function performSearch(search_set_uuid, datatitle) {
             showScanning();
-            console.log("Set item tapped: " + search_set_uuid);
+            
             search_set_add_uuid = search_set_uuid;
             $('#adding-search-set-title').text(datatitle);
             if (is_adding_term) {
@@ -136,23 +126,24 @@
             } else {
                 updateSearchSetPanel(search_set_uuid);
 
-                if (document_uuid == null || document_uuid == "") {
+                if (document_uuids == null || document_uuids == "") {
                     return;
                 }
 
                 showWorking();
+                let data = JSON.stringify({
+                    search_set_uuid: search_set_uuid,
+                    document_uuids: document_uuids
+                });
+
                 $.ajax({
                     url: '/api/begin_search',
                     type: 'POST',
-                    data: JSON.stringify({
-                        search_set_uuid: search_set_add_uuid,
-                        document: "{{ document.path }}"
-                    }),
+                    data: data,
                     contentType: 'application/json; charset=utf-8',
                     dataType: 'json',
                     async: true,
                     success: function (data) {
-                        console.log(data);
                         hideWorking();
                         stopScanning();
                         $('#search-results-panel').show();
@@ -173,7 +164,6 @@
                 location.reload();
             });
             $('.semantic-entry').on("click", function () {
-                console.log("clicked");
                 searchTerm = $(this).attr("data-title");
                 performSemanticSearch(searchTerm);
             });
@@ -186,19 +176,16 @@
 
             $('#clone').on("click", function () {
                 let uuid = $(this).attr("data-uuid");
-                console.log(uuid);
                 cloneSearchSet(uuid);
             });
 
             $('#editset').on("click", function () {
                 let uuid = $(this).attr("data-uuid");
                 updateSearchSetPanel(uuid, true);
-                console.log("here");
             });
 
             
             $('.delete-set-item-button').on("click", function () {
-                console.log("delete set item");
                 let uuid = $(this).attr("data-uuid");
                 deleteSearchSetItem(uuid);
             });
@@ -206,13 +193,15 @@
             $('#renameset').on("click", function () {
                 $('#renameModal').show();
                 let uuid = $(this).attr("data-uuid");
+                let context = $(this).attr("data-context");
 
-                $('#renameBtn').off('click').on('click', function() {
-                    let newName = $('#newName')[0].value;
-                    console.log(uuid);
-                    console.log(newName);
-                    renameSearchSet(uuid, newName);
-                });
+                console.log(uuid);
+                console.log(context);
+
+                // $('#renameBtn').off('click').on('click', function() {
+                //     let newName = $('#newName')[0].value;
+                //     renameSearchSet(uuid, newName);
+                // });
             });
 
 
@@ -274,16 +263,13 @@
             $('.extraction-result').on("click", function () {
                 // get text content
                 searchTerm = $(this).text();
-                console.log("search term: " + searchTerm);
                 highlightTerms = [searchTerm];
                     
                 showToast("Copied to clipboard");
                 navigator.clipboard.writeText(searchTerm);
-                console.log(searchTerm);
 
                 renderPDF();
                 setTimeout(function() {
-                    console.log("showing next");
                     nextHighlight();
                 }, 500);
             });
@@ -297,19 +283,16 @@
                 type: 'POST',
                 data: JSON.stringify({
                     search_set_uuid: set_uuid,
-                    document_uuid: document_uuid,
+                    document_uuids: document_uuids,
                     edit_mode: edit_mode
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    console.log(data);
                     $('#search-results-panel').show();
                     $('#search-results-panel').empty();
                     $(data.template).hide().appendTo('#search-results-panel').fadeIn();
-                    
-                    console.log($('.semantic-entry'))
                     addResultListeners();
                     
                     
@@ -373,7 +356,6 @@
 
         $('#add-search-set-input').on('keyup', function(e) {
             if (e.key === 'Enter') {
-                console.log("triggering click");
                 $('#add-search-set-button').click();
             }
         });
@@ -452,7 +434,6 @@
 
         function updateHighlights() {
             highlights = $('.highlight');
-            console.log(highlights);
 
             highlights[current_search_item].scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
             $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
@@ -487,7 +468,6 @@
                 searchTermDictionary[searchPhrase] = result;
             });
 
-            console.log(searchTermDictionary);
             return searchTermDictionary;
         }
         

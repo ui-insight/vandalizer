@@ -838,3 +838,54 @@ tr {
 .delete-set-item-button {
     cursor: pointer;
 }
+
+
+.file-popup-menu {
+    position: absolute;
+    background-color: white;
+    border: 1px solid #ccc;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+  }
+  
+  .file-popup-menu ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+  }
+  
+  .file-popup-menu li {
+    padding: 10px;
+    cursor: pointer;
+  }
+  
+  .file-popup-menu li:hover {
+    background-color: #f0f0f0;
+  }
+  
+  .ellipsis-btn {
+    background-color: transparent;
+    border: none;
+  }
+
+.file {
+    cursor: move;
+}
+.dragging {
+    opacity: 0.5;
+}
+.drag-over {
+    background-color: #e0e0e0;
+}
+#file-loading {
+    display: none;
+    color: #666;
+    font-style: italic;
+}
+
+.add-folder-input-field {
+    background-color: white;
+    border-radius: 6px;
+    border: 1px solid #d3d3d3;
+    padding: 10px;
+}

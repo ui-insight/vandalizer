@@ -1,6 +1,12 @@
 <script>
 var askingDocument = '';
+var document_uuids = [];
 
+document_uuids = [
+    {% for document in documents %}
+        "{{document.uuid}}",
+    {% endfor %}
+];    
 
 $('#ask-question-btn').on('click', function(e) {
     e.preventDefault()
@@ -18,7 +24,6 @@ if (askingDocument != '') {
     return;
 }
 
-console.log("askQuestion");
 openChatWindow();
 showChatLoading();
 $.ajax({
@@ -37,7 +42,6 @@ $.ajax({
             $('#ask-question-input')[0].value = ''
             openChatWindow();
             removeChatLoading();
-            console.log(answer);
             $('.chat-window').append(`
             <div class="answer-card" style="padding: 30px; ">
                 <p style="font-size: 30; color: #5D6F81;">
@@ -75,7 +79,6 @@ $.ajax({
             $('#ask-question-input')[0].value = ''
             openChatWindow();
             removeChatLoading();
-            console.log(answer);
             $('.chat-window').append(`
             <div class="answer-card" style="padding: 30px; ">
                 <p style="font-size: 30; color: #5D6F81;">
@@ -112,7 +115,6 @@ function cloneSearchSet(uuid) {
         dataType: 'json',
         async: true,
         success: function(msg) {
-            console.log(msg);
             location.reload();
         },
         error: function(xhr, ajaxOptions, thrownError) {
@@ -135,7 +137,6 @@ function renameSearchSet(uuid, title) {
         dataType: 'json',
         async: true,
         success: function(msg) {
-            console.log(msg);
             location.reload();
         },
         error: function(xhr, ajaxOptions, thrownError) {
@@ -156,7 +157,6 @@ function deleteSearchSetItem(uuid) {
         dataType: 'json',
         async: true,
         success: function(msg) {
-            console.log(uuid);
             // Get the set entry group with data-uuid equal to uuid and delete parent
             $(`.set-entry[data-item-uuid=${uuid}]`).parent().remove();
         },
@@ -189,7 +189,6 @@ function summarizeDocument(documentName) {
             $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
             askingDocument = documentName;
            
-            console.log(answer);
             removeChatLoading();
             const newBox = $(`
             <div class="answer-card" style="padding: 30px; ">
@@ -260,10 +259,70 @@ function updateAttachmentUI() {
 
 $(document).ready(function() {
 
+    $('.file').on('click', function(e) {
+        e.stopPropagation();
+        var checkbox = $(this).find('.document-selector');
+        checkbox.prop('checked', !checkbox.prop('checked'));
+        updateDocumentSelections();
+    });
+
+    $('.folder').on('click', function(e) {
+        e.stopPropagation();
+        var checkbox = $(this).find('.document-selector');
+        checkbox.prop('checked', !checkbox.prop('checked'));
+        updateDocumentSelections();
+    });
+
+    $('.document-selector').on('click', function(e) {
+        e.stopPropagation();
+        updateDocumentSelections();
+    });
+
+    function updateDocumentSelections() {
+        var checkedCheckboxes = $('.document-selector:checked');
+        var totalDocs = 0;
+        var uuids = [];
+
+        for (var i = 0; i < checkedCheckboxes.length; i++) {
+            let checkbox = checkedCheckboxes[i];
+            var numDocs = checkbox.attributes['data-num-documents'].value
+            totalDocs += parseInt(numDocs);
+
+            if (checkbox.attributes['data-doc-uuid'] != undefined) {
+                uuids.push(checkbox.attributes['data-doc-uuid'].value);
+            }
+
+            
+
+            if (checkbox.attributes['data-doc-uuids'] != undefined) {
+                let uuidList = checkbox.attributes['data-doc-uuids'].value;
+                let array = JSON.parse(uuidList.replace(/'/g, '"'));
+                uuids = uuids.concat(array);
+            }
+        }
+
+        document_uuids = uuids;
+
+        var counters = $('.doc-selected-counter')
+        for (var i = 0; i < counters.length; i++) {
+            counters[i].textContent = `${totalDocs} documents selected`;
+        }
+    }
+
+    $('#add-folder-button').on('click', function(e) {
+        e.preventDefault()
+        let addFolderField = $('#add-folder-field')[0];
+        if (addFolderField.style.display == 'none') {
+            $('#add-folder-field').show();
+        } else {
+            let addFolderForm = $('#add-folder-form')[0];
+            addFolderForm.submit();
+        }
+    });
+
     $('#space-select').on('change', function(e) {
         e.preventDefault()
         var selectedOption = $(this).val(); 
-        console.log(selectedOption);
 
         if (selectedOption == "Create New Space") {
             window.location.href = "/spaces/new";
@@ -289,26 +348,6 @@ $(document).ready(function() {
             $('#renameModal').hide();
         }
     });
-
-    // Change event handler for the select element
-    // $(".action-select").on("change", function() {
-    //     var selectedOption = $(this).val(); // Get the selected option's value
-    //     var documentName = $(this).data("document-name"); // Get the document name
-
-    //     if (selectedOption == "Ask Document") {
-    //         openChatWindow();
-    //         askDocument(documentName);
-    //     } else if (selectedOption == "Summarize") {
-    //         openChatWindow();
-    //         summarizeDocument(documentName);
-    //     }
-    //     console.log("Selected option:", selectedOption);
-    //     console.log("Document:", documentName);
-
-    //     for (var i = 0; i < $('select').length; i++) {
-    //         $('select')[i].selectedIndex = 0;
-    //     }
-    // });    
 });
 
 

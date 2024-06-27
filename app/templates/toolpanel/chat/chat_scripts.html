@@ -9,7 +9,7 @@
         if (event.key === 'Enter' && !event.shiftKey) {
             event.preventDefault(); // Prevent the default behavior of adding a newline
             // Trigger your JavaScript event here
-            if (document_uuid != "") {
+            if (document_uuids != "") {
                 chat();
                 return;
             } else {
@@ -21,7 +21,7 @@
     $('#chat-button').on("click", function (e) {
             e.preventDefault();
         console.log("chat button clicked");
-            if (document_uuid != "") {
+            if (document_uuids != "") {
                 chat();
                 return;
             } else {
@@ -38,7 +38,7 @@
                 url: '/api/chat',
                 type: 'POST',
                 data: JSON.stringify({
-                    document_uuid: document_uuid,
+                    document_uuids: document_uuids,
                     message: question
                 }),
                 contentType: 'application/json; charset=utf-8',

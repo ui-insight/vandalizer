@@ -74,8 +74,11 @@ function showFile(){
           contentType: filetype,
           contentAsBase64String: base64String,
           fileName: filename,
-          space: $('#current-space-id')[0].innerHTML
+          space: $('#current-space-id')[0].innerHTML,
+          folder: $('#current-folder-id')[0].innerHTML
       };
+
+      console.log(model);
 
       $.ajax({
          type: "POST",
@@ -86,13 +89,14 @@ function showFile(){
          dataType: 'json',
          success: function(result) {
           console.log('upload succeeded');
+          console.log(result);
           $('#loading-area').hide();
           $('#drag-area').show();
           let newRow = $("<tr>");
           let newCell = $("<td>");
           let newLink = $("<a>").attr("href", "/home?docid=" + result.uuid).text(filename);
-          let href = "/home?docid=" + result.uuid
-          window.location.href = href;
+          let href = "/home?folder_id=" + result.folder_id
+          //window.location.href = href;
           return
           
           newCell.append(newLink);
@@ -120,3 +124,201 @@ function getB64Str(buffer) {
           }
           return window.btoa(binary);
 }
+
+$(document).ready(function() {
+    const $popupMenu = $('#file-popup-menu');
+    let currentItemId = null;
+    let currentItemType = null;
+    let isPopupJustOpened = false;
+
+    $('#file-list tr').on('contextmenu', function(e) {
+        e.preventDefault();
+        showPopupMenu(e, $(this));
+    });
+
+    $('.ellipsis-btn').on('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        showPopupMenu(e, $(this).closest('.ellipsis-btn'));
+    });
+
+
+    function showPopupMenu(e, $target) {
+        const rect = e.type === 'contextmenu' ? {
+            left: e.clientX,
+            top: e.clientY,
+            bottom: e.clientY
+        } : $target[0].getBoundingClientRect();
+
+        const popupHeight = $popupMenu.outerHeight();
+        const windowHeight = $(window).height();
+        
+        let top, left;
+        
+        top = rect.top - 45;
+        
+        left = rect.left - 25;
+        
+        // Ensure the popup doesn't go off-screen horizontally
+        const rightEdge = left + $popupMenu.outerWidth();
+        if (rightEdge > $(window).width()) {
+            left = $(window).width() - $popupMenu.outerWidth() - 5;
+        }
+        
+        $popupMenu.css({
+            top: `${top}px`,
+            left: `${left}px`,
+            display: 'block',
+            transform: 'scale(1)',
+            opacity: 0
+        }).animate({
+            transform: 'scale(1)',
+            opacity: 1
+        }, 200);
+        
+        currentItemId =$target.find('.ellipsis-btn').data('folderId') ? $target.find('.ellipsis-btn').data('folderId') : $target.find('.ellipsis-btn').data('docId');
+        currentItemType = $target.find('.ellipsis-btn').data('folderId') ? 'folder' : 'document';
+        console.log(`Current item ID: ${currentItemId}, type: ${currentItemType}`);
+        // Set the flag to true
+        isPopupJustOpened = true;
+
+        // Reset the flag after a short delay
+        setTimeout(() => {
+            isPopupJustOpened = false;
+        }, 50);
+    }
+
+    $('#rename-option').on('click', function() {
+        // Implement rename functionality
+        console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
+        let renameModal = $('#renameModal');
+
+        $('#renameBtn').off('click').on('click', function() {
+            let newName = $('#newName')[0].value;
+            console.log(`Renaming ${currentItemType} with ID: ${currentItemId} to ${newName}`);
+            if (currentItemType === 'folder') {
+                console.log('renaming folder');
+                renameFolder(currentItemId, newName);
+            } else {
+                console.log('renaming document');
+                renameDocument(currentItemId, newName);
+            }
+        });
+
+        $('#renameModal').show();
+        hidePopupMenu();
+    });
+
+    function renameDocument(uuid, newName) {
+        $.ajax({
+            type: "POST",
+            url: "/rename_document",
+            data: JSON.stringify({uuid: uuid, newName: newName}),
+            processData: false,
+            contentType: "application/json",
+            dataType: 'json',
+            success: function(result) {
+                console.log('rename succeeded');
+                console.log(result);
+                location.reload();
+            }
+        });
+    }
+
+    function renameFolder(uuid, newName) {
+        $.ajax({
+            type: "POST",
+            url: "/rename_folder",
+            data: JSON.stringify({uuid: uuid, newName: newName}),
+            processData: false,
+            contentType: "application/json",
+            dataType: 'json',
+            success: function(result) {
+                console.log('rename succeeded');
+                console.log(result);
+                location.reload();
+            }
+        });
+    }
+
+    $('#delete-option').on('click', function() {
+        // Implement delete functionality
+        if (currentItemType === 'folder') {
+            window.location.href = `/delete_folder?folder_id=${currentItemId}`;
+        } else {
+            window.location.href = `/delete_document?docid=${currentItemId}`;
+        }
+        hidePopupMenu();
+    });
+
+    function hidePopupMenu() {
+        $popupMenu.animate({
+            transform: 'scale(0.8)',
+            opacity: 0
+        }, 200, function() {
+            $(this).hide();
+        });
+    }
+
+    // Close the popup menu when clicking outside
+    $(document).on('click', function(e) {
+        if (!isPopupJustOpened && !$popupMenu.is(e.target) && $popupMenu.has(e.target).length === 0 && !$(e.target).hasClass('ellipsis-btn')) {
+            hidePopupMenu();
+        }
+    });
+
+    const $fileList = $('#file-list');
+    const $loadingIndicator = $('#loading');
+    let $draggedItem = null;
+
+    $fileList.on({
+        dragstart: function(e) {
+            const $target = $(e.target);
+            if ($target.hasClass('file')) {
+                $draggedItem = $target;
+                setTimeout(() => $target.addClass('dragging'), 0);
+            } else {
+                e.preventDefault(); // Prevent dragging folders
+            }
+        },
+        dragend: function(e) {
+            $(e.target).removeClass('dragging');
+        },
+        dragover: function(e) {
+            e.preventDefault();
+            const $targetItem = $(e.target).closest('.file-item');
+            if ($targetItem.length && $targetItem.hasClass('folder')) {
+                $targetItem.addClass('drag-over');
+            }
+        },
+        dragleave: function(e) {
+            $(e.target).closest('.file-item').removeClass('drag-over');
+        },
+        drop: function(e) {
+            e.preventDefault();
+            const $targetItem = $(e.target).closest('.file-item');
+            if ($targetItem.length && $targetItem.hasClass('folder') && !$draggedItem.is($targetItem)) {
+                $targetItem.removeClass('drag-over');
+                $loadingIndicator.show();
+                // Simulating an Ajax call
+                setTimeout(() => {
+                    $loadingIndicator.hide();
+                    alert(`File "${$draggedItem.text()}" moved to "${$targetItem.text()}" folder`);
+                    // In a real application, you would make an actual Ajax call here
+                    // and update the UI based on the server response
+                    $draggedItem.remove();
+                }, 1000); // Simulating a 1-second delay
+            }
+        }
+    });
+
+    // Prevent opening the default drag-and-drop window in the browser
+    $(document).on({
+        dragover: function(e) {
+            e.preventDefault();
+        },
+        drop: function(e) {
+            e.preventDefault();
+        }
+    });
+});
