@@ -259,6 +259,27 @@
                 form.submit();
             });
 
+            $('#download-fillable').on("click", function (e) {
+                e.preventDefault();
+                searchDict = createSearchTermDictionary();
+                console.log("Exporting");
+                var form = $('<form>', {
+                    'action': '/download_fillable',
+                    'method': 'GET'
+                });
+
+                $.each(searchDict, function (key, value) {
+                    form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': key,
+                    'value': value
+                    }));
+                });
+
+                $('body').append(form);
+                form.submit();
+            });
+
             $('#submit-comment').on("click", function () {
                 rating = getRating();
                 searchDict = createSearchTermDictionary();

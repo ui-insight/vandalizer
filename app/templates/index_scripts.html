@@ -226,7 +226,7 @@ function showChatLoading() {
 function showFillableDocLoading() {
     $('#navbar-img')[0].classList.add('spin');
     $('#search-results-panel')[0].classList.add('scanning');
-    $('#search-results-panel')[0].append(`<p>Processing fillable PDF...This will take a few minutes</p>`);
+    $('#search-results-panel')[0].append(`Processing fillable PDF...This will take a few minutes`);
 }
 
 function removeChatLoading() {
@@ -291,6 +291,9 @@ $(document).ready(function() {
 
         for (var i = 0; i < checkedCheckboxes.length; i++) {
             let checkbox = checkedCheckboxes[i];
+            if (checkbox.attributes['data-num-documents'] == undefined) {
+                continue;
+            }
             var numDocs = checkbox.attributes['data-num-documents'].value
             totalDocs += parseInt(numDocs);
 
