@@ -58,9 +58,6 @@
 
         <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ results[item.searchphrase|trim] }}</p>
         <!-- <span style="float:right;"><i class="fa-regular fa-flag"></i></i></span> -->
-        
-     
-        
     </div>
 </div>
 {% endif %}
@@ -71,14 +68,14 @@
 </div>
 
 <br>
-<button type="button" class="collapsible-pdf">Fillable PDFs</button>
+<button type="button" class="collapsible-pdf">Fillable PDF</button>
 <div class="fillable-pdf-content" style="display: none;">
     {% if search_set.fillable_pdf_url == None %}
     <div class="button-container" >
         <input type="file" id="fillable-pdf-input" class="file-input" />
     </div>
     {% else %}
-    <div class="button-container" >
+    <div class="button-container" id="download-fillable" >
         <a href="{{ search_set.fillable_pdf_url }}" target="_blank" class="shadow-button">Download</a>
     {% endif %}
 </div>

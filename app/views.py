@@ -15,7 +15,7 @@ import json
 import csv
 from itertools import chain
 from copy import deepcopy
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 import io
 
 #OAuth
@@ -640,6 +640,41 @@ def export_extraction():
 	# Return the path to the CSV file
 	return send_file('static/export.csv', 
                      mimetype='text/csv',
+                     as_attachment=True)
+
+@app.route('/download_fillable', methods=['GET'])
+def download_fillable():
+	result_json = request.args.to_dict()
+	bindings = {}
+	for key, value in result_json.items():
+		search_set = SearchSetItem.objects(searchphrase=key).first()
+		bindings[search_set.pdf_binding] = value
+	
+
+	print(bindings)
+	# Define the file path for the CSV file
+	csv_file_path = os.path.join(app.root_path, 'static', 'fillable_form.pdf')
+	
+	reader = PdfReader("FillableFormTemplate1.pdf")
+	fields = reader.get_fields()
+	print(fields)
+	writer = PdfWriter()
+	writer.append(reader)
+
+	# for page in reader.pages:
+	writer.update_page_form_field_values(
+		writer.pages[0],
+		bindings,
+		auto_regenerate=False
+	)
+		
+
+	with open(csv_file_path, 'wb') as f:
+		writer.write(f)
+	
+	# Return the path to the CSV file
+	return send_file('static/fillable_form.pdf', 
+                     mimetype='text/pdf',
                      as_attachment=True)
 
 
