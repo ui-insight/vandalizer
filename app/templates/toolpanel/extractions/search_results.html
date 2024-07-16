@@ -32,8 +32,6 @@
         <span style="float: right; padding-left: 15px;"><a id="rerun" href="#" data-uuid="{{ search_set.uuid }}"
     data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export</a></span> 
     {% endif %}
-    
-    
 </p>
 
 <div class="set-items set-result-items">
@@ -50,7 +48,6 @@
         {% if results == null and documents != None and documents|length > 0 %}
         <p class="set-items" style="text-align: right; ">processing</p>
         {% endif %}
-        
     </div>
 </div>
 
@@ -71,4 +68,17 @@
 </div>
 
 {% endfor %}
+</div>
+
+<br>
+<button type="button" class="collapsible-pdf">Fillable PDFs</button>
+<div class="fillable-pdf-content" style="display: none;">
+    {% if search_set.fillable_pdf_url == None %}
+    <div class="button-container" >
+        <input type="file" id="fillable-pdf-input" class="file-input" />
+    </div>
+    {% else %}
+    <div class="button-container" >
+        <a href="{{ search_set.fillable_pdf_url }}" target="_blank" class="shadow-button">Download</a>
+    {% endif %}
 </div>

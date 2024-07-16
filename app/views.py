@@ -8,6 +8,7 @@ from flask import request
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
 import json
@@ -15,6 +16,7 @@ import csv
 from itertools import chain
 from copy import deepcopy
 from pypdf import PdfReader
+import io
 
 #OAuth
 import secrets
@@ -163,6 +165,54 @@ def home():
 						current_space_id=spaces[0].uuid, 
 						section=section)
 
+@app.route('/upload_fillable_pdf', methods=['POST'])
+def upload_fillable_pdf():
+	if 'file' not in request.files:
+		return jsonify({'error': 'No file part'}), 400
+
+	file = request.files['file']
+	if file.filename == '':
+		return jsonify({'error': 'No selected file'}), 400
+	
+	search_set_uuid = request.form.get('search_set_uuid')
+	print(search_set_uuid)
+	searchset = SearchSet.objects(uuid=search_set_uuid).first()
+	for item in searchset.items():
+		item.delete()
+
+	# Read the PDF file
+	file_stream = io.BytesIO(file.read())
+	pdf_reader = PdfReader(file_stream)
+	fields = pdf_reader.get_fields()
+
+	# Write to the filesystem
+	file.save(os.path.join(app.root_path, 'static', 'uploads', file.filename))
+	searchset.fillable_pdf_url = file.filename
+	searchset.save()
+
+	# Extract field names and options
+	field_options = {}
+	for field_name, field_data in fields.items():
+		if '/Opt' in field_data:
+			field_options[field_name] = field_data['/Opt']
+		else:
+			field_options[field_name] = 'No options'
+	
+	fillable_manager = FillablePDFManager()
+	output = fillable_manager.build_set_from_items(field_options)
+	#output = json.loads(output)
+	bindings = output['fields']
+	print(output)
+
+	for item in bindings:
+		key = list(item.keys())[0]
+		value = item[key]
+		item = SearchSetItem(searchphrase=value, searchset=search_set_uuid, searchtype="extraction", pdf_binding=key)
+		item.save()
+
+	return jsonify("Success"), 200
+
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
 	user = load_user()
@@ -242,7 +292,7 @@ def chat():
 
 	
 	response = OpenAIInterface().ask_question_to_documents(app.root_path, documents, message)
-	response
+	print(response)
 	return jsonify(response)
 
 @app.route('/api/add_search_set', methods=['POST'])

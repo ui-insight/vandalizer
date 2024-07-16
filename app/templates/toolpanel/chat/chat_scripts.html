@@ -31,7 +31,7 @@
 
         function chat () {
             let question = $("#chatinput")[0].textContent;
-            $("#chat-panel").append("<p><div class='message'><b>You:</b> " + question + "</div></p>");
+            $("#chat-panel").append("<p><div class='message-you'>" + question + "</div></p>");
             // reset the chat
             $("#chatinput").find('p').text("");
             $.ajax({
@@ -46,7 +46,7 @@
                 async: true,
                 success: function (response) {
                     // reload page
-                    $("#chat-panel").append("<p><div class='message'><b>Response:</b> " + response + "</div></p>");
+                    $("#chat-panel").append("<p><div class='message-response'>" + response + "</div></p>");
                     $('#chatplaceholder').attr("data-placeholder", "Chat with document...");
                     $('#chatplaceholder').css("color", "darkgray");
             

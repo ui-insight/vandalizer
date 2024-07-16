@@ -52,6 +52,7 @@ class SearchSet(me.Document):
     is_global = me.BooleanField(default=False)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user = me.StringField(required=False, max_length=200)
+    fillable_pdf_url = me.StringField(required=False, max_length=200)
 
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
@@ -70,6 +71,7 @@ class SearchSetItem(me.Document):
     searchset = me.StringField(required=True, max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
     text_blocks = me.ListField(me.StringField(), required=False)
+    pdf_binding = me.StringField(required=False, max_length=200)
 
 class WhiteList(me.Document):
     email = me.StringField(required=True, max_length=200)

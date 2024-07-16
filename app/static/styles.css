@@ -889,3 +889,19 @@ tr {
     border: 1px solid #d3d3d3;
     padding: 10px;
 }
+
+.message-response {
+    padding: 15px;
+    border-radius: 15px;
+    margin-bottom: 15px;
+    color: black;
+    background-color: #00000008;
+}
+
+.message-you {
+    padding: 15px;
+    border-radius: 15px;
+    margin-bottom: 10px;
+    color:white;
+    background-color: #5c21d2bc;
+}

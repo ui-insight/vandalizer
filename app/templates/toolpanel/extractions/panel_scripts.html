@@ -193,18 +193,44 @@
             $('#renameset').on("click", function () {
                 $('#renameModal').show();
                 let uuid = $(this).attr("data-uuid");
-                let context = $(this).attr("data-context");
 
-                console.log(uuid);
-                console.log(context);
-
-                // $('#renameBtn').off('click').on('click', function() {
-                //     let newName = $('#newName')[0].value;
-                //     renameSearchSet(uuid, newName);
-                // });
+                $('#renameBtn').off('click').on('click', function() {
+                    let newName = $('#newName')[0].value;
+                    renameSearchSet(uuid, newName);
+                });
             });
 
+            $(".collapsible-pdf").click(function() {
+                $(this).toggleClass("active");
+                console.log("Collapsible");
+                var content = $(this).next(".fillable-pdf-content");
+                content.slideToggle("fast");
+            });
 
+            $("#fillable-pdf-button").click(function() {
+            $("#fillable-pdf-input").click();
+        });
+
+        $("#fillable-pdf-input").change(function() {
+            var file = this.files[0];
+            var formData = new FormData();
+            formData.append("file", file);
+            formData.append("search_set_uuid", search_set_add_uuid);
+            showFillableDocLoading();
+            $.ajax({
+                url: "/upload_fillable_pdf",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    location.reload();
+                },
+                error: function(jqXHR, textStatus, errorMessage) {
+                    alert("File upload failed: " + errorMessage);
+                }
+            });
+        });
 
             $('#export').on("click", function (e) {
                 e.preventDefault();

@@ -27,7 +27,7 @@ class OpenAIInterface:
         prompt = ""
         print("asking question")
         if len(item.text_blocks) > 0:
-            prompt = """Given the following document, and the attached additional context, answer the following question:\nQuestion:\n""" + item.searchphrase 
+            prompt = """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted html.\nQuestion:\n""" + item.searchphrase 
             
             for block in item.text_blocks:
                 prompt += "\n\nContext:\n" + block
@@ -36,7 +36,7 @@ class OpenAIInterface:
             print(prompt)
         else:
             print("no text blocks")
-            prompt = """Given the following document, answer the following question:\nQuestion:\n""" + item.searchphrase + "\Document:\n" + self.loaded_doc
+            prompt = """Given the following document, answer the following question. Return the result as nicely formatted html.:\nQuestion:\n""" + item.searchphrase + "\Document:\n" + self.loaded_doc
         
         completion = openai.chat.completions.create(model="gpt-4o", 
                                               messages=[{"role": "user", "content": prompt}],
@@ -51,7 +51,7 @@ class OpenAIInterface:
             full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
         
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
-        prompt = """Given the following document(s), answer the following question:""" + question + "\n" + full_text
+        prompt = """Given the following document(s), answer the following question. Return the result as nicely formatted html with supportive information as if to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Question:""" + question + "\n" + full_text
         completion = openai.chat.completions.create(model="gpt-4o", 
                                               messages=[{"role": "user", "content": prompt}],
                                              )

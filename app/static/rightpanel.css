@@ -275,3 +275,37 @@ button.shadow-button:hover {
 .bottom-0 {
   bottom: 0;
 }
+
+.collapsible-pdf {
+  background-color: #f1f1f1;
+  cursor: pointer;
+  padding: 10px;
+  width: 100%;
+  border: none;
+  text-align: left;
+  outline: none;
+  font-size: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.collapsibl-pdf:after {
+  content: '\002B'; /* Unicode character for "+" sign */
+  font-size: 13px;
+}
+
+.collapsible-pdf.active:after {
+  content: '\2212'; /* Unicode character for "-" sign */
+}
+
+.fillable-pdf-content {
+  padding: 0 18px;
+  display: none;
+  overflow: hidden;
+  background-color: #f9f9f9;
+}
+
+.button-container {
+  padding: 10px 0;
+}

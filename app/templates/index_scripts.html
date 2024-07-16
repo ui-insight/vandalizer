@@ -223,6 +223,12 @@ function showChatLoading() {
         </div>`);
 }
 
+function showFillableDocLoading() {
+    $('#navbar-img')[0].classList.add('spin');
+    $('#search-results-panel')[0].classList.add('scanning');
+    $('#search-results-panel')[0].append(`<p>Processing fillable PDF...This will take a few minutes</p>`);
+}
+
 function removeChatLoading() {
     $('#navbar-img')[0].classList.remove('spin');
     $('.chat-window #loading-area').remove();
