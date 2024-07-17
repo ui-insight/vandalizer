@@ -186,7 +186,12 @@ def upload_fillable_pdf():
 	fields = pdf_reader.get_fields()
 
 	# Write to the filesystem
-	file.save(os.path.join(app.root_path, 'static', 'uploads', file.filename))
+	# Save the file to the filesystem
+	file_path = os.path.join(app.root_path, 'static', 'uploads', file.filename)
+	file.seek(0)  # Go back to the start of the file
+	with open(file_path, 'wb') as f:
+		f.write(file.read())
+		
 	searchset.fillable_pdf_url = file.filename
 	searchset.save()
 
@@ -646,18 +651,22 @@ def export_extraction():
 def download_fillable():
 	result_json = request.args.to_dict()
 	bindings = {}
+	search_set_uuid = result_json['search_set_uuid']
+	search_set = SearchSet.objects(uuid=search_set_uuid).first()
+	del result_json['search_set_uuid']
 	for key, value in result_json.items():
-		search_set = SearchSetItem.objects(searchphrase=key).first()
-		bindings[search_set.pdf_binding] = value
+		print(key)
+		search_set_item = SearchSetItem.objects(searchphrase=key).first()
+		bindings[search_set_item.pdf_binding] = value
 	
 
 	print(bindings)
 	# Define the file path for the CSV file
-	csv_file_path = os.path.join(app.root_path, 'static', 'fillable_form.pdf')
+	pdf_path = os.path.join(app.root_path, 'static', 'uploads', search_set.fillable_pdf_url)
 	
-	reader = PdfReader("FillableFormTemplate1.pdf")
+	print(pdf_path)
+	reader = PdfReader(pdf_path)
 	fields = reader.get_fields()
-	print(fields)
 	writer = PdfWriter()
 	writer.append(reader)
 
@@ -667,9 +676,9 @@ def download_fillable():
 		bindings,
 		auto_regenerate=False
 	)
-		
 
-	with open(csv_file_path, 'wb') as f:
+	output_pdf_path = os.path.join(app.root_path, 'static', 'fillable_form.pdf')
+	with open(output_pdf_path, 'wb') as f:
 		writer.write(f)
 	
 	# Return the path to the CSV file
