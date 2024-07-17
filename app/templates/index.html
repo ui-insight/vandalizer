@@ -134,7 +134,7 @@
                         {% if current_folder_id != "0" %}
                         <tr>
                             <td>
-                                <span style="margin-right: 10px;"><input type="checkbox" checked class="document-selector"
+                                <span style="margin-right: 10px;"><input type="checkbox" class="document-selector"
                                     data-doc-type="all_folder" ></span>
                                 <a href="?folder_id={{ current_folder_parent_id }}">
                                     <i class="fa-solid fa-arrow-up"></i> ..
@@ -168,7 +168,7 @@
                         <tr id="file-item" class="file">
                             <td>
                                 <span style="margin-right: 10px;"><input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}" data-doc-type="file"
-                                        data-num-documents="1"></span>
+                                        data-num-documents="1" data-doc-type="file"></span>
                                 <a href="?docid={{ doc.uuid }}" ">
                                     <span><i class=" fa-solid fa-file"></i></span>
                                     <span

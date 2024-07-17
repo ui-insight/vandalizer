@@ -14,9 +14,6 @@ $('#ask-question-btn').on('click', function(e) {
     askQuestion(question);
 });
 
-
-
-
 function askQuestion(question) {
 // Call API to get answer
 if (askingDocument != '') {
@@ -281,6 +278,15 @@ $(document).ready(function() {
 
     $('.document-selector').on('click', function(e) {
         e.stopPropagation();
+        if ($(this)[0].attributes['data-doc-type'].value == 'all_folder') {
+            var checked = $(this).prop('checked');
+            if (checked == true) {
+                $('.document-selector').prop('checked', true);
+            } else {
+                $('.document-selector').prop('checked', false);
+            }
+        }
+
         updateDocumentSelections();
     });
 
@@ -300,8 +306,6 @@ $(document).ready(function() {
             if (checkbox.attributes['data-doc-uuid'] != undefined) {
                 uuids.push(checkbox.attributes['data-doc-uuid'].value);
             }
-
-            
 
             if (checkbox.attributes['data-doc-uuids'] != undefined) {
                 let uuidList = checkbox.attributes['data-doc-uuids'].value;
