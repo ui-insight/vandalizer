@@ -191,7 +191,7 @@ def upload_fillable_pdf():
 	file.seek(0)  # Go back to the start of the file
 	with open(file_path, 'wb') as f:
 		f.write(file.read())
-		
+
 	searchset.fillable_pdf_url = file.filename
 	searchset.save()
 
@@ -328,7 +328,6 @@ def add_search_term():
 	attachments = data['attachments'] if 'attachments' in data else None
 	print(searchphrase)
 	print(attachments)
-
 
 	if searchset.is_global:
 		user = load_user()
@@ -542,6 +541,10 @@ def delete_documents():
 	document.delete()
 	semantics = SemanticIngest()
 	semantics.delete(document)
+	folder_id = request.args.get('folder_id')
+	if folder_id:
+		return redirect('/home?folder_id=' + folder_id)
+
 	return redirect('/home')
 
 @app.route('/delete_search_set', methods=['GET'])
