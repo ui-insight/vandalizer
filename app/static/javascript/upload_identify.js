@@ -96,7 +96,7 @@ function showFile(){
           let newCell = $("<td>");
           let newLink = $("<a>").attr("href", "/home?docid=" + result.uuid).text(filename);
           let href = "/home?folder_id=" + result.folder_id
-          //window.location.href = href;
+          window.location.href = href;
           return
           
           newCell.append(newLink);
@@ -246,7 +246,18 @@ $(document).ready(function() {
         if (currentItemType === 'folder') {
             window.location.href = `/delete_folder?folder_id=${currentItemId}`;
         } else {
-            window.location.href = `/delete_document?docid=${currentItemId}`;
+            var folderId = null;
+            var href = window.location.href;
+            var folderIdIndex = href.indexOf('folder_id=');
+            if (folderIdIndex !== -1) {
+                folderId = href.substring(folderIdIndex + 10);
+            }
+
+            if (folderId) {
+                window.location.href = `/delete_document?docid=${currentItemId}&folder_id=${folderId}`;
+            } else {
+                window.location.href = `/delete_document?docid=${currentItemId}`;
+            }
         }
         hidePopupMenu();
     });
