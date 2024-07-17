@@ -276,6 +276,12 @@
                     }));
                 });
 
+                form.append($('<input>', {
+                    'type': 'hidden',
+                    'name': 'search_set_uuid',
+                    'value': search_set_add_uuid
+                }));
+
                 $('body').append(form);
                 form.submit();
             });
