@@ -133,22 +133,22 @@ $(document).ready(function() {
 
     $('#file-list tr').on('contextmenu', function(e) {
         e.preventDefault();
-        showPopupMenu(e, $(this));
+        showPopupMenu(e, $(this), $(this));
     });
 
     $('.ellipsis-btn').on('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
-        showPopupMenu(e, $(this).closest('.ellipsis-btn'));
+        showPopupMenu(e, $(this).parent(), $(this));
     });
 
 
-    function showPopupMenu(e, $target) {
+    function showPopupMenu(e, $target, $displaytarget) {
         const rect = e.type === 'contextmenu' ? {
             left: e.clientX,
             top: e.clientY,
             bottom: e.clientY
-        } : $target[0].getBoundingClientRect();
+        } : $displaytarget[0].getBoundingClientRect();
 
         const popupHeight = $popupMenu.outerHeight();
         const windowHeight = $(window).height();
@@ -181,6 +181,10 @@ $(document).ready(function() {
         console.log(`Current item ID: ${currentItemId}, type: ${currentItemType}`);
         // Set the flag to true
         isPopupJustOpened = true;
+
+        console.log(currentItemId);
+        console.log(currentItemType);
+
 
         // Reset the flag after a short delay
         setTimeout(() => {
