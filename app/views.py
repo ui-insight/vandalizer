@@ -369,7 +369,8 @@ def grab_template():
 		if edit_mode:
 			template = render_template('toolpanel/extractions/edit_search_results.html', 
 							search_set=search_set,
-							documents=documents
+							documents=documents,
+							bindable_fields=search_set.get_fillable_fields()
 							)
 			
 			response = {

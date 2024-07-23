@@ -27,6 +27,7 @@
             <i class="fa-solid fa-circle-xmark"></i></a></span> -->
     </div>
 </div>
+
 {% endfor %}
 <br>
 <p><b>Editing</b>
@@ -64,6 +65,18 @@
                 </a>
             </div>
         </div>
+
+{% if bindable_fields|length > 0 %}
+<div class="bindings-panel" style="padding-bottom: 15px; padding-left: 35px;">
+
+    <i>Bound to:</i><select class="custom-select" style="text-align: left; direction: ltr;">
+        <option value=""></option>
+    {% for field in bindable_fields %}
+        <option value="{{ field }}" {% if field == item.pdf_binding %}selected{% endif %}>{{ field }}</option>
+    {% endfor %}
+</select>
+</div>
+{% endif %}
     </div>
     {% endfor %}
 </div>

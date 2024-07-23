@@ -2,6 +2,9 @@ import mongoengine as me
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 import datetime
+import os
+from pypdf import PdfReader
+from app import app
 
 class User(me.Document):
     user_id = me.StringField(required=True, max_length=200)
@@ -65,6 +68,18 @@ class SearchSet(me.Document):
 
     def items(self):
         return SearchSetItem.objects(searchset=self.uuid)
+    
+    def get_fillable_fields(self):
+        if self.fillable_pdf_url == None or self.fillable_pdf_url == "":
+            return []
+        pdf_path = os.path.join(app.root_path, 'static', 'uploads', self.fillable_pdf_url)
+        reader = PdfReader(pdf_path)
+        form_fields = reader.get_fields()
+        fields = []
+        for field_name, field_data in form_fields.items():
+            fields.append(field_name)    
+
+        return fields        
 
 class SearchSetItem(me.Document):
     searchphrase = me.StringField(required=True)
