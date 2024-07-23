@@ -714,11 +714,17 @@ def load_user():
 
 
 
-@app.route('/files/delete_folder', methods=['POST'])
+@app.route('/files/delete_folder', methods=['GET'])
 def delete_folder():
-    folder_id = request.GET.get('folder_id')
-    SmartFolder.objects.filter(id=folder_id).delete()
-    return redirect('file_browser')
+	folder_id = request.args.get('folder_id')
+	SmartFolder.objects.filter(uuid=folder_id).delete()
+
+	# Delete all subfolders
+	SmartFolder.objects.filter(parent_id=folder_id).delete()
+
+	# Delete all subdocuments
+	SmartDocument.objects.filter(folder=folder_id).delete()
+	return redirect('/home')
 
 
 @app.route('/files/move_item', methods=['POST'])

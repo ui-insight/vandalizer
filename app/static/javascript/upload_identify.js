@@ -248,7 +248,9 @@ $(document).ready(function() {
     $('#delete-option').on('click', function() {
         // Implement delete functionality
         if (currentItemType === 'folder') {
-            window.location.href = `/delete_folder?folder_id=${currentItemId}`;
+            if (confirm("Are you sure you want to delete this folder?")) {
+                window.location.href = `/files/delete_folder?folder_id=${currentItemId}`;
+            }
         } else {
             var folderId = null;
             var href = window.location.href;
