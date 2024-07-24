@@ -4,10 +4,50 @@ import openai
 import chardet
 from PyPDF2 import PdfReader
 from app.utilities.prompt_optimization import dspy_model
+import tiktoken
 
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
 max_context_length = 90000
+
+
+def num_tokens_from_text(text: str, model="gpt-4o"):
+    """Return the number of tokens in a text string."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+    except KeyError:
+        print("Warning: model not found. Using cl100k_base encoding.")
+        encoding = tiktoken.get_encoding("cl100k_base")
+
+    # List of models that use the same tokenizer
+    if model in {
+        "gpt-3.5-turbo-0613",
+        "gpt-3.5-turbo-16k-0613",
+        "gpt-4-0314",
+        "gpt-4-32k-0314",
+        "gpt-4-0613",
+        "gpt-4-32k-0613",
+        "gpt-4-turbo",
+        "gpt-4-turbo-2024-04-09",
+        "gpt-4o",
+        "gpt-4o-2024-05-13",
+    }:
+        # These models use the same tokenizer, so we can just encode and count
+        return len(encoding.encode(text))
+    elif model == "gpt-3.5-turbo-0301":
+        # This model might have slightly different tokenization
+        print("Warning: gpt-3.5-turbo-0301 may have slightly different tokenization.")
+        return len(encoding.encode(text))
+    elif "gpt-3.5-turbo" in model:
+        print("Warning: gpt-3.5-turbo may update over time. Using current encoding.")
+        return len(encoding.encode(text))
+    elif "gpt-4" in model:
+        print("Warning: gpt-4 may update over time. Using current encoding.")
+        return len(encoding.encode(text))
+    else:
+        raise NotImplementedError(
+            f"""num_tokens_from_text() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how text is converted to tokens."""
+        )
 
 
 def detect_encoding(file_path):
@@ -69,8 +109,6 @@ class OpenAIInterface:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
             full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
 
-        # TODO add the dspy model here (route based on the length of the documents, if larger call dspy model, if smaller call the chat model)
-
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = (
             """Given the following document(s), answer the following question. Return the result as nicely formatted html with supportive information as if to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Question:"""
@@ -78,15 +116,14 @@ class OpenAIInterface:
             + "\n"
             + full_text
         )
-        total_context_length = len(prompt) + len(full_text)
-
+        # use a tiktoken library for more accurate computation of the total token length for the context
+        total_context_length = num_tokens_from_text(prompt)
         print("total context length: ", total_context_length)
+
         if total_context_length > max_context_length:
             print("using dspy model")
             print("question: ", question)
 
-            # TODO call the dspy model here
-            # return "The document(s) are too large to process, please contact support for assistance."
             persistent_directory = Path(root_path) / "static" / "uploads"
             collection_name = "chat_dspy_model"
             model = dspy_model(full_text, collection_name, persistent_directory)
