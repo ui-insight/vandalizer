@@ -28,7 +28,7 @@
         </a>
     </div>
 
-    <select class="custom-select" id="space-select" style="float: right; margin-top: 20px;">
+    <select class="custom-select space-select" id="space-select" style="float: right; margin-top: 20px;">
         {% for space in spaces %}
         <option value="{{ space.uuid }}">{{ space.title }}</option>
         {% endfor %}
@@ -42,6 +42,10 @@
 </nav>
 
 {% endblock %} {%block content %}
+
+<script>
+  // call this to refresh the list of selected documents
+</script>
 
 <div class="main-panel">
 
@@ -119,6 +123,22 @@
                 </div>
             </div>
             <div style="padding: 0px 45px 45px 45px;">
+                    <div style="width: 100%; background-color: black; height: 1px; margin-bottom: 10px; "></div>
+                <div style="display: flex; gap: 10px; margin-bottom: 10px;" >
+                    <!-- Select a space to view documents -->
+                    <label for="space-select-ui" style="padding-top: 10px;">Select a space</label>
+                    <select id="space-select-ui" class="custom-select space-select" style="padding: 10px;">
+                        {% for space in spaces %}
+                        <option value="{{ space.uuid }}">{{ space.title }}</option>
+                        {% endfor %}
+                    </select>
+                    <!-- Create a new space -->
+                    <a href="/spaces/new" style="color: #5c21d2bc; text-decoration: none; margin: 10px;">
+                        <i class="fa-solid fa-plus"></i>
+                        <span style="padding-left: 8; ">Create a new space</span>
+                    </a>
+                </div>
+
                 <form action="/files/create_folder" method="post" id="add-folder-form">
                     <input type="hidden" name="space_id" value="{{ current_space_id }}">
                     <input type="hidden" name="parent_id" value="{{ current_folder_id }}">
@@ -166,13 +186,22 @@
                         <tr id="file-item" class="file">
                             <td>
                                 <span style="margin-right: 10px;"><input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}" data-doc-type="file"
-                                        data-num-documents="1" data-doc-type="file"></span>
+                                        data-num-documents="1" data-doc-type="file"
+                                {% if doc.is_default %}
+                                    checked disabled
+                                {% endif %}></span>
+
                                 <a href="?docid={{ doc.uuid }}" ">
                                     <span><i class=" fa-solid fa-file"></i></span>
                                     <span
                                         style="padding-right: 10px; padding-left: 10px; overflow: ellipsis; color: #17181abb">{{
                                         doc.title }}</span>
+
                                 </a>
+                                <!-- Show default tag if doc is default -->
+                                {% if doc.is_default %}
+                                <span style="color: #5c21d2bc; font-size: 0.8em; background-color: #c2c2c2; border-radius: 10px; padding: 2px 5px; margin-left: 5px;">Default</span>
+                                {% endif %}
                                 <button class="ellipsis-btn" style="float:right;" data-doc-id="{{ doc.uuid }}">
                                     <span style="font-size: 1em; color: #5c21d2bc;">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -189,6 +218,7 @@
                 <ul>
                     <li id="rename-option">Rename</li>
                     <li id="delete-option">Delete</li>
+                    <li id="toggle-default-doc-option">Toggle Default</li>
                     <!-- Add more options as needed -->
                 </ul>
             </div>

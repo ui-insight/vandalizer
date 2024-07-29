@@ -1,367 +1,373 @@
 <script>
-var askingDocument = '';
-var document_uuids = [];
+    var askingDocument = '';
+    var document_uuids = [];
 
-document_uuids = [
-    {% for document in documents %}
-        "{{document.uuid}}",
-    {% endfor %}
-];    
+  var folder_uuid = "{{current_folder_id}}"
 
-$('#ask-question-btn').on('click', function(e) {
-    e.preventDefault()
-    let question = $('#ask-question-input')[0].value;
-    askQuestion(question);
-});
 
-function askQuestion(question) {
-// Call API to get answer
-if (askingDocument != '') {
-    askDocumentQuestion(question);
-    return;
-}
+    document_uuids = [
+        {% for document in documents %}
+            "{{document.uuid}}",
+        {% endfor %}
+    ];
 
-openChatWindow();
-showChatLoading();
-$.ajax({
-        url: '/api/ask',
-        type: 'POST',
-        data: JSON.stringify({
-            question: question,
-            model: 'gpt-4o',
-            space: $('#current-space-id')[0].innerHTML
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            let answer = msg.answer;
-            $('#ask-question-input')[0].value = ''
-            openChatWindow();
-            removeChatLoading();
-            $('.chat-window').append(`
-            <div class="answer-card" style="padding: 30px; ">
-                <p style="font-size: 30; color: #5D6F81;">
-                    Question: <i>${question}</i>
-                </p>
-                <p style="font-size: 30; color: #5D6F81;">
-                    ${answer}
-                </p>
-            </div>
-        `) 
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-        }
-    });
-}
-
-function askDocumentQuestion(question) {
-// Call API to get answer
-showChatLoading();
-$.ajax({
-        url: '/api/ask_document',
-        type: 'POST',
-        data: JSON.stringify({
-            question: "Considering the document, answer this question: " + question,
-            document: askingDocument,
-            model: 'gpt-4o'
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            let answer = msg.answer;
-            $('#ask-question-input')[0].value = ''
-            openChatWindow();
-            removeChatLoading();
-            $('.chat-window').append(`
-            <div class="answer-card" style="padding: 30px; ">
-                <p style="font-size: 30; color: #5D6F81;">
-                    Asking ${askingDocument }: <i>${question}</i>
-                </p>
-                <p style="font-size: 30; color: #5D6F81;">
-                    ${answer}
-                </p>
-            </div>
-        `)
-           
-            
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-        }
-    });
-}
-
-function askDocument(documentName) {
-    $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
-    askingDocument = documentName;
-}
-
-function cloneSearchSet(uuid) {
-    $.ajax({
-        url: '/api/clone_search_set',
-        type: 'POST',
-        data: JSON.stringify({
-            search_set_uuid: uuid
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            location.reload();
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-        }
+    $('#ask-question-btn').on('click', function(e) {
+        e.preventDefault()
+        let question = $('#ask-question-input')[0].value;
+        askQuestion(question);
     });
 
-}
+    function askQuestion(question) {
+    // Call API to get answer
+    if (askingDocument != '') {
+        askDocumentQuestion(question);
+        return;
+    }
 
-function renameSearchSet(uuid, title) {
-    $.ajax({
-        url: '/api/rename_search_set',
-        type: 'POST',
-        data: JSON.stringify({
-            search_set_uuid: uuid,
-            new_title: title
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            location.reload();
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-        }
-    });
-}
-
-function deleteSearchSetItem(uuid) {
-    $.ajax({
-        url: '/api/delete_search_set_item',
-        type: 'POST',
-        data: JSON.stringify({
-            uuid: uuid
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            // Get the set entry group with data-uuid equal to uuid and delete parent
-            $(`.set-entry[data-item-uuid=${uuid}]`).parent().remove();
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-        }
-    });
-}
-
-function summarizeDocument(documentName) {
+    openChatWindow();
     showChatLoading();
     $.ajax({
-        url: '/api/ask_document',
-        type: 'POST',
-        data: JSON.stringify({
-            question: "Summarize the document text",
-            document: documentName,
-            model: 'gpt-4o'
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function(msg) {
-            let answer = msg.answer;
-            $('#ask-question-input')[0].value = ''
-            openChatWindow();
+            url: '/api/ask',
+            type: 'POST',
+            data: JSON.stringify({
+                question: question,
+                model: 'gpt-4o',
+                space: $('#current-space-id')[0].innerHTML
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg.answer;
+                $('#ask-question-input')[0].value = ''
+                openChatWindow();
+                removeChatLoading();
+                $('.chat-window').append(`
+                <div class="answer-card" style="padding: 30px; ">
+                    <p style="font-size: 30; color: #5D6F81;">
+                        Question: <i>${question}</i>
+                    </p>
+                    <p style="font-size: 30; color: #5D6F81;">
+                        ${answer}
+                    </p>
+                </div>
+            `)
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
 
-            // Switch to document question mode
-            $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
-            askingDocument = documentName;
-           
-            removeChatLoading();
-            const newBox = $(`
-            <div class="answer-card" style="padding: 30px; ">
-                <p style="font-size: 30; color: #5D6F81;">
-                    SUMMARIZE: <i>${documentName}</i>
-                </p>
-                <p style="font-size: 30; color: #5D6F81;">
-                    ${answer}
-                </p>
-            </div>
-        `).hide(); 
-            $('.chat-window').append(newBox);
+    function askDocumentQuestion(question) {
+    // Call API to get answer
+    showChatLoading();
+    $.ajax({
+            url: '/api/ask_document',
+            type: 'POST',
+            data: JSON.stringify({
+                question: "Considering the document, answer this question: " + question,
+                document: askingDocument,
+                model: 'gpt-4o'
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg.answer;
+                $('#ask-question-input')[0].value = ''
+                openChatWindow();
+                removeChatLoading();
+                $('.chat-window').append(`
+                <div class="answer-card" style="padding: 30px; ">
+                    <p style="font-size: 30; color: #5D6F81;">
+                        Asking ${askingDocument }: <i>${question}</i>
+                    </p>
+                    <p style="font-size: 30; color: #5D6F81;">
+                        ${answer}
+                    </p>
+                </div>
+            `)
 
-            //newBox.scrollIntoView();
-            newBox.fadeIn();
- 
-           
-            
-        },
-        error: function(xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
+
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function askDocument(documentName) {
+        $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
+        askingDocument = documentName;
+    }
+
+    function cloneSearchSet(uuid) {
+        $.ajax({
+            url: '/api/clone_search_set',
+            type: 'POST',
+            data: JSON.stringify({
+                search_set_uuid: uuid
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                location.reload();
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+
+    }
+
+    function renameSearchSet(uuid, title) {
+        $.ajax({
+            url: '/api/rename_search_set',
+            type: 'POST',
+            data: JSON.stringify({
+                search_set_uuid: uuid,
+                new_title: title
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                location.reload();
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function deleteSearchSetItem(uuid) {
+        $.ajax({
+            url: '/api/delete_search_set_item',
+            type: 'POST',
+            data: JSON.stringify({
+                uuid: uuid
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                // Get the set entry group with data-uuid equal to uuid and delete parent
+                $(`.set-entry[data-item-uuid=${uuid}]`).parent().remove();
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function summarizeDocument(documentName) {
+        showChatLoading();
+        $.ajax({
+            url: '/api/ask_document',
+            type: 'POST',
+            data: JSON.stringify({
+                question: "Summarize the document text",
+                document: documentName,
+                model: 'gpt-4o'
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                let answer = msg.answer;
+                $('#ask-question-input')[0].value = ''
+                openChatWindow();
+
+                // Switch to document question mode
+                $('#ask-question-input').attr("placeholder", "Ask " + documentName + " a question...");
+                askingDocument = documentName;
+
+                removeChatLoading();
+                const newBox = $(`
+                <div class="answer-card" style="padding: 30px; ">
+                    <p style="font-size: 30; color: #5D6F81;">
+                        SUMMARIZE: <i>${documentName}</i>
+                    </p>
+                    <p style="font-size: 30; color: #5D6F81;">
+                        ${answer}
+                    </p>
+                </div>
+            `).hide();
+                $('.chat-window').append(newBox);
+
+                //newBox.scrollIntoView();
+                newBox.fadeIn();
+
+
+
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function showChatLoading() {
+        $('#navbar-img')[0].classList.add('spin');
+        $('.chat-window').append(`
+        <div id="loading-area" style="display: flex; height: 100px;">
+                <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
+            </div>`);
+    }
+
+    function showFillableDocLoading() {
+        $('#navbar-img')[0].classList.add('spin');
+        $('#search-results-panel')[0].classList.add('scanning');
+        $('#search-results-panel')[0].append(`Processing fillable PDF...This will take a few minutes`);
+    }
+
+    function removeChatLoading() {
+        $('#navbar-img')[0].classList.remove('spin');
+        $('.chat-window #loading-area').remove();
+    }
+
+    function showScanning() {
+        if ($('.document')[0] == undefined) {
+            return;
         }
-    });
-}
 
-function showChatLoading() {
-    $('#navbar-img')[0].classList.add('spin');
-    $('.chat-window').append(`
-    <div id="loading-area" style="display: flex; height: 100px;">
-            <div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div>
-        </div>`);
-}
-
-function showFillableDocLoading() {
-    $('#navbar-img')[0].classList.add('spin');
-    $('#search-results-panel')[0].classList.add('scanning');
-    $('#search-results-panel')[0].append(`Processing fillable PDF...This will take a few minutes`);
-}
-
-function removeChatLoading() {
-    $('#navbar-img')[0].classList.remove('spin');
-    $('.chat-window #loading-area').remove();
-}
-
-function showScanning() {
-    if ($('.document')[0] == undefined) {
-        return;
+        $('.document')[0].classList.add('scanning')
     }
 
-    $('.document')[0].classList.add('scanning')
-}
+    function stopScanning() {
+        if ($('.document')[0] == undefined) {
+            return;
+        }
 
-function stopScanning() {
-    if ($('.document')[0] == undefined) {
-        return;
+        $('.document')[0].classList.remove('scanning')
     }
-    
-    $('.document')[0].classList.remove('scanning')
-}
 
-$('.rescan-button').on('click', function(e) {
-    e.preventDefault()
-    showScanning();
-});
-
-function updateAttachmentUI() {
-    $('#attachment-list').empty();
-    for (var i = 0; i < attachments.length; i++) {
-        $('#attachment-list').append('<button style="float: left; padding: 5px 15px; font-size: 12px; font-weight: 600; margin-top: 15px;" class="shadow-button">Attachment</button>');
-    }
-}
-
-
-$(document).ready(function() {
-
-    $('.file').on('click', function(e) {
-        e.stopPropagation();
-        var checkbox = $(this).find('.document-selector');
-        checkbox.prop('checked', !checkbox.prop('checked'));
-        updateDocumentSelections();
+    $('.rescan-button').on('click', function(e) {
+        e.preventDefault()
+        showScanning();
     });
 
-    $('.folder').on('click', function(e) {
-        e.stopPropagation();
-        var checkbox = $(this).find('.document-selector');
-        checkbox.prop('checked', !checkbox.prop('checked'));
-        updateDocumentSelections();
-    });
+    function updateAttachmentUI() {
+        $('#attachment-list').empty();
+        for (var i = 0; i < attachments.length; i++) {
+            $('#attachment-list').append('<button style="float: left; padding: 5px 15px; font-size: 12px; font-weight: 600; margin-top: 15px;" class="shadow-button">Attachment</button>');
+        }
+    }
 
-    $('.document-selector').on('click', function(e) {
-        e.stopPropagation();
-        if ($(this)[0].attributes['data-doc-type'].value == 'all_folder') {
-            var checked = $(this).prop('checked');
-            if (checked == true) {
-                $('.document-selector').prop('checked', true);
+
+    $(document).ready(function() {
+
+
+        // call this function to refresh the document selection on load
+      updateDocumentSelections();
+
+        $('.file').on('click', function(e) {
+            e.stopPropagation();
+            var checkbox = $(this).find('.document-selector');
+            checkbox.prop('checked', !checkbox.prop('checked'));
+            updateDocumentSelections();
+        });
+
+        $('.folder').on('click', function(e) {
+            e.stopPropagation();
+            var checkbox = $(this).find('.document-selector');
+            checkbox.prop('checked', !checkbox.prop('checked'));
+            updateDocumentSelections();
+        });
+
+        $('.document-selector').on('click', function(e) {
+            e.stopPropagation();
+            if ($(this)[0].attributes['data-doc-type'].value == 'all_folder') {
+                var checked = $(this).prop('checked');
+                if (checked == true) {
+                    $('.document-selector').prop('checked', true);
+                } else {
+                    $('.document-selector').prop('checked', false);
+                }
+            }
+
+            updateDocumentSelections();
+        });
+
+        function updateDocumentSelections() {
+            var checkedCheckboxes = $('.document-selector:checked');
+            console.log("Updating document selections", checkedCheckboxes);
+            var totalDocs = 0;
+            var uuids = [];
+
+            for (var i = 0; i < checkedCheckboxes.length; i++) {
+                let checkbox = checkedCheckboxes[i];
+                if (checkbox.attributes['data-num-documents'] == undefined) {
+                    continue;
+                }
+                var numDocs = checkbox.attributes['data-num-documents'].value
+                totalDocs += parseInt(numDocs);
+
+                if (checkbox.attributes['data-doc-uuid'] != undefined) {
+                    uuids.push(checkbox.attributes['data-doc-uuid'].value);
+                }
+
+                if (checkbox.attributes['data-doc-uuids'] != undefined) {
+                    let uuidList = checkbox.attributes['data-doc-uuids'].value;
+                    let array = JSON.parse(uuidList.replace(/'/g, '"'));
+                    uuids = uuids.concat(array);
+                }
+            }
+
+            document_uuids = uuids;
+
+            var counters = $('.doc-selected-counter')
+            for (var i = 0; i < counters.length; i++) {
+                counters[i].textContent = `${totalDocs} documents selected`;
+            }
+        }
+
+        $('#add-folder-button').on('click', function(e) {
+            e.preventDefault()
+            let addFolderField = $('#add-folder-field')[0];
+            if (addFolderField.style.display == 'none') {
+                $('#add-folder-field').show();
             } else {
-                $('.document-selector').prop('checked', false);
+                let addFolderForm = $('#add-folder-form')[0];
+                addFolderForm.submit();
             }
-        }
+        });
 
-        updateDocumentSelections();
-    });
+        $('.space-select').on('change', function(e) {
+            e.preventDefault()
+            var selectedOption = $(this).val();
 
-    function updateDocumentSelections() {
-        var checkedCheckboxes = $('.document-selector:checked');
-        var totalDocs = 0;
-        var uuids = [];
-
-        for (var i = 0; i < checkedCheckboxes.length; i++) {
-            let checkbox = checkedCheckboxes[i];
-            if (checkbox.attributes['data-num-documents'] == undefined) {
-                continue;
+            if (selectedOption == "Create New Space") {
+                window.location.href = "/spaces/new";
+            } else if (selectedOption == "Logout") {
+                window.location.href = "/logout";
+            } else {
+                window.location.href = "/home?id=" + selectedOption;
             }
-            var numDocs = checkbox.attributes['data-num-documents'].value
-            totalDocs += parseInt(numDocs);
+        });
 
-            if (checkbox.attributes['data-doc-uuid'] != undefined) {
-                uuids.push(checkbox.attributes['data-doc-uuid'].value);
-            }
-
-            if (checkbox.attributes['data-doc-uuids'] != undefined) {
-                let uuidList = checkbox.attributes['data-doc-uuids'].value;
-                let array = JSON.parse(uuidList.replace(/'/g, '"'));
-                uuids = uuids.concat(array);
-            }
-        }
-
-        document_uuids = uuids;
-
-        var counters = $('.doc-selected-counter')
-        for (var i = 0; i < counters.length; i++) {
-            counters[i].textContent = `${totalDocs} documents selected`;
-        }
-    }
-
-    $('#add-folder-button').on('click', function(e) {
-        e.preventDefault()
-        let addFolderField = $('#add-folder-field')[0];
-        if (addFolderField.style.display == 'none') {
-            $('#add-folder-field').show();
-        } else {
-            let addFolderForm = $('#add-folder-form')[0];
-            addFolderForm.submit();
-        }
-    });
-
-    $('#space-select').on('change', function(e) {
-        e.preventDefault()
-        var selectedOption = $(this).val(); 
-
-        if (selectedOption == "Create New Space") {
-            window.location.href = "/spaces/new";
-        } else if (selectedOption == "Logout") {
-            window.location.href = "/logout";
-        } else {
-            window.location.href = "/home?id=" + selectedOption;
-        }
-    });
-    
-    // When the user clicks on <span> (x), close the modal
-    $('#closeRenameBtn').on('click', function() {
-        $('#renameModal').hide();
-    });
-
-    $('#closeAttachBtn').on('click', function() {
-        $('#attachmentModal').hide();
-    });
-
-    // When the user clicks anywhere outside of the modal, close it
-    $(window).on('click', function(event) {
-        if ($(event.target).is($('#renameModal'))) {
+        // When the user clicks on <span> (x), close the modal
+        $('#closeRenameBtn').on('click', function() {
             $('#renameModal').hide();
-        }
+        });
+
+        $('#closeAttachBtn').on('click', function() {
+            $('#attachmentModal').hide();
+        });
+
+        // When the user clicks anywhere outside of the modal, close it
+        $(window).on('click', function(event) {
+            if ($(event.target).is($('#renameModal'))) {
+                $('#renameModal').hide();
+            }
+        });
     });
-});
-
-
 </script>

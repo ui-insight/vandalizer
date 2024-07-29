@@ -1,62 +1,66 @@
 <script>
-    const placeholderText = "Chat with document...";
+  const placeholderText = "Chat with document...";
 
-    // Handle Enter and Shift+Enter keydown events
-    $('#chatinput').on('keydown', function(event) {
-        $('#chatplaceholder').attr("data-placeholder", "");
-        $('#chatplaceholder').css("color", "black");
-        
-        if (event.key === 'Enter' && !event.shiftKey) {
-            event.preventDefault(); // Prevent the default behavior of adding a newline
-            // Trigger your JavaScript event here
-            if (document_uuids != "") {
-                chat();
-                return;
-            } else {
-                showToast("Select a document to chat");
-            }
-        }
+  // Handle Enter and Shift+Enter keydown events
+  $("#chatinput").on("keydown", function (event) {
+    $("#chatplaceholder").attr("data-placeholder", "");
+    $("#chatplaceholder").css("color", "black");
+
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault(); // Prevent the default behavior of adding a newline
+      // Trigger your JavaScript event here
+      if (document_uuids != "") {
+        chat();
+        return;
+      } else {
+        showToast("Select a document to chat");
+      }
+    }
+  });
+
+  $("#chat-button").on("click", function (e) {
+    e.preventDefault();
+    console.log("chat button clicked");
+    if (document_uuids != "") {
+      chat();
+      return;
+    } else {
+      showToast("Select a document to chat");
+    }
+  });
+
+  function chat() {
+    let question = $("#chatinput")[0].textContent;
+    $("#chat-panel").append(
+      "<p><div class='message-you'>" + question + "</div></p>",
+    );
+    // reset the chat
+    $("#chatinput").find("p").text("");
+    $.ajax({
+      url: "/api/chat",
+      type: "POST",
+      data: JSON.stringify({
+        document_uuids: document_uuids,
+        message: question,
+        folder_uuid: folder_uuid,
+      }),
+      contentType: "application/json; charset=utf-8",
+      dataType: "json",
+      async: true,
+      success: function (response) {
+        // reload page
+        $("#chat-panel").append(
+          "<p><div class='message-response'>" + response + "</div></p>",
+        );
+        $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
+        $("#chatplaceholder").css("color", "darkgray");
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+      },
     });
-
-    $('#chat-button').on("click", function (e) {
-            e.preventDefault();
-        console.log("chat button clicked");
-            if (document_uuids != "") {
-                chat();
-                return;
-            } else {
-                showToast("Select a document to chat");
-            }
-        });
-
-        function chat () {
-            let question = $("#chatinput")[0].textContent;
-            $("#chat-panel").append("<p><div class='message-you'>" + question + "</div></p>");
-            // reset the chat
-            $("#chatinput").find('p').text("");
-            $.ajax({
-                url: '/api/chat',
-                type: 'POST',
-                data: JSON.stringify({
-                    document_uuids: document_uuids,
-                    message: question
-                }),
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function (response) {
-                    // reload page
-                    $("#chat-panel").append("<p><div class='message-response'>" + response + "</div></p>");
-                    $('#chatplaceholder').attr("data-placeholder", "Chat with document...");
-                    $('#chatplaceholder').css("color", "darkgray");
-            
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
-            search_set_add_uuid = "";
-            is_adding_term = false
-        }
+    search_set_add_uuid = "";
+    is_adding_term = false;
+  }
 </script>

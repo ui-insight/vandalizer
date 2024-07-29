@@ -6,10 +6,12 @@ import os
 from pypdf import PdfReader
 from app import app
 
+
 class User(me.Document):
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
-    
+
+
 class SmartDocument(me.Document):
     path = me.StringField(required=True, max_length=200)
     title = me.StringField(required=True, max_length=200)
@@ -19,6 +21,10 @@ class SmartDocument(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     folder = me.StringField(required=False, max_length=200)
+    is_default = me.BooleanField(
+        default=False
+    )  # default document to add to the llm context
+
 
 class SmartFolder(me.Document):
     parent_id = me.StringField(required=True, max_length=200)
@@ -29,9 +35,10 @@ class SmartFolder(me.Document):
 
     def number_of_documents(self):
         return SmartDocument.objects(folder=self.uuid).count()
-    
+
     def document_uuids(self):
-        return SmartDocument.objects(folder=self.uuid).values_list('uuid')
+        return SmartDocument.objects(folder=self.uuid).values_list("uuid")
+
 
 class Space(me.Document):
     uuid = me.StringField(required=True, max_length=200)
@@ -44,6 +51,7 @@ class ExtractionQualityRecord(me.Document):
     result_json = me.StringField(required=True, max_length=5000)
     star_rating = me.FloatField(required=True)
     comment = me.StringField(required=False, max_length=5000)
+
 
 class SearchSet(me.Document):
     title = me.StringField(required=True, max_length=200)
@@ -59,7 +67,7 @@ class SearchSet(me.Document):
 
     def item_count(self):
         return SearchSetItem.objects(searchset=self.uuid).count()
-    
+
     def search_items(self):
         return SearchSetItem.objects(searchset=self.uuid, searchtype="search")
 
@@ -68,18 +76,21 @@ class SearchSet(me.Document):
 
     def items(self):
         return SearchSetItem.objects(searchset=self.uuid)
-    
+
     def get_fillable_fields(self):
         if self.fillable_pdf_url == None or self.fillable_pdf_url == "":
             return []
-        pdf_path = os.path.join(app.root_path, 'static', 'uploads', self.fillable_pdf_url)
+        pdf_path = os.path.join(
+            app.root_path, "static", "uploads", self.fillable_pdf_url
+        )
         reader = PdfReader(pdf_path)
         form_fields = reader.get_fields()
         fields = []
         for field_name, field_data in form_fields.items():
-            fields.append(field_name)    
+            fields.append(field_name)
 
-        return fields        
+        return fields
+
 
 class SearchSetItem(me.Document):
     searchphrase = me.StringField(required=True)
@@ -88,10 +99,9 @@ class SearchSetItem(me.Document):
     text_blocks = me.ListField(me.StringField(), required=False)
     pdf_binding = me.StringField(required=False, max_length=200)
 
+
 class WhiteList(me.Document):
     email = me.StringField(required=True, max_length=200)
 
     def check_email(self):
         return WhiteList.objects(email=self.email).first()
-
-    

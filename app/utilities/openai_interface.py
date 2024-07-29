@@ -11,6 +11,9 @@ import tiktoken
 max_context_length = 90000
 
 
+# Implementation based on the discussion:
+# https://community.openai.com/t/whats-the-new-tokenization-algorithm-for-gpt-4o/746708/3
+# gpt-4o seems to be using "o200k_base" encoding
 def num_tokens_from_text(text: str, model="gpt-4o"):
     """Return the number of tokens in a text string."""
     try:
@@ -102,23 +105,37 @@ class OpenAIInterface:
         )
         return completion.choices[0].message.content
 
-    def ask_question_to_documents(self, root_path, documents, question):
+    def ask_question_to_documents(
+        self, root_path, documents, question, default_docs=[]
+    ):
 
         full_text = ""
+        if len(default_docs) > 0:
+            # full_text += "# Default Context: "
+            for doc in default_docs:
+                full_path = os.path.join(root_path, "static", "uploads", doc.path)
+                full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
+
+        # if len(documents) > 0:
+        # full_text += "# Additional Context: "
+
         for document in documents:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
             full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
 
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = (
-            """Given the following document(s), answer the following question. Return the result as nicely formatted html with supportive information as if to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Question:"""
+            """Given the following document(s), answer the following question. Return the result as nicely formatted html with supportive information as if to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting.
+            \n\nQuestion: """
             + question
-            + "\n"
-            + full_text
+            + "\n\n"
         )
+        print("prompt: ", prompt)
+        prompt += full_text
         # use a tiktoken library for more accurate computation of the total token length for the context
         total_context_length = num_tokens_from_text(prompt)
         print("total context length: ", total_context_length)
+        print("docs", documents)
 
         if total_context_length > max_context_length:
             print("using dspy model")
@@ -130,13 +147,14 @@ class OpenAIInterface:
             response, queries = model(question=question)
             output_prompt = (
                 (
-                    """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question' and 'Answer' heading or title in your response, but only respond only with the formatted html code for the answer.\n\n Question: """
+                    """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question' and 'Answer' heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
                 )
                 + question
                 + "\n\nAnwsers: "
                 + response.answer
             )
             print("dspy response: ", response.answer)
+            # print("dspy model generated queries: ", queries)
             completion = openai.chat.completions.create(
                 model="gpt-4o",
                 messages=[{"role": "user", "content": output_prompt}],
