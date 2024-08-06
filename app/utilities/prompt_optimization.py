@@ -2,17 +2,27 @@
 
 import os
 import re
+import pandas as pd
+from pathlib import Path
+
+from typing import List
+
+from datasets import Dataset
 
 # from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain.schema import Document
 
+from app.models import Feedback
+
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 
 import chromadb
 
 import dspy
+from dspy.evaluate import Evaluate
+from dspy.teleprompt import MIPROv2
 
 from dsp.utils import deduplicate
 
@@ -247,3 +257,78 @@ def dspy_model(
     model = MultiHopQAModel(passages_per_hop=3, max_hops=5)
 
     return model
+
+
+def background_retrain_model(feedback_list, root_path):
+    # Implement your model retraining code here
+    print("Retraining the model with the following feedback:")
+
+    persistent_directory = Path(root_path) / "static" / "uploads"
+    collection_name = "chat_dspy_model"
+
+    prompt_model = dspy.OpenAI(model="gpt-4o", max_tokens=None)
+    task_model = MultiHopQAModel(
+        passages_per_hop=3,
+        max_hops=5,
+    )
+
+    program = MultiHopQAModel(
+        passages_per_hop=3,
+        max_hops=5,
+    )
+    # create huggingface dataset from the feedback
+
+    feedback_data = []
+
+    for feedback in feedback_list:
+        if feedback.feedback == "positive":
+            feedback_data.append(
+                {
+                    "question": feedback.question,
+                    "answer": feedback.response,
+                }
+            )
+
+    dataset = Dataset.from_pandas(pd.DataFrame(feedback_data))
+    trainset = dataset.train_test_split(test_size=0.2)["train"]
+    valset = dataset.train_test_split(test_size=0.2)["test"]
+
+    metric = dspy.evaluate.answer_exact_match
+
+    NUM_THREADS = 4
+    kwargs = dict(num_threads=NUM_THREADS, display_progress=True)
+    evaluate = Evaluate(devset=valset, metric=metric, **kwargs)
+
+    baseline_train_score = evaluate(program, devset=trainset)
+    baseline_eval_score = evaluate(program, devset=valset)
+
+    # Compile
+    N = 10  # The number of instructions and fewshot examples that we will generate and optimize over
+    batches = 30  # The number of optimization trials to be run (we will test out a new combination of instructions and fewshot examples in each trial)
+    temperature = 1.0  # The temperature configured for generating new instructions
+
+    eval_kwargs = dict(num_threads=16, display_progress=True, display_table=0)
+    teleprompter = MIPROv2(
+        prompt_model=prompt_model,
+        task_model=task_model,
+        metric=metric,
+        num_candidates=N,
+        init_temperature=temperature,
+        verbose=True,
+    )
+    compiled_program = teleprompter.compile(
+        program,
+        trainset=trainset,
+        valset=valset,
+        num_batches=batches,
+        max_bootstrapped_demos=1,
+        max_labeled_demos=2,
+        eval_kwargs=eval_kwargs,
+    )
+
+    # Evaluate the compiled program
+    bayesian_train_score = evaluate(compiled_program, devset=trainset)
+    bayesian_eval_score = evaluate(compiled_program, devset=valset)
+
+    # save the model
+    compiled_program.save("compiled_program")

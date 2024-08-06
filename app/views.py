@@ -1,3 +1,5 @@
+import urllib.parse
+from app.utilities.prompt_optimization import background_retrain_model
 from flask import (
     url_for,
     send_file,
@@ -19,6 +21,7 @@ from app.models import (
     SearchSetItem,
     ExtractionQualityRecord,
     SmartFolder,
+    Feedback,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -34,6 +37,9 @@ from app.utilities.openai_interface import (
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
+
+import multiprocessing as mp
+
 import json
 import csv
 from itertools import chain
@@ -235,7 +241,6 @@ def home():
         spaces=spaces,
         current_space_id=spaces[0].uuid,
         section=section,
-        total_token_counts=total_token_counts,
         max_context_length=max_context_length,
     )
 
@@ -913,3 +918,51 @@ def create_folder():
         uuid=uuid.uuid4().hex,
     )
     return redirect("/home")
+
+
+####### Feedback #######
+@app.route("/feedback", methods=["POST"])
+def feedback():
+
+    user = load_user()
+    user_id = user.user_id
+    data = request.get_json()
+    print("data", data)
+
+    feedback_type = data.get("feedback_type")
+    question = data.get("question")
+    response = data.get("response")
+    docs_uuids = data.get("docs_uuids").split(",")
+
+    print("feedback_type", feedback_type)
+    print("question", question)
+    print("docs_uuids", docs_uuids)
+    feedback = Feedback(
+        user_id=user_id,
+        feedback=feedback_type,
+        question=question,
+        response=response,
+        docs_uuids=docs_uuids,
+    )
+
+    feedback.save()
+
+    feedback_count = Feedback.objects.count()
+    max_feedback = 10
+
+    if feedback_count >= max_feedback:
+        root_path = app.root_path
+        feedback_list = Feedback.objects[
+            :max_feedback
+        ]  # Fetch the latest 10 feedback entries
+        # threading.Thread(
+        #     target=background_retrain_model, args=(feedback_list, root_path)
+        # ).start()
+
+        process = mp.Process(target=background_retrain_model, args=(feedback_list,root_path))
+        process.start()
+
+    response = {
+        "complete": True,
+    }
+    return jsonify(response)

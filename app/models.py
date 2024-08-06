@@ -107,3 +107,13 @@ class WhiteList(me.Document):
 
     def check_email(self):
         return WhiteList.objects(email=self.email).first()
+
+
+class Feedback(me.Document):
+    user_id = me.StringField(required=True, max_length=200)
+    # feedback is 'positive' or 'negative'
+    feedback = me.StringField(required=True, max_length=200)
+    question = me.StringField(required=True, max_length=200)
+    response = me.StringField(required=True, max_length=100000)
+    docs_uuids = me.ListField(me.StringField(), required=True)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
