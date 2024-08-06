@@ -202,6 +202,14 @@
                                 {% if doc.is_default %}
                                 <span style="color: #5c21d2bc; font-size: 0.8em; background-color: #c2c2c2; border-radius: 10px; padding: 2px 5px; margin-left: 5px;">Default</span>
                                 {% endif %}
+
+                                <span style="font-size: 0.8em; color: #666; margin-left: 10px;">
+                                    {{ doc.num_pages }} pages | {{ doc.token_count }} tokens
+                                    {% if doc.token_count > max_context_length %}
+                                    <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length</span></span>
+                                    {% endif %}
+                                </span>
+
                                 <button class="ellipsis-btn" style="float:right;" data-doc-id="{{ doc.uuid }}">
                                     <span style="font-size: 1em; color: #5c21d2bc;">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
@@ -254,6 +262,39 @@
         {% include "toolpanel/attachment_modal.html" %}
     </div>
 </div>
+
+
+<style>
+    .token-warning {
+        color: #FFA500;
+        cursor: help;
+        margin-left: 5px;
+        position: relative;
+        display: inline-block;
+    }
+
+    .token-warning .tooltiptext {
+        visibility: hidden;
+        width: 200px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.1s;
+    }
+
+    .token-warning:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+</style>
 
 
 {%endblock%} {% block scripts %}
