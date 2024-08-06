@@ -26,7 +26,11 @@ import base64
 from flask import request
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.semantic_ingest import SemanticIngest
-from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.openai_interface import (
+    OpenAIInterface,
+    num_tokens_from_text,
+    max_context_length,
+)
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
@@ -215,6 +219,10 @@ def home():
             user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
         ).all()
 
+    total_token_counts = 0
+    for doc in folder_docs:
+        total_token_counts += doc.token_count
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -227,6 +235,8 @@ def home():
         spaces=spaces,
         current_space_id=spaces[0].uuid,
         section=section,
+        total_token_counts=total_token_counts,
+        max_context_length=max_context_length,
     )
 
 
@@ -320,6 +330,13 @@ def upload():
     ) as f:
         f.write(imgdata)
 
+    pdf = PdfReader(os.path.join(app.root_path, "static", "uploads", f"{uid}.pdf"))
+    number_of_pages = len(pdf.pages)
+    full_text = ""
+    for i in range(number_of_pages):
+        full_text = full_text + pdf.pages[i].extract_text() + " "
+    token_count = num_tokens_from_text(full_text)
+
     document = SmartDocument(
         title=filename,
         path=f"{uid}.pdf",
@@ -327,6 +344,8 @@ def upload():
         user_id=user.user_id,
         space=space,
         folder=folder,
+        token_count=token_count,
+        num_pages=number_of_pages,
     )
     document.save()
 
