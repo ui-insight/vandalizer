@@ -187,6 +187,7 @@
                             <td>
                                 <span style="margin-right: 10px;"><input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}" data-doc-type="file"
                                         data-num-documents="1" data-doc-type="file"
+                                                                         data-token-count="{{ doc.token_count }}"
                                 {% if doc.is_default %}
                                     checked disabled
                                 {% endif %}></span>
@@ -206,7 +207,7 @@
                                 <span style="font-size: 0.8em; color: #666; margin-left: 10px;">
                                     {{ doc.num_pages }} pages | {{ doc.token_count }} tokens
                                     {% if doc.token_count > max_context_length %}
-                                    <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length</span></span>
+                                    <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>
                                     {% endif %}
                                 </span>
 
@@ -275,7 +276,7 @@
 
     .token-warning .tooltiptext {
         visibility: hidden;
-        width: 200px;
+        width: 300px;
         background-color: #555;
         color: #fff;
         text-align: center;
