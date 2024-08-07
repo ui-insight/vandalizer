@@ -32,11 +32,14 @@
         {% for space in spaces %}
         <option value="{{ space.uuid }}">{{ space.title }}</option>
         {% endfor %}
-
+        <option value="New Space">
+        <span style="padding-left: 8; "><i class="fa-solid fa-plus"></i> Create New Space</span>
+        </option>
         <option value="Logout">
             <i>Logout</i>
         </option>
     </select>
+
     </div>
     <!-- /.container-fluid -->
 </nav>
@@ -123,22 +126,7 @@
                 </div>
             </div>
             <div style="padding: 0px 45px 45px 45px;">
-                    <div style="width: 100%; background-color: black; height: 1px; margin-bottom: 10px; "></div>
-                <div style="display: flex; gap: 10px; margin-bottom: 10px;" >
-                    <!-- Select a space to view documents -->
-                    <label for="space-select-ui" style="padding-top: 10px;">Select a space</label>
-                    <select id="space-select-ui" class="custom-select space-select" style="padding: 10px;">
-                        {% for space in spaces %}
-                        <option value="{{ space.uuid }}">{{ space.title }}</option>
-                        {% endfor %}
-                    </select>
-                    <!-- Create a new space -->
-                    <a href="/spaces/new" style="color: #5c21d2bc; text-decoration: none; margin: 10px;">
-                        <i class="fa-solid fa-plus"></i>
-                        <span style="padding-left: 8; ">Create a new space</span>
-                    </a>
-                </div>
-
+         
                 <form action="/files/create_folder" method="post" id="add-folder-form">
                     <input type="hidden" name="space_id" value="{{ current_space_id }}">
                     <input type="hidden" name="parent_id" value="{{ current_folder_id }}">

@@ -344,8 +344,10 @@
         $('.space-select').on('change', function(e) {
             e.preventDefault()
             var selectedOption = $(this).val();
-
+            console.log(selectedOption);
             if (selectedOption == "Create New Space") {
+                window.location.href = "/spaces/new";
+            } else if (selectedOption == "New Space") {
                 window.location.href = "/spaces/new";
             } else if (selectedOption == "Logout") {
                 window.location.href = "/logout";
