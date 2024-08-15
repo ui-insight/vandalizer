@@ -193,6 +193,9 @@
             $('#renameset').on("click", function () {
                 $('#renameModal').show();
                 let uuid = $(this).attr("data-uuid");
+                let datatitle = $(this).attr("data-title");
+                $('#newName')[0].value = datatitle;
+                $('#newName')[0].focus();
 
                 $('#renameBtn').off('click').on('click', function() {
                     let newName = $('#newName')[0].value;

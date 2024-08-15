@@ -208,6 +208,7 @@ $(document).ready(function () {
     console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
     let renameModal = $("#renameModal");
 
+
     $("#renameBtn")
       .off("click")
       .on("click", function () {
@@ -225,6 +226,9 @@ $(document).ready(function () {
       });
 
     $("#renameModal").show();
+    $("#newName")[0].value = "";
+    $("#newName")[0].focus();
+    
     hidePopupMenu();
   });
 

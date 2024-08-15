@@ -50,10 +50,17 @@
       success: function (response) {
         // reload page
         $("#chat-panel").append(
-          "<p><div class='message-response'>" + response + "</div></p>",
+          "<p><div class='message-response'>" + response + "<p><a style='padding: 15px; color: #00000034;' class='copy-btn'><i class='fa-regular fa-copy'></a></p></i></div></p>",
         );
         $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
         $("#chatplaceholder").css("color", "darkgray");
+
+        // copy to clipboard
+        $(".copy-btn").on("click", function () {
+          let searchTerm = $(this).closest("div").text();
+          navigator.clipboard.writeText(searchTerm);
+          showToast("Copied to clipboard");
+        });
       },
       error: function (xhr, ajaxOptions, thrownError) {
         console.log(xhr.status);
@@ -64,3 +71,4 @@
     is_adding_term = false;
   }
 </script>
+
