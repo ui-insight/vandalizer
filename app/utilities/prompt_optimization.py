@@ -154,35 +154,6 @@ embedding_model = "text-embedding-3-large"
 embedding = OpenAIEmbeddings(model=embedding_model)
 
 
-def get_document_splits(document: str, file_path: Path, persistent_directory: Path):
-    # get the file_path from the user's storage
-
-    loader = PyPDFLoader(file_path.as_posix())
-    docs = loader.load()
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
-    return splits
-
-
-def get_retriever(document: str, file_path, persistent_directory: Path):
-    splits = get_document_splits(document, file_path)
-    collection_name = sanitize_filename(document)
-
-    vectordb = Chroma.from_documents(
-        persist_directory=persistent_directory,
-        collection_name=collection_name,
-        documents=splits,
-        embedding=embedding,
-    )
-
-    retriever = vectordb.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 3},
-    )
-    return retriever
-
-
 def dspy_model(
     full_text: str,
     collection_name: str,
@@ -191,24 +162,6 @@ def dspy_model(
     # model_name = "gpt-4"
     # model_name = "gpt-4-turbo"
     model_name = "gpt-4o"
-    # Example questions
-    # "What are the rules around personnel funding?"
-    # "What are the required sections of the proposal?"
-    # "What are the required sections of the proposal and what are their page limits?"
-
-    # pdf_directory = storage_path.as_posix()
-
-    # print("Resolved pdf_directory: ", pdf_directory)
-    # print("Files in directory: ", os.listdir(pdf_directory))
-
-    # loader = DirectoryLoader(pdf_directory, glob="*.pdf", loader_cls=PyPDFLoader)
-
-    # # Load the documents
-    # docs = loader.load()
-
-    # collection_name = sanitize_collection_name(document.filename)
-
-    # docs = [Document(page_content=full_text, metadata={"source": "user_input"})]
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs = text_splitter.split_documents([Document(page_content=full_text)])
@@ -217,14 +170,11 @@ def dspy_model(
 
     # Check if the collection already exists
 
-    chroma_client = chromadb.PersistentClient(path=persistent_directory.as_posix())
-    # existing_collections = chroma_client.list_collections()
-    # collection_exists = any(col.name == collection_name for col in existing_collections)
+    # chroma_client = chromadb.PersistentClient(path=persistent_directory.as_posix())
+    chroma_client = chromadb.HttpClient(host="localhost", port=5028)
 
-    # # TODO check if the collection exists using the count of uploaded documents. If the count is different, recreate the collection
-    # if not collection_exists:
-    # print(f"Creating new collection '{collection_name}'")
     Chroma.from_documents(
+        client=chroma_client,
         collection_name=collection_name,
         documents=docs,
         persist_directory=persistent_directory.as_posix(),
