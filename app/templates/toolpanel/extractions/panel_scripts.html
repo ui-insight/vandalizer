@@ -130,6 +130,8 @@
                     return;
                 }
 
+  
+
                 showWorking();
                 let data = JSON.stringify({
                     search_set_uuid: search_set_uuid,
@@ -169,6 +171,7 @@
             });
 
             $('#rerun').on("click", function () {
+                $('#semantic-panel').hide();
                 let uuid = $(this).attr("data-uuid");
                 let datatitle = $(this).attr("data-title");
                 performSearch(uuid, datatitle);
@@ -334,6 +337,8 @@
         }
 
         function updateSearchSetPanel(set_uuid, edit_mode=false) {
+            console.log("Performing search");
+            console.log(document_uuids);
             $.ajax({
                 url: '/api/search_results',
                 type: 'POST',

@@ -67,6 +67,7 @@
             });
             
             $('#rerun-prompt').on("click", function () {
+                $('#semantic-panel').hide();
                 let uuid = $(this).attr("data-uuid");
                 let datatitle = $(this).attr("data-title");
                 performPromptSearch(uuid, datatitle);

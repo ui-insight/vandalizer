@@ -11,6 +11,8 @@
         {% endfor %}
     ];
 
+    console.log("Document UUIDs", document_uuids);
+
     $('#ask-question-btn').on('click', function(e) {
         e.preventDefault()
         let question = $('#ask-question-input')[0].value;
@@ -322,6 +324,19 @@
                 }
             }
 
+            // Check for docid in the browser's current URL
+            let currentUrl = window.location.href;
+            if (currentUrl.includes('docid=')) {
+                let urlParams = new URLSearchParams(currentUrl.split('?')[1]);
+                let docid = urlParams.get('docid');
+                if (docid) {
+                    uuids.push(docid);
+                }
+            }
+
+            
+
+            console.log("Reset uuids");
             document_uuids = uuids;
 
             var counters = $('.doc-selected-counter')

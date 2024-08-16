@@ -28,9 +28,11 @@
 <p><b>Extractions</b>
     <span style="float: right; padding-left: 15px;"><a id="editset" href="#" data-uuid="{{ search_set.uuid }}"
         data-title="{{ search_set.title }}">Edit mode</a></span>
-    {% if results != null %}
+    
         <span style="float: right; padding-left: 15px;"><a id="rerun" href="#" data-uuid="{{ search_set.uuid }}"
-    data-title="{{ search_set.title }}">Rerun</a></span><span style="float: right;"><a id="export" href="#">Export</a></span> 
+    data-title="{{ search_set.title }}">Rerun</a></span>
+    {% if results != null %}
+    <span style="float: right;"><a id="export" href="#">Export</a></span> 
     {% endif %}
 </p>
 
