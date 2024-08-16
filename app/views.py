@@ -191,18 +191,10 @@ def home():
 
     default_doc_query = Q(user_id=user.user_id, is_default=True)
 
-    # folder_docs = SmartDocument.objects(
-    #     user_id=user.user_id, space=current_space.uuid, folder="0"
-    # ).all()
-
-    folder_docs = SmartDocument.objects(base_query | default_doc_query).all()
+    folder_docs = SmartDocument.objects(base_query | default_doc_query).order_by('-created_at').all()
 
     if current_folder_id != 0 and current_folder_id != "0":
-        # folder_docs = SmartDocument.objects(
-        #     user_id=user.user_id, space=current_space.uuid, folder=current_folder_id
-        # ).all()
-
-        folder_docs = SmartDocument.objects(base_query | default_doc_query).all()
+        folder_docs = SmartDocument.objects(base_query | default_doc_query).order_by('-created_at').all()
 
         folder = SmartFolder.objects(uuid=current_folder_id).first()
         if folder:
@@ -214,6 +206,8 @@ def home():
         folders = SmartFolder.objects(
             user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
         ).all()
+
+    
 
     return render_template(
         "index.html",
