@@ -51,6 +51,19 @@
     }
   });
 
+  $('#chat-suggestion-3').on("click", function (e) {
+    e.preventDefault();
+    console.log("chat button clicked");
+    if (document_uuids != "") {
+      additional_context = "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. You can use the extract tab to run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can run prompt groups, these are more complicated questions that you would normally ask in chat. You can make sets of these that you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document.";
+
+      performChat(document_uuids, "Teach me how to use vandalizer on this", folder_uuid, additional_context);
+      return;
+    } else {
+      showToast("Select a document to chat");
+    }
+  });
+
   function chat() {
     
 
@@ -64,7 +77,7 @@
     is_adding_term = false;
   }
 
-  function performChat(document_uuids, question, folder_uuid) {
+  function performChat(document_uuids, question, folder_uuid, additional_context = "") {
     $('.chat-card-container').hide();
     $("#chat-panel").append(
       "<p><div class='message-you'>" + question + "</div></p>",
@@ -87,7 +100,7 @@
       type: "POST",
       data: JSON.stringify({
         document_uuids: document_uuids,
-        message: question,
+        message: question + " " + additional_context,
         folder_uuid: folder_uuid,
       }),
       contentType: "application/json; charset=utf-8",
