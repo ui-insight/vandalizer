@@ -905,3 +905,8 @@ tr {
     color:white;
     background-color: #5c21d2bc;
 }
+
+.chat-response-body > h1:first-of-type,
+.chat-response-body > h2:first-of-type {
+  margin-top: 0;
+}

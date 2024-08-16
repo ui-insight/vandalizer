@@ -36,6 +36,18 @@
     );
     // reset the chat
     $("#chatinput").find("p").text("");
+
+    // Add the message response bubble with the icon and loader
+    let responseId = "response-" + new Date().getTime(); // unique ID for the response bubble
+    $("#chat-panel").append(
+      `<p>
+        <div class='message-response' id='${responseId}'>
+          <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='vertical-align: middle; margin-right: 10px; width: 30px; height: 45px;'/>
+          <div class='chat-loader' style='display: inline-block;'></div>
+        </div>
+      </p>`
+    );
+
     $.ajax({
       url: "/api/chat",
       type: "POST",
@@ -49,9 +61,26 @@
       async: true,
       success: function (response) {
         // reload page
-        $("#chat-panel").append(
-          "<p><div class='message-response'>" + response + "<p><a style='padding: 15px; color: #00000034;' class='copy-btn'><i class='fa-regular fa-copy'></a></p></i></div></p>",
-        );
+        $("#" + responseId).html(
+          `<div style='display: flex; flex-direction: column;'>
+            <div style='display: flex;'>
+              <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='margin-right: 15px; width: 30px; height: 45px;'/>
+              <div style='flex-grow: 1;'>
+                <div class="chat-reponse-body">
+                ${response}
+                </div>
+                <div style='padding-top: 10px;'>
+                  <a style='color: #000000dd;' class='copy-btn'>
+                    <i class='fa-regular fa-copy'></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+            
+          </div>`
+);
+
+
         $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
         $("#chatplaceholder").css("color", "darkgray");
 
