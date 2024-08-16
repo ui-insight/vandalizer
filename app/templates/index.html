@@ -171,31 +171,36 @@
                         {% endfor %}
                         {% for doc in folder_docs %}
                         <tr id="file-item" class="file">
-                            <td>
-                                <span style="margin-right: 10px;"><input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}" data-doc-type="file"
-                                        data-num-documents="1" data-doc-type="file"
-                                {% if doc.is_default %}
-                                    checked disabled
-                                {% endif %}></span>
-
-                                <a href="?docid={{ doc.uuid }}" ">
-                                    <span><i class=" fa-solid fa-file"></i></span>
-                                    <span
-                                        style="padding-right: 10px; padding-left: 10px; overflow: ellipsis; color: #17181abb">{{
-                                        doc.title }}</span>
-
+                            <td style="white-space: nowrap;">
+                                <span style="margin-right: 10px;">
+                                    <input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}" data-doc-type="file"
+                                           data-num-documents="1" data-doc-type="file"
+                                           {% if doc.is_default %}
+                                           checked disabled
+                                           {% endif %}>
+                                </span>
+                        
+                                <a href="?docid={{ doc.uuid }}" class="file-link">
+                                    <span><i class="fa-solid fa-file"></i></span>
+                                    <span class="file-name">{{ doc.title }}</span>
                                 </a>
-                                <!-- Show default tag if doc is default -->
-                                {% if doc.is_default %}
-                                <span style="color: #5c21d2bc; font-size: 0.8em; background-color: #c2c2c2; border-radius: 10px; padding: 2px 5px; margin-left: 5px;">Default</span>
-                                {% endif %}
-                                <button class="ellipsis-btn" style="float:right;" data-doc-id="{{ doc.uuid }}">
-                                    <span style="font-size: 1em; color: #5c21d2bc;">
-                                        <i class="fa-solid fa-ellipsis-vertical"></i>
-                                    </span>
+
+                                                   <!-- Show default tag if doc is default -->
+                                                   {% if doc.is_default %}
+                                                   <span class="default-tag">Default</span>
+                                                   {% endif %}
+                        
+                                <!-- Show date if there's room -->
+                                <span class="file-date">{{ doc.time_ago_in_words() }}</span>
+                        
+             
+                        
+                                <button class="ellipsis-btn" data-doc-id="{{ doc.uuid }}">
+                                    <span><i class="fa-solid fa-ellipsis-vertical"></i></span>
                                 </button>
                             </td>
                         </tr>
+                        
                         {% endfor %}
                     </tbody>
                 </table>

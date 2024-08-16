@@ -25,6 +25,24 @@ class SmartDocument(me.Document):
         default=False
     )  # default document to add to the llm context
 
+    def time_ago_in_words(self):
+        now = datetime.datetime.now()
+        diff = now - self.created_at
+
+        if diff < datetime.timedelta(minutes=1):
+            return f"{int(diff.total_seconds())} seconds"
+        elif diff < datetime.timedelta(hours=1):
+            minutes = int(diff.total_seconds() / 60)
+            return f"{minutes} minutes"
+        elif diff < datetime.timedelta(days=1):
+            hours = int(diff.total_seconds() / 3600)
+            return f"{hours} hours"
+        elif diff < datetime.timedelta(days=7):
+            days = diff.days
+            return f"{days} days"
+        else:
+            return self.created_at.strftime("%Y-%m-%d")
+
 
 class SmartFolder(me.Document):
     parent_id = me.StringField(required=True, max_length=200)
