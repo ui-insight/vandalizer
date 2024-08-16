@@ -883,6 +883,56 @@ tr {
     font-style: italic;
 }
 
+.file td {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    white-space: nowrap;
+}
+
+.file-link {
+    display: flex;
+    align-items: center;
+    min-width: 0; /* Allows ellipsis to work properly */
+    flex-grow: 1;
+}
+
+.file-name {
+    padding-right: 10px;
+    padding-left: 10px;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #17181abb;
+}
+
+.file-date {
+    padding-left: 30px;
+    padding-right: 30px;
+    margin-left: 10px;
+    color: #17181a6e;
+    font-size: 0.8em;
+    font-weight: 300;
+
+    flex-shrink: 0; /* Prevents shrinking */
+}
+
+.ellipsis-btn {
+    margin-left: 10px;
+    flex-shrink: 0; /* Keeps the button always visible */
+}
+
+.default-tag {
+    color: #5c21d2bc;
+    font-size: 0.8em;
+    background-color: #eaeaea;
+    border-radius: 15px;
+    padding: 5px 10px;
+    margin-left: 5px;
+    flex-shrink: 0;
+}
+
+
 .add-folder-input-field {
     background-color: white;
     border-radius: 6px;
