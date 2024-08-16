@@ -910,3 +910,48 @@ tr {
 .chat-response-body > h2:first-of-type {
   margin-top: 0;
 }
+
+#document-title {
+    text-align: center;
+    padding-top: 15px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #465056;
+    white-space: nowrap; /* Prevents line breaks */
+    overflow: hidden; /* Hides overflow text */
+    text-overflow: ellipsis; /* Adds ellipsis */
+  }
+
+
+  .chat-card-container {
+    display: flex;
+    justify-content: space-around;
+    gap: 15px;
+}
+
+.chat-card-suggestion {
+
+    background-color: rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: black;
+    
+    border-radius: 15px;
+    text-align: center;
+    padding: 30px 15px;
+    flex: 1;
+}
+
+.chat-card-suggestion:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.chat-card-suggestion p {
+    margin-bottom: 10px;
+}
+
+.chat-card-suggestion i {
+    font-size: 24px;
+}

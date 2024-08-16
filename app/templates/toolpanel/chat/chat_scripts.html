@@ -29,15 +29,49 @@
     }
   });
 
+  $('#chat-suggestion-1').on("click", function (e) {
+    e.preventDefault();
+    console.log("chat button clicked");
+    if (document_uuids != "") {
+      performChat(document_uuids, "Summarize this document", folder_uuid);
+      return;
+    } else {
+      showToast("Select a document to chat");
+    }
+  });
+
+  $('#chat-suggestion-2').on("click", function (e) {
+    e.preventDefault();
+    console.log("chat button clicked");
+    if (document_uuids != "") {
+      performChat(document_uuids, "Help me understand what this is about", folder_uuid);
+      return;
+    } else {
+      showToast("Select a document to chat");
+    }
+  });
+
   function chat() {
+    
+
+    // Add the message response bubble with the icon and loader
     let question = $("#chatinput")[0].textContent;
+    
+
+    performChat(document_uuids, question, folder_uuid);
+
+    search_set_add_uuid = "";
+    is_adding_term = false;
+  }
+
+  function performChat(document_uuids, question, folder_uuid) {
+    $('.chat-card-container').hide();
     $("#chat-panel").append(
       "<p><div class='message-you'>" + question + "</div></p>",
     );
     // reset the chat
     $("#chatinput").find("p").text("");
 
-    // Add the message response bubble with the icon and loader
     let responseId = "response-" + new Date().getTime(); // unique ID for the response bubble
     $("#chat-panel").append(
       `<p>
@@ -66,7 +100,7 @@
             <div style='display: flex;'>
               <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='margin-right: 15px; width: 30px; height: 45px;'/>
               <div style='flex-grow: 1;'>
-                <div class="chat-reponse-body">
+                <div class="chat-response-body">
                 ${response}
                 </div>
                 <div style='padding-top: 10px;'>
@@ -96,8 +130,6 @@
         console.log(thrownError);
       },
     });
-    search_set_add_uuid = "";
-    is_adding_term = false;
   }
 </script>
 

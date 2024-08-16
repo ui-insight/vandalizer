@@ -821,7 +821,6 @@ def load_user():
     if "user_id" in session:
         user = User.objects(user_id=session["user_id"]).first()
         if user:
-            print("User found")
             return user
         else:
             user = User(user_id=session["user_id"], is_admin=False)
