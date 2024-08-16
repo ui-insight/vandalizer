@@ -24,6 +24,8 @@ class SmartDocument(me.Document):
     is_default = me.BooleanField(
         default=False
     )  # default document to add to the llm context
+    token_count = me.IntField(default=0)
+    num_pages = me.IntField(default=0)
 
 
 class SmartFolder(me.Document):
