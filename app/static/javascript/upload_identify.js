@@ -92,6 +92,13 @@ function showFile() {
           console.log(result);
           $("#loading-area").hide();
           $("#drag-area").show();
+
+          if (result.uuid == null) {
+            showToast("Document already uploaded");
+            return
+          }
+
+         
           let newRow = $("<tr>");
           let newCell = $("<td>");
           let newLink = $("<a>")

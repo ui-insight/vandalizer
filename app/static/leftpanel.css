@@ -62,7 +62,6 @@
 
   .set-entry {
     padding: 5px 5px;
-    height: 30px;
   }
 
   .semantic-entry:hover {
@@ -72,7 +71,6 @@
 
   .set-item {
     padding: 5px 5px;
-    height: 40px;
   }
 
   .set-item:hover {
@@ -82,7 +80,6 @@
 
   .prompt-set-item {
     padding: 5px 5px;
-    height: 40px;
   }
 
   .prompt-set-item:hover {
