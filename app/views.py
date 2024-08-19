@@ -927,12 +927,13 @@ def feedback():
     user = load_user()
     user_id = user.user_id
     data = request.get_json()
-    print("data", data)
 
     feedback_type = data.get("feedback_type")
     question = data.get("question")
-    response = data.get("response")
-    docs_uuids = data.get("docs_uuids").split(",")
+    answer = data.get("answer")
+    context = data.get("context")
+    context = " ".join(context)
+    docs_uuids = data.get("docs_uuids")
 
     print("feedback_type", feedback_type)
     print("question", question)
@@ -941,7 +942,8 @@ def feedback():
         user_id=user_id,
         feedback=feedback_type,
         question=question,
-        response=response,
+        answer=answer,
+        context=context,
         docs_uuids=docs_uuids,
     )
 
@@ -952,14 +954,12 @@ def feedback():
 
     if feedback_count >= max_feedback:
         root_path = app.root_path
-        feedback_list = Feedback.objects[
-            :max_feedback
-        ]  # Fetch the latest 10 feedback entries
-        # threading.Thread(
-        #     target=background_retrain_model, args=(feedback_list, root_path)
-        # ).start()
+        # get all feedback entries
+        feedback_list = Feedback.objects().all()
 
-        process = mp.Process(target=background_retrain_model, args=(feedback_list,root_path))
+        process = mp.Process(
+            target=background_retrain_model, args=(feedback_list, root_path)
+        )
         process.start()
 
     response = {
