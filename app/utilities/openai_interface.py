@@ -3,7 +3,7 @@ from pathlib import Path
 import openai
 import chardet
 from PyPDF2 import PdfReader
-from app.utilities.prompt_optimization import dspy_model
+from app.utilities.prompt_optimization import dspy_model, simple_qa_model
 import tiktoken
 
 # 128K is the max context length for the GPT-4o model
@@ -114,14 +114,14 @@ class OpenAIInterface:
             # full_text += "# Default Context: "
             for doc in default_docs:
                 full_path = os.path.join(root_path, "static", "uploads", doc.path)
-                full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
+                full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
 
         # if len(documents) > 0:
         # full_text += "# Additional Context: "
 
         for document in documents:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
-            full_text += "\n\nDocument:" + extract_text_from_pdf(full_path) + " "
+            full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
 
         openai.api_key = "***REMOVED***"
         prompt = (
@@ -136,6 +136,7 @@ class OpenAIInterface:
         total_context_length = num_tokens_from_text(prompt)
         print("total context length: ", total_context_length)
         print("docs", documents)
+        formatting_prompt = """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', or 'Context' heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
 
         if total_context_length > max_context_length:
             print("using dspy model")
@@ -144,14 +145,9 @@ class OpenAIInterface:
             persistent_directory = Path(root_path) / "static" / "uploads"
             collection_name = "chat_dspy_model"
             model = dspy_model(full_text, collection_name, persistent_directory)
-            response, queries = model(question=question)
+            response = model(question=question)
             output_prompt = (
-                (
-                    """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question' and 'Answer' heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
-                )
-                + question
-                + "\n\nAnwsers: "
-                + response.answer
+                formatting_prompt + question + "\n\nAnwsers: " + response.answer
             )
             print("dspy response: ", response.answer)
             # print("dspy model generated queries: ", queries)
@@ -160,10 +156,28 @@ class OpenAIInterface:
                 messages=[{"role": "user", "content": output_prompt}],
             )
             print("llm formatted response: ", completion.choices[0].message.content)
-            return completion.choices[0].message.content
+            formatted_answer = completion.choices[0].message.content
+            return dict(
+                context=response.context,
+                answer=response.answer,
+                formatted_answer=formatted_answer,
+                question=question,
+            )
         else:
+            simple_qa = simple_qa_model()
+            response = simple_qa(question=question, full_text=full_text)
+            output_prompt = (
+                formatting_prompt + question + "\n\nAnwsers: " + response.answer
+            )
             completion = openai.chat.completions.create(
                 model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
+                messages=[{"role": "user", "content": output_prompt}],
             )
-            return completion.choices[0].message.content
+            formatted_answer = completion.choices[0].message.content
+
+            return dict(
+                context=response.context,
+                answer=response.answer,
+                formatted_answer=formatted_answer,
+                question=question,
+            )
