@@ -6,6 +6,10 @@ from app.models import SmartDocument
 from app.utilities import pdf_helper
 import nltk
 
+import sys
+import pysqlite3
+sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+
 class SemanticIngest:
     def search(self, search_term, document):
         try: 

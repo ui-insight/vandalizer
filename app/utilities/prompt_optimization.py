@@ -8,6 +8,10 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain.schema import Document
 
+import sys
+import pysqlite3
+sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 
 import chromadb
