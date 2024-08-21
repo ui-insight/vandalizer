@@ -54,6 +54,11 @@ os.environ["OPENAI_API_KEY"] = (
     "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
 )
 
+# llm = OpenAI(openai_api_key=os.environ["OPENAI_API_KEY"])
+
+embedding_model = "text-embedding-3-large"
+embedding = OpenAIEmbeddings(model=embedding_model)
+
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -181,41 +186,6 @@ class MultiHopQAModel(dspy.Module):
         return pred
 
 
-# llm = OpenAI(openai_api_key=os.environ["OPENAI_API_KEY"])
-
-embedding_model = "text-embedding-3-large"
-embedding = OpenAIEmbeddings(model=embedding_model)
-
-
-def get_document_splits(document: str, file_path: Path, persistent_directory: Path):
-    # get the file_path from the user's storage
-
-    loader = PyPDFLoader(file_path.as_posix())
-    docs = loader.load()
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    splits = text_splitter.split_documents(docs)
-    return splits
-
-
-def get_retriever(document: str, file_path, persistent_directory: Path):
-    splits = get_document_splits(document, file_path)
-    collection_name = sanitize_filename(document)
-
-    vectordb = Chroma.from_documents(
-        persist_directory=persistent_directory,
-        collection_name=collection_name,
-        documents=splits,
-        embedding=embedding,
-    )
-
-    retriever = vectordb.as_retriever(
-        search_type="similarity",
-        search_kwargs={"k": 3},
-    )
-    return retriever
-
-
 def dspy_model(
     full_text: str,
     collection_name: str,
@@ -290,7 +260,7 @@ def dspy_model(
 class LLMFactJudge(dspy.Signature):
     """Judge if the answer is factually correct based on the context."""
 
-    context = dspy.InputField(desc="Context for the prediciton")
+    context = dspy.InputField(desc="Context for the prediction")
     question = dspy.InputField(desc="Question to be answered")
     answer = dspy.InputField(desc="Answer for the question")
     factually_correct = dspy.OutputField(desc="Yes or No")
@@ -312,8 +282,19 @@ class LLMAnswerJudge(dspy.Signature):
     # )
 
 
+class LLMAnswerFeedbackJudge(dspy.Signature):
+    """Judge if the predicted answer is correct based on the context and provided feedback answer."""
+
+    predicted_answer = dspy.InputField(desc="Predicted answer")
+    feedback_answer = dspy.InputField(desc="Feedback answer")
+    feedback = dspy.InputField(desc="User feedback")
+    context = dspy.InputField(desc="Context for the prediction")
+    answer_correctness = dspy.OutputField(desc="Yes or No")
+
+
 correctness_judge = dspy.ChainOfThought(LLMAnswerJudge)
 factual_judge = dspy.ChainOfThought(LLMFactJudge)
+feedback_judge = dspy.ChainOfThought(LLMAnswerFeedbackJudge)
 
 
 def llm_judge_metric(example, pred, trace=None):
@@ -336,12 +317,19 @@ def llm_judge_metric(example, pred, trace=None):
     ).factually_correct
     fact_match = factually_correct.lower() == "yes"
 
-    # return answer_correctness == "Yes" and factually_correct == "Yes"
-    # return answer_correctness == "Yes"
+    # Check if the predicted answer is correct based on the context and provided feedback answer
+    feedback_answer = feedback_judge(
+        predicted_answer=pred.answer,
+        feedback_answer=example.answer,
+        feedback=example.feedback,
+        context=pred.context,
+    ).answer_correctness
+    feedback_match = feedback_answer.lower() == "yes"
+
     if trace is None:  # if we're doing evaluation or optimization
-        return (answer_match + fact_match) / 2.0
+        return (answer_match + fact_match + feedback_match) / 3.0
     else:  # if we're doing bootstrapping, i.e. self-generating good demonstrations of each step
-        return answer_match and fact_match
+        return answer_match and fact_match and feedback_match
 
 
 def background_retrain_model(feedback_list, root_path):
@@ -382,24 +370,25 @@ def background_retrain_model(feedback_list, root_path):
 
     retriever = dspy.Retrieve(k=3)
     for feedback in feedback_list:
-        if feedback.feedback == "positive":
-            docs = []
-            docs.append(Document(page_content=feedback.context))
+        # if feedback.feedback == "positive":
+        docs = []
+        docs.append(Document(page_content=feedback.context))
 
-            Chroma.from_documents(
-                collection_name="retrain_collection",
-                documents=docs,
-                persist_directory=persistent_directory.as_posix(),
-                embedding=embedding,
-            )
-            retrieved_context = retriever(feedback.question).passages
-            feedback_data.append(
-                {
-                    "question": feedback.question,
-                    "answer": feedback.answer,
-                    "context": retrieved_context,
-                }
-            )
+        Chroma.from_documents(
+            collection_name="retrain_collection",
+            documents=docs,
+            persist_directory=persistent_directory.as_posix(),
+            embedding=embedding,
+        )
+        retrieved_context = retriever(feedback.question).passages
+        feedback_data.append(
+            {
+                "question": feedback.question,
+                "answer": feedback.answer,
+                "feedback": feedback.feedback,
+                "context": retrieved_context,
+            }
+        )
 
     # for index, feedback in enumerate(feedback_data):
     #     if feedback.get("feeback") == "positive":
