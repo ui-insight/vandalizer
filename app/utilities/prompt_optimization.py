@@ -10,8 +10,12 @@ from langchain.schema import Document
 
 import sys
 import pysqlite3
+# For prod, change to pysqlite3
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
-
+ # Turn off caching
+os.environ['DSP_CACHEBOOL'] = 'false'
+os.environ["DSP_NOTEBOOK_CACHEDIR"] = os.path.join(os.getcwd(), 'cache')
+ 
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 
 import chromadb
