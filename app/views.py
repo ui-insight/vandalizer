@@ -90,8 +90,8 @@ def logout():
 
 @app.route("/home")
 def home():
-    # if not azure.authorized:
-    # 	return redirect(url_for("azure.login"))
+    if not azure.authorized:
+        return redirect(url_for("azure.login"))
     if "user_id" not in session:
         print("No user session")
         resp = azure.get("/v1.0/me")
