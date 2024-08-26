@@ -1,6 +1,8 @@
 <script>
   const placeholderText = "Chat with document...";
 
+  let chatReponse = null;
+
   // Handle Enter and Shift+Enter keydown events
   $("#chatinput").on("keydown", function (event) {
     $("#chatplaceholder").attr("data-placeholder", "");
@@ -29,7 +31,7 @@
     }
   });
 
-  $('#chat-suggestion-1').on("click", function (e) {
+  $("#chat-suggestion-1").on("click", function (e) {
     e.preventDefault();
     console.log("chat button clicked");
     if (document_uuids != "") {
@@ -40,24 +42,34 @@
     }
   });
 
-  $('#chat-suggestion-2').on("click", function (e) {
+  $("#chat-suggestion-2").on("click", function (e) {
     e.preventDefault();
     console.log("chat button clicked");
     if (document_uuids != "") {
-      performChat(document_uuids, "Help me understand what this is about", folder_uuid);
+      performChat(
+        document_uuids,
+        "Help me understand what this is about",
+        folder_uuid,
+      );
       return;
     } else {
       showToast("Select a document to chat");
     }
   });
 
-  $('#chat-suggestion-3').on("click", function (e) {
+  $("#chat-suggestion-3").on("click", function (e) {
     e.preventDefault();
     console.log("chat button clicked");
     if (document_uuids != "") {
-      additional_context = "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. You can use the extract tab to run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can run prompt groups, these are more complicated questions that you would normally ask in chat. You can make sets of these that you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document.";
+      additional_context =
+        "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. You can use the extract tab to run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can run prompt groups, these are more complicated questions that you would normally ask in chat. You can make sets of these that you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document.";
 
-      performChat(document_uuids, "Teach me how to use vandalizer on this", folder_uuid, additional_context);
+      performChat(
+        document_uuids,
+        "Teach me how to use vandalizer on this",
+        folder_uuid,
+        additional_context,
+      );
       return;
     } else {
       showToast("Select a document to chat");
@@ -65,11 +77,8 @@
   });
 
   function chat() {
-    
-
     // Add the message response bubble with the icon and loader
     let question = $("#chatinput")[0].textContent;
-    
 
     performChat(document_uuids, question, folder_uuid);
 
@@ -77,11 +86,66 @@
     is_adding_term = false;
   }
 
-  function performChat(document_uuids, question, folder_uuid, additional_context = "") {
-    $('.chat-card-container').hide();
+  function performChat(
+    document_uuids,
+    question,
+    folder_uuid,
+    additional_context = "",
+  ) {
+    $(".chat-card-container").hide();
     $("#chat-panel").append(
       "<p><div class='message-you'>" + question + "</div></p>",
     );
+
+    function createFeedbackButtons(question, answer, context, document_uuids) {
+      const feedbackDiv = document.createElement("div");
+      feedbackDiv.className = "feedback-buttons";
+
+      const positiveButton = document.createElement("button");
+      positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
+      positiveButton.className = "feedback-button-positive";
+      positiveButton.dataset.feedbackType = "positive";
+
+      const negativeButton = document.createElement("button");
+      negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
+      negativeButton.className = "feedback-button-negative";
+      negativeButton.dataset.feedbackType = "negative";
+
+      feedbackDiv.appendChild(positiveButton);
+      feedbackDiv.appendChild(negativeButton);
+
+      return feedbackDiv;
+    }
+
+    // Attach a delegated event listener to the parent container
+    $(document).on(
+      "click",
+      ".feedback-button-positive, .feedback-button-negative",
+      function () {
+        const feedbackType = this.dataset.feedbackType;
+        const question = $(this)
+          .closest(".message-response")
+          .attr("data-question");
+        const answer = $(this).closest(".message-response").attr("data-answer");
+        const context = $(this)
+          .closest(".message-response")
+          .attr("data-context");
+        const documentUuids = $(this)
+          .closest(".message-response")
+          .attr("data-document-uuids")
+          .split(",");
+
+        sendFeedback(
+          feedbackType,
+          question,
+          answer,
+          context,
+          documentUuids,
+          this,
+        );
+      },
+    );
+
     // reset the chat
     $("#chatinput").find("p").text("");
 
@@ -92,7 +156,7 @@
           <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='vertical-align: middle; margin-right: 10px; width: 30px; height: 45px;'/>
           <div class='chat-loader' style='display: inline-block;'></div>
         </div>
-      </p>`
+      </p>`,
     );
 
     $.ajax({
@@ -107,6 +171,25 @@
       dataType: "json",
       async: true,
       success: function (response) {
+        console.log(response);
+        let answer = response.answer;
+        let question = response.question;
+        let formatted_answer = response.formatted_answer;
+        let context = response.context;
+
+        let responseDiv = $("<div>")
+          .addClass("message-response")
+          .attr({
+            "data-question": question,
+            "data-answer": answer,
+            "data-context": context,
+            "data-document-uuids": document_uuids.join(","),
+          });
+
+        responseDiv.html(formatted_answer);
+        responseDiv.append(
+          createFeedbackButtons(question, answer, context, document_uuids),
+        );
         // reload page
         $("#" + responseId).html(
           `<div style='display: flex; flex-direction: column;'>
@@ -114,19 +197,18 @@
               <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='margin-right: 15px; width: 30px; height: 45px;'/>
               <div style='flex-grow: 1;'>
                 <div class="chat-response-body">
-                ${response}
+                ${responseDiv.prop("outerHTML")}
                 </div>
                 <div style='padding-top: 10px;'>
                   <a style='color: #000000dd;' class='copy-btn'>
-                    <i class='fa-regular fa-copy'></i>
+                    <i class='fa-regular fa-copy' style='cursor: pointer'></i>
                   </a>
                 </div>
               </div>
             </div>
             
-          </div>`
-);
-
+          </div>`,
+        );
 
         $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
         $("#chatplaceholder").css("color", "darkgray");
@@ -136,6 +218,18 @@
           let searchTerm = $(this).closest("div").text();
           navigator.clipboard.writeText(searchTerm);
           showToast("Copied to clipboard");
+
+          console.log("Sending feedback", response);
+
+          // Send feedback for copy action
+          sendFeedback(
+            "The user copied the answer, thus it can be considered a good answer.",
+            question,
+            answer,
+            context,
+            document_uuids,
+            this,
+          );
         });
       },
       error: function (xhr, ajaxOptions, thrownError) {
@@ -144,5 +238,38 @@
       },
     });
   }
-</script>
 
+  function sendFeedback(
+    feedback_type,
+    question,
+    answer,
+    context,
+    document_uuids,
+    button,
+  ) {
+    $.ajax({
+      url: "/feedback",
+      type: "POST",
+      data: JSON.stringify({
+        feedback_type: feedback_type,
+        question: question,
+        answer: answer,
+        context: context,
+        docs_uuids: document_uuids,
+      }),
+      contentType: "application/json; charset=utf-8",
+      dataType: "json",
+      async: true,
+      success: function (response) {
+        // $(button).attr("disabled", true);
+        // $(button).attr("style", "cursor: not-allowed;");
+        // $(button).siblings("button").attr("disabled", true);
+        console.log("Feedback sent successfully", response);
+      },
+      error: function (xhr, ajaxOptions, thrownError) {
+        console.log(xhr.status);
+        console.log(thrownError);
+      },
+    });
+  }
+</script>

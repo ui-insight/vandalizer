@@ -248,6 +248,39 @@
 </div>
 
 
+<style>
+    .token-warning {
+        color: #FFA500;
+        cursor: help;
+        margin-left: 5px;
+        position: relative;
+        display: inline-block;
+    }
+
+    .token-warning .tooltiptext {
+        visibility: hidden;
+        width: 300px;
+        background-color: #555;
+        color: #fff;
+        text-align: center;
+        border-radius: 6px;
+        padding: 5px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -100px;
+        opacity: 0;
+        transition: opacity 0.1s;
+    }
+
+    .token-warning:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+</style>
+
+
 {%endblock%} {% block scripts %}
 {{super()}}
 {% include "index_scripts.html" %}

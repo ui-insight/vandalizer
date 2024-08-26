@@ -1,3 +1,5 @@
+import urllib.parse
+from app.utilities.prompt_optimization import background_retrain_model
 from flask import (
     url_for,
     send_file,
@@ -19,6 +21,8 @@ from app.models import (
     SearchSetItem,
     ExtractionQualityRecord,
     SmartFolder,
+    Feedback,
+    FeedbackCounter,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -26,10 +30,17 @@ import base64
 from flask import request
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.semantic_ingest import SemanticIngest
-from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.openai_interface import (
+    OpenAIInterface,
+    num_tokens_from_text,
+    max_context_length,
+)
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
+
+import multiprocessing as mp
+
 import json
 import csv
 from itertools import chain
@@ -61,9 +72,9 @@ def mismatching_state(e):
 
 @app.route("/")
 def index():
-    if azure.authorized:
-        print("Already authorized")
-        return redirect(url_for("home"))
+    # if azure.authorized:
+    #     print("Already authorized")
+    #     return redirect(url_for("home"))
 
     print("Not authorized")
     return render_template("landing.html")
@@ -90,19 +101,19 @@ def logout():
 
 @app.route("/home")
 def home():
-    if not azure.authorized:
-        return redirect(url_for("azure.login"))
-    if "user_id" not in session:
-        print("No user session")
-        resp = azure.get("/v1.0/me")
-        user_info = resp.json()
-        if "id" not in user_info:
-            print("Got nothing from azure")
-            session["user_id"] = "admin"
-        else:
-            print("Got user info from azure")
-            user_id = user_info["id"]
-            session["user_id"] = user_id
+    # if not azure.authorized:
+    #     return redirect(url_for("azure.login"))
+    # if "user_id" not in session:
+    #     print("No user session")
+    #     resp = azure.get("/v1.0/me")
+    #     user_info = resp.json()
+    #     if "id" not in user_info:
+    #         print("Got nothing from azure")
+    #         session["user_id"] = "admin"
+    #     else:
+    #         print("Got user info from azure")
+    #         user_id = user_info["id"]
+    #         session["user_id"] = user_id
 
     user = load_user()
     section = request.args.get("section", default="Extract").strip()
@@ -215,6 +226,10 @@ def home():
             user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
         ).all()
 
+    total_token_counts = 0
+    for doc in folder_docs:
+        total_token_counts += doc.token_count
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -227,6 +242,7 @@ def home():
         spaces=spaces,
         current_space_id=spaces[0].uuid,
         section=section,
+        max_context_length=max_context_length,
     )
 
 
@@ -323,6 +339,13 @@ def upload():
     ) as f:
         f.write(imgdata)
 
+    pdf = PdfReader(os.path.join(app.root_path, "static", "uploads", f"{uid}.pdf"))
+    number_of_pages = len(pdf.pages)
+    full_text = ""
+    for i in range(number_of_pages):
+        full_text = full_text + pdf.pages[i].extract_text() + " "
+    token_count = num_tokens_from_text(full_text)
+
     document = SmartDocument(
         title=filename,
         path=f"{uid}.pdf",
@@ -330,6 +353,8 @@ def upload():
         user_id=user.user_id,
         space=space,
         folder=folder,
+        token_count=token_count,
+        num_pages=number_of_pages,
     )
     document.save()
 
@@ -896,3 +921,66 @@ def create_folder():
         uuid=uuid.uuid4().hex,
     )
     return redirect("/home")
+
+
+####### Feedback #######
+@app.route("/feedback", methods=["POST"])
+def feedback():
+
+    user = load_user()
+    user_id = user.user_id
+    data = request.get_json()
+
+    feedback_type = data.get("feedback_type")
+    question = data.get("question")
+    answer = data.get("answer")
+    context = data.get("context")
+    context = " ".join(context)
+    docs_uuids = data.get("docs_uuids")
+
+    print("feedback_type", feedback_type)
+    print("question", question)
+    print("docs_uuids", docs_uuids)
+    feedback = Feedback(
+        user_id=user_id,
+        feedback=feedback_type,
+        question=question,
+        answer=answer,
+        context=context,
+        docs_uuids=docs_uuids,
+    )
+
+    feedback.save()
+
+    # Maintain feedback count
+    feedback_counter = FeedbackCounter.objects().first()
+
+    if not feedback_counter:
+        feedback_counter = FeedbackCounter(count=0)
+
+    feedback_counter.count += 1
+    feedback_counter.save()
+    max_feedback_count = 10
+
+    print("feedback_counter", feedback_counter.count)
+
+    if feedback_counter.count >= max_feedback_count:
+        feedback_counter.count = 0  # Reset count after 10 feedbacks
+        feedback_counter.save()
+
+        # feedback_list = Feedback.objects().order_by("-id")[
+        #     :max_feedback_count
+        # ]  # Get latest 10 feedbacks
+
+        feedback_list = Feedback.objects().all()
+
+        root_path = app.root_path
+        process = mp.Process(
+            target=background_retrain_model, args=(feedback_list, root_path)
+        )
+        process.start()
+
+    response = {
+        "complete": True,
+    }
+    return jsonify(response)

@@ -1,8 +1,9 @@
 <script>
     var askingDocument = '';
     var document_uuids = [];
+  var maxContextLength = parseInt("{{max_context_length}}");
 
-  var folder_uuid = "{{current_folder_id}}"
+   var folder_uuid = "{{current_folder_id}}"
 
 
     document_uuids = [
@@ -269,7 +270,7 @@
 
 
         // call this function to refresh the document selection on load
-      updateDocumentSelections();
+        updateDocumentSelections();
 
         $('.file').on('click', function(e) {
             e.stopPropagation();
@@ -303,6 +304,7 @@
             var checkedCheckboxes = $('.document-selector:checked');
             console.log("Updating document selections", checkedCheckboxes);
             var totalDocs = 0;
+            // var totalTokenCounts = 0;
             var uuids = [];
 
             for (var i = 0; i < checkedCheckboxes.length; i++) {
@@ -312,6 +314,7 @@
                 }
                 var numDocs = checkbox.attributes['data-num-documents'].value
                 totalDocs += parseInt(numDocs);
+                // totalTokenCounts += parseInt(checkbox.attributes['data-token-count'].value);
 
                 if (checkbox.attributes['data-doc-uuid'] != undefined) {
                     uuids.push(checkbox.attributes['data-doc-uuid'].value);
@@ -334,14 +337,31 @@
                 }
             }
 
-            
+
 
             console.log("Reset uuids");
             document_uuids = uuids;
 
+            var contextLengthWarning = `
+                                     <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>
+            `
+
             var counters = $('.doc-selected-counter')
             for (var i = 0; i < counters.length; i++) {
+                if(totalDocs == 0) {
+                    counters[i].textContent = `Select documents to start the conversation`;
+                } else if (totalDocs == 1) {
+                    // counters[i].textContent = `${totalDocs} document selected (${totalTokenCounts} tokens)`;
+                    counters[i].textContent = `${totalDocs} document selected`;
+
+
+                } else {
+                    // counters[i].textContent = `${totalDocs} documents selected (${totalTokenCounts} tokens)`;
                 counters[i].textContent = `${totalDocs} documents selected`;
+                }
+                // if (totalTokenCounts > maxContextLength) {
+                //     counters[i].innerHTML += contextLengthWarning;
+                // }
             }
         }
 
