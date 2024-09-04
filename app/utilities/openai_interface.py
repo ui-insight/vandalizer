@@ -3,7 +3,11 @@ from pathlib import Path
 import openai
 import chardet
 from PyPDF2 import PdfReader
-from app.utilities.prompt_optimization import dspy_model, simple_qa_model
+from app.utilities.prompt_optimization import (
+    dspy_model,
+    simple_qa_model,
+    proposal_review_model,
+)
 import tiktoken
 
 # 128K is the max context length for the GPT-4o model
@@ -110,11 +114,15 @@ class OpenAIInterface:
     ):
 
         full_text = ""
+        proposal_text = ""
         if len(default_docs) > 0:
             # full_text += "# Default Context: "
             for doc in default_docs:
                 full_path = os.path.join(root_path, "static", "uploads", doc.path)
-                full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
+                # full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
+                proposal_text = (
+                    "\n\nProposal: " + extract_text_from_pdf(full_path) + " "
+                )
 
         # if len(documents) > 0:
         # full_text += "# Additional Context: "
@@ -144,12 +152,20 @@ class OpenAIInterface:
 
             persistent_directory = Path(root_path) / "static" / "uploads"
             collection_name = "chat_dspy_model"
-            model = dspy_model(full_text, collection_name, persistent_directory)
-            response = model(question=question)
+            rag_model = dspy_model(full_text, collection_name, persistent_directory)
+            response = rag_model(question=question)
+
+            print("dspy response: ", response.answer)
+
+            review_model = proposal_review_model()
+            response = review_model(
+                proposal=proposal_text, question=question, context=response.answer
+            )
+            print("review response: ", response.answer)
+
             output_prompt = (
                 formatting_prompt + question + "\n\nAnwsers: " + response.answer
             )
-            print("dspy response: ", response.answer)
             # print("dspy model generated queries: ", queries)
             completion = openai.chat.completions.create(
                 model="gpt-4o",
@@ -166,6 +182,12 @@ class OpenAIInterface:
         else:
             simple_qa = simple_qa_model()
             response = simple_qa(question=question, full_text=full_text)
+
+            review_model = proposal_review_model()
+            response = review_model(
+                proposal=proposal_text, question=question, context=response.answer
+            )
+
             output_prompt = (
                 formatting_prompt + question + "\n\nAnwsers: " + response.answer
             )
