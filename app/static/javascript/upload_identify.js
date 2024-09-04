@@ -55,7 +55,13 @@ $("#loading-area")
 function showFile() {
   console.log("beginning upload");
   let fileType = file.type; //getting selected file type
-  let validExtensions = ["application/pdf"]; //adding some valid image extensions in array
+  console.log("file type: " + fileType);
+  console.log("file ", file);
+  let validExtensions = [
+    "application/pdf", // PDF
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // Word
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // Excel
+  ]; //adding some valid image extensions in array
   if (validExtensions.includes(fileType)) {
     //if user selected file is an image file
     let fileReader = new FileReader(); //creating new FileReader object
@@ -68,12 +74,15 @@ function showFile() {
       $("#drag-area").hide();
       var filetype = file.type;
       var filename = file.name;
+      const extension = filename.split(".").pop();
+      console.log("extension: ", extension);
       var base64String = getB64Str(fileURL);
 
       var model = {
         contentType: filetype,
         contentAsBase64String: base64String,
         fileName: filename,
+        extension: extension,
         space: $("#current-space-id")[0].innerHTML,
         folder: $("#current-folder-id")[0].innerHTML,
       };
@@ -95,10 +104,9 @@ function showFile() {
 
           if (result.uuid == null) {
             showToast("Document already uploaded");
-            return
+            return;
           }
 
-         
           let newRow = $("<tr>");
           let newCell = $("<td>");
           let newLink = $("<a>")
@@ -215,7 +223,6 @@ $(document).ready(function () {
     console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
     let renameModal = $("#renameModal");
 
-
     $("#renameBtn")
       .off("click")
       .on("click", function () {
@@ -235,7 +242,7 @@ $(document).ready(function () {
     $("#renameModal").show();
     $("#newName")[0].value = "";
     $("#newName")[0].focus();
-    
+
     hidePopupMenu();
   });
 

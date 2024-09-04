@@ -15,6 +15,7 @@ class User(me.Document):
 class SmartDocument(me.Document):
     path = me.StringField(required=True, max_length=200)
     title = me.StringField(required=True, max_length=200)
+    extension = me.StringField(default="pdf", max_length=10)
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)

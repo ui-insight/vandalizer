@@ -141,14 +141,31 @@ class GenerateSearchQuery(dspy.Signature):
     )
 
 
+class MeaninglessQuestion(dspy.Signature):
+    """Check if the question is meaningless."""
+
+    question = dspy.InputField()
+    meaningless = dspy.OutputField(desc="Yes or No")
+
+
 class SimpleQA(dspy.Module):
     def __init__(self):
         super().__init__()
         self.model = dspy.ChainOfThought("context, question -> answer")
+        self.meaningless = dspy.ChainOfThought(MeaninglessQuestion)
 
     def forward(self, question: str, full_text: str):
-        pred = self.model(context=full_text, question=question)
-        return dspy.Prediction(context=full_text, answer=pred.answer, question=question)
+        if self.meaningless(question=question).meaningless == "Yes":
+            return dspy.Prediction(
+                context=full_text,
+                answer="I'm sorry, I can't answer that question.",
+                question=question,
+            )
+        else:
+            pred = self.model(context=full_text, question=question)
+            return dspy.Prediction(
+                context=full_text, answer=pred.answer, question=question
+            )
 
 
 def simple_qa_model():
@@ -194,6 +211,32 @@ class MultiHopQAModel(dspy.Module):
 
         pred = dspy.Prediction(context=context, answer=pred.answer, question=question)
         return pred
+
+
+class ProposalReview(dspy.Signature):
+    """Review the proposal based on the question and provided context."""
+
+    question = dspy.InputField()
+    context = dspy.InputField(desc="may contain relevant facts")
+    proposal = dspy.InputField()
+    review = dspy.OutputField()
+
+
+class ReviewerModel(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.model = dspy.ChainOfThought(ProposalReview)
+
+    def forward(self, proposal: str, context: str, question: str):
+        pred = self.model(proposal=proposal, context=context, question=question)
+        return dspy.Prediction(context=context, answer=pred.review, question=question)
+
+
+def proposal_review_model():
+    llm = dspy.OpenAI(model="gpt-4o")
+    dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
+    model = ReviewerModel()
+    return model
 
 
 def dspy_model(

@@ -1,5 +1,6 @@
 import urllib.parse
 from app.utilities.prompt_optimization import background_retrain_model
+from app.utilities.excel_helper import save_excel_to_html
 from flask import (
     url_for,
     send_file,
@@ -55,6 +56,8 @@ from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
 from flask_dance.contrib.azure import azure, make_azure_blueprint
 
 from mongoengine.queryset.visitor import Q
+
+import pypandoc
 
 blueprint = make_azure_blueprint(
     client_id=app.config["CLIENT_ID"],
@@ -310,9 +313,13 @@ def upload():
     if user is None:
         return redirect(url_for("login"))
 
+    # TODO convert docx documents to pdf using pypandoc (pypandoc.convert_file)
+    # TODO convert excel documents to csv using pandas (pd.read_excel)
+
     json_data = request.get_json()
     blob = json_data["contentAsBase64String"]
     filename = json_data["fileName"]
+    extension = json_data["extension"]
     space = json_data["space"]
     folder = json_data["folder"]
 
@@ -331,30 +338,42 @@ def upload():
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
-    # create upload directory if it doesn't exist
-    if not os.path.exists(os.path.join(app.root_path, "static", "uploads")):
-        os.makedirs(os.path.join(app.root_path, "static", "uploads"))
+
     with open(
-        os.path.join(app.root_path, "static", "uploads", f"{uid}.pdf"), "wb"
+        os.path.join(app.root_path, "static", "uploads", f"{uid}.{extension}"), "wb"
     ) as f:
         f.write(imgdata)
 
-    pdf = PdfReader(os.path.join(app.root_path, "static", "uploads", f"{uid}.pdf"))
-    number_of_pages = len(pdf.pages)
-    full_text = ""
-    for i in range(number_of_pages):
-        full_text = full_text + pdf.pages[i].extract_text() + " "
-    token_count = num_tokens_from_text(full_text)
+    # create upload directory if it doesn't exist
+    if not os.path.exists(os.path.join(app.root_path, "static", "uploads")):
+        os.makedirs(os.path.join(app.root_path, "static", "uploads"))
+
+    if extension == "docx":
+        # convert to pdf
+        pdf_path = os.path.join(app.root_path, "static", "uploads", f"{uid}.pdf")
+        docx_path = os.path.join(app.root_path, "static", "uploads", f"{uid}.docx")
+        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
+        extension = "pdf"
+
+    elif extension == "xlsx" or extension == "xls":
+        # convert to html
+        html_path = os.path.join(app.root_path, "static", "uploads", f"{uid}.html")
+        excel_path = os.path.join(
+            app.root_path, "static", "uploads", f"{uid}.{extension}"
+        )
+        save_excel_to_html(excel_path, html_path)
+        extension = "html"
 
     document = SmartDocument(
         title=filename,
-        path=f"{uid}.pdf",
+        path=f"{uid}.{extension}",
+        extension=extension,
         uuid=uid,
         user_id=user.user_id,
         space=space,
         folder=folder,
-        token_count=token_count,
-        num_pages=number_of_pages,
+        # token_count=token_count,
+        # num_pages=number_of_pages,
     )
     document.save()
 
@@ -861,7 +880,11 @@ def load_user():
             user.save()
             print("Built new user" + user.user_id)
             return user
-    return None
+    # return None
+    # Create a admin
+    user = User(user_id="0", is_admin=True)
+    user.save()
+    return user
 
 
 @app.route("/files/delete_folder", methods=["GET"])
