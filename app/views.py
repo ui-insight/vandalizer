@@ -426,6 +426,7 @@ def chat():
         if document != None:
             documents.append(document)
 
+    print("Documents", [document.extension for document in documents])
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 

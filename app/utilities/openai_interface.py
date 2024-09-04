@@ -71,6 +71,18 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 
+def extract_text_from_html(html_path):
+    with open(html_path, "r", encoding="utf-8") as file:
+        return file.read()
+
+
+def extract_text_from_doc(doc, doc_path):
+    if doc.extension == "pdf" or doc.extension == "docx":
+        return extract_text_from_pdf(doc_path)
+    elif doc.extension == "html":
+        return extract_text_from_html(doc_path)
+
+
 # TODO we might need to rename the class
 class OpenAIInterface:
     loaded_doc = ""
@@ -121,7 +133,7 @@ class OpenAIInterface:
                 full_path = os.path.join(root_path, "static", "uploads", doc.path)
                 # full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
                 proposal_text = (
-                    "\n\nProposal: " + extract_text_from_pdf(full_path) + " "
+                    "\n\nProposal: " + extract_text_from_doc(doc, full_path) + " "
                 )
 
         # if len(documents) > 0:
@@ -129,7 +141,9 @@ class OpenAIInterface:
 
         for document in documents:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
-            full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
+            full_text += (
+                "\n\nDocument: " + extract_text_from_doc(document, full_path) + " "
+            )
 
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = (
@@ -157,11 +171,11 @@ class OpenAIInterface:
 
             print("dspy response: ", response.answer)
 
-            review_model = proposal_review_model()
-            response = review_model(
-                proposal=proposal_text, question=question, context=response.answer
-            )
-            print("review response: ", response.answer)
+            # review_model = proposal_review_model()
+            # response = review_model(
+            #     proposal=proposal_text, question=question, context=response.answer
+            # )
+            # print("review response: ", response.answer)
 
             output_prompt = (
                 formatting_prompt + question + "\n\nAnwsers: " + response.answer
@@ -183,10 +197,10 @@ class OpenAIInterface:
             simple_qa = simple_qa_model()
             response = simple_qa(question=question, full_text=full_text)
 
-            review_model = proposal_review_model()
-            response = review_model(
-                proposal=proposal_text, question=question, context=response.answer
-            )
+            # review_model = proposal_review_model()
+            # response = review_model(
+            #     proposal=proposal_text, question=question, context=response.answer
+            # )
 
             output_prompt = (
                 formatting_prompt + question + "\n\nAnwsers: " + response.answer

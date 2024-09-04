@@ -1,127 +1,144 @@
 <script>
-    $('#semantic-panel').hide();
-    var highlightTerms = [];
-    var searchTerm = "";
-    var current_search_item = 0;
-    needsScroll = true;
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'static/javascript/pdf.worker.js';
+     $('#semantic-panel').hide();
+     var highlightTerms = [];
+     var searchTerm = "";
+     var current_search_item = 0;
+     needsScroll = true;
+     pdfjsLib.GlobalWorkerOptions.workerSrc = 'static/javascript/pdf.worker.js';
 
-    var pdfDoc = null,
-        pageNum = 1,
-        pageRendering = false,
-        pdfContainer = document.getElementById('document');
+     var pdfDoc = null,
+         pageNum = 1,
+         pageRendering = false,
+         pdfContainer = document.getElementById('document');
 
-    function renderPage(num) {
-        pageRendering = true;
-        pdfDoc.getPage(num).then(function (page) {
-            const container = document.createElement('div');
-            container.style.position = "relative";
-            const canvas = document.createElement('canvas');
-            container.appendChild(canvas);
-            container.appendChild(document.createElement('div'));
-            pdfContainer.appendChild(container);
-            pdfDoc.getPage(num).then(function (page) {
-                var scale = 1.2;
-                var viewport = page.getViewport({ scale: scale, });
-                var context = canvas.getContext('2d');
-                var aspect = viewport.width / viewport.height;
+     function renderPage(num) {
+         pageRendering = true;
+         pdfDoc.getPage(num).then(function (page) {
+             const container = document.createElement('div');
+             container.style.position = "relative";
+             const canvas = document.createElement('canvas');
+             container.appendChild(canvas);
+             container.appendChild(document.createElement('div'));
+             pdfContainer.appendChild(container);
+             pdfDoc.getPage(num).then(function (page) {
+                 var scale = 1.2;
+                 var viewport = page.getViewport({ scale: scale, });
+                 var context = canvas.getContext('2d');
+                 var aspect = viewport.width / viewport.height;
 
-                canvas.width = Math.floor(pdfContainer.clientWidth - 100.0);
-                canvas.height = Math.floor((pdfContainer.clientWidth - 100.0) / aspect);
-                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
-                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
+                 canvas.width = Math.floor(pdfContainer.clientWidth - 100.0);
+                 canvas.height = Math.floor((pdfContainer.clientWidth - 100.0) / aspect);
+                 //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
+                 //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
 
 
-                var renderContext = {
-                    canvasContext: context,
+                 var renderContext = {
+                     canvasContext: context,
 
-                    viewport: viewport
-                };
-                var renderTask = page.render(renderContext);
+                     viewport: viewport
+                 };
+                 var renderTask = page.render(renderContext);
 
-               
 
-                renderTask.promise.then(function () {
-                    pageRendering = false;
-                    highlightText(page, highlightTerms, viewport, container);
-                });
-            })
-        });
-    }
 
-    function highlightText(page, highlightTerms, viewport, canvas) {
-        if (highlightTerms == []) {
-            return;
-        }
+                 renderTask.promise.then(function () {
+                     pageRendering = false;
+                     highlightText(page, highlightTerms, viewport, container);
+                 });
+             })
+         });
+     }
 
-        page.getTextContent().then(function (textContent) {
-            textContent.items.forEach(function (textItem) {
-                textString = textItem.str;
-                // Check if textString includes anything in highlightTerms array
-                var phrase = highlightTerms.find(function (phrase) {
-                    return textString.includes(phrase);
-                });
+     function highlightText(page, highlightTerms, viewport, canvas) {
+         if (highlightTerms == []) {
+             return;
+         }
 
-                if (phrase != undefined) {
-                    console.log(phrase);
-                    // Create highlight div
-                    var highlight = document.createElement('div');
-                    highlight.style.position = 'absolute';
+         page.getTextContent().then(function (textContent) {
+             textContent.items.forEach(function (textItem) {
+                 textString = textItem.str;
+                 // Check if textString includes anything in highlightTerms array
+                 var phrase = highlightTerms.find(function (phrase) {
+                     return textString.includes(phrase);
+                 });
 
-                    // Adjust the position and size according to the scale of the viewport
-                    var adjustedX = textItem.transform[4] * viewport.scale;
-                    var adjustedY = viewport.height - (textItem.transform[5] * viewport.scale) - (textItem.height * viewport.scale);
+                 if (phrase != undefined) {
+                     console.log(phrase);
+                     // Create highlight div
+                     var highlight = document.createElement('div');
+                     highlight.style.position = 'absolute';
 
-                    highlight.style.left = adjustedX + 'px';
-                    highlight.style.top = adjustedY + 'px';
-                    highlight.style.width = (textItem.width * viewport.scale) + 'px';
-                    highlight.style.height = (textItem.height * viewport.scale) + 'px';
-                    highlight.style.backgroundColor = 'yellow';
-                    highlight.style.opacity = 0.5; // Making it semi-transparent
-                    highlight.className = 'highlight';
-                    // Append to the container
-                    canvas.appendChild(highlight);
-                }
-            });
+                     // Adjust the position and size according to the scale of the viewport
+                     var adjustedX = textItem.transform[4] * viewport.scale;
+                     var adjustedY = viewport.height - (textItem.transform[5] * viewport.scale) - (textItem.height * viewport.scale);
 
-            highlights = $('.highlight');
-            if (highlights.length == 0) {
-                $('#semantic-panel').hide();
-            } else {
-                $('#semantic-panel').show();
-                $('#semantic-panel-term').text(searchTerm);
-                $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
-                
-                if (needsScroll) {
-                    needsScroll = false;
-                    $('.left-panel').animate({
-                        scrollTop: highlights[current_search_item].style.top
-                    }, 1000);
-                }
-            }
-        });
-    }
+                     highlight.style.left = adjustedX + 'px';
+                     highlight.style.top = adjustedY + 'px';
+                     highlight.style.width = (textItem.width * viewport.scale) + 'px';
+                     highlight.style.height = (textItem.height * viewport.scale) + 'px';
+                     highlight.style.backgroundColor = 'yellow';
+                     highlight.style.opacity = 0.5; // Making it semi-transparent
+                     highlight.className = 'highlight';
+                     // Append to the container
+                     canvas.appendChild(highlight);
+                 }
+             });
 
-    {% if documents|length > 0 %}
+             highlights = $('.highlight');
+             if (highlights.length == 0) {
+                 $('#semantic-panel').hide();
+             } else {
+                 $('#semantic-panel').show();
+                 $('#semantic-panel-term').text(searchTerm);
+                 $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
 
-    pdfjsLib.getDocument('/static/uploads/{{ documents[0].path }}').promise.then(function (pdfDoc_) {
-        pdfDoc = pdfDoc_;
-        
-        renderPDF();
-    });
-    {% endif %}
+                 if (needsScroll) {
+                     needsScroll = false;
+                     $('.left-panel').animate({
+                         scrollTop: highlights[current_search_item].style.top
+                     }, 1000);
+                 }
+             }
+         });
+     }
 
-    function renderPDF() {
-        pdfContainer.innerHTML = '';
-        current_search_item = 0;
-        needsScroll = false;
+  {% if documents|length > 0 %}
 
-        if (pdfDoc == null) {
-            return;
-        }
-        
-        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
-            renderPage(pageNumber);
-        }
-    }
+  console.log("rendering pdf")
+  console.log("{{ documents[0].path }}");
+  // check if the document is a pdf
+  const document_path = "{{ documents[0].path }}";
+  const extension = document_path.split('.').pop();
+  console.log("extension: " + extension);
+
+
+  if(extension == "pdf"){
+      pdfjsLib.getDocument('/static/uploads/{{ documents[0].path }}').promise.then(function (pdfDoc_) {
+          pdfDoc = pdfDoc_;
+
+          renderPDF();
+      });
+  } else if (extension == "html"){
+      console.log("rendering html")
+      var iframe = document.createElement('iframe');
+      iframe.src = '/static/uploads/{{ documents[0].path }}';
+      iframe.width = "100%";
+      iframe.height = "100%";
+      pdfContainer.appendChild(iframe);
+  }
+     {% endif %}
+
+     function renderPDF() {
+         pdfContainer.innerHTML = '';
+         current_search_item = 0;
+         needsScroll = false;
+
+         if (pdfDoc == null) {
+             return;
+         }
+
+         for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+             renderPage(pageNumber);
+         }
+     }
 </script>
