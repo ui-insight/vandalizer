@@ -131,6 +131,7 @@ class OpenAIInterface:
             # full_text += "# Default Context: "
             for doc in default_docs:
                 full_path = os.path.join(root_path, "static", "uploads", doc.path)
+                print("full path: ", full_path)
                 # full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
                 proposal_text = (
                     "\n\nProposal: " + extract_text_from_doc(doc, full_path) + " "
@@ -141,6 +142,7 @@ class OpenAIInterface:
 
         for document in documents:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
+            print("full path: ", full_path)
             full_text += (
                 "\n\nDocument: " + extract_text_from_doc(document, full_path) + " "
             )
