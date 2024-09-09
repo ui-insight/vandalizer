@@ -425,6 +425,28 @@ def chat():
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
             documents.append(document)
+            # find related html documents (excel converted to html)
+            if document.extension == "html":
+                html_files = [
+                    f
+                    for f in os.listdir(
+                        os.path.join(app.root_path, "static", "uploads")
+                    )
+                    if f.startswith(document.uuid)
+                    and f != document.path
+                    and f.endswith(".html")
+                ]
+                for html_file in html_files:
+                    html_doc = SmartDocument(
+                        title=document.title,
+                        path=html_file,
+                        extension="html",
+                        uuid=uuid.uuid4().hex,
+                        user_id=document.user_id,
+                        space=document.space,
+                        folder=document.folder,
+                    )
+                    documents.append(html_doc)
 
     print("Documents", [document.extension for document in documents])
     # default context docs
@@ -707,6 +729,15 @@ def delete_documents():
     document.delete()
     semantics = SemanticIngest()
     semantics.delete(document)
+    if document.extension == "html":
+        # delete html files lmke doc_uuid-*.html
+        html_files = [
+            f
+            for f in os.listdir(os.path.join(app.root_path, "static", "uploads"))
+            if f.startswith(document.uuid)
+        ]
+        for html_file in html_files:
+            os.remove(os.path.join(app.root_path, "static", "uploads", html_file))
     folder_id = request.args.get("folder_id")
     if folder_id:
         return redirect("/home?folder_id=" + folder_id)

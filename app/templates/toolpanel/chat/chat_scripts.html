@@ -35,7 +35,11 @@
     e.preventDefault();
     console.log("chat button clicked");
     if (document_uuids != "") {
-      performChat(document_uuids, "Summarize this document", folder_uuid);
+      performChat(
+        document_uuids,
+        "Summarize the provided document(s)",
+        folder_uuid,
+      );
       return;
     } else {
       showToast("Select a document to chat");
