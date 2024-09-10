@@ -141,3 +141,10 @@ class Feedback(me.Document):
 
 class FeedbackCounter(me.Document):
     count = me.IntField(default=0)
+
+
+class Conversation(me.Document):
+    user_id = me.StringField(required=True, max_length=200)
+    question = me.StringField(required=True, max_length=500000)
+    answer = me.StringField(required=True, max_length=500000)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
