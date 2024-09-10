@@ -119,7 +119,7 @@ def home():
     #         session["user_id"] = user_id
 
     user = load_user()
-    section = request.args.get("section", default="Extract").strip()
+    section = request.args.get("section", default="Chat").strip()
     print(section)
 
     document = None
@@ -719,6 +719,19 @@ def rename_folder():
     document = SmartFolder.objects(uuid=document_uuid).first()
     document.title = new_title
     document.save()
+    return jsonify({"complete": True})
+
+
+@app.route("/move_file", methods=["POST"])
+def move_file():
+    data = request.get_json()
+    file_uuid = data["fileUUID"]
+    folder_id = data["folderID"]
+
+    document = SmartDocument.objects(uuid=file_uuid).first()
+    document.folder = folder_id
+    document.save()
+
     return jsonify({"complete": True})
 
 
