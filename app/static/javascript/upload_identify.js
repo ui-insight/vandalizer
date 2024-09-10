@@ -339,54 +339,113 @@ $(document).ready(function () {
   const $fileList = $("#file-list");
   const $loadingIndicator = $("#loading");
   let $draggedItem = null;
-
+  let $dragGhost = null;
+  
   $fileList.on({
     dragstart: function (e) {
-      const $target = $(e.target);
-      if ($target.hasClass("file")) {
+      const $target = $(e.target).closest(".file");
+      if ($target.length) {
         $draggedItem = $target;
         setTimeout(() => $target.addClass("dragging"), 0);
+  
+        // Create ghost element to indicate dragging
+        $dragGhost = $('<div class="drag-ghost">Moving file...</div>');
+        $("body").append($dragGhost);
+        $(document).on("mousemove", moveDragGhost);
       } else {
-        e.preventDefault(); // Prevent dragging folders
+        e.preventDefault(); // Prevent dragging folders or other items
       }
     },
     dragend: function (e) {
       $(e.target).removeClass("dragging");
+      if ($dragGhost) {
+        $dragGhost.remove();
+        $(document).off("mousemove", moveDragGhost);
+      }
     },
     dragover: function (e) {
       e.preventDefault();
-      const $targetItem = $(e.target).closest(".file-item");
-      if ($targetItem.length && $targetItem.hasClass("folder")) {
+      const $targetItem = $(e.target).closest(".folder");
+      if ($targetItem.length) {
         $targetItem.addClass("drag-over");
+      } else {
+        $(".folder").removeClass("drag-over"); // Remove the border from all folders if not dragging over any folder
       }
     },
     dragleave: function (e) {
-      $(e.target).closest(".file-item").removeClass("drag-over");
+      $(e.target).closest(".folder").removeClass("drag-over");
     },
     drop: function (e) {
       e.preventDefault();
-      const $targetItem = $(e.target).closest(".file-item");
-      if (
-        $targetItem.length &&
-        $targetItem.hasClass("folder") &&
-        !$draggedItem.is($targetItem)
-      ) {
+      const $targetItem = $(e.target).closest(".folder");
+      if ($targetItem.length && !$draggedItem.is($targetItem)) {
         $targetItem.removeClass("drag-over");
         $loadingIndicator.show();
-        // Simulating an Ajax call
+  
+        // Call the custom function when file is dropped on folder
+        moveFileToFolder($draggedItem, $targetItem);
+  
         setTimeout(() => {
           $loadingIndicator.hide();
-          alert(
-            `File "${$draggedItem.text()}" moved to "${$targetItem.text()}" folder`,
-          );
-          // In a real application, you would make an actual Ajax call here
-          // and update the UI based on the server response
           $draggedItem.remove();
         }, 1000); // Simulating a 1-second delay
       }
+  
+      // Remove dragging styles
+      $draggedItem.removeClass("dragging");
+      if ($dragGhost) {
+        $dragGhost.remove();
+        $(document).off("mousemove", moveDragGhost);
+      }
+  
+      // Remove any leftover drag-over class from folders
+      $(".folder").removeClass("drag-over");
     },
   });
+  
+  // Function to move the ghost element with the cursor
+  function moveDragGhost(e) {
+    $dragGhost.css({
+      top: e.pageY + 10 + "px",
+      left: e.pageX + 10 + "px",
+    });
+  }
+  
+  // Custom function to handle file move logic
+  function moveFileToFolder($file, $folder) {
+    // Implement any server-side call or other logic here
+    console.log('Moving file');
+    console.log($file);
+    console.log($folder);
+    // Get the data-doc-uuid of the file being moved
+    const fileUUID = $file.find('input:first').data('doc-uuid');
+    
+    // Get the data-folder-id of the target folder
+    const folderID = $folder.find('input:first').data('doc-uuid');
 
+    console.log('File UUID:', fileUUID);
+    console.log('Target Folder ID:', folderID);
+
+    
+    $.ajax({
+      type: "POST",
+      url: "/move_file",
+      data: JSON.stringify({
+        fileUUID: fileUUID,
+        folderID: folderID
+      }),
+      processData: false,
+      contentType: "application/json",
+      dataType: "json",
+      success: function (result) {
+        console.log("rename succeeded");
+        console.log(result);
+        location.reload();
+      },
+    });
+
+  }
+  
   // Prevent opening the default drag-and-drop window in the browser
   $(document).on({
     dragover: function (e) {

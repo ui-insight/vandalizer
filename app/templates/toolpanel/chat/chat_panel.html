@@ -1,17 +1,20 @@
 <div class="tab-content" id="chat-panel" style="{% if section != 'Chat' %}display: none;{% endif %}">
     <p style="font-size: 12px; font-weight: 300; color: #00000077;"  class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></i></p>
     <div class="chat-card-container" style="margin-top: 30px;">
+        <div class="chat-card-suggestion" id="chat-suggestion-3">
+            <i class="fas fa-wrench" style="color: #F1B300;"></i>
+            <p>Teach me how to use Vandalizer on this</p>
+            
+        </div>
         <div class="chat-card-suggestion" id="chat-suggestion-1">
-            <p>Summarize this document</p>
             <i class="fas fa-file-alt" style="color: #d22121bd;"></i>
+            <p>Summarize this document</p>
+            
         </div>
         <div class="chat-card-suggestion" id="chat-suggestion-2">
-            <p>Help me understand what this is about</p>
             <i class="fas fa-question-circle" style="color: #5c21d2bc;"></i>
-        </div>
-        <div class="chat-card-suggestion" id="chat-suggestion-3">
-            <p>Teach me how to use vandalizer on this</p>
-            <i class="fas fa-wrench" style="color: #F1B300;"></i>
+            <p>Help me understand what this is about</p>
+            
         </div>
     </div>
 </div>

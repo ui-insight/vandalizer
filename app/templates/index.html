@@ -150,7 +150,6 @@
                         {% for folder in folders %}
                         <tr class="folder">
                             <td>
-
                                 <span style="margin-right: 10px;"><input type="checkbox" class="document-selector"
                                         data-doc-type="folder" data-doc-uuid="{{ folder.uuid }}" data-doc-uuids="{{ folder.document_uuids() }}"
                                         data-num-documents="{{ folder.number_of_documents() }} "></span>
@@ -223,12 +222,13 @@
         <div id="right-panel-content">
             <div class="tab-container">
                 <ul class="tab-menu">
+                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"
+                        style="padding-right: 5px;"></i>Chat</li>
                     <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt"
                             style="padding-right: 5px;"></i>Extract</li>
                     <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard"
                             style="padding-right: 5px;"></i>Prompt</li>
-                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"
-                            style="padding-right: 5px;"></i>Chat</li>
+                    
                 </ul>
 
                 {% include "toolpanel/extractions/extraction_panel.html" %}

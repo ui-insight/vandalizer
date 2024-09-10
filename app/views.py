@@ -91,7 +91,7 @@ def logout():
 @app.route("/home")
 def home():
     if not azure.authorized:
-        return redirect(url_for("azure.login"))
+    	return redirect(url_for("azure.login"))
     if "user_id" not in session:
         print("No user session")
         resp = azure.get("/v1.0/me")
@@ -105,7 +105,7 @@ def home():
             session["user_id"] = user_id
 
     user = load_user()
-    section = request.args.get("section", default="Extract").strip()
+    section = request.args.get("section", default="Chat").strip()
     print(section)
 
     document = None
@@ -654,6 +654,17 @@ def rename_folder():
     document.save()
     return jsonify({"complete": True})
 
+@app.route("/move_file", methods=["POST"])
+def move_file():
+    data = request.get_json()
+    file_uuid = data["fileUUID"]
+    folder_id = data["folderID"]
+
+    document = SmartDocument.objects(uuid=file_uuid).first()
+    document.folder = folder_id
+    document.save()
+
+    return jsonify({"complete": True})
 
 @app.route("/delete_document", methods=["GET"])
 def delete_documents():
