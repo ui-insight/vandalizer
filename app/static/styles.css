@@ -869,14 +869,30 @@ tr {
   }
 
 .file {
-    cursor: move;
+    cursor: default;
 }
 .dragging {
-    opacity: 0.5;
+    opacity: 0.5; /* Dim the dragged item */
 }
-.drag-over {
-    background-color: #e0e0e0;
+
+.file.drag-over {
 }
+
+.folder.drag-over {
+    border: 2px solid #5c21d2; /* Add dashed border when dragging over */
+}
+
+.drag-ghost {
+    position: absolute;
+    pointer-events: none;
+    background-color: #f1f1f1;
+    border: 1px solid #ccc;
+    padding: 5px;
+    font-size: 12px;
+    opacity: 0.7;
+    z-index: 1000;
+}
+
 #file-loading {
     display: none;
     color: #666;
@@ -889,6 +905,16 @@ tr {
     justify-content: space-between;
     white-space: nowrap;
 }
+
+.file a {
+    cursor: default;
+    text-decoration: none;
+}
+
+.file td:hover {
+    background-color: #a6b5c945;
+}
+
 
 .file-link {
     display: flex;
@@ -975,22 +1001,23 @@ tr {
 
   .chat-card-container {
     display: flex;
+    flex-direction: column;
     justify-content: space-around;
-    gap: 15px;
+    gap: 10px;
 }
 
 .chat-card-suggestion {
 
     background-color: rgba(0, 0, 0, 0.05);
     display: flex;
-    flex-direction: column;
-    justify-content: center;
+    flex-direction: row;
+    justify-content: start;
     align-items: center;
     color: black;
     
     border-radius: 15px;
     text-align: center;
-    padding: 30px 15px;
+    padding: 10px 22px;
     flex: 1;
 }
 
@@ -999,7 +1026,8 @@ tr {
 }
 
 .chat-card-suggestion p {
-    margin-bottom: 10px;
+    margin-left: 15px;
+    margin-top: 10px;
 }
 
 .chat-card-suggestion i {
