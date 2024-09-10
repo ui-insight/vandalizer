@@ -140,7 +140,7 @@ class OpenAIInterface:
             question=question,
         )
 
-    def handle_long_context(self, question, full_text):
+    def handle_long_context(self, question, full_text, root_path):
         print("using dspy model")
         print("question: ", question)
 
@@ -193,7 +193,7 @@ class OpenAIInterface:
         print("docs", documents)
 
         if total_context_length > max_context_length:
-            return self.handle_long_context(question, full_text)
+            return self.handle_long_context(question, full_text, root_path)
 
             # review_model = proposal_review_model()
             # response = review_model(
