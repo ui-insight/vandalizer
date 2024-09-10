@@ -912,11 +912,12 @@ def load_user():
             user.save()
             print("Built new user" + user.user_id)
             return user
-    # return None
-    # Create a admin
-    user = User(user_id="0", is_admin=True)
-    user.save()
-    return user
+    return None
+    # # Create a admin
+    # user = User(user_id="0", is_admin=True)
+    # session["user_id"] = "0"
+    # user.save()
+    # return user
 
 
 @app.route("/files/delete_folder", methods=["GET"])

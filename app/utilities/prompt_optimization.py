@@ -167,6 +167,11 @@ class SimpleQA(dspy.Module):
                 context=full_text, answer=pred.answer, question=question
             )
 
+        # pred = self.model(context=full_text, question=question)
+        # return dspy.Prediction(
+        #     context=full_text, answer=pred.answer, question=question
+        # )
+
 
 def simple_qa_model():
     llm = dspy.OpenAI(model="gpt-4o")

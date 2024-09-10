@@ -10,6 +10,8 @@ from app.utilities.prompt_optimization import (
 )
 import tiktoken
 
+from app.models import Conversation
+
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
 max_context_length = 90000
@@ -121,26 +123,56 @@ class OpenAIInterface:
         )
         return completion.choices[0].message.content
 
+    def format_answer(self, response, question):
+        formatting_prompt = """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
+        output_prompt = formatting_prompt + question + "\n\nAnwsers: " + response.answer
+        # print("dspy model generated queries: ", queries)
+        completion = openai.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": output_prompt}],
+        )
+        print("llm formatted response: ", completion.choices[0].message.content)
+        formatted_answer = completion.choices[0].message.content
+        return dict(
+            context=response.context,
+            answer=response.answer,
+            formatted_answer=formatted_answer,
+            question=question,
+        )
+
+    def handle_long_context(self, question, full_text):
+        print("using dspy model")
+        print("question: ", question)
+
+        persistent_directory = Path(root_path) / "static" / "uploads"
+        collection_name = "chat_dspy_model"
+        rag_model = dspy_model(full_text, collection_name, persistent_directory)
+        response = rag_model(question=question)
+
+        print("dspy response: ", response.answer)
+        return self.format_answer(response, question)
+
+    def handle_short_context(self, question, full_text):
+        simple_qa = simple_qa_model()
+        response = simple_qa(question=question, full_text=full_text)
+
+        print("simple qa response: ", response.answer)
+
+        # review_model = proposal_review_model()
+        # response = review_model(
+        #     proposal=proposal_text, question=question, context=response.answer
+        # )
+
+        return self.format_answer(response, question)
+
     def ask_question_to_documents(
         self, root_path, documents, question, default_docs=[]
     ):
+        default_docs = list(default_docs)
+        documents = list(documents)
 
         full_text = ""
-        proposal_text = ""
-        if len(default_docs) > 0:
-            # full_text += "# Default Context: "
-            for doc in default_docs:
-                full_path = os.path.join(root_path, "static", "uploads", doc.path)
-                print("full path: ", full_path)
-                # full_text += "\n\nDocument: " + extract_text_from_pdf(full_path) + " "
-                proposal_text = (
-                    "\n\nProposal: " + extract_text_from_doc(doc, full_path) + " "
-                )
-
-        # if len(documents) > 0:
-        # full_text += "# Additional Context: "
-
-        for document in documents:
+        for document in default_docs + documents:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
             print("full path: ", full_path)
             full_text += (
@@ -149,29 +181,19 @@ class OpenAIInterface:
 
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = (
-            """Given the following document(s), answer the following question. Return the result as nicely formatted html with supportive information as if to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting.
+            """Given the following document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
             \n\nQuestion: """
             + question
             + "\n\n"
         )
-        print("prompt: ", prompt)
         prompt += full_text
         # use a tiktoken library for more accurate computation of the total token length for the context
         total_context_length = num_tokens_from_text(prompt)
         print("total context length: ", total_context_length)
         print("docs", documents)
-        formatting_prompt = """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', or 'Context' heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
 
         if total_context_length > max_context_length:
-            print("using dspy model")
-            print("question: ", question)
-
-            persistent_directory = Path(root_path) / "static" / "uploads"
-            collection_name = "chat_dspy_model"
-            rag_model = dspy_model(full_text, collection_name, persistent_directory)
-            response = rag_model(question=question)
-
-            print("dspy response: ", response.answer)
+            return self.handle_long_context(question, full_text)
 
             # review_model = proposal_review_model()
             # response = review_model(
@@ -179,43 +201,5 @@ class OpenAIInterface:
             # )
             # print("review response: ", response.answer)
 
-            output_prompt = (
-                formatting_prompt + question + "\n\nAnwsers: " + response.answer
-            )
-            # print("dspy model generated queries: ", queries)
-            completion = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": output_prompt}],
-            )
-            print("llm formatted response: ", completion.choices[0].message.content)
-            formatted_answer = completion.choices[0].message.content
-            return dict(
-                context=response.context,
-                answer=response.answer,
-                formatted_answer=formatted_answer,
-                question=question,
-            )
         else:
-            simple_qa = simple_qa_model()
-            response = simple_qa(question=question, full_text=full_text)
-
-            # review_model = proposal_review_model()
-            # response = review_model(
-            #     proposal=proposal_text, question=question, context=response.answer
-            # )
-
-            output_prompt = (
-                formatting_prompt + question + "\n\nAnwsers: " + response.answer
-            )
-            completion = openai.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": output_prompt}],
-            )
-            formatted_answer = completion.choices[0].message.content
-
-            return dict(
-                context=response.context,
-                answer=response.answer,
-                formatted_answer=formatted_answer,
-                question=question,
-            )
+            return self.handle_short_context(prompt, full_text)
