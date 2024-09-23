@@ -118,17 +118,19 @@ class OpenAIInterface:
             )
 
         completion = openai.chat.completions.create(
-            model="gpt-4o",
+            # model="gpt-4o",
+            model="gpt-4o-2024-08-06",
             messages=[{"role": "user", "content": prompt}],
         )
         return completion.choices[0].message.content
 
     def format_answer(self, response, question):
-        formatting_prompt = """Format the following answer to the given question as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n Question: """
-        output_prompt = formatting_prompt + question + "\n\nAnwsers: " + response.answer
+        formatting_prompt = """Format the following answer as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n"""
+        output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
         # print("dspy model generated queries: ", queries)
         completion = openai.chat.completions.create(
-            model="gpt-4o",
+            # model="gpt-4o",
+            model="gpt-4o-2024-08-06",
             messages=[{"role": "user", "content": output_prompt}],
         )
         print("llm formatted response: ", completion.choices[0].message.content)
@@ -140,7 +142,7 @@ class OpenAIInterface:
             question=question,
         )
 
-    def handle_long_context(self, question, full_text, root_path):
+    def handle_long_context(self, prompt, question, full_text, root_path):
         print("using dspy model")
         print("question: ", question)
 
@@ -152,9 +154,9 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         return self.format_answer(response, question)
 
-    def handle_short_context(self, question, full_text):
+    def handle_short_context(self, prompt, question, full_text):
         simple_qa = simple_qa_model()
-        response = simple_qa(question=question, full_text=full_text)
+        response = simple_qa(question=prompt, full_text=full_text)
 
         print("simple qa response: ", response.answer)
 
@@ -193,7 +195,7 @@ class OpenAIInterface:
         print("docs", documents)
 
         if total_context_length > max_context_length:
-            return self.handle_long_context(question, full_text, root_path)
+            return self.handle_long_context(prompt, question, full_text, root_path)
 
             # review_model = proposal_review_model()
             # response = review_model(
@@ -202,4 +204,4 @@ class OpenAIInterface:
             # print("review response: ", response.answer)
 
         else:
-            return self.handle_short_context(prompt, full_text)
+            return self.handle_short_context(prompt, question, full_text)
