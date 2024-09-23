@@ -174,7 +174,8 @@ class SimpleQA(dspy.Module):
 
 
 def simple_qa_model():
-    llm = dspy.OpenAI(model="gpt-4o")
+    model = "gpt-4o-2024-08-06"
+    llm = dspy.OpenAI(model=model)
     dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
     model = SimpleQA()
     return model
@@ -238,7 +239,8 @@ class ReviewerModel(dspy.Module):
 
 
 def proposal_review_model():
-    llm = dspy.OpenAI(model="gpt-4o")
+    model = "gpt-4o-2024-08-06"
+    llm = dspy.OpenAI(model=model)
     dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
     model = ReviewerModel()
     return model
