@@ -155,22 +155,20 @@ class SimpleQA(dspy.Module):
         self.meaningless = dspy.ChainOfThought(MeaninglessQuestion)
 
     def forward(self, question: str, full_text: str):
-        if self.meaningless(question=question).meaningless == "Yes":
-            return dspy.Prediction(
-                context=full_text,
-                answer="I'm sorry, I can't answer that question.",
-                question=question,
-            )
-        else:
-            pred = self.model(context=full_text, question=question)
-            return dspy.Prediction(
-                context=full_text, answer=pred.answer, question=question
-            )
+        # if self.meaningless(question=question).meaningless == "Yes":
+        #     return dspy.Prediction(
+        #         context=full_text,
+        #         answer="I'm sorry, I can't answer that question.",
+        #         question=question,
+        #     )
+        # else:
+        #     pred = self.model(context=full_text, question=question)
+        #     return dspy.Prediction(
+        #         context=full_text, answer=pred.answer, question=question
+        #     )
 
-        # pred = self.model(context=full_text, question=question)
-        # return dspy.Prediction(
-        #     context=full_text, answer=pred.answer, question=question
-        # )
+        pred = self.model(context=full_text, question=question)
+        return dspy.Prediction(context=full_text, answer=pred.answer, question=question)
 
 
 def simple_qa_model():
