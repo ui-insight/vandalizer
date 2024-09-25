@@ -916,6 +916,12 @@ def build_admin():
 
 
 def load_user():
+    if "dev" in os.environ.get("APP_ENV"):
+        # Create a admin
+        user = User(user_id="0", is_admin=True)
+        session["user_id"] = "0"
+        user.save()
+        return user
     if "user_id" in session:
         user = User.objects(user_id=session["user_id"]).first()
         if user:
@@ -925,12 +931,7 @@ def load_user():
             user.save()
             print("Built new user" + user.user_id)
             return user
-    # return None
-    # Create a admin
-    user = User(user_id="0", is_admin=True)
-    session["user_id"] = "0"
-    user.save()
-    return user
+    return None
 
 
 @app.route("/files/delete_folder", methods=["GET"])

@@ -18,14 +18,18 @@ from langchain.schema import Document
 
 import sys
 
+
 # For prod, change to pysqlite3
-import pysqlite3
 
-sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
-# Turn off caching
-os.environ["DSP_CACHEBOOL"] = "false"
-os.environ["DSP_NOTEBOOK_CACHEDIR"] = os.path.join(os.getcwd(), "cache")
+if "dev" in os.environ.get("APP_ENV") or "dev" in os.uname().nodename:
+    import pysqlite3
+
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+    # Turn off caching
+    os.environ["DSP_CACHEBOOL"] = "false"
+    # create a cache directory in the current working directory
+    os.environ["DSP_CACHEDIR"] = os.path.join(os.getcwd(), "cache")
 
 from app.models import Feedback
 
