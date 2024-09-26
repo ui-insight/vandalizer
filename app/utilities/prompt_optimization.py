@@ -10,12 +10,6 @@ from typing import List
 from datasets import Dataset
 from dspy.datasets import DataLoader
 
-
-# from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from langchain.schema import Document
-
 import sys
 
 
@@ -34,6 +28,10 @@ if "dev" in os.environ.get("APP_ENV") or "dev" in os.uname().nodename:
 from app.models import Feedback
 
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
+# from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain.schema import Document
 
 import chromadb
 
