@@ -1030,7 +1030,7 @@ def feedback():
 
     feedback_counter.count += 1
     feedback_counter.save()
-    max_feedback_count = 5
+    max_feedback_count = 100
 
     print("feedback_counter", feedback_counter.count)
 
@@ -1038,11 +1038,11 @@ def feedback():
         feedback_counter.count = 0  # Reset count after 10 feedbacks
         feedback_counter.save()
 
-        # feedback_list = Feedback.objects().order_by("-id")[
-        #     :max_feedback_count
-        # ]  # Get latest 10 feedbacks
+        feedback_list = Feedback.objects().order_by("-id")[
+            :max_feedback_count
+        ]  # Get latest 10 feedbacks
 
-        feedback_list = Feedback.objects().all()
+        # feedback_list = Feedback.objects().all()
 
         root_path = app.root_path
         process = mp.Process(
