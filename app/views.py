@@ -1030,7 +1030,7 @@ def feedback():
 
     feedback_counter.count += 1
     feedback_counter.save()
-    max_feedback_count = 10
+    max_feedback_count = 5
 
     print("feedback_counter", feedback_counter.count)
 
