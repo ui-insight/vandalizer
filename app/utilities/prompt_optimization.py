@@ -16,7 +16,7 @@ import sys
 # For prod, change to pysqlite3
 
 
-if "dev_prod" == os.environ.get("APP_ENV", None) or "dev" in os.uname().nodename:
+if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
     import pysqlite3
 
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
