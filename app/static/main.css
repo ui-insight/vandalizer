@@ -131,7 +131,6 @@
     font-size: 1.2em;
     min-width: 400px;
     border-collapse: collapse;
-    border-radius: 16px;
     overflow: hidden;
     box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
 }
