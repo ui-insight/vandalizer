@@ -1,6 +1,7 @@
 import urllib.parse
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
+from app.utilities.workflow import build_workflow
 from flask import (
     url_for,
     send_file,
@@ -1056,3 +1057,13 @@ def feedback():
         "complete": True,
     }
     return jsonify(response)
+
+
+#### Workflow ####
+@app.route("/workflow", methods=["GET", "POST"])
+def workflow():
+    workflow_data = request.get_json()
+
+    engine = build_workflow(workflow_data.dict())
+    result = engine.execute()
+    return result

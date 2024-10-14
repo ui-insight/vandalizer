@@ -7,6 +7,21 @@ from pypdf import PdfReader
 from app import app
 
 
+class WorkflowStep(me.Document):
+    name = me.StringField(required=True, max_length=50)
+    data = me.DictField(required=True)
+
+
+class Worklfow(me.Document):
+    name = me.StringField(required=True, max_length=50)
+    description = me.StringField(required=False, max_length=200)
+    user_id = me.StringField(required=True, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+    steps = me.ListField(me.ReferenceField(WorkflowStep))
+    num_executions = me.IntField(default=0)
+
+
 class User(me.Document):
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
