@@ -53,6 +53,12 @@
                 } else if (tabTitle == "Chat") {
                     $('#chat-panel').show();
                     $('#bottom-toolbar-chat').show();
+                } else if (tabTitle == "Workflows") {
+                    $('#workflows-panel').show();
+                    $('#bottom-toolbar-workflows').show();
+                } else if (tabTitle == "Tasks") {
+                    $('#tasks-panel').show();
+                    $('#bottom-toolbar-tasks').show();
                 }
 
             });
@@ -74,6 +80,36 @@
                 $('#attachmentText')[0].value = "";
             });
         });
+
+        $('#add-new_workflow-button').on("click", function () {
+            $('#newWorkflowModal').show();
+            $('#newWorkflowBtn').off('click').on('click', function() {
+                createNewWorkflow();
+                $('#newWorkflowModal').hide();
+            });
+        });
+        
+        function createNewWorkflow() {
+            $.ajax({
+                url: '/api/create_workflow',
+                type: 'POST',
+                data: JSON.stringify({
+                    name: $("#newWorkflowName")[0].value,
+                    description: $("#newWorkflowDescription")[0].value,
+                    space_id: "{{ current_space_id }}"
+                }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (msg) {
+              
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
 
 
         // PERFORM SEARCH

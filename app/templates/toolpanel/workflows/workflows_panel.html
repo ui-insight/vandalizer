@@ -1,0 +1,38 @@
+<div class="tab-content" id="workflows-panel" style="{% if section != 'Workflows' %}display: none;{% endif %}">
+    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+        <p style="font-size: 24px; font-weight: 600;">Workflows</p>
+        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class=""><i>Workflows perform a series of tasks on your selected documents, and output to different formats.</i></p>
+        
+        <div class="search-set-container" style="padding: 15px 0px;">
+            {% for workflow in workflows %}
+            <div class="expandable-container">
+                <div class="set-item" data-uuid="{{ workflow.id }}" data-title="{{ workflow.title }}">
+                    <div class="set-content">
+                
+                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </span>                        
+
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                        
+                            {{
+                            workflow.name }}</p>
+
+                        <p class="set-items" style="text-align: right; ">
+
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        
+
+        
+    </div>
+    <div style="display: none" class="search-results-panel" id="search-results-panel"
+        style="margin: 0px 30px 30px 30px; text-align: left;">
+    </div>
+</div>

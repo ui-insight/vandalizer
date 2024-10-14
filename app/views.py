@@ -25,6 +25,7 @@ from app.models import (
     SmartFolder,
     Feedback,
     FeedbackCounter,
+    Workflow
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -184,6 +185,8 @@ def home():
     ).all()
     extraction_sets = chain(global_extraction_sets, user_extraction_sets)
 
+
+
     # Get the prompt sets
     global_prompt_sets = SearchSet.objects(
         space=current_space.uuid, is_global=True, set_type="prompt"
@@ -195,6 +198,12 @@ def home():
         set_type="prompt",
     ).all()
     prompt_sets = chain(global_prompt_sets, user_prompt_sets)
+
+    # Workflows
+    workflows = Workflow.objects(
+        user_id=user.user_id,
+        #space=current_space.uuid,
+    ).all()
 
     # Get the folders
     current_folder_id = "0"
@@ -249,6 +258,7 @@ def home():
         current_space_id=spaces[0].uuid,
         section=section,
         max_context_length=max_context_length,
+        workflows=workflows,
     )
 
 
@@ -921,9 +931,11 @@ def build_admin():
 def load_user():
     if "dev" in os.environ.get("APP_ENV"):
         # Create a admin
-        user = User(user_id="0", is_admin=True)
+        user = User.objects(user_id="0").first()
+        if not user:
+            user = User(user_id="0", is_admin=True)
+            user.save()
         session["user_id"] = "0"
-        user.save()
         return user
     if "user_id" in session:
         user = User.objects(user_id=session["user_id"]).first()
@@ -1060,6 +1072,16 @@ def feedback():
 
 
 #### Workflow ####
+@app.route("/api/create_workflow", methods=["POST"])
+def add_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow = Workflow(name=workflow_data["name"], description=workflow_data["description"], user_id=session["user_id"])
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
 @app.route("/workflow", methods=["GET", "POST"])
 def workflow():
     workflow_data = request.get_json()
