@@ -1,21 +1,27 @@
 img { width: 100%; }
 
+html {
+    height: 100%;
+}
+
 body {
-    background-color: #F3F4F8;
-    color: #17181abb;
+    background-color: white;
+    color: #191919;
     font-family: "Public Sans",Arial,sans-serif;
     line-height: 1.25;
-    min-height: 100vh;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 
 a {
-    color: #5c21d2bc;
+    color: #f1b300;
 }
 
 
 .btn-primary {
-    background-color: #5c21d2bc;
+    background-color: #f1b300;
 }
 
 .navbar-default {
@@ -879,7 +885,7 @@ tr {
 }
 
 .folder.drag-over {
-    border: 2px solid #5c21d2; /* Add dashed border when dragging over */
+    border: 2px solid #f1b300; /* Add dashed border when dragging over */
 }
 
 .drag-ghost {
@@ -949,7 +955,7 @@ tr {
 }
 
 .default-tag {
-    color: #5c21d2bc;
+    color: #f1b300;
     font-size: 0.8em;
     background-color: #eaeaea;
     border-radius: 15px;
@@ -979,7 +985,7 @@ tr {
     border-radius: 15px;
     margin-bottom: 10px;
     color:white;
-    background-color: #5c21d2bc;
+    background-color: #f1b300;
 }
 
 .chat-response-body > h1:first-of-type,
@@ -992,7 +998,7 @@ tr {
     padding-top: 15px;
     font-size: 18px;
     font-weight: 600;
-    color: #465056;
+    color: white;
     white-space: nowrap; /* Prevents line breaks */
     overflow: hidden; /* Hides overflow text */
     text-overflow: ellipsis; /* Adds ellipsis */
@@ -1014,8 +1020,6 @@ tr {
     justify-content: start;
     align-items: center;
     color: black;
-    
-    border-radius: 15px;
     text-align: center;
     padding: 10px 22px;
     flex: 1;
@@ -1032,4 +1036,27 @@ tr {
 
 .chat-card-suggestion i {
     font-size: 24px;
+}
+
+.btn, .btn-primary {
+    background-color: #f1b300;
+    border-radius: 0px;
+    text-decoration: none;
+    text-align: center;
+    border: 2px solid #f1b300;
+    -webkit-transition: all 0.3s ease 0s;
+    -moz-transition: all 0.3s ease 0s;
+    -o-transition: all 0.3s ease 0s;
+    transition: all 0.3s ease 0s;
+    font-size: 1.15rem;
+    line-height: 1;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #191919;
+    padding: 0.65em;
+    outline-offset: 3px;
+}
+
+.btn:hover , .btn-primary:hover {
+    background-color: white;
 }

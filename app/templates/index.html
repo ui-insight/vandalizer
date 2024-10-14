@@ -55,11 +55,11 @@
     <div class="left-panel">
         <div class="header">
 
-            <div class="row" style="height:100%;">
+            <div class="row" style="height:100%; background-color: #191919;">
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
                     {% if (documents != None) and documents|length > 0 %}
                     <a style="padding-left: 30px; margin-top: 5px;" href="/home">
-                        <span style="font-size: 2em;  color: #687786;">
+                        <span style="font-size: 2em;  color: white;">
                             <i class="fa-solid fa-arrow-left"></i>
                         </span>
                     </a>
@@ -132,7 +132,7 @@
                     <input type="text" style="display: none;" class="add-folder-input-field" id="add-folder-field"
                         name="name" placeholder="New folder name">
                     <button type="submit" id="add-folder-button" class="btn btn-primary"
-                        style="background-color: #5c21d2bc;">Add Folder</button>
+                       >Add Folder</button>
                 </form>
                 <table class="styled-table" id="file-list" style="width: 100%;">
                     <tbody id="doc-body">
@@ -225,26 +225,33 @@
                 <ul class="tab-menu">
                     <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"
                         style="padding-right: 5px;"></i>Chat</li>
-                    <li class="{% if section == 'Extract' %}active{% endif %}"><i class="fas fa-file-alt"
-                            style="padding-right: 5px;"></i>Extract</li>
-                    <li class="{% if section == 'Prompt' %}active{% endif %}"><i class="fas fa-keyboard"
-                            style="padding-right: 5px;"></i>Prompt</li>
+                    <li class="{% if section == 'Workflows' %}active{% endif %}"><i class="fas fa-file-alt"
+                            style="padding-right: 5px;"></i>Workflows</li>
+                    <li class="{% if section == 'Tasks' %}active{% endif %}"><i class="fas fa-keyboard"
+                            style="padding-right: 5px;"></i>Tasks</li>
                     
                 </ul>
 
+                {% include "toolpanel/chat/chat_panel.html" %}
                 {% include "toolpanel/extractions/extraction_panel.html" %}
                 {% include "toolpanel/prompts/prompt_panel.html" %}
-                {% include "toolpanel/chat/chat_panel.html" %}
+                {% include "toolpanel/tasks/tasks_panel.html" %}
+                {% include "toolpanel/workflows/workflows_panel.html" %}
             </div>
+
+            {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
+            {% include "toolpanel/workflows/workflows_bottom_panel.html" %}
         </div>
 
         {% include "toolpanel/extractions/extraction_search_panel.html" %}
         {% include "toolpanel/prompts/prompt_search_panel.html" %}
         {% include "toolpanel/chat/chat_search_panel.html" %}
+        
 
         <div id="snackbar">Copied</div>
         {% include "toolpanel/rename_modal.html" %}
         {% include "toolpanel/attachment_modal.html" %}
+        {% include "toolpanel/workflows/new_workflow_modal.html" %}
     </div>
 </div>
 

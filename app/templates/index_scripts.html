@@ -400,6 +400,10 @@
             $('#attachmentModal').hide();
         });
 
+        $('#closeNewWorkflowBtn').on('click', function() {
+            $('#newWorkflowModal').hide();
+        });
+
         // When the user clicks anywhere outside of the modal, close it
         $(window).on('click', function(event) {
             if ($(event.target).is($('#renameModal'))) {

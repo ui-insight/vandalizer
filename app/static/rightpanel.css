@@ -24,6 +24,14 @@
     z-index: 400;
 }
 
+.left-panel::-webkit-scrollbar {
+  display: none; /* Hides the scrollbar */
+}
+
+.right-panel::-webkit-scrollbar {
+  display: none; /* Hides the scrollbar */
+}
+
 .right-panel .bottom-toolbar {
     position: fixed;
     bottom: 0;
@@ -56,12 +64,12 @@
   }
 
 button.shadow-button {
-    border-radius: 30px;
     border-width: 0px;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     font-size: 20px;
-    font-weight: 600;
-    background-color: white;
+    font-weight: 700;
+    background-color: #f1b300;
+    color: #191919;
     transition: 1s;
     animation-timing-function:cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -144,9 +152,9 @@ button.shadow-button:hover {
 }
 
 .segmented-control input[type="radio"]:checked + label {
-  background: #5c21d2bc;
+  background: #f1b300;
   color: white;
-  border-bottom: 1px solid #5c21d2bc;
+  border-bottom: 1px solid #f1b300;
 }
 
 .segmented-control label:first-of-type {
@@ -177,7 +185,6 @@ button.shadow-button:hover {
   width: 100%;
   height: 100%;
   background-color: white;
-  border-radius: 6px;
   border: 1px solid #d3d3d3;
 }
 
@@ -209,12 +216,10 @@ button.shadow-button:hover {
   position: absolute;
   
   right: 5px;
-  top: 15px;
+  top: 5px;
   height: 40px;
   width: 40px;
   border-width: 0px;
-  background-color: transparent;
-  border-radius: 6px;
   border-width: 0px;
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
@@ -225,8 +230,6 @@ button.shadow-button:hover {
   height: 40px;
   width: 40px;
   border-width: 0px;
-  background-color: transparent;
-  border-radius: 6px;
   border-width: 0px;
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
@@ -243,7 +246,7 @@ button.shadow-button:hover {
   list-style-type: none;
   padding: 0;
   margin: 0;
-  background-color: #ffffff;
+  background-color: #191919;
 
   border-bottom: 1px solid #cccccc48;
 }
@@ -251,17 +254,19 @@ button.shadow-button:hover {
 .tab-menu li {
   flex: 1;
   text-align: center;
-  padding: 15px;
+  padding: 16px;
   cursor: pointer;
+  color: white;
+  font-weight: 700;
 }
 
 .tab-menu li:hover {
-  background-color: #ddd;
+  background-color: #f1b300;
 }
 
 .tab-menu li.active {
-  background-color: #5c21d2bc;
-  color: white;
+  background-color: #f1b300;
+  color: black;
 }
 
 .tab-content {
@@ -308,4 +313,98 @@ button.shadow-button:hover {
 
 .button-container {
   padding: 10px 0;
+}
+
+
+.workflow-container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  width: 100%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.trigger {
+  background-color: #404040;
+  color: white;
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+  margin-bottom: 20px;
+  font-weight: bold;
+}
+
+.workflow-step {
+  display: flex;
+  align-items: center;
+  background-color: #f7f7f7;
+  padding: 15px;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  position: relative;
+  border: 1px solid #ddd;
+}
+
+.step-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.step-header span:first-child {
+  font-weight: bold;
+}
+
+.attachment-info,
+.item-info,
+.output-info {
+  color: #888;
+  font-size: 0.9em;
+}
+
+.step-icon img {
+  width: 30px;
+  height: 30px;
+}
+
+.add-step {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.add-step button {
+  background-color: #6a1b9a;
+  color: white;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: space-between;
+}
+
+.action-button {
+  background-color: #4A90E2;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 8px;
+  font-size: 0.9em;
+  cursor: pointer;
+  flex: 1;
+  margin: 0 5px;
+}
+
+.action-button:nth-child(2) {
+  background-color: #FF9800;
+}
+
+.action-button:nth-child(3) {
+  background-color: #673AB7;
 }

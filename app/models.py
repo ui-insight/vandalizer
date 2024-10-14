@@ -12,7 +12,7 @@ class WorkflowStep(me.Document):
     data = me.DictField(required=True)
 
 
-class Worklfow(me.Document):
+class Workflow(me.Document):
     name = me.StringField(required=True, max_length=50)
     description = me.StringField(required=False, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
@@ -20,6 +20,7 @@ class Worklfow(me.Document):
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     steps = me.ListField(me.ReferenceField(WorkflowStep))
     num_executions = me.IntField(default=0)
+    space = me.StringField(required=False, max_length=100)
 
 
 class User(me.Document):
