@@ -1065,5 +1065,5 @@ def workflow():
     workflow_data = request.get_json()
 
     engine = build_workflow(workflow_data.dict())
-    result = engine.execute()
-    return result
+    output, data = engine.execute()
+    return {"output": output, "steps": data}
