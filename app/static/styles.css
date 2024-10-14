@@ -974,7 +974,6 @@ tr {
 
 .message-response {
     padding: 15px;
-    border-radius: 15px;
     margin-bottom: 15px;
     color: black;
     background-color: #00000008;
@@ -982,10 +981,10 @@ tr {
 
 .message-you {
     padding: 15px;
-    border-radius: 15px;
     margin-bottom: 10px;
-    color:#191919;
-    background-color: #f1b300;
+    color:white;
+    background-color: #191919;
+    border-left: 7px solid #f1b300;
 }
 
 .chat-response-body > h1:first-of-type,
