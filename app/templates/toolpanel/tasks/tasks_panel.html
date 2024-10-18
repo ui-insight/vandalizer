@@ -1,9 +1,9 @@
 <div class="tab-content" id="tasks-panel" style="{% if section != 'Tasks' %}display: none;{% endif %}">
     <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-        <p style="font-size: 24px; font-weight: 600;">Tasks</p>
+        <p style="font-size: 24px; font-weight: 700;">Tasks</p>
         <p style="font-size: 12px; font-weight: 300; color: #00000077;" class=""><i>Tasks perform extractions and prompts on your selected documents, and output to different formats.</i></p>
-       
         <div class="search-set-container" style="padding: 30px 0px;">
+            <p style="font-size: 18px; font-weight: 500;">Extraction Sets</p>
             {% for search_set in extraction_sets %}
             <div class="expandable-container">
                 <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
@@ -22,8 +22,43 @@
                             search_set.title }}</p>
 
                         <p class="set-items" style="text-align: right; ">
+                            {% if search_set.item_count() == 0 %}
+                                <span><i style="color: #00000077;">setup</i></span>
+                            {% else %}
                             <span>{{ search_set.item_count() }}
                                 items</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Prompt Sets</p>
+            {% for prompt_set in prompt_sets %}
+            <div class="expandable-container">
+                <div class="set-item" data-uuid="{{ prompt_set.uuid }}" data-title="{{ prompt_set.title }}">
+                    <div class="set-content">
+                
+                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </span>                        
+
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                            {% if prompt_set.is_global %}
+                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                        {% endif %}
+                            {{
+                                prompt_set.title }}</p>
+
+                        <p class="set-items" style="text-align: right; ">
+                            {% if prompt_set.item_count() == 0 %}
+                            <span><i style="color: #00000077;">setup</i></span>
+                        {% else %}
+                        <span>{{ prompt_set.item_count() }}
+                            items</span>
+                        {% endif %}
                         </p>
                     </div>
                 </div>
@@ -32,8 +67,5 @@
         </div>
 
         
-    </div>
-    <div style="display: none" class="search-results-panel" id="search-results-panel"
-        style="margin: 0px 30px 30px 30px; text-align: left;">
     </div>
 </div>

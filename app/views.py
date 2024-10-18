@@ -183,8 +183,8 @@ def home():
         is_global=False,
         set_type="extraction",
     ).all()
-    extraction_sets = chain(global_extraction_sets, user_extraction_sets)
-
+    extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
+    
 
 
     # Get the prompt sets
@@ -197,7 +197,7 @@ def home():
         is_global=False,
         set_type="prompt",
     ).all()
-    prompt_sets = chain(global_prompt_sets, user_prompt_sets)
+    prompt_sets = list(chain(global_prompt_sets, user_prompt_sets))
 
     # Workflows
     workflows = Workflow.objects(
@@ -244,6 +244,8 @@ def home():
     total_token_counts = 0
     for doc in folder_docs:
         total_token_counts += doc.token_count
+
+    print(len(extraction_sets))
 
     return render_template(
         "index.html",
@@ -537,6 +539,23 @@ def add_search_term():
     }
     return jsonify(response)
 
+
+@app.route("/api/fetch_workflow", methods=["POST"])
+def fetch_workflow():
+    data = request.get_json()
+    workflow_id = data["workflow_uuid"]
+    workflow = Workflow.objects(id=workflow_id).first()
+
+    template = render_template(
+                "toolpanel/workflows/workflow.html",
+                workflow=workflow,
+            )
+
+    response = {
+        "template": template,
+    }
+
+    return jsonify(response)
 
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():

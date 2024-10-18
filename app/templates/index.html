@@ -231,19 +231,22 @@
                             style="padding-right: 5px;"></i>Tasks</li>
                     
                 </ul>
-
                 {% include "toolpanel/chat/chat_panel.html" %}
                 {% include "toolpanel/extractions/extraction_panel.html" %}
                 {% include "toolpanel/prompts/prompt_panel.html" %}
                 {% include "toolpanel/tasks/tasks_panel.html" %}
                 {% include "toolpanel/workflows/workflows_panel.html" %}
+
             </div>
 
             {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
             {% include "toolpanel/workflows/workflows_bottom_panel.html" %}
+            <div style="display: none" class="search-results-panel" id="search-results-panel"
+                    style="margin: 0px 30px 30px 30px; text-align: left;">
+            </div>      
         </div>
 
-        {% include "toolpanel/extractions/extraction_search_panel.html" %}
+        
         {% include "toolpanel/prompts/prompt_search_panel.html" %}
         {% include "toolpanel/chat/chat_search_panel.html" %}
         
@@ -252,6 +255,7 @@
         {% include "toolpanel/rename_modal.html" %}
         {% include "toolpanel/attachment_modal.html" %}
         {% include "toolpanel/workflows/new_workflow_modal.html" %}
+        {% include "toolpanel/tasks/new_task_modal.html" %}
     </div>
 </div>
 
@@ -293,6 +297,7 @@
 {{super()}}
 {% include "index_scripts.html" %}
 {% include "toolpanel/extractions/panel_scripts.html" %}
+{% include "toolpanel/workflows/workflow_scripts.html" %}
 {% include "toolpanel/prompts/prompt_set_scripts.html" %}
 {% include "toolpanel/chat/chat_scripts.html" %}
 <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>

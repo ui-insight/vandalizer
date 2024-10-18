@@ -31,7 +31,7 @@
             item.addEventListener('click', function() {
                 tabMenuItems.forEach(item => item.classList.remove('active'));
                 this.classList.add('active');
-
+                $('.search-results-panel').hide();
                 $('.tab-content').hide();
                 $('.bottom-toolbar').hide();
                 var tabTitle = $(this).text();
@@ -83,12 +83,51 @@
 
         $('#add-new_workflow-button').on("click", function () {
             $('#newWorkflowModal').show();
+
             $('#newWorkflowBtn').off('click').on('click', function() {
                 createNewWorkflow();
                 $('#newWorkflowModal').hide();
             });
         });
+
+        var newTaskType = "";
+
+        $('#add-new-task-button').on("click", function () {
+            $('#newTaskModal').show();
+            $('.add-task-container').show();
+            $('.name-add-task-container').hide();
+            $('#newTaskBtn').hide();
+            newTaskType = "";
+            
+            
+            $('#add-extraction-task-btn').off('click').on('click', function() {
+                console.log("here");
+                newTaskType = "extraction";
+                $('#add-task-container').hide();
+                $('#name-add-task-container').show();
+                $('#newTaskBtn').show();
+            });
+            
+            $('#add-prompt-task-btn').off('click').on('click', function() {
+                newTaskType = "prompt";
+                $('#add-task-container').hide();
+                $('#name-add-task-container').show();
+                $('#newTaskBtn').show();
+            });
+
+
+            $('#newTaskBtn').off('click').on('click', function() {
+                createTask();
+                $('#newTaskModal').hide();
+            });
+        });
         
+        function createTask() {
+            let title = $('#newTaskName')[0].value;
+            if (title == "" || newTaskType == "") { return; }
+            addSearchSet(title, newTaskType);
+        }
+
         function createNewWorkflow() {
             $.ajax({
                 url: '/api/create_workflow',
@@ -143,14 +182,52 @@
                 }
             });
         }
+
+        
+
         
         $('.set-item').on("click", function () {
             let uuid = $(this).attr("data-uuid");
             let datatitle = $(this).attr("data-title");
-            performSearch(uuid, datatitle);
+            //performSearch(uuid, datatitle);
+            updateSearchSetPanel(uuid);
         });
 
-        
+        function performExtraction(search_set_uuid) {
+            if (document_uuids == null || document_uuids == "") {
+                showToast("Please select a document")
+                    return;
+                }
+
+                showScanning();
+
+                showWorking();
+                let data = JSON.stringify({
+                    search_set_uuid: search_set_uuid,
+                    document_uuids: document_uuids
+                });
+
+                $.ajax({
+                    url: '/api/begin_search',
+                    type: 'POST',
+                    data: data,
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    async: true,
+                    success: function (data) {
+                        hideWorking();
+                        stopScanning();
+                        $('#search-results-panel').show();
+                        $('#search-results-panel').empty();
+                        $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                        addResultListeners();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.log(xhr.status);
+                        console.log(thrownError);
+                    }
+                });
+        }
 
         function performSearch(search_set_uuid, datatitle) {
             showScanning();
@@ -163,6 +240,7 @@
                 updateSearchSetPanel(search_set_uuid);
 
                 if (document_uuids == null || document_uuids == "") {
+                    showToast("Please select a document")
                     return;
                 }
 
@@ -198,6 +276,20 @@
         }
 
         function addResultListeners() {
+            $('#add-term-button').on("click", function () {
+            if (search_set_add_uuid != "") {
+                    addSearchSetItem();
+                    return;
+                } else {
+                    showToast("Please select an extraction group to add to");
+                }
+            });
+
+            $('#run-term-button').on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            performExtraction(uuid);
+        });
+            
             $('#set-close-button').on("click", function () {
                 location.reload();
             });
@@ -412,15 +504,6 @@
             }
         });
 
-        $('#add-term-button').on("click", function () {
-            if (search_set_add_uuid != "") {
-                addSearchSetItem();
-                return;
-            } else {
-                showToast("Please select an extraction group to add to");
-            }
-        });
-
         function addSearchSetItem () {
             $.ajax({
                 url: '/api/add_search_term',
@@ -458,13 +541,17 @@
         });
 
         $("#add-search-set-button").on("click", function () {
+            addSearchSet($("#add-search-set-input")[0].value, "extraction");
+        });
+
+        function addSearchSet(title, category) {
             $.ajax({
                 url: '/api/add_search_set',
                 type: 'POST',
                 data: JSON.stringify({
-                    title: $("#add-search-set-input")[0].value,
+                    title: title,
                     space_id: "{{ current_space_id }}",
-                    search_type: "extraction"
+                    search_type: category
                 }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
@@ -478,7 +565,7 @@
                     console.log(thrownError);
                 }
             });
-        });
+        }
 
         $("#semantic-search-button").on("click", function (e) {
             e.preventDefault();
