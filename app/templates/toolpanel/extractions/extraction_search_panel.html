@@ -1,17 +1,25 @@
 <div class="bottom-toolbar" id="bottom-toolbar-extraction"
     style="{% if section != 'Extract' %}display: none;{% endif %}">
     <div id="add-item-panel">
-        <p style="font-size: 24px; font-weight: 600;">Add Extraction</p>
-        <div class="input-container">
-            <div class="ask-question">
-                <input type="text" id="add-search-term-input" placeholder="Term or phrase to extract...">
-
-                <button class="add-button-2 shadow-button" id="add-term-button">
-                    <span style="font-size: 2em; color: #5c21d2bc;">
-                        <i class="fa-solid fa-plus"></i>
-                    </span>
+        <div class="input-container" style="position: relative; display: flex; align-items: center;">
+            
+            <!-- Input Field Container -->
+            <div class="ask-question" style="flex: 1; display: flex; position: relative;">
+                <input type="text" id="add-search-term-input" placeholder="Add term to extract..." 
+                    style="width: 100%; padding-right: 60px;">
+                
+                <!-- Add Button hovering over the input's right edge -->
+                <button class="add-button-2 btn btn-primary" id="add-term-button" 
+                    style="position: absolute; right: 0; top: 0; bottom: 0; height: 100%; background-color: #191919; color: white; border-radius: 0;">
+                    Add
                 </button>
             </div>
+
+            <!-- Run Button aligned next to the input and same width -->
+            <button class="btn btn-primary" id="run-term-button" data-uuid="{{ search_set.uuid }}"
+                style="flex: 1; margin-left: 10px; height: 100%; border-radius: 0;">
+                Run
+            </button>
         </div>
     </div>
 </div>

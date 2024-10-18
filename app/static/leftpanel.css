@@ -79,6 +79,15 @@
     cursor: pointer;
   }
 
+  .workflow-item {
+    padding: 5px 5px;
+  }
+
+  .workflow-item:hover {
+    background-color: #efefef;
+    cursor: pointer;
+  }
+
   .prompt-set-item {
     padding: 5px 5px;
   }

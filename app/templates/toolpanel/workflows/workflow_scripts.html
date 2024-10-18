@@ -1,0 +1,45 @@
+<script>
+$(document).ready(function () {   
+    $('.workflow-item').on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        fetchWorkflow(uuid);
+    });
+
+    function fetchWorkflow(workflow_uuid) {
+        showScanning();
+        
+        let data = JSON.stringify({
+            workflow_uuid: workflow_uuid,
+        });
+
+        $.ajax({
+            url: '/api/fetch_workflow',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                hideWorking();
+                stopScanning();
+                $('#search-results-panel').show();
+                $('#search-results-panel').empty();
+                $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                addWorklowListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function addWorklowListeners() {
+        $('#workflow-close-button').on("click", function () {
+            $('#search-results-panel').fadeOut();
+            });
+    }
+
+});
+
+</script>

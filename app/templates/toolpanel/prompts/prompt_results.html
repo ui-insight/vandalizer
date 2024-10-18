@@ -1,3 +1,4 @@
+<div class="search-results-content">
 <p style="font-size: 24px; font-weight: 600;">
     {{ search_set.title }}
 
@@ -15,7 +16,7 @@
             data-title="{{ search_set.title }}">Rerun</a></span>
     {% if results != null %}<span style="float: right;"><a id="export-prompt" href="#">Export all</a></span> {% endif %}
     <span style="float: right; padding-left: 15px;"><a id="edit-prompt" href="#" data-uuid="{{ search_set.uuid }}"
-            data-title="{{ search_set.title }}">Edit mode</a></span>
+            data-title="{{ search_set.title }}">Edit</a></span>
 </p>
 
 <div class="set-items set-result-items">
@@ -61,4 +62,5 @@
             {% endif %}
         </div>
     {% endfor %}
+</div>
 </div>

@@ -1,51 +1,67 @@
-<div>
-    <div class="workflow-container">
-        <div class="trigger">Trigger</div>
+
+<div class="workflow-container">
+    <div>
+    <p style="font-size: 24px; font-weight: 600;">
+
+        {{ workflow.name }}
     
-        <div class="workflow-step">
-            <div class="step-content">
-                <div class="step-header">
-                    <span>Documents Selected</span>
-                    <span class="attachment-info">None selected + 1 attached</span>
-                </div>
-                <div class="step-icon">
-                    <img src="icon-documents.png" alt="Documents">
-                </div>
+        <span id="workflow-close-button" style="float: right; font-size: 1em; color: #5c21d2bc;">
+            <a>
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </span>
+    </p>
+</div>
+    <div class="trigger">Trigger</div>
+
+    <div class="workflow-step">
+        <div class="step-content">
+            <div class="add-task-icon-container">
+                <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
             </div>
-        </div>
-    
-        <div class="workflow-step">
-            <div class="step-content">
-                <div class="step-header">
-                    <span>Extract Information</span>
-                    <span class="item-info">NSF Budget 16 items</span>
-                </div>
-                <div class="step-icon">
-                    <img src="icon-extract.png" alt="Extract">
-                </div>
+            <div class="step-header">
+                <span>Documents Selected</span>
+                <span class="attachment-info">None selected + 1 attached</span>
             </div>
-        </div>
-    
-        <div class="workflow-step">
-            <div class="step-content">
-                <div class="step-header">
-                    <span>Format Output</span>
-                    <span class="output-info">VERSO Output Prompt</span>
-                </div>
-                <div class="step-icon">
-                    <img src="icon-format.png" alt="Format">
-                </div>
+            <div class="step-icon">
+                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
-        </div>
-    
-        <div class="add-step">
-            <button>+</button>
-        </div>
-    
-        <div class="action-buttons">
-            <button class="action-button">Run Workflow</button>
-            <button class="action-button">Download</button>
-            <button class="action-button">Integrate</button>
         </div>
     </div>
+
+    <div class="workflow-step">
+        <div class="step-content">
+            <div class="add-task-icon-container">
+                <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
+            </div>
+            <div class="step-header">
+                <span>Extract Information</span>
+                <span class="item-info">NSF Budget 16 items</span>
+            </div>
+            <div class="step-icon">
+                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="workflow-step">
+        <div class="step-content">
+            <div class="add-task-icon-container">
+                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+            </div>
+            <div class="step-header">
+                <span>Format Output</span>
+                <span class="output-info">VERSO Output Prompt</span>
+            </div>
+            <div class="step-icon">
+                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+            </div>
+        </div>
+    </div>
+
+    <div class="add-step">
+        <button>+</button>
+    </div>
+
+    {% include "toolpanel/workflows/workflows_bottom_panel.html" %}
 </div>
