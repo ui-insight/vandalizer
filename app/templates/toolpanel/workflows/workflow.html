@@ -14,7 +14,7 @@
 </div>
     <div class="trigger">Trigger</div>
 
-    <div class="workflow-step">
+    <div class="workflow-step active">
         <div class="step-content">
             <div class="add-task-icon-container">
                 <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
@@ -27,9 +27,16 @@
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
+        <div class="step-connector bottom">
+            <img src='/static/images/step-connector-bottom-active.png'> 
+        </div>
     </div>
+    <div class="step-connection-line"></div>
 
     <div class="workflow-step">
+        <div class="step-connector top">
+            <img src='/static/images/step-connector-top.png'> 
+        </div>
         <div class="step-content">
             <div class="add-task-icon-container">
                 <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
@@ -42,9 +49,14 @@
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
+        <div class="step-connector bottom">
+            <img src='/static/images/step-connector-bottom.png'> 
+        </div>
     </div>
+    <div class="step-connection-line"></div>
 
-    <div class="workflow-step">
+  
+    <!-- <div class="workflow-step">
         <div class="step-content">
             <div class="add-task-icon-container">
                 <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
@@ -57,10 +69,10 @@
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
-    </div>
+    </div>  -->
 
     <div class="add-step">
-        <button>+</button>
+        <button>+ ADD STEP</button>
     </div>
 
     {% include "toolpanel/workflows/workflows_bottom_panel.html" %}
