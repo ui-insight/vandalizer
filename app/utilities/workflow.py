@@ -8,6 +8,9 @@ from pypdf import PdfReader
 
 from typing import List, Dict, Any
 
+import re
+import graphlib
+
 load_dotenv()
 
 
@@ -34,6 +37,8 @@ def data_extraction_model(prompt):
         ],
     )
     output = completion.choices[0].message.content
+    if output is None:
+        return None
     output = output.replace("\\n", "")
     output = output.replace("=json", "")
     output = output.replace("=", "")
@@ -48,9 +53,13 @@ def format_model(format, data):
     )
 
     response = completion.choices[0].message.content
+    if response is None:
+        return None, None
     # formatted text is between ```json\n and \n```
     format_spec = f"```{format}\n"
     formatted_text = re.search(f"{format_spec}(.*?)\n```", response, re.DOTALL)
+    if formatted_text is None:
+        return prompt, None
 
     return prompt, formatted_text.group(1)
 
@@ -70,7 +79,7 @@ class FormatNode(Node):
         super().__init__("Format")
         self.format = data.get("format", "")
 
-    def process(self, inputs=None):
+    def process(self, inputs):
         data = inputs.get("output", None)
         prompt, output = format_model(self.format, data)
         return {"output": output, "input": prompt}
@@ -161,6 +170,9 @@ class WorkflowEngine:
                     input=output.get("input", None),
                 )
             )
+        if latest_output is None:
+            return None, data
+
         return latest_output.get("output"), data
 
 

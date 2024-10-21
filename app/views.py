@@ -25,7 +25,7 @@ from app.models import (
     SmartFolder,
     Feedback,
     FeedbackCounter,
-    Workflow
+    Workflow,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -184,8 +184,6 @@ def home():
         set_type="extraction",
     ).all()
     extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
-    
-
 
     # Get the prompt sets
     global_prompt_sets = SearchSet.objects(
@@ -202,7 +200,7 @@ def home():
     # Workflows
     workflows = Workflow.objects(
         user_id=user.user_id,
-        #space=current_space.uuid,
+        # space=current_space.uuid,
     ).all()
 
     # Get the folders
@@ -547,15 +545,16 @@ def fetch_workflow():
     workflow = Workflow.objects(id=workflow_id).first()
 
     template = render_template(
-                "toolpanel/workflows/workflow.html",
-                workflow=workflow,
-            )
+        "toolpanel/workflows/workflow.html",
+        workflow=workflow,
+    )
 
     response = {
         "template": template,
     }
 
     return jsonify(response)
+
 
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():
@@ -572,6 +571,9 @@ def grab_template():
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
     print("Document count: " + str(len(documents)))
+
+    if search_set is None:
+        return jsonify({"error": "Search set not found."})
 
     if search_set.set_type == "extraction":
         if edit_mode:
@@ -659,7 +661,9 @@ def begin_search():
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     keys = []
-    items = search_set.items()
+    items = []
+    if search_set is not None:
+        items = search_set.items()
     for item in items:
         if item.searchtype == "extraction":
             keys.append(item.searchphrase)
@@ -1097,11 +1101,16 @@ def add_workflow():
     if user is None:
         return redirect(url_for("login"))
     workflow_data = request.get_json()
-    workflow = Workflow(name=workflow_data["name"], description=workflow_data["description"], user_id=session["user_id"])
+    workflow = Workflow(
+        name=workflow_data["name"],
+        description=workflow_data["description"],
+        user_id=session["user_id"],
+    )
     workflow.save()
     return redirect("/home?section=Workflows")
 
-@app.route("/workflow", methods=["GET", "POST"])
+
+@app.route("/api/execute_workflow", methods=["GET", "POST"])
 def workflow():
     workflow_data = request.get_json()
 
