@@ -5,6 +5,10 @@ $(document).ready(function () {
         fetchWorkflow(uuid);
     });
 
+    $('#closeWorkflowBtn').on("click", function () {
+        $('#newWorkflowStepModal').fadeOut();
+    });
+
     function fetchWorkflow(workflow_uuid) {
         showScanning();
         
@@ -38,7 +42,15 @@ $(document).ready(function () {
         $('#workflow-close-button').on("click", function () {
             $('#search-results-panel').fadeOut();
             });
+
+            $('#add-workflow-step-btn').on("click", function () {
+                $('#newWorkflowStepModal').show();
+            });
+        
     }
+
+
+
 
 });
 
