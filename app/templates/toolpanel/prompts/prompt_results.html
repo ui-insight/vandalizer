@@ -12,8 +12,6 @@
 <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>0 documents selected</i></p>
 <br>
 <p><b>Prompts</b>
-    <span style="float: right; padding-left: 15px;"><a id="rerun-prompt" href="#" data-uuid="{{ search_set.uuid }}"
-            data-title="{{ search_set.title }}">Rerun</a></span>
     {% if results != null %}<span style="float: right;"><a id="export-prompt" href="#">Export all</a></span> {% endif %}
     <span style="float: right; padding-left: 15px;"><a id="edit-prompt" href="#" data-uuid="{{ search_set.uuid }}"
             data-title="{{ search_set.title }}">Edit</a></span>
@@ -64,3 +62,5 @@
     {% endfor %}
 </div>
 </div>
+
+{% include "toolpanel/prompts/prompt_search_panel.html" %}
