@@ -1101,6 +1101,7 @@ def add_workflow():
     if user is None:
         return redirect(url_for("login"))
     workflow_data = request.get_json()
+    print("workflow_data", workflow_data)
     workflow = Workflow(
         name=workflow_data["name"],
         description=workflow_data["description"],
@@ -1110,10 +1111,85 @@ def add_workflow():
     return redirect("/home?section=Workflows")
 
 
+@app.route("/api/delete_workflow", methods=["GET"])
+def delete_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_id = request.args.get("workflow_id")
+    Workflow.objects(id=workflow_id).delete()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/update_workflow", methods=["POST"])
+def update_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow.name = workflow_data["name"]
+    workflow.description = workflow_data["description"]
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/add_workflow_step", methods=["POST"])
+def add_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    step = workflow_data["step"]
+    workflow.steps.append(step)
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/delete_workflow_step", methods=["POST"])
+def delete_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    step_index = workflow_data["step_index"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    if step_index < len(workflow.steps):
+        error = "Step index out of range"
+        return jsonify({"error": error})
+    workflow.steps.pop(step_index)
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/update_workflow_step", methods=["POST"])
+def update_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    step_index = workflow_data["step_index"]
+    step = workflow_data["step"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    if step_index < len(workflow.steps):
+        error = "Step index out of range"
+        return jsonify({"error": error})
+    workflow.steps[step_index] = step
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
 @app.route("/api/execute_workflow", methods=["GET", "POST"])
 def workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
     workflow_data = request.get_json()
-
     engine = build_workflow(workflow_data.dict())
     output, data = engine.execute()
-    return {"output": output, "steps": data}
+    return jsonify({"output": output, "steps": data})
