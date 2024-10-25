@@ -1,4 +1,6 @@
 <script>
+    var current_workflow_id = 0;
+
 $(document).ready(function () {   
     $('.workflow-item').on("click", function () {
         let uuid = $(this).attr("data-uuid");
@@ -9,8 +11,28 @@ $(document).ready(function () {
         $('#newWorkflowStepModal').fadeOut();
     });
 
+    $('.add-extraction-step-btn').on("click", function (e) {
+        e.preventDefault();  // Prevent default behavior, if needed
+        console.log("Add Extraction");
+        workflowAddExtractionStep();
+    });
+
+    
+
+    function addWorklowListeners() {
+        console.log("Add workflow listeners");
+        $('#workflow-close-button').on("click", function () {
+            $('#search-results-panel').fadeOut();
+        });
+
+        $('#add-workflow-step-btn').on("click", function () {
+            $('#newWorkflowStepModal').show();
+        });
+    }
+
     function fetchWorkflow(workflow_uuid) {
         showScanning();
+        current_workflow_id = workflow_uuid;
         
         let data = JSON.stringify({
             workflow_uuid: workflow_uuid,
@@ -38,20 +60,101 @@ $(document).ready(function () {
         });
     }
 
-    function addWorklowListeners() {
-        $('#workflow-close-button').on("click", function () {
-            $('#search-results-panel').fadeOut();
-            });
+    function workflowAddExtractionStep() {
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+        });
 
-            $('#add-workflow-step-btn').on("click", function () {
-                $('#newWorkflowStepModal').show();
-            });
-        
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'GET',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $('#newWorkflowStepModal').fadeOut();
+                $(data.template).hide().appendTo('.modal-container').fadeIn();
+                addWorklowListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
     }
 
+    function workflowAddPromptStep() {
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+        });
 
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'GET',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $('#newWorkflowStepModal').fadeOut();
+                $(data.template).hide().appendTo('.modal-container').fadeIn();
+                addWorklowListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
 
+    function workflowAddFormatStep() {
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+        });
 
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'GET',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $('#newWorkflowStepModal').fadeOut();
+                $(data.template).hide().appendTo('.modal-container').fadeIn();
+                addWorklowListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function workflowAddDocumentStep() {
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'GET',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $('#newWorkflowStepModal').fadeOut();
+                $(data.template).hide().appendTo('.modal-container').fadeIn();
+                addWorklowListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
 });
 
 </script>

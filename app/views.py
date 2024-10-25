@@ -555,6 +555,41 @@ def fetch_workflow():
 
     return jsonify(response)
 
+@app.route("/api/workflows/add_extraction_step", methods=["GET", "POST"])
+def workflow_add_extraction_step():
+    if request.method == "GET":
+        # Handle GET request - retrieve and return the template
+        data = request.args  # Retrieve query parameters, if any
+        workflow_id = data.get("workflow_uuid")
+        workflow = Workflow.objects(id=workflow_id).first()
+        
+        template = render_template(
+            "toolpanel/workflows/modals/workflow_add_extractions_modal.html",
+            workflow=workflow,
+        )
+        response = {"template": template}
+        return jsonify(response)
+
+    elif request.method == "POST":
+        # Handle POST request - create a new WorkflowStep
+        data = request.get_json()
+        workflow_id = data["workflow_uuid"]
+        workflow = Workflow.objects(id=workflow_id).first()
+        
+        # Extract name and data fields from the request to create WorkflowStep
+        step_name = data.get("step_name")
+        step_data = data.get("step_data", {})
+
+        if step_name and step_data:
+            new_step = WorkflowStep(name=step_name, data=step_data)
+            new_step.save()  # Save to the database
+            
+            response = {"message": "Workflow step created successfully", "step_id": str(new_step.id)}
+        else:
+            response = {"error": "Missing 'step_name' or 'step_data' in request"}
+
+        return jsonify(response)
+
 
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():

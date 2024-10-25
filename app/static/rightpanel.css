@@ -237,11 +237,6 @@ button.shadow-button:hover {
 .ask-question .add-button {
   height: 40px;
   width: 40px;
-  border-width: 0px;
-  border-width: 0px;
-  box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .tab-container {
