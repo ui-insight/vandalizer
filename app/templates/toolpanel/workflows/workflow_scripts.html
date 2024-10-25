@@ -24,11 +24,21 @@ $(document).ready(function () {
 
     $('.add-prompt-step-btn').on("click", function (e) {
         e.preventDefault();  // Prevent default behavior, if needed
-        console.log("Add Extraction");
+        console.log("Add Prompt");
         workflowAddPromptStep();
     });
 
-    
+    $('.add-format-step-btn').on("click", function (e) {
+        e.preventDefault();  // Prevent default behavior, if needed
+        console.log("Add Format");
+        workflowAddFormatStep();
+    });
+
+    $('.add-document-step-btn').on("click", function (e) {
+        e.preventDefault();  // Prevent default behavior, if needed
+        console.log("Add Document");
+        workflowAddDocumentStep();
+    });
 
     function addWorklowListeners() {
         console.log("Add workflow listeners");
@@ -135,8 +145,10 @@ $(document).ready(function () {
     }
 
     function workflowAddPromptStep() {
+        console.log(current_space_id);
         let data = JSON.stringify({
             workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
         });
 
         $.ajax({
@@ -150,6 +162,36 @@ $(document).ready(function () {
                 $('#newWorkflowStepModal').fadeOut();
                 $(data.template).hide().appendTo('.modal-container').fadeIn();
                 addWorklowListeners();
+
+                $('#confirmPromptStepBtn').on("click", function (e) {
+                    e.preventDefault();  // Prevent default behavior, if needed
+                    console.log("Add Prompt");
+                    workflowConfirmPromptStep();
+                });
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function workflowConfirmPromptStep() {
+        console.log(current_space_id);
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/add_prompt_step',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -159,12 +201,14 @@ $(document).ready(function () {
     }
 
     function workflowAddFormatStep() {
+        console.log(current_space_id);
         let data = JSON.stringify({
             workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
         });
 
         $.ajax({
-            url: '/api/workflows/add_extraction_step',
+            url: '/api/workflows/add_format_step',
             type: 'GET',
             data: data,
             contentType: 'application/json; charset=utf-8',
@@ -174,6 +218,36 @@ $(document).ready(function () {
                 $('#newWorkflowStepModal').fadeOut();
                 $(data.template).hide().appendTo('.modal-container').fadeIn();
                 addWorklowListeners();
+
+                $('#confirmFormatStepBtn').on("click", function (e) {
+                    e.preventDefault();  // Prevent default behavior, if needed
+                    console.log("Add Extraction");
+                    workflowConfirmFormatStep();
+                });
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function workflowConfirmFormatStep() {
+        console.log(current_space_id);
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -183,12 +257,14 @@ $(document).ready(function () {
     }
 
     function workflowAddDocumentStep() {
+        console.log(current_space_id);
         let data = JSON.stringify({
             workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
         });
 
         $.ajax({
-            url: '/api/workflows/add_extraction_step',
+            url: '/api/workflows/add_document_step',
             type: 'GET',
             data: data,
             contentType: 'application/json; charset=utf-8',
@@ -198,6 +274,36 @@ $(document).ready(function () {
                 $('#newWorkflowStepModal').fadeOut();
                 $(data.template).hide().appendTo('.modal-container').fadeIn();
                 addWorklowListeners();
+
+                $('#confirmDocumentStepBtn').on("click", function (e) {
+                    e.preventDefault();  // Prevent default behavior, if needed
+                    console.log("Add Extraction");
+                    workflowConfirmDocumentStep();
+                });
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function workflowConfirmDocumentStep() {
+        console.log(current_space_id);
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/add_document_step',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);

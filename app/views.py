@@ -617,13 +617,34 @@ def workflow_add_extraction_step():
 def workflow_add_prompt_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data = request.args  # Retrieve query parameters, if any
+        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
+        space_id = data.get("space_id")
+
+        print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
+ 
+
+        current_space = Space.objects(uuid=space_id).first()
+        global_extraction_sets = SearchSet.objects(
+            space=current_space.uuid, is_global=True, set_type="extraction"
+        ).all()
+        user_extraction_sets = SearchSet.objects(
+            user_id=workflow.user_id,
+            space=current_space.uuid,
+            is_global=False,
+            set_type="extraction",
+        ).all()
+        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
+        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
+
+
         
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
+            extraction_sets=extraction_sets
         )
         response = {"template": template}
         return jsonify(response)
@@ -633,20 +654,99 @@ def workflow_add_prompt_step():
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
+
+
+        return jsonify( {"response": "Placeholder"})
+
+@app.route("/api/workflows/add_format_step", methods=["GET", "POST"])
+def workflow_add_format_step():
+    if request.method == "GET":
+        # Handle GET request - retrieve and return the template
+        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data = json.loads(data_str)  # Retrieve query parameters, if any
+        workflow_id = data.get("workflow_uuid")
+        space_id = data.get("space_id")
+
+        print(workflow_id)
+        workflow = Workflow.objects(id=workflow_id).first()
+ 
+
+        current_space = Space.objects(uuid=space_id).first()
+        global_extraction_sets = SearchSet.objects(
+            space=current_space.uuid, is_global=True, set_type="format"
+        ).all()
+        user_extraction_sets = SearchSet.objects(
+            user_id=workflow.user_id,
+            space=current_space.uuid,
+            is_global=False,
+            set_type="extraction",
+        ).all()
+        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
+        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
+
+
         
-        # Extract name and data fields from the request to create WorkflowStep
-        step_name = data.get("step_name")
-        step_data = data.get("step_data", {})
-
-        if step_name and step_data:
-            new_step = WorkflowStep(name=step_name, data=step_data)
-            new_step.save()  # Save to the database
-            
-            response = {"message": "Workflow step created successfully", "step_id": str(new_step.id)}
-        else:
-            response = {"error": "Missing 'step_name' or 'step_data' in request"}
-
+        template = render_template(
+            "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
+            workflow=workflow,
+            extraction_sets=extraction_sets
+        )
+        response = {"template": template}
         return jsonify(response)
+
+    elif request.method == "POST":
+        # Handle POST request - create a new WorkflowStep
+        data = request.get_json()
+        workflow_id = data["workflow_uuid"]
+        workflow = Workflow.objects(id=workflow_id).first()
+
+
+        return jsonify( {"response": "Placeholder"})
+
+@app.route("/api/workflows/add_document_step", methods=["GET", "POST"])
+def workflow_add_document_step():
+    if request.method == "GET":
+        # Handle GET request - retrieve and return the template
+        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data = json.loads(data_str)  # Retrieve query parameters, if any
+        workflow_id = data.get("workflow_uuid")
+        space_id = data.get("space_id")
+
+        print(workflow_id)
+        workflow = Workflow.objects(id=workflow_id).first()
+ 
+
+        current_space = Space.objects(uuid=space_id).first()
+        global_extraction_sets = SearchSet.objects(
+            space=current_space.uuid, is_global=True, set_type="document"
+        ).all()
+        user_extraction_sets = SearchSet.objects(
+            user_id=workflow.user_id,
+            space=current_space.uuid,
+            is_global=False,
+            set_type="extraction",
+        ).all()
+        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
+        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
+
+
+        
+        template = render_template(
+            "toolpanel/workflows/modals/workflow_add_documents_modal.html",
+            workflow=workflow,
+            extraction_sets=extraction_sets
+        )
+        response = {"template": template}
+        return jsonify(response)
+
+    elif request.method == "POST":
+        # Handle POST request - create a new WorkflowStep
+        data = request.get_json()
+        workflow_id = data["workflow_uuid"]
+        workflow = Workflow.objects(id=workflow_id).first()
+
+
+        return jsonify( {"response": "Placeholder"})
 
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():
