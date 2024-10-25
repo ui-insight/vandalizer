@@ -276,95 +276,106 @@
         }
 
         function addResultListeners() {
+            console.log("add listeners");
+
+            // Button click handlers
             $('#add-term-button').on("click", function () {
-            if (search_set_add_uuid != "") {
-                    addSearchSetItem();
-                    return;
-                } else {
-                    showToast("Please select an extraction group to add to");
-                }
+                search_set_add_uuid ? addSearchSetItem() : showToast("Please select an extraction group to add to");
             });
 
-            $('#run-term-button').on("click", function () {
-            let uuid = $(this).attr("data-uuid");
-            performExtraction(uuid);
-        });
-            
-            $('#set-close-button').on("click", function () {
-                location.reload();
-            });
-            $('.semantic-entry').on("click", function () {
-                searchTerm = $(this).attr("data-title");
-                performSemanticSearch(searchTerm);
-            });
-
-            $('#rerun').on("click", function () {
-                $('#semantic-panel').hide();
+            $('#run-term-button, #rerun, #rerun-prompt').on("click", function () {
                 let uuid = $(this).attr("data-uuid");
                 let datatitle = $(this).attr("data-title");
-                performSearch(uuid, datatitle);
+                $(this).is('#rerun, #rerun-prompt') ? performSearch(uuid, datatitle) : performExtraction(uuid);
+            });
+
+            $('#set-close-button, #prompt-set-close-button').on("click", function () {
+                location.reload();
             });
 
             $('#clone').on("click", function () {
-                let uuid = $(this).attr("data-uuid");
-                cloneSearchSet(uuid);
+                cloneSearchSet($(this).attr("data-uuid"));
             });
 
-            $('#editset').on("click", function () {
-                let uuid = $(this).attr("data-uuid");
-                updateSearchSetPanel(uuid, true);
-            });
-
-            
-            $('.delete-set-item-button').on("click", function () {
-                let uuid = $(this).attr("data-uuid");
-                deleteSearchSetItem(uuid);
+            $('#editset, #edit-prompt').on("click", function () {
+                updateSearchSetPanel($(this).attr("data-uuid"), true);
             });
 
             $('#renameset').on("click", function () {
                 $('#renameModal').show();
                 let uuid = $(this).attr("data-uuid");
-                let datatitle = $(this).attr("data-title");
-                $('#newName')[0].value = datatitle;
-                $('#newName')[0].focus();
+                $('#newName').val($(this).attr("data-title")).focus();
 
-                $('#renameBtn').off('click').on('click', function() {
-                    let newName = $('#newName')[0].value;
-                    renameSearchSet(uuid, newName);
+                $('#renameBtn').off('click').on('click', function () {
+                    renameSearchSet(uuid, $('#newName').val());
                 });
             });
 
-            $(".collapsible-pdf").click(function() {
+            $('.delete-set-item-button').on("click", function () {
+                deleteSearchSetItem($(this).attr("data-uuid"));
+            });
+
+            // Collapsible and fillable PDF
+            $('.collapsible-pdf').on("click", function () {
                 $(this).toggleClass("active");
-                console.log("Collapsible");
-                var content = $(this).next(".fillable-pdf-content");
-                content.slideToggle("fast");
+                $(this).next(".fillable-pdf-content").slideToggle("fast");
             });
 
-            $("#fillable-pdf-button").click(function() {
-            $("#fillable-pdf-input").click();
-        });
-
-        $("#fillable-pdf-input").change(function() {
-            var file = this.files[0];
-            var formData = new FormData();
-            formData.append("file", file);
-            formData.append("search_set_uuid", search_set_add_uuid);
-            showFillableDocLoading();
-            $.ajax({
-                url: "/upload_fillable_pdf",
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    location.reload();
-                },
-                error: function(jqXHR, textStatus, errorMessage) {
-                    alert("File upload failed: " + errorMessage);
-                }
+            $("#fillable-pdf-button").on("click", function () {
+                $("#fillable-pdf-input").click();
             });
-        });
+
+            // Export prompt
+            $('#export-prompt').on("click", function (e) {
+                e.preventDefault();
+                let searchDict = createSearchTermDictionary();
+
+                let form = $('<form>', { 'action': '/export_extraction', 'method': 'GET' });
+                $.each(searchDict, function (key, value) {
+                    form.append($('<input>', { 'type': 'hidden', 'name': key, 'value': value }));
+                });
+                form.append($('<input>', { 'type': 'hidden', 'name': 'pdf_title', 'value': $('#document-title').text() }));
+
+                $('body').append(form);
+                form.submit();
+            });
+
+            // Prompt result click handler
+            $('.prompt-result').on("click", function () {
+                let searchTerm = $(this).text();
+                highlightTerms = [searchTerm];
+                showToast();
+                navigator.clipboard.writeText(searchTerm);
+                renderPDF();
+
+                setTimeout(nextHighlight, 500);
+            });
+
+            $('.semantic-entry').on("click", function () {
+                performSemanticSearch($(this).attr("data-title"));
+            });
+
+
+            $("#fillable-pdf-input").change(function() {
+                var file = this.files[0];
+                var formData = new FormData();
+                formData.append("file", file);
+                formData.append("search_set_uuid", search_set_add_uuid);
+                showFillableDocLoading();
+                $.ajax({
+                    url: "/upload_fillable_pdf",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        location.reload();
+                    },
+                    error: function(jqXHR, textStatus, errorMessage) {
+                        alert("File upload failed: " + errorMessage);
+                    }
+                });
+            });
 
             $('#export').on("click", function (e) {
                 e.preventDefault();
@@ -460,13 +471,12 @@
                     nextHighlight();
                 }, 500);
             });
-
-            
         }
 
         function updateSearchSetPanel(set_uuid, edit_mode=false) {
             console.log("Performing search");
             console.log(document_uuids);
+            search_set_add_uuid = set_uuid;
             $.ajax({
                 url: '/api/search_results',
                 type: 'POST',

@@ -51,7 +51,7 @@
                         $('#prompt-search-results-panel').show();
                         $('#prompt-search-results-panel').empty();
                         $(data.template).hide().appendTo('#prompt-search-results-panel').fadeIn();
-                        addResultListeners();
+                        addPromptListeners();
                     },
                     error: function (xhr, ajaxOptions, thrownError) {
                         console.log(xhr.status);
@@ -59,117 +59,6 @@
                     }
                 });
             }
-        }
-
-        function addResultListeners() {
-            $('#prompt-set-close-button').on("click", function () {
-                location.reload();
-            });
-            
-            $('#rerun-prompt').on("click", function () {
-                $('#semantic-panel').hide();
-                let uuid = $(this).attr("data-uuid");
-                let datatitle = $(this).attr("data-title");
-                performPromptSearch(uuid, datatitle);
-            });
-
-            $('#edit-prompt').on("click", function () {
-                let uuid = $(this).attr("data-uuid");
-                updateSearchSetPanel(uuid, true);
-            });
-
-            $('#clone').on("click", function () {
-                let uuid = $(this).attr("data-uuid");
-                cloneSearchSet(uuid);
-            });
-
-            $('#renameset').on("click", function () {
-                $('#renameModal').show();
-                let uuid = $(this).attr("data-uuid");
-                let datatitle = $(this).attr("data-title");
-                $('#newName')[0].value = datatitle;
-                $('#newName')[0].focus();
-
-                $('#renameBtn').off('click').on('click', function() {
-                    let newName = $('#newName')[0].value;
-                    renameSearchSet(uuid, newName);
-                });
-            });
-
-            $('.delete-set-item-button').on("click", function () {
-                console.log("delete set item");
-                let uuid = $(this).attr("data-uuid");
-                deleteSearchSetItem(uuid);
-            });
-
-            $('#export-prompt').on("click", function (e) {
-                e.preventDefault();
-                searchDict = createSearchTermDictionary();
-
-                var form = $('<form>', {
-                    'action': '/export_extraction',
-                    'method': 'GET'
-                });
-
-                $.each(searchDict, function (key, value) {
-                    form.append($('<input>', {
-                    'type': 'hidden',
-                    'name': key,
-                    'value': value
-                    }));
-                });
-
-                form.append($('<input>', {
-                    'type': 'hidden',
-                    'name': 'pdf_title',
-                    'value': $('#document-title')[0].innerText
-                }));
-
-                $('body').append(form);
-                form.submit();
-            });
-
-            $('.prompt-result').on("click", function () {
-                // get text content
-                searchTerm = $(this).text();
-                highlightTerms = [searchTerm];
-                    
-                showToast();
-                navigator.clipboard.writeText(searchTerm);
-
-                renderPDF();
-                setTimeout(function() {
-                    console.log("showing next");
-                    nextHighlight();
-                }, 500);
-            });
-        }
-
-        function updateSearchSetPanel(set_uuid, edit_mode=false) {
-            $.ajax({
-                url: '/api/search_results',
-                type: 'POST',
-                data: JSON.stringify({
-                    search_set_uuid: set_uuid,
-                    document_uuids: document_uuids,
-                    edit_mode: edit_mode
-                }),
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function (data) {
-                    $('#prompt-search-results-panel').show();
-                    $('#prompt-search-results-panel').empty();
-                    $(data.template).hide().appendTo('#prompt-search-results-panel').fadeIn();
-                    addResultListeners();
-                    
-                    
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
         }
 
         $('#promptinput').on('keydown', function(event) {
