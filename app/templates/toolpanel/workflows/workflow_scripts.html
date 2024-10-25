@@ -1,7 +1,10 @@
 <script>
-    var current_workflow_id = 0;
+    var current_workflow_id = "{{ workflow_id }}";
+    var current_space_id = "{{ current_space_id }}"
 
 $(document).ready(function () {   
+
+
     $('.workflow-item').on("click", function () {
         let uuid = $(this).attr("data-uuid");
         fetchWorkflow(uuid);
@@ -9,12 +12,20 @@ $(document).ready(function () {
 
     $('#closeWorkflowBtn').on("click", function () {
         $('#newWorkflowStepModal').fadeOut();
+        const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
+        history.pushState({ path: newUrl }, '', newUrl);
     });
 
     $('.add-extraction-step-btn').on("click", function (e) {
         e.preventDefault();  // Prevent default behavior, if needed
         console.log("Add Extraction");
         workflowAddExtractionStep();
+    });
+
+    $('.add-prompt-step-btn').on("click", function (e) {
+        e.preventDefault();  // Prevent default behavior, if needed
+        console.log("Add Extraction");
+        workflowAddPromptStep();
     });
 
     
@@ -32,6 +43,7 @@ $(document).ready(function () {
 
     function fetchWorkflow(workflow_uuid) {
         showScanning();
+        console.log("fetching workflow:" + workflow_uuid);
         current_workflow_id = workflow_uuid;
         
         let data = JSON.stringify({
@@ -46,12 +58,18 @@ $(document).ready(function () {
             dataType: 'json',
             async: true,
             success: function (data) {
+
+
                 hideWorking();
                 stopScanning();
                 $('#search-results-panel').show();
                 $('#search-results-panel').empty();
                 $(data.template).hide().appendTo('#search-results-panel').fadeIn();
                 addWorklowListeners();
+
+                            // Update the browser URL with the current_workflow_id without refreshing the page
+                const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
+                history.pushState({ path: newUrl }, '', newUrl);
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -61,8 +79,10 @@ $(document).ready(function () {
     }
 
     function workflowAddExtractionStep() {
+        console.log(current_space_id);
         let data = JSON.stringify({
             workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
         });
 
         $.ajax({
@@ -76,6 +96,36 @@ $(document).ready(function () {
                 $('#newWorkflowStepModal').fadeOut();
                 $(data.template).hide().appendTo('.modal-container').fadeIn();
                 addWorklowListeners();
+
+                $('#confirmExtractionStepBtn').on("click", function (e) {
+                    e.preventDefault();  // Prevent default behavior, if needed
+                    console.log("Add Extraction");
+                    workflowConfirmExtractionStep();
+                });
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function workflowConfirmExtractionStep() {
+        console.log(current_space_id);
+        let data = JSON.stringify({
+            workflow_uuid: current_workflow_id,
+            space_id: current_space_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/add_extraction_step',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -90,7 +140,7 @@ $(document).ready(function () {
         });
 
         $.ajax({
-            url: '/api/workflows/add_extraction_step',
+            url: '/api/workflows/add_prompt_step',
             type: 'GET',
             data: data,
             contentType: 'application/json; charset=utf-8',
@@ -155,6 +205,13 @@ $(document).ready(function () {
             }
         });
     }
+
+    // If there is a workflow in the browser href
+    let workflow_template = {{ workflow_template|length }}
+    if (workflow_template != "") {
+        addWorklowListeners();
+    }
+    
 });
 
 </script>

@@ -112,3 +112,55 @@
   .add-step button:hover {
     background-color: white;
   }
+
+  .workflow-modal-content {
+    background-color: #fff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.workflow-tab-container {
+    display: flex;
+    border-bottom: 1px solid #ddddddbb;
+    margin-bottom: 15px;
+}
+
+.workflow-tab-btn {
+    flex: 1;
+    padding: 10px;
+    font-size: 16px;
+    text-align: center;
+    background: #f9f9f9;
+    cursor: pointer;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: 0.3s;
+}
+
+.workflow-tab-btn:hover {
+    background-color: white;
+}
+
+.workflow-tab-btn.active {
+    border-bottom: 2px solid #f1b300;
+    font-weight: bold;
+}
+
+.workflow-tab-content {
+    display: none;
+}
+
+.workflow-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 14px;
+    color: #555;
+}
+
+.workflow-input-field {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 16px;
+}

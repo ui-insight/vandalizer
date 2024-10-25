@@ -1,9 +1,56 @@
-<div id="workflowAddFormattingModal" class="modal informationmodal">
-    <div class="modal-content" style="margin: 5% auto;"> 
-        <h2 style="margin-top: 0px; text-align: left;">Add formatting</h2>
+<div id="workflowAddExtractionsModal" class="modal informationmodal" style="display: block;">
+    <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
+        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Extractions</h2>
+
+        <!-- Tabbed navigation -->
+        <div class="workflow-tab-container">
+            <button class="workflow-tab-btn active" id="selectDropdownTab" onclick="openAddExtractionTab('selectDropdown')">Select from List</button>
+            <button class="workflow-tab-btn " id="manualInputTab" onclick="openAddExtractionTab('manualInput')">Enter Manually</button>
+        </div>
+
+        <!-- Tab content for dropdown selection -->
+        <div class="workflow-tab-content" id="selectDropdown" style="display: block;">
+            <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
+            <select id="extractionSetDropdown" class="workflow-input-field">
+                <!-- Options are populated dynamically from the extraction_sets variable -->
+                <script>
+                    const extractionSets = ["Set 1", "Set 2", "Set 3"]; // Replace with actual variable
+                    const dropdown = document.getElementById("extractionSetDropdown");
+                    extractionSets.forEach(set => {
+                        const option = document.createElement("option");
+                        option.value = set;
+                        option.textContent = set;
+                        dropdown.appendChild(option);
+                    });
+                </script>
+            </select>
+        </div>
+
+        <!-- Tab content for manual input -->
+        <div class="workflow-tab-content" id="manualInput" style="display: none;">
+            <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
+            <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field">
+        </div>
+
         
 
-        <button id="newWorkflowBtn" class="btn btn-primary">Add Formatting</button>
-        <button id="closeNewWorkflowBtn" class="btn btn-primary" style="background-color: white;">Close</button>
+        <!-- Action buttons -->
+         <div style="padding: 15px 0px">
+        <button id="newWorkflowBtn" class="btn btn-primary">Add Extractions</button>
+        <button id="closeNewWorkflowBtn" class="btn btn-secondary">Close</button>
     </div>
+    </div>
+    <script>
+        function openAddExtractionTab(tabName) {
+            // Hide all tab content
+            document.querySelectorAll('.workflow-tab-content').forEach(content => content.style.display = 'none');
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.workflow-tab-btn').forEach(btn => btn.classList.remove('active'));
+            // Show the selected tab content and mark the button as active
+            document.getElementById(tabName).style.display = 'block';
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+    </script>
+    
 </div>
+

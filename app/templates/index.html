@@ -242,9 +242,19 @@
 
             {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
             {% include "toolpanel/workflows/add_workflow_bottom_panel.html" %}
+            {% if workflow_template != "" %}
+            <div class="search-results-panel" id="search-results-panel"
+                    style="margin: 0px 0px; text-align: left;">
+                    {{ workflow_template|safe }}
+                    
+            </div>     
+                    
+            {% else %}  
             <div style="display: none" class="search-results-panel" id="search-results-panel"
                     style="margin: 0px 30px 30px 30px; text-align: left;">
+                    
             </div>      
+            {% endif %}
         </div>
 
         {% include "toolpanel/chat/chat_search_panel.html" %}

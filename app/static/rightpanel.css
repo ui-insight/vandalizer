@@ -388,6 +388,7 @@ button.shadow-button:hover {
   border-radius: 6px;
   padding: 15px;
   margin-right: 15px;
+  aspect-ratio: 1;
 }
 
 .add-task-content {
