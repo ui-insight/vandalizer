@@ -7,6 +7,9 @@ from pypdf import PdfReader
 from app import app
 
 
+# TODO utilities functions to convert search_set_item into workflow step data.
+
+
 class WorkflowStep(me.Document):
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
@@ -61,6 +64,23 @@ class SmartDocument(me.Document):
             return f"{days} days"
         else:
             return self.created_at.strftime("%Y-%m-%d")
+
+    def to_workflow(self):
+        steps = []
+        step = WorkflowStep(
+            name="Document",
+            data={
+                "filename": self.path,
+            },
+        )
+        steps.append(step)
+        workflow = Workflow(
+            name=self.title,
+            user_id=self.user_id,
+            steps=steps,
+            space=self.space,
+        )
+        return workflow
 
 
 class SmartFolder(me.Document):
@@ -127,6 +147,40 @@ class SearchSet(me.Document):
             fields.append(field_name)
 
         return fields
+
+    def to_workflow(self):
+        steps = []
+        for item in self.items():
+            if item.searchtype == "search":
+                step = WorkflowStep(
+                    name="Search",
+                    data={
+                        "searchphrase": item.searchphrase,
+                        "searchset": self.uuid,
+                        "searchtype": item.searchtype,
+                        "text_blocks": item.text_blocks,
+                        "pdf_binding": item.pdf_binding,
+                    },
+                )
+            else:
+                step = WorkflowStep(
+                    name="Extraction",
+                    data={
+                        "searchphrase": item.searchphrase,
+                        "searchset": self.uuid,
+                        "searchtype": item.searchtype,
+                        "text_blocks": item.text_blocks,
+                        "pdf_binding": item.pdf_binding,
+                    },
+                )
+            steps.append(step)
+        workflow = Workflow(
+            name=self.title,
+            user_id=self.user_id,
+            steps=steps,
+            space=self.space,
+        )
+        return workflow
 
 
 class SearchSetItem(me.Document):
