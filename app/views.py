@@ -26,6 +26,7 @@ from app.models import (
     Feedback,
     FeedbackCounter,
     Workflow,
+    WorkflowAttachment
 )
 from app.forms import LoginForm, SpaceForm
 import os
