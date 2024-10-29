@@ -14,6 +14,9 @@ class WorkflowStep(me.Document):
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
+class WorkflowAttachment(me.Document):
+    attachment = me.StringField(required=True, max_length=50)
+   
 
 class Workflow(me.Document):
     name = me.StringField(required=True, max_length=50)
@@ -22,6 +25,7 @@ class Workflow(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     steps = me.ListField(me.ReferenceField(WorkflowStep))
+    attachments = me.ListField(me.ReferenceField(WorkflowAttachment))
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
 

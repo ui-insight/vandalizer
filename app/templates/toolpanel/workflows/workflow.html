@@ -21,7 +21,7 @@
             </div>
             <div class="step-header">
                 <span>Documents Selected</span>
-                <span class="attachment-info">None selected + 1 attached</span>
+                <span class="attachment-info"><span class="doc-selected-counter">None selected</span> <span>+ {{ workflow.attachments|length }} attached</span></span>
             </div>
             <div class="step-icon">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
@@ -33,6 +33,7 @@
     </div>
     <div class="step-connection-line"></div>
 
+    {% for step in workflow.steps %}
     <div class="workflow-step">
         <div class="step-connector top">
             <img src='/static/images/step-connector-top.png'> 
@@ -54,6 +55,9 @@
         </div>
     </div>
     <div class="step-connection-line"></div>
+    {% endfor %}
+
+
 
   
     <!-- <div class="workflow-step">
