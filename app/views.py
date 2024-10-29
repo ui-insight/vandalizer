@@ -103,7 +103,7 @@ def logout():
 #######################################
 ######## HOME ######
 #######################################
-
+## MARK: Home
 
 @app.route("/home")
 def home():
@@ -275,6 +275,7 @@ def home():
         workflow_id=workflow_id
     )
 
+## MARK: Uploads
 
 @app.route("/upload_fillable_pdf", methods=["POST"])
 def upload_fillable_pdf():
@@ -439,6 +440,7 @@ def ingest_semantics(document):
     semantics = SemanticIngest()
     semantics.ingest(document=document)
 
+## MARK: Chat
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -485,6 +487,7 @@ def chat():
     print(response)
     return jsonify(response)
 
+## MARK: Tasks
 
 @app.route("/api/add_search_set", methods=["POST"])
 def add_search_set():
@@ -551,6 +554,231 @@ def add_search_term():
     }
     return jsonify(response)
 
+@app.route("/api/search_results", methods=["POST"])
+def grab_template():
+    data = request.get_json()
+    searchset_uuid = data["search_set_uuid"]
+    document_uuids = data["document_uuids"]
+
+    edit_mode = data["edit_mode"]
+    documents = []
+    for doc_uuid in document_uuids:
+        document = SmartDocument.objects(uuid=doc_uuid).first()
+        documents.append(document)
+
+    search_set = SearchSet.objects(uuid=searchset_uuid).first()
+
+    print("Document count: " + str(len(documents)))
+
+    if search_set is None:
+        return jsonify({"error": "Search set not found."})
+
+    if search_set.set_type == "extraction":
+        if edit_mode:
+            template = render_template(
+                "toolpanel/extractions/edit_search_results.html",
+                search_set=search_set,
+                documents=documents,
+                bindable_fields=search_set.get_fillable_fields(),
+            )
+
+            response = {
+                "template": template,
+            }
+
+            return jsonify(response)
+        else:
+            template = render_template(
+                "toolpanel/extractions/search_results.html",
+                search_set=search_set,
+                documents=documents,
+            )
+            response = {
+                "template": template,
+            }
+
+            return jsonify(response)
+    else:
+        if edit_mode:
+            template = render_template(
+                "toolpanel/prompts/edit_prompt_results.html",
+                search_set=search_set,
+                documents=documents,
+            )
+            response = {
+                "template": template,
+            }
+            return jsonify(response)
+        else:
+            template = render_template(
+                "toolpanel/prompts/prompt_results.html",
+                search_set=search_set,
+                documents=documents,
+            )
+            response = {
+                "template": template,
+            }
+            return jsonify(response)
+
+
+
+@app.route("/api/semantic_search", methods=["POST"])
+def semantic_search():
+    data = request.get_json()
+    search_term = data["search_term"]
+    document_uuids = data["document_uuids"]
+
+    documents = []
+    for doc_uuid in document_uuids:
+        document = SmartDocument.objects(uuid=doc_uuid).first()
+        documents.append(document)
+
+    semantics = SemanticIngest()
+    results = semantics.search(search_term, documents.first)
+    print(results)
+
+    response = {
+        "results": results,
+    }
+    return jsonify(response)
+
+
+@app.route("/api/begin_search", methods=["POST"])
+def begin_search():
+    data = request.get_json()
+    searchset_uuid = data["search_set_uuid"]
+    document_uuids = data["document_uuids"]
+
+    documents = []
+    document_paths = []
+    for doc_uuid in document_uuids:
+        document = SmartDocument.objects(uuid=doc_uuid).first()
+        documents.append(document)
+        document_paths.append(document.path)
+
+    print("Fetch loading template:" + searchset_uuid)
+
+    search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    keys = []
+    items = []
+    if search_set is not None:
+        items = search_set.items()
+    for item in items:
+        if item.searchtype == "extraction":
+            keys.append(item.searchphrase)
+
+    if len(keys) > 0:
+        em = ExtractionManager2()
+        em.root_path = app.root_path
+        results = em.extract(keys, document_paths)
+        print(results)
+        template = render_template(
+            "toolpanel/extractions/search_results.html",
+            search_set=search_set,
+            results=results,
+            documents=documents,
+        )
+        response = {
+            "template": template,
+        }
+        return jsonify(response)
+    else:
+        template = render_template(
+            "toolpanel/extractions/search_results.html",
+            search_set=search_set,
+            documents=documents,
+        )
+        response = {
+            "template": template,
+        }
+        return jsonify(response)
+
+
+@app.route("/api/begin_prompt_search", methods=["POST"])
+def begin_prompt_search():
+    data = request.get_json()
+    searchset_uuid = data["search_set_uuid"]
+    document_path = data["document"]
+
+    search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    keys = []
+    items = search_set.items()
+
+    if len(items) > 0:
+        llm = OpenAIInterface()
+        llm.load_document(app.root_path, document_path)
+        results = {}
+        for item in items:
+            results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
+        print(results)
+        template = render_template(
+            "toolpanel/prompts/prompt_results.html",
+            search_set=search_set,
+            results=results,
+        )
+        response = {
+            "template": template,
+        }
+        return jsonify(response)
+    else:
+        template = render_template(
+            "toolpanel/prompts/prompt_results.html", search_set=search_set
+        )
+        response = {
+            "template": template,
+        }
+        return jsonify(response)
+
+## MARK: Workflows
+@app.route("/api/create_workflow", methods=["POST"])
+def add_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    print("workflow_data", workflow_data)
+    workflow = Workflow(
+        name=workflow_data["name"],
+        description=workflow_data["description"],
+        user_id=session["user_id"],
+    )
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/delete_workflow", methods=["GET"])
+def delete_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_id = request.args.get("workflow_id")
+    Workflow.objects(id=workflow_id).delete()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/update_workflow", methods=["POST"])
+def update_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow.name = workflow_data["name"]
+    workflow.description = workflow_data["description"]
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/execute_workflow", methods=["GET", "POST"])
+def workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    engine = build_workflow(workflow_data.dict())
+    output, data = engine.execute()
+    return jsonify({"output": output, "steps": data})
 
 @app.route("/api/fetch_workflow", methods=["POST"])
 def fetch_workflow():
@@ -568,6 +796,57 @@ def fetch_workflow():
     }
 
     return jsonify(response)
+
+## MARK: Workflow steps
+@app.route("/api/add_workflow_step", methods=["POST"])
+def add_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    step = workflow_data["step"]
+    workflow.steps.append(step)
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/delete_workflow_step", methods=["POST"])
+def delete_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    step_index = workflow_data["step_index"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    if step_index < len(workflow.steps):
+        error = "Step index out of range"
+        return jsonify({"error": error})
+    workflow.steps.pop(step_index)
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
+@app.route("/api/update_workflow_step", methods=["POST"])
+def update_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    step_index = workflow_data["step_index"]
+    step = workflow_data["step"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    if step_index < len(workflow.steps):
+        error = "Step index out of range"
+        return jsonify({"error": error})
+    workflow.steps[step_index] = step
+    workflow.save()
+    return redirect("/home?section=Workflows")
+
+
 
 @app.route("/api/workflows/add_extraction_step", methods=["GET", "POST"])
 def workflow_add_extraction_step():
@@ -749,180 +1028,8 @@ def workflow_add_document_step():
 
         return jsonify( {"response": "Placeholder"})
 
-@app.route("/api/search_results", methods=["POST"])
-def grab_template():
-    data = request.get_json()
-    searchset_uuid = data["search_set_uuid"]
-    document_uuids = data["document_uuids"]
 
-    edit_mode = data["edit_mode"]
-    documents = []
-    for doc_uuid in document_uuids:
-        document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-
-    search_set = SearchSet.objects(uuid=searchset_uuid).first()
-
-    print("Document count: " + str(len(documents)))
-
-    if search_set is None:
-        return jsonify({"error": "Search set not found."})
-
-    if search_set.set_type == "extraction":
-        if edit_mode:
-            template = render_template(
-                "toolpanel/extractions/edit_search_results.html",
-                search_set=search_set,
-                documents=documents,
-                bindable_fields=search_set.get_fillable_fields(),
-            )
-
-            response = {
-                "template": template,
-            }
-
-            return jsonify(response)
-        else:
-            template = render_template(
-                "toolpanel/extractions/search_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-
-            return jsonify(response)
-    else:
-        if edit_mode:
-            template = render_template(
-                "toolpanel/prompts/edit_prompt_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-            return jsonify(response)
-        else:
-            template = render_template(
-                "toolpanel/prompts/prompt_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-            return jsonify(response)
-
-
-@app.route("/api/semantic_search", methods=["POST"])
-def semantic_search():
-    data = request.get_json()
-    search_term = data["search_term"]
-    document_uuids = data["document_uuids"]
-
-    documents = []
-    for doc_uuid in document_uuids:
-        document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-
-    semantics = SemanticIngest()
-    results = semantics.search(search_term, documents.first)
-    print(results)
-
-    response = {
-        "results": results,
-    }
-    return jsonify(response)
-
-
-@app.route("/api/begin_search", methods=["POST"])
-def begin_search():
-    data = request.get_json()
-    searchset_uuid = data["search_set_uuid"]
-    document_uuids = data["document_uuids"]
-
-    documents = []
-    document_paths = []
-    for doc_uuid in document_uuids:
-        document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-        document_paths.append(document.path)
-
-    print("Fetch loading template:" + searchset_uuid)
-
-    search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    keys = []
-    items = []
-    if search_set is not None:
-        items = search_set.items()
-    for item in items:
-        if item.searchtype == "extraction":
-            keys.append(item.searchphrase)
-
-    if len(keys) > 0:
-        em = ExtractionManager2()
-        em.root_path = app.root_path
-        results = em.extract(keys, document_paths)
-        print(results)
-        template = render_template(
-            "toolpanel/extractions/search_results.html",
-            search_set=search_set,
-            results=results,
-            documents=documents,
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
-    else:
-        template = render_template(
-            "toolpanel/extractions/search_results.html",
-            search_set=search_set,
-            documents=documents,
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
-
-
-@app.route("/api/begin_prompt_search", methods=["POST"])
-def begin_prompt_search():
-    data = request.get_json()
-    searchset_uuid = data["search_set_uuid"]
-    document_path = data["document"]
-
-    search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    keys = []
-    items = search_set.items()
-
-    if len(items) > 0:
-        llm = OpenAIInterface()
-        llm.load_document(app.root_path, document_path)
-        results = {}
-        for item in items:
-            results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
-        print(results)
-        template = render_template(
-            "toolpanel/prompts/prompt_results.html",
-            search_set=search_set,
-            results=results,
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
-    else:
-        template = render_template(
-            "toolpanel/prompts/prompt_results.html", search_set=search_set
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
-
+## MARK: File management
 
 @app.route("/rename_document", methods=["POST"])
 def rename_document():
@@ -1046,6 +1153,7 @@ def delete_search_set_item():
 ##################
 # Spaces         #
 ##################
+## MARK: Spaces
 @app.route("/spaces/new", methods=["GET", "POST"])
 def new_space():
     if request.method == "POST":
@@ -1287,102 +1395,4 @@ def feedback():
     return jsonify(response)
 
 
-#### Workflow ####
-@app.route("/api/create_workflow", methods=["POST"])
-def add_workflow():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    print("workflow_data", workflow_data)
-    workflow = Workflow(
-        name=workflow_data["name"],
-        description=workflow_data["description"],
-        user_id=session["user_id"],
-    )
-    workflow.save()
-    return redirect("/home?section=Workflows")
 
-
-@app.route("/api/delete_workflow", methods=["GET"])
-def delete_workflow():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_id = request.args.get("workflow_id")
-    Workflow.objects(id=workflow_id).delete()
-    return redirect("/home?section=Workflows")
-
-
-@app.route("/api/update_workflow", methods=["POST"])
-def update_workflow():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
-    workflow = Workflow.objects(id=workflow_id).first()
-    workflow.name = workflow_data["name"]
-    workflow.description = workflow_data["description"]
-    workflow.save()
-    return redirect("/home?section=Workflows")
-
-
-@app.route("/api/add_workflow_step", methods=["POST"])
-def add_workflow_step():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
-    workflow = Workflow.objects(id=workflow_id).first()
-    step = workflow_data["step"]
-    workflow.steps.append(step)
-    workflow.save()
-    return redirect("/home?section=Workflows")
-
-
-@app.route("/api/delete_workflow_step", methods=["POST"])
-def delete_workflow_step():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
-    step_index = workflow_data["step_index"]
-    workflow = Workflow.objects(id=workflow_id).first()
-    if step_index < len(workflow.steps):
-        error = "Step index out of range"
-        return jsonify({"error": error})
-    workflow.steps.pop(step_index)
-    workflow.save()
-    return redirect("/home?section=Workflows")
-
-
-@app.route("/api/update_workflow_step", methods=["POST"])
-def update_workflow_step():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
-    step_index = workflow_data["step_index"]
-    step = workflow_data["step"]
-    workflow = Workflow.objects(id=workflow_id).first()
-    if step_index < len(workflow.steps):
-        error = "Step index out of range"
-        return jsonify({"error": error})
-    workflow.steps[step_index] = step
-    workflow.save()
-    return redirect("/home?section=Workflows")
-
-
-@app.route("/api/execute_workflow", methods=["GET", "POST"])
-def workflow():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    engine = build_workflow(workflow_data.dict())
-    output, data = engine.execute()
-    return jsonify({"output": output, "steps": data})
