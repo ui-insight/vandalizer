@@ -692,6 +692,61 @@ def begin_search():
             "template": template,
         }
         return jsonify(response)
+    
+@app.route("/delete_search_set", methods=["GET"])
+def delete_search_set():
+    search_set_uuid = request.args.get("uuid")
+    print(search_set_uuid)
+    search_set = SearchSet.objects(id=search_set_uuid).first()
+    search_set.delete()
+    return redirect("/")
+
+
+@app.route("/api/rename_search_set", methods=["POST"])
+def rename_search_set():
+    data = request.get_json()
+    search_set_uuid = data["search_set_uuid"]
+    new_title = data["new_title"]
+    print(search_set_uuid)
+    search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    search_set.title = new_title
+    search_set.save()
+
+    return jsonify({"complete": True})
+
+
+@app.route("/api/clone_search_set", methods=["POST"])
+def clone_search_set():
+    data = request.get_json()
+    search_set_uuid = data["search_set_uuid"]
+    print(search_set_uuid)
+    search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    new_search_set = deepcopy(search_set)
+    new_search_set.id = None
+    new_search_set.uuid = uuid.uuid4().hex
+    new_search_set.is_global = False
+    new_search_set.title = "Copy of " + new_search_set.title
+    new_search_set.save()
+
+    # Clone the search set items
+    for item in search_set.items():
+        new_item = deepcopy(item)
+        new_item.id = None
+        new_item.searchset = new_search_set.uuid
+        new_item.save()
+
+    return jsonify({"complete": True})
+
+
+@app.route("/api/delete_search_set_item", methods=["POST"])
+def delete_search_set_item():
+    data = request.get_json()
+    print("Deleting search set item")
+    search_set_item_uuid = data["uuid"]
+    print(search_set_item_uuid)
+    search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
+    search_set.delete()
+    return jsonify({"complete": True})
 
 
 @app.route("/api/begin_prompt_search", methods=["POST"])
@@ -1094,60 +1149,65 @@ def delete_documents():
     return redirect("/home")
 
 
-@app.route("/delete_search_set", methods=["GET"])
-def delete_search_set():
-    search_set_uuid = request.args.get("uuid")
-    print(search_set_uuid)
-    search_set = SearchSet.objects(id=search_set_uuid).first()
-    search_set.delete()
-    return redirect("/")
+@app.route("/files/delete_folder", methods=["GET"])
+def delete_folder():
+    folder_id = request.args.get("folder_id")
+    SmartFolder.objects.filter(uuid=folder_id).delete()
+
+    # Delete all subfolders
+    SmartFolder.objects.filter(parent_id=folder_id).delete()
+
+    # Delete all subdocuments
+    SmartDocument.objects.filter(folder=folder_id).delete()
+    return redirect("/home")
 
 
-@app.route("/api/rename_search_set", methods=["POST"])
-def rename_search_set():
-    data = request.get_json()
-    search_set_uuid = data["search_set_uuid"]
-    new_title = data["new_title"]
-    print(search_set_uuid)
-    search_set = SearchSet.objects(uuid=search_set_uuid).first()
-    search_set.title = new_title
-    search_set.save()
+@app.route("/files/move_item", methods=["POST"])
+def move_item():
+    item_type = request.POST.get("item_type")
+    item_id = request.POST.get("item_id")
+    target_folder_id = request.POST.get("target_folder_id")
 
-    return jsonify({"complete": True})
+    if item_type == "folder":
+        SmartFolder.objects.filter(id=item_id).update(parent_id=target_folder_id)
+    elif item_type == "document":
+        SmartDocument.objects.filter(uuid=item_id).update(folder_id=target_folder_id)
 
-
-@app.route("/api/clone_search_set", methods=["POST"])
-def clone_search_set():
-    data = request.get_json()
-    search_set_uuid = data["search_set_uuid"]
-    print(search_set_uuid)
-    search_set = SearchSet.objects(uuid=search_set_uuid).first()
-    new_search_set = deepcopy(search_set)
-    new_search_set.id = None
-    new_search_set.uuid = uuid.uuid4().hex
-    new_search_set.is_global = False
-    new_search_set.title = "Copy of " + new_search_set.title
-    new_search_set.save()
-
-    # Clone the search set items
-    for item in search_set.items():
-        new_item = deepcopy(item)
-        new_item.id = None
-        new_item.searchset = new_search_set.uuid
-        new_item.save()
-
-    return jsonify({"complete": True})
+    return redirect("file_browser")
 
 
-@app.route("/api/delete_search_set_item", methods=["POST"])
-def delete_search_set_item():
-    data = request.get_json()
-    print("Deleting search set item")
-    search_set_item_uuid = data["uuid"]
-    print(search_set_item_uuid)
-    search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
-    search_set.delete()
-    return jsonify({"complete": True})
+@app.route("/files/toggle_default_doc", methods=["GET"])
+def add_default_doc():
+    user = load_user()
+    doc_id = request.args.get("doc_id")
+    folder_id = request.args.get("folder_id")
+    redirect_url = request.args.get("redirect_url")
+    redirect_url = f"/home?{redirect_url}"
+
+    doc = SmartDocument.objects(uuid=doc_id).first()
+    # toggle the default doc
+    doc.is_default = not doc.is_default
+    doc.save()
+
+    return redirect(redirect_url)
+
+
+@app.route("/files/create_folder", methods=["GET", "POST"])
+def create_folder():
+    parent_id = request.form["parent_id"]
+    name = request.form["name"]
+    space_id = request.form["space_id"]
+    SmartFolder.objects.create(
+        title=name,
+        parent_id=parent_id,
+        space=space_id,
+        user_id=session["user_id"],
+        uuid=uuid.uuid4().hex,
+    )
+    return redirect("/home")
+
+
+
 
 
 ##################
@@ -1273,66 +1333,10 @@ def load_user():
     return None
 
 
-@app.route("/files/delete_folder", methods=["GET"])
-def delete_folder():
-    folder_id = request.args.get("folder_id")
-    SmartFolder.objects.filter(uuid=folder_id).delete()
-
-    # Delete all subfolders
-    SmartFolder.objects.filter(parent_id=folder_id).delete()
-
-    # Delete all subdocuments
-    SmartDocument.objects.filter(folder=folder_id).delete()
-    return redirect("/home")
-
-
-@app.route("/files/move_item", methods=["POST"])
-def move_item():
-    item_type = request.POST.get("item_type")
-    item_id = request.POST.get("item_id")
-    target_folder_id = request.POST.get("target_folder_id")
-
-    if item_type == "folder":
-        SmartFolder.objects.filter(id=item_id).update(parent_id=target_folder_id)
-    elif item_type == "document":
-        SmartDocument.objects.filter(uuid=item_id).update(folder_id=target_folder_id)
-
-    return redirect("file_browser")
-
-
-@app.route("/files/toggle_default_doc", methods=["GET"])
-def add_default_doc():
-    user = load_user()
-    doc_id = request.args.get("doc_id")
-    folder_id = request.args.get("folder_id")
-    redirect_url = request.args.get("redirect_url")
-    redirect_url = f"/home?{redirect_url}"
-
-    doc = SmartDocument.objects(uuid=doc_id).first()
-    # toggle the default doc
-    doc.is_default = not doc.is_default
-    doc.save()
-
-    return redirect(redirect_url)
-
-
-####### File Browser #######
-@app.route("/files/create_folder", methods=["GET", "POST"])
-def create_folder():
-    parent_id = request.form["parent_id"]
-    name = request.form["name"]
-    space_id = request.form["space_id"]
-    SmartFolder.objects.create(
-        title=name,
-        parent_id=parent_id,
-        space=space_id,
-        user_id=session["user_id"],
-        uuid=uuid.uuid4().hex,
-    )
-    return redirect("/home")
 
 
 ####### Feedback #######
+## MARK: Feedback
 @app.route("/feedback", methods=["POST"])
 def feedback():
 
