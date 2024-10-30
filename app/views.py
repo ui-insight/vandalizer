@@ -868,21 +868,22 @@ def add_workflow_step():
     return redirect("/home?section=Workflows")
 
 
-@app.route("/api/delete_workflow_step", methods=["POST"])
+@app.route("/api/workflow/delete_step", methods=["POST"])
 def delete_workflow_step():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
     workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
-    step_index = workflow_data["step_index"]
-    workflow = Workflow.objects(id=workflow_id).first()
-    if step_index < len(workflow.steps):
-        error = "Step index out of range"
-        return jsonify({"error": error})
-    workflow.steps.pop(step_index)
-    workflow.save()
-    return redirect("/home?section=Workflows")
+    workflow_step_id = workflow_data["workflow_step_id"]
+    step = WorkflowStep.objects(id=workflow_step_id).first()
+    if not step:
+        return jsonify({"success": False, "error": "Step not found"}), 404
+    
+    # Find any Workflow containing this step and remove the reference
+    Workflow.objects(steps=step).update(pull__steps=step)
+    step.delete()
+
+    return jsonify({"success": True})
 
 
 @app.route("/api/update_workflow_step", methods=["POST"])
@@ -914,9 +915,10 @@ def workflow_add_extraction_step():
         space_id = data.get("space_id")
 
         is_editing = data.get("editing") or False
+        workflow_step_id = ""
 
         if is_editing:
-            print("EDITING")
+            workflow_step_id = data.get("workflow_step_id")
 
         print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
@@ -940,7 +942,8 @@ def workflow_add_extraction_step():
             "toolpanel/workflows/modals/workflow_add_extractions_modal.html",
             workflow=workflow,
             extraction_sets=extraction_sets_objects,
-            is_editing=is_editing
+            is_editing=is_editing,
+            workflow_step_id=workflow_step_id
         )
         response = {"template": template}
         return jsonify(response)
