@@ -1,6 +1,10 @@
 <div id="workflowAddExtractionsModal" class="modal informationmodal" style="display: block;">
     <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
+        {% if is_editing %}
+        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Edit Extractions</h2>
+        {% else %}
         <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Extractions</h2>
+        {% endif %}
 
         <!-- Tabbed navigation -->
         <div class="workflow-tab-container">
@@ -26,9 +30,18 @@
         </div>        
 
         <!-- Action buttons -->
-         <div style="padding: 30px 0px 0px 0px; margin: 0 auto;">
-        <button id="confirmExtractionStepBtn" class="btn btn-primary">Add Extractions</button>
+         <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
+        <button id="confirmExtractionStepBtn" class="btn btn-primary">
+            {% if is_editing %}
+            Edit Extractions
+            {% else %}
+            Add Extractions
+            {% endif %}
+        </button>
         <button id="closeAddExtractionToWorkflowBtn" class="btn btn-secondary">Close</button>
+        {% if is_editing %}
+        <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
+        {% endif %}
     </div>
     </div>
     <script>
