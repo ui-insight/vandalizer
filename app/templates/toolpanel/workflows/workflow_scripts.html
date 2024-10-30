@@ -172,11 +172,23 @@ $(document).ready(function () {
 
     function workflowConfirmStep(stepType) {
         console.log(current_space_id);
-        let data = JSON.stringify({
+        dict = {
             workflow_uuid: current_workflow_id,
             space_id: current_space_id,
-            search_set_id: stepType === 'extraction' ? $('#extractionSetDropdown')[0].value : undefined
-        });
+        }
+
+        if (stepType == "extraction") {
+            let activeTab = $('.workflow-tab-btn.active').attr('id');
+            if (activeTab == "manualInputTab") {
+                let manualInput = $('#extractionInput')[0].value;
+                dict['manual_input'] = manualInput;
+            } else {
+                let dropdown_selection = $('#extractionSetDropdown')[0].value;
+                dict["search_set_id"] = dropdown_selection
+            }
+        }
+
+        let data = JSON.stringify(dict);
 
         $.ajax({
             url: `/api/workflows/add_${stepType}_step`,

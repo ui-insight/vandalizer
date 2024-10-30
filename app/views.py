@@ -951,19 +951,28 @@ def workflow_add_extraction_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        search_set_id = data["search_set_id"]
+        search_set_id = data["search_set_id"] if "search_set_id" in data else None
+        manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
-        searchset = SearchSet.objects(uuid=search_set_id).first()
+       
+        if search_set_id:
+            searchset = SearchSet.objects(uuid=search_set_id).first()
+            workflow_step = WorkflowStep(
+                        name="Extraction",
+                        data=searchset.to_workflow_step_data())
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
+        elif manual_input:
+            workflow_step = WorkflowStep(
+                        name="Extraction",
+                        data={"searchphrases": manual_input})
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
 
-        workflow_step = WorkflowStep(
-                    name="Extraction",
-                    data=searchset.to_workflow_step_data())
-        workflow_step.save()
-        workflow.steps.append(workflow_step)
-        workflow.save()
 
-
-        return jsonify( {"response": "Placeholder"})
+        return jsonify( {"response": "success"})
     
 ## MARK: ~~ Attachments
 @app.route("/api/workflows/add_attachment", methods=["GET", "POST"])
@@ -1033,12 +1042,12 @@ def workflow_add_prompt_step():
         extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
         extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
 
-
-        
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets
+            extraction_sets=extraction_sets,
+            is_editing=is_editing,
+            workflow_step_id=workflow_step_id
         )
         response = {"template": template}
         return jsonify(response)
