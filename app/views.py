@@ -957,9 +957,7 @@ def workflow_add_extraction_step():
 
         workflow_step = WorkflowStep(
                     name="Extraction",
-                    data={
-                        "searchphrase": ""
-                    })
+                    data=searchset.to_workflow_step_data())
         workflow_step.save()
         workflow.steps.append(workflow_step)
         workflow.save()
