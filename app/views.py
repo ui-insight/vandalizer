@@ -825,6 +825,18 @@ def update_workflow():
     workflow.save()
     return redirect("/home?section=Workflows")
 
+@app.route("/api/workflow/run", methods=["POST"])
+def run_workflow():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    print("Run workflow here")
+
+
+    return jsonify({"success": True})
 
 @app.route("/api/execute_workflow", methods=["GET", "POST"])
 def workflow():
