@@ -136,19 +136,15 @@ class SearchSet(me.Document):
 
         return fields
 
-    def to_workflow_step(self):
-        search_phrases = []
-        for item in self.items():
-            search_phrases.append(item.searchphrase)
+    def to_workflow_step_data(self):
+
         workflow_data = {
-            "search_phrases": search_phrases,
+            "search_set_type": self.set_type,
             "search_set_uuid": self.uuid,
             "search_set_title": self.title,
             "search_set_space": self.space,
         }
-        workflow_step = WorkflowStep(name="SearchSet", data=workflow_data)
-        # workflow_step.save()
-        return workflow_step
+        return workflow_data
 
 
 class SearchSetItem(me.Document):
@@ -157,6 +153,13 @@ class SearchSetItem(me.Document):
     searchtype = me.StringField(required=True, max_length=200)
     text_blocks = me.ListField(me.StringField(), required=False)
     pdf_binding = me.StringField(required=False, max_length=200)
+
+    def to_workflow_step_data(self):
+        workflow_data = {
+            "type": self.searchtype,
+            "searchphrase": self.searchphrase,
+        }
+        return workflow_data
 
 
 class WhiteList(me.Document):

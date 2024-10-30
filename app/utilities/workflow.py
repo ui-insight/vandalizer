@@ -19,9 +19,10 @@ load_dotenv()
 
 def add_document_to_workflow_step(document, workflow_step):
     documents = workflow_step.data.get("documents", [])
-    documents.append(document)
-    workflow_step.data["documents"] = documents
-    workflow_step.save()
+    if document not in documents:
+        documents.append(document)
+        workflow_step.data["documents"] = documents
+        workflow_step.save()
     return workflow_step
 
 
