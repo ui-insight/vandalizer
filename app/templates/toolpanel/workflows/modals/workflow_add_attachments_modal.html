@@ -1,0 +1,41 @@
+<div id="workflowAddAttachmentsModal" class="modal informationmodal">
+    <div class="modal-content" style="margin: 5% auto;"> 
+        <h2 style="margin-top: 0px; text-align: left;">Attach document(s)</h2>
+        
+        <div class="file-selector" style="padding: 30px 0px;">
+            <!-- Search bar -->
+            <input type="text" id="fileSearch" placeholder="Search files..." oninput="filterFiles()">
+        
+            <!-- File list rendered with Jinja -->
+            <ul id="fileList">
+                {% for file in files %}
+                <li class="attachment-file-item" data-uuid="{{ file.uuid }}">{{ file.title }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <button id="closeAddAttachmentsBtn" class="btn btn-primary" style="background-color: white;">Close</button>
+    </div>
+
+    <script>
+        function filterFiles() {
+                const searchValue = document.getElementById('fileSearch').value.toLowerCase();
+                const fileList = document.getElementById('fileList');
+                const items = fileList.getElementsByTagName('li');
+
+                Array.from(items).forEach(item => {
+                    const fileName = item.textContent.toLowerCase();
+                    if (fileName.includes(searchValue)) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            }
+
+        $('#closeAddAttachmentsBtn').on("click", function (e) {
+        e.preventDefault();  // Prevent default behavior, if needed
+        $('#workflowAddAttachmentsModal').remove();
+    });
+    </script>
+</div>

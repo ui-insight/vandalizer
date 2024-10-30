@@ -164,3 +164,29 @@
     border-radius: 4px;
     font-size: 16px;
 }
+
+#fileSearch {
+  width: 100%;
+  padding: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#fileList {
+  list-style: none;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+}
+
+#fileList li {
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+
+#fileList li:hover {
+  background-color: #f0f0f5;
+}

@@ -152,6 +152,7 @@ class SearchSet(me.Document):
 
         return fields
 
+
     def to_workflow(self):
         steps = []
         for item in self.items():

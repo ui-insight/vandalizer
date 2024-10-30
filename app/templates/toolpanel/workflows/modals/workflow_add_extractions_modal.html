@@ -12,17 +12,10 @@
         <div class="workflow-tab-content" id="selectDropdown" style="display: block;">
             <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
             <select id="extractionSetDropdown" class="workflow-input-field">
-                <!-- Options are populated dynamically from the extraction_sets variable -->
-                <script>
-                    const extractionSets = {{ extraction_sets | tojson }};
-    const dropdown = document.getElementById("extractionSetDropdown");
-    extractionSets.forEach(set => {
-        const option = document.createElement("option");
-        option.value = set;
-        option.textContent = set;
-        dropdown.appendChild(option);
-    });
-                </script>
+               <option value="Create a new set">Create a new set</option>
+               {% for extraction in extraction_sets %}
+               <option value="{{ extraction.uuid }}">{{ extraction.title }}</option>
+               {% endfor %}
             </select>
         </div>
 
@@ -30,9 +23,7 @@
         <div class="workflow-tab-content" id="manualInput" style="display: none; margin: 0 auto;">
             <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
             <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field">
-        </div>
-
-        
+        </div>        
 
         <!-- Action buttons -->
          <div style="padding: 30px 0px 0px 0px; margin: 0 auto;">

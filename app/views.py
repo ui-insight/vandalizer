@@ -26,6 +26,7 @@ from app.models import (
     Feedback,
     FeedbackCounter,
     Workflow,
+    WorkflowStep,
     WorkflowAttachment
 )
 from app.forms import LoginForm, SpaceForm
@@ -902,7 +903,7 @@ def update_workflow_step():
     return redirect("/home?section=Workflows")
 
 
-
+## MARK: ~~ Extraction
 @app.route("/api/workflows/add_extraction_step", methods=["GET", "POST"])
 def workflow_add_extraction_step():
     if request.method == "GET":
@@ -911,6 +912,11 @@ def workflow_add_extraction_step():
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
+
+        is_editing = data.get("editing") or False
+
+        if is_editing:
+            print("EDITING")
 
         print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
@@ -927,14 +933,14 @@ def workflow_add_extraction_step():
             set_type="extraction",
         ).all()
         extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
-        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
-
+        
 
         
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_extractions_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets
+            extraction_sets=extraction_sets_objects,
+            is_editing=is_editing
         )
         response = {"template": template}
         return jsonify(response)
@@ -943,11 +949,59 @@ def workflow_add_extraction_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
+        search_set_id = data["search_set_id"]
         workflow = Workflow.objects(id=workflow_id).first()
+        searchset = SearchSet.objects(uuid=search_set_id).first()
+
+        workflow_step = WorkflowStep(
+                    name="Extraction",
+                    data={
+                        "searchphrase": ""
+                    })
+        workflow_step.save()
+        workflow.steps.append(workflow_step)
+        workflow.save()
 
 
         return jsonify( {"response": "Placeholder"})
+    
+## MARK: ~~ Attachments
+@app.route("/api/workflows/add_attachment", methods=["GET", "POST"])
+def workflow_add_attachment():
+    if request.method == "GET":
+        # Handle GET request - retrieve and return the template
+        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data = json.loads(data_str)  # Retrieve query parameters, if any
+        workflow_id = data.get("workflow_uuid")
+        space_id = data.get("space_id")
+        user = load_user()
 
+        workflow = Workflow.objects(id=workflow_id).first()
+        current_space = Space.objects(uuid=space_id).first()
+        files = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid, )
+
+        template = render_template(
+            "toolpanel/workflows/modals/workflow_add_attachments_modal.html",
+            workflow=workflow,
+            files=files
+        )
+        response = {"template": template}
+        return jsonify(response)
+    elif request.method == "POST":
+        # Handle POST request - create a new WorkflowStep
+        data = request.get_json()
+        workflow_id = data["workflow_uuid"]
+        document_uuid = data["document_uuid"]
+
+        workflow = Workflow.objects(id=workflow_id).first()
+        attachment = WorkflowAttachment(attachment=document_uuid)
+        attachment.save()
+        workflow.attachments.append(attachment)
+        workflow.save()
+
+        return jsonify( {"response": "Placeholder"})
+
+## MARK: ~~ Prompts
 @app.route("/api/workflows/add_prompt_step", methods=["GET", "POST"])
 def workflow_add_prompt_step():
     if request.method == "GET":
@@ -993,6 +1047,7 @@ def workflow_add_prompt_step():
 
         return jsonify( {"response": "Placeholder"})
 
+## MARK: ~~ Formatting
 @app.route("/api/workflows/add_format_step", methods=["GET", "POST"])
 def workflow_add_format_step():
     if request.method == "GET":
@@ -1038,6 +1093,7 @@ def workflow_add_format_step():
 
         return jsonify( {"response": "Placeholder"})
 
+## MARK: ~~ Documents
 @app.route("/api/workflows/add_document_step", methods=["GET", "POST"])
 def workflow_add_document_step():
     if request.method == "GET":

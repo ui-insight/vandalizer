@@ -23,7 +23,7 @@
                 <span>Documents Selected</span>
                 <span class="attachment-info"><span class="doc-selected-counter">None selected</span> <span>+ {{ workflow.attachments|length }} attached</span></span>
             </div>
-            <div class="step-icon">
+            <div class="step-icon edit-workflow-attachments-btn">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
@@ -34,19 +34,34 @@
     <div class="step-connection-line"></div>
 
     {% for step in workflow.steps %}
+
+   
     <div class="workflow-step">
         <div class="step-connector top">
+            
             <img src='/static/images/step-connector-top.png'> 
+           
         </div>
         <div class="step-content">
             <div class="add-task-icon-container">
+                {{ step.data.name }}
+                {% if step.name == "Extraction" %}
                 <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
+                {% elif step.name == "Prompt" %}
+                <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
+                {% elif step.name == "Format" %}
+                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                {% elif step.name == "Document" %}
+                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
+                {% else %}
+                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                {% endif %}
             </div>
             <div class="step-header">
                 <span>Extract Information</span>
                 <span class="item-info">NSF Budget 16 items</span>
             </div>
-            <div class="step-icon">
+            <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name }}">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
