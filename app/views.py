@@ -832,6 +832,7 @@ def run_workflow():
         return redirect(url_for("login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
+    document_uuids = workflow_data["document_uuids"]
     workflow = Workflow.objects(id=workflow_id).first()
     print("Run workflow here")
 
