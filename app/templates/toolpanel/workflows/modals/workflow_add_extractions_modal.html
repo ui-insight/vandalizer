@@ -31,18 +31,18 @@
 
         <!-- Action buttons -->
          <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-        <button id="confirmExtractionStepBtn" class="btn btn-primary">
+            <button id="confirmExtractionStepBtn" class="btn btn-primary">
+                {% if is_editing %}
+                Edit Extractions
+                {% else %}
+                Add Extractions
+                {% endif %}
+            </button>
+            <button id="closeAddExtractionToWorkflowBtn" class="btn btn-secondary">Close</button>
             {% if is_editing %}
-            Edit Extractions
-            {% else %}
-            Add Extractions
+            <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
             {% endif %}
-        </button>
-        <button id="closeAddExtractionToWorkflowBtn" class="btn btn-secondary">Close</button>
-        {% if is_editing %}
-        <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
-        {% endif %}
-    </div>
+        </div>
     </div>
     <script>
         function openAddExtractionTab(tabName) {
