@@ -190,18 +190,19 @@ class OpenAIInterface:
         )
         prompt += full_text
         # use a tiktoken library for more accurate computation of the total token length for the context
+        # print("total context length: ", total_context_length)
+        # print("docs", documents)
+
+        output = self.perform_llm_call(
+            prompt, question=question, full_text=full_text, root_path=root_path
+        )
+        return output
+
+    def perform_llm_call(self, prompt, **kwargs):
+
         total_context_length = num_tokens_from_text(prompt)
-        print("total context length: ", total_context_length)
-        print("docs", documents)
-
         if total_context_length > max_context_length:
-            return self.handle_long_context(prompt, question, full_text, root_path)
-
-            # review_model = proposal_review_model()
-            # response = review_model(
-            #     proposal=proposal_text, question=question, context=response.answer
-            # )
-            # print("review response: ", response.answer)
+            return self.handle_long_context(**kwargs)
 
         else:
-            return self.handle_short_context(prompt, question, full_text)
+            return self.handle_short_context(**kwargs)

@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 
 from typing import List, Dict, Any
+from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.openai_interface import OpenAIInterface
 
 import re
 import graphlib
@@ -26,34 +28,27 @@ def add_document_to_workflow_step(document, workflow_step):
     return workflow_step
 
 
+def remove_document_from_workflow_step(document, workflow_step):
+    documents = workflow_step.data.get("documents", [])
+    if document in documents:
+        documents.remove(document)
+        workflow_step.data["documents"] = documents
+        workflow_step.save()
+    return workflow_step
+
+
+# TODO prompt and formatter
+#
+
+
 def llm_chat_model(prompt):
-    completion = openai.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return completion.choices[0].message.content
+    open_ai_interface = OpenAIInterface()
+    output = open_ai_interface.perform_llm_call(prompt=prompt)
 
 
-def data_extraction_model(prompt):
-    model = "gpt-4o"
-
-    completion = openai.chat.completions.create(
-        model=model,
-        response_format={"type": "json_object"},
-        messages=[
-            {
-                "role": "system",
-                "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage and provide the response in a JSON format.",
-            },
-            {"role": "user", "content": prompt},
-        ],
-    )
-    output = completion.choices[0].message.content
-    if output is None:
-        return None
-    output = output.replace("\\n", "")
-    output = output.replace("=json", "")
-    output = output.replace("=", "")
+def data_extraction_model(keys, pdf_paths):
+    extraction_manager = ExtractionManager2()
+    output = extraction_manager.extract(keys, pdf_paths)
     return output
 
 
