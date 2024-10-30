@@ -920,7 +920,6 @@ def workflow_add_extraction_step():
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
 
-        print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
  
 
@@ -1014,7 +1013,12 @@ def workflow_add_prompt_step():
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
 
-        print(workflow_id)
+        is_editing = data.get("editing") or False
+        workflow_step_id = ""
+
+        if is_editing:
+            workflow_step_id = data.get("workflow_step_id")
+
         workflow = Workflow.objects(id=workflow_id).first()
  
 
@@ -1046,6 +1050,15 @@ def workflow_add_prompt_step():
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
+
+        workflow_step = WorkflowStep(
+                    name="Prompt",
+                    data={
+                        "searchphrase": ""
+                    })
+        workflow_step.save()
+        workflow.steps.append(workflow_step)
+        workflow.save()
 
 
         return jsonify( {"response": "Placeholder"})
