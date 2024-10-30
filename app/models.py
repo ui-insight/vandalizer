@@ -14,9 +14,10 @@ class WorkflowStep(me.Document):
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
+
 class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)
-   
+
 
 class Workflow(me.Document):
     name = me.StringField(required=True, max_length=50)
@@ -68,23 +69,6 @@ class SmartDocument(me.Document):
             return f"{days} days"
         else:
             return self.created_at.strftime("%Y-%m-%d")
-
-    def to_workflow(self):
-        steps = []
-        step = WorkflowStep(
-            name="Document",
-            data={
-                "filename": self.path,
-            },
-        )
-        steps.append(step)
-        workflow = Workflow(
-            name=self.title,
-            user_id=self.user_id,
-            steps=steps,
-            space=self.space,
-        )
-        return workflow
 
 
 class SmartFolder(me.Document):
@@ -152,40 +136,19 @@ class SearchSet(me.Document):
 
         return fields
 
-
-    def to_workflow(self):
-        steps = []
+    def to_workflow_step(self):
+        search_phrases = []
         for item in self.items():
-            if item.searchtype == "search":
-                step = WorkflowStep(
-                    name="Search",
-                    data={
-                        "searchphrase": item.searchphrase,
-                        "searchset": self.uuid,
-                        "searchtype": item.searchtype,
-                        "text_blocks": item.text_blocks,
-                        "pdf_binding": item.pdf_binding,
-                    },
-                )
-            else:
-                step = WorkflowStep(
-                    name="Extraction",
-                    data={
-                        "searchphrase": item.searchphrase,
-                        "searchset": self.uuid,
-                        "searchtype": item.searchtype,
-                        "text_blocks": item.text_blocks,
-                        "pdf_binding": item.pdf_binding,
-                    },
-                )
-            steps.append(step)
-        workflow = Workflow(
-            name=self.title,
-            user_id=self.user_id,
-            steps=steps,
-            space=self.space,
-        )
-        return workflow
+            search_phrases.append(item.searchphrase)
+        workflow_data = {
+            "search_phrases": search_phrases,
+            "search_set_uuid": self.uuid,
+            "search_set_title": self.title,
+            "search_set_space": self.space,
+        }
+        workflow_step = WorkflowStep(name="SearchSet", data=workflow_data)
+        # workflow_step.save()
+        return workflow_step
 
 
 class SearchSetItem(me.Document):

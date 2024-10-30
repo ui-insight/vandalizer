@@ -13,6 +13,17 @@ import graphlib
 
 load_dotenv()
 
+# TODO add the option to choose the llm model
+# TODO add the option to choose the way we get the document content (luke's model, or pdfreader)
+
+
+def add_document_to_workflow_step(document, workflow_step):
+    documents = workflow_step.data.get("documents", [])
+    documents.append(document)
+    workflow_step.data["documents"] = documents
+    workflow_step.save()
+    return workflow_step
+
 
 def llm_chat_model(prompt):
     completion = openai.chat.completions.create(
