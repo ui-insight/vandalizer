@@ -28,6 +28,7 @@ from app.models import (
     Workflow,
     WorkflowStep,
     WorkflowAttachment,
+    WorkflowResult,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -844,6 +845,7 @@ def run_workflow():
     workflow_id = workflow_data["workflow_id"]
     document_uuids = workflow_data["document_uuids"]
     workflow = Workflow.objects(id=workflow_id).first()
+    workflow.workflow_result = WorkflowResult()
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
@@ -852,7 +854,7 @@ def run_workflow():
         name="Document", data=dict(docs=docs, attachments=attachments)
     )
     workflow.steps.append(document_step)
-    engine = build_workflow_engine(workflow.steps)
+    engine = build_workflow_engine(workflow.steps, workflow=workflow)
 
     output, data = engine.execute()
     return {"output": output, "steps": data}

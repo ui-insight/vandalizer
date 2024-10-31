@@ -165,7 +165,8 @@ class PromptNode(Node):
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
-    def __init__(self):
+    def __init__(self, workflow):
+        self.workflow = workflow
         self.nodes = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
@@ -184,12 +185,18 @@ class WorkflowEngine:
         data = []
         nodes = self.get_topological_order()
         print("nodes", nodes)
+        self.workflow.workflow_result.num_steps_completed = 0
+        self.workflow.workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             if idx == 0:
                 output = node.process(dict())
             else:
                 output = node.process(latest_output)
+
+            self.workflow.workflow_result.steps_output[node.name] = output
+            self.workflow.workflow_result.num_steps_completed += 1
+            self.workflow.workflow_result.save()
 
             latest_output = output
             data.append(
@@ -205,8 +212,9 @@ class WorkflowEngine:
         return latest_output.get("output"), data
 
 
-def build_workflow_engine(steps):
-    engine = WorkflowEngine()
+def build_workflow_engine(steps, workflow):
+    print("Building workflow engine: ", steps, workflow)
+    engine = WorkflowEngine(workflow)
     node_objects = {}
     node_uuids = []
 
