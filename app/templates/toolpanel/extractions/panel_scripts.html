@@ -45,6 +45,7 @@
       const newQs = qs.toString();
       const newhref = `/home?${newQs}`;
       window.history.pushState({}, "", newhref);
+      $("#tasks-panel").hide();
 
       if (tabTitle == "Extract") {
         $("#extraction-panel").show();
@@ -66,6 +67,8 @@
   });
 
   $(document).ready(function () {
+
+    
     // ADD ATTACHMENT
     $("#add-attachment-button").on("click", function () {
       $("#attachmentModal").show();

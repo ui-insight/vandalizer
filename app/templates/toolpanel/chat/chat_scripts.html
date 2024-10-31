@@ -48,17 +48,8 @@
 
   $("#chat-suggestion-2").on("click", function (e) {
     e.preventDefault();
-    console.log("chat button clicked");
-    if (document_uuids != "") {
-      performChat(
-        document_uuids,
-        "Help me understand what this is about",
-        folder_uuid,
-      );
-      return;
-    } else {
-      showToast("Select a document to chat");
-    }
+   
+    $("#tasks-panel").show();
   });
 
   $("#chat-suggestion-3").on("click", function (e) {

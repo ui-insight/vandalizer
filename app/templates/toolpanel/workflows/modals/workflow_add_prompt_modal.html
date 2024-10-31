@@ -17,24 +17,16 @@
         <div class="workflow-tab-content" id="selectDropdown" style="display: none;">
             <label for="extractionSetDropdown" class="workflow-label">Select a prompt:</label>
             <select id="extractionSetDropdown" class="workflow-input-field">
-                <!-- Options are populated dynamically from the extraction_sets variable -->
-                <script>
-                    const extractionSets = {{ extraction_sets | tojson }};
-    const dropdown = document.getElementById("extractionSetDropdown");
-    extractionSets.forEach(set => {
-        const option = document.createElement("option");
-        option.value = set;
-        option.textContent = set;
-        dropdown.appendChild(option);
-    });
-                </script>
+                {% for prompt in prompts %}
+                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
+                {% endfor %}
             </select>
         </div>
 
         <!-- Tab content for manual input -->
         <div class="workflow-tab-content" id="manualInput" style="display: block; margin: 0 auto;">
-            <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-            <input type="text" id="extractionInput" placeholder="e.g., Summarize this for me into a todo list" class="input-field">
+            <label for="promptInput" class="label">Enter prompt:</label>
+            <input type="text" id="promptInput" placeholder="e.g., Summarize this for me into a todo list" class="input-field">
         </div>
 
         
