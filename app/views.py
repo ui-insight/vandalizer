@@ -1,7 +1,7 @@
 import urllib.parse
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
-from app.utilities.workflow import build_workflow
+from app.utilities.workflow import build_workflow_engine
 from flask import (
     url_for,
     send_file,
@@ -27,7 +27,7 @@ from app.models import (
     FeedbackCounter,
     Workflow,
     WorkflowStep,
-    WorkflowAttachment
+    WorkflowAttachment,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -105,6 +105,7 @@ def logout():
 ######## HOME ######
 #######################################
 ## MARK: Home
+
 
 @app.route("/home")
 def home():
@@ -273,10 +274,12 @@ def home():
         max_context_length=max_context_length,
         workflows=workflows,
         workflow_template=workflow_template,
-        workflow_id=workflow_id
+        workflow_id=workflow_id,
     )
 
+
 ## MARK: Uploads
+
 
 @app.route("/upload_fillable_pdf", methods=["POST"])
 def upload_fillable_pdf():
@@ -441,7 +444,9 @@ def ingest_semantics(document):
     semantics = SemanticIngest()
     semantics.ingest(document=document)
 
+
 ## MARK: Chat
+
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
@@ -488,7 +493,9 @@ def chat():
     print(response)
     return jsonify(response)
 
+
 ## MARK: Tasks
+
 
 @app.route("/api/add_search_set", methods=["POST"])
 def add_search_set():
@@ -555,6 +562,7 @@ def add_search_term():
     }
     return jsonify(response)
 
+
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():
     data = request.get_json()
@@ -620,7 +628,6 @@ def grab_template():
                 "template": template,
             }
             return jsonify(response)
-
 
 
 @app.route("/api/semantic_search", methods=["POST"])
@@ -693,7 +700,8 @@ def begin_search():
             "template": template,
         }
         return jsonify(response)
-    
+
+
 @app.route("/delete_search_set", methods=["GET"])
 def delete_search_set():
     search_set_uuid = request.args.get("uuid")
@@ -785,6 +793,7 @@ def begin_prompt_search():
         }
         return jsonify(response)
 
+
 ## MARK: Workflows
 @app.route("/api/create_workflow", methods=["POST"])
 def add_workflow():
@@ -825,6 +834,7 @@ def update_workflow():
     workflow.save()
     return redirect("/home?section=Workflows")
 
+
 @app.route("/api/workflow/run", methods=["POST"])
 def run_workflow():
     user = load_user()
@@ -834,10 +844,21 @@ def run_workflow():
     workflow_id = workflow_data["workflow_id"]
     document_uuids = workflow_data["document_uuids"]
     workflow = Workflow.objects(id=workflow_id).first()
-    print("Run workflow here")
+    attachments = [
+        SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
+    ]
+    docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
+    document_step = WorkflowStep(
+        name="Document", data=dict(docs=docs, attachments=attachments)
+    )
+    workflow.steps.append(document_step)
+    engine = build_workflow_engine(workflow.steps)
 
+    output, data = engine.execute()
+    return {"output": output, "steps": data}
 
-    return jsonify({"success": True})
+    # return jsonify({"success": True})
+
 
 @app.route("/api/execute_workflow", methods=["GET", "POST"])
 def workflow():
@@ -845,9 +866,7 @@ def workflow():
     if user is None:
         return redirect(url_for("login"))
     workflow_data = request.get_json()
-    engine = build_workflow(workflow_data.dict())
-    output, data = engine.execute()
-    return jsonify({"output": output, "steps": data})
+
 
 @app.route("/api/fetch_workflow", methods=["POST"])
 def fetch_workflow():
@@ -865,6 +884,7 @@ def fetch_workflow():
     }
 
     return jsonify(response)
+
 
 ## MARK: Workflow steps
 @app.route("/api/add_workflow_step", methods=["POST"])
@@ -891,7 +911,7 @@ def delete_workflow_step():
     step = WorkflowStep.objects(id=workflow_step_id).first()
     if not step:
         return jsonify({"success": False, "error": "Step not found"}), 404
-    
+
     # Find any Workflow containing this step and remove the reference
     Workflow.objects(steps=step).update(pull__steps=step)
     step.delete()
@@ -934,10 +954,8 @@ def workflow_add_extraction_step():
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
             workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-            print(workflow_step)
 
         workflow = Workflow.objects(id=workflow_id).first()
- 
 
         current_space = Space.objects(uuid=space_id).first()
         global_extraction_sets = SearchSet.objects(
@@ -949,17 +967,17 @@ def workflow_add_extraction_step():
             is_global=False,
             set_type="extraction",
         ).all()
-        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
-        
+        extraction_sets_objects = list(
+            chain(global_extraction_sets, user_extraction_sets)
+        )
 
-        
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_extractions_modal.html",
             workflow=workflow,
             extraction_sets=extraction_sets_objects,
             is_editing=is_editing,
             workflow_step_id=workflow_step_id,
-            workflow_step=workflow_step
+            workflow_step=workflow_step,
         )
         response = {"template": template}
         return jsonify(response)
@@ -971,26 +989,26 @@ def workflow_add_extraction_step():
         search_set_id = data["search_set_id"] if "search_set_id" in data else None
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
-       
+
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
             workflow_step = WorkflowStep(
-                        name="Extraction",
-                        data=searchset.to_workflow_step_data())
+                name="Extraction", data=searchset.to_workflow_step_data()
+            )
             workflow_step.save()
             workflow.steps.append(workflow_step)
             workflow.save()
         elif manual_input:
             workflow_step = WorkflowStep(
-                        name="Extraction",
-                        data={"searchphrases": manual_input})
+                name="Extraction", data={"searchphrases": manual_input}
+            )
             workflow_step.save()
             workflow.steps.append(workflow_step)
             workflow.save()
 
+        return jsonify({"response": "success"})
 
-        return jsonify( {"response": "success"})
-    
+
 ## MARK: ~~ Attachments
 @app.route("/api/workflows/add_attachment", methods=["GET", "POST"])
 def workflow_add_attachment():
@@ -1004,12 +1022,15 @@ def workflow_add_attachment():
 
         workflow = Workflow.objects(id=workflow_id).first()
         current_space = Space.objects(uuid=space_id).first()
-        files = SmartDocument.objects(user_id=user.user_id, space=current_space.uuid, )
+        files = SmartDocument.objects(
+            user_id=user.user_id,
+            space=current_space.uuid,
+        )
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_attachments_modal.html",
             workflow=workflow,
-            files=files
+            files=files,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1025,7 +1046,8 @@ def workflow_add_attachment():
         workflow.attachments.append(attachment)
         workflow.save()
 
-        return jsonify( {"response": "Placeholder"})
+        return jsonify({"response": "Placeholder"})
+
 
 ## MARK: ~~ Prompts
 @app.route("/api/workflows/add_prompt_step", methods=["GET", "POST"])
@@ -1044,23 +1066,36 @@ def workflow_add_prompt_step():
             workflow_step_id = data.get("workflow_step_id")
 
         workflow = Workflow.objects(id=workflow_id).first()
- 
 
         current_space = Space.objects(uuid=space_id).first()
-        
+
         prompt_sets = SearchSetItem.objects(
             # user_id=workflow.user_id,
             # space=current_space.uuid,
             # is_global=False,
             set_type="prompt",
         ).all()
-        
+        user_extraction_sets = SearchSet.objects(
+            user_id=workflow.user_id,
+            space=current_space.uuid,
+            is_global=False,
+            set_type="extraction",
+        ).all()
+        extraction_sets_objects = list(
+            chain(global_extraction_sets, user_extraction_sets)
+        )
+        extraction_sets = ["Create a new set"] + [
+            extraction["title"]
+            for extraction in extraction_sets_objects
+            if "title" in extraction
+        ]
+
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
             prompt_sets=prompt_sets,
             is_editing=is_editing,
-            workflow_step_id=workflow_step_id
+            workflow_step_id=workflow_step_id,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1071,17 +1106,13 @@ def workflow_add_prompt_step():
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
 
-        workflow_step = WorkflowStep(
-                    name="Prompt",
-                    data={
-                        "searchphrase": ""
-                    })
+        workflow_step = WorkflowStep(name="Prompt", data={"searchphrase": ""})
         workflow_step.save()
         workflow.steps.append(workflow_step)
         workflow.save()
 
+        return jsonify({"response": "Placeholder"})
 
-        return jsonify( {"response": "Placeholder"})
 
 ## MARK: ~~ Formatting
 @app.route("/api/workflows/add_format_step", methods=["GET", "POST"])
@@ -1093,9 +1124,7 @@ def workflow_add_format_step():
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
 
-        print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
- 
 
         current_space = Space.objects(uuid=space_id).first()
         global_extraction_sets = SearchSet.objects(
@@ -1107,15 +1136,19 @@ def workflow_add_format_step():
             is_global=False,
             set_type="extraction",
         ).all()
-        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
-        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
+        extraction_sets_objects = list(
+            chain(global_extraction_sets, user_extraction_sets)
+        )
+        extraction_sets = ["Create a new set"] + [
+            extraction["title"]
+            for extraction in extraction_sets_objects
+            if "title" in extraction
+        ]
 
-
-        
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets
+            extraction_sets=extraction_sets,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1126,8 +1159,8 @@ def workflow_add_format_step():
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
 
+        return jsonify({"response": "Placeholder"})
 
-        return jsonify( {"response": "Placeholder"})
 
 ## MARK: ~~ Documents
 @app.route("/api/workflows/add_document_step", methods=["GET", "POST"])
@@ -1139,9 +1172,7 @@ def workflow_add_document_step():
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
 
-        print(workflow_id)
         workflow = Workflow.objects(id=workflow_id).first()
- 
 
         current_space = Space.objects(uuid=space_id).first()
         global_extraction_sets = SearchSet.objects(
@@ -1153,15 +1184,19 @@ def workflow_add_document_step():
             is_global=False,
             set_type="extraction",
         ).all()
-        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
-        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
+        extraction_sets_objects = list(
+            chain(global_extraction_sets, user_extraction_sets)
+        )
+        extraction_sets = ["Create a new set"] + [
+            extraction["title"]
+            for extraction in extraction_sets_objects
+            if "title" in extraction
+        ]
 
-
-        
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_documents_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets
+            extraction_sets=extraction_sets,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1172,11 +1207,11 @@ def workflow_add_document_step():
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
 
-
-        return jsonify( {"response": "Placeholder"})
+        return jsonify({"response": "Placeholder"})
 
 
 ## MARK: File management
+
 
 @app.route("/rename_document", methods=["POST"])
 def rename_document():
@@ -1297,9 +1332,6 @@ def create_folder():
         uuid=uuid.uuid4().hex,
     )
     return redirect("/home")
-
-
-
 
 
 ##################
@@ -1425,8 +1457,6 @@ def load_user():
     return None
 
 
-
-
 ####### Feedback #######
 ## MARK: Feedback
 @app.route("/feedback", methods=["POST"])
@@ -1489,6 +1519,3 @@ def feedback():
         "complete": True,
     }
     return jsonify(response)
-
-
-
