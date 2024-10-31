@@ -929,9 +929,12 @@ def workflow_add_extraction_step():
 
         is_editing = data.get("editing") or False
         workflow_step_id = ""
+        workflow_step = None
 
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
+            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+            print(workflow_step)
 
         workflow = Workflow.objects(id=workflow_id).first()
  
@@ -955,7 +958,8 @@ def workflow_add_extraction_step():
             workflow=workflow,
             extraction_sets=extraction_sets_objects,
             is_editing=is_editing,
-            workflow_step_id=workflow_step_id
+            workflow_step_id=workflow_step_id,
+            workflow_step=workflow_step
         )
         response = {"template": template}
         return jsonify(response)
