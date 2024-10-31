@@ -206,6 +206,7 @@ class WorkflowEngine:
                     input=output.get("input", None),
                 )
             )
+
         if latest_output is None:
             return None, data
 
