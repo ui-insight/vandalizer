@@ -35,12 +35,11 @@
         <div class="workflow-tab-content" id="manualInput" 
         style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
        <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-       <input type="text" id="extractionInput" 
-              placeholder="e.g., Name, Age, Location" 
-              class="input-field" 
+       <input type="text" id="extractionInput"
+              placeholder="e.g., Name, Age, Location"
+              class="input-field"
               value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
-   </div>
-   
+        </div>
 
         <!-- Action buttons -->
          <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">

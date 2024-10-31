@@ -1047,22 +1047,18 @@ def workflow_add_prompt_step():
  
 
         current_space = Space.objects(uuid=space_id).first()
-        global_extraction_sets = SearchSet.objects(
-            space=current_space.uuid, is_global=True, set_type="extraction"
+        
+        prompt_sets = SearchSetItem.objects(
+            # user_id=workflow.user_id,
+            # space=current_space.uuid,
+            # is_global=False,
+            set_type="prompt",
         ).all()
-        user_extraction_sets = SearchSet.objects(
-            user_id=workflow.user_id,
-            space=current_space.uuid,
-            is_global=False,
-            set_type="extraction",
-        ).all()
-        extraction_sets_objects = list(chain(global_extraction_sets, user_extraction_sets))
-        extraction_sets = ["Create a new set"] + [extraction['title'] for extraction in extraction_sets_objects if 'title' in extraction]
-
+        
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets,
+            prompt_sets=prompt_sets,
             is_editing=is_editing,
             workflow_step_id=workflow_step_id
         )

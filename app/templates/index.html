@@ -228,19 +228,17 @@
                         style="padding-right: 5px;"></i>Chat</li>
                     <li class="{% if section == 'Workflows' %}active{% endif %}"><i class="fas fa-file-alt"
                             style="padding-right: 5px;"></i>Workflows</li>
-                    <li class="{% if section == 'Tasks' %}active{% endif %}"><i class="fas fa-keyboard"
-                            style="padding-right: 5px;"></i>Tasks</li>
+                   
                     
                 </ul>
                 {% include "toolpanel/chat/chat_panel.html" %}
                 {% include "toolpanel/extractions/extraction_panel.html" %}
                 {% include "toolpanel/prompts/prompt_panel.html" %}
-                {% include "toolpanel/tasks/tasks_panel.html" %}
+               
                 {% include "toolpanel/workflows/workflows_panel.html" %}
-
             </div>
 
-            {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
+            {% include "toolpanel/tasks/tasks_panel.html" %}
             {% include "toolpanel/workflows/add_workflow_bottom_panel.html" %}
             {% if workflow_template != "" and section=="Workflows" %}
             <div class="search-results-panel" id="search-results-panel"
