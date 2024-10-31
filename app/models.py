@@ -161,10 +161,13 @@ class SearchSet(me.Document):
 
 class SearchSetItem(me.Document):
     searchphrase = me.StringField(required=True)
-    searchset = me.StringField(required=True, max_length=200)
+    searchset = me.StringField(max_length=200)
     searchtype = me.StringField(required=True, max_length=200)
     text_blocks = me.ListField(me.StringField(), required=False)
     pdf_binding = me.StringField(required=False, max_length=200)
+    user_id = me.StringField(required=False, max_length=200)
+    space_id = me.StringField(required=True, max_length=200)
+    title = me.StringField(required=False, max_length=200)
 
     def to_workflow_step_data(self):
         workflow_data = {

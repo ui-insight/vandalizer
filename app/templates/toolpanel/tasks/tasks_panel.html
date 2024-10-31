@@ -42,9 +42,9 @@
             {% endfor %}
 
             <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Prompts</p>
-            {% for prompt_set in prompt_sets %}
+            {% for prompt in prompts %}
             <div class="expandable-container">
-                <div class="set-item" data-uuid="{{ prompt_set.uuid }}" data-title="{{ prompt_set.title }}">
+                <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                     <div class="set-content">
                 
                         <span style="float: left; font-size: 1em; color: #5c21d2bc;">
@@ -53,19 +53,38 @@
 
                         <p class="set-title"
                             style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                            {% if prompt_set.is_global %}
-                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
-                        {% endif %}
                             {{
-                                prompt_set.title }}</p>
+                                prompt.title }}</p>
+                                <p class="set-items" style="text-align: right; ">
+                                   
+                                        <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                   
+                                </p>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
 
-                        <p class="set-items" style="text-align: right; ">
-                            {% if prompt_set.item_count() == 0 %}
-                            <span><i style="color: #00000077;">setup</i></span>
-                        {% else %}
-                        <span>{{ prompt_set.item_count() }}
-                            items</span>
-                        {% endif %}
+            <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Formatters</p>
+            {% for prompt in formatters %}
+            <div class="expandable-container">
+                <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
+                    <div class="set-content">
+                
+                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </span>                        
+
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                            {{
+                                prompt.title }}</p>
+                                <p class="set-items" style="text-align: right; ">
+                                   
+                                        <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                   
+                                </p>
                         </p>
                     </div>
                 </div>

@@ -199,16 +199,19 @@ def home():
     extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
 
     # Get the prompt sets
-    global_prompt_sets = SearchSet.objects(
-        space=current_space.uuid, is_global=True, set_type="prompt"
-    ).all()
-    user_prompt_sets = SearchSet.objects(
+    
+    prompts = SearchSetItem.objects(
         user_id=user.user_id,
-        space=current_space.uuid,
-        is_global=False,
-        set_type="prompt",
+        space_id=current_space.uuid,
+        searchtype="prompt"
     ).all()
-    prompt_sets = list(chain(global_prompt_sets, user_prompt_sets))
+
+    formatters = SearchSetItem.objects(
+        user_id=user.user_id,
+        space_id=current_space.uuid,
+        searchtype="formatter"
+    ).all()
+    
 
     # Workflows
     workflows = Workflow.objects(
@@ -261,7 +264,8 @@ def home():
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
-        prompt_sets=prompt_sets,
+        prompts=prompts,
+        formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
@@ -552,6 +556,26 @@ def add_search_term():
     response = {
         "complete": True,
         "template": template,
+    }
+    return jsonify(response)
+
+@app.route("/api/add_prompt", methods=["POST"])
+def add_prompt():
+    data = request.get_json()
+    title = data["title"]
+    prompt = data["prompt"]
+    space_id = data["space_id"]
+    prompt_type = data["prompt_type"]
+    user = load_user()
+
+
+    searchsetitem = SearchSetItem(
+        searchphrase=prompt, title=title, space_id=space_id, user_id=user.user_id, searchtype=prompt_type
+    )
+    
+    searchsetitem.save()
+    response = {
+        "complete": True
     }
     return jsonify(response)
 

@@ -23,8 +23,20 @@
             <i class="fas fa-brain add-task-icon" style="color: #70B5D2;"></i>
             </div>
             <div class="add-task-content">
-                <div class="add-task-title">Prompts</div>
+                <div class="add-task-title">Prompt</div>
                 <div class="add-task-description">Ask questions, build to-do lists, summarize, and synthesize</div>
+            </div>
+            </div>
+        </a>
+
+        <a class="content-btn" id="add-formatter-task-btn">
+            <div class="add-task">
+                <div class="add-task-icon-container">
+                    <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+            </div>
+            <div class="add-task-content">
+                <div class="add-task-title">Formatter</div>
+                <div class="add-task-description">Format your data, transform data, reshape information </div>
             </div>
             </div>
         </a>
@@ -36,7 +48,19 @@
         <div style="width: 100%; padding: 15px 0px;"><input type="text" id="newTaskName" placeholder="Name your task"></div>
       
       </div>
+
+      <div class="name-add-task-prompt-container" id="name-add-task-prompt-container" style="display: none;">  
+        <h2 style="margin-top: 0px; text-align: left;">Prompt creation</h2>
+          
+        <div style="width: 100%; padding: 15px 0px;"><input type="text" id="newTaskPromptName" placeholder="Title your prompt"></div>
+        <div style="padding-bottom: 15px;">
+          <textarea id="newTaskPrompt" placeholder="Write your prompt here" rows="10"></textarea>
+        </div>
+    </div>        
+
       <button id="newTaskBtn" class="btn btn-primary" style="display: none;">Create Task</button>
       <button id="closeNewTaskBtn" class="btn btn-secondary">Close</button>
     </div>
+
+    
   </div>
