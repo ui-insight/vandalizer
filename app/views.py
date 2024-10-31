@@ -587,6 +587,20 @@ def add_prompt():
     }
     return jsonify(response)
 
+@app.route("/api/fetch_search_set_item", methods=["POST"])
+def fetch_search_set_item():
+    data = request.get_json()
+    uuid = data["uuid"]
+
+    searchsetitem = SearchSetItem.objects(
+        id=uuid
+    ).first()
+    
+    response = {
+        "prompt": searchsetitem.searchphrase
+    }
+    return jsonify(response)
+
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():
     data = request.get_json()

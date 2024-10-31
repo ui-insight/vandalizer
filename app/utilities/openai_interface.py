@@ -154,7 +154,7 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         return self.format_answer(response, question)
 
-    def handle_short_context(self, prompt, question, full_text):
+    def handle_short_context(self, prompt, question, full_text, root_path):
         simple_qa = simple_qa_model()
         response = simple_qa(question=prompt, full_text=full_text)
 
@@ -202,7 +202,7 @@ class OpenAIInterface:
 
         total_context_length = num_tokens_from_text(prompt)
         if total_context_length > max_context_length:
-            return self.handle_long_context(**kwargs)
+            return self.handle_long_context(prompt, **kwargs)
 
         else:
-            return self.handle_short_context(**kwargs)
+            return self.handle_short_context(prompt, **kwargs)

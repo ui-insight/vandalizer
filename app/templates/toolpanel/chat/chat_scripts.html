@@ -148,7 +148,6 @@
     $("#chat-panel").append(
       `<p>
         <div class='message-response' id='${responseId}'>
-          <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='vertical-align: middle; margin-right: 10px; width: 30px; height: 45px;'/>
           <div class='chat-loader' style='display: inline-block;'></div>
         </div>
       </p>`,
@@ -173,7 +172,7 @@
         let context = response.context;
 
         let responseDiv = $("<div>")
-          .addClass("message-response")
+          .addClass("message-response-body")
           .attr({
             "data-question": question,
             "data-answer": answer,
@@ -189,7 +188,6 @@
         $("#" + responseId).html(
           `<div style='display: flex; flex-direction: column;'>
             <div style='display: flex;'>
-              <img src='/static/images/Lightning_RGB+W.png' alt='Icon' style='margin-right: 15px; width: 30px; height: 45px;'/>
               <div style='flex-grow: 1;'>
                 <div class="chat-response-body">
                 ${responseDiv.prop("outerHTML")}
