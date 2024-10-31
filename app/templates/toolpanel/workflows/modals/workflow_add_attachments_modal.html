@@ -1,4 +1,4 @@
-<div id="workflowAddAttachmentsModal" class="modal informationmodal">
+<div id="" class="modal informationmodal workflowAddAttachmentsModal">
     <div class="modal-content" style="margin: 5% auto;"> 
         <h2 style="margin-top: 0px; text-align: left;">Attach document(s)</h2>
         
@@ -14,7 +14,7 @@
             </ul>
         </div>
 
-        <button id="closeAddAttachmentsBtn" class="btn btn-primary" style="background-color: white;">Close</button>
+        <button id="" class="btn btn-primary closeAddAttachmentsBtn" style="background-color: white;">Close</button>
     </div>
 
     <script>
@@ -33,9 +33,10 @@
                 });
             }
 
-        $('#closeAddAttachmentsBtn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        $('#workflowAddAttachmentsModal').remove();
-    });
+            
+        $('.closeAddAttachmentsBtn').off("click").on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            $('.workflowAddAttachmentsModal').remove();
+        });
     </script>
 </div>

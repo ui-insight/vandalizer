@@ -40,27 +40,6 @@ $(document).ready(function () {
         workflowAddStep("document");
     });
 
-    $('.edit-workflow-attachments-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        workflowAddAttachmentStep();
-    });
-
-    $('.edit-workflow-step-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        let step_id = $(this).attr("data-step-id");
-        let step_type = $(this).attr("data-step-type");
-        console.log("Editing step");
-        workflowEditStep(step_id, step_type);
-    });
-
-    $('.run-workflow').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        //let workflow_id = $(this).attr("data-workflow-id");
-        runWorkflow();
-    });
-
-    
-
     function addWorklowListeners() {
         console.log("Add workflow listeners");
         $('#workflow-close-button').on("click", function () {
@@ -69,6 +48,25 @@ $(document).ready(function () {
 
         $('#add-workflow-step-btn').on("click", function () {
             $('#newWorkflowStepModal').show();
+        });
+
+        $('.edit-workflow-attachments-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            workflowAddAttachmentStep();
+        });
+
+        $('.edit-workflow-step-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            let step_id = $(this).attr("data-step-id");
+            let step_type = $(this).attr("data-step-type");
+            console.log("Editing step");
+            workflowEditStep(step_id, step_type);
+        });
+
+        $('.run-workflow').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            //let workflow_id = $(this).attr("data-workflow-id");
+            runWorkflow();
         });
     }
 
