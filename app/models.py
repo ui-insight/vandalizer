@@ -14,6 +14,18 @@ class WorkflowStep(me.Document):
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
+    def extration_items(self):
+        if "search_set_uuid" in self.data:
+            search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
+            items = search_set.extraction_items()
+            search_phrases = [item.searchphrase for item in items] if items else []
+            return search_phrases
+        elif "searchphrases" in self.data:
+            return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
+        
+        return 0
+
+
 
 class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)

@@ -59,7 +59,19 @@
             </div>
             <div class="step-header">
                 <span>Extract Information</span>
+                {% if step.name == "Extraction" %}
+                    
+                <span class="item-info">
+                    {% if step.data.search_set_title %}
+                    {{ step.data.search_set_title }}
+                    {% else %} 
+                    Custom Extraction
+                    {% endif %}
+                    <i>{{ step.extration_items()|length }} items</i>
+                </span>
+                {% else %}
                 <span class="item-info">NSF Budget 16 items</span>
+                {% endif %}
             </div>
             <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name }}">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>

@@ -242,7 +242,7 @@
 
             {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
             {% include "toolpanel/workflows/add_workflow_bottom_panel.html" %}
-            {% if workflow_template != "" %}
+            {% if workflow_template != "" and section=="Workflows" %}
             <div class="search-results-panel" id="search-results-panel"
                     style="margin: 0px 0px; text-align: left;">
                     {{ workflow_template|safe }}
