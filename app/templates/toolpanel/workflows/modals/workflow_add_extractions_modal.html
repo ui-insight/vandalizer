@@ -1,4 +1,4 @@
-<div id="workflowAddExtractionsModal" class="modal informationmodal" style="display: block;">
+<div id="" class="modal informationmodal workflowAddExtractionsModal" style="display: block;">
     <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
         {% if is_editing %}
         <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Edit Extractions</h2>
@@ -8,26 +8,39 @@
 
         <!-- Tabbed navigation -->
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn active" id="selectDropdownTab" onclick="openAddExtractionTab('selectDropdown')">Select from Tasks</button>
-            <button class="workflow-tab-btn " id="manualInputTab" onclick="openAddExtractionTab('manualInput')">Enter Manually</button>
+            <button class="workflow-tab-btn {% if is_editing and 'search_set_uuid' in workflow_step.data %}active{% endif %}" 
+                    id="selectDropdownTab" 
+                    onclick="openAddExtractionTab('selectDropdown')">
+                Select from Tasks
+            </button>
+            <button class="workflow-tab-btn {% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+                    id="manualInputTab" 
+                    onclick="openAddExtractionTab('manualInput')">
+                Enter Manually
+            </button>
         </div>
 
         <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown" style="display: block;">
+        <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
             <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
             <select id="extractionSetDropdown" class="workflow-input-field">
                <option value="Create a new set">Create a new set</option>
                {% for extraction in extraction_sets %}
-               <option value="{{ extraction.uuid }}">{{ extraction.title }}</option>
+               <option value="{{ extraction.uuid }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
                {% endfor %}
             </select>
         </div>
 
         <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" style="display: none; margin: 0 auto;">
-            <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-            <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field">
-        </div>        
+        <div class="workflow-tab-content" id="manualInput" 
+        style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
+       <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
+       <input type="text" id="extractionInput" 
+              placeholder="e.g., Name, Age, Location" 
+              class="input-field" 
+              value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
+   </div>
+   
 
         <!-- Action buttons -->
          <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
@@ -38,7 +51,7 @@
                 Add Extractions
                 {% endif %}
             </button>
-            <button id="closeAddExtractionToWorkflowBtn" class="btn btn-secondary">Close</button>
+            <button id="" class="btn btn-secondary closeAddExtractionToWorkflowBtn">Close</button>
             {% if is_editing %}
             <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
             {% endif %}
@@ -55,9 +68,9 @@
             document.getElementById(tabName + 'Tab').classList.add('active');
         }
 
-        $('#closeAddExtractionToWorkflowBtn').on("click", function (e) {
+        $('.closeAddExtractionToWorkflowBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
-            $('#workflowAddExtractionsModal').remove();
+            $('.workflowAddExtractionsModal').remove();
         });
 
         {% if is_editing %}

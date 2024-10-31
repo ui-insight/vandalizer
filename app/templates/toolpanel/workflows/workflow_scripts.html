@@ -42,20 +42,20 @@ $(document).ready(function () {
 
     function addWorklowListeners() {
         console.log("Add workflow listeners");
-        $('#workflow-close-button').on("click", function () {
+        $('#workflow-close-button').off("click").on("click", function () {
             $('#search-results-panel').fadeOut();
         });
 
-        $('#add-workflow-step-btn').on("click", function () {
+        $('#add-workflow-step-btn').off("click").on("click", function () {
             $('#newWorkflowStepModal').show();
         });
 
-        $('.edit-workflow-attachments-btn').on("click", function (e) {
+        $('.edit-workflow-attachments-btn').off("click").on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             workflowAddAttachmentStep();
         });
 
-        $('.edit-workflow-step-btn').on("click", function (e) {
+        $('.edit-workflow-step-btn').off("click").on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             let step_id = $(this).attr("data-step-id");
             let step_type = $(this).attr("data-step-type");
@@ -63,7 +63,7 @@ $(document).ready(function () {
             workflowEditStep(step_id, step_type);
         });
 
-        $('.run-workflow').on("click", function (e) {
+        $('.run-workflow').off("click").on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             //let workflow_id = $(this).attr("data-workflow-id");
             runWorkflow();
