@@ -5,16 +5,19 @@ import datetime
 import os
 from pypdf import PdfReader
 from app import app
+from uuid import uuid4
 
 
 # TODO utilities functions to convert search_set_item into workflow step data.
+# TODO ajax timer for streaming
 
 
 class WorkflowStep(me.Document):
+    # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
-    def extration_items(self):
+    def extraction_items(self):
         if "search_set_uuid" in self.data:
             search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
             items = search_set.extraction_items()
@@ -22,9 +25,15 @@ class WorkflowStep(me.Document):
             return search_phrases
         elif "searchphrases" in self.data:
             return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
-        
+
         return 0
 
+
+class WorkflowResult(me.Document):
+    # id = me.StringField(default=uuid4().hex)
+    num_steps_completed = me.IntField(default=0)
+    num_steps_total = me.IntField(default=0)
+    steps_output = me.DictField()
 
 
 class WorkflowAttachment(me.Document):
@@ -32,6 +41,7 @@ class WorkflowAttachment(me.Document):
 
 
 class Workflow(me.Document):
+    # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     description = me.StringField(required=False, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
@@ -41,6 +51,7 @@ class Workflow(me.Document):
     attachments = me.ListField(me.ReferenceField(WorkflowAttachment))
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
+    workflow_result = me.ReferenceField(WorkflowResult)
 
 
 class User(me.Document):

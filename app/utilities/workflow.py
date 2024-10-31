@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -7,8 +8,14 @@ from dotenv import load_dotenv
 from pypdf import PdfReader
 
 from typing import List, Dict, Any
+
+from app import app
 from app.utilities.extraction_manager2 import ExtractionManager2
-from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.openai_interface import OpenAIInterface, extract_text_from_doc
+
+from app.models import SmartDocument
+
+from uuid import uuid4
 
 import re
 import graphlib
@@ -95,37 +102,52 @@ class FormatNode(Node):
 class DocumentNode(Node):
     def __init__(self, data):
         super().__init__("Document")
-        self.filename = data.get("filename", "")
+        self.docs = data.get("docs", [])
+        self.attachments = data.get("attachments", [])
+        self.pdf_paths = []
+        print("Document Node: ", data, self.docs, self.attachments)
+
+        # self.filename = data.get("filename", "")
+        # self.content = ""
+        self.docs_uuids = []
         self.content = ""
+        for doc in self.attachments:
+            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            self.pdf_paths.append(doc_path)
 
-    def process(self, inputs):
+        for doc in self.docs:
+            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            self.pdf_paths.append(doc_path)
 
-        data = inputs.get("output", None)
-        # read the content of the file
-        extension = self.filename.split(".")[-1]
-        if extension == "pdf":
-            pdf_path = f"uploads/{self.filename}"
-            pdf = PdfReader(pdf_path)
-            number_of_pages = len(pdf.pages)
-            full_text = ""
-            for i in range(number_of_pages):
-                full_text = full_text + pdf.pages[i].extract_text() + " "
-            self.content = full_text
+    def process(self, inputs=None):
 
-        return {"output": self.content, "input": self.filename}
+        # data = inputs.get("data", None)
+
+        output = {"step_name": self.name, "output": self.pdf_paths, "input": None}
+
+        return output
 
 
 class ExtractionNode(Node):
     def __init__(self, data):
         super().__init__("Extraction")
-        self.field = data.get("field", "")
+        print("Extraction Node: ", data)
+        self.keys = data.get("keys", [])
+        print("Extraction keys: ", self.keys)
 
     def process(self, inputs):
-        text = inputs.get("output", None)
-        if text is None:
-            return {"output": None}
-        extraction_response = data_extraction_model(text)
-        return {"output": extraction_response, "input": text}
+        step_name = inputs.get("step_name", None)
+
+        step_input = None
+        pdf_paths = None
+        if step_name == "Document":
+            pdf_paths = inputs.get("output", None)
+            if pdf_paths is None:
+                return {"output": None}
+            step_input = pdf_paths
+
+        extraction_response = data_extraction_model(self.keys, pdf_paths)
+        return {"output": extraction_response, "input": step_input}
 
 
 class PromptNode(Node):
@@ -143,7 +165,8 @@ class PromptNode(Node):
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
-    def __init__(self):
+    def __init__(self, workflow):
+        self.workflow = workflow
         self.nodes = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
@@ -162,12 +185,18 @@ class WorkflowEngine:
         data = []
         nodes = self.get_topological_order()
         print("nodes", nodes)
+        self.workflow.workflow_result.num_steps_completed = 0
+        self.workflow.workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             if idx == 0:
                 output = node.process(dict())
             else:
                 output = node.process(latest_output)
+
+            self.workflow.workflow_result.steps_output[node.name] = output
+            self.workflow.workflow_result.num_steps_completed += 1
+            self.workflow.workflow_result.save()
 
             latest_output = output
             data.append(
@@ -183,29 +212,33 @@ class WorkflowEngine:
         return latest_output.get("output"), data
 
 
-def build_workflow(data):
-    engine = WorkflowEngine()
+def build_workflow_engine(steps, workflow):
+    print("Building workflow engine: ", steps, workflow)
+    engine = WorkflowEngine(workflow)
     node_objects = {}
+    node_uuids = []
 
-    for node_data in data["nodes"]:
-        node_type = node_data["type"]
-        node_id = node_data["id"]
-
-        if node_type == "Document":
-            node_objects[node_id] = DocumentNode(node_data["data"])
-        elif node_type == "Extraction":
-            node_objects[node_id] = ExtractionNode(node_data["data"])
-        elif node_type == "Prompt":
-            node_objects[node_id] = PromptNode(node_data["data"])
-        elif node_type == "Format":
-            node_objects[node_id] = FormatNode(node_data["data"])
+    for step in steps:
+        node_id = uuid4().hex
+        if step.name == "Document":
+            node_objects[node_id] = DocumentNode(step.data)
+        elif step.name == "Extraction":
+            extract_keys = step.extraction_items()
+            node_objects[node_id] = ExtractionNode(
+                dict(data=step.data, keys=extract_keys)
+            )
+        elif step.name == "Prompt":
+            node_objects[node_id] = PromptNode(step.data)
+        elif step.name == "Format":
+            node_objects[node_id] = FormatNode(step.data)
 
         engine.add_node(node_objects[node_id])
 
-    for conn_data in data["connections"]:
-        from_node = node_objects[conn_data["from_"]["node"]]
-        to_node = node_objects[conn_data["to"]["node"]]
-        engine.connect(from_node, to_node)
+    # connect the steps
+    for idx, node_uuid in enumerate(node_uuids):
+        if idx == 0:
+            continue
+        engine.connect(node_objects[node_uuids[idx - 1]], node_objects[node_uuid])
 
     return engine
 
