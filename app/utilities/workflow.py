@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import json
 import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -54,12 +55,21 @@ def remove_document_from_workflow_step(document, workflow_step):
 
 def llm_chat_model(prompt, data=None, docs=[]):
     open_ai_interface = OpenAIInterface()
+    output = None
     if len(docs) == 0:
-        return open_ai_interface.handle_short_context(prompt=prompt, full_text=data)
+        # convert the data to string
+        full_text = json.dumps(data)
+        output = open_ai_interface.handle_short_context(
+            prompt=prompt, full_text=full_text
+        )
+        if output is not None:
+            output = output.get("answer", "")
+        print("llm formatted response: ", output, prompt)
 
-    output = open_ai_interface.ask_question_to_documents(
-        root_path=app.root_path, documents=docs, question=prompt
-    )
+    else:
+        output = open_ai_interface.ask_question_to_documents(
+            root_path=app.root_path, documents=docs, question=prompt
+        )
     return output
 
 
