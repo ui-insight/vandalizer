@@ -1151,7 +1151,7 @@ def workflow_add_prompt_step():
 
 
 ## MARK: ~~ Formatting
-@app.route("/api/workflows/add_format_step", methods=["GET", "POST"])
+@app.route("/api/workflows/add_formatter_step", methods=["GET", "POST"])
 def workflow_add_format_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
@@ -1166,20 +1166,19 @@ def workflow_add_format_step():
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
             workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+        
         workflow = Workflow.objects(id=workflow_id).first()
 
         current_space = Space.objects(uuid=space_id).first()
-        format_sets = SearchSetItem.objects(
-            user_id=workflow.user_id,
-            space_id=current_space.uuid,
-            searchtype="formatter",
+        formatters = SearchSetItem.objects(
+            user_id=load_user().user_id, space_id=current_space.uuid, searchtype="formatter"
         ).all()
 
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
             workflow=workflow,
-            format_sets=format_sets,
+            formatters=formatters,
             is_editing=is_editing,
             workflow_step=workflow_step
         )
@@ -1190,9 +1189,28 @@ def workflow_add_format_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
+        search_set_item_id = data["search_set_item_id"] if "search_set_item_id" in data else None
+        manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
 
-        return jsonify({"response": "Placeholder"})
+
+        if search_set_item_id:
+            searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
+            workflow_step = WorkflowStep(
+                name="Formatter", data=searchsetitem.to_workflow_step_data()
+            )
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
+        elif manual_input:
+            workflow_step = WorkflowStep(
+                name="Formatter", data={"prompt": manual_input}
+            )
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
+
+        return jsonify({"response": "success"})
 
 
 ## MARK: ~~ Documents

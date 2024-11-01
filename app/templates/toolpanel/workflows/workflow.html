@@ -62,7 +62,7 @@
                 <span>Extract Information</span>
                 {% elif step.name == "Prompt" %}
                 <span>Prompt</span>
-                {% elif step.name == "Format" %}
+                {% elif step.name == "Formatter" %}
                 <span>Formatter</span>
                 {% elif step.name == "Document" %}
                 <span>Add Document(s)</span>
@@ -77,7 +77,7 @@
                     {% endif %}
                     <i>{{ step.extraction_items()|length }} items</i>
                 </span>
-                {% elif step.name == "Prompt" %}
+                {% elif step.name == "Prompt" or step.name == "Formatter" %}
                 <span class="item-info">
                     {% if "search_set_item_title" in step.data %}
                     {{ step.data["search_set_item_title"] }}
@@ -86,7 +86,7 @@
                     {% endif %}
                 </span>
                 {% else %}
-                <span class="item-info">NSF Budget 16 items</span>
+                <span class="item-info"></span>
                 {% endif %}
             </div>
             <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name }}">
