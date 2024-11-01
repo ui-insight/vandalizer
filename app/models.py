@@ -29,16 +29,6 @@ class WorkflowStep(me.Document):
         return 0
 
 
-class WorkflowResult(me.Document):
-    # id = me.StringField(default=uuid4().hex)
-    num_steps_completed = me.IntField(default=0)
-    num_steps_total = me.IntField(default=0)
-    steps_output = me.DictField()
-    workflow_id = me.StringField(required=True, max_length=50)
-    start_time = me.DateTimeField(default=datetime.datetime.now)
-    session_id = me.StringField(required=True, max_length=50)
-
-
 class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)
 
@@ -54,7 +44,16 @@ class Workflow(me.Document):
     attachments = me.ListField(me.ReferenceField(WorkflowAttachment))
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
-    workflow_result = me.ReferenceField(WorkflowResult)
+
+
+class WorkflowResult(me.Document):
+    workflow = me.ReferenceField(Workflow)
+    num_steps_completed = me.IntField(default=0)
+    num_steps_total = me.IntField(default=0)
+    steps_output = me.DictField()
+    start_time = me.DateTimeField(default=datetime.datetime.now)
+    status = me.StringField(default="running")
+    session_id = me.StringField(required=True, max_length=50)
 
 
 class User(me.Document):

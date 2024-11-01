@@ -14,7 +14,8 @@ from app.models import Conversation
 
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
-max_context_length = 16 * 1024  # 16k tokens
+# max_context_length = 16 * 1024  # 16k tokens
+max_context_length = 90 * 1024  # 90k tokens
 
 
 # Implementation based on the discussion:
@@ -130,7 +131,7 @@ class OpenAIInterface:
         # print("dspy model generated queries: ", queries)
         completion = openai.chat.completions.create(
             # model="gpt-4o",
-            model="gpt-4o-2024-08-06",
+            model="gpt-4o",
             messages=[{"role": "user", "content": output_prompt}],
         )
         print("llm formatted response: ", completion.choices[0].message.content)
@@ -142,7 +143,14 @@ class OpenAIInterface:
             question=question,
         )
 
-    def handle_long_context(self, question, full_text, root_path):
+    def handle_long_context(self, **kwargs):
+        question = kwargs.get("question")
+        full_text = kwargs.get("full_text")
+        print("Long context not needed")
+        print("question: ", question)
+        print("full text: ", full_text)
+        root_path = kwargs.get("root_path")
+
         print("using dspy model")
         print("question: ", question)
 
@@ -154,7 +162,15 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         return self.format_answer(response, question)
 
-    def handle_short_context(self, prompt, question, full_text):
+    def handle_short_context(self, **kwargs):
+        prompt = kwargs.get("prompt")
+        question = kwargs.get("question")
+        full_text = kwargs.get("full_text")
+        print("Short context needed")
+        print("question: ", question)
+        print("full text: ", full_text)
+        print("prompt: ", prompt)
+
         simple_qa = simple_qa_model()
         response = simple_qa(question=prompt, full_text=full_text)
 
@@ -194,7 +210,7 @@ class OpenAIInterface:
         # print("docs", documents)
 
         output = self.perform_llm_call(
-            prompt, question=question, full_text=full_text, root_path=root_path
+            prompt=prompt, question=question, full_text=full_text, root_path=root_path
         )
         return output
 
@@ -202,7 +218,7 @@ class OpenAIInterface:
 
         total_context_length = num_tokens_from_text(prompt)
         if total_context_length > max_context_length:
-            return self.handle_long_context(prompt, **kwargs)
+            return self.handle_long_context(prompt=prompt, **kwargs)
 
         else:
-            return self.handle_short_context(prompt, **kwargs)
+            return self.handle_short_context(prompt=prompt, **kwargs)

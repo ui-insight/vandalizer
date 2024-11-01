@@ -12,7 +12,10 @@ from typing import List, Dict, Any
 
 from app import app
 from app.utilities.extraction_manager2 import ExtractionManager2
-from app.utilities.openai_interface import OpenAIInterface, extract_text_from_doc
+from app.utilities.openai_interface import (
+    OpenAIInterface,
+    extract_text_from_doc,
+)
 
 from app.models import SmartDocument
 
@@ -49,8 +52,11 @@ def remove_document_from_workflow_step(document, workflow_step):
 #
 
 
-def llm_chat_model(prompt, docs):
+def llm_chat_model(prompt, data=None, docs=[]):
     open_ai_interface = OpenAIInterface()
+    if len(docs) == 0:
+        return open_ai_interface.handle_short_context(prompt=prompt, full_text=data)
+
     output = open_ai_interface.ask_question_to_documents(
         root_path=app.root_path, documents=docs, question=prompt
     )
@@ -101,10 +107,11 @@ class FormatNode(Node):
         text = None
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "")
-
+        else:
+            text = data
         print("Format Node data: ", text, prev_step_name)
         prompt, output = format_model(self.formatting_prompt, text)
-        return {"output": output, "input": prompt}
+        return {"output": output, "input": prompt, "step_name": self.name}
 
 
 class DocumentNode(Node):
@@ -144,15 +151,18 @@ class ExtractionNode(Node):
         print("Extraction keys: ", self.keys)
 
     def process(self, inputs):
-        step_name = inputs.get("step_name", None)
+        prev_step_name = inputs.get("step_name", None)
 
         step_input = None
         pdf_paths = None
-        if step_name == "Document":
+        if prev_step_name == "Document":
             pdf_paths = inputs.get("output", None)
             if pdf_paths is None:
                 return {"output": None}
             step_input = pdf_paths
+        # TODO handle else case
+        # else:
+        #     pass
 
         extraction_response = data_extraction_model(self.keys, pdf_paths)
         return {
@@ -168,21 +178,30 @@ class PromptNode(Node):
         self.prompt = data.get("prompt", "Enter prompt")
 
     def process(self, inputs):
-        docs_paths = inputs.get("output", None)
-        docs_uuids = []
-        for doc_path in docs_paths:
-            doc_uuid = doc_path.split("/")[-1].split(".")[0]
-            docs_uuids.append(doc_uuid)
-        docs = [SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids]
+        print("Prompt Node: ", self.prompt, inputs)
+        prev_step_name = inputs.get("step_name", None)
+        chat_response = None
+        if prev_step_name == "Document":
+            docs_paths = inputs.get("output", None)
+            docs_uuids = []
+            for doc_path in docs_paths:
+                doc_uuid = doc_path.split("/")[-1].split(".")[0]
+                docs_uuids.append(doc_uuid)
+            docs = [
+                SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
+            ]
 
-        chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
+            chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
+        else:
+            data = inputs.get("output", None)
+
+            chat_response = llm_chat_model(docs=[], prompt=self.prompt, data=data)
         return {"output": chat_response, "input": self.prompt, "step_name": self.name}
 
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
-    def __init__(self, workflow):
-        self.workflow = workflow
+    def __init__(self):
         self.nodes = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
@@ -197,12 +216,12 @@ class WorkflowEngine:
     def get_topological_order(self):
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self):
+    def execute(self, workflow_result):
         data = []
         nodes = self.get_topological_order()
         print("nodes", nodes)
-        self.workflow.workflow_result.num_steps_completed = 0
-        self.workflow.workflow_result.num_steps_total = len(nodes)
+        workflow_result.num_steps_completed = 0
+        workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             print("Executing node: ", node.name, idx, len(nodes))
@@ -211,9 +230,8 @@ class WorkflowEngine:
             else:
                 output = node.process(latest_output)
 
-            self.workflow.workflow_result.steps_output[node.name] = output
-            self.workflow.workflow_result.num_steps_completed += 1
-            self.workflow.workflow_result.save()
+            workflow_result.steps_output[node.name] = output
+            workflow_result.num_steps_completed += 1
 
             latest_output = output
             data.append(
@@ -224,15 +242,19 @@ class WorkflowEngine:
                 )
             )
 
+            workflow_result.save()
+
         if latest_output is None:
             return None, data
 
+        workflow_result.status = "completed"
+        workflow_result.save()
         return latest_output.get("output"), data
 
 
 def build_workflow_engine(steps, workflow):
     print("Building workflow engine: ", steps, workflow)
-    engine = WorkflowEngine(workflow)
+    engine = WorkflowEngine()
     nodes = []
 
     for idx, step in enumerate(steps):
