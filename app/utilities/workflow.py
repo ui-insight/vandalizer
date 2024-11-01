@@ -12,7 +12,10 @@ from typing import List, Dict, Any
 
 from app import app
 from app.utilities.extraction_manager2 import ExtractionManager2
-from app.utilities.openai_interface import OpenAIInterface, extract_text_from_doc
+from app.utilities.openai_interface import (
+    OpenAIInterface,
+    extract_text_from_doc,
+)
 
 from app.models import SmartDocument
 
@@ -49,8 +52,11 @@ def remove_document_from_workflow_step(document, workflow_step):
 #
 
 
-def llm_chat_model(prompt, docs):
+def llm_chat_model(prompt, data=None, docs=[]):
     open_ai_interface = OpenAIInterface()
+    if len(docs) == 0:
+        return open_ai_interface.handle_short_context(prompt=prompt, full_text=data)
+
     output = open_ai_interface.ask_question_to_documents(
         root_path=app.root_path, documents=docs, question=prompt
     )
@@ -105,7 +111,7 @@ class FormatNode(Node):
             text = data
         print("Format Node data: ", text, prev_step_name)
         prompt, output = format_model(self.formatting_prompt, text)
-        return {"output": output, "input": prompt}
+        return {"output": output, "input": prompt, "step_name": self.name}
 
 
 class DocumentNode(Node):
@@ -172,14 +178,24 @@ class PromptNode(Node):
         self.prompt = data.get("prompt", "Enter prompt")
 
     def process(self, inputs):
-        docs_paths = inputs.get("output", None)
-        docs_uuids = []
-        for doc_path in docs_paths:
-            doc_uuid = doc_path.split("/")[-1].split(".")[0]
-            docs_uuids.append(doc_uuid)
-        docs = [SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids]
+        print("Prompt Node: ", self.prompt, inputs)
+        prev_step_name = inputs.get("step_name", None)
+        chat_response = None
+        if prev_step_name == "Document":
+            docs_paths = inputs.get("output", None)
+            docs_uuids = []
+            for doc_path in docs_paths:
+                doc_uuid = doc_path.split("/")[-1].split(".")[0]
+                docs_uuids.append(doc_uuid)
+            docs = [
+                SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
+            ]
 
-        chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
+            chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
+        else:
+            data = inputs.get("output", None)
+
+            chat_response = llm_chat_model(docs=[], prompt=self.prompt, data=data)
         return {"output": chat_response, "input": self.prompt, "step_name": self.name}
 
 
