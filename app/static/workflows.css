@@ -3,7 +3,7 @@
     background-color: #F0F2F8;
     width: 100%;
     height: 100%;
-    padding: 30px 30px 60px 30px;
+    padding: 30px 30px 150px 30px;
     background-image: 
     linear-gradient(45deg, #EAECF2 25%, transparent 25%),
     linear-gradient(-45deg, #EAECF2 25%, transparent 25%),
@@ -12,6 +12,7 @@
     background-size: 30px 30px;
     background-position: 0 0, 0 15px, 15px -15px, -15px 0;
     border: 1px solid #2f2f2fc2;
+    overflow: scroll;
   }
   
   .trigger {

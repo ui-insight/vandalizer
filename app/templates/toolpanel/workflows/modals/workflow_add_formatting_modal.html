@@ -4,32 +4,35 @@
 
         <!-- Tabbed navigation -->
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn active" id="manualInputTab" onclick="openAddExtractionTab('manualInput')">Enter Manually</button>
-            <button class="workflow-tab-btn " id="selectDropdownTab" onclick="openAddExtractionTab('selectDropdown')">Select from Tasks</button>
+            <button class="workflow-tab-btn {% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+                    id="selectDropdownTab" 
+                    onclick="openAddExtractionTab('selectDropdown')">
+                Select from Tasks
+            </button>
+            <button class="workflow-tab-btn {% if (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+                    id="manualInputTab" 
+                    onclick="openAddExtractionTab('manualInput')">
+                Enter Manually
+            </button>
         </div>
 
         <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown" style="display: none;">
+        <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
             <label for="formatSetDropdown" class="workflow-label">Select an format task:</label>
             <select id="formatSetDropdown" class="workflow-input-field">
-                <!-- Options are populated dynamically from the extraction_sets variable -->
-                <script>
-                    const extractionSets = {{ extraction_sets | tojson }};
-    const dropdown = document.getElementById("formatSetDropdown");
-    extractionSets.forEach(set => {
-        const option = document.createElement("option");
-        option.value = set;
-        option.textContent = set;
-        dropdown.appendChild(option);
-    });
-                </script>
+                {% for prompt in prompts %}
+                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
+                {% endfor %}
             </select>
         </div>
 
         <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" style="display: block; margin: 0 auto;">
+        <div class="workflow-tab-content" id="manualInput" style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
             <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-            <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field">
+            <input type="text" id="extractionInput" 
+                placeholder="e.g., Name, Age, Location" 
+                class="input-field"
+                value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
         </div>
 
         

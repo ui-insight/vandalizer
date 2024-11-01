@@ -183,7 +183,9 @@ class SearchSetItem(me.Document):
     def to_workflow_step_data(self):
         workflow_data = {
             "type": self.searchtype,
-            "searchphrase": self.searchphrase,
+            "search_set_item_id": self.id,
+            "search_set_item_title": self.title,
+            "prompt": self.searchphrase,
         }
         return workflow_data
 
