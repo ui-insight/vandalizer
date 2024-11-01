@@ -893,13 +893,32 @@ def run_workflow():
 
     # return jsonify({"success": True})
 
+@app.route('/api/workflow/status', methods=['GET'])
+def workflow_status():
+    workflow_id = request.args.get('workflow_id')
+    
+    if not workflow_id:
+        return jsonify({"error": "workflow_id is required"}), 400
 
-@app.route("/api/execute_workflow", methods=["GET", "POST"])
-def workflow():
-    user = load_user()
-    if user is None:
-        return redirect(url_for("login"))
-    workflow_data = request.get_json()
+    # Get workflow status
+    workflow = WorkflowResult.objects(workflow_id=workflow_id)
+    
+    # if not workflow:
+    #     return jsonify({"error": "Workflow not found"}), 404
+
+    # # Calculate time elapsed in seconds
+    # #time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
+
+    # response = {
+    #     "steps_completed": workflow["steps_completed"],
+    #     "total_steps": workflow["total_steps"],
+    #     "status": workflow["status"],
+    #     "time_elapsed": int(time_elapsed)
+    # }
+
+    #return jsonify(response)
+    return jsonify({"success": True})
+
 
 
 @app.route("/api/fetch_workflow", methods=["POST"])
@@ -1162,6 +1181,7 @@ def workflow_add_format_step():
 
         is_editing = data.get("editing") or False
         workflow_step = None
+        workflow_step_id = ""
 
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
@@ -1180,7 +1200,8 @@ def workflow_add_format_step():
             workflow=workflow,
             formatters=formatters,
             is_editing=is_editing,
-            workflow_step=workflow_step
+            workflow_step=workflow_step,
+            workflow_step_id=workflow_step_id
         )
         response = {"template": template}
         return jsonify(response)

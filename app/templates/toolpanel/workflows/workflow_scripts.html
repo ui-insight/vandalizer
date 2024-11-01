@@ -294,12 +294,21 @@
       }
 
       function runWorkflow() {
+        if (document_uuids == "") {
+            showToast("Select a document to run workflow");
+            return;
+        }
           console.log(current_space_id);
           let data = JSON.stringify({
               workflow_id: current_workflow_id,
               space_id: current_space_id,
               document_uuids: document_uuids,
           });
+
+          $('.add-step').hide();
+          $('.workflow-output').fadeIn();
+
+          pollWorkflowStatus(current_workflow_id);
 
           $.ajax({
               url: '/api/workflow/run',
@@ -309,7 +318,9 @@
               dataType: 'json',
               async: true,
               success: function (data) {
-
+                console.log(data.output.formatted_answer);
+                $('.workflow-output-section').append(data.output.formatted_answer);
+                $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
               },
               error: function (xhr, ajaxOptions, thrownError) {
                   console.log(xhr.status);
@@ -325,4 +336,53 @@
       }
 
   });
+
+  function pollWorkflowStatus(workflow_id) {
+    let startTime = Date.now(); // Capture start time to calculate elapsed time
+    const pollInterval = 1000; // Poll every second
+    const maxAttempts = 180; // Optional: Stop polling after 60 seconds to prevent infinite loop
+    let attemptCount = 0;
+
+    const intervalId = setInterval(() => {
+        attemptCount += 1;
+
+        $.ajax({
+            url: `/api/workflow/status?workflow_id=${workflow_id}`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                //const { steps_completed, total_steps, status } = data;
+                let steps_completed = 0;
+                let total_steps = 3;
+                // Update steps completed and time elapsed
+                $('.workflow-output-attachment-info').html(`
+                    <span>${steps_completed} / ${total_steps} steps completed</span>
+                    <span><i> ${attemptCount} seconds elapsed</i></span>
+                `);
+
+                // Check if the workflow is completed or has failed
+                if (status === 'completed' || status === 'failed') {
+                    clearInterval(intervalId); // Stop polling
+                    if (status === 'failed') {
+                        showToast("Workflow failed");
+                    } else {
+                        showToast("Workflow completed");
+                    }
+                }
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                clearInterval(intervalId); // Stop polling on error
+                console.log(xhr.status);
+                console.log(thrownError);
+                showToast("Error polling workflow status");
+            }
+        });
+
+        // Stop polling after max attempts
+        if (attemptCount >= maxAttempts) {
+            clearInterval(intervalId);
+            showToast("Workflow status polling timed out");
+        }
+    }, pollInterval);
+}
 </script>

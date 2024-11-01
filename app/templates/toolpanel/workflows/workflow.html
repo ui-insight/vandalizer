@@ -102,24 +102,33 @@
 
 
 
-  
-    <!-- <div class="workflow-step">
+    <div class="add-step">
+        <button id="add-workflow-step-btn">+ ADD STEP</button>
+    </div>
+
+
+    <div class="workflow-step workflow-output" style="display: none;">
+        <div class="step-connector top">
+            
+            <img src='/static/images/step-connector-top.png'> 
+           
+        </div>
         <div class="step-content">
             <div class="add-task-icon-container">
-                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
             </div>
             <div class="step-header">
-                <span>Format Output</span>
-                <span class="output-info">VERSO Output Prompt</span>
+                <span>View output</span>
+                <span class="workflow-output-attachment-info"><span>0 / 3 steps completed</span> <span> <i> 1 second elapsed</i></span></span>
             </div>
-            <div class="step-icon">
+            <div class="step-icon edit-workflow-attachments-btn">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
-    </div>  -->
+        <div class="workflow-output-section">
 
-    <div class="add-step">
-        <button id="add-workflow-step-btn">+ ADD STEP</button>
+        </div>
+
     </div>
 
     {% include "toolpanel/workflows/workflows_bottom_panel.html" %}

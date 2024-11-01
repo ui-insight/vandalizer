@@ -28,6 +28,7 @@
   
   .workflow-step {
     display: flex;
+    flex-direction: column;
     align-items: center;
     background-color: white;
     padding: 15px;
