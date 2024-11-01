@@ -201,19 +201,14 @@ def home():
     extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
 
     # Get the prompt sets
-    
+
     prompts = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="prompt"
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="prompt"
     ).all()
 
     formatters = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="formatter"
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="formatter"
     ).all()
-    
 
     # Workflows
     workflows = Workflow.objects(
@@ -567,6 +562,7 @@ def add_search_term():
     }
     return jsonify(response)
 
+
 @app.route("/api/add_prompt", methods=["POST"])
 def add_prompt():
     data = request.get_json()
@@ -576,30 +572,29 @@ def add_prompt():
     prompt_type = data["prompt_type"]
     user = load_user()
 
-
     searchsetitem = SearchSetItem(
-        searchphrase=prompt, title=title, space_id=space_id, user_id=user.user_id, searchtype=prompt_type
+        searchphrase=prompt,
+        title=title,
+        space_id=space_id,
+        user_id=user.user_id,
+        searchtype=prompt_type,
     )
-    
+
     searchsetitem.save()
-    response = {
-        "complete": True
-    }
+    response = {"complete": True}
     return jsonify(response)
+
 
 @app.route("/api/fetch_search_set_item", methods=["POST"])
 def fetch_search_set_item():
     data = request.get_json()
     uuid = data["uuid"]
 
-    searchsetitem = SearchSetItem.objects(
-        id=uuid
-    ).first()
-    
-    response = {
-        "prompt": searchsetitem.searchphrase
-    }
+    searchsetitem = SearchSetItem.objects(id=uuid).first()
+
+    response = {"prompt": searchsetitem.searchphrase}
     return jsonify(response)
+
 
 @app.route("/api/search_results", methods=["POST"])
 def grab_template():
@@ -1114,20 +1109,6 @@ def workflow_add_prompt_step():
             # is_global=False,
             set_type="prompt",
         ).all()
-        user_extraction_sets = SearchSet.objects(
-            user_id=workflow.user_id,
-            space=current_space.uuid,
-            is_global=False,
-            set_type="extraction",
-        ).all()
-        extraction_sets_objects = list(
-            chain(global_extraction_sets, user_extraction_sets)
-        )
-        extraction_sets = ["Create a new set"] + [
-            extraction["title"]
-            for extraction in extraction_sets_objects
-            if "title" in extraction
-        ]
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
