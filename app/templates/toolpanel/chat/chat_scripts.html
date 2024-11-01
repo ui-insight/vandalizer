@@ -153,6 +153,9 @@
       </p>`,
     );
 
+    $('#chat-panel').animate({ scrollTop: $('#chat-panel')[0].scrollHeight }, 'slow');
+
+
     $.ajax({
       url: "/api/chat",
       type: "POST",
@@ -205,6 +208,9 @@
 
         $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
         $("#chatplaceholder").css("color", "darkgray");
+
+        $('#chat-panel').animate({ scrollTop: $('#chat-panel')[0].scrollHeight }, 'slow');
+
 
         // copy to clipboard
         $(".copy-btn").on("click", function () {
