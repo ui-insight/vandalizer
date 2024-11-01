@@ -4,6 +4,7 @@ import os
 import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
+import re
 
 from pypdf import PdfReader
 
@@ -48,9 +49,12 @@ def remove_document_from_workflow_step(document, workflow_step):
 #
 
 
-def llm_chat_model(prompt):
+def llm_chat_model(prompt, docs):
     open_ai_interface = OpenAIInterface()
-    output = open_ai_interface.perform_llm_call(prompt=prompt)
+    output = open_ai_interface.ask_question_to_documents(
+        root_path=app.root_path, documents=docs, question=prompt
+    )
+    return output
 
 
 def data_extraction_model(keys, pdf_paths):
@@ -156,10 +160,14 @@ class PromptNode(Node):
         self.prompt = data.get("prompt", "Enter prompt")
 
     def process(self, inputs):
-        data = inputs.get("output", None)
-        self.prompt = f"{self.prompt} \n{data}"
-        # print("Prompt Node: ", self.prompt)
-        chat_response = llm_chat_model(self.prompt)
+        docs_paths = inputs.get("output", None)
+        docs_uuids = []
+        for doc_path in docs_paths:
+            doc_uuid = doc_path.split("/")[-1].split(".")[0]
+            docs_uuids.append(doc_uuid)
+        docs = [SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids]
+
+        chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
         return {"output": chat_response, "input": self.prompt}
 
 
@@ -229,6 +237,7 @@ def build_workflow_engine(steps, workflow):
                 dict(data=step.data, keys=extract_keys)
             )
         elif step.name == "Prompt":
+            print("Prompt step: ", step.data)
             node_objects[node_id] = PromptNode(step.data)
         elif step.name == "Format":
             node_objects[node_id] = FormatNode(step.data)
