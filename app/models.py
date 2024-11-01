@@ -34,6 +34,9 @@ class WorkflowResult(me.Document):
     num_steps_completed = me.IntField(default=0)
     num_steps_total = me.IntField(default=0)
     steps_output = me.DictField()
+    workflow_id = me.StringField(required=True, max_length=50)
+    start_time = me.DateTimeField(default=datetime.datetime.now)
+    session_id = me.StringField(required=True, max_length=50)
 
 
 class WorkflowAttachment(me.Document):
@@ -177,7 +180,7 @@ class SearchSetItem(me.Document):
     text_blocks = me.ListField(me.StringField(), required=False)
     pdf_binding = me.StringField(required=False, max_length=200)
     user_id = me.StringField(required=False, max_length=200)
-    space_id = me.StringField(required=True, max_length=200)
+    space_id = me.StringField(required=False, max_length=200)
     title = me.StringField(required=False, max_length=200)
 
     def to_workflow_step_data(self):

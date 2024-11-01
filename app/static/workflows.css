@@ -192,3 +192,25 @@
 #fileList li:hover {
   background-color: #f0f0f5;
 }
+
+.workflow-loader {
+  margin-right: 15px;
+  width: 20px;
+  height: 20px;
+  border: 5px dotted #f1b300;
+  border-radius: 50%;
+  display: inline-block;
+  position: relative;
+  box-sizing: border-box;
+  animation: rotation 2s linear infinite;
+}
+
+
+@keyframes rotation {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+} 

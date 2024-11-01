@@ -38,9 +38,7 @@
    
     <div class="workflow-step">
         <div class="step-connector top">
-            
             <img src='/static/images/step-connector-top.png'> 
-           
         </div>
         <div class="step-content">
             <div class="add-task-icon-container">
@@ -89,6 +87,8 @@
                 <span class="item-info"></span>
                 {% endif %}
             </div>
+           
+            <span class="workflow-loader" style="display: none;"></span>
             <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name }}">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
