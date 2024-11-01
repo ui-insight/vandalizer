@@ -25,11 +25,11 @@
     width: 40%;
     height: 100%;
     float: left;
-    overflow: scroll;
     padding-top: 0px;
     padding-bottom: 120px;
     box-shadow: -7px 20px 25px -16px rgb(211, 211, 211);
     z-index: 400;
+    overflow: hidden;
 }
 
 .left-panel::-webkit-scrollbar {
@@ -124,7 +124,6 @@ button.shadow-button:hover {
   bottom: 80px;
   right: 0;
   width: 40%;
-  overflow: scroll;
   height: calc(100% - 165px);
   backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
       -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
@@ -273,7 +272,13 @@ button.shadow-button:hover {
 }
 
 .tab-content {
-  padding: 20px;
+  padding: 20px 20px 180px 20px;
+  overflow:scroll;
+  height: calc(100vh - 120px);
+}
+
+.tab-content::-webkit-scrollbar {
+  display: none; /* Hides the scrollbar */
 }
 
 .sticky {

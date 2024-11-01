@@ -3,8 +3,8 @@
     width: 60%;
     height: 100%;
     float: left;
-    overflow: scroll;
     background-color: #EEEEEE;
+    overflow: hidden;
 }
 
 .left-panel .document {
@@ -24,6 +24,14 @@
   position: absolute;
 }
 
+.file-selection {
+  overflow: scroll;
+  height: 100%;
+}
+
+.file-selection::-webkit-scrollbar {
+  display: none; /* Hides the scrollbar */
+}
 
 .left-panel .chat-window {
     position: absolute;
@@ -31,7 +39,6 @@
     bottom: 80px;
     left: 0;
     width: 100%;
-    overflow: scroll;
     height: calc(100%);
     backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
         -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */
