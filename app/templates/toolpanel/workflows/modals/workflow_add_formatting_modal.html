@@ -1,10 +1,14 @@
 <div id="workflowAddFormattingModal" class="modal informationmodal" style="display: block;">
     <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
-        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Formatting</h2>
+        {% if is_editing %}
+        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Edit Formatter</h2>
+        {% else %}
+        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Formatter</h2>
+        {% endif %}
 
         <!-- Tabbed navigation -->
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn {% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+            <button class="workflow-tab-btn {% if not is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data)) %}active{% endif %}" 
                     id="selectDropdownTab" 
                     onclick="openAddExtractionTab('selectDropdown')">
                 Select from Tasks
@@ -14,33 +18,44 @@
                     onclick="openAddExtractionTab('manualInput')">
                 Enter Manually
             </button>
+            
         </div>
 
         <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
-            <label for="formatSetDropdown" class="workflow-label">Select an format task:</label>
-            <select id="formatSetDropdown" class="workflow-input-field">
-                {% for prompt in prompts %}
-                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
+        <div class="workflow-tab-content" id="selectDropdown"style="{% if (is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data))) %}display: none;{% else %}display: block;{% endif %}">
+            <label for="extractionSetDropdown" class="workflow-label">Select a formatter:</label>
+            <select id="extractionSetDropdown" class="workflow-input-field">
+                {% for prompt in formatters %}
+                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_uuid' in workflow_step.data and workflow_step.data['search_set_item_uuid'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
                 {% endfor %}
             </select>
         </div>
 
         <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
-            <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-            <input type="text" id="extractionInput" 
-                placeholder="e.g., Name, Age, Location" 
+        <div class="workflow-tab-content" id="manualInput" style="{% if not (is_editing and 'prompt' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
+            <label for="promptInput" class="label">Enter formatter:</label>
+            <input type="text" id="promptInput" 
+                placeholder="e.g., Format this as markdown" 
                 class="input-field"
-                value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
+                value="{{ workflow_step.data['prompt'] if is_editing and 'prompt' in workflow_step.data else '' }}">
         </div>
 
         
 
         <!-- Action buttons -->
-         <div style="padding: 30px 0px 0px 0px; margin: 0 auto;">
-        <button id="confirmFormatStepBtn" class="btn btn-primary">Add Formatting</button>
-        <button id="closeAddFormatToWorkflowBtn" class="btn btn-secondary">Close</button>
+         <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
+            <button id="confirmFormatterStepBtn" class="btn btn-primary">
+                {% if is_editing %}
+                Edit Formatter
+                {% else %}
+                Add Formatter
+                {% endif %}
+            </button>
+            <button id="closeAddPromptToWorkflowBtn" class="btn btn-secondary">Close</button>
+            {% if is_editing %}
+            <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
+            {% endif %}
+        </div>
     </div>
     </div>
     <script>
@@ -54,10 +69,36 @@
             document.getElementById(tabName + 'Tab').classList.add('active');
         }
 
-        $('#closeAddFormatToWorkflowBtn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        $('#workflowAddFormattingModal').remove();
-    });
+        $('#closeAddPromptToWorkflowBtn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            $('#workflowAddFormattingModal').remove();
+        });
+
+        {% if is_editing %}
+        $('#deletePromptToWorkflowBtn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            console.log("clicked");
+            let data = JSON.stringify({
+                workflow_step_id: "{{ workflow_step_id }}"
+            });
+
+            $.ajax({
+                url: `/api/workflow/delete_step`,
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+        {% endif %}
     </script>
     
 </div>
