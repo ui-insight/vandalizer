@@ -58,7 +58,15 @@
                 {% endif %}
             </div>
             <div class="step-header">
+                {% if step.name == "Extraction" %}
                 <span>Extract Information</span>
+                {% elif step.name == "Prompt" %}
+                <span>Prompt</span>
+                {% elif step.name == "Format" %}
+                <span>Formatter</span>
+                {% elif step.name == "Document" %}
+                <span>Add Document(s)</span>
+                {% endif %}
                 {% if step.name == "Extraction" %}
                     
                 <span class="item-info">
@@ -68,6 +76,14 @@
                     Custom Extraction
                     {% endif %}
                     <i>{{ step.extraction_items()|length }} items</i>
+                </span>
+                {% elif step.name == "Prompt" %}
+                <span class="item-info">
+                    {% if "search_set_item_title" in step.data %}
+                    {{ step.data["search_set_item_title"] }}
+                    {% else %}
+                    Run Custom prompt
+                    {% endif %}
                 </span>
                 {% else %}
                 <span class="item-info">NSF Budget 16 items</span>

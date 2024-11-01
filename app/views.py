@@ -1095,27 +1095,30 @@ def workflow_add_prompt_step():
 
         is_editing = data.get("editing") or False
         workflow_step_id = ""
+        workflow_step = None
+
 
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
+            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
 
         workflow = Workflow.objects(id=workflow_id).first()
 
         current_space = Space.objects(uuid=space_id).first()
 
-        prompt_sets = SearchSetItem.objects(
-            # user_id=workflow.user_id,
-            # space=current_space.uuid,
-            # is_global=False,
-            set_type="prompt",
+        prompts = SearchSetItem.objects(
+            user_id=load_user().user_id,
+            space_id=current_space.uuid,
+            searchtype="prompt",
         ).all()
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
-            prompt_sets=prompt_sets,
+            prompts=prompts,
             is_editing=is_editing,
             workflow_step_id=workflow_step_id,
+            workflow_step=workflow_step
         )
         response = {"template": template}
         return jsonify(response)
@@ -1124,14 +1127,27 @@ def workflow_add_prompt_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
+        search_set_item_id = data["search_set_item_id"] if "search_set_item_id" in data else None
+        manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
 
-        workflow_step = WorkflowStep(name="Prompt", data={"searchphrase": ""})
-        workflow_step.save()
-        workflow.steps.append(workflow_step)
-        workflow.save()
+        if search_set_item_id:
+            searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
+            workflow_step = WorkflowStep(
+                name="Prompt", data=searchsetitem.to_workflow_step_data()
+            )
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
+        elif manual_input:
+            workflow_step = WorkflowStep(
+                name="Prompt", data={"prompt": manual_input}
+            )
+            workflow_step.save()
+            workflow.steps.append(workflow_step)
+            workflow.save()
 
-        return jsonify({"response": "Placeholder"})
+        return jsonify({"response": "success"})
 
 
 ## MARK: ~~ Formatting
@@ -1144,31 +1160,28 @@ def workflow_add_format_step():
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
 
+        is_editing = False
+        workflow_step = None
+
+        if is_editing:
+            workflow_step_id = data.get("workflow_step_id")
+            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
         workflow = Workflow.objects(id=workflow_id).first()
 
         current_space = Space.objects(uuid=space_id).first()
-        global_extraction_sets = SearchSet.objects(
-            space=current_space.uuid, is_global=True, set_type="format"
-        ).all()
-        user_extraction_sets = SearchSet.objects(
+        format_sets = SearchSetItem.objects(
             user_id=workflow.user_id,
-            space=current_space.uuid,
-            is_global=False,
-            set_type="extraction",
+            space_id=current_space.uuid,
+            searchtype="formatter",
         ).all()
-        extraction_sets_objects = list(
-            chain(global_extraction_sets, user_extraction_sets)
-        )
-        extraction_sets = ["Create a new set"] + [
-            extraction["title"]
-            for extraction in extraction_sets_objects
-            if "title" in extraction
-        ]
+
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
             workflow=workflow,
-            extraction_sets=extraction_sets,
+            format_sets=format_sets,
+            is_editing=is_editing,
+            workflow_step=workflow_step
         )
         response = {"template": template}
         return jsonify(response)

@@ -193,14 +193,12 @@
           } else if (stepType == "prompt") {
               let activeTab = $('.workflow-tab-btn.active').attr('id');
               if (activeTab == "manualInputTab") {
-                  let manualInput = $('#extractionInput')[0].value;
+                  let manualInput = $('#promptInput')[0].value;
                   dict['manual_input'] = manualInput;
               } else {
                   let dropdown_selection = $('#extractionSetDropdown')[0].value;
-                  dict["search_set_id"] = dropdown_selection
+                  dict["search_set_item_id"] = dropdown_selection
               }
-
-              return
           }
 
           let data = JSON.stringify(dict);

@@ -8,25 +8,36 @@
 
         <!-- Tabbed navigation -->
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn active" id="manualInputTab" onclick="openAddExtractionTab('manualInput')">Enter Manually</button>
-            <button class="workflow-tab-btn " id="selectDropdownTab" onclick="openAddExtractionTab('selectDropdown')">Select from Tasks</button>
+            <button class="workflow-tab-btn {% if not is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data)) %}active{% endif %}" 
+                    id="selectDropdownTab" 
+                    onclick="openAddExtractionTab('selectDropdown')">
+                Select from Tasks
+            </button>
+            <button class="workflow-tab-btn {% if (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+                    id="manualInputTab" 
+                    onclick="openAddExtractionTab('manualInput')">
+                Enter Manually
+            </button>
             
         </div>
 
         <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown" style="display: none;">
+        <div class="workflow-tab-content" id="selectDropdown"style="{% if (is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data))) %}display: none;{% else %}display: block;{% endif %}">
             <label for="extractionSetDropdown" class="workflow-label">Select a prompt:</label>
             <select id="extractionSetDropdown" class="workflow-input-field">
                 {% for prompt in prompts %}
-                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
+                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_uuid' in workflow_step.data and workflow_step.data['search_set_item_uuid'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
                 {% endfor %}
             </select>
         </div>
 
         <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" style="display: block; margin: 0 auto;">
+        <div class="workflow-tab-content" id="manualInput" style="{% if not (is_editing and 'prompt' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
             <label for="promptInput" class="label">Enter prompt:</label>
-            <input type="text" id="promptInput" placeholder="e.g., Summarize this for me into a todo list" class="input-field">
+            <input type="text" id="promptInput" 
+                placeholder="e.g., Summarize this for me into a todo list" 
+                class="input-field"
+                value="{{ workflow_step.data['prompt'] if is_editing and 'prompt' in workflow_step.data else '' }}">
         </div>
 
         
