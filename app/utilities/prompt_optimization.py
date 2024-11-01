@@ -72,6 +72,8 @@ os.environ["OPENAI_API_KEY"] = (
 embedding_model = "text-embedding-3-large"
 embedding = OpenAIEmbeddings(model=embedding_model)
 
+max_tokens = None
+
 
 def format_docs(docs):
     return "\n\n".join(doc.page_content for doc in docs)
@@ -175,7 +177,7 @@ class SimpleQA(dspy.Module):
 
 
 def simple_qa_model():
-    model = "gpt-4o-2024-08-06"
+    model = "gpt-4o"
     llm = dspy.OpenAI(model=model)
     dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
     model = SimpleQA()
@@ -240,7 +242,7 @@ class ReviewerModel(dspy.Module):
 
 
 def proposal_review_model():
-    model = "gpt-4o-2024-08-06"
+    model = "gpt-4o"
     llm = dspy.OpenAI(model=model)
     dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
     model = ReviewerModel()
@@ -284,7 +286,7 @@ def dspy_model(
     )
 
     # model 32k tokens
-    llm = dspy.OpenAI(model=model_name, max_tokens=16 * 1024)
+    llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
     # llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
     # llm = dspy.OpenAI(model=model_name, max_tokens=4096)
     dspy.settings.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
@@ -404,7 +406,7 @@ def background_retrain_model(feedback_list, root_path):
 
     model_name = "gpt-4o-mini"
     # model_name = "gpt-4o"
-    llm = dspy.OpenAI(model=model_name, max_tokens=16 * 1024)
+    llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
     # dspy.settings.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
     dspy.settings.configure(lm=llm, rm=rm, trace=[])
 
