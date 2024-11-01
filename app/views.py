@@ -1,4 +1,5 @@
 import urllib.parse
+from datetime import datetime
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.workflow import build_workflow_engine
@@ -877,7 +878,7 @@ def run_workflow():
     workflow_id = workflow_data["workflow_id"]
     document_uuids = workflow_data["document_uuids"]
     workflow = Workflow.objects(id=workflow_id).first()
-    workflow.workflow_result = WorkflowResult()
+    workflow_result = WorkflowResult(workflow=workflow)
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
@@ -890,37 +891,38 @@ def run_workflow():
         steps.append(step)
     engine = build_workflow_engine(steps, workflow=workflow)
 
-    output, data = engine.execute()
+    output, data = engine.execute(workflow_result)
     return {"output": output, "steps": data}
 
     # return jsonify({"success": True})
 
-@app.route('/api/workflow/status', methods=['GET'])
+
+@app.route("/api/workflow/status", methods=["GET"])
 def workflow_status():
-    workflow_id = request.args.get('workflow_id')
-    
+    workflow_id = request.args.get("workflow_id")
+
     if not workflow_id:
         return jsonify({"error": "workflow_id is required"}), 400
 
     # Get workflow status
-    workflow = WorkflowResult.objects(workflow_id=workflow_id)
-    
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow_result = WorkflowResult(workflow=workflow)
+
     # if not workflow:
     #     return jsonify({"error": "Workflow not found"}), 404
 
-    # # Calculate time elapsed in seconds
-    # #time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
+    # Calculate time elapsed in seconds
+    time_elapsed = (datetime.now() - workflow_result["start_time"]).total_seconds()
 
-    # response = {
-    #     "steps_completed": workflow["steps_completed"],
-    #     "total_steps": workflow["total_steps"],
-    #     "status": workflow["status"],
-    #     "time_elapsed": int(time_elapsed)
-    # }
+    response = {
+        "steps_completed": workflow_result.num_steps_completed,
+        "total_steps": workflow_result.num_steps_total,
+        "status": workflow_result.status,
+        "time_elapsed": int(time_elapsed),
+    }
 
-    #return jsonify(response)
-    return jsonify({"success": True})
-
+    return jsonify(response)
+    # return jsonify({"success": True})
 
 
 @app.route("/api/fetch_workflow", methods=["POST"])
@@ -1203,7 +1205,7 @@ def workflow_add_format_step():
             formatters=formatters,
             is_editing=is_editing,
             workflow_step=workflow_step,
-            workflow_step_id=workflow_step_id
+            workflow_step_id=workflow_step_id,
         )
         response = {"template": template}
         return jsonify(response)

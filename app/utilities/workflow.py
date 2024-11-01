@@ -101,7 +101,8 @@ class FormatNode(Node):
         text = None
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "")
-
+        else:
+            text = data
         print("Format Node data: ", text, prev_step_name)
         prompt, output = format_model(self.formatting_prompt, text)
         return {"output": output, "input": prompt}
@@ -144,15 +145,18 @@ class ExtractionNode(Node):
         print("Extraction keys: ", self.keys)
 
     def process(self, inputs):
-        step_name = inputs.get("step_name", None)
+        prev_step_name = inputs.get("step_name", None)
 
         step_input = None
         pdf_paths = None
-        if step_name == "Document":
+        if prev_step_name == "Document":
             pdf_paths = inputs.get("output", None)
             if pdf_paths is None:
                 return {"output": None}
             step_input = pdf_paths
+        # TODO handle else case
+        # else:
+        #     pass
 
         extraction_response = data_extraction_model(self.keys, pdf_paths)
         return {
@@ -181,8 +185,7 @@ class PromptNode(Node):
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
-    def __init__(self, workflow):
-        self.workflow = workflow
+    def __init__(self):
         self.nodes = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
@@ -197,12 +200,12 @@ class WorkflowEngine:
     def get_topological_order(self):
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self):
+    def execute(self, workflow_result):
         data = []
         nodes = self.get_topological_order()
         print("nodes", nodes)
-        self.workflow.workflow_result.num_steps_completed = 0
-        self.workflow.workflow_result.num_steps_total = len(nodes)
+        workflow_result.num_steps_completed = 0
+        workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             print("Executing node: ", node.name, idx, len(nodes))
@@ -211,9 +214,8 @@ class WorkflowEngine:
             else:
                 output = node.process(latest_output)
 
-            self.workflow.workflow_result.steps_output[node.name] = output
-            self.workflow.workflow_result.num_steps_completed += 1
-            self.workflow.workflow_result.save()
+            workflow_result.steps_output[node.name] = output
+            workflow_result.num_steps_completed += 1
 
             latest_output = output
             data.append(
@@ -224,15 +226,18 @@ class WorkflowEngine:
                 )
             )
 
+            workflow_result.save()
+
         if latest_output is None:
             return None, data
 
+        workflow_result.status = "completed"
         return latest_output.get("output"), data
 
 
 def build_workflow_engine(steps, workflow):
     print("Building workflow engine: ", steps, workflow)
-    engine = WorkflowEngine(workflow)
+    engine = WorkflowEngine()
     nodes = []
 
     for idx, step in enumerate(steps):
