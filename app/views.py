@@ -1160,7 +1160,7 @@ def workflow_add_format_step():
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
 
-        is_editing = False
+        is_editing = data.get("editing") or False
         workflow_step = None
 
         if is_editing:

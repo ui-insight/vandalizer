@@ -16,6 +16,7 @@
     background-color: transparent;
     border-radius: 10px;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+    overflow: scroll;
 }
 
 
