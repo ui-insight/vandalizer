@@ -113,6 +113,7 @@
               workflow_uuid: current_workflow_id,
               space_id: current_space_id,
           });
+          console.log("Adding step", data);
 
           $.ajax({
               url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
