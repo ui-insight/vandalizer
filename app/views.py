@@ -906,7 +906,8 @@ def workflow_status():
 
     # Get workflow status
     workflow = Workflow.objects(id=workflow_id).first()
-    workflow_result = WorkflowResult(workflow=workflow)
+    # refresh workflow_result
+    workflow_result = WorkflowResult.objects(workflow=workflow).first()
 
     # if not workflow:
     #     return jsonify({"error": "Workflow not found"}), 404
@@ -920,6 +921,7 @@ def workflow_status():
         "status": workflow_result.status,
         "time_elapsed": int(time_elapsed),
     }
+    print(response)
 
     return jsonify(response)
     # return jsonify({"success": True})

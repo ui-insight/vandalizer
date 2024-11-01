@@ -248,6 +248,7 @@ class WorkflowEngine:
             return None, data
 
         workflow_result.status = "completed"
+        workflow_result.save()
         return latest_output.get("output"), data
 
 
