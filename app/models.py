@@ -34,6 +34,7 @@ class WorkflowResult(me.Document):
     num_steps_completed = me.IntField(default=0)
     num_steps_total = me.IntField(default=0)
     steps_output = me.DictField()
+    start_time = me.DateTimeField(default=datetime.datetime.now)
 
 
 class WorkflowAttachment(me.Document):
