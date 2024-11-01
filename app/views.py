@@ -882,11 +882,13 @@ def run_workflow():
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
-    document_step = WorkflowStep(
+    document_trigger_step = WorkflowStep(
         name="Document", data=dict(docs=docs, attachments=attachments)
     )
-    workflow.steps.append(document_step)
-    engine = build_workflow_engine(workflow.steps, workflow=workflow)
+    steps = [document_trigger_step]
+    for step in workflow.steps:
+        steps.append(step)
+    engine = build_workflow_engine(steps, workflow=workflow)
 
     output, data = engine.execute()
     return {"output": output, "steps": data}
@@ -1097,7 +1099,6 @@ def workflow_add_prompt_step():
         workflow_step_id = ""
         workflow_step = None
 
-
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
             workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
@@ -1118,7 +1119,7 @@ def workflow_add_prompt_step():
             prompts=prompts,
             is_editing=is_editing,
             workflow_step_id=workflow_step_id,
-            workflow_step=workflow_step
+            workflow_step=workflow_step,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1127,7 +1128,9 @@ def workflow_add_prompt_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        search_set_item_id = data["search_set_item_id"] if "search_set_item_id" in data else None
+        search_set_item_id = (
+            data["search_set_item_id"] if "search_set_item_id" in data else None
+        )
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
 
@@ -1140,9 +1143,7 @@ def workflow_add_prompt_step():
             workflow.steps.append(workflow_step)
             workflow.save()
         elif manual_input:
-            workflow_step = WorkflowStep(
-                name="Prompt", data={"prompt": manual_input}
-            )
+            workflow_step = WorkflowStep(name="Prompt", data={"prompt": manual_input})
             workflow_step.save()
             workflow.steps.append(workflow_step)
             workflow.save()
@@ -1166,21 +1167,22 @@ def workflow_add_format_step():
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
             workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-        
+
         workflow = Workflow.objects(id=workflow_id).first()
 
         current_space = Space.objects(uuid=space_id).first()
         formatters = SearchSetItem.objects(
-            user_id=load_user().user_id, space_id=current_space.uuid, searchtype="formatter"
+            user_id=load_user().user_id,
+            space_id=current_space.uuid,
+            searchtype="formatter",
         ).all()
-
 
         template = render_template(
             "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
             workflow=workflow,
             formatters=formatters,
             is_editing=is_editing,
-            workflow_step=workflow_step
+            workflow_step=workflow_step,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1189,10 +1191,11 @@ def workflow_add_format_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        search_set_item_id = data["search_set_item_id"] if "search_set_item_id" in data else None
+        search_set_item_id = (
+            data["search_set_item_id"] if "search_set_item_id" in data else None
+        )
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
-
 
         if search_set_item_id:
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()

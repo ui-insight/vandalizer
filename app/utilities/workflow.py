@@ -63,23 +63,20 @@ def data_extraction_model(keys, pdf_paths):
     return output
 
 
-def format_model(format, data):
-    prompt = f"Format the following text in {format} format: \n{data}"
+def format_model(formatting_prompt, text):
+    prompt = f"{formatting_prompt}\n\n {text}"
     completion = openai.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
     )
 
     response = completion.choices[0].message.content
+    print("Response: ", response)
     if response is None:
         return None, None
     # formatted text is between ```json\n and \n```
-    format_spec = f"```{format}\n"
-    formatted_text = re.search(f"{format_spec}(.*?)\n```", response, re.DOTALL)
-    if formatted_text is None:
-        return prompt, None
 
-    return prompt, formatted_text.group(1)
+    return prompt, response
 
 
 class Node:
@@ -94,12 +91,19 @@ class Node:
 
 class FormatNode(Node):
     def __init__(self, data):
-        super().__init__("Format")
-        self.format = data.get("format", "")
+        super().__init__("Formatter")
+        self.formatting_prompt = data.get("prompt", "")
+        print("Format Node: ", data, self.formatting_prompt)
 
     def process(self, inputs):
         data = inputs.get("output", None)
-        prompt, output = format_model(self.format, data)
+        prev_step_name = inputs.get("step_name", None)
+        text = None
+        if prev_step_name == "Prompt":
+            text = data.get("formatted_answer", "")
+
+        print("Format Node data: ", text, prev_step_name)
+        prompt, output = format_model(self.formatting_prompt, text)
         return {"output": output, "input": prompt}
 
 
@@ -151,7 +155,11 @@ class ExtractionNode(Node):
             step_input = pdf_paths
 
         extraction_response = data_extraction_model(self.keys, pdf_paths)
-        return {"output": extraction_response, "input": step_input}
+        return {
+            "output": extraction_response,
+            "input": step_input,
+            "step_name": self.name,
+        }
 
 
 class PromptNode(Node):
@@ -168,7 +176,7 @@ class PromptNode(Node):
         docs = [SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids]
 
         chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
-        return {"output": chat_response, "input": self.prompt}
+        return {"output": chat_response, "input": self.prompt, "step_name": self.name}
 
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
@@ -197,6 +205,7 @@ class WorkflowEngine:
         self.workflow.workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
+            print("Executing node: ", node.name, idx, len(nodes))
             if idx == 0:
                 output = node.process(dict())
             else:
@@ -224,46 +233,34 @@ class WorkflowEngine:
 def build_workflow_engine(steps, workflow):
     print("Building workflow engine: ", steps, workflow)
     engine = WorkflowEngine(workflow)
-    node_objects = {}
-    node_uuids = []
+    nodes = []
 
-    for step in steps:
-        node_id = uuid4().hex
+    for idx, step in enumerate(steps):
+        # node_id = uuid4().hex
+        node = None
         if step.name == "Document":
-            node_objects[node_id] = DocumentNode(step.data)
+            # node_objects[node_id] = DocumentNode(step.data)
+            node = DocumentNode(step.data)
+            nodes.append(node)
         elif step.name == "Extraction":
             extract_keys = step.extraction_items()
-            node_objects[node_id] = ExtractionNode(
-                dict(data=step.data, keys=extract_keys)
-            )
+            node = ExtractionNode(dict(data=step.data, keys=extract_keys))
+            nodes.append(node)
         elif step.name == "Prompt":
-            print("Prompt step: ", step.data)
-            node_objects[node_id] = PromptNode(step.data)
-        elif step.name == "Format":
-            node_objects[node_id] = FormatNode(step.data)
+            node = PromptNode(step.data)
+            nodes.append(node)
+        elif step.name == "Formatter":
+            node = FormatNode(step.data)
+            nodes.append(node)
 
-        engine.add_node(node_objects[node_id])
+        print("Node: ", node, step.name)
+
+        engine.add_node(node)
 
     # connect the steps
-    for idx, node_uuid in enumerate(node_uuids):
+    for idx in range(len(nodes)):
         if idx == 0:
             continue
-        engine.connect(node_objects[node_uuids[idx - 1]], node_objects[node_uuid])
+        engine.connect(nodes[idx - 1], nodes[idx])
 
     return engine
-
-
-class NodeData(BaseModel):
-    id: str
-    type: str
-    data: Dict[str, Any]
-
-
-class ConnectionData(BaseModel):
-    from_: Dict[str, str]
-    to: Dict[str, str]
-
-
-class WorkflowData(BaseModel):
-    nodes: List[NodeData]
-    connections: List[ConnectionData]
