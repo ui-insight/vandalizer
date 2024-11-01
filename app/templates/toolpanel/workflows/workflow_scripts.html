@@ -1,4 +1,5 @@
 <script>
+    var active_step = 1;
       var current_workflow_id = "{{ workflow_id }}";
       var current_space_id = "{{ current_space_id }}"
 
@@ -293,22 +294,32 @@
           });
       }
 
+      function generateSessionId() {
+        const timestamp = Date.now().toString(36); // Convert timestamp to base-36 string
+        const randomString = Math.random().toString(36).substring(2, 10); // Generate a random base-36 string
+        return `${timestamp}-${randomString}`;
+    }
+
+
       function runWorkflow() {
         if (document_uuids == "") {
             showToast("Select a document to run workflow");
             return;
         }
+
+        let session_id = generateSessionId();
           console.log(current_space_id);
           let data = JSON.stringify({
               workflow_id: current_workflow_id,
               space_id: current_space_id,
               document_uuids: document_uuids,
+              session_id: session_id
           });
 
           $('.add-step').hide();
           $('.workflow-output').fadeIn();
 
-          pollWorkflowStatus(current_workflow_id);
+          let workflowIntervalId = pollWorkflowStatus(session_id);
 
           $.ajax({
               url: '/api/workflow/run',
@@ -318,13 +329,19 @@
               dataType: 'json',
               async: true,
               success: function (data) {
-                console.log(data.output.formatted_answer);
-                $('.workflow-output-section').append(data.output.formatted_answer);
+                console.log(data.output);
+                $('.workflow-output-section').append(`${JSON.stringify(data.output)}`);
                 $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
+                clearInterval(workflowIntervalId);
+                $('.workflow-step').removeClass('active');
+                    // Add 'active' class to the nth $('.workflow-step') element (0-based index)
+                $('.workflow-container').addClass('active');
+                $('.workflow-loader').hide();
               },
               error: function (xhr, ajaxOptions, thrownError) {
                   console.log(xhr.status);
                   console.log(thrownError);
+                  clearInterval(workflowIntervalId);
               }
           });
       }
@@ -337,23 +354,35 @@
 
   });
 
-  function pollWorkflowStatus(workflow_id) {
+  function pollWorkflowStatus(session_id) {
     let startTime = Date.now(); // Capture start time to calculate elapsed time
     const pollInterval = 1000; // Poll every second
     const maxAttempts = 180; // Optional: Stop polling after 60 seconds to prevent infinite loop
     let attemptCount = 0;
 
-    const intervalId = setInterval(() => {
+    let intervalId = setInterval(() => {
         attemptCount += 1;
 
         $.ajax({
-            url: `/api/workflow/status?workflow_id=${workflow_id}`,
+            url: `/api/workflow/status?session_id=${session_id}`,
             type: 'GET',
             dataType: 'json',
             success: function (data) {
+                console.log(data);
                 //const { steps_completed, total_steps, status } = data;
-                let steps_completed = 0;
-                let total_steps = 3;
+                let steps_completed = data.steps_completed;
+                let total_steps = data.total_steps;
+
+                if (steps_completed == active_step) {
+                    $('.workflow-step').removeClass('active');
+                    
+                    $('.workflow-loader').hide();
+                    // Add 'active' class to the nth $('.workflow-step') element (0-based index)
+                    $('.workflow-step').eq(active_step).addClass('active');
+                    $('.workflow-loader').eq(active_step).fadeIn();
+                    active_step = steps_completed + 1;
+                }
+
                 // Update steps completed and time elapsed
                 $('.workflow-output-attachment-info').html(`
                     <span>${steps_completed} / ${total_steps} steps completed</span>
@@ -384,5 +413,7 @@
             showToast("Workflow status polling timed out");
         }
     }, pollInterval);
+
+    return intervalId;
 }
 </script>

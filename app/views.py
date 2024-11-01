@@ -53,6 +53,7 @@ from itertools import chain
 from copy import deepcopy
 from pypdf import PdfReader, PdfWriter
 import io
+import datetime
 
 # OAuth
 import secrets
@@ -875,9 +876,10 @@ def run_workflow():
         return redirect(url_for("login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
+    session_id = workflow_data["session_id"]
     document_uuids = workflow_data["document_uuids"]
     workflow = Workflow.objects(id=workflow_id).first()
-    workflow.workflow_result = WorkflowResult()
+    workflow.workflow_result = WorkflowResult(workflow_id=workflow_id, session_id=session_id)
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
@@ -897,29 +899,28 @@ def run_workflow():
 
 @app.route('/api/workflow/status', methods=['GET'])
 def workflow_status():
-    workflow_id = request.args.get('workflow_id')
+    session_id = request.args.get('session_id')
     
-    if not workflow_id:
+    if not session_id:
         return jsonify({"error": "workflow_id is required"}), 400
 
     # Get workflow status
-    workflow = WorkflowResult.objects(workflow_id=workflow_id)
+    workflow_result = WorkflowResult.objects(session_id=session_id).first()
     
-    # if not workflow:
-    #     return jsonify({"error": "Workflow not found"}), 404
+    if not workflow_result:
+        return jsonify({"error": "Workflow not found"}), 404
 
     # # Calculate time elapsed in seconds
-    # #time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
+    #time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
 
-    # response = {
-    #     "steps_completed": workflow["steps_completed"],
-    #     "total_steps": workflow["total_steps"],
-    #     "status": workflow["status"],
-    #     "time_elapsed": int(time_elapsed)
-    # }
+    response = {
+        "steps_completed": workflow_result.num_steps_completed,
+        "total_steps": workflow_result.num_steps_total,
+        #"time_elapsed": int(time_elapsed)
+    }
 
-    #return jsonify(response)
-    return jsonify({"success": True})
+    return jsonify(response)
+    #return jsonify({"success": True})
 
 
 
