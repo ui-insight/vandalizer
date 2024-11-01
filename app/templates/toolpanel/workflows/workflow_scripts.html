@@ -329,13 +329,12 @@
               dataType: 'json',
               async: true,
               success: function (data) {
-                console.log(data.output);
                 $('.workflow-output-section').append(`${JSON.stringify(data.output)}`);
                 $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
                 clearInterval(workflowIntervalId);
                 $('.workflow-step').removeClass('active');
                     // Add 'active' class to the nth $('.workflow-step') element (0-based index)
-                $('.workflow-container').addClass('active');
+                $('.workflow-output').addClass('active');
                 $('.workflow-loader').hide();
               },
               error: function (xhr, ajaxOptions, thrownError) {
@@ -379,7 +378,7 @@
                     $('.workflow-loader').hide();
                     // Add 'active' class to the nth $('.workflow-step') element (0-based index)
                     $('.workflow-step').eq(active_step).addClass('active');
-                    $('.workflow-loader').eq(active_step).fadeIn();
+                    $('.workflow-loader').eq(active_step-1).fadeIn();
                     active_step = steps_completed + 1;
                 }
 
