@@ -283,8 +283,8 @@ def dspy_model(
         k=3,
     )
 
-    # model
-    llm = dspy.OpenAI(model=model_name, max_tokens=None)
+    # model 32k tokens
+    llm = dspy.OpenAI(model=model_name, max_tokens=16 * 1024)
     # llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
     # llm = dspy.OpenAI(model=model_name, max_tokens=4096)
     dspy.settings.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
@@ -404,7 +404,7 @@ def background_retrain_model(feedback_list, root_path):
 
     model_name = "gpt-4o-mini"
     # model_name = "gpt-4o"
-    llm = dspy.OpenAI(model=model_name, max_tokens=4096)
+    llm = dspy.OpenAI(model=model_name, max_tokens=16 * 1024)
     # dspy.settings.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
     dspy.settings.configure(lm=llm, rm=rm, trace=[])
 
