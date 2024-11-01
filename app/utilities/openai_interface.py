@@ -14,7 +14,7 @@ from app.models import Conversation
 
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
-max_context_length = 90000
+max_context_length = 16 * 1024  # 16k tokens
 
 
 # Implementation based on the discussion:
@@ -142,7 +142,7 @@ class OpenAIInterface:
             question=question,
         )
 
-    def handle_long_context(self, prompt, question, full_text, root_path):
+    def handle_long_context(self, question, full_text, root_path):
         print("using dspy model")
         print("question: ", question)
 
@@ -154,7 +154,7 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         return self.format_answer(response, question)
 
-    def handle_short_context(self, prompt, question, full_text, root_path):
+    def handle_short_context(self, prompt, question, full_text):
         simple_qa = simple_qa_model()
         response = simple_qa(question=prompt, full_text=full_text)
 
