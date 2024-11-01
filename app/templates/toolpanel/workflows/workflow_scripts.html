@@ -1,321 +1,320 @@
 <script>
-    var current_workflow_id = "{{ workflow_id }}";
-    var current_space_id = "{{ current_space_id }}"
+      var current_workflow_id = "{{ workflow_id }}";
+      var current_space_id = "{{ current_space_id }}"
 
-$(document).ready(function () {   
-
-
-    $('.workflow-item').on("click", function () {
-        let uuid = $(this).attr("data-uuid");
-        fetchWorkflow(uuid);
-    });
-
-    $('#closeWorkflowBtn').on("click", function () {
-        $('#newWorkflowStepModal').fadeOut();
-        const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
-        history.pushState({ path: newUrl }, '', newUrl);
-    });
-
-    $('.add-extraction-step-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        console.log("Add Extraction");
-        workflowAddStep("extraction");
-    });
-
-    $('.add-prompt-step-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        console.log("Add Prompt");
-        workflowAddStep("prompt");
-    });
-
-    $('.add-format-step-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        console.log("Add Format");
-        workflowAddStep("format");
-    });
-
-    $('.add-document-step-btn').on("click", function (e) {
-        e.preventDefault();  // Prevent default behavior, if needed
-        console.log("Add Document");
-        workflowAddStep("document");
-    });
-
-    function addWorklowListeners() {
-        console.log("Add workflow listeners");
-        $('#workflow-close-button').off("click").on("click", function () {
-            $('#search-results-panel').fadeOut();
-        });
-
-        $('#add-workflow-step-btn').off("click").on("click", function () {
-            $('#newWorkflowStepModal').show();
-        });
-
-        $('.edit-workflow-attachments-btn').off("click").on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            workflowAddAttachmentStep();
-        });
-
-        $('.edit-workflow-step-btn').off("click").on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            let step_id = $(this).attr("data-step-id");
-            let step_type = $(this).attr("data-step-type");
-            console.log("Editing step");
-            workflowEditStep(step_id, step_type);
-        });
-
-        $('.run-workflow').off("click").on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            //let workflow_id = $(this).attr("data-workflow-id");
-            runWorkflow();
-        });
-    }
-
-    function fetchWorkflow(workflow_uuid) {
-        showScanning();
-        console.log("fetching workflow:" + workflow_uuid);
-        current_workflow_id = workflow_uuid;
-        
-        let data = JSON.stringify({
-            workflow_uuid: workflow_uuid,
-        });
-
-        $.ajax({
-            url: '/api/fetch_workflow',
-            type: 'POST',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
+  $(document).ready(function () {
 
 
-                hideWorking();
-                stopScanning();
-                $('#search-results-panel').show();
-                $('#search-results-panel').empty();
-                $(data.template).hide().appendTo('#search-results-panel').fadeIn();
-                addWorklowListeners();
+      $('.workflow-item').on("click", function () {
+          let uuid = $(this).attr("data-uuid");
+          fetchWorkflow(uuid);
+      });
 
-                            // Update the browser URL with the current_workflow_id without refreshing the page
-                const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
-                history.pushState({ path: newUrl }, '', newUrl);
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+      $('#closeWorkflowBtn').on("click", function () {
+          $('#newWorkflowStepModal').fadeOut();
+          const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
+          history.pushState({ path: newUrl }, '', newUrl);
+      });
 
-    function workflowAddStep(stepType) {
-        console.log(current_space_id);
-        let data = JSON.stringify({
-            workflow_uuid: current_workflow_id,
-            space_id: current_space_id,
-        });
+      $('.add-extraction-step-btn').on("click", function (e) {
+          e.preventDefault();  // Prevent default behavior, if needed
+          console.log("Add Extraction");
+          workflowAddStep("extraction");
+      });
 
-        $.ajax({
-            url: `/api/workflows/add_${stepType}_step`,
-            type: 'GET',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                $('#newWorkflowStepModal').fadeOut();
-                $(data.template).hide().appendTo('.modal-container').fadeIn();
-                addWorklowListeners();
+      $('.add-prompt-step-btn').on("click", function (e) {
+          e.preventDefault();  // Prevent default behavior, if needed
+          console.log("Add Prompt");
+          workflowAddStep("prompt");
+      });
 
-                $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
-                    e.preventDefault();
-                    console.log(`Add ${capitalize(stepType)}`);
-                    workflowConfirmStep(stepType);
-                });
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+      $('.add-format-step-btn').on("click", function (e) {
+          e.preventDefault();  // Prevent default behavior, if needed
+          console.log("Add Format");
+          workflowAddStep("format");
+      });
 
-    function workflowEditStep(step_id, stepType) {
-        console.log(current_space_id);
-        let data = JSON.stringify({
-            workflow_uuid: current_workflow_id,
-            space_id: current_space_id,
-            editing: true,
-            workflow_step_id: step_id
-        });
+      $('.add-document-step-btn').on("click", function (e) {
+          e.preventDefault();  // Prevent default behavior, if needed
+          console.log("Add Document");
+          workflowAddStep("document");
+      });
 
-        $.ajax({
-            url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
-            type: 'GET',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                $('#newWorkflowStepModal').fadeOut();
-                $(data.template).hide().appendTo('.modal-container').fadeIn();
-                addWorklowListeners();
+      function addWorklowListeners() {
+          console.log("Add workflow listeners");
+          $('#workflow-close-button').off("click").on("click", function () {
+              $('#search-results-panel').fadeOut();
+          });
 
-                $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
-                    e.preventDefault();
-                    console.log(`Add ${capitalize(stepType)}`);
-                    workflowConfirmStep(stepType);
-                });
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+          $('#add-workflow-step-btn').off("click").on("click", function () {
+              $('#newWorkflowStepModal').show();
+          });
 
-    function workflowConfirmStep(stepType) {
-        console.log(current_space_id);
-        dict = {
-            workflow_uuid: current_workflow_id,
-            space_id: current_space_id,
-        }
+          $('.edit-workflow-attachments-btn').off("click").on("click", function (e) {
+              e.preventDefault();  // Prevent default behavior, if needed
+              workflowAddAttachmentStep();
+          });
 
-        if (stepType == "extraction") {
-            let activeTab = $('.workflow-tab-btn.active').attr('id');
-            if (activeTab == "manualInputTab") {
-                let manualInput = $('#extractionInput')[0].value;
-                dict['manual_input'] = manualInput;
-            } else {
-                let dropdown_selection = $('#extractionSetDropdown')[0].value;
-                dict["search_set_id"] = dropdown_selection
-            }
-        } else if (stepType == "prompt") {
-            let activeTab = $('.workflow-tab-btn.active').attr('id');
-            if (activeTab == "manualInputTab") {
-                let manualInput = $('#extractionInput')[0].value;
-                dict['manual_input'] = manualInput;
-            } else {
-                let dropdown_selection = $('#extractionSetDropdown')[0].value;
-                dict["search_set_id"] = dropdown_selection
-            }
+          $('.edit-workflow-step-btn').off("click").on("click", function (e) {
+              e.preventDefault();  // Prevent default behavior, if needed
+              let step_id = $(this).attr("data-step-id");
+              let step_type = $(this).attr("data-step-type");
+              console.log("Editing step");
+              workflowEditStep(step_id, step_type);
+          });
 
-            return
-        }
+          $('.run-workflow').off("click").on("click", function (e) {
+              e.preventDefault();  // Prevent default behavior, if needed
+              //let workflow_id = $(this).attr("data-workflow-id");
+              runWorkflow();
+          });
+      }
 
-        let data = JSON.stringify(dict);
+      function fetchWorkflow(workflow_uuid) {
+          showScanning();
+          console.log("fetching workflow:" + workflow_uuid);
+          current_workflow_id = workflow_uuid;
 
-        $.ajax({
-            url: `/api/workflows/add_${stepType}_step`,
-            type: 'POST',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                location.reload();
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+          let data = JSON.stringify({
+              workflow_uuid: workflow_uuid,
+          });
 
-    // Helper function to capitalize the first letter of a string
-    function capitalize(str) {
-        return str.charAt(0).toUpperCase() + str.slice(1);
-    }
-
-    function workflowAddAttachmentStep() {
-        console.log(current_space_id);
-        let data = JSON.stringify({
-            workflow_uuid: current_workflow_id,
-            space_id: current_space_id,
-        });
-
-        $.ajax({
-            url: '/api/workflows/add_attachment',
-            type: 'GET',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                $(data.template).hide().appendTo('.modal-container').fadeIn();
-                addWorklowListeners();
-
-                $('.attachment-file-item').on("click", function (e) {
-                    e.preventDefault();  // Prevent default behavior, if needed
-                    let uuid =  $(this).attr("data-uuid");
-                    workflowConfirmAttachmentStep(uuid);
-                });
+          $.ajax({
+              url: '/api/fetch_workflow',
+              type: 'POST',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
 
 
+                  hideWorking();
+                  stopScanning();
+                  $('#search-results-panel').show();
+                  $('#search-results-panel').empty();
+                  $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                  addWorklowListeners();
 
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+                              // Update the browser URL with the current_workflow_id without refreshing the page
+                  const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
+                  history.pushState({ path: newUrl }, '', newUrl);
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
 
-    function workflowConfirmAttachmentStep(uuid) {
-        console.log(current_space_id);
-        let data = JSON.stringify({
-            workflow_uuid: current_workflow_id,
-            space_id: current_space_id,
-            document_uuid: uuid
-        });
+      function workflowAddStep(stepType) {
+          console.log(current_space_id);
+          let data = JSON.stringify({
+              workflow_uuid: current_workflow_id,
+              space_id: current_space_id,
+          });
 
-        $.ajax({
-            url: '/api/workflows/add_attachment',
-            type: 'POST',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                location.reload();
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+          $.ajax({
+              url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
+              type: 'GET',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+                  $('#newWorkflowStepModal').fadeOut();
+                  $(data.template).hide().appendTo('.modal-container').fadeIn();
+                  addWorklowListeners();
 
-    function runWorkflow() {
-        console.log(current_space_id);
-        let data = JSON.stringify({
-            workflow_id: current_workflow_id,
-            space_id: current_space_id,
-            document_uuids: document_uuids,
-        });
+                  $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
+                      e.preventDefault();
+                      console.log(`Add ${capitalize(stepType)}`);
+                      workflowConfirmStep(stepType);
+                  });
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
 
-        $.ajax({
-            url: '/api/workflow/run',
-            type: 'POST',
-            data: data,
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            async: true,
-            success: function (data) {
-                
-            },
-            error: function (xhr, ajaxOptions, thrownError) {
-                console.log(xhr.status);
-                console.log(thrownError);
-            }
-        });
-    }
+      function workflowEditStep(step_id, stepType) {
+          console.log(current_space_id);
+          let data = JSON.stringify({
+              workflow_uuid: current_workflow_id,
+              space_id: current_space_id,
+              editing: true,
+              workflow_step_id: step_id
+          });
 
-    // If there is a workflow in the browser href
-    let workflow_template = {{ workflow_template|length }}
-    if (workflow_template != "") {
-        addWorklowListeners();
-    }
-    
-});
+          $.ajax({
+              url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
+              type: 'GET',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+                  $('#newWorkflowStepModal').fadeOut();
+                  $(data.template).hide().appendTo('.modal-container').fadeIn();
+                  addWorklowListeners();
 
+                  $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
+                      e.preventDefault();
+                      console.log(`Add ${capitalize(stepType)}`);
+                      workflowConfirmStep(stepType);
+                  });
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
+
+      function workflowConfirmStep(stepType) {
+          console.log(current_space_id);
+          dict = {
+              workflow_uuid: current_workflow_id,
+              space_id: current_space_id,
+          }
+
+          if (stepType == "extraction") {
+              let activeTab = $('.workflow-tab-btn.active').attr('id');
+              if (activeTab == "manualInputTab") {
+                  let manualInput = $('#extractionInput')[0].value;
+                  dict['manual_input'] = manualInput;
+              } else {
+                  let dropdown_selection = $('#extractionSetDropdown')[0].value;
+                  dict["search_set_id"] = dropdown_selection
+              }
+          } else if (stepType == "prompt") {
+              let activeTab = $('.workflow-tab-btn.active').attr('id');
+              if (activeTab == "manualInputTab") {
+                  let manualInput = $('#extractionInput')[0].value;
+                  dict['manual_input'] = manualInput;
+              } else {
+                  let dropdown_selection = $('#extractionSetDropdown')[0].value;
+                  dict["search_set_id"] = dropdown_selection
+              }
+
+              return
+          }
+
+          let data = JSON.stringify(dict);
+
+          $.ajax({
+              url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
+              type: 'POST',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+                  location.reload();
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
+
+      // Helper function to capitalize the first letter of a string
+      function capitalize(str) {
+          return str.charAt(0).toUpperCase() + str.slice(1);
+      }
+
+      function workflowAddAttachmentStep() {
+          console.log(current_space_id);
+          let data = JSON.stringify({
+              workflow_uuid: current_workflow_id,
+              space_id: current_space_id,
+          });
+
+          $.ajax({
+              url: '/api/workflows/add_attachment',
+              type: 'GET',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+                  $(data.template).hide().appendTo('.modal-container').fadeIn();
+                  addWorklowListeners();
+
+                  $('.attachment-file-item').on("click", function (e) {
+                      e.preventDefault();  // Prevent default behavior, if needed
+                      let uuid =  $(this).attr("data-uuid");
+                      workflowConfirmAttachmentStep(uuid);
+                  });
+
+
+
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
+
+      function workflowConfirmAttachmentStep(uuid) {
+          console.log(current_space_id);
+          let data = JSON.stringify({
+              workflow_uuid: current_workflow_id,
+              space_id: current_space_id,
+              document_uuid: uuid
+          });
+
+          $.ajax({
+              url: '/api/workflows/add_attachment',
+              type: 'POST',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+                  location.reload();
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
+
+      function runWorkflow() {
+          console.log(current_space_id);
+          let data = JSON.stringify({
+              workflow_id: current_workflow_id,
+              space_id: current_space_id,
+              document_uuids: document_uuids,
+          });
+
+          $.ajax({
+              url: '/api/workflow/run',
+              type: 'POST',
+              data: data,
+              contentType: 'application/json; charset=utf-8',
+              dataType: 'json',
+              async: true,
+              success: function (data) {
+
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  console.log(xhr.status);
+                  console.log(thrownError);
+              }
+          });
+      }
+
+      // If there is a workflow in the browser href
+      let workflow_template = {{ workflow_template|length }}
+      if (workflow_template != "") {
+          addWorklowListeners();
+      }
+
+  });
 </script>
