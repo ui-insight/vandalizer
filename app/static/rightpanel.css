@@ -281,6 +281,16 @@ button.shadow-button:hover {
   display: none; /* Hides the scrollbar */
 }
 
+.tasks-panel {
+  padding: 20px 20px 180px 20px;
+  overflow:scroll;
+  height: calc(100vh - 120px);
+}
+
+.tasks-panel::-webkit-scrollbar {
+  display: none; /* Hides the scrollbar */
+}
+
 .sticky {
   position: sticky;
 }
