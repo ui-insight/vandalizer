@@ -59,7 +59,7 @@
             <div class="row" style="height:100%; background-color: #191919;">
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <a style="padding-left: 30px; margin-top: 5px;" href="/home">
+                    <a style="padding-left: 30px; margin-top: 5px;" href="javascript:void(0);" onclick="removeDocIdAndGo()">
                         <span style="font-size: 2em;  color: white;">
                             <i class="fa-solid fa-arrow-left"></i>
                         </span>
@@ -180,7 +180,7 @@
                                            {% endif %}>
                                 </span>
                         
-                                <a href="?docid={{ doc.uuid }}" class="file-link">
+                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')">
                                     <span><i class="fa-solid fa-file"></i></span>
                                     <span class="file-name">{{ doc.title }}</span>
                                 </a>
