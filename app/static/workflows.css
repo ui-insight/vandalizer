@@ -66,11 +66,22 @@
 
   .step-connector.bottom {
     bottom: -15px;
+    background-image: url('/static/images/step-connector-bottom.png');
   }
 
   .step-connector.top {
     top: -15px;
+    background-image: url('/static/images/step-connector-top.png');
   }
+
+  /* Active states */
+.step-connector.bottom.active {
+  background-image: url('/static/images/step-connector-bottom-active.png');
+}
+
+.step-connector.top.active {
+  background-image: url('/static/images/step-connector-top-active.png');
+}
   
   .step-connection-line {
     width: 2px;
