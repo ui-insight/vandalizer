@@ -25,69 +25,70 @@
     }
 
     function updateDocumentSelections() {
-            var checkedCheckboxes = $('.document-selector:checked');
-            console.log("Updating document selections", checkedCheckboxes);
-            var totalDocs = 0;
-            // var totalTokenCounts = 0;
-            var uuids = [];
+        var checkedCheckboxes = $('.document-selector:checked');
+        console.log("Updating document selections", checkedCheckboxes);
+        var totalDocs = 0;
+        // var totalTokenCounts = 0;
+        var uuids = [];
 
-            for (var i = 0; i < checkedCheckboxes.length; i++) {
-                let checkbox = checkedCheckboxes[i];
-                if (checkbox.attributes['data-num-documents'] == undefined) {
-                    continue;
-                }
-                var numDocs = checkbox.attributes['data-num-documents'].value
-                totalDocs += parseInt(numDocs);
-                // totalTokenCounts += parseInt(checkbox.attributes['data-token-count'].value);
+        for (var i = 0; i < checkedCheckboxes.length; i++) {
+            let checkbox = checkedCheckboxes[i];
+            if (checkbox.attributes['data-num-documents'] == undefined) {
+                continue;
+            }
+            var numDocs = checkbox.attributes['data-num-documents'].value
+           
+            // totalTokenCounts += parseInt(checkbox.attributes['data-token-count'].value);
 
-                if (checkbox.attributes['data-doc-uuid'] != undefined) {
-                    uuids.push(checkbox.attributes['data-doc-uuid'].value);
-                }
-
-                if (checkbox.attributes['data-doc-uuids'] != undefined) {
-                    let uuidList = checkbox.attributes['data-doc-uuids'].value;
-                    let array = JSON.parse(uuidList.replace(/'/g, '"'));
-                    uuids = uuids.concat(array);
-                }
+            if (checkbox.attributes['data-doc-uuid'] != undefined) {
+                uuids.push(checkbox.attributes['data-doc-uuid'].value);
             }
 
-            // Check for docid in the browser's current URL
-            let currentUrl = window.location.href;
-            if (currentUrl.includes('docid=')) {
-                let urlParams = new URLSearchParams(currentUrl.split('?')[1]);
-                let docid = urlParams.get('docid');
-                if (docid) {
-                    uuids.push(docid);
-                }
-            }
-
-
-
-            console.log("Reset uuids");
-            document_uuids = uuids;
-
-            var contextLengthWarning = `
-                                     <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>
-            `
-
-            var counters = $('.doc-selected-counter')
-            for (var i = 0; i < counters.length; i++) {
-                if(totalDocs == 0) {
-                    counters[i].textContent = `Select documents to start the conversation`;
-                } else if (totalDocs == 1) {
-                    // counters[i].textContent = `${totalDocs} document selected (${totalTokenCounts} tokens)`;
-                    counters[i].textContent = `${totalDocs} document selected`;
-
-
-                } else {
-                    // counters[i].textContent = `${totalDocs} documents selected (${totalTokenCounts} tokens)`;
-                counters[i].textContent = `${totalDocs} documents selected`;
-                }
-                // if (totalTokenCounts > maxContextLength) {
-                //     counters[i].innerHTML += contextLengthWarning;
-                // }
+            if (checkbox.attributes['data-doc-uuids'] != undefined) {
+                let uuidList = checkbox.attributes['data-doc-uuids'].value;
+                let array = JSON.parse(uuidList.replace(/'/g, '"'));
+                uuids = uuids.concat(array);
             }
         }
+
+        // Check for docid in the browser's current URL
+        let currentUrl = window.location.href;
+        if (currentUrl.includes('docid=')) {
+            let urlParams = new URLSearchParams(currentUrl.split('?')[1]);
+            let docid = urlParams.get('docid');
+            if (docid) {
+                uuids.push(docid);
+            }
+        }
+
+
+
+        console.log("Reset uuids: " + uuids.length);
+        totalDocs += uuids.length;
+        document_uuids = uuids;
+
+        var contextLengthWarning = `
+                                    <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>
+        `
+
+        var counters = $('.doc-selected-counter')
+        for (var i = 0; i < counters.length; i++) {
+            if(totalDocs == 0) {
+                counters[i].textContent = `Select documents to begin`;
+            } else if (totalDocs == 1) {
+                // counters[i].textContent = `${totalDocs} document selected (${totalTokenCounts} tokens)`;
+                counters[i].textContent = `${totalDocs} document selected`;
+
+
+            } else {
+                // counters[i].textContent = `${totalDocs} documents selected (${totalTokenCounts} tokens)`;
+            counters[i].textContent = `${totalDocs} documents selected`;
+            }
+            // if (totalTokenCounts > maxContextLength) {
+            //     counters[i].innerHTML += contextLengthWarning;
+            // }
+        }
+    }
 
     console.log("Document UUIDs", document_uuids);
 
