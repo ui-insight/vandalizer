@@ -164,10 +164,8 @@ class OpenAIInterface:
 
     def handle_short_context(self, **kwargs):
         prompt = kwargs.get("prompt")
-        question = kwargs.get("question")
         full_text = kwargs.get("full_text")
         print("Short context needed")
-        print("question: ", question)
         print("full text: ", full_text)
         print("prompt: ", prompt)
 
