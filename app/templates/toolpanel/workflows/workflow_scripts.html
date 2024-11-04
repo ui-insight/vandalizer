@@ -43,8 +43,13 @@
 
       function addWorklowListeners() {
           console.log("Add workflow listeners");
+          updateDocumentSelections();
+
           $('#workflow-close-button').off("click").on("click", function () {
               $('#search-results-panel').fadeOut();
+              const url = new URL(window.location.href);
+                url.searchParams.delete('workflow_id');
+                window.history.replaceState(null, '', url.toString());
           });
 
           $('#add-workflow-step-btn').off("click").on("click", function () {
