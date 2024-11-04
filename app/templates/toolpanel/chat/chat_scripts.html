@@ -86,11 +86,16 @@
     question,
     folder_uuid,
     additional_context = "",
+    display_question = ""
   ) {
     $(".chat-card-container").hide();
-    $("#chat-panel").append(
-      "<p><div class='message-you'>" + question + "</div></p>",
-    );
+   
+    console.log("Display question:" + display_question);
+    console.log("Question:" + question);
+
+      $("#chat-panel").append(
+        "<p><div class='message-you'>" + (display_question == "" ? question : display_question) + "</div></p>",
+      );
 
     function createFeedbackButtons(question, answer, context, document_uuids) {
       const feedbackDiv = document.createElement("div");
