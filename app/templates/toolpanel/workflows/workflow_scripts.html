@@ -345,6 +345,7 @@
                 $('.workflow-step').removeClass('active');
                     // Add 'active' class to the nth $('.workflow-step') element (0-based index)
                 $('.workflow-output').addClass('active');
+                $('.workflow-output').find('.step-connector').addClass('active');
                 $('.workflow-loader').hide();
                 performWorkflowStatus(session_id, workflow_elapsed_time);
               },
@@ -377,13 +378,16 @@
                 let total_steps = data.total_steps;
 
                 console.log(steps_completed);
+               
 
                 if (steps_completed == active_step) {
                     $('.workflow-step').removeClass('active');
+                    $('.step-connector').removeClass('active');
                     
                     $('.workflow-loader').hide();
                     // Add 'active' class to the nth $('.workflow-step') element (0-based index)
                     $('.workflow-step').eq(active_step).addClass('active');
+                    $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
                     $('.workflow-loader').eq(active_step-1).fadeIn();
                     active_step = steps_completed + 1;
                 }
