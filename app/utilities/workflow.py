@@ -5,18 +5,22 @@ import json
 import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
 import re
+import html
 
 from pypdf import PdfReader
 
 from typing import List, Dict, Any
 
 from app import app
+from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.openai_interface import (
     OpenAIInterface,
-    extract_text_from_doc,
 )
+
+from threading import Thread
 
 from app.models import SmartDocument
 
@@ -29,6 +33,25 @@ load_dotenv()
 
 # TODO add the option to choose the llm model
 # TODO add the option to choose the way we get the document content (luke's model, or pdfreader)
+
+
+class WorkflowThread(Thread):
+    def __init__(
+        self, group=None, target=None, name=None, args=(), kwargs={}, verbose=None
+    ):
+        super().__init__(group, target, name, args, kwargs)
+        self._return = None
+        self._target = target
+        self._args = args
+        self._kwargs = kwargs
+
+    def run(self):
+        if self._target is not None:
+            self._return = self._target(*self._args, **self._kwargs)
+
+    def join(self, timeout=None):
+        super().join(timeout)
+        return self._return
 
 
 def add_document_to_workflow_step(document, workflow_step):
@@ -51,6 +74,52 @@ def remove_document_from_workflow_step(document, workflow_step):
 
 # TODO prompt and formatter
 #
+# def format_llm_output(text: str) -> str:
+#     """
+#     Format LLM output text for HTML display.
+
+#     Args:
+#         text (str): Raw LLM output text containing \n literals and markdown formatting
+
+#     Returns:
+#         str: Formatted HTML-safe string
+#     """
+#     # Replace explicit \n with actual newlines
+#     text = text.replace("\\n", "\n")
+
+#     # Escape HTML special characters
+#     text = html.escape(text)
+
+#     # Convert markdown-style bold to HTML
+#     text = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", text)
+
+#     # Convert newlines to <br> tags
+#     text = text.replace("\n", "<br>")
+
+#     # Remove any extra whitespace at start/end
+#     return text.strip()
+
+
+def format_llm_output(text: str) -> str:
+    """
+    Format raw LLM text output to clean up escape characters and extra whitespace.
+    Returns clean text that can be safely placed in HTML elements on the frontend.
+
+    Args:
+        text (str): Raw LLM output text containing \n literals and extra whitespace
+
+    Returns:
+        str: Cleaned text string
+    """
+    # Replace explicit \n escapes with actual newlines
+    text = text.replace("\n", "")
+    text = text.strip('"')
+
+    # Remove any extra/duplicate newlines
+    text = "\n".join(line for line in text.splitlines() if line.strip())
+
+    # Remove any whitespace from start/end
+    return text.strip()
 
 
 def llm_chat_model(prompt, data=None, docs=[]):
@@ -59,12 +128,21 @@ def llm_chat_model(prompt, data=None, docs=[]):
     if len(docs) == 0:
         # convert the data to string
         full_text = json.dumps(data)
-        output = open_ai_interface.handle_short_context(
-            prompt=prompt, full_text=full_text
+        output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
+
+        completion = openai.chat.completions.create(
+            # model="gpt-4o",
+            model="gpt-4o",
+            messages=[{"role": "user", "content": output_prompt}],
+            max_tokens=None,
         )
-        if output is not None:
-            output = output.get("answer", "")
-        print("llm formatted response: ", output, prompt)
+        output = completion.choices[0].message.content
+        output = format_llm_output(output).strip()
+        # output = open_ai_interface.handle_short_context(
+        #     prompt=prompt, full_text=full_text
+        # )
+        # if output is not None:
+        #     output = output.get("answer", "")
 
     else:
         output = open_ai_interface.ask_question_to_documents(
@@ -73,9 +151,13 @@ def llm_chat_model(prompt, data=None, docs=[]):
     return output
 
 
-def data_extraction_model(keys, pdf_paths):
+def data_extraction_model(keys, pdf_paths, full_text=None):
+    output = None
     extraction_manager = ExtractionManager2()
-    output = extraction_manager.extract(keys, pdf_paths)
+    if pdf_paths is None:
+        output = extraction_manager.extract(keys, pdf_paths=[], full_text=full_text)
+    else:
+        output = extraction_manager.extract(keys, pdf_paths)
     return output
 
 
@@ -87,7 +169,7 @@ def format_model(formatting_prompt, text):
     )
 
     response = completion.choices[0].message.content
-    print("Response: ", response)
+
     if response is None:
         return None, None
     # formatted text is between ```json\n and \n```
@@ -105,32 +187,12 @@ class Node:
         raise NotImplementedError
 
 
-class FormatNode(Node):
-    def __init__(self, data):
-        super().__init__("Formatter")
-        self.formatting_prompt = data.get("prompt", "")
-        print("Format Node: ", data, self.formatting_prompt)
-
-    def process(self, inputs):
-        data = inputs.get("output", None)
-        prev_step_name = inputs.get("step_name", None)
-        text = None
-        if prev_step_name == "Prompt":
-            text = data.get("formatted_answer", "")
-        else:
-            text = data
-        print("Format Node data: ", text, prev_step_name)
-        prompt, output = format_model(self.formatting_prompt, text)
-        return {"output": output, "input": prompt, "step_name": self.name}
-
-
 class DocumentNode(Node):
     def __init__(self, data):
         super().__init__("Document")
         self.docs = data.get("docs", [])
         self.attachments = data.get("attachments", [])
         self.pdf_paths = []
-        print("Document Node: ", data, self.docs, self.attachments)
 
         # self.filename = data.get("filename", "")
         # self.content = ""
@@ -153,28 +215,71 @@ class DocumentNode(Node):
         return output
 
 
+class FormatNode(Node):
+    def __init__(self, data):
+        super().__init__("Formatter")
+        self.formatting_prompt = data.get("prompt", "")
+
+    def process(self, inputs):
+        data = inputs.get("output", None)
+        prev_step_name = inputs.get("step_name", None)
+        text = None
+        if prev_step_name == "Prompt":
+            if isinstance(data, dict):
+                text = data.get("formatted_answer", "")
+            else:
+                text = data
+        if prev_step_name == "Document":
+            doc_paths = inputs.get("output", None)
+            text = ""
+            for doc_path in doc_paths:
+                doc_text = extract_text_from_doc(doc_path)
+                if doc_text is not None:
+                    text += doc_text
+        else:
+            text = data
+
+        prompt, output = format_model(self.formatting_prompt, text)
+        return {"output": output, "input": prompt, "step_name": self.name}
+
+
 class ExtractionNode(Node):
     def __init__(self, data):
         super().__init__("Extraction")
-        print("Extraction Node: ", data)
+
         self.keys = data.get("keys", [])
-        print("Extraction keys: ", self.keys)
 
     def process(self, inputs):
         prev_step_name = inputs.get("step_name", None)
 
         step_input = None
         pdf_paths = None
+        extraction_response = None
         if prev_step_name == "Document":
             pdf_paths = inputs.get("output", None)
             if pdf_paths is None:
                 return {"output": None}
             step_input = pdf_paths
-        # TODO handle else case
-        # else:
-        #     pass
 
-        extraction_response = data_extraction_model(self.keys, pdf_paths)
+            extraction_response = data_extraction_model(self.keys, pdf_paths)
+        elif prev_step_name == "Prompt":
+            step_input = inputs.get("output", None)
+            step_input = inputs.get("answer")
+            extraction_response = data_extraction_model(
+                self.keys, pdf_paths, full_text=step_input
+            )
+        elif prev_step_name == "Extraction":
+            step_input = inputs.get("output", None)
+            step_input = inputs.get("output", None)
+            extraction_response = data_extraction_model(
+                self.keys, pdf_paths, full_text=step_input
+            )
+        elif prev_step_name == "Formatter":
+            step_input = inputs.get("output", None)
+            extraction_response = data_extraction_model(
+                self.keys, pdf_paths, full_text=step_input
+            )
+
         return {
             "output": extraction_response,
             "input": step_input,
@@ -188,7 +293,6 @@ class PromptNode(Node):
         self.prompt = data.get("prompt", "Enter prompt")
 
     def process(self, inputs):
-        print("Prompt Node: ", self.prompt, inputs)
         prev_step_name = inputs.get("step_name", None)
         chat_response = None
         if prev_step_name == "Document":
@@ -229,12 +333,12 @@ class WorkflowEngine:
     def execute(self, workflow_result):
         data = []
         nodes = self.get_topological_order()
-        print("nodes", nodes)
+
         workflow_result.num_steps_completed = 0
         workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
-            print("Executing node: ", node.name, idx, len(nodes))
+
             if idx == 0:
                 output = node.process(dict())
             else:
@@ -263,7 +367,7 @@ class WorkflowEngine:
 
 
 def build_workflow_engine(steps, workflow):
-    print("Building workflow engine: ", steps, workflow)
+
     engine = WorkflowEngine()
     nodes = []
 
@@ -284,8 +388,6 @@ def build_workflow_engine(steps, workflow):
         elif step.name == "Formatter":
             node = FormatNode(step.data)
             nodes.append(node)
-
-        print("Node: ", node, step.name)
 
         engine.add_node(node)
 

@@ -1,4 +1,3 @@
-
 import time
 import openai
 from pypdf import PdfReader
@@ -8,11 +7,19 @@ import csv
 from io import StringIO
 import json
 
+
+from app.utilities.document_readers import extract_text_from_doc
+
+
 class ExtractionManager2:
     root_path = ""
+
     def getPrompt(self, context, features):
-        return """Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
-        """ + "\n".join(features) + """
+        return (
+            """Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
+        """
+            + "\n".join(features)
+            + """
 
         If a property is not present, represent it as "Not Found".
 
@@ -20,53 +27,64 @@ class ExtractionManager2:
         
         Passage: 
 
-        """ + context + """
+        """
+            + context
+            + """
         Remember: Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
-        """ + "\n".join(features) + """
+        """
+            + "\n".join(features)
+            + """
 
         If a property is not present, represent it as "Not Found".
 
         ormat the output as JSON, with the entity name as the key and a single string as the value. Make sure the entity name is exactly as it is listed. Do not include any additional text. Do not nest json values format it as {"entity": "value"}.
        
         """
+        )
 
-    def extract(self, extract_keys, pdf_paths):
+    def extract(self, extract_keys, pdf_paths, full_text=None):
         start_time = time.time()
         openai.api_key = "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"
-        full_text = ""
-        for pdf_path in pdf_paths:
-            pdf = PdfReader(os.path.join(self.root_path, "static", "uploads", pdf_path))
-            number_of_pages = len(pdf.pages)
-            
-            for i in range(number_of_pages):
-                full_text = full_text + pdf.pages[i].extract_text() + " "
+        doc_text = ""
+        if full_text is None:
+            for pdf_path in pdf_paths:
+                doc_text = extract_text_from_doc(doc_path=pdf_path)
 
-        print(f"PDF processing time: {time.time() - start_time:.2f} seconds")
+            print(f"PDF processing time: {time.time() - start_time:.2f} seconds")
+        else:
+            doc_text = full_text
         start_time = time.time()
 
-        prompt = self.getPrompt(full_text, extract_keys)
-        #model = "gpt-3.5-turbo-0125"
-        #if len(prompt) > 50000:
+        print(
+            "Extracting entities from document(s): ", doc_text, pdf_paths, extract_keys
+        )
+        prompt = self.getPrompt(doc_text, extract_keys)
+        # model = "gpt-3.5-turbo-0125"
+        # if len(prompt) > 50000:
         #    model = "gpt-4-turbo"
         model = "gpt-4o"
 
         print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()
 
-        completion = openai.chat.completions.create(model=model, 
-                                                    response_format={"type": "json_object"},
-                                                messages=[
-                                                    {"role": "system", "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage."},
-                                                    {"role": "user", "content": prompt}],
-                                                )
+        completion = openai.chat.completions.create(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
         output = completion.choices[0].message.content
-        output = output.replace('\\n', '') 
-        output = output.replace('```json', '')
-        output = output.replace('```', '')
+        output = output.replace("\\n", "")
+        output = output.replace("```json", "")
+        output = output.replace("```", "")
         print(output)
 
         print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
-
 
         if "{" in output and "}" in output:
             output_data = json.loads(output.strip())
@@ -74,11 +92,3 @@ class ExtractionManager2:
         else:
             print("Threw out: " + output)
             return
-
-    
-
-
-
-    
-        
-        

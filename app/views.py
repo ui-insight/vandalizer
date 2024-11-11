@@ -2,7 +2,7 @@ import urllib.parse
 from datetime import datetime
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
-from app.utilities.workflow import build_workflow_engine
+from app.utilities.workflow import WorkflowThread, build_workflow_engine
 from flask import (
     url_for,
     send_file,
@@ -893,7 +893,10 @@ def run_workflow():
         steps.append(step)
     engine = build_workflow_engine(steps, workflow=workflow)
 
-    output, data = engine.execute(workflow_result)
+    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
+    workflow_thread.start()
+    output, data = workflow_thread.join()
+    # output, data = engine.execute(workflow_result)
     return {"output": output, "steps": data}
 
     # return jsonify({"success": True})
@@ -901,28 +904,27 @@ def run_workflow():
 
 @app.route("/api/workflow/status", methods=["GET"])
 def workflow_status():
-    session_id = request.args.get('session_id')
-    
+    session_id = request.args.get("session_id")
+
     if not session_id:
         return jsonify({"error": "workflow_id is required"}), 400
 
     # Get workflow status
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
-    
+
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
 
     # # Calculate time elapsed in seconds
-    #time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
+    # time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
 
     response = {
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
-        #"time_elapsed": int(time_elapsed)
+        # "time_elapsed": int(time_elapsed)
     }
 
     return jsonify(response)
-
 
 
 @app.route("/api/fetch_workflow", methods=["POST"])
