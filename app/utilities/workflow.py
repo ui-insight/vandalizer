@@ -264,12 +264,11 @@ class ExtractionNode(Node):
             extraction_response = data_extraction_model(self.keys, pdf_paths)
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
-            step_input = inputs.get("answer")
+            step_input = step_input.get("answer")
             extraction_response = data_extraction_model(
                 self.keys, pdf_paths, full_text=step_input
             )
         elif prev_step_name == "Extraction":
-            step_input = inputs.get("output", None)
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
                 self.keys, pdf_paths, full_text=step_input
