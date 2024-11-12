@@ -6,11 +6,11 @@ from PyPDF2 import PdfReader
 from app.utilities.prompt_optimization import (
     dspy_model,
     simple_qa_model,
-    proposal_review_model,
 )
 import tiktoken
 
 from app.models import Conversation
+from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
@@ -66,26 +66,6 @@ def detect_encoding(file_path):
     return result["encoding"]
 
 
-def extract_text_from_pdf(pdf_path):
-    reader = PdfReader(pdf_path)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
-
-
-def extract_text_from_html(html_path):
-    with open(html_path, "r", encoding="utf-8") as file:
-        return file.read()
-
-
-def extract_text_from_doc(doc, doc_path):
-    if doc.extension == "pdf" or doc.extension == "docx":
-        return extract_text_from_pdf(doc_path)
-    elif doc.extension == "html":
-        return extract_text_from_html(doc_path)
-
-
 # TODO we might need to rename the class
 class OpenAIInterface:
     loaded_doc = ""
@@ -133,6 +113,7 @@ class OpenAIInterface:
             # model="gpt-4o",
             model="gpt-4o",
             messages=[{"role": "user", "content": output_prompt}],
+            max_tokens=None,
         )
         print("llm formatted response: ", completion.choices[0].message.content)
         formatted_answer = completion.choices[0].message.content
@@ -140,15 +121,13 @@ class OpenAIInterface:
             context=response.context,
             answer=response.answer,
             formatted_answer=formatted_answer,
-            question=question,
         )
 
     def handle_long_context(self, **kwargs):
         question = kwargs.get("question")
         full_text = kwargs.get("full_text")
-        print("Long context not needed")
+        print("Long context needed")
         print("question: ", question)
-        print("full text: ", full_text)
         root_path = kwargs.get("root_path")
 
         print("using dspy model")
@@ -164,24 +143,15 @@ class OpenAIInterface:
 
     def handle_short_context(self, **kwargs):
         prompt = kwargs.get("prompt")
-        question = kwargs.get("question")
         full_text = kwargs.get("full_text")
         print("Short context needed")
-        print("question: ", question)
-        print("full text: ", full_text)
-        print("prompt: ", prompt)
 
         simple_qa = simple_qa_model()
         response = simple_qa(question=prompt, full_text=full_text)
 
         print("simple qa response: ", response.answer)
 
-        # review_model = proposal_review_model()
-        # response = review_model(
-        #     proposal=proposal_text, question=question, context=response.answer
-        # )
-
-        return self.format_answer(response, question)
+        return self.format_answer(response, prompt)
 
     def ask_question_to_documents(
         self, root_path, documents, question, default_docs=[]
@@ -194,7 +164,9 @@ class OpenAIInterface:
             full_path = os.path.join(root_path, "static", "uploads", document.path)
             print("full path: ", full_path)
             full_text += (
-                "\n\nDocument: " + extract_text_from_doc(document, full_path) + " "
+                "\n\nDocument: "
+                + extract_text_from_doc(doc=document, doc_path=full_path)
+                + " "
             )
 
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
@@ -217,6 +189,8 @@ class OpenAIInterface:
     def perform_llm_call(self, prompt, **kwargs):
 
         total_context_length = num_tokens_from_text(prompt)
+        print("total context length: ", total_context_length)
+        print("max context length: ", max_context_length)
         if total_context_length > max_context_length:
             return self.handle_long_context(prompt=prompt, **kwargs)
 

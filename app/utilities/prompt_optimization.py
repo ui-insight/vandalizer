@@ -72,7 +72,8 @@ os.environ["OPENAI_API_KEY"] = (
 embedding_model = "text-embedding-3-large"
 embedding = OpenAIEmbeddings(model=embedding_model)
 
-max_tokens = None
+max_tokens = 1024 * 128
+# max_tokens = None
 
 
 def format_docs(docs):
@@ -146,32 +147,12 @@ class GenerateSearchQuery(dspy.Signature):
     )
 
 
-class MeaninglessQuestion(dspy.Signature):
-    """Check if the question is meaningless."""
-
-    question = dspy.InputField()
-    meaningless = dspy.OutputField(desc="Yes or No")
-
-
 class SimpleQA(dspy.Module):
     def __init__(self):
         super().__init__()
         self.model = dspy.ChainOfThought("context, question -> answer")
-        self.meaningless = dspy.ChainOfThought(MeaninglessQuestion)
 
     def forward(self, question: str, full_text: str):
-        # if self.meaningless(question=question).meaningless == "Yes":
-        #     return dspy.Prediction(
-        #         context=full_text,
-        #         answer="I'm sorry, I can't answer that question.",
-        #         question=question,
-        #     )
-        # else:
-        #     pred = self.model(context=full_text, question=question)
-        #     return dspy.Prediction(
-        #         context=full_text, answer=pred.answer, question=question
-        #     )
-
         pred = self.model(context=full_text, question=question)
         return dspy.Prediction(context=full_text, answer=pred.answer, question=question)
 
@@ -189,11 +170,12 @@ class MultiHopQAModel(dspy.Module):
         super().__init__()
 
         self.generate_query = [
-            dspy.ChainOfThought(GenerateSearchQuery) for _ in range(max_hops)
+            dspy.ChainOfThought(GenerateSearchQuery, max_tokens=4 * 1024)
+            for _ in range(max_hops)
         ]
         self.retrieve = dspy.Retrieve(k=passages_per_hop)
         self.max_hops = max_hops
-        self.generate_answer = dspy.ChainOfThought(GenerateAnswer)
+        self.generate_answer = dspy.ChainOfThought(GenerateAnswer, max_tokens=None)
 
         # for evaluating assertions only
         self.passed_suggestions = 0
@@ -222,33 +204,6 @@ class MultiHopQAModel(dspy.Module):
         return pred
 
 
-class ProposalReview(dspy.Signature):
-    """Review the proposal based on the question and provided context."""
-
-    question = dspy.InputField()
-    context = dspy.InputField(desc="may contain relevant facts")
-    proposal = dspy.InputField()
-    review = dspy.OutputField()
-
-
-class ReviewerModel(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.model = dspy.ChainOfThought(ProposalReview)
-
-    def forward(self, proposal: str, context: str, question: str):
-        pred = self.model(proposal=proposal, context=context, question=question)
-        return dspy.Prediction(context=context, answer=pred.review, question=question)
-
-
-def proposal_review_model():
-    model = "gpt-4o"
-    llm = dspy.OpenAI(model=model)
-    dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
-    model = ReviewerModel()
-    return model
-
-
 def dspy_model(
     full_text: str,
     collection_name: str,
@@ -258,7 +213,7 @@ def dspy_model(
     # model_name = "gpt-4-turbo"
     model_name = "gpt-4o"
 
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=100)
     docs = text_splitter.split_documents([Document(page_content=full_text)])
 
     print("collection_name: ", collection_name)
@@ -334,9 +289,9 @@ class LLMAnswerFeedbackJudge(dspy.Signature):
     answer_correctness = dspy.OutputField(desc="Yes or No")
 
 
-correctness_judge = dspy.ChainOfThought(LLMAnswerJudge)
-factual_judge = dspy.ChainOfThought(LLMFactJudge)
-feedback_judge = dspy.ChainOfThought(LLMAnswerFeedbackJudge)
+correctness_judge = dspy.ChainOfThought(LLMAnswerJudge, max_tokens=max_tokens)
+factual_judge = dspy.ChainOfThought(LLMFactJudge, max_tokens=max_tokens)
+feedback_judge = dspy.ChainOfThought(LLMAnswerFeedbackJudge, max_tokens=max_tokens)
 
 
 def llm_judge_metric(example, pred, trace=None):
