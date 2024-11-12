@@ -149,6 +149,8 @@
 
       function workflowEditStep(step_id, stepType) {
           console.log(current_space_id);
+            console.log(stepType);
+
           let data = JSON.stringify({
               workflow_uuid: current_workflow_id,
               space_id: current_space_id,
@@ -171,7 +173,7 @@
                   $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
                       e.preventDefault();
                       console.log(`Add ${capitalize(stepType)}`);
-                      workflowConfirmStep(stepType);
+                      workflowConfirmStep(stepType, step_id);
                   });
               },
               error: function (xhr, ajaxOptions, thrownError) {
@@ -181,11 +183,12 @@
           });
       }
 
-      function workflowConfirmStep(stepType) {
+      function workflowConfirmStep(stepType, step_id=0) {
           console.log(current_space_id);
           dict = {
               workflow_uuid: current_workflow_id,
               space_id: current_space_id,
+              step_id: step_id
           }
 
           if (stepType == "extraction") {
