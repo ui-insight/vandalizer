@@ -97,9 +97,14 @@
     font-size: 0.9em;
   }
   
+  .step-icon {
+    cursor: pointer;
+  }
+
   .step-icon img {
     width: 30px;
     height: 30px;
+    
   }
   
   .add-step {
