@@ -875,10 +875,13 @@ def run_workflow():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
+    
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
     document_uuids = workflow_data["document_uuids"]
+    download = workflow_data.get("download", False)  # Get the 'download' flag
+    
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     attachments = [
@@ -897,9 +900,9 @@ def run_workflow():
     workflow_thread.start()
     output, data = workflow_thread.join()
     # output, data = engine.execute(workflow_result)
+
     return {"output": output, "steps": data}
 
-    # return jsonify({"success": True})
 
 
 @app.route("/api/workflow/status", methods=["GET"])
@@ -925,6 +928,37 @@ def workflow_status():
     }
 
     return jsonify(response)
+
+@app.route("/api/workflow/download", methods=["GET"])
+def workflow_download():
+    session_id = request.args.get("session_id")
+
+    if not session_id:
+        return jsonify({"error": "workflow_id is required"}), 400
+
+    # Get workflow status
+    workflow_result = WorkflowResult.objects(session_id=session_id).first()
+
+    if not workflow_result:
+        return jsonify({"error": "Workflow not found"}), 404
+
+    # # Calculate time elapsed in seconds
+    # time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
+
+    # Ensure the static folder exists
+    os.makedirs(os.path.join(app.root_path, "static"), exist_ok=True)
+
+    output_file_path = os.path.join(app.root_path, "static", "workflow_output.txt")
+    final_output = list(workflow_result.steps_output.values())[-1]
+    print(final_output)
+
+    with open(output_file_path, "w") as f:  # Open as text file for string output
+        f.write(final_output["output"])  # Assuming output is a string
+
+    # Return the path to the CSV file
+    return send_file(
+        "static/workflow_output.txt", mimetype="text/plain", as_attachment=True
+    )
 
 
 @app.route("/api/fetch_workflow", methods=["POST"])

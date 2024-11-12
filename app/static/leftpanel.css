@@ -28,6 +28,8 @@
 .file-selection {
   overflow: scroll;
   height: 100%;
+  padding-top: 60px; 
+  padding-bottom: 60px;
 }
 
 .file-selection::-webkit-scrollbar {

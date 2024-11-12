@@ -3,6 +3,7 @@
       var current_workflow_id = "{{ workflow_id }}";
       var current_space_id = "{{ current_space_id }}"
       var workflow_elapsed_time = 0;
+      var workflow_session_id = "";
 
   $(document).ready(function () {
 
@@ -74,6 +75,16 @@
               e.preventDefault();  // Prevent default behavior, if needed
               //let workflow_id = $(this).attr("data-workflow-id");
               runWorkflow();
+          });
+
+          $('.download-workflow').off("click").on("click", function (e) {
+              e.preventDefault();  // Prevent default behavior, if needed
+              //let workflow_id = $(this).attr("data-workflow-id");
+              if (workflow_session_id != "") {
+                downloadWorkflow(workflow_session_id);
+              } else {
+                runWorkflow(download=true);
+              }
           });
       }
 
@@ -312,19 +323,21 @@
 
 
 
-      function runWorkflow() {
+      function runWorkflow(download=false) {
         if (document_uuids == "") {
             showToast("Select a document to run workflow");
             return;
         }
 
         let session_id = generateSessionId();
+        workflow_session_id = session_id;
           console.log(current_space_id);
           let data = JSON.stringify({
               workflow_id: current_workflow_id,
               space_id: current_space_id,
               document_uuids: document_uuids,
-              session_id: session_id
+              session_id: session_id,
+              
           });
 
           $('.add-step').hide();
@@ -351,6 +364,10 @@
                 $('.workflow-output').find('.step-connector').addClass('active');
                 $('.workflow-loader').hide();
                 performWorkflowStatus(session_id, workflow_elapsed_time);
+
+                if (download) {
+                    downloadWorkflow(session_id)
+                }
               },
               error: function (xhr, ajaxOptions, thrownError) {
                   console.log(xhr.status);
@@ -418,6 +435,10 @@
                 showToast("Error polling workflow status");
             }
         });
+  }
+
+  function downloadWorkflow(session_id) {
+    window.location.href = `/api/workflow/download?session_id=${session_id}`;
   }
 
   function pollWorkflowStatus(session_id) {
