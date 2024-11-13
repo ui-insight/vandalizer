@@ -875,13 +875,13 @@ def run_workflow():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
-    
+
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
     document_uuids = workflow_data["document_uuids"]
     download = workflow_data.get("download", False)  # Get the 'download' flag
-    
+
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     attachments = [
@@ -894,15 +894,14 @@ def run_workflow():
     steps = [document_trigger_step]
     for step in workflow.steps:
         steps.append(step)
-    engine = build_workflow_engine(steps, workflow=workflow)
 
+    engine = build_workflow_engine(steps, workflow=workflow)
     workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
     workflow_thread.start()
     output, data = workflow_thread.join()
     # output, data = engine.execute(workflow_result)
 
     return {"output": output, "steps": data}
-
 
 
 @app.route("/api/workflow/status", methods=["GET"])
@@ -928,6 +927,7 @@ def workflow_status():
     }
 
     return jsonify(response)
+
 
 @app.route("/api/workflow/download", methods=["GET"])
 def workflow_download():
@@ -1083,7 +1083,6 @@ def workflow_add_extraction_step():
         manual_input = data["manual_input"] if "manual_input" in data else None
         step_id = data["step_id"] if "step_id" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
-        
 
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
@@ -1102,8 +1101,6 @@ def workflow_add_extraction_step():
                 workflow.steps.append(workflow_step)
                 workflow.save()
 
-
-            
         elif manual_input:
             workflow_step = None
             if step_id != None and step_id != 0:
@@ -1117,7 +1114,7 @@ def workflow_add_extraction_step():
                 )
                 workflow_step.save()
                 workflow.steps.append(workflow_step)
-            
+
             workflow.save()
 
         return jsonify({"response": "success"})
@@ -1236,7 +1233,9 @@ def workflow_add_prompt_step():
                     workflow_step.data = {"prompt": manual_input}
                     workflow_step.save()
             else:
-                workflow_step = WorkflowStep(name="Prompt", data={"prompt": manual_input})
+                workflow_step = WorkflowStep(
+                    name="Prompt", data={"prompt": manual_input}
+                )
                 workflow_step.save()
                 workflow.steps.append(workflow_step)
                 workflow.save()
@@ -1253,7 +1252,6 @@ def workflow_add_format_step():
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
-        
 
         is_editing = data.get("editing") or False
         workflow_step = None
@@ -1284,7 +1282,7 @@ def workflow_add_format_step():
         return jsonify(response)
 
     elif request.method == "POST":
-        
+
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         step_id = data["step_id"] if "step_id" in data else None
