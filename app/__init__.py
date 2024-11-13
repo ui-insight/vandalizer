@@ -23,5 +23,6 @@ app.config.from_object('app.configuration.DevelopmentConfig')
 me.connect('osp')
 
 bs = Bootstrap(app) #flask-bootstrap
+mail = Mail(app)
 
 from app import views, models

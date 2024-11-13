@@ -14,6 +14,7 @@ from flask import (
     send_file,
 )
 from app import app
+from app import mail
 from app.models import (
     User,
     SmartDocument,
@@ -39,6 +40,7 @@ from app.utilities.openai_interface import (
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
+from flask_mail import Mail, Message
 
 import multiprocessing as mp
 
@@ -1056,3 +1058,16 @@ def feedback():
         "complete": True,
     }
     return jsonify(response)
+
+
+## Handle the errors by sending an email to John
+@app.errorhandler(Exception)
+def handle_exception(e):
+    with app.app_context():
+        msg = Message(
+            "Flask App Error",
+            recipients=["your_email@example.com"]
+        )
+        msg.body = f"An error occurred: {str(e)}"
+        mail.send(msg)
+    return "An error occurred, and the admin has been notified.", 500
