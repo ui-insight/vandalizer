@@ -101,25 +101,33 @@
       "<p><div class='message-you'>" + question + "</div></p>",
     );
 
-    function createFeedbackButtons(question, answer, context, document_uuids) {
-      const feedbackDiv = document.createElement("div");
-      feedbackDiv.className = "feedback-buttons";
+      function createFeedbackButtons(question, answer, context, document_uuids) {
+        const feedbackDiv = document.createElement("div");
+        feedbackDiv.className = "feedback-buttons";
 
-      const positiveButton = document.createElement("button");
-      positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
-      positiveButton.className = "feedback-button-positive";
-      positiveButton.dataset.feedbackType = "positive";
+        const copyButton = document.createElement("button");
+        copyButton.innerHTML = '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
+        copyButton.className = "copy-btn";
+        copyButton.style.marginRight = "5px"; // Add margin to create space
 
-      const negativeButton = document.createElement("button");
-      negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
-      negativeButton.className = "feedback-button-negative";
-      negativeButton.dataset.feedbackType = "negative";
+        const positiveButton = document.createElement("button");
+        positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
+        positiveButton.className = "feedback-button-positive";
+        positiveButton.dataset.feedbackType = "positive";
+        positiveButton.style.marginRight = "5px"; // Add margin to create space
 
-      feedbackDiv.appendChild(positiveButton);
-      feedbackDiv.appendChild(negativeButton);
+        const negativeButton = document.createElement("button");
+        negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
+        negativeButton.className = "feedback-button-negative";
+        negativeButton.dataset.feedbackType = "negative";
 
-      return feedbackDiv;
+        feedbackDiv.appendChild(copyButton);
+        feedbackDiv.appendChild(positiveButton);
+        feedbackDiv.appendChild(negativeButton);
+
+        return feedbackDiv;
     }
+
 
     // Attach a delegated event listener to the parent container
     $(document).on(
@@ -194,6 +202,8 @@
         responseDiv.append(
           createFeedbackButtons(question, answer, context, document_uuids),
         );
+
+       
         // reload page
         $("#" + responseId).html(
           `<div style='display: flex; flex-direction: column;'>
@@ -203,11 +213,7 @@
                 <div class="chat-response-body">
                 ${responseDiv.prop("outerHTML")}
                 </div>
-                <div style='padding-top: 10px;'>
-                  <a style='color: #000000dd;' class='copy-btn'>
-                    <i class='fa-regular fa-copy' style='cursor: pointer'></i>
-                  </a>
-                </div>
+                
               </div>
             </div>
             
@@ -219,11 +225,9 @@
 
         // copy to clipboard
         $(".copy-btn").on("click", function () {
-          let searchTerm = $(this).closest("div").text();
-          navigator.clipboard.writeText(searchTerm);
+          console.log("Copy to clipboard", answer)
+          navigator.clipboard.writeText(answer);
           showToast("Copied to clipboard");
-
-          console.log("Sending feedback", response);
 
           // Send feedback for copy action
           sendFeedback(
