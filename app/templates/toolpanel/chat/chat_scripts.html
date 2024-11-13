@@ -3,10 +3,28 @@
 
   let chatReponse = null;
 
-  // Handle Enter and Shift+Enter keydown events
+
   $("#chatinput").on("keydown", function (event) {
-    $("#chatplaceholder").attr("data-placeholder", "");
-    $("#chatplaceholder").css("color", "black");
+    if ($('#chatplaceholder')[0].textContent == "") {
+      $("#chatplaceholder").attr("data-placeholder",placeholderText);
+      $("#chatplaceholder").css("color", "darkgray");
+    } else {
+      $("#chatplaceholder").attr("data-placeholder", "");
+      $("#chatplaceholder").css("color", "black");
+    }
+   
+  });
+  // Handle Enter and Shift+Enter keydown events
+  $("#chatinput").on("keyup", function (event) {
+    
+    if ($('#chatplaceholder')[0].textContent == "") {
+      $("#chatplaceholder").attr("data-placeholder", placeholderText);
+      $("#chatplaceholder").css("color", "darkgray");
+
+    } else {
+      $("#chatplaceholder").attr("data-placeholder", "");
+      $("#chatplaceholder").css("color", "black");
+    }
 
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault(); // Prevent the default behavior of adding a newline
