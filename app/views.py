@@ -14,6 +14,7 @@ from flask import (
     jsonify,
     Response,
     send_file,
+    send_from_directory
 )
 from app import app
 from app import mail
@@ -1215,9 +1216,11 @@ def workflow_add_prompt_step():
         if search_set_item_id:
             workflow_step = None
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
+            # Editing
             if step_id != None and step_id != 0:
                 workflow_step = WorkflowStep.objects(id=step_id).first()
                 if workflow_step:
+                    print("SETTING UP DATA FROM SEARCH SET ITEM")
                     workflow_step.data = searchsetitem.to_workflow_step_data()
                     workflow_step.save()
             else:
@@ -1229,9 +1232,11 @@ def workflow_add_prompt_step():
                 workflow.save()
         elif manual_input:
             workflow_step = None
+            # Editing
             if step_id != None and step_id != 0:
                 workflow_step = WorkflowStep.objects(id=step_id).first()
                 if workflow_step:
+                    print("SETTING UP DATA FROM MANUAL")
                     workflow_step.data = {"prompt": manual_input}
                     workflow_step.save()
             else:
@@ -1698,3 +1703,13 @@ def handle_exception(e):
         msg.body = f"An error occurred: {str(e)}"
         mail.send(msg)
     return "An error occurred, and the admin has been notified.", 500
+
+
+@app.route('/static/fontawesome/webfonts/<path:filename>')
+def serve_fonts(filename):
+    if filename.endswith('.woff2'):
+        return send_from_directory('static/fontawesome/webfonts', filename, mimetype='font/woff2')
+    elif filename.endswith('.ttf'):
+        return send_from_directory('static/fontawesome/webfonts', filename, mimetype='font/ttf')
+    else:
+        return send_from_directory('static/fontawesome/webfonts', filename)

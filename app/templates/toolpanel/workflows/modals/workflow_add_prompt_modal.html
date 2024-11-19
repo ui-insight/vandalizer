@@ -1,19 +1,29 @@
-<div id="workflowAddPromptModal" class="modal informationmodal" style="display: block;">
-    <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
+<div id="workflowAddPromptModal" class="workflow-overlay" style="display: block;">
+    <div class="workflow-modal-content">
+        <h2 class="workflow-modal-header">
         {% if is_editing %}
-        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Edit Prompt</h2>
+        Edit Prompt
         {% else %}
-        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Prompt</h2>
+        Add Prompt
         {% endif %}
+        <a id="closeAddPromptToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
+        </h2>
+        
+        <!-- Description -->
+        <hr>
+        <h3 class="workflow-modal-subtitle">Uses AI to perform your instructions on text</h3>
+        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
         <!-- Tabbed navigation -->
+        <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
+
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn {% if not is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data)) %}active{% endif %}" 
+            <button class="workflow-tab-btn {% if not is_editing or (is_editing and ('search_set_item_id' in workflow_step.data or not ('prompt' in workflow_step.data))) %}active{% endif %}" 
                     id="selectDropdownTab" 
                     onclick="openAddExtractionTab('selectDropdown')">
                 Select from Tasks
             </button>
-            <button class="workflow-tab-btn {% if (is_editing and 'search_set_uuid' in workflow_step.data) %}active{% endif %}" 
+            <button class="workflow-tab-btn {% if (is_editing and ('search_set_item_id' not in workflow_step.data)) %}active{% endif %}" 
                     id="manualInputTab" 
                     onclick="openAddExtractionTab('manualInput')">
                 Enter Manually
@@ -21,43 +31,47 @@
             
         </div>
 
-        <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown"style="{% if (is_editing and ('search_set_uuid' in workflow_step.data or not ('prompt' in workflow_step.data))) %}display: none;{% else %}display: block;{% endif %}">
-            <label for="extractionSetDropdown" class="workflow-label">Select a prompt:</label>
-            <select id="extractionSetDropdown" class="workflow-input-field">
-                {% for prompt in prompts %}
-                <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_uuid' in workflow_step.data and workflow_step.data['search_set_item_uuid'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
-                {% endfor %}
-            </select>
-        </div>
+        <div class="workflow-content-body">
+            <!-- Tab content for dropdown selection -->
+            <div class="workflow-tab-content" id="selectDropdown"style="{% if (is_editing and ('search_set_item_id' not in workflow_step.data)) %}display: none;{% else %}display: block;{% endif %}">
+                <label for="extractionSetDropdown" class="workflow-label">Select a prompt:</label>
+                <select id="extractionSetDropdown" class="workflow-input-field">
+                    {% for prompt in prompts %}
+                    <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_uuid' in workflow_step.data and workflow_step.data['search_set_item_uuid'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
 
-        <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" style="{% if not (is_editing and 'prompt' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
-            <label for="promptInput" class="label">Enter prompt:</label>
-            <input type="text" id="promptInput" 
-                placeholder="e.g., Summarize this for me into a todo list" 
-                class="input-field"
-                value="{{ workflow_step.data['prompt'] if is_editing and 'prompt' in workflow_step.data else '' }}">
+            <!-- Tab content for manual input -->
+            <div class="workflow-tab-content" id="manualInput" style="{% if not is_editing or (is_editing and 'search_set_item_id' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
+                <label for="promptInput" class="label">Enter prompt:</label>
+                <input type="text" id="promptInput" 
+                    placeholder="e.g., Summarize this for me into a todo list" 
+                    class="input-field"
+                    value="{{ workflow_step.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_step.data else '' }}">
+            </div>
         </div>
-
         
-
-        <!-- Action buttons -->
-         <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-            <button id="confirmPromptStepBtn" class="btn btn-primary">
-                {% if is_editing %}
-                Edit Prompt
-                {% else %}
-                Add Prompt
-                {% endif %}
-            </button>
-            <button id="closeAddPromptToWorkflowBtn" class="btn btn-secondary">Close</button>
-            {% if is_editing %}
-            <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
-            {% endif %}
-        </div>
+        <div class="bottom-toolbar" style>
+            <div>
+                <!-- Action buttons -->
+                
+                <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
+                    {% if is_editing %}
+                    <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
+                    {% endif %}
+                    <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;">
+                    {% if is_editing %}
+                    Edit Prompt
+                    {% else %}
+                    Add Prompt
+                    {% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>        
     </div>
-    </div>
+    
     <script>
         function openAddExtractionTab(tabName) {
             // Hide all tab content
@@ -100,6 +114,4 @@
         });
         {% endif %}
     </script>
-    
 </div>
-

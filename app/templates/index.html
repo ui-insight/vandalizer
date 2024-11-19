@@ -13,7 +13,7 @@
 <link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='rawstyles.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='workflows.css')}}" />
-
+<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
 {% endblock %}
 
 {% block navbar %}
@@ -251,6 +251,8 @@
                     
             </div>      
             {% endif %}
+
+        {% include "toolpanel/workflows/new_workflow_step_modal.html" %}
         </div>
 
         {% include "toolpanel/chat/chat_search_panel.html" %}
@@ -262,7 +264,6 @@
         {% include "toolpanel/attachment_modal.html" %}
         {% include "toolpanel/workflows/new_workflow_modal.html" %}
         {% include "toolpanel/tasks/new_task_modal.html" %}
-        {% include "toolpanel/workflows/new_workflow_step_modal.html" %}
         </div>
     </div>
 </div>
@@ -309,7 +310,7 @@
 {% include "toolpanel/prompts/prompt_set_scripts.html" %}
 {% include "toolpanel/chat/chat_scripts.html" %}
 <!-- <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script> -->
-<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+
 <script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
 
 

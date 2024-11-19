@@ -178,7 +178,7 @@
               async: true,
               success: function (data) {
                   $('#newWorkflowStepModal').fadeOut();
-                  $(data.template).hide().appendTo('.modal-container').fadeIn();
+                  $(data.template).hide().appendTo('#search-results-panel').fadeIn();
                   addWorklowListeners();
 
                   $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {

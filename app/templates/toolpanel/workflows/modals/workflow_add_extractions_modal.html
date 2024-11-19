@@ -1,12 +1,18 @@
-<div id="" class="modal informationmodal workflowAddExtractionsModal" style="display: block;">
-    <div class="workflow-modal-content" style="margin: 5% auto; max-width: 500px; padding: 20px; border-radius: 8px;">
-        {% if is_editing %}
-        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Edit Extractions</h2>
-        {% else %}
-        <h2 style="margin-top: 0; text-align: left; font-size: 24px;">Add Extractions</h2>
-        {% endif %}
+<div id="" class="workflow-overlay workflowAddExtractionsModal" style="display: block;">
+    <div class="workflow-modal-content">
+        <!-- Header -->
+        <h2 class="workflow-modal-header">
+            {% if is_editing %} Edit Extractions {% else %} Add Extractions {% endif %}
+            <a class="closeAddExtractionToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
+        </h2>
+
+        <!-- Description -->
+        <hr>
+        <h3 class="workflow-modal-subtitle">Extract specific information from text using AI</h3>
+        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
         <!-- Tabbed navigation -->
+        <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
         <div class="workflow-tab-container">
             <button class="workflow-tab-btn {% if is_editing and 'search_set_uuid' in workflow_step.data %}active{% endif %}" 
                     id="selectDropdownTab" 
@@ -20,40 +26,47 @@
             </button>
         </div>
 
-        <!-- Tab content for dropdown selection -->
-        <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
-            <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
-            <select id="extractionSetDropdown" class="workflow-input-field">
-               <option value="Create a new set">Create a new set</option>
-               {% for extraction in extraction_sets %}
-               <option value="{{ extraction.uuid }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
-               {% endfor %}
-            </select>
+        <!-- Body -->
+        <div class="workflow-content-body">
+            <!-- Tab content for dropdown selection -->
+            <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
+                <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
+                <select id="extractionSetDropdown" class="workflow-input-field">
+                <option value="Create a new set">Create a new set</option>
+                {% for extraction in extraction_sets %}
+                <option value="{{ extraction.uuid }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
+                {% endfor %}
+                </select>
+            </div>
+
+            <!-- Tab content for manual input -->
+            <div class="workflow-tab-content" id="manualInput" 
+            style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
+                <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
+                <input type="text" id="extractionInput"
+                        placeholder="e.g., Name, Age, Location"
+                        class="input-field"
+                        value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
+            </div>
         </div>
 
-        <!-- Tab content for manual input -->
-        <div class="workflow-tab-content" id="manualInput" 
-        style="{% if not (is_editing and 'searchphrases' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
-       <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-       <input type="text" id="extractionInput"
-              placeholder="e.g., Name, Age, Location"
-              class="input-field"
-              value="{{ workflow_step.data['searchphrases'] if is_editing and 'searchphrases' in workflow_step.data else '' }}">
-        </div>
-
-        <!-- Action buttons -->
-         <div style="padding: 30px 0px 0px 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-            <button id="confirmExtractionStepBtn" class="btn btn-primary">
-                {% if is_editing %}
-                Edit Extractions
-                {% else %}
-                Add Extractions
-                {% endif %}
-            </button>
-            <button id="" class="btn btn-secondary closeAddExtractionToWorkflowBtn">Close</button>
-            {% if is_editing %}
-            <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red;">Delete Step</button>
-            {% endif %}
+        <!-- Bottom Toolbar -->
+        <div class="bottom-toolbar" style>
+            <div>
+                <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
+                    {% if is_editing %}
+                    <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
+                    {% endif %}
+                    
+                    <button id="confirmExtractionStepBtn" class="btn btn-primary" style="flex-grow: 1;">
+                        {% if is_editing %}
+                        Edit Extractions
+                        {% else %}
+                        Add Extractions
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
     <script>
@@ -98,6 +111,5 @@
         });
         {% endif %}
     </script>
-    
 </div>
 

@@ -134,6 +134,7 @@
   .workflow-modal-content {
     background-color: #fff;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    height: 100%;
 }
 
 .workflow-tab-container {
@@ -229,4 +230,103 @@
   100% {
     transform: rotate(360deg);
   }
-} 
+}
+
+.workflow-modal-header {
+  margin-top: 0; 
+  text-align: left; 
+  font-size: 20px; 
+  font-weight: 600;
+  padding: 20px 30px 5px 30px;
+}
+
+.workflow-modal-subtitle {
+  font-size: 16px; 
+  font-weight: 400;
+  color: #888;
+  padding: 0px 30px;
+}
+
+.workflow-overlay hr {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  border-top: 0.5px solid #88888842;
+}
+
+.workflow-content-body {
+  padding: 10px 30px 5px 30px;
+}
+
+.workflow-overlay {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.add-workflow-step-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* Left Column Styling */
+.add-workflow-step-container .left-column {
+  width: 25%;
+  background-color: #f4f4f4;
+  padding: 20px 10px 20px 0px;
+  border-right: 1px solid #ddd;
+}
+
+.add-workflow-step-container .workflow-modal-header {
+  font-size: 1.2em;
+  margin-bottom: 1em;
+}
+
+.add-workflow-step-container .section-list {
+  list-style: none;
+  padding: 0;
+}
+
+.add-workflow-step-container .section-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  color: #777777;
+  font-weight: 600;
+}
+
+.add-workflow-step-container .section-item.active {
+  background-color: #e6e6e6;
+  font-weight: bold;
+}
+
+/* Right Column Styling */
+.add-workflow-step-container .right-column {
+  width: 75%;
+  padding: 0px 20px 20px 20px;
+}
+
+.add-workflow-step-container .right-column .workflow-add-step-subtitle {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 1em;
+}
+
+.workflow-tab-content input {
+  width: 100%;
+  height: 100%;
+  padding: 15px;
+  border-width: 0px;
+  border: 1px solid #d3d3d3;
+}
+
+.workflow-tab-content textarea {
+  width: 100%;
+  height: 100%;
+  padding: 15px;
+  border-width: 0px;
+  border-radius: 6px;
+  border: 1px solid #d3d3d3;
+}
