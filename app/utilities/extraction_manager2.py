@@ -29,17 +29,6 @@ class ExtractionManager2:
 
         """
             + context
-            + """
-        Remember: Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
-        """
-            + "\n".join(features)
-            + """
-
-        If a property is not present, represent it as "Not Found".
-
-        ormat the output as JSON, with the entity name as the key and a single string as the value. Make sure the entity name is exactly as it is listed. Do not include any additional text. Do not nest json values format it as {"entity": "value"}.
-       
-        """
         )
 
     def extract(self, extract_keys, pdf_paths, full_text=None):

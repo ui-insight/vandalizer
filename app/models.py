@@ -6,6 +6,7 @@ import os
 from pypdf import PdfReader
 from app import app
 from uuid import uuid4
+from enum import Enum
 
 
 # TODO utilities functions to convert search_set_item into workflow step data.
@@ -214,8 +215,28 @@ class FeedbackCounter(me.Document):
     count = me.IntField(default=0)
 
 
-class Conversation(me.Document):
-    user_id = me.StringField(required=True, max_length=200)
-    question = me.StringField(required=True, max_length=500000)
-    answer = me.StringField(required=True, max_length=500000)
+class ChatRole(Enum):
+    SYSTEM = "system"
+    USER = "user"
+
+
+MAX_CHAT_MESSAGES = 20
+
+
+class ChatMessage(me.Document):
+    role = me.EnumField(ChatRole, required=True)
+    message = me.StringField(required=True, max_length=500000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
+
+
+class ChatHistory(me.Document):
+    user_id = me.StringField(required=True, max_length=200)
+    messages = me.ListField(me.ReferenceField(ChatMessage))
+    last_conversation_id = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+    @staticmethod
+    def get_latest_conversation(user_id):
+        # latest conversation MAX_CHAT_MESSAGES
+        return ChatHistory.objects().order_by("-created_at").first()
