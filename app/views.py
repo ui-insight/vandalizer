@@ -963,6 +963,26 @@ def workflow_download():
         "static/workflow_output.txt", mimetype="text/plain", as_attachment=True
     )
 
+## MARK: ~~ Integrate
+@app.route("/api/workflows/integrate", methods=["GET"])
+def workflow_integrate():
+    if request.method == "GET":
+        # Handle GET request - retrieve and return the template
+        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data = json.loads(data_str)  # Retrieve query parameters, if any
+        workflow_id = data.get("workflow_uuid")
+        space_id = data.get("space_id")
+
+
+        workflow = Workflow.objects(id=workflow_id).first()
+
+        template = render_template(
+            "toolpanel/workflows/modals/workflow_integration.html",
+            workflow=workflow,
+        )
+        response = {"template": template}
+        return jsonify(response)
+
 
 @app.route("/api/fetch_workflow", methods=["POST"])
 def fetch_workflow():

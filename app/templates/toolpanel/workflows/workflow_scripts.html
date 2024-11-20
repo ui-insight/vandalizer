@@ -86,6 +86,11 @@
                 runWorkflow(download=true);
               }
           });
+
+          $('.integrate-workflow').off("click").on("click", function (e) {
+              e.preventDefault();  // Prevent default behavior, if needed
+              integrateWorkflow();
+          });
       }
 
       function fetchWorkflow(workflow_uuid) {
@@ -384,6 +389,31 @@
       }
 
   });
+
+  function integrateWorkflow() {
+        let data = JSON.stringify({
+            workflow_id: current_workflow_id,
+        });
+
+        $.ajax({
+            url: '/api/workflows/integrate',
+            type: 'GET',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+            $(data.template).hide().appendTo('.modal-container').fadeIn();
+                addWorklowListeners();
+
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
 
 
   function performWorkflowStatus(session_id, workflow_time) {
