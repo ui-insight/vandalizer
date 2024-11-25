@@ -3,6 +3,7 @@ from datetime import datetime
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
+from werkzeug.utils import secure_filename
 from flask import (
     url_for,
     send_file,
@@ -873,7 +874,7 @@ def update_workflow():
     workflow.save()
     return redirect("/home?section=Workflows")
 
-
+## MARK: ~~ Run in-app
 @app.route("/api/workflow/run", methods=["POST"])
 def run_workflow():
     user = load_user()
@@ -908,6 +909,106 @@ def run_workflow():
     # output, data = engine.execute(workflow_result)
 
     return {"output": output, "steps": data}
+
+
+## MARK: ~~ Run integration
+@app.route("/workflow/run", methods=["GET", "POST"])
+def run_workflow_integrated():
+    # **1. Authenticate User via API Key**
+    api_key = request.headers.get('x-api-key')
+    if not api_key:
+        return jsonify({"error": "API key is missing"}), 401
+
+    user = User.objects(id=api_key).first()
+    if user is None:
+        return jsonify({"error": "Invalid API key"}), 401
+
+    # **2. Generate Session ID**
+    session_id = str(uuid.uuid4())
+
+    # **3. Get Workflow ID**
+    workflow_id = request.form.get('workflowID')
+    if not workflow_id:
+        return jsonify({"error": "workflowID is required"}), 400
+
+    workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": "Workflow not found"}), 404
+
+    # **4. Handle File Uploads**
+    print(request.files)
+    uploaded_files = request.files.getlist('file')
+    if not uploaded_files:
+        return jsonify({"error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash."}), 400
+
+    document_uuids = []
+
+    for file in uploaded_files:
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        extension = os.path.splitext(filename)[1][1:].lower()
+        uid = uuid.uuid4().hex.upper()
+
+        # Create upload directory if it doesn't exist
+        upload_dir = os.path.join(app.root_path, "static", "uploads", str(user.id))
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+
+        file_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        file.save(file_path)
+
+        # **Optional: Handle File Conversion**
+        if extension == "docx":
+            pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+            pypandoc.convert_file(file_path, 'pdf', outputfile=pdf_path)
+            extension = "pdf"
+            file_path = pdf_path
+        elif extension in ["xlsx", "xls"]:
+            html_path = os.path.join(upload_dir, f"{uid}.html")
+            save_excel_to_html(file_path, html_path)
+            extension = "html"
+            file_path = html_path
+
+        # **Create SmartDocument Object**
+        document = SmartDocument(
+            title=filename,
+            path=f"{user.id}/{uid}.{extension}",
+            extension=extension,
+            uuid=uid,
+            user_id=user.user_id,
+            space="None"
+        )
+        document.save()
+        document_uuids.append(uid)
+
+    # **5. Prepare Workflow Execution**
+    workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
+
+    # Since we can't look up attachments, we'll assume there are none or handle them accordingly
+    attachments = []
+    # If your workflow has predefined attachments, you might need to handle them differently
+
+    # Retrieve the SmartDocument objects we just created
+    docs = [SmartDocument.objects(uuid=uuid).first() for uuid in document_uuids]
+
+    document_trigger_step = WorkflowStep(
+        name="Document",
+        data={
+            "docs": docs,
+            "attachments": attachments
+        }
+    )
+
+    steps = [document_trigger_step] + workflow.steps
+
+    # **6. Execute the Workflow**
+    engine = build_workflow_engine(steps, workflow=workflow)
+    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
+    workflow_thread.start()
+    output, data = workflow_thread.join()
+
+    # **7. Return the Response**
+    return jsonify({"output": output, "steps": data})
 
 
 @app.route("/api/workflow/status", methods=["GET"])
@@ -968,23 +1069,21 @@ def workflow_download():
 
 
 ## MARK: ~~ Integrate
-@app.route("/api/workflows/integrate", methods=["GET"])
+@app.route("/api/workflows/integrate", methods=["POST"])
 def workflow_integrate():
-    if request.method == "GET":
-        # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
-        data = json.loads(data_str)  # Retrieve query parameters, if any
-        workflow_id = data.get("workflow_uuid")
-        space_id = data.get("space_id")
+    user = load_user()
+    data = request.get_json()
+    workflow_id = data.get("workflow_id")
 
-        workflow = Workflow.objects(id=workflow_id).first()
+    workflow = Workflow.objects(id=workflow_id).first()
 
-        template = render_template(
-            "toolpanel/workflows/modals/workflow_integration.html",
-            workflow=workflow,
-        )
-        response = {"template": template}
-        return jsonify(response)
+    template = render_template(
+        "toolpanel/workflows/modals/workflow_integration.html",
+        workflow=workflow,
+        user=user
+    )
+    response = {"template": template}
+    return jsonify(response)
 
 
 @app.route("/api/fetch_workflow", methods=["POST"])
@@ -1716,13 +1815,13 @@ def feedback():
 
 
 ## Handle the errors by sending an email to John
-@app.errorhandler(Exception)
-def handle_exception(e):
-    with app.app_context():
-        msg = Message("Flask App Error", recipients=["your_email@example.com"])
-        msg.body = f"An error occurred: {str(e)}"
-        mail.send(msg)
-    return "An error occurred, and the admin has been notified.", 500
+# @app.errorhandler(Exception)
+# def handle_exception(e):
+#     with app.app_context():
+#         msg = Message("Flask App Error", recipients=["your_email@example.com"])
+#         msg.body = f"An error occurred: {str(e)}"
+#         mail.send(msg)
+#     return "An error occurred, and the admin has been notified.", 500
 
 
 @app.route("/static/fontawesome/webfonts/<path:filename>")

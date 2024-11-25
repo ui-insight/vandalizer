@@ -32,9 +32,6 @@ a {
 
 select {
     height: 40px;
-    border-radius: 6px;
-    box-shadow: 0 2px 0 white;
-    background-color: white;
 }
 
 footer {

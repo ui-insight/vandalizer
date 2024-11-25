@@ -1,4 +1,4 @@
-<div id="workflowAddPromptModal" class="workflow-overlay" style="display: block;">
+<div id="workflowAddPromptModal" class="workflow-overlay" style="display: block; overflow: scroll;">
     <div class="workflow-modal-content">
         <h2 class="workflow-modal-header">
             Integration
@@ -9,33 +9,51 @@
 
         <!-- Description -->
         <hr>
-        <h3 class="workflow-modal-subtitle">Programatically access your workflow</h3>
+        <h3 class="workflow-modal-subtitle">Programmatically access your workflow</h3>
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
         <!-- Tabbed navigation -->
         <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
 
         <!-- Added design section -->
-        <div class="workflow-content-body">
+        <div class="workflow-content-body" style="background-color: white; padding: 0px 30px 60px 30px;">
             <div class="quickstart-code">
                 <h4>Start Workflow</h4>
-                <pre><code>import requests
+                <div style="position: relative;">
+                    <a id="copyCodeButton" class="btn btn-secondary" style="position: absolute; top: 10px; right: 10px; cursor: pointer;"><i class="fa-regular fa-copy"></i></a>
+                    <div style="position: absolute; bottom: 10px; right: 10px;">
+                        <select id="languageDropdown" style="cursor: pointer;" style="border-radius: 0; box-shadow: none;">
+                            <option value="python">Python</option>
+                            <option value="bash">Bash</option>
+                        </select>
+                    </div>
+                    <pre style="border-radius: 0px;"><code id="codeSnippet">
+import requests
 import json
 
+files = {
+    'file1': open('path/to/your/file1.txt', 'rb'),
+    'file2': open('path/to/your/file2.txt', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'workflowID': '{{ workflow.id }}',
+}
+
 response = requests.post(
-    'https://vandalizer.nkn.uidaho.edu',
+    'https://vandalizer.nkn.uidaho.edu/workflow/run',
     headers={
-        'x-api-key': 'your-api-key',
+        'x-api-key': '{{ user.id }}',
         'Accept': 'application/json',
-        'Content-Type': 'application/json',
     },
-    data=json.dumps({
-        'workflowID': '1234sjdklfj23',
-        'wait': true,
-        'inputs': {},
-    }),
+    data=data,
+    files=files,
 )
+
+print(response.json())`;
 </code></pre>
+                </div>
             </div>
 
             <div class="run-response">
@@ -55,41 +73,55 @@ response = requests.post(
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowAddPromptModal').remove();
         });
+
+        $('#copyCodeButton').on("click", function () {
+            const code = document.getElementById('codeSnippet').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Code copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        });
+
+        $('#languageDropdown').on("change", function () {
+    const language = $(this).val();
+    let codeSnippet = '';
+
+    if (language === 'python') {
+        codeSnippet = `import requests
+
+files = {
+    'file': open('path/to/your/file1.txt', 'rb'),
+    'file': open('path/to/your/file2.txt', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'workflowID': '{{ workflow.id }}',
+}
+
+response = requests.post(
+    'https://vandalizer.nkn.uidaho.edu/workflow/run',
+    headers={
+        'x-api-key': '{{ user.id }}',
+        'Accept': 'application/json',
+    },
+    data=data,
+    files=files,
+)
+
+print(response.json())`;
+    } else if (language === 'bash') {
+        codeSnippet = `curl -X POST https://vandalizer.nkn.uidaho.edu/workflow/run \\
+    -H "x-api-key: {{ user.id }}" \\
+    -H "Accept: application/json" \\
+    -F "workflowID={{ workflow.id }}" \\
+    -F "file=@path/to/your/file1.txt" \\
+    -F "file=@path/to/your/file2.txt"
+    # Add more files using additional -F flags`;
+    }
+
+    $('#codeSnippet').text(codeSnippet);
+});
     </script>
 </div>
-
-<style>
-   
-
-    .api-quickstart-label {
-        font-weight: bold;
-        color: #444;
-    }
-
-    .quickstart-section {
-        margin-bottom: 20px;
-    }
-
-    .quickstart-code, .run-response {
-        background-color: #f9f9f9;
-        padding: 10px;
-        border-radius: 5px;
-        margin-bottom: 10px;
-        font-family: monospace;
-    }
-
-    pre {
-        overflow-x: auto;
-    }
-
-    h4 {
-        font-size: 16px;
-        margin-top: 10px;
-        color: #444;
-    }
-
-    #spellRunWait {
-        margin-left: 5px;
-        vertical-align: middle;
-    }
-</style>
