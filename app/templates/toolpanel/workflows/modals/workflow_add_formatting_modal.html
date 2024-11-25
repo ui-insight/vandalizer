@@ -32,7 +32,7 @@
                 <label for="extractionSetDropdown" class="workflow-label">Select a formatter:</label>
                 <select id="extractionSetDropdown" class="workflow-input-field">
                     {% for prompt in formatters %}
-                    <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_uuid' in workflow_step.data and workflow_step.data['search_set_item_uuid'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
+                    <option value="{{ prompt.id }}" {% if is_editing and 'search_set_item_id' in workflow_step.data and workflow_step.data['search_set_item_id'] == prompt.id %}selected{% endif %}>{{ prompt.title }}</option>
                     {% endfor %}
                 </select>
             </div>
