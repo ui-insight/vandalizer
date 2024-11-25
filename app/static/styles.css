@@ -1058,6 +1058,9 @@ tr {
     background-color: white;
 }
 
+
 .dimmed {
-    opacity: 0.5; /* Adjust the value between 0 (completely transparent) and 1 (fully opaque) */
-  }
+    opacity: 0.4;
+
+    
+}
