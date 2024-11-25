@@ -14,7 +14,7 @@ from flask import (
     jsonify,
     Response,
     send_file,
-    send_from_directory
+    send_from_directory,
 )
 from app import app
 from app import mail
@@ -492,8 +492,9 @@ def chat():
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
+    user_id = load_user().user_id
     response = OpenAIInterface().ask_question_to_documents(
-        app.root_path, documents, message, default_docs=docs
+        user_id, app.root_path, documents, message, default_docs=docs
     )
     print(response)
     return jsonify(response)
@@ -898,6 +899,8 @@ def run_workflow():
     for step in workflow.steps:
         steps.append(step)
 
+    # TODO add the ability to cancel the thread (same for the chat)
+    # maybe store the thread id in the user's session.
     engine = build_workflow_engine(steps, workflow=workflow)
     workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
     workflow_thread.start()
@@ -963,6 +966,7 @@ def workflow_download():
         "static/workflow_output.txt", mimetype="text/plain", as_attachment=True
     )
 
+
 ## MARK: ~~ Integrate
 @app.route("/api/workflows/integrate", methods=["GET"])
 def workflow_integrate():
@@ -972,7 +976,6 @@ def workflow_integrate():
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
-
 
         workflow = Workflow.objects(id=workflow_id).first()
 
@@ -1716,20 +1719,21 @@ def feedback():
 @app.errorhandler(Exception)
 def handle_exception(e):
     with app.app_context():
-        msg = Message(
-            "Flask App Error",
-            recipients=["your_email@example.com"]
-        )
+        msg = Message("Flask App Error", recipients=["your_email@example.com"])
         msg.body = f"An error occurred: {str(e)}"
         mail.send(msg)
     return "An error occurred, and the admin has been notified.", 500
 
 
-@app.route('/static/fontawesome/webfonts/<path:filename>')
+@app.route("/static/fontawesome/webfonts/<path:filename>")
 def serve_fonts(filename):
-    if filename.endswith('.woff2'):
-        return send_from_directory('static/fontawesome/webfonts', filename, mimetype='font/woff2')
-    elif filename.endswith('.ttf'):
-        return send_from_directory('static/fontawesome/webfonts', filename, mimetype='font/ttf')
+    if filename.endswith(".woff2"):
+        return send_from_directory(
+            "static/fontawesome/webfonts", filename, mimetype="font/woff2"
+        )
+    elif filename.endswith(".ttf"):
+        return send_from_directory(
+            "static/fontawesome/webfonts", filename, mimetype="font/ttf"
+        )
     else:
-        return send_from_directory('static/fontawesome/webfonts', filename)
+        return send_from_directory("static/fontawesome/webfonts", filename)

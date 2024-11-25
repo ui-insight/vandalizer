@@ -9,7 +9,7 @@ from app.utilities.prompt_optimization import (
 )
 import tiktoken
 
-from app.models import Conversation
+from app.models import ChatHistory, ChatMessage, ChatRole, MAX_CHAT_MESSAGES
 from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 
 # 128K is the max context length for the GPT-4o model
@@ -154,7 +154,7 @@ class OpenAIInterface:
         return self.format_answer(response, prompt)
 
     def ask_question_to_documents(
-        self, root_path, documents, question, default_docs=[]
+        self, user_id, root_path, documents, question, default_docs=[]
     ):
         default_docs = list(default_docs)
         documents = list(documents)
@@ -170,12 +170,36 @@ class OpenAIInterface:
             )
 
         openai.api_key = "***REMOVED***"
+
+        latest_conversation = ChatHistory.get_latest_conversation(user_id=user_id)
+        previous_messages = []
+        if latest_conversation is not None:
+            print("latest conversation: ", latest_conversation)
+            # if the number of messages in the conversation is less than the max chat messages
+            if len(latest_conversation.messages) < MAX_CHAT_MESSAGES:
+                previous_messages = latest_conversation.messages
+            else:
+                # get the latest messages
+                previous_messages = latest_conversation.messages[-MAX_CHAT_MESSAGES:]
+
+        print("previous messages: ", previous_messages)
+
         prompt = (
-            """Given the following document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
+            """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
             \n\nQuestion: """
             + question
             + "\n\n"
         )
+        # append the question to the previous messages
+        prompt += "Conversation history: \n"
+        for message in previous_messages:
+            if message.role == ChatRole.USER:
+                prompt += "User: " + message.message + "\n"
+            elif message.role == ChatRole.SYSTEM:
+                prompt += "System: " + message.message + "\n"
+
+        print("prompt: ", prompt)
+
         prompt += full_text
         # use a tiktoken library for more accurate computation of the total token length for the context
         # print("total context length: ", total_context_length)
@@ -184,6 +208,29 @@ class OpenAIInterface:
         output = self.perform_llm_call(
             prompt=prompt, question=question, full_text=full_text, root_path=root_path
         )
+
+        # save the conversation
+        user_message = ChatMessage(
+            role=ChatRole.USER,
+            message=question,
+        )
+        system_message = ChatMessage(
+            role=ChatRole.SYSTEM,
+            message=output["formatted_answer"],
+        )
+        user_message.save()
+        system_message.save()
+        print("messages: ", previous_messages + [user_message, system_message])
+        if latest_conversation is not None:
+            latest_conversation.messages.append(user_message)
+            latest_conversation.messages.append(system_message)
+            latest_conversation.save()
+        else:
+            conversation = ChatHistory(
+                user_id=user_id, messages=[user_message, system_message]
+            )
+            conversation.save()
+            print("conversation saved", conversation)
         return output
 
     def perform_llm_call(self, prompt, **kwargs):
