@@ -3,24 +3,20 @@
 
   let chatReponse = null;
 
-
   $("#chatinput").on("keydown", function (event) {
-    if ($('#chatplaceholder')[0].textContent == "") {
-      $("#chatplaceholder").attr("data-placeholder",placeholderText);
+    if ($("#chatplaceholder")[0].textContent == "") {
+      $("#chatplaceholder").attr("data-placeholder", placeholderText);
       $("#chatplaceholder").css("color", "darkgray");
     } else {
       $("#chatplaceholder").attr("data-placeholder", "");
       $("#chatplaceholder").css("color", "black");
     }
-   
   });
   // Handle Enter and Shift+Enter keydown events
   $("#chatinput").on("keyup", function (event) {
-    
-    if ($('#chatplaceholder')[0].textContent == "") {
+    if ($("#chatplaceholder")[0].textContent == "") {
       $("#chatplaceholder").attr("data-placeholder", placeholderText);
       $("#chatplaceholder").css("color", "darkgray");
-
     } else {
       $("#chatplaceholder").attr("data-placeholder", "");
       $("#chatplaceholder").css("color", "black");
@@ -66,7 +62,7 @@
 
   $("#chat-suggestion-2").on("click", function (e) {
     e.preventDefault();
-   
+
     $("#tasks-panel").show();
   });
 
@@ -104,16 +100,18 @@
     question,
     folder_uuid,
     additional_context = "",
-    display_question = ""
+    display_question = "",
   ) {
     $(".chat-card-container").hide();
-   
+
     console.log("Display question:" + display_question);
     console.log("Question:" + question);
 
-      $("#chat-panel").append(
-        "<p><div class='message-you'>" + (display_question == "" ? question : display_question) + "</div></p>",
-      );
+    $("#chat-panel").append(
+      "<p><div class='message-you'>" +
+        (display_question == "" ? question : display_question) +
+        "</div></p>",
+    );
 
     function createFeedbackButtons(question, answer, context, document_uuids) {
       const feedbackDiv = document.createElement("div");
@@ -176,8 +174,10 @@
       </p>`,
     );
 
-    $('#chat-panel').animate({ scrollTop: $('#chat-panel')[0].scrollHeight }, 'slow');
-
+    $("#chat-panel").animate(
+      { scrollTop: $("#chat-panel")[0].scrollHeight },
+      "slow",
+    );
 
     $.ajax({
       url: "/api/chat",
@@ -232,8 +232,10 @@
         $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
         $("#chatplaceholder").css("color", "darkgray");
 
-        $('#chat-panel').animate({ scrollTop: $('#chat-panel')[0].scrollHeight }, 'slow');
-
+        $("#chat-panel").animate(
+          { scrollTop: $("#chat-panel")[0].scrollHeight },
+          "slow",
+        );
 
         // copy to clipboard
         $(".copy-btn").on("click", function () {
@@ -241,7 +243,14 @@
           navigator.clipboard.writeText(searchTerm);
           showToast("Copied to clipboard");
 
-          console.log("Sending feedback", response);
+          console.log(
+            "Sending feedback",
+            response,
+            question,
+            answer,
+            context,
+            document_uuids,
+          );
 
           // Send feedback for copy action
           sendFeedback(

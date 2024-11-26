@@ -15,7 +15,7 @@ from typing import List, Dict, Any
 
 from app import app
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
@@ -137,6 +137,7 @@ def llm_chat_model(prompt, data=None, docs=[]):
             max_tokens=None,
         )
         output = completion.choices[0].message.content
+        print("llm chat response: ", output)
         output = format_llm_output(output).strip()
         # output = open_ai_interface.handle_short_context(
         #     prompt=prompt, full_text=full_text
@@ -153,7 +154,7 @@ def llm_chat_model(prompt, data=None, docs=[]):
 
 def data_extraction_model(keys, pdf_paths, full_text=None):
     output = None
-    extraction_manager = ExtractionManager2()
+    extraction_manager = ExtractionManager3()
     if pdf_paths is None:
         output = extraction_manager.extract(keys, pdf_paths=[], full_text=full_text)
     else:
