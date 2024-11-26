@@ -38,7 +38,9 @@ from app.forms import LoginForm, SpaceForm
 import os
 import base64
 from flask import request
-from app.utilities.extraction_manager2 import ExtractionManager2
+
+# from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.openai_interface import (
     OpenAIInterface,
@@ -497,6 +499,7 @@ def chat():
     response = OpenAIInterface().ask_question_to_documents(
         user_id, app.root_path, documents, message, default_docs=docs
     )
+    response["question"] = message
     print(response)
     return jsonify(response)
 
@@ -716,7 +719,7 @@ def begin_search():
             keys.append(item.searchphrase)
 
     if len(keys) > 0:
-        em = ExtractionManager2()
+        em = ExtractionManager3()
         em.root_path = app.root_path
         results = em.extract(keys, document_paths)
         print(results)
@@ -874,6 +877,7 @@ def update_workflow():
     workflow.save()
     return redirect("/home?section=Workflows")
 
+
 ## MARK: ~~ Run in-app
 @app.route("/api/workflow/run", methods=["POST"])
 def run_workflow():
@@ -905,8 +909,11 @@ def run_workflow():
     engine = build_workflow_engine(steps, workflow=workflow)
     workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
     workflow_thread.start()
-    output, data = workflow_thread.join()
-    # output, data = engine.execute(workflow_result)
+    result = workflow_thread.join()
+    output = None
+    data = None
+    if result:
+        output, data = result
 
     return {"output": output, "steps": data}
 
@@ -915,7 +922,7 @@ def run_workflow():
 @app.route("/workflow/run", methods=["GET", "POST"])
 def run_workflow_integrated():
     # **1. Authenticate User via API Key**
-    api_key = request.headers.get('x-api-key')
+    api_key = request.headers.get("x-api-key")
     if not api_key:
         return jsonify({"error": "API key is missing"}), 401
 
@@ -927,7 +934,7 @@ def run_workflow_integrated():
     session_id = str(uuid.uuid4())
 
     # **3. Get Workflow ID**
-    workflow_id = request.form.get('workflowID')
+    workflow_id = request.form.get("workflowID")
     if not workflow_id:
         return jsonify({"error": "workflowID is required"}), 400
 
@@ -937,9 +944,16 @@ def run_workflow_integrated():
 
     # **4. Handle File Uploads**
     print(request.files)
-    uploaded_files = request.files.getlist('file')
+    uploaded_files = request.files.getlist("file")
     if not uploaded_files:
-        return jsonify({"error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash."}), 400
+        return (
+            jsonify(
+                {
+                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash."
+                }
+            ),
+            400,
+        )
 
     document_uuids = []
 
@@ -960,7 +974,7 @@ def run_workflow_integrated():
         # **Optional: Handle File Conversion**
         if extension == "docx":
             pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-            pypandoc.convert_file(file_path, 'pdf', outputfile=pdf_path)
+            pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
             extension = "pdf"
             file_path = pdf_path
         elif extension in ["xlsx", "xls"]:
@@ -976,7 +990,7 @@ def run_workflow_integrated():
             extension=extension,
             uuid=uid,
             user_id=user.user_id,
-            space="None"
+            space="None",
         )
         document.save()
         document_uuids.append(uid)
@@ -992,11 +1006,7 @@ def run_workflow_integrated():
     docs = [SmartDocument.objects(uuid=uuid).first() for uuid in document_uuids]
 
     document_trigger_step = WorkflowStep(
-        name="Document",
-        data={
-            "docs": docs,
-            "attachments": attachments
-        }
+        name="Document", data={"docs": docs, "attachments": attachments}
     )
 
     steps = [document_trigger_step] + workflow.steps
@@ -1080,7 +1090,7 @@ def workflow_integrate():
     template = render_template(
         "toolpanel/workflows/modals/workflow_integration.html",
         workflow=workflow,
-        user=user
+        user=user,
     )
     response = {"template": template}
     return jsonify(response)
