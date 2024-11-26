@@ -5,7 +5,8 @@ import re
 import pandas as pd
 from pathlib import Path
 
-from typing import List
+
+from typing import List, Literal
 
 from datasets import Dataset
 from dspy.datasets import DataLoader
@@ -132,17 +133,17 @@ def all_queries_distinct(prev_queries):
 class GenerateAnswer(dspy.Signature):
     """Answer questions based on the provided context."""
 
-    context = dspy.InputField(desc="may contain relevant facts")
-    question = dspy.InputField()
-    answer = dspy.OutputField()
+    context: str = dspy.InputField(desc="may contain relevant facts")
+    question: str = dspy.InputField()
+    answer: str = dspy.OutputField()
 
 
 class GenerateSearchQuery(dspy.Signature):
     """Write a simple search query that will help answer a complex question."""
 
-    context = dspy.InputField(desc="may contain relevant facts")
-    question = dspy.InputField(desc="complex question")
-    query = dspy.OutputField(
+    context: str = dspy.InputField(desc="may contain relevant facts")
+    question: str = dspy.InputField(desc="complex question")
+    query: str = dspy.OutputField(
         desc="A Retrieval Augmented Generation (RAG) search query to retrieve relevant facts"
     )
 
@@ -257,10 +258,10 @@ def dspy_model(
 class LLMFactJudge(dspy.Signature):
     """Judge if the answer is factually correct based on the context."""
 
-    context = dspy.InputField(desc="Context for the prediction")
-    question = dspy.InputField(desc="Question to be answered")
-    answer = dspy.InputField(desc="Answer for the question")
-    factually_correct = dspy.OutputField(desc="Yes or No")
+    context: str = dspy.InputField(desc="Context for the prediction")
+    question: str = dspy.InputField(desc="Question to be answered")
+    answer: str = dspy.InputField(desc="Answer for the question")
+    factually_correct: str = dspy.OutputField(desc="Yes or No")
     # factually_correct = dspy.OutputField(
     #     desc="Is the answer factually correct based on the context?",
     #     prefix="Factual[Yes/No]:",
@@ -270,9 +271,9 @@ class LLMFactJudge(dspy.Signature):
 class LLMAnswerJudge(dspy.Signature):
     """Judge if the predicted answer is correct based on the true answer."""
 
-    predicted_answer = dspy.InputField(desc="Predicted answer")
-    true_answer = dspy.InputField(desc="True answer")
-    answer_correctness = dspy.OutputField(desc="Yes or No")
+    predicted_answer: str = dspy.InputField(desc="Predicted answer")
+    true_answer: str = dspy.InputField(desc="True answer")
+    answer_correctness: Literal["Yes", "No"] = dspy.OutputField()
     # answer_correctness = dspy.OutputField(
     #     desc="Is the predicted answer correct based on the true answer?",
     #     prefix="Yes or No:",
