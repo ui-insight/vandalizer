@@ -7,13 +7,8 @@ from pypdf import PdfReader
 from app import app
 from uuid import uuid4
 from enum import Enum
-
-
-# TODO utilities functions to convert search_set_item into workflow step data.
-# TODO ajax timer for streaming
-
-
-class WorkflowStep(me.Document):
+    
+class WorkflowStepTask(me.Document):
     # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
@@ -29,6 +24,24 @@ class WorkflowStep(me.Document):
 
         return 0
 
+class WorkflowStep(me.Document):
+    # id = me.StringField(default=uuid4().hex)
+    name = me.StringField(required=True, max_length=50)
+    tasks = me.ListField(me.ReferenceField(WorkflowStepTask))
+
+    data = me.DictField(required=False)
+
+    #TODO: This is deprecated need to refactor out
+    def extraction_items(self):
+        if "search_set_uuid" in self.data:
+            search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
+            items = search_set.extraction_items()
+            search_phrases = [item.searchphrase for item in items] if items else []
+            return search_phrases
+        elif "searchphrases" in self.data:
+            return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
+
+        return 0
 
 class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)

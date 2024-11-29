@@ -52,36 +52,11 @@
                 {% endif %}
             </div>
             <div class="step-header">
-                {% if step.name == "Extraction" %}
-                <span>Extract Information</span>
-                {% elif step.name == "Prompt" %}
-                <span>Prompt</span>
-                {% elif step.name == "Formatter" %}
-                <span>Formatter</span>
-                {% elif step.name == "Document" %}
-                <span>Add Document(s)</span>
-                {% endif %}
-                {% if step.name == "Extraction" %}
-                    
+                <span>{{ step.name }}</span>
                 <span class="item-info">
-                    {% if step.data.search_set_title %}
-                    {{ step.data.search_set_title }}
-                    {% else %} 
-                    Custom Extraction
-                    {% endif %}
-                    <i>{{ step.extraction_items()|length }} items</i>
+                    {{ step.tasks|length }} tasks
                 </span>
-                {% elif step.name == "Prompt" or step.name == "Formatter" %}
-                <span class="item-info">
-                    {% if "search_set_item_title" in step.data %}
-                    {{ step.data["search_set_item_title"] }}
-                    {% else %}
-                    Run Custom prompt
-                    {% endif %}
-                </span>
-                {% else %}
-                <span class="item-info"></span>
-                {% endif %}
+                
             </div>
            
             <span class="workflow-loader" style="display: none;"></span>
@@ -119,5 +94,5 @@
 
     </div>
 
-    {% include "toolpanel/workflows/workflows_bottom_panel.html" %}
+    {% include "workflows/workflows_bottom_panel.html" %}
 </div>

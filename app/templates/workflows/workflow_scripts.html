@@ -1,9 +1,9 @@
 <script>
-      var active_step = 1;
-        var current_workflow_id = "{{ workflow_id }}";
-        var current_space_id = "{{ current_space_id }}"
-        var workflow_elapsed_time = 0;
-        var workflow_session_id = "";
+    var active_step = 1;
+    var current_workflow_id = "{{ workflow_id }}";
+    var current_space_id = "{{ current_space_id }}"
+    var workflow_elapsed_time = 0;
+    var workflow_session_id = "";
 
     $(document).ready(function () {
 
@@ -130,7 +130,7 @@
             });
         }
 
-        function workflowAddStep(stepType) {
+        function workflowAddStepTask(stepType) {
             console.log(current_space_id);
             let data = JSON.stringify({
                 workflow_uuid: current_workflow_id,
