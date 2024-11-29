@@ -192,7 +192,7 @@ def home():
         workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
 
         workflow_template = render_template(
-            "toolpanel/workflows/workflow.html",
+            "workflows/workflow.html",
             workflow=workflow,
         )
 
@@ -1088,7 +1088,7 @@ def workflow_integrate():
     workflow = Workflow.objects(id=workflow_id).first()
 
     template = render_template(
-        "toolpanel/workflows/modals/workflow_integration.html",
+        "workflows/modals/workflow_integration.html",
         workflow=workflow,
         user=user,
     )
@@ -1103,7 +1103,7 @@ def fetch_workflow():
     workflow = Workflow.objects(id=workflow_id).first()
 
     template = render_template(
-        "toolpanel/workflows/workflow.html",
+        "workflows/workflow.html",
         workflow=workflow,
     )
 
@@ -1115,8 +1115,32 @@ def fetch_workflow():
 
 
 ## MARK: Workflow steps
-@app.route("/api/add_workflow_step", methods=["POST"])
+@app.route("/api/workflows/add_workflow_step", methods=["POST"])
 def add_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_step_data = request.get_json()
+    workflow_id = workflow_step_data["workflow_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    step_title = workflow_step_data["title"]
+
+    workflow_step = WorkflowStep(name=step_title)
+    workflow_step.save()
+    workflow.steps.append(workflow_step)
+    workflow.save()
+    template = render_template(
+        "workflows/workflow_steps/edit_workflow_step_modal.html",
+        workflow=workflow,
+        workflow_step_id=workflow_step.id,
+        workflow_step=workflow_step,
+    )
+    
+    response = {"template": template}
+    return jsonify(response)
+
+@app.route("/api/add_workflow_step_task", methods=["POST"])
+def add_workflow_step_task():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -1200,7 +1224,7 @@ def workflow_add_extraction_step():
         )
 
         template = render_template(
-            "toolpanel/workflows/modals/workflow_add_extractions_modal.html",
+            "workflows/modals/workflow_add_extractions_modal.html",
             workflow=workflow,
             extraction_sets=extraction_sets_objects,
             is_editing=is_editing,
@@ -1274,7 +1298,7 @@ def workflow_add_attachment():
         )
 
         template = render_template(
-            "toolpanel/workflows/modals/workflow_add_attachments_modal.html",
+            "workflows/modals/workflow_add_attachments_modal.html",
             workflow=workflow,
             files=files,
         )
@@ -1324,7 +1348,7 @@ def workflow_add_prompt_step():
         ).all()
 
         template = render_template(
-            "toolpanel/workflows/modals/workflow_add_prompt_modal.html",
+            "workflows/modals/workflow_add_prompt_modal.html",
             workflow=workflow,
             prompts=prompts,
             is_editing=is_editing,
@@ -1410,7 +1434,7 @@ def workflow_add_format_step():
         ).all()
 
         template = render_template(
-            "toolpanel/workflows/modals/workflow_add_formatting_modal.html",
+            "workflows/modals/workflow_add_formatting_modal.html",
             workflow=workflow,
             formatters=formatters,
             is_editing=is_editing,
@@ -1497,7 +1521,7 @@ def workflow_add_document_step():
         ]
 
         template = render_template(
-            "toolpanel/workflows/modals/workflow_add_documents_modal.html",
+            "workflows/modals/workflow_add_documents_modal.html",
             workflow=workflow,
             extraction_sets=extraction_sets,
         )

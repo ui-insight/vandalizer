@@ -233,11 +233,11 @@
                 {% include "toolpanel/extractions/extraction_panel.html" %}
                 {% include "toolpanel/prompts/prompt_panel.html" %}
                
-                {% include "toolpanel/workflows/workflows_panel.html" %}
+                {% include "workflows/workflows_panel.html" %}
             </div>
 
             {% include "toolpanel/tasks/tasks_panel.html" %}
-            {% include "toolpanel/workflows/add_workflow_bottom_panel.html" %}
+            {% include "workflows/add_workflow_bottom_panel.html" %}
             {% if workflow_template != "" and section=="Workflows" %}
             <div class="search-results-panel" id="search-results-panel"
                     style="margin: 0px 0px; text-align: left;">
@@ -252,7 +252,7 @@
             </div>      
             {% endif %}
 
-        {% include "toolpanel/workflows/new_workflow_step_modal.html" %}
+        {% include "workflows/workflow_steps/new_workflow_step_modal.html" %}
         </div>
 
         {% include "toolpanel/chat/chat_search_panel.html" %}
@@ -262,7 +262,7 @@
         <div class="modal-container">
         {% include "toolpanel/rename_modal.html" %}
         {% include "toolpanel/attachment_modal.html" %}
-        {% include "toolpanel/workflows/new_workflow_modal.html" %}
+        {% include "workflows/new_workflow_modal.html" %}
         {% include "toolpanel/tasks/new_task_modal.html" %}
         </div>
     </div>
@@ -306,7 +306,8 @@
 {{super()}}
 {% include "index_scripts.html" %}
 {% include "toolpanel/extractions/panel_scripts.html" %}
-{% include "toolpanel/workflows/workflow_scripts.html" %}
+{% include "workflows/workflow_scripts.html" %}
+{% include "workflows/workflow_step_scripts.html" %}
 {% include "toolpanel/prompts/prompt_set_scripts.html" %}
 {% include "toolpanel/chat/chat_scripts.html" %}
 <!-- <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script> -->

@@ -1,0 +1,20 @@
+<!-- Rename Modal Structure -->
+<div id="newWorkflowStepModal" class="modal informationmodal">
+    <div class="modal-content" style="margin: 5% auto;"> 
+        <h2 style="margin-top: 0px; text-align: left;">Add a workflow step</h2>
+        
+        <div style="width: 100%; padding: 15px 0px;">
+            <input type="text" id="newWorkflowStepName" placeholder="Briefly describe the purpose of the step">
+        </div>
+        <button id="newWorkflowStepBtn" class="btn btn-primary">Begin Building Step</button>
+        <button id="closeNewWorkflowStepBtn" class="btn btn-primary closeNewWorkflowStepBtn" style="background-color: white;">Close</button>
+    </div>
+
+    <script>
+        $('#closeNewWorkflowStepBtn').off("click").on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            $('#newWorkflowStepModal').hide();
+        });
+    </script>
+</div>
+
