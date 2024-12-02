@@ -25,6 +25,17 @@
     width: 120px;
     margin: 22px auto 0px auto;
   }
+
+  .workflow-add-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background-color: #f1b300;
+    border: 2px #f1b300 solid;
+    padding: 15px;
+    position: relative;
+    cursor: pointer;
+  }
   
   .workflow-step {
     display: flex;
@@ -34,6 +45,10 @@
     padding: 15px;
     margin-bottom: 15px;
     position: relative;
+  }
+
+  .workflow-add-step:hover {
+    background-color: white;
   }
   
   .workflow-step.active {

@@ -14,27 +14,42 @@
         <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
 
         <div class="workflow-content-body">
-            
+            <div class="workflow-step-add-tasks-panel">
+                <div class="workflow-container" style="overflow: hidden; padding: 30px;">
+
+
+
+                    <div class="workflow-add-step" data-workflow-step-id="{{ workflow_step_id }}">
+                        <div class="step-content" style="background-color: transparent;">
+                            <div class="add-task-icon-container">
+                                <i class="fa-solid fa-plus"  style="font-size: 24px; color: #000000;"></i>
+                            </div>
+                            <div class="step-header">
+                                <span>ADD YOUR FIRST TASK</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <div class="bottom-toolbar" style>
             <div>
                 <!-- Action buttons -->
-                
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
                     <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
-                    <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;"></button>
+                    <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;">DONE</button>
                 </div>
             </div>
-        </div>        
+        </div>
     </div>
     
     <script>
         
 
-        $('#closeAddPromptToWorkflowBtn').on("click", function (e) {
+        $('#closeWorkflowStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
-            $('#workflowAddPromptModal').remove();
+            $('#workflowEditStepModal').remove();
         });
 
         $('#deletePromptToWorkflowBtn').on("click", function (e) {
@@ -60,5 +75,37 @@
                 }
             });
         });
+
+        $(".workflow-add-step")
+            .off("click")
+            .on("click", function () {
+                let workflow_step_id = $(this).attr("data-workflow-step-id");
+                workflowAddStepTask(workflow_step_id);
+            });
+
+
+            function workflowAddStepTask(workflow_step_id) { 
+        let data = JSON.stringify({
+            workflow_id: current_workflow_id,
+            space_id: current_space_id,
+            workflow_step_id: workflow_step_id
+        });
+        
+        $.ajax({
+            url: `/api/workflows/step/add_task`,
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $(data.template).hide().appendTo('.search-results-panel').fadeIn();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
     </script>
 </div>

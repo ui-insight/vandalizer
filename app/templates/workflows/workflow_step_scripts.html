@@ -10,8 +10,8 @@ $(document).ready(function () {
     });
 
 
-    function addWorklowStepListeners() {
-
+    function addWorkflowStepListeners() {
+        
     }
 
 
@@ -19,7 +19,6 @@ $(document).ready(function () {
         let data = JSON.stringify({
             workflow_id: current_workflow_id,
             space_id: current_space_id,
-            title: $('#newWorkflowStepName')[0].value
         });
         
         console.log("Adding step", data);
@@ -42,6 +41,8 @@ $(document).ready(function () {
             }
         });
     }
+
+    
 
 });
 
