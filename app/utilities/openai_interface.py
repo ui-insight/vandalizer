@@ -105,6 +105,18 @@ class OpenAIInterface:
         )
         return completion.choices[0].message.content
 
+    def markdown_format(self, response):
+        formatting_prompt = """Format the following answer as a nicely markdown. Do not add ```markdown before your response.\n\n"""
+        output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
+        # print("dspy model generated queries: ", queries)
+        completion = openai.chat.completions.create(
+            # model="gpt-4o",
+            model="gpt-4o",
+            messages=[{"role": "user", "content": output_prompt}],
+            max_tokens=None,
+        )
+        return completion.choices[0].message.content
+
     def format_answer(self, response, question):
         formatting_prompt = """Format the following answer as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n"""
         output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
@@ -117,10 +129,12 @@ class OpenAIInterface:
         )
         print("llm formatted response: ", completion.choices[0].message.content)
         formatted_answer = completion.choices[0].message.content
+        markdown_answer = self.markdown_format(response)
         return dict(
             context=response.context,
             answer=response.answer,
             formatted_answer=formatted_answer,
+            markdown_answer=markdown_answer,
         )
 
     def handle_long_context(self, **kwargs):
