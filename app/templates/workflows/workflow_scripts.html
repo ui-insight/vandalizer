@@ -68,7 +68,7 @@
                 let step_id = $(this).attr("data-step-id");
                 let step_type = $(this).attr("data-step-type");
                 console.log("Editing step");
-                workflowEditStep(step_id, step_type);
+                workflowEditStep(step_id);
             });
 
             $('.run-workflow').off("click").on("click", function (e) {
@@ -163,7 +163,36 @@
             });
         }
 
-        function workflowEditStep(step_id, stepType) {
+        function workflowEditStep(step_id) {
+            console.log(current_space_id);
+            
+            let data = JSON.stringify({
+                workflow_id: current_workflow_id,
+                space_id: current_space_id,
+                editing: true,
+                workflow_step_id: step_id
+            });
+
+            $.ajax({
+                url: `/api/workflows/edit_step`,
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    $('#newWorkflowStepModal').fadeOut();
+                    $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                    
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+
+        function workflowEditStepItem(step_id, stepType) {
             console.log(current_space_id);
               console.log(stepType);
 
@@ -403,7 +432,7 @@
               dataType: 'json',
               async: true,
               success: function (data) {
-              $(data.template).hide().appendTo('.modal-container').fadeIn();
+              $(data.template).hide().appendTo('.search-results-panel').fadeIn();
                   addWorklowListeners();
 
 

@@ -1139,18 +1139,45 @@ def add_workflow_step():
     response = {"template": template}
     return jsonify(response)
 
-@app.route("/api/add_workflow_step_task", methods=["POST"])
+@app.route("/api/workflows/edit_step", methods=["POST"])
+def edit_workflow_step():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_step_data = request.get_json()
+    workflow_id = workflow_step_data["workflow_id"]
+    workflow_step_id = workflow_step_data["workflow_step_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+    template = render_template(
+        "workflows/workflow_steps/edit_workflow_step_modal.html",
+        workflow=workflow,
+        workflow_step_id=workflow_step.id,
+        workflow_step=workflow_step,
+    )
+    
+    response = {"template": template}
+    return jsonify(response)
+
+@app.route("/api/workflows/step/add_task", methods=["POST"])
 def add_workflow_step_task():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
-    workflow_data = request.get_json()
-    workflow_id = workflow_data["workflow_id"]
+    workflow_step_data = request.get_json()
+    workflow_id = workflow_step_data["workflow_id"]
+    workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
-    step = workflow_data["step"]
-    workflow.steps.append(step)
-    workflow.save()
-    return redirect("/home?section=Workflows")
+    workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+    template = render_template(
+        "workflows/workflow_steps/new_workflow_task_modal.html",
+        workflow=workflow,
+        workflow_step_id=workflow_step.id,
+        workflow_step=workflow_step,
+    )
+    
+    response = {"template": template}
+    return jsonify(response)
 
 
 @app.route("/api/workflow/delete_step", methods=["POST"])
