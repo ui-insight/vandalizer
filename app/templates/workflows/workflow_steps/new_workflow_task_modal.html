@@ -1,10 +1,10 @@
 <!-- Rename Modal Structure -->
-<div id="newWorkflowStepModal" class="workflow-overlay" style="display:none;">
+<div id="newWorkflowStepTaskModal" class="workflow-overlay" style="display:none;">
     <div class="workflow-modal-content"> 
       <div class="add-task-container" id="add-task-container" style="height: 100%;">
         <h2 class="workflow-modal-header">
             Add a step
-            <a id="closeWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
+            <a class="closeWorkflowAddStepTaskBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
         </h2>
 
         <hr>
@@ -261,6 +261,69 @@
             $(".add-workflow-step-web-section").show();
             $('.section-item').removeClass('active');
             $(this).addClass('active');
+        });
+
+
+        $('.add-extraction-step-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            console.log("Add Extraction");
+            workflowAddStepTask("extraction");
+        });
+
+        $('.add-prompt-step-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            console.log("Add Prompt");
+            workflowAddStepTask("prompt");
+        });
+
+        $('.add-format-step-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            console.log("Add Format");
+            workflowAddStepTask("formatter");
+        });
+
+        $('.add-document-step-btn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            console.log("Add Document");
+            workflowAddStepTask("document");
+        });
+
+        function workflowAddStepTask(stepType) {
+            console.log(current_space_id);
+            let data = JSON.stringify({
+                workflow_uuid: current_workflow_id,
+                space_id: current_space_id,
+            });
+            console.log("Adding step", data);
+
+            $.ajax({
+                url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
+                type: 'GET',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    $('#newWorkflowStepModal').fadeOut();
+                    $(data.template).hide().appendTo('.search-results-panel').fadeIn();
+
+                    $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
+                        e.preventDefault();
+                        console.log(`Add ${capitalize(stepType)}`);
+                        workflowConfirmStep(stepType);
+                    });
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+
+        $('.closeWorkflowAddStepTaskBtn').off("click").on("click", function () {
+            $('#newWorkflowStepTaskModal').remove();
+            const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
+            history.pushState({ path: newUrl }, '', newUrl);
         });
     </script>
   </div>

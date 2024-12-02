@@ -13,36 +13,6 @@
             fetchWorkflow(uuid);
         });
 
-        $('#closeWorkflowBtn').on("click", function () {
-            $('#newWorkflowStepModal').fadeOut();
-            const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
-            history.pushState({ path: newUrl }, '', newUrl);
-        });
-
-        $('.add-extraction-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Extraction");
-            workflowAddStep("extraction");
-        });
-
-        $('.add-prompt-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Prompt");
-            workflowAddStep("prompt");
-        });
-
-        $('.add-format-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Format");
-            workflowAddStep("formatter");
-        });
-
-        $('.add-document-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Document");
-            workflowAddStep("document");
-        });
-
         function addWorklowListeners() {
             console.log("Add workflow listeners");
             updateDocumentSelections();
@@ -122,39 +92,6 @@
                                 // Update the browser URL with the current_workflow_id without refreshing the page
                     const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
                     history.pushState({ path: newUrl }, '', newUrl);
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
-        }
-
-        function workflowAddStepTask(stepType) {
-            console.log(current_space_id);
-            let data = JSON.stringify({
-                workflow_uuid: current_workflow_id,
-                space_id: current_space_id,
-            });
-            console.log("Adding step", data);
-
-            $.ajax({
-                url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
-                type: 'GET',
-                data: data,
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function (data) {
-                    $('#newWorkflowStepModal').fadeOut();
-                    $(data.template).hide().appendTo('.modal-container').fadeIn();
-                    addWorklowListeners();
-
-                    $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
-                        e.preventDefault();
-                        console.log(`Add ${capitalize(stepType)}`);
-                        workflowConfirmStep(stepType);
-                    });
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
