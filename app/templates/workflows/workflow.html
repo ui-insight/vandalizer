@@ -37,19 +37,8 @@
     <div class="workflow-step">
         <div class="step-connector top"></div>
         <div class="step-content">
-            <div class="add-task-icon-container">
-                {{ step.data.name }}
-                {% if step.name == "Extraction" %}
-                <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
-                {% elif step.name == "Prompt" %}
-                <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
-                {% elif step.name == "Format" %}
-                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                {% elif step.name == "Document" %}
-                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
-                {% else %}
-                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                {% endif %}
+            <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
+                {{ loop.index }}
             </div>
             <div class="step-header">
                 <span>{{ step.name }}</span>

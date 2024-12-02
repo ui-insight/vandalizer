@@ -32,7 +32,6 @@
             <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_step.data) %}display: none;{% else %}display: block;{% endif %}">
                 <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
                 <select id="extractionSetDropdown" class="workflow-input-field">
-                <option value="Create a new set">Create a new set</option>
                 {% for extraction in extraction_sets %}
                 <option value="{{ extraction.uuid }}" {% if is_editing and 'search_set_uuid' in workflow_step.data and workflow_step.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
                 {% endfor %}

@@ -4,6 +4,38 @@
 //var current_workflow_id = "{{ workflow_id }}";
 //var current_space_id = "{{ current_space_id }}"
 
+function workflowAddStepTaskType(stepType, workflow_step_id) {
+    let data = JSON.stringify({
+        workflow_uuid: current_workflow_id,
+        space_id: current_space_id,
+        workflow_step_id: workflow_step_id
+    });
+
+    $.ajax({
+        url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
+        type: 'GET',
+        data: data,
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function (data) {
+            $('#newWorkflowStepModal').fadeOut();
+            $(data.template).hide().appendTo('.search-results-panel').fadeIn();
+
+            console.log(stepType);
+            $(`#confirm${capitalize(stepType)}StepBtn`).off("click").on("click", function (e) {
+                e.preventDefault();
+                console.log(`Add ${capitalize(stepType)}`);
+                workflowConfirmStep(stepType, workflow_step_id);
+            });
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+        }
+    });
+}
+
 $(document).ready(function () {
     $('#newWorkflowStepBtn').on("click", function () {
         workflowAddStep();
@@ -19,10 +51,9 @@ $(document).ready(function () {
         let data = JSON.stringify({
             workflow_id: current_workflow_id,
             space_id: current_space_id,
+            title: $('#newWorkflowStepName')[0].value
         });
         
-        console.log("Adding step", data);
-
         $.ajax({
             url: `/api/workflows/add_workflow_step`,
             type: 'POST',
@@ -32,7 +63,7 @@ $(document).ready(function () {
             async: true,
             success: function (data) {
                 $('#newWorkflowStepModal').fadeOut();
-                $(data.template).hide().appendTo('.modal-container').fadeIn();
+                $(data.template).hide().appendTo('.search-results-panel').fadeIn();
                 addWorklowStepListeners();
             },
             error: function (xhr, ajaxOptions, thrownError) {
