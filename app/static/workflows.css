@@ -30,8 +30,9 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    background-color: #f1b300;
-    border: 2px #f1b300 solid;
+    color: white;
+    background-color: #191919;
+    border: 2px #191919 solid;
     padding: 15px;
     position: relative;
     cursor: pointer;
@@ -49,6 +50,7 @@
 
   .workflow-add-step:hover {
     background-color: white;
+    color: #191919;
   }
   
   .workflow-step.active {

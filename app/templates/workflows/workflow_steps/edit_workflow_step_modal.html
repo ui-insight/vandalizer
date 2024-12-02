@@ -34,9 +34,36 @@
                                 {% endif %}
                             </div>
                             <div class="step-header">
-                                <span>{{ step.name }}</span>
+                                {% if step.name == "Extraction" %}
+                                <span>Extract Information</span>
+                                {% elif step.name == "Prompt" %}
+                                <span>Prompt</span>
+                                {% elif step.name == "Formatter" %}
+                                <span>Formatter</span>
+                                {% elif step.name == "Document" %}
+                                <span>Add Document(s)</span>
+                                {% endif %}
+                                {% if step.name == "Extraction" %}
+                                    
                                 <span class="item-info">
+                                    {% if step.data.search_set_title %}
+                                    {{ step.data.search_set_title }}
+                                    {% else %} 
+                                    Custom Extraction
+                                    {% endif %}
+                                    <i>{{ step.extraction_items()|length }} items</i>
                                 </span>
+                                {% elif step.name == "Prompt" or step.name == "Formatter" %}
+                                <span class="item-info">
+                                    {% if "search_set_item_title" in step.data %}
+                                    {{ step.data["search_set_item_title"] }}
+                                    {% else %}
+                                    Run Custom prompt
+                                    {% endif %}
+                                </span>
+                                {% else %}
+                                <span class="item-info"></span>
+                                {% endif %}
                             </div>
                         
                             <span class="workflow-loader" style="display: none;"></span>
@@ -50,8 +77,8 @@
 
                     <div class="workflow-add-step" data-workflow-step-id="{{ workflow_step_id }}" style="padding: 0px;">
                         <div class="step-content" style="background-color: transparent;">
-                            <div class="add-task-icon-container">
-                                <i class="fa-solid fa-plus"  style="font-size: 18px; color: #000000;"></i>
+                            <div class="add-task-icon-container" style="background-color: rgba(181, 181, 181, 0.163);">
+                                <i class="fa-solid fa-plus"  style="font-size: 18px;"></i>
                             </div>
                             <div class="step-header">
                                 {% if workflow_step.tasks|length > 0 %}
