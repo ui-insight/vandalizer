@@ -159,9 +159,9 @@ class SimpleQA(dspy.Module):
 
 
 def simple_qa_model():
-    model = "gpt-4o"
-    llm = dspy.OpenAI(model=model)
-    dspy.settings.configure(lm=llm, trace=[], temperature=0.7)
+    model = "openai/gpt-4o"
+    llm = dspy.LM(model=model)
+    dspy.configure(lm=llm, trace=[], temperature=0.7)
     model = SimpleQA()
     return model
 
@@ -212,7 +212,7 @@ def dspy_model(
 ):
     # model_name = "gpt-4"
     # model_name = "gpt-4-turbo"
-    model_name = "gpt-4o"
+    model_name = "openai/gpt-4o"
 
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=100)
     docs = text_splitter.split_documents([Document(page_content=full_text)])
@@ -242,10 +242,10 @@ def dspy_model(
     )
 
     # model 32k tokens
-    llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
+    llm = dspy.LM(model=model_name, max_tokens=max_tokens)
     # llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
     # llm = dspy.OpenAI(model=model_name, max_tokens=4096)
-    dspy.settings.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
+    dspy.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
 
     model = MultiHopQAModel(passages_per_hop=3, max_hops=5)
     # check if the model is already compiled

@@ -1,4 +1,5 @@
 import mongoengine as me
+from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 import datetime
@@ -233,7 +234,7 @@ class ChatRole(Enum):
     USER = "user"
 
 
-MAX_CHAT_MESSAGES = 20
+MAX_CHAT_MESSAGES = 5
 
 
 class ChatMessage(me.Document):
@@ -250,6 +251,17 @@ class ChatHistory(me.Document):
     updated_at = me.DateTimeField(default=datetime.datetime.now)
 
     @staticmethod
-    def get_latest_conversation(user_id):
-        # latest conversation MAX_CHAT_MESSAGES
-        return ChatHistory.objects().order_by("-created_at").first()
+    def get_latest_conversation_messages(user_id):
+        # latest conversation MAX_CHAT_MESSAGES from the user
+        history = ChatHistory.objects(user_id=user_id).order_by("-created_at").first()
+        if history is None:
+            return None
+        # take the last 2h of conversation
+        filtered_messages = [m for m in history.messages if convert_to_hours(m) < 2]  #
+        print("filtered messages: ", filtered_messages)
+        return filtered_messages
+
+
+def convert_to_hours(message):
+    time_slot = datetime.datetime.now() - message.created_at
+    return time_slot.total_seconds() / 3600
