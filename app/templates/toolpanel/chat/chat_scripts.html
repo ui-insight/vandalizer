@@ -193,6 +193,7 @@
       success: function (response) {
         console.log(response);
         let answer = response.answer;
+        let markdownAnswer = response.markdown_answer;
         let question = response.question;
         let formatted_answer = response.formatted_answer;
         let context = response.context;
@@ -218,6 +219,9 @@
                 <div class="chat-response-body">
                 ${responseDiv.prop("outerHTML")}
                 </div>
+                <div class="markdown-answer" style='display: none;'>
+                  ${markdownAnswer}
+                </div>
                 <div style='padding-top: 10px;'>
                   <a style='color: #000000dd;' class='copy-btn'>
                     <i class='fa-regular fa-copy' style='cursor: pointer'></i>
@@ -239,18 +243,17 @@
 
         // copy to clipboard
         $(".copy-btn").on("click", function () {
-          let searchTerm = $(this).closest("div").text();
-          navigator.clipboard.writeText(searchTerm);
-          showToast("Copied to clipboard");
+          // let searchTerm = $(this).closest("div").text();
+          let markdownAnswer = $(this)
+            .closest('[id^="response"]')
+            .find(".markdown-answer")
+            .text()
+            .trim();
 
-          console.log(
-            "Sending feedback",
-            response,
-            question,
-            answer,
-            context,
-            document_uuids,
-          );
+          navigator.clipboard.writeText(markdownAnswer);
+          console.log("Copied to clipboard: ", markdownAnswer);
+
+          showToast("Copied to clipboard");
 
           // Send feedback for copy action
           sendFeedback(
