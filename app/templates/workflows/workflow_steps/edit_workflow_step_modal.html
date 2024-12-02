@@ -14,18 +14,51 @@
         <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
 
         <div class="workflow-content-body">
-            <div class="workflow-step-add-tasks-panel">
-                <div class="workflow-container" style="overflow: hidden; padding: 30px;">
-
-
-
-                    <div class="workflow-add-step" data-workflow-step-id="{{ workflow_step_id }}">
-                        <div class="step-content" style="background-color: transparent;">
+            <div class="workflow-container" style="overflow: hidden; padding: 30px;">
+                <div class="workflow-step-add-tasks-panel">
+                    {% for step in workflow_step.tasks %}
+                    <div class="workflow-step">
+                        <div class="step-content">
                             <div class="add-task-icon-container">
-                                <i class="fa-solid fa-plus"  style="font-size: 24px; color: #000000;"></i>
+                                {{ step.data.name }}
+                                {% if step.name == "Extraction" %}
+                                <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
+                                {% elif step.name == "Prompt" %}
+                                <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
+                                {% elif step.name == "Format" %}
+                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                                {% elif step.name == "Document" %}
+                                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
+                                {% else %}
+                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                                {% endif %}
                             </div>
                             <div class="step-header">
+                                <span>{{ step.name }}</span>
+                                <span class="item-info">
+                                </span>
+                            </div>
+                        
+                            <span class="workflow-loader" style="display: none;"></span>
+                            <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name|lower }}">
+                                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% endfor %}
+
+                    <div class="workflow-add-step" data-workflow-step-id="{{ workflow_step_id }}" style="padding: 0px;">
+                        <div class="step-content" style="background-color: transparent;">
+                            <div class="add-task-icon-container">
+                                <i class="fa-solid fa-plus"  style="font-size: 18px; color: #000000;"></i>
+                            </div>
+                            <div class="step-header">
+                                {% if workflow_step.tasks|length > 0 %}
+                                <span>ADD A TASK</span>
+                                {% else %}
                                 <span>ADD YOUR FIRST TASK</span>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -38,7 +71,7 @@
                 <!-- Action buttons -->
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
                     <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
-                    <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;">DONE</button>
+                    <button id="confirmWorkflowStepModalStepBtn" class="btn btn-primary" style="flex-grow: 1;">DONE</button>
                 </div>
             </div>
         </div>

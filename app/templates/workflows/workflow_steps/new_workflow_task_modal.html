@@ -33,7 +33,7 @@
                         
                             <div class="add-task-content">
                                 <div class="add-task-title">Extractions</div>
-                                <div class="add-task-description">Use extraction groups to get data</div>
+                                <div class="add-task-description">Extract information from text</div>
                             </div>
                         </div>
                     </a>
@@ -85,7 +85,7 @@
                         
                             <div class="add-task-content">
                                 <div class="add-task-title">Extractions</div>
-                                <div class="add-task-description">Use extraction groups to get data</div>
+                                <div class="add-task-description">Extract information from text</div>
                             </div>
                         </div>
                     </a>
@@ -267,58 +267,25 @@
         $('.add-extraction-step-btn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             console.log("Add Extraction");
-            workflowAddStepTask("extraction");
+            workflowAddStepTaskType("extraction", "{{ workflow_step_id }}");
         });
 
         $('.add-prompt-step-btn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Prompt");
-            workflowAddStepTask("prompt");
+            workflowAddStepTaskType("prompt", "{{ workflow_step_id }}");
         });
 
         $('.add-format-step-btn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             console.log("Add Format");
-            workflowAddStepTask("formatter");
+            workflowAddStepTaskType("formatter", "{{ workflow_step_id }}");
         });
 
         $('.add-document-step-btn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             console.log("Add Document");
-            workflowAddStepTask("document");
+            workflowAddStepTaskType("document", "{{ workflow_step_id }}");
         });
-
-        function workflowAddStepTask(stepType) {
-            console.log(current_space_id);
-            let data = JSON.stringify({
-                workflow_uuid: current_workflow_id,
-                space_id: current_space_id,
-            });
-            console.log("Adding step", data);
-
-            $.ajax({
-                url: `/api/workflows/add_${stepType.toLowerCase()}_step`,
-                type: 'GET',
-                data: data,
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function (data) {
-                    $('#newWorkflowStepModal').fadeOut();
-                    $(data.template).hide().appendTo('.search-results-panel').fadeIn();
-
-                    $(`#confirm${capitalize(stepType)}StepBtn`).on("click", function (e) {
-                        e.preventDefault();
-                        console.log(`Add ${capitalize(stepType)}`);
-                        workflowConfirmStep(stepType);
-                    });
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
-        }
 
         $('.closeWorkflowAddStepTaskBtn').off("click").on("click", function () {
             $('#newWorkflowStepTaskModal').remove();

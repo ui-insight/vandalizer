@@ -4,6 +4,7 @@ from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
 from werkzeug.utils import secure_filename
+from bson import ObjectId
 from flask import (
     url_for,
     send_file,
@@ -33,6 +34,7 @@ from app.models import (
     WorkflowStep,
     WorkflowAttachment,
     WorkflowResult,
+    WorkflowStepTask
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -1232,7 +1234,7 @@ def workflow_add_extraction_step():
 
         if is_editing:
             workflow_step_id = data.get("workflow_step_id")
-            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+            workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         workflow = Workflow.objects(id=workflow_id).first()
 
@@ -1263,45 +1265,48 @@ def workflow_add_extraction_step():
 
     elif request.method == "POST":
         # Handle POST request - create a new WorkflowStep
+       
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
         search_set_id = data["search_set_id"] if "search_set_id" in data else None
         manual_input = data["manual_input"] if "manual_input" in data else None
-        step_id = data["step_id"] if "step_id" in data else None
+        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        task_id = data["task_id"] if "task_id" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
+        workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
 
-            workflow_step = None
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
-                    workflow_step.data = searchset.to_workflow_step_data()
-                    workflow_step.save()
+            workflow_step_task = None
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
+                    workflow_step_task.data = searchset.to_workflow_step_data()
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Extraction", data=searchset.to_workflow_step_data()
                 )
+                workflow_step_task.save()
+                workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
-                workflow.steps.append(workflow_step)
-                workflow.save()
 
         elif manual_input:
             workflow_step = None
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
-                    workflow_step.data = {"searchphrases": manual_input}
-                    workflow_step.save()
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
+                    workflow_step_task.data = {"searchphrases": manual_input}
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Extraction", data={"searchphrases": manual_input}
                 )
-                workflow_step.save()
-                workflow.steps.append(workflow_step)
+                workflow_step_task.save()
+                workflow_step.tasks.append(workflow_step_task)
 
-            workflow.save()
+            workflow_step.save()
 
         return jsonify({"response": "success"})
 
@@ -1389,46 +1394,48 @@ def workflow_add_prompt_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        step_id = data["step_id"] if "step_id" in data else None
+        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        task_id = data["task_id"] if "task_id" in data else None
         search_set_item_id = (
             data["search_set_item_id"] if "search_set_item_id" in data else None
         )
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
+        workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         if search_set_item_id:
-            workflow_step = None
+            workflow_step_task = None
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
             # Editing
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
                     print("SETTING UP DATA FROM SEARCH SET ITEM")
-                    workflow_step.data = searchsetitem.to_workflow_step_data()
-                    workflow_step.save()
+                    workflow_step_task.data = searchsetitem.to_workflow_step_data()
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Prompt", data=searchsetitem.to_workflow_step_data()
                 )
+                workflow_step_task.save()
+                workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
-                workflow.steps.append(workflow_step)
-                workflow.save()
         elif manual_input:
-            workflow_step = None
+            workflow_step_task = None
             # Editing
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
                     print("SETTING UP DATA FROM MANUAL")
-                    workflow_step.data = {"prompt": manual_input}
-                    workflow_step.save()
+                    workflow_step_task.data = {"prompt": manual_input}
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Prompt", data={"prompt": manual_input}
                 )
-                workflow_step.save()
-                workflow.steps.append(workflow_step)
-                workflow.save()
+                workflow_step_task.save()
+                workflow_step.steps.append(workflow_step_task)
+                workflow_step.tasks()
 
         return jsonify({"response": "success"})
 
@@ -1475,43 +1482,46 @@ def workflow_add_format_step():
 
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
-        step_id = data["step_id"] if "step_id" in data else None
+        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        task_id = data["task_id"] if "task_id" in data else None
+        
         workflow_id = data["workflow_uuid"]
         search_set_item_id = (
             data["search_set_item_id"] if "search_set_item_id" in data else None
         )
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
+        workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         if search_set_item_id:
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
-            workflow_step = None
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
-                    workflow_step.data = searchsetitem.to_workflow_step_data()
-                    workflow_step.save()
+            workflow_step_task = None
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
+                    workflow_step_task.data = searchsetitem.to_workflow_step_data()
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Formatter", data=searchsetitem.to_workflow_step_data()
                 )
+                workflow_step_task.save()
+                workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
-                workflow.steps.append(workflow_step)
-                workflow.save()
         elif manual_input:
             workflow_step = None
-            if step_id != None and step_id != 0:
-                workflow_step = WorkflowStep.objects(id=step_id).first()
-                if workflow_step:
-                    workflow_step.data = {"prompt": manual_input}
-                    workflow_step.save()
+            if task_id != None and task_id != 0:
+                workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
+                if workflow_step_task:
+                    workflow_step_task.data = {"prompt": manual_input}
+                    workflow_step_task.save()
             else:
-                workflow_step = WorkflowStep(
+                workflow_step_task = WorkflowStepTask(
                     name="Formatter", data={"prompt": manual_input}
                 )
+                workflow_step_task.save()
+                workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
-                workflow.steps.append(workflow_step)
-                workflow.save()
 
         return jsonify({"response": "success"})
 
@@ -1541,7 +1551,7 @@ def workflow_add_document_step():
         extraction_sets_objects = list(
             chain(global_extraction_sets, user_extraction_sets)
         )
-        extraction_sets = ["Create a new set"] + [
+        extraction_sets = [
             extraction["title"]
             for extraction in extraction_sets_objects
             if "title" in extraction

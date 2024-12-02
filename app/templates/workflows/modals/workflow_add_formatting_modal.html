@@ -83,6 +83,11 @@
             $('#workflowAddFormattingModal').remove();
         });
 
+        $('#confirmFormatterStepBtn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            $('#workflowAddFormattingModal').remove();
+        });
+
         {% if is_editing %}
         $('#deletePromptToWorkflowBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
