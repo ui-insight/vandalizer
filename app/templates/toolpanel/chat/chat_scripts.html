@@ -244,11 +244,13 @@
         // copy to clipboard
         $(".copy-btn").on("click", function () {
           // let searchTerm = $(this).closest("div").text();
-          let markdownAnswer = $(this)
+          let responseHtml = $(this)
             .closest('[id^="response"]')
-            .find(".markdown-answer")
-            .text()
+            .find(".chat-response-body")
+            .html()
             .trim();
+
+          copyRichTextToClipboard(responseHtml);
 
           navigator.clipboard.writeText(markdownAnswer);
           console.log("Copied to clipboard: ", markdownAnswer);
@@ -271,6 +273,55 @@
         console.log(thrownError);
       },
     });
+  }
+
+  function copyRichTextToClipboard(htmlContent) {
+    // Create a temporary element to hold the content
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = htmlContent;
+
+    // Create a range and selection
+    const range = document.createRange();
+    range.selectNodeContents(tempDiv);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    try {
+      // Copy both plain text and HTML
+      const plainText = tempDiv.innerText;
+
+      const clipboardItem = new ClipboardItem({
+        "text/html": new Blob([htmlContent], { type: "text/html" }),
+        "text/plain": new Blob([plainText], { type: "text/plain" }),
+      });
+
+      navigator.clipboard
+        .write([clipboardItem])
+        .then(() => {
+          showToast("Copied with formatting");
+          selection.removeAllRanges(); // Clear selection
+        })
+        .catch((err) => {
+          console.error("Failed to copy rich text:", err);
+          fallbackRichTextCopy(htmlContent, plainText);
+        });
+    } catch (err) {
+      console.error("Rich text copy failed:", err);
+      fallbackRichTextCopy(htmlContent, tempDiv.innerText);
+    }
+  }
+
+  function fallbackRichTextCopy(htmlContent, plainText) {
+    // Fallback method for browsers that don't support ClipboardItem
+    const listener = function (ev) {
+      ev.preventDefault();
+      ev.clipboardData.setData("text/html", htmlContent);
+      ev.clipboardData.setData("text/plain", plainText);
+    };
+    document.addEventListener("copy", listener);
+    document.execCommand("copy");
+    document.removeEventListener("copy", listener);
   }
 
   function sendFeedback(
