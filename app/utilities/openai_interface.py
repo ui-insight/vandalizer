@@ -154,7 +154,7 @@ class OpenAIInterface:
         return self.format_answer(response, prompt)
 
     def ask_question_to_documents(
-        self, user_id, root_path, documents, question, default_docs=[]
+        self, root_path, documents, question, default_docs=[], user_id=None
     ):
         default_docs = list(default_docs)
         documents = list(documents)
@@ -171,16 +171,16 @@ class OpenAIInterface:
 
         openai.api_key = "***REMOVED***"
 
-        latest_conversation = ChatHistory.get_latest_conversation(user_id=user_id)
+        latest_conversation_messages = ChatHistory.get_latest_conversation_messages(
+            user_id=user_id
+        )
         previous_messages = []
-        if latest_conversation is not None:
-            print("latest conversation: ", latest_conversation)
-            # if the number of messages in the conversation is less than the max chat messages
-            if len(latest_conversation.messages) < MAX_CHAT_MESSAGES:
-                previous_messages = latest_conversation.messages
-            else:
-                # get the latest messages
-                previous_messages = latest_conversation.messages[-MAX_CHAT_MESSAGES:]
+        # if the number of messages in the conversation is less than the max chat messages
+        if len(latest_conversation_messages) < MAX_CHAT_MESSAGES:
+            previous_messages = latest_conversation_messages
+        else:
+            # get the latest messages
+            previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
 
         print("previous messages: ", previous_messages)
 
@@ -196,11 +196,11 @@ class OpenAIInterface:
             if message.role == ChatRole.USER:
                 prompt += "User: " + message.message + "\n"
             elif message.role == ChatRole.SYSTEM:
-                prompt += "System: " + message.message + "\n"
+                prompt += "System: " + message.message + "\n\n"
 
         print("prompt: ", prompt)
 
-        prompt += full_text
+        # prompt += full_text
         # use a tiktoken library for more accurate computation of the total token length for the context
         # print("total context length: ", total_context_length)
         # print("docs", documents)
@@ -208,6 +208,9 @@ class OpenAIInterface:
         output = self.perform_llm_call(
             prompt=prompt, question=question, full_text=full_text, root_path=root_path
         )
+
+        if user_id is None:
+            return output
 
         # save the conversation
         user_message = ChatMessage(
@@ -221,21 +224,18 @@ class OpenAIInterface:
         user_message.save()
         system_message.save()
         print("messages: ", previous_messages + [user_message, system_message])
-        if latest_conversation is not None:
-            latest_conversation.messages.append(user_message)
-            latest_conversation.messages.append(system_message)
-            latest_conversation.save()
-        else:
-            conversation = ChatHistory(
-                user_id=user_id, messages=[user_message, system_message]
-            )
-            conversation.save()
-            print("conversation saved", conversation)
+        conversation = ChatHistory(
+            user_id=user_id, messages=[user_message, system_message]
+        )
+        conversation.save()
+        print("conversation saved", conversation)
         return output
 
     def perform_llm_call(self, prompt, **kwargs):
+        full_text = kwargs.get("full_text")
+        context = prompt + full_text if full_text else prompt
 
-        total_context_length = num_tokens_from_text(prompt)
+        total_context_length = num_tokens_from_text(context)
         print("total context length: ", total_context_length)
         print("max context length: ", max_context_length)
         if total_context_length > max_context_length:

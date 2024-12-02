@@ -497,7 +497,7 @@ def chat():
 
     user_id = load_user().user_id
     response = OpenAIInterface().ask_question_to_documents(
-        user_id, app.root_path, documents, message, default_docs=docs
+        app.root_path, documents, message, default_docs=docs, user_id=user_id
     )
     response["question"] = message
     print(response)
