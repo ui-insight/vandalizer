@@ -190,10 +190,7 @@ class OpenAIInterface:
         )
         previous_messages = []
         # if the number of messages in the conversation is less than the max chat messages
-        if len(latest_conversation_messages) < MAX_CHAT_MESSAGES:
-            previous_messages = latest_conversation_messages
-        else:
-            # get the latest messages
+        if latest_conversation_messages is not None:
             previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
 
         print("previous messages: ", previous_messages)
