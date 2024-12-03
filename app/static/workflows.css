@@ -381,3 +381,13 @@ h4 {
   margin-left: 5px;
   vertical-align: middle;
 }
+
+.workflow-step-editable-title {
+  border: none; /* Remove any default border */
+  border-bottom: 1px solid transparent; /* Ensures spacing alignment */
+  background-image: radial-gradient(#cccccc99 50%, transparent 50%);
+  background-size: 15px 4px; /* Dots 5px wide with 1px spacing vertically */
+  background-repeat: repeat-x; /* Repeat the pattern horizontally */
+  background-position: bottom; 
+  padding-bottom: 10px; /* Adds some space between the text and the underline */
+}

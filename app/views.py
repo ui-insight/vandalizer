@@ -1187,17 +1187,25 @@ def delete_workflow_step():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
+    
     workflow_data = request.get_json()
     workflow_step_id = workflow_data["workflow_step_id"]
     step = WorkflowStep.objects(id=workflow_step_id).first()
     if not step:
         return jsonify({"success": False, "error": "Step not found"}), 404
 
-    # Find any Workflow containing this step and remove the reference
+    # Delete all associated WorkflowStepTasks
+    for task in step.tasks:
+        task.delete()
+
+    # Remove references to the step in any Workflow
     Workflow.objects(steps=step).update(pull__steps=step)
+
+    # Delete the WorkflowStep itself
     step.delete()
 
     return jsonify({"success": True})
+
 
 
 @app.route("/api/update_workflow_step", methods=["POST"])

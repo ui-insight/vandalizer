@@ -1,8 +1,8 @@
 <div id="workflowEditStepModal" class="workflow-overlay" style="display: block;">
     <div class="workflow-modal-content">
-        <h2 class="workflow-modal-header">
-        {{ workflow_step.name }}
-        <a id="closeWorkflowStepBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
+        <h2 class="workflow-modal-header ">
+        <span class="">{{ workflow_step.name }}</span>
+        <a id="closeWorkflowStepBtn" style="float:right; color: #88888899; cursor: pointer; font-weight: 200;"><i class="fa-regular fa-pen-to-square"></i></a>
         </h2>
         
         <!-- Description -->
@@ -108,6 +108,11 @@
         
 
         $('#closeWorkflowStepBtn').on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            $('#workflowEditStepModal').remove();
+        });
+
+        $('#confirmWorkflowStepModalStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
         });

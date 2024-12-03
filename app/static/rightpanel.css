@@ -40,6 +40,19 @@
   display: none; /* Hides the scrollbar */
 }
 
+
+.floating-bottom-toolbar {
+  position: fixed;
+  bottom: 0;
+  padding: 15px;
+  right: 0;
+  width: 40%;
+  /* height: 135px; */
+  background-color: white;
+  box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
+  z-index: 500;
+}
+
 .right-panel .bottom-toolbar {
     position: fixed;
     bottom: 0;
