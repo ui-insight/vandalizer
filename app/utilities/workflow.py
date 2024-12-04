@@ -174,8 +174,13 @@ def format_model(formatting_prompt, text):
     if response is None:
         return None, None
     # formatted text is between ```json\n and \n```
-
-    return prompt, response
+    format_spec_regex = r"```(.*?)\n(.*?)\n```"
+    match = re.search(format_spec_regex, response, re.DOTALL)
+    if match is not None:
+        formatted_text = match.group(2)
+        return prompt, formatted_text
+    else:
+        return prompt, response
 
 
 class Node:

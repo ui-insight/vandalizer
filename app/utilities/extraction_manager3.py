@@ -11,9 +11,59 @@ import re
 import csv
 from io import StringIO
 import json
+from pydantic import BaseModel, Field, ValidationError
+from app.utilities.document_readers import extract_text_from_doc
 
 
-# Extraction Manager 3 Work in Progress (WIP)
+def retry_llm_request(
+    callback: Any,
+    messages: List[Dict[str, str]],
+    model_class: Type[BaseModel],
+    max_retries: int = 5,
+    **kwargs,
+):
+    for attempt in range(max_retries):
+        try:
+            completion = callback(messages=messages, **kwargs)
+
+            # Validate the response
+            output = completion.choices[0].message.content
+            print("Output: ", output)
+            # output should be an array of objects of type model_class
+            validated_output = model_class.model_validate(json.loads(output))
+            return validated_output
+            # return output
+
+        except ValidationError as ve:
+            error_details = str(ve)
+
+            improvement_prompt = (
+                f"The previous JSON response failed validation. "
+                f"Here are the specific validation errors:\n\n"
+                f"{error_details}\n\n"
+                f"Please correct the JSON to match the required structure. "
+                f"Pay close attention to the following requirements:"
+            )
+
+            field_guidance = []
+            for error in ve.errors():
+                loc = " -> ".join(map(str, error["loc"]))
+                field_guidance.append(
+                    f"- Field {loc}: {error['msg']} (Type: {error.get('type', 'unspecified')})"
+                )
+
+            improvement_prompt += "\n" + "\n".join(field_guidance)
+
+            messages.append({"role": "system", "content": improvement_prompt})
+
+            print(
+                f"Validation attempt {attempt + 1} failed. Retrying with detailed guidance."
+            )
+            print("Improvement Prompt: ", improvement_prompt)
+
+    return (
+        f"Failed to generate valid {model_class.__name__} after {max_retries} attempts"
+    )
 
 
 class EntityExtractor:
@@ -40,17 +90,17 @@ Field names:
 {f'Context: {context}' if context else ''}
 
 For each field, determine the most appropriate data type and description from these options:
-- str (string)
-- int (integer or number)
-- float (decimal number)
-- bool (boolean)
-- List[str] (list of strings)
-- List[int] (list of integers)
-- List[float] (list of decimal numbers)
-- Optional[str] (optional string)
-- Optional[int] (optional integer)
-- Optional[float] (optional decimal)
-- Optional[bool] (optional boolean)
+- str
+- int
+- float
+- bool
+- List[str]
+- List[int]
+- List[float]
+- Optional[str]
+- Optional[int]
+- Optional[float]
+- Optional[bool]
 
 Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above.
 Consider making fields Optional if they might not always be present."""
@@ -78,16 +128,16 @@ Consider making fields Optional if they might not always be present."""
             "List[int]": (List[int], ...),
             "List[float]": (List[float], ...),
             "Dict[str, str]": (Dict[str, str], ...),
-            "Optional[str]": (Optional[str], None),
-            "Optional[int]": (Optional[int], None),
-            "Optional[float]": (Optional[float], None),
-            "Optional[bool]": (Optional[bool], None),
+            "Optional[str]": (Optional[str], ...),
+            "Optional[int]": (Optional[int], ...),
+            "Optional[float]": (Optional[float], ...),
+            "Optional[bool]": (Optional[bool], ...),
         }
 
         try:
             type_suggestions = json.loads(response.choices[0].message.content)
             return {
-                key: type_mapping.get(type_str, (Any, ...))
+                key: type_mapping.get(type_str.strip(), (Any, ...))
                 for key, type_str in type_suggestions.items()
             }
         except Exception as e:
@@ -124,10 +174,17 @@ Consider making fields Optional if they might not always be present."""
         ]
         field_str = "\n".join(field_descriptions)
 
-        return f"""Extract the following information from the text below:
+        multiple_entity_instruction = (
+            "\n\nImportant: Extract ALL relevant entities from the text only if it is present. "
+            "Return a JSON array of objects, where each object represents a distinct entity. "
+            "If no multiple entities are found, return a single-item array."
+        )
+
+        return f"""Extract the following information from the text below only if it is present:
+
 {field_str}
 
-Return the information in JSON format.
+Return the information in JSON format and be as precise as possible{multiple_entity_instruction}
 
 Text:
 {text}"""
@@ -137,6 +194,7 @@ Text:
         text: str,
         keys: List[str],
         context: str = "",
+        max_retries: int = 3,
     ) -> BaseModel:
         """
         Extract entities from text using GPT and return structured output.
@@ -157,46 +215,44 @@ Text:
 
         # Create dynamic Pydantic model
         DynamicModel = self._create_dynamic_model(inferred_types)
+        ExtractionModel = create_model(
+            "ExtractionModel", entities=(List[DynamicModel], ...)
+        )
         print("DynamicModel: ", DynamicModel)
 
         # Generate prompt
         prompt = self._generate_extraction_prompt(text, inferred_types)
-        print("Prompt: ", prompt)
 
         # Get completion from GPT
-        response = self.client.beta.chat.completions.parse(
-            model="gpt-4o",
-            messages=[
+        # Parse response
+        try:
+
+            messages = [
                 {
                     "role": "system",
                     "content": "You are a precise entity extraction assistant. Extract only the requested information and return it in valid JSON format.",
                 },
                 {"role": "user", "content": prompt},
-            ],
-            response_format=DynamicModel,
-        )
+            ]
+            kwargs = {
+                "model": "gpt-4o",
+                "response_format": ExtractionModel,
+            }
+            callback = lambda **kwargs: self.client.beta.chat.completions.parse(
+                **kwargs
+            )
+            response = retry_llm_request(
+                callback=callback,
+                messages=messages,
+                model_class=ExtractionModel,
+                max_retries=max_retries,
+                **kwargs,
+            )
+            print("Request Response: ", response)
+            return response
 
-        # Parse response
-        try:
-            extracted_data = json.loads(response.choices[0].message.content)
-            return DynamicModel(**extracted_data)
         except Exception as e:
             raise ValueError(f"Failed to parse GPT response: {str(e)}")
-
-    def extract_entities_batch(
-        self,
-        texts: List[str],
-        keys: List[str],
-        context: str = "",
-        custom_types: Dict[str, tuple] = None,
-    ) -> List[BaseModel]:
-        """Process multiple texts and return a list of structured outputs."""
-        return [
-            self.extract_entities(text, keys, context, custom_types) for text in texts
-        ]
-
-
-from app.utilities.document_readers import extract_text_from_doc
 
 
 class ExtractionManager3:
@@ -232,13 +288,9 @@ class ExtractionManager3:
         start_time = time.time()
 
         data = extractor.extract_entities(doc_text, fields_to_extract)
-        print(data.model_dump_json(indent=2))
-
-        result = (
-            data.model_dump_json()
-            if hasattr(data, "model_dump_json")
-            else json.dumps(data)
-        )
+        result = data.model_dump_json(indent=2)
+        print("data: ", data)
+        # print(data.model_dump_json(indent=2))
 
         result = json.loads(result)
 
@@ -246,4 +298,4 @@ class ExtractionManager3:
 
         print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
 
-        return result
+        return result.get("entities", [])
