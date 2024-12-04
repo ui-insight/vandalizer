@@ -408,8 +408,8 @@ function workflowEditStepTaskType(workflow_step_id, workflow_task_id, stepType) 
                 async: true,
                 success: function (data) {
 
-
-                  $('.workflow-output-section').append(`${JSON.stringify(data.output)}`);
+                  const outputText = JSON.stringify(data.output).replace(/^"|"$/g, '');
+                  $('.workflow-output-section').append(`${outputText}<br>`);
                   $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
                   clearInterval(workflowIntervalId);
                   $('.workflow-step').removeClass('active');
