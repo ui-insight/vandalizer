@@ -1,6 +1,6 @@
-<div id="tasks-panel" class="tasks-panel" style="background-color: white; display: none; position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501;">
-    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-        <p style="font-size: 24px; font-weight: 700;">Tasks
+<div id="tasks-panel" class="tasks-panel" style="background-color: white; display: none; position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501; padding: 0px 0px;">
+    <div id="search-set-panel" style="margin: 0px 0px 30px 00px; text-align: left;">
+        <p style="font-size: 24px; font-weight: 700; padding: 0px 30px;">Tasks
             <span  style="float: right; font-size: 1em; color: #5c21d2bc;">
                 <a class="tasks-close-button">
                     <i class="fa-solid fa-circle-xmark"></i>
@@ -8,92 +8,239 @@
             </span>
 
         </p>
-        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class=""><i>Tasks perform extractions and prompts on your selected documents, and output to different formats.</i></p>
-        <div class="search-set-container" style="padding: 30px 0px;">
-            <p style="font-size: 18px; font-weight: 500;">Extraction Sets</p>
-            {% for search_set in extraction_sets %}
-            <div class="expandable-container">
-                <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
-                    <div class="set-content">
-                
-                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                            <i class="fa-solid fa-chevron-right"></i>
-                        </span>                        
+        <p style="font-size: 12px; font-weight: 300; color: #00000077; padding: 0px 30px;" class=""><i>Tasks perform extractions and prompts on your selected documents, and output to different formats.</i></p>
+        <div class="search-set-container" style="padding: 15px 0px 30px 0px;">
+            <div class="add-workflow-step-container" style="border-top: 1px #ddd solid;">
+                <div class="left-column">
+                    <ul class="section-list">
+                        <li class="section-item tasks-all-section active">All</li>
+                        <li class="section-item tasks-extract-section">Extract</li>
+                        <li class="section-item tasks-prompt-section">Prompt</li>
+                        <li class="section-item tasks-format-section">Format</li>
+                    </ul>
+                </div>
+    
+                <div class="right-column">
+                    <!-- All Section -->
+                    <div class="tasks-container-all-section">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-box-archive" style="margin-right: 10px;"></i>All</h3>
+                        <p style="font-size: 18px; font-weight: 500;">Extraction Sets</p>
+                        {% for search_set in extraction_sets %}
+                        <div class="expandable-container">
+                            <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>                        
 
-                        <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                            {% if search_set.is_global %}
-                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
-                        {% endif %}
-                            {{
-                            search_set.title }}</p>
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {% if search_set.is_global %}
+                                    <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                                    {% endif %}
+                                        {{
+                                        search_set.title }}</p>
 
-                        <p class="set-items" style="text-align: right; ">
-                            {% if search_set.item_count() == 0 %}
-                                <span><i style="color: #00000077;">setup</i></span>
-                            {% else %}
-                            <span>{{ search_set.item_count() }}
-                                items</span>
-                            {% endif %}
-                        </p>
+                                    <p class="set-items" style="text-align: right; ">
+                                        {% if search_set.item_count() == 0 %}
+                                            <span><i style="color: #00000077;">setup</i></span>
+                                        {% else %}
+                                        <span>{{ search_set.item_count() }}
+                                            items</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Prompts</p>
+                        {% for prompt in prompts %}
+                        <div class="expandable-container">
+                            <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>                        
+
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {{
+                                            prompt.title }}</p>
+                                            <p class="set-items" style="text-align: right; ">
+                                            
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            
+                                            </p>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Formatters</p>
+                        {% for prompt in formatters %}
+                        <div class="expandable-container">
+                            <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>  
+
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {{
+                                            prompt.title }}</p>
+                                            <p class="set-items" style="text-align: right; ">
+                                            
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            
+                                            </p>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                     <!-- Extract Section -->
+                     <div class="tasks-container-extract-section" style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-text-height" style="margin-right: 10px;"></i>Extract</h3>
+                        {% for search_set in extraction_sets %}
+                        <div class="expandable-container">
+                            <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>                        
+
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {% if search_set.is_global %}
+                                    <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                                    {% endif %}
+                                        {{
+                                        search_set.title }}</p>
+
+                                    <p class="set-items" style="text-align: right; ">
+                                        {% if search_set.item_count() == 0 %}
+                                            <span><i style="color: #00000077;">setup</i></span>
+                                        {% else %}
+                                        <span>{{ search_set.item_count() }}
+                                            items</span>
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <!-- Prompt Section -->
+                    <div class="tasks-container-prompt-section" style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Prompts</h3>
+                        {% for prompt in prompts %}
+                        <div class="expandable-container">
+                            <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>                        
+
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {{
+                                            prompt.title }}</p>
+                                            <p class="set-items" style="text-align: right; ">
+                                            
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            
+                                            </p>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+    
+                    <!-- Format Section -->
+                    <div class="tasks-container-format-section " style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Formatters</h3>
+                        {% for prompt in formatters %}
+                        <div class="expandable-container">
+                            <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
+                                <div class="set-content">
+                            
+                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                        <i class="fa-solid fa-chevron-right"></i>
+                                    </span>  
+
+                                    <p class="set-title"
+                                        style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                                        {{
+                                            prompt.title }}</p>
+                                            <p class="set-items" style="text-align: right; ">
+                                            
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            
+                                            </p>
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-            </div>
-            {% endfor %}
-
-            <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Prompts</p>
-            {% for prompt in prompts %}
-            <div class="expandable-container">
-                <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
-                    <div class="set-content">
-                
-                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                            <i class="fa-solid fa-chevron-right"></i>
-                        </span>                        
-
-                        <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                            {{
-                                prompt.title }}</p>
-                                <p class="set-items" style="text-align: right; ">
-                                   
-                                        <span><i class="fa-regular fa-pen-to-square"></i></span>
-                                   
-                                </p>
-                        </p>
-                    </div>
                 </div>
-            </div>
-            {% endfor %}
-
-            <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Formatters</p>
-            {% for prompt in formatters %}
-            <div class="expandable-container">
-                <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
-                    <div class="set-content">
-                
-                        <span style="float: left; font-size: 1em; color: #5c21d2bc;">
-                            <i class="fa-solid fa-chevron-right"></i>
-                        </span>  
-
-                        <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                            {{
-                                prompt.title }}</p>
-                                <p class="set-items" style="text-align: right; ">
-                                   
-                                        <span><i class="fa-regular fa-pen-to-square"></i></span>
-                                   
-                                </p>
-                        </p>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
         </div>
-
-        
     </div>
+
+    <script>
+        $('.tasks-all-section').off('click').on('click', function(e) {
+            e.preventDefault();
+            $(".tasks-container-all-section").show();
+            $(".tasks-container-extract-section").hide();
+            $(".tasks-container-prompt-section").hide();
+            $(".tasks-container-format-section").hide();
+            $('.section-item').removeClass('active');
+            $(this).addClass('active');
+        });
+
+        $('.tasks-extract-section').off('click').on('click', function(e) {
+            e.preventDefault();
+            $(".tasks-container-all-section").hide();
+            $(".tasks-container-extract-section").show();
+            $(".tasks-container-prompt-section").hide();
+            $(".tasks-container-format-section").hide();
+            $('.section-item').removeClass('active');
+            $(this).addClass('active');
+        });
+
+        $('.tasks-prompt-section').off('click').on('click', function(e) {
+            e.preventDefault();
+            $(".tasks-container-all-section").hide();
+            $(".tasks-container-extract-section").hide();
+            $(".tasks-container-prompt-section").show();
+            $(".tasks-container-format-section").hide();
+            $('.section-item').removeClass('active');
+            $(this).addClass('active');
+        });
+
+        $('.tasks-format-section').off('click').on('click', function(e) {
+            e.preventDefault();
+            $(".tasks-container-all-section").hide();
+            $(".tasks-container-extract-section").hide();
+            $(".tasks-container-prompt-section").hide();
+            $(".tasks-container-format-section").show();
+            $('.section-item').removeClass('active');
+            $(this).addClass('active');
+        });
+
+
+    </script>
 
     {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
 
