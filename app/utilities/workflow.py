@@ -253,7 +253,7 @@ class ExtractionNode(Node):
     def __init__(self, data):
         super().__init__("Extraction")
 
-        self.keys = data.get("keys", [])
+        self.keys = data.get("searchphrases", [])
 
     def process(self, inputs):
         prev_step_name = inputs.get("step_name", None)
@@ -339,11 +339,13 @@ class WorkflowEngine:
     def execute(self, workflow_result):
         data = []
         nodes = self.get_topological_order()
+        print("Nodes: ", nodes)
 
         workflow_result.num_steps_completed = 0
         workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
+            print(f"Processing node {node}")
 
             if idx == 0:
                 output = node.process(dict())
@@ -380,22 +382,32 @@ def build_workflow_engine(steps, workflow):
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
         node = None
-        if step.name == "Document":
+        print("Step: ", step.name, step.data, step.tasks)
+        if step.name == "Document":  # this the trigger step
             # node_objects[node_id] = DocumentNode(step.data)
             node = DocumentNode(step.data)
             nodes.append(node)
-        elif step.name == "Extraction":
-            extract_keys = step.extraction_items()
-            node = ExtractionNode(dict(data=step.data, keys=extract_keys))
-            nodes.append(node)
-        elif step.name == "Prompt":
-            node = PromptNode(step.data)
-            nodes.append(node)
-        elif step.name == "Formatter":
-            node = FormatNode(step.data)
-            nodes.append(node)
+        else:  # this a task step
+            for task in step.tasks:
+                print("Task: ", task.name, task.data)
+                if task.name == "Extraction":
+                    node = ExtractionNode(
+                        data=task.data,
+                    )
+                    nodes.append(node)
+                elif task.name == "Prompt":
+                    node = PromptNode(
+                        data=task.data,
+                    )
+                    nodes.append(node)
+                elif task.name == "Formatter":
+                    node = FormatNode(
+                        data=task.data,
+                    )
+                    nodes.append(node)
 
-        engine.add_node(node)
+        if node is not None:
+            engine.add_node(node)
 
     # connect the steps
     for idx in range(len(nodes)):

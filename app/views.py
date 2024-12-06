@@ -34,7 +34,7 @@ from app.models import (
     WorkflowStep,
     WorkflowAttachment,
     WorkflowResult,
-    WorkflowStepTask
+    WorkflowStepTask,
 )
 from app.forms import LoginForm, SpaceForm
 import os
@@ -906,6 +906,8 @@ def run_workflow():
     for step in workflow.steps:
         steps.append(step)
 
+    print("Running workflow", steps)
+
     # TODO add the ability to cancel the thread (same for the chat)
     # maybe store the thread id in the user's session.
     engine = build_workflow_engine(steps, workflow=workflow)
@@ -1137,9 +1139,10 @@ def add_workflow_step():
         workflow_step_id=workflow_step.id,
         workflow_step=workflow_step,
     )
-    
+
     response = {"template": template}
     return jsonify(response)
+
 
 @app.route("/api/workflows/edit_step", methods=["POST"])
 def edit_workflow_step():
@@ -1157,9 +1160,10 @@ def edit_workflow_step():
         workflow_step_id=workflow_step.id,
         workflow_step=workflow_step,
     )
-    
+
     response = {"template": template}
     return jsonify(response)
+
 
 @app.route("/api/workflow/step/update_title", methods=["POST"])
 def update_workflow_step_title():
@@ -1172,16 +1176,18 @@ def update_workflow_step_title():
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
     workflow_step.name = workflow_step_data["title"]
     workflow_step.save()
-    
+
     response = {"complete": True}
     return jsonify(response)
 
+
 @app.route("/api/workflows/step/add_task", methods=["POST"])
-def add_workflow_step_task():
+def add_workflow_add_task():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
     workflow_step_data = request.get_json()
+    print("Workflow step data", workflow_step_data)
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -1192,9 +1198,28 @@ def add_workflow_step_task():
         workflow_step_id=workflow_step.id,
         workflow_step=workflow_step,
     )
-    
+
     response = {"template": template}
     return jsonify(response)
+
+
+@app.route("/api/workflows/step/add_step_task", methods=["POST"])
+def add_workflow_step_task():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_step_data = request.get_json()
+    workflow_id = workflow_step_data["workflow_id"]
+    workflow_step_id = workflow_step_data["workflow_step_id"]
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+    task_name = workflow_step_data["task_name"]
+    task_data = workflow_step_data["task_data"]
+    workflow_step_task = WorkflowStepTask(name=task_name, data=task_data)
+    workflow_step_task.save()
+    workflow_step.tasks.append(workflow_step_task)
+    workflow_step.save()
+    return jsonify({"complete": True})
 
 
 @app.route("/api/workflow/delete_step", methods=["POST"])
@@ -1202,7 +1227,7 @@ def delete_workflow_step():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
-    
+
     workflow_data = request.get_json()
     workflow_step_id = workflow_data["workflow_step_id"]
     step = WorkflowStep.objects(id=workflow_step_id).first()
@@ -1221,18 +1246,18 @@ def delete_workflow_step():
 
     return jsonify({"success": True})
 
+
 @app.route("/api/workflow/delete_step_task", methods=["POST"])
 def delete_workflow_step_task():
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
-    
+
     workflow_data = request.get_json()
     workflow_task_id = workflow_data["workflow_task_id"]
     task = WorkflowStepTask.objects(id=workflow_task_id).first()
     if not task:
         return jsonify({"success": False, "error": "Step not found"}), 404
-
 
     # Remove references to the step in any Workflow
     WorkflowStep.objects(tasks=task).update(pull__tasks=task)
@@ -1240,9 +1265,7 @@ def delete_workflow_step_task():
     # Delete all associated WorkflowStepTasks
     task.delete()
 
-
     return jsonify({"success": True})
-
 
 
 @app.route("/api/update_workflow_step", methods=["POST"])
@@ -1279,7 +1302,9 @@ def workflow_add_extraction_step():
 
         if is_editing:
             workflow_task_id = data.get("workflow_task_id")
-            workflow_task = WorkflowStepTask.objects(id=ObjectId(workflow_task_id)).first()
+            workflow_task = WorkflowStepTask.objects(
+                id=ObjectId(workflow_task_id)
+            ).first()
 
         workflow = Workflow.objects(id=workflow_id).first()
 
@@ -1310,15 +1335,18 @@ def workflow_add_extraction_step():
 
     elif request.method == "POST":
         # Handle POST request - create a new WorkflowStep
-       
+
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
         search_set_id = data["search_set_id"] if "search_set_id" in data else None
         manual_input = data["manual_input"] if "manual_input" in data else None
-        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        workflow_step_id = (
+            data["workflow_step_id"] if "workflow_step_id" in data else None
+        )
         task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+        workflow_step_task = None
 
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
@@ -1334,11 +1362,8 @@ def workflow_add_extraction_step():
                     name="Extraction", data=searchset.to_workflow_step_data()
                 )
                 workflow_step_task.save()
-                workflow_step.tasks.append(workflow_step_task)
-                workflow_step.save()
 
         elif manual_input:
-            workflow_step = None
             if task_id != None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
@@ -1349,9 +1374,11 @@ def workflow_add_extraction_step():
                     name="Extraction", data={"searchphrases": manual_input}
                 )
                 workflow_step_task.save()
-                workflow_step.tasks.append(workflow_step_task)
 
-            workflow_step.save()
+        if workflow_step.tasks is None:
+            workflow_step.tasks = []
+        workflow_step.tasks.append(workflow_step_task)
+        workflow_step.save()
 
         return jsonify({"response": "success"})
 
@@ -1404,18 +1431,19 @@ def workflow_add_prompt_step():
         data_str = list(request.args.keys())[0]  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
+        workflow_step_id = data.get("workflow_step_id")
         space_id = data.get("space_id")
 
         is_editing = data.get("is_editing") or False
         workflow_task_id = ""
         workflow_task = None
 
-        if is_editing:
-            workflow_task_id = data.get("workflow_task_id")
-            workflow_task= WorkflowStepTask.objects(id=workflow_task_id).first()
-
         workflow = Workflow.objects(id=workflow_id).first()
         current_space = Space.objects(uuid=space_id).first()
+
+        if is_editing:
+            workflow_task_id = data.get("workflow_task_id")
+            workflow_task = WorkflowStepTask.objects(id=workflow_task_id).first()
 
         prompts = SearchSetItem.objects(
             user_id=load_user().user_id,
@@ -1438,7 +1466,9 @@ def workflow_add_prompt_step():
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        workflow_step_id = (
+            data["workflow_step_id"] if "workflow_step_id" in data else None
+        )
         task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
         search_set_item_id = (
             data["search_set_item_id"] if "search_set_item_id" in data else None
@@ -1478,8 +1508,8 @@ def workflow_add_prompt_step():
                     name="Prompt", data={"prompt": manual_input}
                 )
                 workflow_step_task.save()
-                workflow_step.steps.append(workflow_step_task)
-                workflow_step.tasks()
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
 
         return jsonify({"response": "success"})
 
@@ -1526,9 +1556,11 @@ def workflow_add_format_step():
 
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
-        workflow_step_id = data["workflow_step_id"] if "workflow_step_id" in data else None
+        workflow_step_id = (
+            data["workflow_step_id"] if "workflow_step_id" in data else None
+        )
         task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
-        
+
         workflow_id = data["workflow_uuid"]
         search_set_item_id = (
             data["search_set_item_id"] if "search_set_item_id" in data else None
