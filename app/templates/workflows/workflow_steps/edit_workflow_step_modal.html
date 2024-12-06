@@ -1,8 +1,11 @@
 <div id="workflowEditStepModal" class="workflow-overlay" style="display: block;">
     <div class="workflow-modal-content">
         <h2 class="workflow-modal-header ">
-        <span class="">{{ workflow_step.name }}</span>
-        <a id="closeWorkflowStepBtn" style="float:right; color: #88888899; cursor: pointer; font-weight: 200;"><i class="fa-regular fa-pen-to-square"></i></a>
+            <span id="workflowTitle">{{ workflow_step.name }}</span>
+            <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
+            <a id="editWorkflowTitleBtn" style="float: right; color: #88888899; cursor: pointer; font-weight: 200;">
+                <i class="fa-regular fa-pen-to-square"></i>
+            </a>
         </h2>
         
         <!-- Description -->
@@ -67,7 +70,7 @@
                             </div>
                         
                             <span class="workflow-loader" style="display: none;"></span>
-                            <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name|lower }}">
+                            <div class="step-icon edit-workflow-step-task-btn" data-task-id="{{ step.id }}" data-step-id="{{ workflow_step.id }}" data-task-type="{{ step.name|lower }}">
                                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
                             </div>
                         </div>
@@ -110,11 +113,15 @@
         $('#closeWorkflowStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
+            
+           
+            
         });
 
         $('#confirmWorkflowStepModalStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
+            window.location.href = `/home?workflow_id={{ workflow.id }}&section=Workflows`;
         });
 
         $('#deletePromptToWorkflowBtn').on("click", function (e) {
@@ -172,5 +179,48 @@
             }
         });
     }
+
+    $('#editWorkflowTitleBtn').on("click", function (e) {
+            e.preventDefault();
+            $('#workflowTitle').hide();
+            $('#workflowTitleInput')
+                .val($('#workflowTitle').text())
+                .show()
+                .focus();
+        });
+
+        // Handle title input blur or Enter key
+        $('#workflowTitleInput')
+            .on("blur", updateTitle)
+            .on("keypress", function (e) {
+                if (e.which === 13) {
+                    updateTitle();
+                }
+            });
+
+        function updateTitle() {
+            const newTitle = $('#workflowTitleInput').val().trim();
+            if (newTitle) {
+                // Update title text
+                $('#workflowTitle').text(newTitle).show();
+                
+                // Send new title to the server
+                const data = JSON.stringify({ title: newTitle, workflow_step_id: "{{ workflow_step_id }}" });
+                $.ajax({
+                    url: `/api/workflow/step/update_title`,
+                    type: 'POST',
+                    data: data,
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    success: function () {
+                        console.log("Title updated successfully");
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.error(xhr.status, thrownError);
+                    }
+                });
+            }
+            $('#workflowTitleInput').hide();
+        }
     </script>
 </div>
