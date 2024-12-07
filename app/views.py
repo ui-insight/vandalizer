@@ -1568,10 +1568,12 @@ def workflow_add_format_step():
         manual_input = data["manual_input"] if "manual_input" in data else None
         workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+        print("Workflow step", workflow_step)
+
+        workflow_step_task = None
 
         if search_set_item_id:
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
-            workflow_step_task = None
             if task_id != None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
@@ -1585,7 +1587,6 @@ def workflow_add_format_step():
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
         elif manual_input:
-            workflow_step = None
             if task_id != None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
@@ -1596,8 +1597,10 @@ def workflow_add_format_step():
                     name="Formatter", data={"prompt": manual_input}
                 )
                 workflow_step_task.save()
-                workflow_step.tasks.append(workflow_step_task)
-                workflow_step.save()
+        if workflow_step.tasks is None:
+            workflow_step.tasks = []
+        workflow_step.tasks.append(workflow_step_task)
+        workflow_step.save()
 
         return jsonify({"response": "success"})
 
