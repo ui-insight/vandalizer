@@ -1,69 +1,17 @@
 import os
 from pathlib import Path
 import openai
-import chardet
 from PyPDF2 import PdfReader
+from app.utilities.llm import ChatLM
 from app.utilities.prompt_optimization import (
     dspy_model,
     simple_qa_model,
 )
-import tiktoken
 
 from app.models import ChatHistory, ChatMessage, ChatRole, MAX_CHAT_MESSAGES
 from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 
-# 128K is the max context length for the GPT-4o model
-# we use less than this to be safe
-# max_context_length = 16 * 1024  # 16k tokens
-max_context_length = 90 * 1024  # 90k tokens
-
-
-# Implementation based on the discussion:
-# https://community.openai.com/t/whats-the-new-tokenization-algorithm-for-gpt-4o/746708/3
-# gpt-4o seems to be using "o200k_base" encoding
-def num_tokens_from_text(text: str, model="gpt-4o"):
-    """Return the number of tokens in a text string."""
-    try:
-        encoding = tiktoken.encoding_for_model(model)
-    except KeyError:
-        print("Warning: model not found. Using cl100k_base encoding.")
-        encoding = tiktoken.get_encoding("cl100k_base")
-
-    # List of models that use the same tokenizer
-    if model in {
-        "gpt-3.5-turbo-0613",
-        "gpt-3.5-turbo-16k-0613",
-        "gpt-4-0314",
-        "gpt-4-32k-0314",
-        "gpt-4-0613",
-        "gpt-4-32k-0613",
-        "gpt-4-turbo",
-        "gpt-4-turbo-2024-04-09",
-        "gpt-4o",
-        "gpt-4o-2024-05-13",
-    }:
-        # These models use the same tokenizer, so we can just encode and count
-        return len(encoding.encode(text))
-    elif model == "gpt-3.5-turbo-0301":
-        # This model might have slightly different tokenization
-        print("Warning: gpt-3.5-turbo-0301 may have slightly different tokenization.")
-        return len(encoding.encode(text))
-    elif "gpt-3.5-turbo" in model:
-        print("Warning: gpt-3.5-turbo may update over time. Using current encoding.")
-        return len(encoding.encode(text))
-    elif "gpt-4" in model:
-        print("Warning: gpt-4 may update over time. Using current encoding.")
-        return len(encoding.encode(text))
-    else:
-        raise NotImplementedError(
-            f"""num_tokens_from_text() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how text is converted to tokens."""
-        )
-
-
-def detect_encoding(file_path):
-    with open(file_path, "rb") as file:
-        result = chardet.detect(file.read())
-    return result["encoding"]
+from app.utilities.llm_helpers import num_tokens_from_text, max_context_length
 
 
 # TODO we might need to rename the class
@@ -98,58 +46,43 @@ class OpenAIInterface:
                 + self.loaded_doc
             )
 
-        completion = openai.chat.completions.create(
-            # model="gpt-4o",
-            model="gpt-4o-2024-08-06",
+        chat_lm = ChatLM()
+        completion = chat_lm.completion(
             messages=[{"role": "user", "content": prompt}],
         )
-        return completion.choices[0].message.content
-
-    def markdown_format(self, response):
-        formatting_prompt = """Format the following answer as a nicely markdown. Do not add ```markdown before your response.\n\n"""
-        output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
-        # print("dspy model generated queries: ", queries)
-        completion = openai.chat.completions.create(
-            # model="gpt-4o",
-            model="gpt-4o",
-            messages=[{"role": "user", "content": output_prompt}],
-            max_tokens=None,
-        )
-        return completion.choices[0].message.content
+        return completion
 
     def format_answer(self, response, question):
         formatting_prompt = """Format the following answer as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n"""
         output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
-        # print("dspy model generated queries: ", queries)
-        completion = openai.chat.completions.create(
-            # model="gpt-4o",
-            model="gpt-4o",
+        chat_lm = ChatLM()
+        completion = chat_lm.completion(
             messages=[{"role": "user", "content": output_prompt}],
             max_tokens=None,
         )
-        print("llm formatted response: ", completion.choices[0].message.content)
-        formatted_answer = completion.choices[0].message.content
-        markdown_answer = self.markdown_format(response)
+        print("llm formatted response: ", completion)
+        formatted_answer = completion
         return dict(
             context=response.context,
             answer=response.answer,
             formatted_answer=formatted_answer,
-            markdown_answer=markdown_answer,
         )
 
     def handle_long_context(self, **kwargs):
         question = kwargs.get("question")
-        full_text = kwargs.get("full_text")
+        full_text = kwargs.get("full_text", "")
         print("Long context needed")
         print("question: ", question)
-        root_path = kwargs.get("root_path")
+        root_path = kwargs.get("root_path", "")
 
         print("using dspy model")
         print("question: ", question)
 
         persistent_directory = Path(root_path) / "static" / "uploads"
         collection_name = "chat_dspy_model"
-        rag_model = dspy_model(full_text, collection_name, persistent_directory)
+        rag_model = dspy_model(
+            full_text, collection_name, persistent_directory, model_type="insight"
+        )
         response = rag_model(question=question)
 
         print("dspy response: ", response.answer)

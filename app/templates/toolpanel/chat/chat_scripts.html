@@ -113,33 +113,33 @@
         "</div></p>",
     );
 
-      function createFeedbackButtons(question, answer, context, document_uuids) {
-        const feedbackDiv = document.createElement("div");
-        feedbackDiv.className = "feedback-buttons";
+    function createFeedbackButtons(question, answer, context, document_uuids) {
+      const feedbackDiv = document.createElement("div");
+      feedbackDiv.className = "feedback-buttons";
 
-        const copyButton = document.createElement("button");
-        copyButton.innerHTML = '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
-        copyButton.className = "copy-btn";
-        copyButton.style.marginRight = "5px"; // Add margin to create space
+      const copyButton = document.createElement("button");
+      copyButton.innerHTML =
+        '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
+      copyButton.className = "copy-btn";
+      copyButton.style.marginRight = "5px"; // Add margin to create space
 
-        const positiveButton = document.createElement("button");
-        positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
-        positiveButton.className = "feedback-button-positive";
-        positiveButton.dataset.feedbackType = "positive";
-        positiveButton.style.marginRight = "5px"; // Add margin to create space
+      const positiveButton = document.createElement("button");
+      positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
+      positiveButton.className = "feedback-button-positive";
+      positiveButton.dataset.feedbackType = "positive";
+      positiveButton.style.marginRight = "5px"; // Add margin to create space
 
-        const negativeButton = document.createElement("button");
-        negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
-        negativeButton.className = "feedback-button-negative";
-        negativeButton.dataset.feedbackType = "negative";
+      const negativeButton = document.createElement("button");
+      negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
+      negativeButton.className = "feedback-button-negative";
+      negativeButton.dataset.feedbackType = "negative";
 
-        feedbackDiv.appendChild(copyButton);
-        feedbackDiv.appendChild(positiveButton);
-        feedbackDiv.appendChild(negativeButton);
+      feedbackDiv.appendChild(copyButton);
+      feedbackDiv.appendChild(positiveButton);
+      feedbackDiv.appendChild(negativeButton);
 
-        return feedbackDiv;
+      return feedbackDiv;
     }
-
 
     // Attach a delegated event listener to the parent container
     $(document).on(
@@ -201,7 +201,6 @@
       success: function (response) {
         console.log(response);
         let answer = response.answer;
-        let markdownAnswer = response.markdown_answer;
         let question = response.question;
         let formatted_answer = response.formatted_answer;
         let context = response.context;
@@ -220,7 +219,6 @@
           createFeedbackButtons(question, answer, context, document_uuids),
         );
 
-       
         // reload page
         $("#" + responseId).html(
           `<div style='display: flex; flex-direction: column;'>
@@ -228,9 +226,6 @@
               <div style='flex-grow: 1;'>
                 <div class="chat-response-body">
                 ${responseDiv.prop("outerHTML")}
-                </div>
-                <div class="markdown-answer" style='display: none;'>
-                  ${markdownAnswer}
                 </div>
                 <div style='padding-top: 10px;'>
                   <a style='color: #000000dd;' class='copy-btn'>
@@ -262,20 +257,19 @@
 
           copyRichTextToClipboard(responseHtml);
 
-          navigator.clipboard.writeText(markdownAnswer);
-          console.log("Copied to clipboard: ", markdownAnswer);
+          navigator.clipboard.writeText(responseHtml).then(function () {
+            showToast("Copied to clipboard");
 
-          showToast("Copied to clipboard");
-
-          // Send feedback for copy action
-          sendFeedback(
-            "The user copied the answer, thus it can be considered a good answer.",
-            question,
-            answer,
-            context,
-            document_uuids,
-            this,
-          );
+            // Send feedback for copy action
+            sendFeedback(
+              "The user copied the answer, thus it can be considered a good answer.",
+              question,
+              answer,
+              context,
+              document_uuids,
+              this,
+            );
+          });
         });
       },
       error: function (xhr, ajaxOptions, thrownError) {

@@ -9,6 +9,7 @@ import json
 
 
 from app.utilities.document_readers import extract_text_from_doc
+from app.utilities.llm import ChatLM
 
 
 class ExtractionManager2:
@@ -56,7 +57,8 @@ class ExtractionManager2:
         print(f"Prompt processing time: {time.time() - start_time:.2f} seconds")
         start_time = time.time()
 
-        completion = openai.chat.completions.create(
+        chat_lm = ChatLM("insight")
+        output = chat_lm.completion(
             model=model,
             response_format={"type": "json_object"},
             messages=[
@@ -67,7 +69,7 @@ class ExtractionManager2:
                 {"role": "user", "content": prompt},
             ],
         )
-        output = completion.choices[0].message.content
+        print("Extraction: ", output)
         output = output.replace("\\n", "")
         output = output.replace("```json", "")
         output = output.replace("```", "")

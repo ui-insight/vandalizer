@@ -16,6 +16,7 @@ from typing import List, Dict, Any
 from app import app
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
@@ -130,13 +131,13 @@ def llm_chat_model(prompt, data=None, docs=[]):
         full_text = json.dumps(data)
         output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
 
-        completion = openai.chat.completions.create(
-            # model="gpt-4o",
+        chat_lm = ChatLM("openai")
+
+        output = chat_lm.completion(
             model="gpt-4o",
             messages=[{"role": "user", "content": output_prompt}],
             max_tokens=None,
         )
-        output = completion.choices[0].message.content
         print("llm chat response: ", output)
         output = format_llm_output(output).strip()
         # output = open_ai_interface.handle_short_context(
@@ -164,12 +165,10 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
 
 def format_model(formatting_prompt, text):
     prompt = f"{formatting_prompt}\n\n {text}"
-    completion = openai.chat.completions.create(
-        model="gpt-4o-mini",
+    chat_lm = ChatLM()
+    response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
-
-    response = completion.choices[0].message.content
 
     if response is None:
         return None, None
@@ -211,6 +210,8 @@ class DocumentNode(Node):
         for doc in self.docs:
             doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
             self.pdf_paths.append(doc_path)
+
+        print("PDF Paths: ", self.pdf_paths)
 
     def process(self, inputs=None):
 
@@ -314,6 +315,7 @@ class PromptNode(Node):
             chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
         else:
             data = inputs.get("output", None)
+            print("Prompt Data: ", data)
 
             chat_response = llm_chat_model(docs=[], prompt=self.prompt, data=data)
         return {"output": chat_response, "input": self.prompt, "step_name": self.name}

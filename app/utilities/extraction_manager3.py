@@ -13,57 +13,8 @@ from io import StringIO
 import json
 from pydantic import BaseModel, Field, ValidationError
 from app.utilities.document_readers import extract_text_from_doc
-
-
-def retry_llm_request(
-    callback: Any,
-    messages: List[Dict[str, str]],
-    model_class: Type[BaseModel],
-    max_retries: int = 5,
-    **kwargs,
-):
-    for attempt in range(max_retries):
-        try:
-            completion = callback(messages=messages, **kwargs)
-
-            # Validate the response
-            output = completion.choices[0].message.content
-            print("Output: ", output)
-            # output should be an array of objects of type model_class
-            validated_output = model_class.model_validate(json.loads(output))
-            return validated_output
-            # return output
-
-        except ValidationError as ve:
-            error_details = str(ve)
-
-            improvement_prompt = (
-                f"The previous JSON response failed validation. "
-                f"Here are the specific validation errors:\n\n"
-                f"{error_details}\n\n"
-                f"Please correct the JSON to match the required structure. "
-                f"Pay close attention to the following requirements:"
-            )
-
-            field_guidance = []
-            for error in ve.errors():
-                loc = " -> ".join(map(str, error["loc"]))
-                field_guidance.append(
-                    f"- Field {loc}: {error['msg']} (Type: {error.get('type', 'unspecified')})"
-                )
-
-            improvement_prompt += "\n" + "\n".join(field_guidance)
-
-            messages.append({"role": "system", "content": improvement_prompt})
-
-            print(
-                f"Validation attempt {attempt + 1} failed. Retrying with detailed guidance."
-            )
-            print("Improvement Prompt: ", improvement_prompt)
-
-    return (
-        f"Failed to generate valid {model_class.__name__} after {max_retries} attempts"
-    )
+from app.utilities.llm import ChatLM
+from app.utilities.llm_helpers import retry_llm_request
 
 
 class EntityExtractor:
@@ -105,8 +56,8 @@ For each field, determine the most appropriate data type and description from th
 Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above.
 Consider making fields Optional if they might not always be present."""
 
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
+        chat_lm = ChatLM()
+        response = chat_lm.completion(
             messages=[
                 {
                     "role": "system",
@@ -117,7 +68,7 @@ Consider making fields Optional if they might not always be present."""
             response_format={"type": "json_object"},
         )
 
-        print("response: ", response.choices[0].message.content)
+        print("response: ", response)
 
         type_mapping = {
             "str": (str, ...),
@@ -135,7 +86,7 @@ Consider making fields Optional if they might not always be present."""
         }
 
         try:
-            type_suggestions = json.loads(response.choices[0].message.content)
+            type_suggestions = json.loads(response)
             return {
                 key: type_mapping.get(type_str.strip(), (Any, ...))
                 for key, type_str in type_suggestions.items()
@@ -234,19 +185,11 @@ Text:
                 },
                 {"role": "user", "content": prompt},
             ]
-            kwargs = {
-                "model": "gpt-4o",
-                "response_format": ExtractionModel,
-            }
-            callback = lambda **kwargs: self.client.beta.chat.completions.parse(
-                **kwargs
-            )
             response = retry_llm_request(
-                callback=callback,
+                client=self.client,
                 messages=messages,
                 model_class=ExtractionModel,
                 max_retries=max_retries,
-                **kwargs,
             )
             print("Request Response: ", response)
             return response
@@ -270,32 +213,29 @@ class ExtractionManager3:
         start_time = time.time()
         openai.api_key = "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"
         doc_text = ""
+        extractions = []
+        start_time = time.time()
         if full_text is None:
             for pdf_path in pdf_paths:
                 doc_text = extract_text_from_doc(doc_path=pdf_path)
+                if doc_text:
+                    data = extractor.extract_entities(doc_text, fields_to_extract)
+                    extractions = data
+                    print("Data item: ", data)
+                    print("Extracting: ", extractions)
 
-            print(f"PDF processing time: {time.time() - start_time:.2f} seconds")
         else:
             doc_text = full_text
+            data = extractor.extract_entities(doc_text, fields_to_extract)
+            extractions = data
 
-        print(
-            "Extracting entities from document(s): ", doc_text, pdf_paths, extract_keys
-        )
         # model = "gpt-3.5-turbo-0125"
         # if len(prompt) > 50000:
         #    model = "gpt-4-turbo"
 
-        start_time = time.time()
-
-        data = extractor.extract_entities(doc_text, fields_to_extract)
-        result = data.model_dump_json(indent=2)
-        print("data: ", data)
+        print("Extraction: ", extractions)
         # print(data.model_dump_json(indent=2))
-
-        result = json.loads(result)
-
-        print("Extraction Result: ", result)
 
         print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
 
-        return result.get("entities", [])
+        return extractions

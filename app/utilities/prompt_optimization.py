@@ -13,6 +13,8 @@ from dspy.datasets import DataLoader
 
 import sys
 
+from app.utilities.llm import InsightLM
+
 
 # For prod, change to pysqlite3
 
@@ -67,8 +69,6 @@ dotenv.load_dotenv()
 os.environ["OPENAI_API_KEY"] = (
     "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
 )
-
-# llm = OpenAI(openai_api_key=os.environ["OPENAI_API_KEY"])
 
 embedding_model = "text-embedding-3-large"
 embedding = OpenAIEmbeddings(model=embedding_model)
@@ -158,9 +158,13 @@ class SimpleQA(dspy.Module):
         return dspy.Prediction(context=full_text, answer=pred.answer, question=question)
 
 
-def simple_qa_model():
-    model = "openai/gpt-4o"
-    llm = dspy.LM(model=model)
+def simple_qa_model(model_type="gpt-4o"):
+    llm = None
+    if model_type == "insight":
+        llm = InsightLM(model="gpt-4o", max_tokens=max_tokens)
+    else:
+        model = "openai/gpt-4o"
+        llm = dspy.LM(model=model)
     dspy.configure(lm=llm, trace=[], temperature=0.7)
     model = SimpleQA()
     return model
@@ -209,6 +213,7 @@ def dspy_model(
     full_text: str,
     collection_name: str,
     persistent_directory: Path,
+    model_type: str,
 ):
     # model_name = "gpt-4"
     # model_name = "gpt-4-turbo"
@@ -241,10 +246,14 @@ def dspy_model(
         k=3,
     )
 
-    # model 32k tokens
-    llm = dspy.LM(model=model_name, max_tokens=max_tokens)
-    # llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
-    # llm = dspy.OpenAI(model=model_name, max_tokens=4096)
+    llm = None
+    if model_type == "insight":
+        llm = InsightLM(max_tokens=max_tokens)
+    else:
+        # model 32k tokens
+        llm = dspy.LM(model=model_name, max_tokens=max_tokens)
+        # llm = dspy.OpenAI(model=model_name, max_tokens=max_tokens)
+        # llm = dspy.OpenAI(model=model_name, max_tokens=4096)
     dspy.configure(lm=llm, rm=rm, trace=[], temperature=0.7)
 
     model = MultiHopQAModel(passages_per_hop=3, max_hops=5)
