@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM
 from app.utilities.llm_helpers import retry_llm_request
+from app.utilities.config import model_type
 
 
 class EntityExtractor:
@@ -56,11 +57,11 @@ For each field, determine the most appropriate data type and description from th
 Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above.
 Consider making fields Optional if they might not always be present."""
 
-        chat_lm = ChatLM()
+        chat_lm = ChatLM(model_type)
         response = chat_lm.completion(
             messages=[
                 {
-                    "role": "system",
+                    "role": "assistant",
                     "content": "You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
                 },
                 {"role": "user", "content": prompt},
@@ -186,6 +187,7 @@ Text:
                 {"role": "user", "content": prompt},
             ]
             response = retry_llm_request(
+                model_type="openai",
                 client=self.client,
                 messages=messages,
                 model_class=ExtractionModel,

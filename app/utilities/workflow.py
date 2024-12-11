@@ -20,6 +20,7 @@ from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
+from app.utilities.config import model_type
 
 from threading import Thread
 
@@ -131,7 +132,7 @@ def llm_chat_model(prompt, data=None, docs=[]):
         full_text = json.dumps(data)
         output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
 
-        chat_lm = ChatLM("openai")
+        chat_lm = ChatLM(model_type)
 
         output = chat_lm.completion(
             model="gpt-4o",
@@ -165,7 +166,7 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
 
 def format_model(formatting_prompt, text):
     prompt = f"{formatting_prompt}\n\n {text}"
-    chat_lm = ChatLM()
+    chat_lm = ChatLM(model_type)
     response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )

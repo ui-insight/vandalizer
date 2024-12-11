@@ -47,7 +47,8 @@ from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-from app.utilities.llm_helpers import num_tokens_from_text, max_context_length
+from app.utilities.llm_helpers import num_tokens_from_text
+from app.utilities.config import max_context_length
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 import uuid
 import threading
