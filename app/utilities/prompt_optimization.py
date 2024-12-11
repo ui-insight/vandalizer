@@ -161,7 +161,7 @@ class SimpleQA(dspy.Module):
 def simple_qa_model(model_type="gpt-4o"):
     llm = None
     if model_type == "insight":
-        llm = InsightLM(model="gpt-4o", max_tokens=max_tokens)
+        llm = InsightLM(max_tokens=max_tokens)
     else:
         model = "openai/gpt-4o"
         llm = dspy.LM(model=model)

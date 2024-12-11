@@ -4,17 +4,12 @@ import json
 import tiktoken
 from typing import Any, Callable, List, Dict, Type
 from pydantic import BaseModel, ValidationError
+from app.utilities.config import model_type
 
 import chardet
 
 import tiktoken
-from app.utilities.llm import ChatLM, InsightLM
-
-
-# 128K is the max context length for the GPT-4o model
-# we use less than this to be safe
-# max_context_length = 16 * 1024  # 16k tokens
-max_context_length = 90 * 1024  # 90k tokens
+from app.utilities.llm import ChatLM
 
 
 # Implementation based on the discussion:
@@ -113,11 +108,10 @@ def process_large_prompt(
         try:
             # Call OpenAI API with system prompt and current chunk
 
-            chat_lm = ChatLM("insight")
+            chat_lm = ChatLM(model_type)
             print("model schema: ", response_format.model_json_schema())
             response = chat_lm.completion(
                 structured_output=True,
-                endpoint="api/chat",
                 format=response_format.model_json_schema(),
                 messages=[
                     {"role": "system", "content": system_prompt},
@@ -157,7 +151,7 @@ def retry_llm_request(
             chat_lm = ChatLM(model_type)
             system_prompt = messages[0]["content"]
             user_prompt = messages[1]["content"]
-            response_format = model_class.model_json_schema()
+            response_format = model_class
             print("model schema: ", response_format)
             kwargs = dict()
             if model_type == "openai":
@@ -167,7 +161,6 @@ def retry_llm_request(
             else:
                 kwargs = dict(
                     structured_output=True,
-                    endpoint="api/chat",
                     format=response_format,
                 )
 

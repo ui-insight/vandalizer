@@ -8,6 +8,7 @@ from datetime import datetime
 import uuid
 import openai
 from openai import OpenAI
+import random
 
 
 class ChatLM:
@@ -16,12 +17,18 @@ class ChatLM:
 
     def completion(self, structured_output=False, stream=False, **kwargs):
         if self.model_type == "openai":
+            model = kwargs.pop("model", "gpt-4o")
+            messages = kwargs.pop("messages", [])
             if structured_output:
                 api_key = kwargs.pop("api_key", None)
                 client = OpenAI(api_key=api_key)
-                return client.beta.chat.completions.parse(**kwargs)
+                return client.beta.chat.completions.parse(
+                    model=model, messages=messages, **kwargs
+                )
             else:
-                completion = openai.chat.completions.create(**kwargs)
+                completion = openai.chat.completions.create(
+                    model=model, messages=messages, **kwargs
+                )
                 output = completion.choices[0].message.content
                 return output
         lm = InsightLM()
@@ -36,39 +43,48 @@ class InsightLM(LM):
         api_key=None,
         cache=None,
         stream=False,
+        endpoint="v1/chat/completions",
         **kwargs,
     ):
         super().__init__(model=model, cache=cache, **kwargs)
         self.api_key = api_key
+        self.stream = stream
+        self.endpoint = endpoint
         self.kwargs = kwargs
         self.cache = cache
         self.history = []
         self.global_history = []
 
-    def request(self, messages=None, endpoint="v1/chat/completions", **kwargs):
-
-        url = f"https://mindrouter-api.nkn.uidaho.edu/{endpoint}"
-        data = {
-            "model": self.model,
-            "messages": messages,
-            "stream": kwargs.get("stream", False),
-            **kwargs,
-        }
-
-        headers = {
+        self.host = f"https://mindrouter-api.nkn.uidaho.edu/{self.endpoint}"
+        self.headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
 
-        response = requests.post(url, json=data, headers=headers)
+    def request(self, messages=None, **kwargs):
 
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print("SERVER ERROR")
-            print(response.status_code)
-            print(response.text)
+        data = {
+            "model": self.model,
+            "messages": messages,
+            "stream": self.stream,
+            **kwargs,
+        }
+
+        response = requests.post(self.host, json=data, headers=self.headers)
+
+        if response.status_code != 200:
+            print("Error: ", response.text)
             return None
+        response = response.json()
+        if response.get("error") == "No instances available for model":
+            data["model"] = random.choice(
+                ["mistral-large:123b", "qwen2.5:72b", "llama3.2:3b"]
+            )
+            response = requests.post(self.host, json=data, headers=self.headers)
+            response = response.json()
+        print("chat response: ", response)
+
+        return response
 
     def __call__(self, prompt=None, messages=None, **kwargs):
         # Build the request.
@@ -87,6 +103,7 @@ class InsightLM(LM):
         else:
             outputs = [c["message"]["content"] for c in response["choices"]][0]
 
+        print("outputs: ", outputs)
         # Logging, with removed api key & where `cost` is None on cache hit.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("api_")}
         entry = dict(prompt=prompt, messages=messages, kwargs=kwargs, response=response)
@@ -104,6 +121,5 @@ class InsightLM(LM):
             model_type=self.model_type,
         )
         self.history.append(entry)
-        self.update_global_history(entry)
 
         return outputs

@@ -11,7 +11,8 @@ from app.utilities.prompt_optimization import (
 from app.models import ChatHistory, ChatMessage, ChatRole, MAX_CHAT_MESSAGES
 from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 
-from app.utilities.llm_helpers import num_tokens_from_text, max_context_length
+from app.utilities.llm_helpers import num_tokens_from_text
+from app.utilities.config import max_context_length, model_type
 
 
 # TODO we might need to rename the class
@@ -46,7 +47,7 @@ class OpenAIInterface:
                 + self.loaded_doc
             )
 
-        chat_lm = ChatLM()
+        chat_lm = ChatLM(model_type)
         completion = chat_lm.completion(
             messages=[{"role": "user", "content": prompt}],
         )
@@ -55,7 +56,7 @@ class OpenAIInterface:
     def format_answer(self, response, question):
         formatting_prompt = """Format the following answer as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n"""
         output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
-        chat_lm = ChatLM()
+        chat_lm = ChatLM(model_type)
         completion = chat_lm.completion(
             messages=[{"role": "user", "content": output_prompt}],
             max_tokens=None,
