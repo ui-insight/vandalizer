@@ -212,6 +212,7 @@
       //performSearch(uuid, datatitle);
       search_set_add_uuid = uuid;
       updateSearchSetPanel(uuid);
+      performExtraction(uuid);
     });
 
     $(".prompt-item").on("click", function () {
@@ -254,6 +255,8 @@
     });
 
     function performExtraction(search_set_uuid) {
+      console.log("PERFORM EXTRACTION");
+
       if (document_uuids == null || document_uuids == "") {
         showToast("Please select a document");
         return;
@@ -291,6 +294,7 @@
 
     function performSearch(search_set_uuid, datatitle) {
       showScanning();
+      
 
       search_set_add_uuid = search_set_uuid;
       $("#adding-search-set-title").text(datatitle);
