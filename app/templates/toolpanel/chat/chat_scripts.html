@@ -116,6 +116,7 @@
     function createFeedbackButtons(question, answer, context, document_uuids) {
       const feedbackDiv = document.createElement("div");
       feedbackDiv.className = "feedback-buttons";
+      feedbackDiv.style.marginTop = "20px";
 
       const copyButton = document.createElement("button");
       copyButton.innerHTML =
@@ -226,11 +227,6 @@
               <div style='flex-grow: 1;'>
                 <div class="chat-response-body">
                 ${responseDiv.prop("outerHTML")}
-                </div>
-                <div style='padding-top: 10px;'>
-                  <a style='color: #000000dd;' class='copy-btn'>
-                    <i class='fa-regular fa-copy' style='cursor: pointer'></i>
-                  </a>
                 </div>
               </div>
             </div>
