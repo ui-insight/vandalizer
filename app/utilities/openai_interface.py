@@ -14,6 +14,9 @@ from app.utilities.document_readers import extract_text_from_pdf, extract_text_f
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
 
+# TODO remove the formatting of the answer from the OpenAIInterface class
+# it is taking so much time to execute the call
+
 
 # TODO we might need to rename the class
 class OpenAIInterface:
