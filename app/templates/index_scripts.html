@@ -24,6 +24,17 @@
         window.location.href = url.toString();
     }
 
+    function setSection(sectionName) {
+          // Use the tabTitle variable as needed
+          let href = window.location.href;
+      const qs = new URLSearchParams(href.split("?")[1]);
+      qs.delete("section");
+      qs.append("section", sectionName);
+      const newQs = qs.toString();
+      const newhref = `/home?${newQs}`;
+      window.history.pushState({}, "", newhref);
+  }
+
     function updateDocumentSelections() {
         var checkedCheckboxes = $('.document-selector:checked');
         console.log("Updating document selections", checkedCheckboxes);
@@ -347,11 +358,13 @@
         $('.tasks-btn').on('click', function(e) {
             e.preventDefault();
             $("#tasks-panel").show();
+            setSection("Tasks");
         });
 
         $('.tasks-close-button').off('click').on('click', function(e) {
             e.preventDefault();
             console.log("here");
+            setSection("Chat");
             $("#tasks-panel").hide();
         });
 

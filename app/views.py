@@ -530,7 +530,7 @@ def add_search_set():
     if user.is_admin:
         searchset.is_global = True
     searchset.save()
-    return jsonify({"complete": True})
+    return jsonify({"complete": True, "uuid": searchset.uuid})
 
 
 @app.route("/api/add_search_term", methods=["POST"])

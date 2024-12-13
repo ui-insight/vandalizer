@@ -81,7 +81,7 @@
         <div class="document" id="document"></div>
         <div class="semantic-panel" id="semantic-panel">
             <button class="shadow-button" id="prev-semantic-button" style="margin: 10px;">
-                <span style="font-size: 1em; color: #5c21d2bc;">
+                <span style="font-size: 1em; color: #191919;">
                     <i class="fa-solid fa-arrow-left"></i>
                 </span>
             </button>
@@ -91,7 +91,7 @@
                     results</span>
             </span>
             <button class="shadow-button" id="next-semantic-button" style="margin: 10px;">
-                <span style="font-size: 1em; color: #5c21d2bc;">
+                <span style="font-size: 1em; color: #191919;">
                     <i class="fa-solid fa-arrow-right"></i>
                 </span>
             </button>
@@ -160,7 +160,7 @@
                                         {{ folder.title }}</span>
                                 </a>
                                 <button class="ellipsis-btn" style="float:right;" data-folder-id="{{ folder.uuid }}">
-                                    <span style="font-size: 1em; color: #5c21d2bc;">
+                                    <span style="font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>
                                     </span>
                                 </button>
@@ -221,7 +221,7 @@
         <div id="right-panel-content">
             <div class="tab-container">
                 <ul class="tab-menu">
-                    <li class="{% if section == 'Chat' %}active{% endif %}"><i class="fas fa-comments"
+                    <li class="{% if section == 'Chat' or section == 'Tasks' %}active{% endif %}"><i class="fas fa-comments"
                         style="padding-right: 5px;"></i>Chat</li>
                     <li class="{% if section == 'Workflows' %}active{% endif %}"><i class="fas fa-file-alt"
                             style="padding-right: 5px;"></i>Workflows</li>

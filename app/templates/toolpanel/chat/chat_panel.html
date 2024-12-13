@@ -1,4 +1,4 @@
-<div class="tab-content" id="chat-panel" style="{% if section != 'Chat' %}display: none;{% endif %}">
+<div class="tab-content" id="chat-panel" style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
     <p style="font-size: 12px; font-weight: 300; color: #00000077;"  class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></i></p>
     <div class="chat-card-container" style="margin-top: 30px;">
         <div class="chat-card-suggestion" id="chat-suggestion-3">
