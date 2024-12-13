@@ -1,7 +1,7 @@
-<div id="tasks-panel" class="tasks-panel" style="background-color: white; display: none; position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501; padding: 0px 0px;">
+<div id="tasks-panel" class="tasks-panel" style="background-color: white; {% if section != 'Tasks' %}display: none;{% endif %} position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501; padding: 0px 0px;">
     <div id="search-set-panel" style="margin: 0px 0px 30px 00px; text-align: left;">
         <p style="font-size: 24px; font-weight: 700; padding: 0px 30px;">Tasks
-            <span  style="float: right; font-size: 1em; color: #5c21d2bc;">
+            <span  style="float: right; font-size: 1em; color: #191919;">
                 <a class="tasks-close-button">
                     <i class="fa-solid fa-circle-xmark"></i>
                 </a>
@@ -30,7 +30,7 @@
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>                        
 
@@ -61,7 +61,7 @@
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>                        
 
@@ -70,9 +70,10 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
+                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="prompt">
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
-                                            
+                                            </p>
                                             </p>
                                     </p>
                                 </div>
@@ -86,7 +87,7 @@
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>  
 
@@ -95,8 +96,8 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
-                                            
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="formatter">
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
                                             </p>
                                     </p>
@@ -113,7 +114,7 @@
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>                        
 
@@ -146,7 +147,7 @@
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>                        
 
@@ -155,9 +156,10 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
+                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="prompt">
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
-                                            
+                                            </p>
                                             </p>
                                     </p>
                                 </div>
@@ -174,7 +176,7 @@
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
-                                    <span style="float: left; font-size: 1em; color: #5c21d2bc;">
+                                    <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-chevron-right"></i>
                                     </span>  
 
@@ -183,8 +185,10 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
+                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="formatter">
+                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span>
+                                            </p>
                                             
                                             </p>
                                     </p>
@@ -238,6 +242,16 @@
             $('.section-item').removeClass('active');
             $(this).addClass('active');
         });
+
+        $(".edit-prompt-button").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("here");
+        $("#newTaskModal").show();
+        $("#add-task-container").hide();
+          $("#name-add-task-prompt-container").show();
+          $("#newTaskBtn").show();
+      });
 
 
     </script>

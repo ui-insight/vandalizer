@@ -24,6 +24,8 @@
   function hideWorking() {
     $("#navbar-img")[0].classList.remove("spin");
   }
+  
+
 
   // TAB MENU
   const tabMenu = document.querySelector(".tab-menu");
@@ -37,14 +39,7 @@
       $(".tab-content").hide();
       $(".bottom-toolbar").hide();
       var tabTitle = $(this).text();
-      // Use the tabTitle variable as needed
-      let href = window.location.href;
-      const qs = new URLSearchParams(href.split("?")[1]);
-      qs.delete("section");
-      qs.append("section", tabTitle);
-      const newQs = qs.toString();
-      const newhref = `/home?${newQs}`;
-      window.history.pushState({}, "", newhref);
+      setSection(tabTitle);
       $("#tasks-panel").hide();
 
       if (tabTitle == "Extract") {
@@ -60,6 +55,7 @@
         $("#workflows-panel").show();
         $("#bottom-toolbar-add-workflows").show();
       } else if (tabTitle == "Tasks") {
+        $("#chat-panel").show();
         $("#tasks-panel").show();
         $("#bottom-toolbar-tasks").show();
       }
@@ -100,7 +96,10 @@
       $("#newTaskModal").show();
       $(".add-task-container").show();
       $(".name-add-task-container").hide();
+      $("#name-add-task-prompt-container").hide();
       $("#newTaskBtn").hide();
+      $('#newTaskPromptName')[0].value = "";
+      $('#newTaskPrompt')[0].value = "";
       newTaskType = "";
 
       $("#add-extraction-task-btn")
@@ -377,25 +376,7 @@
         updateSearchSetPanel(uuid, true);
       });
 
-      $(".delete-set-item-button").on("click", function () {
-        let uuid = $(this).attr("data-uuid");
-        deleteSearchSetItem(uuid);
-      });
-
-      $("#renameset").on("click", function () {
-        $("#renameModal").show();
-        let uuid = $(this).attr("data-uuid");
-        let datatitle = $(this).attr("data-title");
-        $("#newName")[0].value = datatitle;
-        $("#newName")[0].focus();
-
-        $("#renameBtn")
-          .off("click")
-          .on("click", function () {
-            let newName = $("#newName")[0].value;
-            renameSearchSet(uuid, newName);
-          });
-      });
+      
 
       $(".collapsible-pdf").click(function () {
         $(this).toggleClass("active");
@@ -651,8 +632,8 @@
         dataType: "json",
         async: true,
         success: function (msg) {
-          // reload page
-          location.reload();
+          search_set_add_uuid = msg.uuid;
+          updateSearchSetPanel(msg.uuid);
         },
         error: function (xhr, ajaxOptions, thrownError) {
           console.log(xhr.status);
