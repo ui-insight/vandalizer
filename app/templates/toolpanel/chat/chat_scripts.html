@@ -71,11 +71,11 @@
     console.log("chat button clicked");
     if (document_uuids != "") {
       additional_context =
-        "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. You can use the extract tab to run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can run prompt groups, these are more complicated questions that you would normally ask in chat. You can make sets of these that you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document.";
+        "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. The chat tab allows you to chat with your documents. You can use the tasks to create and run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can create prompt or formatting tasks, these are more complicated questions that you might frequently ask to chat. Save tasks you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document. The workflow tab allows for you to build out more complicated multi-step workflows. You can add extractions, prompts and other nodes to a series of interconnected steps and run them with the click of a button on one to many documents. Output the results, format them and download them if you like. When you are showing someone how to use this, show them examples in their document of what they might extract, prompt or how a workflow might be applied.";
 
       performChat(
         document_uuids,
-        "Teach me how to use vandalizer on this",
+        "Teach me how to use vandalizer on this.",
         folder_uuid,
         additional_context,
       );
