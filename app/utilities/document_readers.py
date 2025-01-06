@@ -2,6 +2,7 @@
 
 from PyPDF2 import PdfReader
 from pathlib import Path
+from flask import current_app
 
 
 def extract_text_from_pdf(pdf_path):
@@ -27,15 +28,17 @@ def extract_text_from_html(html_path):
 
 def extract_text_from_doc(doc_path, doc=None):
     if "static/uploads/" not in doc_path:
-        doc_path = Path("static/uploads") / doc_path
+        doc_path = Path(current_app.root_path) / "static/uploads" / doc_path
+
+    doc_path_str = str(doc_path)
 
     if doc is None:
-        if doc_path.endswith(".pdf"):
-            return extract_text_from_pdf(doc_path)
-        elif doc_path.endswith(".html"):
-            return extract_text_from_html(doc_path)
+        if doc_path_str.endswith(".pdf"):
+            return extract_text_from_pdf(doc_path_str)
+        elif doc_path_str.endswith(".html"):
+            return extract_text_from_html(doc_path_str)
     else:
         if doc.extension == "pdf" or doc.extension == "docx":
-            return extract_text_from_pdf(doc_path)
+            return extract_text_from_pdf(doc_path_str)
         elif doc.extension == "html":
-            return extract_text_from_html(doc_path)
+            return extract_text_from_html(doc_path_str)
