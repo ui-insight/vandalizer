@@ -723,8 +723,7 @@ def begin_search():
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = app.root_path
-        results = em.extract(keys, document_paths)
-        print(results)
+        results = em.extract(keys, document_paths)[0]
         template = render_template(
             "toolpanel/extractions/search_results.html",
             search_set=search_set,
