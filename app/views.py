@@ -527,8 +527,8 @@ def add_search_set():
         status="active",
         set_type=search_type,
     )
-    if user.is_admin:
-        searchset.is_global = True
+    # if user.is_admin:
+    #     searchset.is_global = True
     searchset.save()
     return jsonify({"complete": True, "uuid": searchset.uuid})
 
@@ -596,7 +596,7 @@ def add_prompt():
     response = {"complete": True}
     return jsonify(response)
 
-
+## MARK: Tasks - Extraction
 @app.route("/api/fetch_search_set_item", methods=["POST"])
 def fetch_search_set_item():
     data = request.get_json()
@@ -628,30 +628,16 @@ def grab_template():
         return jsonify({"error": "Search set not found."})
 
     if search_set.set_type == "extraction":
-        if edit_mode:
-            template = render_template(
-                "toolpanel/extractions/edit_search_results.html",
-                search_set=search_set,
-                documents=documents,
-                bindable_fields=search_set.get_fillable_fields(),
-            )
+        template = render_template(
+            "toolpanel/extractions/extraction_panel.html",
+            search_set=search_set,
+            documents=documents,
+        )
+        response = {
+            "template": template,
+        }
 
-            response = {
-                "template": template,
-            }
-
-            return jsonify(response)
-        else:
-            template = render_template(
-                "toolpanel/extractions/search_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-
-            return jsonify(response)
+        return jsonify(response)
     else:
         if edit_mode:
             template = render_template(
@@ -674,6 +660,19 @@ def grab_template():
             }
             return jsonify(response)
 
+@app.route("/api/extraction/update_title", methods=["POST"])
+def update_extraction_title():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    extraction_data = request.get_json()
+    extraction_uuid = extraction_data["extraction_uuid"]
+    extraction_step = SearchSet.objects(uuid=extraction_uuid).first()
+    extraction_step.title = extraction_data["title"]
+    extraction_step.save()
+
+    response = {"complete": True}
+    return jsonify(response)
 
 @app.route("/api/semantic_search", methods=["POST"])
 def semantic_search():
@@ -725,7 +724,7 @@ def begin_search():
         em.root_path = app.root_path
         results = em.extract(keys, document_paths)[0]
         template = render_template(
-            "toolpanel/extractions/search_results.html",
+            "toolpanel/extractions/extraction_panel.html",
             search_set=search_set,
             results=results,
             documents=documents,
@@ -736,7 +735,7 @@ def begin_search():
         return jsonify(response)
     else:
         template = render_template(
-            "toolpanel/extractions/search_results.html",
+            "toolpanel/extractions/extraction_panel.html",
             search_set=search_set,
             documents=documents,
         )
@@ -752,7 +751,7 @@ def delete_search_set():
     print(search_set_uuid)
     search_set = SearchSet.objects(id=search_set_uuid).first()
     search_set.delete()
-    return redirect("/")
+    return redirect("/home?section=Tasks")
 
 
 @app.route("/api/rename_search_set", methods=["POST"])

@@ -248,7 +248,7 @@
             async: true,
             success: function(msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
-                $(`.set-entry[data-item-uuid=${uuid}]`).parent().remove();
+                $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().remove();
             },
             error: function(xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);

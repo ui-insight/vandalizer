@@ -229,7 +229,6 @@
                     
                 </ul>
                 {% include "toolpanel/chat/chat_panel.html" %}
-                {% include "toolpanel/extractions/extraction_panel.html" %}
                 {% include "toolpanel/prompts/prompt_panel.html" %}
                
                 {% include "workflows/workflows_panel.html" %}
@@ -304,7 +303,7 @@
 {%endblock%} {% block scripts %}
 {{super()}}
 {% include "index_scripts.html" %}
-{% include "toolpanel/extractions/panel_scripts.html" %}
+{% include "toolpanel/extractions/extraction_scripts.html" %}
 {% include "workflows/workflow_scripts.html" %}
 {% include "workflows/workflow_step_scripts.html" %}
 {% include "toolpanel/prompts/prompt_set_scripts.html" %}

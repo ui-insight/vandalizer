@@ -17,6 +17,8 @@ class WorkflowStepTask(me.Document):
     def extraction_items(self):
         if "search_set_uuid" in self.data:
             search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
+            if search_set is None:
+                return []
             items = search_set.extraction_items()
             search_phrases = [item.searchphrase for item in items] if items else []
             return search_phrases

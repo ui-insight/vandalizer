@@ -366,9 +366,21 @@
         performSearch(uuid, datatitle);
       });
 
+      $("#renameset").on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        let data_title = $(this).attr("data-title");
+        renameSearchSet(uuid, data_title);
+      });
+
       $("#clone").on("click", function () {
         let uuid = $(this).attr("data-uuid");
         cloneSearchSet(uuid);
+      });
+
+      $(".delete-set-item-button").on("click", function (e) {
+        e.preventDefault();
+        let uuid = $(this).attr("data-uuid");
+        deleteSearchSetItem(uuid);
       });
 
       $("#editset").on("click", function () {

@@ -45,10 +45,7 @@
             <!-- Tab content for manual input -->
             <div class="workflow-tab-content" id="manualInput" style="{% if not is_editing or (is_editing and 'search_set_item_id' in workflow_task.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
                 <label for="promptInput" class="label">Enter prompt:</label>
-                <input type="text" id="promptInput" 
-                    placeholder="e.g., Summarize this for me into a todo list" 
-                    class="input-field"
-                    value="{{ workflow_task.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_task.data else '' }}">
+                <textarea id="promptInput" class="input-field" placeholder="e.g., Summarize this for me into a todo list" rows="10" value="{{ workflow_task.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_task.data else '' }}"></textarea>
             </div>
         </div>
         

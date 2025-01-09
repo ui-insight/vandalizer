@@ -11,8 +11,41 @@
   overflow: scroll;
 }
 
+.search-results-panel hr {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  border-top: 0.5px solid #88888842;
+}
+
 .search-results-content {
-  padding: 15px 30px 60px 30px;
+  background-color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow: scroll;
+  padding-bottom: 200px;
+}
+
+.extraction-tools-panel {
+  padding: 10px 30px 5px 30px;
+}
+
+.extraction-tools-panel-content {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px; /* Adds 15px spacing between rows and columns */
+}
+
+.search-results-header {
+  margin-top: 0;
+  text-align: left;
+  font-size: 20px;
+  font-weight: 600;
+  padding: 20px 30px 5px 30px;
+}
+
+.search-results-content-body {
+  padding: 10px 30px 5px 30px;
+
 }
 
 .search-results-panel::-webkit-scrollbar {

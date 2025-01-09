@@ -1,46 +1,188 @@
-<div class="tab-content" id="extraction-panel" style="{% if section != 'Extract' %}display: none;{% endif %}">
-    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
-        <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
-        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></p>
-        <div class="input-container">
-            <div class="ask-question">
-                <input type="text" id="add-search-set-input" placeholder="Find or create a extraction set...">
+<div class="search-results-content">
+    <h2 class="search-results-header ">
+        <span id="extractionTitle">{{ search_set.title }}<i class="fa-regular fa-pen-to-square" id="editExtractionTitleBtn" style="margin-left: 15px; font-size: 16px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
+        <input id="extractionTitleInput" type="text" style="display: none; font-size: 24px;" />
+        <span style="float: right; font-size: 1em; color: #191919;">
+            <a  id="set-close-button">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </span>
+    </h2>
 
-                <button class="add-button-2 shadow-button" id="add-search-set-button">
-                    <span style="font-size: 2em; color: #191919;">
-                        <i class="fa-solid fa-plus"></i>
-                    </span>
-                </button>
+    <!-- Description -->
+    <hr>
+    <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter workflow-modal-subtitle"><i>{{ documents|length
+            }} documents selected</i></p>
+    <hr style="padding-bottom: 0px; margin-bottom: 0px;">
+    <div class="search-results-content-body">
+        <!-- <p><b>Searches</b></p> -->
+        {% for item in search_set.search_items() %}
+        <div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}"
+            data-search-type="{{ search_set.searchtype }}">
+            <div class="set-content">
+                <span style="float: left; font-size: 1em; color: #191919;">
+                    <i class="fa-brands fa-searchengin"></i>
+                </span>
+                <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+                    item.searchphrase }}</p>
             </div>
         </div>
-        <div class="search-set-container" style="padding: 30px 0px;">
-            {% for search_set in extraction_sets %}
-            <div class="expandable-container">
-                <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+        {% endfor %}
+        <br>
+        <p><i class="fa-solid fa-filter" style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Extractions</b>
+     
+            {% if results != null %}
+            <span style="float: right;"><a id="export" href="#">Export</a></span>
+            {% endif %}
+        </p>
+
+        <div class="set-items set-result-items">
+            {% if search_set.extraction_items()|length == 0 %}
+            <i style="color: rgba(0, 0, 0, 0.425);">Add your first item to begin</i>
+            {% endif %}
+            {% for item in search_set.extraction_items() %}
+            <div class="set-entry-group">
+                <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}"
+                    data-search-type="{{ search_set.searchtype }}">
                     <div class="set-content">
-                
                         <span style="float: left; font-size: 1em; color: #191919;">
-                            <i class="fa-solid fa-chevron-right"></i>
-                        </span>                        
-
+                            {{ loop.index }}.
+                        </span>
                         <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                            {% if search_set.is_global %}
-                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
-                        {% endif %}
-                            {{
-                            search_set.title }}</p>
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+                            item.searchphrase }}</p>
 
-                        <p class="set-items" style="text-align: right; ">
-                            <span>{{ search_set.item_count() }}
-                                items</span>
-                        </p>
+                       
+                        <a class="delete-set-item-button" data-uuid="{{ item.id }}"
+                    style="float: right; font-size: 1em; color: #adadad99;">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </a>
                     </div>
                 </div>
+
+                {% if results == null and documents != None and documents|length > 0 %}
+                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
+                data-title="{{ search_set.title }}">
+                <div class="set-content ">
+                    <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">processing</p>
+                </div>
+                </div>
+                {% endif %}
+                {% if results != null %}
+                {% if results[item.searchphrase|trim] != null %}
+                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
+                    data-title="{{ search_set.title }}">
+                    <div class="set-content ">
+
+                        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{
+                            results[item.searchphrase|trim] }}</p>
+                        <!-- <span style="float:right;"><i class="fa-regular fa-flag"></i></i></span> -->
+                    </div>
+                </div>
+                {% endif %}
+                {% endif %}
             </div>
+
             {% endfor %}
         </div>
-
-        
     </div>
+    <br><br><hr>
+    <div class="extraction-tools-panel">
+        <p><i class="fa-solid fa-box-archive" style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
+        <div class="extraction-tools-panel-content">
+        <a class="content-btn" id="add-formatter-task-btn">
+            <div class="add-task">
+                <div class="add-task-icon-container">
+                    <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
+            </div>
+            <div class="add-task-content">
+                <div class="add-task-title">Clone</div>
+                <div class="add-task-description">Make a duplicate copy of the extraction set</div>
+            </div>
+            </div>
+        </a>
+        <a class="content-btn" id="add-formatter-task-btn">
+            <div class="add-task">
+                <div class="add-task-icon-container">
+                    <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #54bbb6;"></i>
+            </div>
+            <div class="add-task-content">
+                <div class="add-task-title">Fillable PDF</div>
+                <div class="add-task-description">Build an extraction set from a fillable pdf</div>
+            </div>
+            </div>
+        </a>
+        <a class="content-btn" id="add-formatter-task-btn">
+            <div class="add-task">
+                <div class="add-task-icon-container">
+                    <i class="fa-regular fa-file" style="font-size: 24px; color: #252c32;"></i>
+            </div>
+            <div class="add-task-content">
+                <div class="add-task-title">From Document</div>
+                <div class="add-task-description">Build an extraction set out of your selected document with AI</div>
+            </div>
+            </div>
+        </a>
+        <a class="content-btn" id="add-formatter-task-btn">
+            <div class="add-task">
+                <div class="add-task-icon-container">
+                    <i class="fa-solid fa-delete-left" style="font-size: 24px; color: #bb7354;"></i>
+            </div>
+            <div class="add-task-content">
+                <div class="add-task-title">Delete</div>
+                <div class="add-task-description">Delete this extraction set</div>
+            </div>
+            </div>
+        </a>
+        </div>
+    </div>
+
+        {% include "toolpanel/extractions/extraction_search_panel.html" %}
+    
+
+        <script>
+            $('#editExtractionTitleBtn').on("click", function (e) {
+            e.preventDefault();
+            $('#extractionTitle').hide();
+            $('#extractionTitleInput')
+                .val($('#extractionTitle').text())
+                .show()
+                .focus();
+        });
+
+        // Handle title input blur or Enter key
+        $('#extractionTitleInput')
+            .on("blur", updateTitle)
+            .on("keypress", function (e) {
+                if (e.which === 13) {
+                    updateTitle();
+                }
+            });
+
+        function updateTitle() {
+            const newTitle = $('#extractionTitleInput').val().trim();
+            if (newTitle) {
+                // Update title text
+                $('#extractionTitle').text(newTitle).show();
+                
+                // Send new title to the server
+                const data = JSON.stringify({ title: newTitle, extraction_uuid: "{{ search_set.uuid }}" });
+                $.ajax({
+                    url: `/api/extraction/update_title`,
+                    type: 'POST',
+                    data: data,
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    success: function () {
+                        console.log("Title updated successfully");
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.error(xhr.status, thrownError);
+                    }
+                });
+            }
+            $('#extractionTitleInput').hide();
+        }
+        </script>
+
 </div>

@@ -1,0 +1,46 @@
+<div class="tab-content" id="extraction-panel" style="{% if section != 'Extract' %}display: none;{% endif %}">
+    <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
+        <p style="font-size: 24px; font-weight: 600;">Extraction Groups</p>
+        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></p>
+        <div class="input-container">
+            <div class="ask-question">
+                <input type="text" id="add-search-set-input" placeholder="Find or create a extraction set...">
+
+                <button class="add-button-2 shadow-button" id="add-search-set-button">
+                    <span style="font-size: 2em; color: #191919;">
+                        <i class="fa-solid fa-plus"></i>
+                    </span>
+                </button>
+            </div>
+        </div>
+        <div class="search-set-container" style="padding: 30px 0px;">
+            {% for search_set in extraction_sets %}
+            <div class="expandable-container">
+                <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
+                    <div class="set-content">
+                
+                        <span style="float: left; font-size: 1em; color: #191919;">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </span>                        
+
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
+                            {% if search_set.is_global %}
+                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                        {% endif %}
+                            {{
+                            search_set.title }}</p>
+
+                        <p class="set-items" style="text-align: right; ">
+                            <span>{{ search_set.item_count() }}
+                                items</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        
+    </div>
+</div>
