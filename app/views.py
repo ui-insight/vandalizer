@@ -745,13 +745,14 @@ def begin_search():
         return jsonify(response)
 
 
-@app.route("/delete_search_set", methods=["GET"])
+@app.route("/api/delete_search_set", methods=["POST"])
 def delete_search_set():
-    search_set_uuid = request.args.get("uuid")
+    data = request.get_json()
+    search_set_uuid = data["uuid"]
     print(search_set_uuid)
-    search_set = SearchSet.objects(id=search_set_uuid).first()
+    search_set = SearchSet.objects(uuid=search_set_uuid).first()
     search_set.delete()
-    return redirect("/home?section=Tasks")
+    return jsonify({"success": True})
 
 
 @app.route("/api/rename_search_set", methods=["POST"])

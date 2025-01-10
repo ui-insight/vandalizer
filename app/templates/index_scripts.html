@@ -236,6 +236,26 @@
         });
     }
 
+    function deleteSearchSet(uuid) {
+        $.ajax({
+            url: '/api/delete_search_set',
+            type: 'POST',
+            data: JSON.stringify({
+                uuid: uuid
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function(msg) {
+                location.href = "/home?section=Tasks"
+            },
+            error: function(xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
     function deleteSearchSetItem(uuid) {
         $.ajax({
             url: '/api/delete_search_set_item',

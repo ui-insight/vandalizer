@@ -24,7 +24,7 @@
                     <!-- All Section -->
                     <div class="tasks-container-all-section">
                         <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-box-archive" style="margin-right: 10px;"></i>All</h3>
-                        <p style="font-size: 18px; font-weight: 500;">Extraction Sets</p>
+                        <p style="font-size: 18px; font-weight: 700;">Extraction Sets</p>
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
@@ -55,7 +55,7 @@
                         </div>
                         {% endfor %}
 
-                        <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Prompts</p>
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Prompts</p>
                         {% for prompt in prompts %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
@@ -70,7 +70,7 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="prompt">
+                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="prompt">
                                                     <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
                                             </p>
@@ -81,7 +81,7 @@
                         </div>
                         {% endfor %}
 
-                        <p style="margin-top: 30px; font-size: 18px; font-weight: 500;">Formatters</p>
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Formatters</p>
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
@@ -96,7 +96,7 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
-                                            <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="formatter">
+                                            <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="formatter">
                                                     <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
                                             </p>
@@ -156,7 +156,7 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="prompt">
+                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="prompt">
                                                     <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
                                             </p>
@@ -185,7 +185,7 @@
                                         {{
                                             prompt.title }}</p>
                                             <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" data-uuid="{{ prompt.id }}" data-type="formatter">
+                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="formatter">
                                                     <span><i class="fa-regular fa-pen-to-square"></i></span></a>
                                             
                                             </p>

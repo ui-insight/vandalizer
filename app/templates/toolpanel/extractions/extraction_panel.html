@@ -90,7 +90,7 @@
     <div class="extraction-tools-panel">
         <p><i class="fa-solid fa-box-archive" style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
         <div class="extraction-tools-panel-content">
-        <a class="content-btn" id="add-formatter-task-btn">
+        <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
             <div class="add-task">
                 <div class="add-task-icon-container">
                     <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
@@ -123,7 +123,7 @@
             </div>
             </div>
         </a>
-        <a class="content-btn" id="add-formatter-task-btn">
+        <a class="content-btn" id="delete-extraction-set" data-uuid="{{ search_set.uuid }}">
             <div class="add-task">
                 <div class="add-task-icon-container">
                     <i class="fa-solid fa-delete-left" style="font-size: 24px; color: #bb7354;"></i>
