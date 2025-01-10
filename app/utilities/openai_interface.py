@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 import openai
 from PyPDF2 import PdfReader
@@ -56,21 +57,10 @@ class OpenAIInterface:
         )
         return completion
 
-    def format_answer(self, response, question):
-        formatting_prompt = """Format the following answer as a nicely formatted html with supportive information to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not add ```html before your response. Do not add 'Question', 'Answer', 'Document', 'Next Sheet', 'Previous Sheet', or 'Context' any heading or title in your response, but respond only with the formatted html code for the answer.\n\n"""
-        output_prompt = formatting_prompt + "\n\nAnwser: " + response.answer
-        chat_lm = ChatLM(model_type)
-        completion = chat_lm.completion(
-            messages=[{"role": "user", "content": output_prompt}],
-            max_tokens=None,
-        )
-        print("llm formatted response: ", completion)
-        formatted_answer = completion
-        return dict(
-            context=response.context,
-            answer=response.answer,
-            formatted_answer=formatted_answer,
-        )
+    def format_anwser(self, answer):
+        regex = r"^```(html|json|markdown)?\s*|\s*```$"
+        formatted_answer = re.sub(regex, "", answer)
+        return formatted_answer
 
     def handle_long_context(self, **kwargs):
         question = kwargs.get("question")
@@ -92,14 +82,15 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         # return self.format_answer(response, question)
         return dict(
-            answer=response.answer,
-            formatted_answer=response.answer,
+            answer=self.format_anwser(response.answer),
+            formatted_answer=self.format_anwser(response.answer),
             context=response.context,
             question=question,
         )
 
     def handle_short_context(self, **kwargs):
         prompt = kwargs.get("prompt")
+        question = kwargs.get("question")
         full_text = kwargs.get("full_text")
         print("Short context needed")
 
@@ -111,8 +102,8 @@ class OpenAIInterface:
         # return self.format_answer(response, prompt)
         #
         return dict(
-            answer=response.answer,
-            formatted_answer=response.answer,
+            answer=self.format_anwser(response.answer),
+            formatted_answer=self.format_anwser(response.answer),
             context=response.context,
             question=question,
         )
