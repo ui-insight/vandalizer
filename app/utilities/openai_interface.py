@@ -46,7 +46,7 @@ class OpenAIInterface:
             prompt = (
                 """Given the following document, answer the following question. Return the result as nicely formatted html.:\nQuestion:\n"""
                 + item.searchphrase
-                + "\Document:\n"
+                + "\n\nDocument:\n"
                 + self.loaded_doc
             )
 
@@ -90,7 +90,13 @@ class OpenAIInterface:
         response = rag_model(question=question)
 
         print("dspy response: ", response.answer)
-        return self.format_answer(response, question)
+        # return self.format_answer(response, question)
+        return dict(
+            answer=response.answer,
+            formatted_answer=response.answer,
+            context=response.context,
+            question=question,
+        )
 
     def handle_short_context(self, **kwargs):
         prompt = kwargs.get("prompt")
@@ -102,7 +108,14 @@ class OpenAIInterface:
 
         print("simple qa response: ", response.answer)
 
-        return self.format_answer(response, prompt)
+        # return self.format_answer(response, prompt)
+        #
+        return dict(
+            answer=response.answer,
+            formatted_answer=response.answer,
+            context=response.context,
+            question=question,
+        )
 
     def ask_question_to_documents(
         self, root_path, documents, question, default_docs=[], user_id=None
