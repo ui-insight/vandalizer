@@ -9,6 +9,8 @@ from app.utilities.prompt_optimization import (
     simple_qa_model,
 )
 
+import time
+
 from app.models import ChatHistory, ChatMessage, ChatRole, MAX_CHAT_MESSAGES
 from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 

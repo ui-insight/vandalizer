@@ -596,6 +596,46 @@ def add_prompt():
     response = {"complete": True}
     return jsonify(response)
 
+@app.route("/api/tasks/edit_prompt", methods=["POST"])
+def edit_prompt():
+    data = request.get_json()
+    uuid = data["uuid"]
+    user = load_user()
+    prompt = SearchSetItem.objects(
+        id=uuid
+    ).first()
+
+    template = render_template(
+            "toolpanel/prompts/edit_prompt.html",
+            prompt=prompt,
+        )
+    response = {
+        "template": template,
+    }
+
+    return jsonify(response)
+
+@app.route("/api/tasks/update_prompt", methods=["POST"])
+def update_prompt():
+    data = request.get_json()
+    uuid = data["uuid"]
+    title = data["title"]
+    prompt = data["prompt"]
+    user = load_user()
+    prompt_item = SearchSetItem.objects(
+        id=uuid
+    ).first()
+
+    prompt_item.title = title
+    prompt_item.searchphrase = prompt
+    prompt_item.save()
+
+    response = {
+        "success": True,
+    }
+
+    return jsonify(response)
+
 ## MARK: Tasks - Extraction
 @app.route("/api/fetch_search_set_item", methods=["POST"])
 def fetch_search_set_item():

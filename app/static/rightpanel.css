@@ -488,8 +488,25 @@ button.shadow-button:hover {
 .btn-secondary {
     background-color: #ffffff;
     color: #191919;
-    border: 1px solid #d3d3d386;
+    border: 2px solid #d3d3d386;
 }
+
+.btn-secondary {
+  border-radius: 0px;
+  text-decoration: none;
+  text-align: center;
+  -webkit-transition: all 0.3s ease 0s;
+  -moz-transition: all 0.3s ease 0s;
+  -o-transition: all 0.3s ease 0s;
+  transition: all 0.3s ease 0s;
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.65em;
+  outline-offset: 3px;
+}
+
 
 .btn-secondary:hover {
   background-color: black;

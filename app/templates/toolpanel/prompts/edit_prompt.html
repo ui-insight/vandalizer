@@ -1,0 +1,90 @@
+<div class="search-results-content">
+    <h2 class="search-results-header ">
+        <span id="extractionTitle">Edit Prompt</span>
+        <span style="float: right; font-size: 1em; color: #191919;">
+            <a  id="edit-prompt-close-button">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </span>
+    </h2>
+
+    <!-- Description -->
+    <hr>
+    <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter workflow-modal-subtitle">
+        <div style="margin: 0px 30px; padding: 15px 0px;">
+            <input style="width: 100%; padding: 15px; height: 50px;" type="text" id="newTaskPromptName" placeholder="Title your prompt" value="{{ prompt.title }}">
+        </div>
+    </p>
+    <div class="search-results-content-body">
+        <div style="padding-bottom: 15px; width: 100%;">
+            <textarea id="newTaskPrompt" placeholder="Write your prompt here" rows="10"> {{ prompt.searchphrase }}</textarea>
+          </div>
+        
+        <a class="btn btn-primary" id="update-prompt-button" data-uuid="{{ prompt.id }}" style="float: right;">UPDATE TASK</a>
+        <a class="btn btn-secondary" id="delete-prompt-button" data-uuid="{{ prompt.id }}" style="float: right; margin-right: 15px;">DELETE</a>
+    </div>
+    
+    <script>
+        $('#edit-prompt-close-button').off('click').on('click', function(e) {
+            e.preventDefault();
+            $("#search-results-panel").hide();
+            $("#search-results-panel").empty();
+        });
+
+        $('#update-prompt-button').off('click').on('click', function(e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                uuid: uuid,
+                title: $('#newTaskPromptName')[0].value,
+                prompt: $('#newTaskPrompt')[0].value
+            });
+
+            $.ajax({
+                url: '/api/tasks/update_prompt',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    location.href = "/home?section=Tasks"
+
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $('#delete-prompt-button').off('click').on('click', function(e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                uuid: uuid,
+            });
+
+            $.ajax({
+                url: '/api/delete_search_set_item',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    location.href = "/home?section=Tasks"
+
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+    </script>
+
+</div>
