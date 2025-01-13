@@ -22,16 +22,15 @@
     
                 <div class="right-column">
                     <!-- All Section -->
-                    <div class="tasks-container-all-section">
-                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-box-archive" style="margin-right: 10px;"></i>All</h3>
-                        <p style="font-size: 18px; font-weight: 700;">Extraction Sets</p>
+                    <div class="tasks-container-all-section" style="padding-top: 20px;">
+                        <p style="font-size: 18px; font-weight: 700;">Extract</p>
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-solid fa-filter"></i>
                                     </span>                        
 
                                     <p class="set-title"
@@ -55,14 +54,14 @@
                         </div>
                         {% endfor %}
 
-                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Prompts</p>
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Prompt</p>
                         {% for prompt in prompts %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-regular fa-message"></i>
                                     </span>                        
 
                                     <p class="set-title"
@@ -81,14 +80,14 @@
                         </div>
                         {% endfor %}
 
-                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Formatters</p>
+                        <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Format</p>
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-solid fa-i-cursor"></i>
                                     </span>  
 
                                     <p class="set-title"
@@ -107,15 +106,15 @@
                         {% endfor %}
                     </div>
                      <!-- Extract Section -->
-                     <div class="tasks-container-extract-section" style="display: none;">
-                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-text-height" style="margin-right: 10px;"></i>Extract</h3>
+                     <div class="tasks-container-extract-section" style="display: none; padding-top: 20px;">
+                        <p style="font-size: 18px; font-weight: 700;">Extract</p>
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-solid fa-filter"></i>
                                     </span>                        
 
                                     <p class="set-title"
@@ -140,15 +139,15 @@
                         {% endfor %}
                     </div>
                     <!-- Prompt Section -->
-                    <div class="tasks-container-prompt-section" style="display: none;">
-                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Prompts</h3>
+                    <div class="tasks-container-prompt-section" style="display: none; padding-top: 20px;">
+                        <p style="font-size: 18px; font-weight: 700;">Prompt</p>
                         {% for prompt in prompts %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-regular fa-message"></i>
                                     </span>                        
 
                                     <p class="set-title"
@@ -169,15 +168,15 @@
                     </div>
     
                     <!-- Format Section -->
-                    <div class="tasks-container-format-section " style="display: none;">
-                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Formatters</h3>
+                    <div class="tasks-container-format-section" style="display: none; padding-top: 20px;">
+                        <p style="font-size: 18px; font-weight: 700;">Format</p>
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
                             
                                     <span style="float: left; font-size: 1em; color: #191919;">
-                                        <i class="fa-solid fa-chevron-right"></i>
+                                        <i class="fa-solid fa-i-cursor"></i>
                                     </span>  
 
                                     <p class="set-title"
