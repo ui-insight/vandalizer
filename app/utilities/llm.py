@@ -54,6 +54,9 @@ class InsightLM(LM):
         self.cache = cache
         self.history = []
         self.global_history = []
+        # add temperature key in kwargs if not present
+        if "temperature" not in self.kwargs:
+            self.kwargs["temperature"] = 0.7
 
         self.host = f"https://mindrouter-api.nkn.uidaho.edu/{self.endpoint}"
         self.headers = {

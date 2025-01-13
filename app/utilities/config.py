@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 # the model type to use, either openai or insight server (ollama)
+# model_type = "insight"
 model_type = "openai"
 
 # 128K is the max context length for the GPT-4o model
