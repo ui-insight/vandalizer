@@ -5,9 +5,10 @@ import openai
 from PyPDF2 import PdfReader
 from app.utilities.llm import ChatLM
 from app.utilities.prompt_optimization import (
-    dspy_model,
-    simple_qa_model,
+    multi_qa,
+    simple_qa,
 )
+from langfuse.decorators import observe
 
 import time
 
@@ -29,6 +30,7 @@ class OpenAIInterface:
         full_path = os.path.join(root_path, "static", "uploads", document_path)
         self.loaded_doc = extract_text_from_pdf(full_path)
 
+    @observe()
     def ask_question_to_loaded_document(self, item):
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = ""
@@ -76,10 +78,12 @@ class OpenAIInterface:
 
         persistent_directory = Path(root_path) / "static" / "uploads"
         collection_name = "chat_dspy_model"
-        rag_model = dspy_model(
-            full_text, collection_name, persistent_directory, model_type="insight"
+        response = multi_qa(
+            full_text,
+            collection_name,
+            persistent_directory,
+            model_type=model_type,
         )
-        response = rag_model(question=question)
 
         print("dspy response: ", response.answer)
         # return self.format_answer(response, question)
@@ -96,8 +100,9 @@ class OpenAIInterface:
         full_text = kwargs.get("full_text")
         print("Short context needed")
 
-        simple_qa = simple_qa_model()
-        response = simple_qa(question=prompt, full_text=full_text)
+        response = simple_qa(
+            question=prompt, full_text=full_text, model_type=model_type
+        )
 
         print("simple qa response: ", response.answer)
 
