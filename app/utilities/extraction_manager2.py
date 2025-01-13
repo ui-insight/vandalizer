@@ -84,3 +84,48 @@ class ExtractionManager2:
         else:
             print("Threw out: " + output)
             return
+        
+    def build_from_documents(self, pdf_paths):
+        openai.api_key = "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"
+        doc_text = ""
+        start_time = time.time()
+        for pdf_path in pdf_paths:
+            doc_text += "\n\n" + extract_text_from_doc(doc_path=pdf_path)
+
+        prompt = """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
+        
+          Passage: 
+
+        """ + doc_text
+        
+        model = "gpt-4o"
+
+        chat_lm = ChatLM(model_type)
+        output = chat_lm.completion(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. ",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        print("Extraction: ", output)
+        output = output.replace("\\n", "")
+        output = output.replace("```json", "")
+        output = output.replace("```", "")
+        print(output)
+
+        print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
+
+        if "{" in output and "}" in output:
+            output_data = json.loads(output.strip())
+            return output_data
+        else:
+            print("Threw out: " + output)
+            return
+        
+
+

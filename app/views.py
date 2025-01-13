@@ -41,7 +41,7 @@ import os
 import base64
 from flask import request
 
-# from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.openai_interface import (
@@ -783,6 +783,56 @@ def begin_search():
             "template": template,
         }
         return jsonify(response)
+
+@app.route("/api/extract/build_from_document", methods=["POST"])
+def build_extraction_from_document():
+    data = request.get_json()
+    print(data)
+    searchset_uuid = data["search_set_uuid"]
+    document_uuids = data["document_uuids"]
+
+    documents = []
+    document_paths = []
+    for doc_uuid in document_uuids:
+        document = SmartDocument.objects(uuid=doc_uuid).first()
+        documents.append(document)
+        document_paths.append(document.path)
+
+    search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    
+    em = ExtractionManager2()
+    em.root_path = app.root_path
+    keys = em.build_from_documents(document_paths)
+    print(keys)
+
+    if "entities" in keys:
+        bindings = keys["entities"]
+        for item in bindings:
+            item = SearchSetItem(
+                searchphrase=item,
+                searchset=search_set.uuid,
+                searchtype="extraction",
+            )
+            item.save()
+    else:
+        response = {
+            "complete": False,
+        }
+        return jsonify(response)
+
+
+
+    template = render_template(
+        "toolpanel/extractions/extraction_panel.html",
+        search_set=search_set,
+    )
+    response = {
+        "template": template,
+    }
+
+    return jsonify(response)
+    return jsonify(response)
+    
 
 
 @app.route("/api/delete_search_set", methods=["POST"])

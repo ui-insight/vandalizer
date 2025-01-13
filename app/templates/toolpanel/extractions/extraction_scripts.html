@@ -262,7 +262,6 @@
       }
 
       showScanning();
-
       showWorking();
       let data = JSON.stringify({
         search_set_uuid: search_set_uuid,
@@ -380,6 +379,16 @@
       $("#delete-extraction-set").on("click", function () {
         let uuid = $(this).attr("data-uuid");
         deleteSearchSet(uuid);
+      });
+
+      $("#build-extraction-from-document-btn").on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        buildExtractionFromDocument(uuid);
+      });
+
+      $("#build-extraction-from-fillable-pdf-btn").on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        
       });
 
      
@@ -620,6 +629,43 @@
           }
 
           location.reload();
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+          console.log(xhr.status);
+          console.log(thrownError);
+        },
+      });
+    }
+
+    function buildExtractionFromDocument(uuid) {
+      showScanning();
+      showWorking();
+      $.ajax({
+        url: "/api/extract/build_from_document",
+        type: "POST",
+        data: JSON.stringify({
+          search_set_uuid: uuid,
+          document_uuids: document_uuids,
+        }),
+        contentType: "application/json; charset=utf-8",
+        dataType: "json",
+        async: true,
+        success: function (msg) {
+          if (msg.complete == false) {
+            showToast(msg.error);
+            return;
+          }
+
+          
+          stopScanning();
+          hideWorking();
+
+          $("#search-results-panel").show();
+          $("#search-results-panel").empty();
+          $(msg.template).hide().appendTo("#search-results-panel").fadeIn();
+          addResultListeners();
+         
+         
         },
         error: function (xhr, ajaxOptions, thrownError) {
           console.log(xhr.status);

@@ -90,18 +90,20 @@
     <div class="extraction-tools-panel">
         <p><i class="fa-solid fa-box-archive" style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
         <div class="extraction-tools-panel-content">
-        <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
+        
+        <a class="content-btn" id="build-extraction-from-document-btn" data-uuid="{{ search_set.uuid }}">
             <div class="add-task">
                 <div class="add-task-icon-container">
-                    <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
+                    <i class="fa-regular fa-file" style="font-size: 24px; color: #252c32;"></i>
             </div>
             <div class="add-task-content">
-                <div class="add-task-title">Clone</div>
-                <div class="add-task-description">Make a duplicate copy of the extraction set</div>
+                <div class="add-task-title">From Document</div>
+                <div class="add-task-description">Build an extraction set out of your selected document with AI</div>
             </div>
             </div>
         </a>
-        <a class="content-btn" id="add-formatter-task-btn">
+
+        <a class="content-btn" id="build-extraction-from-fillable-pdf-btn">
             <div class="add-task">
                 <div class="add-task-icon-container">
                     <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #54bbb6;"></i>
@@ -112,14 +114,14 @@
             </div>
             </div>
         </a>
-        <a class="content-btn" id="add-formatter-task-btn">
+        <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
             <div class="add-task">
                 <div class="add-task-icon-container">
-                    <i class="fa-regular fa-file" style="font-size: 24px; color: #252c32;"></i>
+                    <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
             </div>
             <div class="add-task-content">
-                <div class="add-task-title">From Document</div>
-                <div class="add-task-description">Build an extraction set out of your selected document with AI</div>
+                <div class="add-task-title">Clone</div>
+                <div class="add-task-description">Make a duplicate copy of the extraction set</div>
             </div>
             </div>
         </a>
