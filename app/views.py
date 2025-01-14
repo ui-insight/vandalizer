@@ -763,6 +763,41 @@ def begin_search():
         em = ExtractionManager3()
         em.root_path = app.root_path
         results = em.extract(keys, document_paths)[0]
+
+        if search_set.fillable_pdf_url != "":
+            bindings = {}
+            for key in results:
+                print(key)
+                search_set_item = SearchSetItem.objects(searchphrase=key).first()
+                bindings[search_set_item.pdf_binding] = results[key]
+
+            print(bindings)
+            # Define the file path for the CSV file
+            pdf_path = os.path.join(
+                app.root_path, "static", "uploads", search_set.fillable_pdf_url
+            )
+
+            print(pdf_path)
+            reader = PdfReader(pdf_path)
+            fields = reader.get_fields()
+            writer = PdfWriter()
+            writer.append(reader)
+
+            # for page in reader.pages:
+            writer.update_page_form_field_values(
+                writer.pages[0], bindings, auto_regenerate=False
+            )
+
+            output_pdf_path = os.path.join(app.root_path, "static", "fillable_form.pdf")
+            with open(output_pdf_path, "wb") as f:
+                writer.write(f)
+
+            # Return the path to the CSV file
+            return send_file(
+                "static/fillable_form.pdf", mimetype="text/pdf", as_attachment=True
+            )
+
+
         template = render_template(
             "toolpanel/extractions/extraction_panel.html",
             search_set=search_set,
