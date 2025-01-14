@@ -2,8 +2,9 @@
 <div class="workflow-container">
     <div>
     <p style="font-size: 24px; font-weight: 600;">
-
-        {{ workflow.name }}
+        <span id="workflowTitle">{{ workflow.name }}<i class="fa-regular fa-pen-to-square" id="editWorkflowTitleBtn" style="margin-left: 7.5px; padding-bottom: 5px; font-size: 14px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
+        <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
+        
     
         <span id="workflow-close-button" style="float: right; font-size: 1em; color: #191919;">
             <a>
@@ -58,8 +59,6 @@
     <div class="step-connection-line"></div>
     {% endfor %}
 
-
-
     <div class="add-step">
         <button id="add-workflow-step-btn">+ ADD STEP</button>
     </div>
@@ -82,6 +81,52 @@
         </div>
 
     </div>
+
+    <script>
+        $('#editWorkflowTitleBtn').on("click", function (e) {
+            e.preventDefault();
+            $('#workflowTitle').hide();
+            $('#workflowTitleInput')
+                .val($('#workflowTitle').text())
+                .show()
+                .focus();
+        });
+
+        // Handle title input blur or Enter key
+        $('#workflowTitleInput')
+            .on("blur", updateWorkflowTitle)
+            .on("keypress", function (e) {
+                if (e.which === 13) {
+                    updateWorkflowTitle();
+                }
+            });
+
+        function updateWorkflowTitle() {
+            const newTitle = $('#workflowTitleInput').val().trim();
+            if (newTitle) {
+                // Update title text
+                $('#workflowTitle').text(newTitle).show();
+                
+                // Send new title to the server
+                const data = JSON.stringify({ title: newTitle, uuid: "{{ workflow.id }}" });
+                $.ajax({
+                    url: `/api/workflow/update_title`,
+                    type: 'POST',
+                    data: data,
+                    contentType: 'application/json; charset=utf-8',
+                    dataType: 'json',
+                    success: function () {
+                        location.reload();
+                    },
+                    error: function (xhr, ajaxOptions, thrownError) {
+                        console.error(xhr.status, thrownError);
+                    }
+                });
+            }
+            $('#workflowTitleInput').hide();
+        }
+
+    </script>
 
     {% include "workflows/workflows_bottom_panel.html" %}
 </div>

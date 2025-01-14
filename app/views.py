@@ -1241,6 +1241,20 @@ def fetch_workflow():
 
     return jsonify(response)
 
+@app.route("/api/workflow/update_title", methods=["POST"])
+def update_workflow_title():
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    workflow_data = request.get_json()
+    workflow_id = workflow_data["uuid"]
+    workflow = Workflow.objects(id=ObjectId(workflow_id)).first()
+    workflow.name = workflow_data["title"]
+    workflow.save()
+
+    response = {"complete": True}
+    return jsonify(response)
+
 
 ## MARK: Workflow steps
 @app.route("/api/workflows/add_workflow_step", methods=["POST"])
