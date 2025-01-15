@@ -1,5 +1,6 @@
 import urllib.parse
 from datetime import datetime
+from app.utilities.document_manager import DocumentManager
 from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
@@ -453,6 +454,15 @@ def read_pdf():
 def ingest_semantics(document):
     semantics = SemanticIngest()
     semantics.ingest(document=document)
+    document_manager = DocumentManager()
+    document_manager.add_document(
+        user_id=document.user_id,
+        doc_path=document.path,
+        document_name=document.title,
+        document_id=document.uuid,
+    )
+    user_docs = document_manager.list_user_documents(document.user_id)
+    print("User docs: ", user_docs)
 
 
 ## MARK: Chat
@@ -596,24 +606,24 @@ def add_prompt():
     response = {"complete": True}
     return jsonify(response)
 
+
 @app.route("/api/tasks/edit_prompt", methods=["POST"])
 def edit_prompt():
     data = request.get_json()
     uuid = data["uuid"]
     user = load_user()
-    prompt = SearchSetItem.objects(
-        id=uuid
-    ).first()
+    prompt = SearchSetItem.objects(id=uuid).first()
 
     template = render_template(
-            "toolpanel/prompts/edit_prompt.html",
-            prompt=prompt,
-        )
+        "toolpanel/prompts/edit_prompt.html",
+        prompt=prompt,
+    )
     response = {
         "template": template,
     }
 
     return jsonify(response)
+
 
 @app.route("/api/tasks/update_prompt", methods=["POST"])
 def update_prompt():
@@ -622,9 +632,7 @@ def update_prompt():
     title = data["title"]
     prompt = data["prompt"]
     user = load_user()
-    prompt_item = SearchSetItem.objects(
-        id=uuid
-    ).first()
+    prompt_item = SearchSetItem.objects(id=uuid).first()
 
     prompt_item.title = title
     prompt_item.searchphrase = prompt
@@ -635,6 +643,7 @@ def update_prompt():
     }
 
     return jsonify(response)
+
 
 ## MARK: Tasks - Extraction
 @app.route("/api/fetch_search_set_item", methods=["POST"])
@@ -700,6 +709,7 @@ def grab_template():
             }
             return jsonify(response)
 
+
 @app.route("/api/extraction/update_title", methods=["POST"])
 def update_extraction_title():
     user = load_user()
@@ -713,6 +723,7 @@ def update_extraction_title():
 
     response = {"complete": True}
     return jsonify(response)
+
 
 @app.route("/api/semantic_search", methods=["POST"])
 def semantic_search():
@@ -1838,18 +1849,23 @@ def move_file():
 def delete_documents():
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
-    document.delete()
-    semantics = SemanticIngest()
-    semantics.delete(document)
-    if document.extension == "html":
-        # delete html files lmke doc_uuid-*.html
-        html_files = [
-            f
-            for f in os.listdir(os.path.join(app.root_path, "static", "uploads"))
-            if f.startswith(document.uuid)
-        ]
-        for html_file in html_files:
-            os.remove(os.path.join(app.root_path, "static", "uploads", html_file))
+    if document:
+        document.delete()
+        semantics = SemanticIngest()
+        semantics.delete(document)
+        document_manager = DocumentManager()
+        document_manager.delete_document(
+            user_id=session["user_id"], document_id=document_uuid
+        )
+        if document.extension == "html":
+            # delete html files lmke doc_uuid-*.html
+            html_files = [
+                f
+                for f in os.listdir(os.path.join(app.root_path, "static", "uploads"))
+                if f.startswith(document.uuid)
+            ]
+            for html_file in html_files:
+                os.remove(os.path.join(app.root_path, "static", "uploads", html_file))
     folder_id = request.args.get("folder_id")
     if folder_id:
         return redirect("/home?folder_id=" + folder_id)

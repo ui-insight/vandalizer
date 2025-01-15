@@ -16,6 +16,12 @@ from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM
 from app.utilities.llm_helpers import retry_llm_request
 from app.utilities.config import model_type
+from langfuse.decorators import observe
+from langfuse import Langfuse
+
+langfuse = Langfuse()
+
+trace = langfuse.trace()
 
 
 class EntityExtractor:

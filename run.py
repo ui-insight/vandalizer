@@ -4,6 +4,9 @@ from dotenv import load_dotenv
 from langfuse.decorators import langfuse_context
 import logging
 
+import nest_asyncio
+
+nest_asyncio.apply()
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
 
