@@ -509,7 +509,12 @@ def chat():
 
     user_id = load_user().user_id
     response = OpenAIInterface().ask_question_to_documents(
-        app.root_path, documents, message, default_docs=docs, user_id=user_id
+        app.root_path,
+        documents,
+        message,
+        default_docs=docs,
+        user_id=user_id,
+        session=session,
     )
     response["question"] = message
     print(response)
@@ -808,7 +813,6 @@ def begin_search():
                 "static/fillable_form.pdf", mimetype="text/pdf", as_attachment=True
             )
 
-
         template = render_template(
             "toolpanel/extractions/extraction_panel.html",
             search_set=search_set,
@@ -830,6 +834,7 @@ def begin_search():
         }
         return jsonify(response)
 
+
 @app.route("/api/extract/build_from_document", methods=["POST"])
 def build_extraction_from_document():
     data = request.get_json()
@@ -845,7 +850,7 @@ def build_extraction_from_document():
         document_paths.append(document.path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    
+
     em = ExtractionManager2()
     em.root_path = app.root_path
     keys = em.build_from_documents(document_paths)
@@ -866,8 +871,6 @@ def build_extraction_from_document():
         }
         return jsonify(response)
 
-
-
     template = render_template(
         "toolpanel/extractions/extraction_panel.html",
         search_set=search_set,
@@ -878,7 +881,6 @@ def build_extraction_from_document():
 
     return jsonify(response)
     return jsonify(response)
-    
 
 
 @app.route("/api/delete_search_set", methods=["POST"])
@@ -1251,6 +1253,7 @@ def fetch_workflow():
     }
 
     return jsonify(response)
+
 
 @app.route("/api/workflow/update_title", methods=["POST"])
 def update_workflow_title():

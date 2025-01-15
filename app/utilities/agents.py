@@ -12,7 +12,11 @@ class RagDeps:
     user_id: str
 
 
-rag_agent = Agent("openai:gpt-4o", deps_type=RagDeps)
+rag_agent = Agent(
+    "openai:gpt-4o",
+    deps_type=RagDeps,
+    system_prompt="You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.",
+)
 
 
 @rag_agent.tool
@@ -32,7 +36,7 @@ async def retrieve(
     results = context.deps.doc_manager.query_documents(
         context.deps.user_id, question, docs_ids
     )
-    content = ""
+    content = "Context: \n"
     for result in results:
         if result.get("metadata") is not None:
             content += f"Document title: {result['metadata'].get('document_name')}\n"
