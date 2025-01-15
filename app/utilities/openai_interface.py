@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 import re
 from pathlib import Path
 import openai
@@ -15,11 +16,18 @@ import asyncio
 
 import time
 
-from app.models import ChatHistory, ChatMessage, ChatRole, MAX_CHAT_MESSAGES
+from app.models import (
+    ChatHistory,
+    ChatMessage,
+    ChatRole,
+    MAX_CHAT_MESSAGES,
+    AgentHistory,
+)
 from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
 
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
@@ -149,7 +157,13 @@ class OpenAIInterface:
         )
 
     def ask_question_to_documents(
-        self, root_path, documents, question, default_docs=[], user_id=None
+        self,
+        root_path,
+        documents,
+        question,
+        session,
+        user_id=None,
+        default_docs=[],
     ):
         default_docs = list(default_docs)
         documents = list(documents)
@@ -173,24 +187,66 @@ class OpenAIInterface:
         """
         print("prompt: ", prompt)
         deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
-        answer = rag_agent.run_sync(prompt, deps=deps)
-        print("answer: ", answer)
 
+        # Get previous messages
+        # latest_conversation_messages = AgentHistory.get_latest_conversation_messages(
+        #     user_id=user_id
+        # )
+        latest_conversation_messages = session.get("chat_history", [])
+        previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
+        parsed_messages = []
+        for message in previous_messages:
+            new_parts = []
+            for part in message["parts"]:
+                # remove tool_call
+                if "tool-call" in part["part_kind"]:
+                    print("removing tool call", part)
+                    continue
+                new_parts.append(part)
+            message["parts"] = new_parts
+
+            if message["parts"] == []:
+                continue
+            if "timestamp" not in message:
+                continue
+            try:
+                # check if timestamp is already a datetime object
+                if isinstance(message["timestamp"], datetime):
+                    continue
+                # Adjust format string if necessary
+                timestamp_obj = datetime.strptime(
+                    message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT"
+                )
+                message["timestamp"] = timestamp_obj
+                parsed_messages.append(message)
+            except ValueError:
+                # Handle parsing errors (optional)
+                print(f"Failed to parse timestamp for message: {message}")
+                pass  # Skip the message if parsing fails
+
+        previous_messages = parsed_messages
+
+        print("previous messages: ", previous_messages)
+        previous_messages = ModelMessagesTypeAdapter.validate_python(previous_messages)
+
+        answer = rag_agent.run_sync(
+            prompt,
+            deps=deps,
+            message_history=previous_messages,
+        )
+        # print("answer: ", answer.new_messages_json())
+        # Save new messages
+        # AgentHistory.save_messages(user_id, answer.new_messages_json())
+        new_chat_history = latest_conversation_messages + answer.new_messages()
+        # save the latest max messages
+        session["chat_history"] = new_chat_history
         return dict(
             question=question,
             answer=self.format_answer(answer.data),
             formatted_answer=self.format_answer(answer.data),
         )
 
-        # latest_conversation_messages = ChatHistory.get_latest_conversation_messages(
-        #     user_id=user_id
-        # )
-        # previous_messages = []
-        # # if the number of messages in the conversation is less than the max chat messages
-        # if latest_conversation_messages is not None:
-        #     previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
-
-        # print("previous messages: ", previous_messages)
+        # for new_message in answer.new_messages:
 
         # prompt = (
         #     """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.

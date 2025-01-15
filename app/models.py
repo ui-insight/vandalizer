@@ -8,7 +8,17 @@ from pypdf import PdfReader
 from app import app
 from uuid import uuid4
 from enum import Enum
-    
+import json
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
+
+
 class WorkflowStepTask(me.Document):
     # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
@@ -27,6 +37,7 @@ class WorkflowStepTask(me.Document):
 
         return 0
 
+
 class WorkflowStep(me.Document):
     # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
@@ -34,7 +45,7 @@ class WorkflowStep(me.Document):
 
     data = me.DictField(required=False)
 
-    #TODO: This is deprecated need to refactor out
+    # TODO: This is deprecated need to refactor out
     def extraction_items(self):
         if "search_set_uuid" in self.data:
             search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
@@ -45,6 +56,7 @@ class WorkflowStep(me.Document):
             return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
 
         return 0
+
 
 class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)
@@ -260,10 +272,49 @@ class ChatHistory(me.Document):
             return None
         # take the last 2h of conversation
         filtered_messages = [m for m in history.messages if convert_to_hours(m) < 2]  #
-        print("filtered messages: ", filtered_messages)
         return filtered_messages
 
 
 def convert_to_hours(message):
     time_slot = datetime.datetime.now() - message.created_at
     return time_slot.total_seconds() / 3600
+
+
+class AgentHistory(me.Document):
+    """Simple agent history model for storing conversation messages as JSON"""
+
+    user_id = me.StringField(required=True)
+    messages = me.ListField(me.DictField())  # Store messages as plain JSON
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {"collection": "agent_history"}
+
+    @classmethod
+    def get_latest_conversation_messages(cls, user_id):
+        """Retrieve the latest conversation messages for a user"""
+        # Get today's conversation and filter by the latest conversation
+        # history = cls.objects(user_id=user_id).order_by("-created_at").first()
+        today_history = cls.objects(user_id=user_id).filter(
+            created_at__gte=datetime.datetime.now().replace(hour=0, minute=0, second=0)
+        )
+        if today_history:
+            latest_conversation = today_history.order_by("-created_at").first()
+            # return latest_conversation.messages
+            messages: list[ModelMessage] = []
+            for message in latest_conversation.messages:
+                print("message: ", message)
+                # convert message to ModelMessage
+                if message["kind"] == "request":
+                    messages.append(ModelRequest(**message))
+                elif message["kind"] == "response":
+                    messages.append(ModelResponse(**message))
+            return messages
+        return []
+
+    @classmethod
+    def save_messages(cls, user_id, messages_json):
+        """Save new messages to the history"""
+        messages_data = json.loads(messages_json)
+        print("messages_data: ", messages_data)
+        history = AgentHistory(user_id=user_id, messages=messages_data).save()
+        return history
