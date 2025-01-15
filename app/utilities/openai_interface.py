@@ -3,12 +3,15 @@ import re
 from pathlib import Path
 import openai
 from PyPDF2 import PdfReader
+from app.utilities.agents import RagDeps, rag_agent
+from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
 from app.utilities.prompt_optimization import (
     multi_qa,
     simple_qa,
 )
 from langfuse.decorators import observe
+import asyncio
 
 import time
 
@@ -37,7 +40,7 @@ class OpenAIInterface:
         print("asking question")
         if len(item.text_blocks) > 0:
             prompt = (
-                """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted html.\nQuestion:\n"""
+                """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted html div.\nQuestion:\n"""
                 + item.searchphrase
             )
 
@@ -61,9 +64,39 @@ class OpenAIInterface:
         )
         return completion
 
-    def format_anwser(self, answer):
-        regex = r"^```(html|json|markdown)?\s*|\s*```$"
-        formatted_answer = re.sub(regex, "", answer)
+    # def format_answer(self, answer):
+    #     regex = r"^```(html|json|markdown)?\s*|\s*```$"
+    #     formatted_answer = re.sub(regex, "", answer)
+    #     return formatted_answer
+    def format_answer(self, answer):
+        """
+        Removes code block markers and language specifiers from LLM responses.
+
+        Args:
+            answer (str): The raw LLM response text
+
+        Returns:
+            str: Formatted text with code blocks and language specifiers removed
+        """
+        # Split the text into lines
+        lines = answer.split("\n")
+        formatted_lines = []
+        skip_line = False
+
+        for line in lines:
+            # Check for code block markers with or without language specification
+            if "```" in line:
+                # If line only contains the code block marker with optional language
+                if line.strip().startswith("```") and len(line.strip().split()) <= 2:
+                    continue
+                # If code block marker is part of a content line, remove just the markers
+                line = line.replace("```", "")
+
+            formatted_lines.append(line)
+
+        # Join the lines back together
+        formatted_answer = "\n".join(formatted_lines)
+
         return formatted_answer
 
     def handle_long_context(self, **kwargs):
@@ -88,8 +121,8 @@ class OpenAIInterface:
         print("dspy response: ", response.answer)
         # return self.format_answer(response, question)
         return dict(
-            answer=self.format_anwser(response.answer),
-            formatted_answer=self.format_anwser(response.answer),
+            answer=self.format_answer(response.answer),
+            formatted_answer=self.format_answer(response.answer),
             context=response.context,
             question=question,
         )
@@ -109,8 +142,8 @@ class OpenAIInterface:
         # return self.format_answer(response, prompt)
         #
         return dict(
-            answer=self.format_anwser(response.answer),
-            formatted_answer=self.format_anwser(response.answer),
+            answer=self.format_answer(response.answer),
+            formatted_answer=self.format_answer(response.answer),
             context=response.context,
             question=question,
         )
@@ -133,62 +166,78 @@ class OpenAIInterface:
 
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
 
-        latest_conversation_messages = ChatHistory.get_latest_conversation_messages(
-            user_id=user_id
-        )
-        previous_messages = []
-        # if the number of messages in the conversation is less than the max chat messages
-        if latest_conversation_messages is not None:
-            previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
-
-        print("previous messages: ", previous_messages)
-
-        prompt = (
-            """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
-            \n\nQuestion: """
-            + question
-            + "\n\n"
-        )
-        # append the question to the previous messages
-        prompt += "Conversation history: \n"
-        for message in previous_messages:
-            if message.role == ChatRole.USER:
-                prompt += "User: " + message.message + "\n"
-            elif message.role == ChatRole.SYSTEM:
-                prompt += "System: " + message.message + "\n\n"
-
+        print("Ask question to documents")
+        prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div.
+        \nDocument(s): {[doc.path for doc in documents]}\n
+        Question: {question}
+        """
         print("prompt: ", prompt)
+        deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
+        answer = rag_agent.run_sync(prompt, deps=deps)
+        print("answer: ", answer)
 
-        # prompt += full_text
-        # use a tiktoken library for more accurate computation of the total token length for the context
-        # print("total context length: ", total_context_length)
-        # print("docs", documents)
-
-        output = self.perform_llm_call(
-            prompt=prompt, question=question, full_text=full_text, root_path=root_path
+        return dict(
+            question=question,
+            answer=self.format_answer(answer.data),
+            formatted_answer=self.format_answer(answer.data),
         )
 
-        if user_id is None:
-            return output
+        # latest_conversation_messages = ChatHistory.get_latest_conversation_messages(
+        #     user_id=user_id
+        # )
+        # previous_messages = []
+        # # if the number of messages in the conversation is less than the max chat messages
+        # if latest_conversation_messages is not None:
+        #     previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
 
-        # save the conversation
-        user_message = ChatMessage(
-            role=ChatRole.USER,
-            message=question,
-        )
-        system_message = ChatMessage(
-            role=ChatRole.SYSTEM,
-            message=output["formatted_answer"],
-        )
-        user_message.save()
-        system_message.save()
-        print("messages: ", previous_messages + [user_message, system_message])
-        conversation = ChatHistory(
-            user_id=user_id, messages=[user_message, system_message]
-        )
-        conversation.save()
-        print("conversation saved", conversation)
-        return output
+        # print("previous messages: ", previous_messages)
+
+        # prompt = (
+        #     """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
+        #     \n\nQuestion: """
+        #     + question
+        #     + "\n\n"
+        # )
+        # # append the question to the previous messages
+        # prompt += "Conversation history: \n"
+        # for message in previous_messages:
+        #     if message.role == ChatRole.USER:
+        #         prompt += "User: " + message.message + "\n"
+        #     elif message.role == ChatRole.SYSTEM:
+        #         prompt += "System: " + message.message + "\n\n"
+
+        # print("prompt: ", prompt)
+
+        # # prompt += full_text
+        # # use a tiktoken library for more accurate computation of the total token length for the context
+        # # print("total context length: ", total_context_length)
+        # # print("docs", documents)
+
+        # output = self.perform_llm_call(
+        #     prompt=prompt, question=question, full_text=full_text, root_path=root_path
+        # )
+
+        # if user_id is None:
+        #     return output
+
+        # # save the conversation
+        # user_message = ChatMessage(
+        #     role=ChatRole.USER,
+        #     message=question,
+        # )
+        # system_message = ChatMessage(
+        #     role=ChatRole.SYSTEM,
+        #     message=output["formatted_answer"],
+        # )
+        # user_message.save()
+        # system_message.save()
+        # print("messages: ", previous_messages + [user_message, system_message])
+        # conversation = ChatHistory(
+        #     user_id=user_id, messages=[user_message, system_message]
+        # )
+        # conversation.save()
+        # print("conversation saved", conversation)
+        # return output
 
     def perform_llm_call(self, prompt, **kwargs):
         full_text = kwargs.get("full_text")

@@ -73,8 +73,8 @@ os.environ["OPENAI_API_KEY"] = (
     "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
 )
 
-embedding_model = "text-embedding-3-large"
-embedding = OpenAIEmbeddings(model=embedding_model)
+# embedding_model = "text-embedding-3-large"
+# embedding = OpenAIEmbeddings(model=embedding_model)
 
 max_tokens = 1024 * 128
 # max_tokens = None
@@ -260,6 +260,9 @@ def dspy_model(
     # for dev server
     # chroma_client = chromadb.HttpClient(host="localhost", port=5028)
 
+    embedding_model = "text-embedding-3-large"
+    embedding = OpenAIEmbeddings(model=embedding_model)
+
     Chroma.from_documents(
         client=chroma_client,
         collection_name=collection_name,
@@ -396,6 +399,9 @@ def background_retrain_model(feedback_list, root_path):
     # create huggingface dataset from the feedback
 
     feedback_data = []
+
+    embedding_model = "text-embedding-3-large"
+    embedding = OpenAIEmbeddings(model=embedding_model)
 
     chroma_client = chromadb.PersistentClient(path=persistent_directory.as_posix())
     rm = ChromadbRM(
