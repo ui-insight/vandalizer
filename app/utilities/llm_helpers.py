@@ -13,6 +13,38 @@ import tiktoken
 from app.utilities.llm import ChatLM
 
 
+def remove_code_markers(text: str) -> str:
+    """
+    Removes code block markers and language specifiers from LLM responses.
+
+    Args:
+        answer (str): The raw LLM response text
+
+    Returns:
+        str: Formatted text with code blocks and language specifiers removed
+    """
+    # Split the text into lines
+    lines = text.split("\n")
+    formatted_lines = []
+    skip_line = False
+
+    for line in lines:
+        # Check for code block markers with or without language specification
+        if "```" in line:
+            # If line only contains the code block marker with optional language
+            if line.strip().startswith("```") and len(line.strip().split()) <= 2:
+                continue
+            # If code block marker is part of a content line, remove just the markers
+            line = line.replace("```", "")
+
+        formatted_lines.append(line)
+
+    # Join the lines back together
+    formatted_text = "\n".join(formatted_lines)
+
+    return formatted_text
+
+
 # Implementation based on the discussion:
 # https://community.openai.com/t/whats-the-new-tokenization-algorithm-for-gpt-4o/746708/3
 # gpt-4o seems to be using "o200k_base" encoding
