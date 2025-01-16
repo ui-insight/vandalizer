@@ -161,7 +161,7 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
-        session,
+        session=None,
         user_id=None,
         default_docs=[],
     ):
@@ -192,42 +192,47 @@ class OpenAIInterface:
         # latest_conversation_messages = AgentHistory.get_latest_conversation_messages(
         #     user_id=user_id
         # )
-        latest_conversation_messages = session.get("chat_history", [])
-        previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
-        parsed_messages = []
-        for message in previous_messages:
-            new_parts = []
-            for part in message["parts"]:
-                # remove tool_call
-                if "tool-call" in part["part_kind"]:
-                    print("removing tool call", part)
+        previous_messages = []
+        latest_conversation_messages = []
+        if session is not None:
+            latest_conversation_messages = session.get("chat_history", [])
+            previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
+            parsed_messages = []
+            for message in previous_messages:
+                new_parts = []
+                for part in message["parts"]:
+                    # remove tool_call
+                    if "tool-call" in part["part_kind"]:
+                        print("removing tool call", part)
+                        continue
+                    new_parts.append(part)
+                message["parts"] = new_parts
+
+                if message["parts"] == []:
                     continue
-                new_parts.append(part)
-            message["parts"] = new_parts
-
-            if message["parts"] == []:
-                continue
-            if "timestamp" not in message:
-                continue
-            try:
-                # check if timestamp is already a datetime object
-                if isinstance(message["timestamp"], datetime):
+                if "timestamp" not in message:
                     continue
-                # Adjust format string if necessary
-                timestamp_obj = datetime.strptime(
-                    message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT"
-                )
-                message["timestamp"] = timestamp_obj
-                parsed_messages.append(message)
-            except ValueError:
-                # Handle parsing errors (optional)
-                print(f"Failed to parse timestamp for message: {message}")
-                pass  # Skip the message if parsing fails
+                try:
+                    # check if timestamp is already a datetime object
+                    if isinstance(message["timestamp"], datetime):
+                        continue
+                    # Adjust format string if necessary
+                    timestamp_obj = datetime.strptime(
+                        message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT"
+                    )
+                    message["timestamp"] = timestamp_obj
+                    parsed_messages.append(message)
+                except ValueError:
+                    # Handle parsing errors (optional)
+                    print(f"Failed to parse timestamp for message: {message}")
+                    pass  # Skip the message if parsing fails
 
-        previous_messages = parsed_messages
+            previous_messages = parsed_messages
 
-        print("previous messages: ", previous_messages)
-        previous_messages = ModelMessagesTypeAdapter.validate_python(previous_messages)
+            print("previous messages: ", previous_messages)
+            previous_messages = ModelMessagesTypeAdapter.validate_python(
+                previous_messages
+            )
 
         answer = rag_agent.run_sync(
             prompt,
@@ -237,9 +242,11 @@ class OpenAIInterface:
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())
-        new_chat_history = latest_conversation_messages + answer.new_messages()
-        # save the latest max messages
-        session["chat_history"] = new_chat_history
+        if session is not None:
+            new_chat_history = latest_conversation_messages + answer.new_messages()
+            # save the latest max messages
+            session["chat_history"] = new_chat_history
+
         return dict(
             question=question,
             answer=self.format_answer(answer.data),

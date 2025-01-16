@@ -24,7 +24,7 @@ from app.utilities.config import model_type
 
 from threading import Thread
 
-from app.models import SmartDocument
+from app.models import SmartDocument, SearchSet
 
 from uuid import uuid4
 
@@ -256,6 +256,9 @@ class ExtractionNode(Node):
         super().__init__("Extraction")
 
         self.keys = data.get("searchphrases", [])
+        if len(self.keys) == 0:
+            self.keys = data.get("keys", [])
+        print("keys: ", self.keys, data)
 
     def process(self, inputs):
         prev_step_name = inputs.get("step_name", None)
@@ -394,6 +397,13 @@ def build_workflow_engine(steps, workflow):
             for task in step.tasks:
                 print("Task: ", task.name, task.data)
                 if task.name == "Extraction":
+                    if task.data.get("search_set_uuid"):
+                        search_set = SearchSet.objects(
+                            uuid=task.data.get("search_set_uuid")
+                        ).first()
+                        search_items = search_set.items()
+                        print("Search Items: ", search_items, search_set.title)
+                        task.data["keys"] = [item.searchphrase for item in search_items]
                     node = ExtractionNode(
                         data=task.data,
                     )

@@ -19,6 +19,8 @@ from app.utilities.config import model_type
 from langfuse.decorators import observe
 from langfuse import Langfuse
 
+from app.utilities.agents import extract_entities_with_agent
+
 langfuse = Langfuse()
 
 trace = langfuse.trace()
@@ -218,6 +220,8 @@ class ExtractionManager3:
         fields_to_extract = extract_keys
         # Extract entities
 
+        print("Extracting keys: ", extract_keys, pdf_paths)
+
         start_time = time.time()
         openai.api_key = "***REMOVED***"
         doc_text = ""
@@ -227,7 +231,10 @@ class ExtractionManager3:
             for pdf_path in pdf_paths:
                 doc_text = extract_text_from_doc(doc_path=pdf_path)
                 if doc_text:
-                    data = extractor.extract_entities(doc_text, fields_to_extract)
+                    # data = extractor.extract_entities(doc_text, fields_to_extract)
+                    data = extract_entities_with_agent(
+                        text=doc_text, keys=fields_to_extract
+                    )
                     extractions = data
                     print("Data item: ", data)
                     print("Extracting: ", extractions)

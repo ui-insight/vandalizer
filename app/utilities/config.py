@@ -4,6 +4,9 @@
 # model_type = "insight"
 model_type = "openai"
 
+# model category to use, either pydantic_ai or dspy
+model_category = "pydantic_ai"
+
 # 128K is the max context length for the GPT-4o model
 # we use less than this to be safe
 # max_context_length = 16 * 1024  # 16k tokens
