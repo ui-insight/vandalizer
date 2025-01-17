@@ -780,7 +780,7 @@ def begin_search():
         em.root_path = app.root_path
         results = em.extract(keys, document_paths)[0]
 
-        if search_set.fillable_pdf_url != "":
+        if search_set.fillable_pdf_url != "" and search_set.fillable_pdf_url != None:
             bindings = {}
             for key in results:
                 print(key)
