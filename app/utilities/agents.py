@@ -11,6 +11,13 @@ from pydantic_ai.agent import Agent
 
 from app.utilities.document_manager import DocumentManager
 
+from langchain_redis import RedisCache
+
+# Standard cache
+# cache ttl is 1 month
+ttl = 60 * 60 * 24 * 30
+cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+
 langfuse = Langfuse()
 
 
@@ -208,6 +215,19 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     Returns:
         A JSON object with extracted entities
     """
+
+    # check if previous extraction exists in cache
+
+    cache_key = f"Keys:{keys}\n\nText:{text}"
+    llm_string = "pydantic_model:openai:gpt-4o"
+    cache_result = cache.lookup(cache_key, llm_string)
+    if cache_result:
+        result = json.loads(cache_result[0])
+        print("Cache hit: ", cache_result, result)
+        return result.get("entities", [])
+
+    print("Cache miss")
+
     field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
     fields = field_inference_agent.run_sync(
         "Infer the types of the keys", deps=field_inference_deps
@@ -236,5 +256,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
 
     result = extraction.data.model_dump_json(indent=2)
     print("Result: ", result)
+    # cache the result
+    cache.update(cache_key, llm_string, [result])
     result = json.loads(result)
     return result.get("entities", [])
