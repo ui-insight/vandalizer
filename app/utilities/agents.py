@@ -90,7 +90,16 @@ For each field, determine the most appropriate data type and description from th
 - Optional[float]
 - Optional[bool]
 
-Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above.
+ CRITICAL:
+1. Treat monetary values as strings, not floats.
+2. Preserve ALL original formatting of numbers, including:
+   - Keep ALL commas in numbers (e.g., "1,234,567")
+   - Keep ALL currency symbols (e.g., "$1,234.56")
+   - Keep ALL decimal places exactly as found
+   - DO NOT convert formatted numbers into plain numbers
+3. Extract values exactly as they appear in the text, without any modifications
+
+Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above. Do not convert floating numbers to integers and vice versa, or change the number of decimal places, or change numbers locale encoding. Preserve commas and other punctuation in the extracted text and numbers.
 Consider making fields Optional if they might not always be present."""
     return prompt
 
@@ -123,6 +132,8 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
         "Optional[bool]": (Optional[bool], ...),
     }
 
+    print("inferred_fields: ", inferred_fields)
+
     fields = dict()
     try:
         fields = {
@@ -140,13 +151,13 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
 class ExtractionDeps:
     extraction_context: Optional[str]
     fields: Dict[str, tuple]
+    text: str
 
 
 extraction_agent = Agent(
     "openai:gpt-4o",
     deps_type=ExtractionDeps,
     retries=3,
-    system_prompt="You are a precise entity extraction assistant. Extract only the requested information and return it in valid JSON format.",
 )
 
 
@@ -154,6 +165,7 @@ extraction_agent = Agent(
 def extraction_system_prompt(
     context: RunContext[ExtractionDeps],
 ):
+    text = context.deps.text
     fields = context.deps.fields
     field_descriptions = [
         f"- {field}: {field_type[0]}" for field, field_type in fields.items()
@@ -166,12 +178,22 @@ def extraction_system_prompt(
         "If no multiple entities are found, return a single-item array."
     )
 
-    return f"""Extract the following information from the text below only if it is present:
+    system_prompt = (
+        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format.",
+    )
+
+    return (
+        f"""
+{system_prompt}
+Extract the following information from the text below only if it is present:
 
 {field_str}
 
 Return the information in JSON format and be as precise as possible{multiple_entity_instruction}
-"""
+
+Text:
+{text}""",
+    )
 
 
 @observe()
@@ -199,34 +221,17 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         "ExtractionModel", entities=(List[DynamicModel], ...)
     )
 
-    field_descriptions = [
-        f"- {field}: {field_type[0]}" for field, field_type in fields.items()
-    ]
-    field_str = "\n".join(field_descriptions)
-
-    multiple_entity_instruction = (
-        "\n\nImportant: Extract ALL relevant entities from the text only if it is present. "
-        "Return a JSON array of objects, where each object represents a distinct entity. "
-        "If no multiple entities are found, return a single-item array."
-    )
-
     extractor_agent = Agent(
         "openai:gpt-4o",
         deps_type=ExtractionDeps,
         result_type=ExtractionModel,
         result_retries=3,
         retries=3,
-        system_prompt=f"""Extract the following information from the text below only if it is present:
-
-{field_str}
-
-Return the information in JSON format and be as precise as possible{multiple_entity_instruction}
-
-Text:
-{text}""",
     )
 
-    extractor_deps = ExtractionDeps(extraction_context=context, fields=fields)
+    extractor_deps = ExtractionDeps(
+        extraction_context=context, fields=fields, text=text
+    )
     extraction = extractor_agent.run_sync(text, deps=extractor_deps)
 
     result = extraction.data.model_dump_json(indent=2)

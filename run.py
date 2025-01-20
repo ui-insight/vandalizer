@@ -8,6 +8,11 @@ import nest_asyncio
 
 nest_asyncio.apply()
 
+if os.environ.get("LOGFIRE") == "true":
+    import logfire
+
+    logfire.configure()
+
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
 
 app.logger.info(f"Langfuse enabled: {langfuse_enabled}")
