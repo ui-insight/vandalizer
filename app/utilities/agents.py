@@ -111,45 +111,76 @@ Consider making fields Optional if they might not always be present."""
     return prompt
 
 
+type_mapping = {
+    "str": (str, ...),
+    "int": (int, ...),
+    "float": (float, ...),
+    "bool": (bool, ...),
+    "List[str]": (List[str], ...),
+    "List[int]": (List[int], ...),
+    "List[float]": (List[float], ...),
+    "Dict[str, str]": (Dict[str, str], ...),
+    "Optional[str]": (str, None),
+    "Optional[int]": (int, None),
+    "Optional[float]": (float, None),
+    "Optional[bool]": (bool, None),
+}
+
+reverse_type_mapping = {
+    (str, ...): "str",
+    (int, ...): "int",
+    (float, ...): "float",
+    (bool, ...): "bool",
+    (List[str], ...): "List[str]",
+    (List[int], ...): "List[int]",
+    (List[float], ...): "List[float]",
+    (Dict[str, str], ...): "Dict[str, str]",
+    (str, None): "Optional[str]",
+    (int, None): "Optional[int]",
+    (float, None): "Optional[float]",
+    (bool, None): "Optional[bool]",
+}
+
+
+def get_cache_key(key: str, context: str) -> str:
+    """Generate consistent cache key for a field"""
+    return f"field_type:{key}:{context}"
+
+
 @field_inference_agent.result_validator
 def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str):
     formatted_response = remove_code_markers(response)
-    print("response: ", formatted_response)
     langfuse.trace(
         name="validate_fields_types",
         input=formatted_response,
     )
-    inferred_fields = dict()
+
     try:
         inferred_fields = json.loads(formatted_response)
     except Exception as e:
         raise ModelRetry(f"Failed to parse type inference response: {str(e)}")
-    type_mapping = {
-        "str": (str, ...),
-        "int": (int, ...),
-        "float": (float, ...),
-        "bool": (bool, ...),
-        "List[str]": (List[str], ...),
-        "List[int]": (List[int], ...),
-        "List[float]": (List[float], ...),
-        "Dict[str, str]": (Dict[str, str], ...),
-        "Optional[str]": (Optional[str], ...),
-        "Optional[int]": (Optional[int], ...),
-        "Optional[float]": (Optional[float], ...),
-        "Optional[bool]": (Optional[bool], ...),
-    }
 
-    print("inferred_fields: ", inferred_fields)
+    # Modified validation logic
+    fields = {}
+    for key, type_str in inferred_fields.items():
+        try:
+            # Get type with fallback to Optional[str]
+            field_type = type_mapping.get(type_str.strip(), (Optional[str], None))
 
-    fields = dict()
-    try:
-        fields = {
-            key: type_mapping.get(type_str.strip(), (Any, ...))
-            for key, type_str in inferred_fields.items()
-        }
-    except Exception as e:
-        langfuse.span(name="validation_error", input=e)
-        raise ModelRetry(f"Failed to parse type inference response: {str(e)}")
+            # Ensure Optional fields get None default
+            if "Optional" in type_str:
+                field_type = (field_type[0], None)
+
+            fields[key] = field_type
+        except Exception as e:
+            langfuse.span(name="validation_error", input=e)
+            raise ModelRetry(f"Invalid type for field {key}: {str(e)}")
+
+    # Add fallback for missing keys (shouldn't happen but just in case)
+    requested_keys = context.deps.keys
+    for key in requested_keys:
+        if key not in fields:
+            fields[key] = (Optional[str], None)  # Default to optional string
 
     return fields
 
@@ -228,15 +259,53 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
 
     print("Cache miss")
 
-    field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
-    fields = field_inference_agent.run_sync(
-        "Infer the types of the keys", deps=field_inference_deps
-    ).data
+    # field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
+    # fields = field_inference_agent.run_sync(
+    #     "Infer the types of the keys", deps=field_inference_deps
+    # ).data
 
-    DynamicModel = create_model(
-        "DynamicEntity",
-        **{field_name: field_spec for field_name, field_spec in fields.items()},
-    )
+    # Individual field type caching
+    inferred_fields = dict()
+    uncached_keys = []
+
+    # Check cache for each individual key
+    for key in keys:
+        key_cache_key = get_cache_key(key, context)
+        cached = cache.lookup(key_cache_key, "field_inference")
+        if cached:
+            inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
+        else:
+            uncached_keys.append(key)
+
+    # Process uncached keys in a single batch if any
+    print("Uncached keys: ", len(uncached_keys), uncached_keys)
+    print("Inferred fields: ", len(inferred_fields), inferred_fields)
+    if uncached_keys:
+        field_inference_deps = FieldInferenceDeps(
+            extraction_context=context, keys=uncached_keys
+        )
+        new_fields = field_inference_agent.run_sync(
+            "Infer the types of the keys", deps=field_inference_deps
+        ).data
+
+        # Cache newly inferred fields individually
+        for key, field_type in new_fields.items():
+            key_cache_key = get_cache_key(key, context)
+            type_str = reverse_type_mapping.get(field_type, "Any")
+            cache.update(key_cache_key, "field_inference", [type_str])
+
+        inferred_fields.update(new_fields)
+
+    # DynamicModel = create_model(
+    #     "DynamicEntity",
+    #     **{field_name: field_spec for field_name, field_spec in fields.items()},
+    # )
+    # ExtractionModel = create_model(
+    #     "ExtractionModel", entities=(List[DynamicModel], ...)
+    # )
+    #
+    # Proceed with entity extraction
+    DynamicModel = create_model("DynamicEntity", **inferred_fields)
     ExtractionModel = create_model(
         "ExtractionModel", entities=(List[DynamicModel], ...)
     )
@@ -250,7 +319,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     )
 
     extractor_deps = ExtractionDeps(
-        extraction_context=context, fields=fields, text=text
+        extraction_context=context, fields=inferred_fields, text=text
     )
     extraction = extractor_agent.run_sync(text, deps=extractor_deps)
 
