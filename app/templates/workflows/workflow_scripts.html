@@ -10,13 +10,16 @@
           }
 
       function workflowConfirmStepTask(stepType, workflow_step_id=0, workflow_task_id=0) {
-          console.log(current_space_id);
+          
           dict = {
               workflow_uuid: current_workflow_id,
               space_id: current_space_id,
               workflow_step_id: workflow_step_id,
               workflow_task_id: workflow_task_id
           }
+
+          console.log("Confirm/Edit step");
+          console.log(dict);
 
           if (stepType == "extraction") {
               let activeTab = $('.workflow-tab-btn.active').attr('id');

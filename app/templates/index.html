@@ -153,12 +153,13 @@
                                         data-doc-type="folder" data-doc-uuid="{{ folder.uuid }}" data-doc-uuids="{{ folder.document_uuids() }}"
                                         data-num-documents="{{ folder.number_of_documents() }} "></span>
 
-                                <a href="?folder_id={{ folder.uuid }}" style="color: #d22121bd;">
+                                <a href="javascript:void(0);" onclick="addFolderId('{{ folder.uuid }}')">
                                     <span><i class="fa-solid fa-folder"></i></span>
                                     <span
                                         style="padding-right: 10px; padding-left: 10px; overflow: ellipsis; color:#17181abb;">
                                         {{ folder.title }}</span>
                                 </a>
+                                
                                 <button class="ellipsis-btn" style="float:right;" data-folder-id="{{ folder.uuid }}">
                                     <span style="font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-ellipsis-vertical"></i>

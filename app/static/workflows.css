@@ -391,3 +391,7 @@ h4 {
   background-position: bottom; 
   padding-bottom: 10px; /* Adds some space between the text and the underline */
 }
+
+.workflow-output-section {
+  padding: 15px 0px;
+}

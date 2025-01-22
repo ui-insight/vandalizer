@@ -139,7 +139,6 @@ def home():
 
     user = load_user()
     section = request.args.get("section", default="Chat").strip()
-    print(section)
 
     document = None
 
@@ -267,7 +266,6 @@ def home():
     for doc in folder_docs:
         total_token_counts += doc.token_count
 
-    print(len(extraction_sets))
 
     return render_template(
         "index.html",
@@ -302,7 +300,6 @@ def upload_fillable_pdf():
         return jsonify({"error": "No selected file"}), 400
 
     search_set_uuid = request.form.get("search_set_uuid")
-    print(search_set_uuid)
     searchset = SearchSet.objects(uuid=search_set_uuid).first()
     for item in searchset.items():
         item.delete()
@@ -1500,6 +1497,8 @@ def workflow_add_extraction_step():
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
 
+        
+
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
 
@@ -1517,20 +1516,24 @@ def workflow_add_extraction_step():
 
         elif manual_input:
             if task_id != None and task_id != 0:
+                print("----- FOUND A TASK ID")
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     workflow_step_task.data = {"searchphrases": manual_input}
                     workflow_step_task.save()
+                return jsonify({"response": "success"})
             else:
+                print("----- NO TASK ID")
+                print(data)
                 workflow_step_task = WorkflowStepTask(
                     name="Extraction", data={"searchphrases": manual_input}
                 )
                 workflow_step_task.save()
 
-        if workflow_step.tasks is None:
-            workflow_step.tasks = []
-        workflow_step.tasks.append(workflow_step_task)
-        workflow_step.save()
+                if workflow_step.tasks is None:
+                    workflow_step.tasks = []
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
 
         return jsonify({"response": "success"})
 
@@ -1749,10 +1752,10 @@ def workflow_add_format_step():
                     name="Formatter", data={"prompt": manual_input}
                 )
                 workflow_step_task.save()
-        if workflow_step.tasks is None:
-            workflow_step.tasks = []
-        workflow_step.tasks.append(workflow_step_task)
-        workflow_step.save()
+                if workflow_step.tasks is None:
+                    workflow_step.tasks = []
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
 
         return jsonify({"response": "success"})
 

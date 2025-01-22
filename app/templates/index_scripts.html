@@ -18,6 +18,12 @@
         window.location.href = url.toString();
     }
 
+    function addFolderId(folder_id) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('folder_id', folder_id);
+        window.location.href = url.toString();
+    }
+
     function removeDocIdAndGo() {
         const url = new URL(window.location.href);
         url.searchParams.delete('docid');

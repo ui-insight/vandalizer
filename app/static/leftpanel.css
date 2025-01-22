@@ -123,7 +123,6 @@
     height: 50px;
     left: 30px;
     width: calc(60% - 60px);
-    border-radius: 25px;
     border: 1px solid #efefef;
     backdrop-filter: blur(10px); /* Adjust the blur radius as needed */
         -webkit-backdrop-filter: blur(10px); /* For Safari compatibility */

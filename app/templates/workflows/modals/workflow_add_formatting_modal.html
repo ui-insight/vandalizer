@@ -40,7 +40,7 @@
             <!-- Tab content for manual input -->
             <div class="workflow-tab-content" id="manualInput" style="{% if not is_editing or (is_editing and 'search_set_item_id' in workflow_task.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
                 <label for="promptInput" class="label">Enter formatter:</label>
-                <textarea id="promptInput" class="input-field" placeholder="e.g., Format this as markdown" rows="10" value="{{ workflow_task.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_task.data else '' }}"></textarea>
+                <textarea id="promptInput" class="input-field" placeholder="e.g., Format this as markdown" rows="10" value="{{ workflow_task.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_task.data else '' }}">{{ workflow_task.data['prompt'] if is_editing and 'search_set_item_id' not in workflow_task.data else '' }}</textarea>
             </div>
         </div>
 
