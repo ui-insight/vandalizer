@@ -34,8 +34,11 @@ class ExtractionManager3:
 
         # extractor = EntityExtractor(api_key)
 
-        # Define fields to extract
-        fields_to_extract = extract_keys
+        # if extract_keys is string convert to list by splitting on comma
+        if isinstance(extract_keys, str):
+            fields_to_extract = extract_keys.split(",")
+        else:
+            fields_to_extract = extract_keys
         # Extract entities
 
         print("Extracting keys: ", extract_keys, pdf_paths)

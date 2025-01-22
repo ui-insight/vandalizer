@@ -248,7 +248,6 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """
 
     # check if previous extraction exists in cache
-
     cache_key = f"Keys:{keys}\n\nText:{text}"
     llm_string = "pydantic_model:openai:gpt-4o"
     cache_result = cache.lookup(cache_key, llm_string)
@@ -263,6 +262,10 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     # fields = field_inference_agent.run_sync(
     #     "Infer the types of the keys", deps=field_inference_deps
     # ).data
+
+    # ensure keys are a list of strings, otherwise split on comma
+    if isinstance(keys, str):
+        keys = keys.split(",")
 
     # Individual field type caching
     inferred_fields = dict()
