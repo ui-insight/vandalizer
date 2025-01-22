@@ -121,7 +121,8 @@
         $('#confirmWorkflowStepModalStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
-            window.location.href = `/home?workflow_id={{ workflow.id }}&section=Workflows`;
+            // window.location.href = `/home?workflow_id={{ workflow.id }}&section=Workflows`;
+            location.reload();
         });
 
         $('#deletePromptToWorkflowBtn').on("click", function (e) {
