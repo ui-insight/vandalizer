@@ -265,7 +265,9 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
-        keys = keys.split(",")
+        keys = [k.strip() for k in keys.split(",")]
+    else:
+        keys = [k.strip() for k in keys]
 
     # Individual field type caching
     inferred_fields = dict()

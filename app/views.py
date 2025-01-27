@@ -1,7 +1,8 @@
 import urllib.parse
 from datetime import datetime
 from app.utilities.document_manager import DocumentManager
-from app.utilities.prompt_optimization import background_retrain_model
+
+# from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
 from werkzeug.utils import secure_filename
@@ -265,7 +266,6 @@ def home():
     total_token_counts = 0
     for doc in folder_docs:
         total_token_counts += doc.token_count
-
 
     return render_template(
         "index.html",
@@ -1497,8 +1497,6 @@ def workflow_add_extraction_step():
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
 
-        
-
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
 
@@ -2102,21 +2100,21 @@ def feedback():
 
     print("feedback_counter", feedback_counter.count)
 
-    if feedback_counter.count >= max_feedback_count:
-        feedback_counter.count = 0  # Reset count after 10 feedbacks
-        feedback_counter.save()
+    # if feedback_counter.count >= max_feedback_count:
+    #     feedback_counter.count = 0  # Reset count after 10 feedbacks
+    #     feedback_counter.save()
 
-        feedback_list = Feedback.objects().order_by("-id")[
-            :max_feedback_count
-        ]  # Get latest 10 feedbacks
+    #     feedback_list = Feedback.objects().order_by("-id")[
+    #         :max_feedback_count
+    #     ]  # Get latest 10 feedbacks
 
-        # feedback_list = Feedback.objects().all()
+    #     # feedback_list = Feedback.objects().all()
 
-        root_path = app.root_path
-        process = mp.Process(
-            target=background_retrain_model, args=(feedback_list, root_path)
-        )
-        process.start()
+    #     root_path = app.root_path
+    #     process = mp.Process(
+    #         target=background_retrain_model, args=(feedback_list, root_path)
+    #     )
+    #     process.start()
 
     response = {
         "complete": True,
