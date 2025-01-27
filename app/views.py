@@ -1539,6 +1539,10 @@ def workflow_add_extraction_step():
                     name="Extraction", data=searchset.to_workflow_step_data()
                 )
                 workflow_step_task.save()
+                if workflow_step.tasks is None:
+                    workflow_step.tasks = []
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
 
         elif manual_input:
             if task_id != None and task_id != 0:
