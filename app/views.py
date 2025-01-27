@@ -1,6 +1,8 @@
 import urllib.parse
 from datetime import datetime
 from app.utilities.document_manager import DocumentManager
+from app import socketio
+from flask_socketio import emit, send
 
 # from app.utilities.prompt_optimization import background_retrain_model
 from app.utilities.excel_helper import save_excel_to_html
@@ -1182,6 +1184,32 @@ def workflow_status():
     }
 
     return jsonify(response)
+
+
+@socketio.on("workflow_status")
+def workflow_status_socket(data):
+    print("Workflow websocket", data)
+    session_id = data.get("session_id")
+
+    if not session_id:
+        emit("workflow_status", {"error": "session_id is required"})
+        return
+
+    # Get workflow status
+    workflow_result = WorkflowResult.objects(session_id=session_id).first()
+
+    if not workflow_result:
+        emit("workflow_status", {"error": "Workflow not found"})
+        return
+
+    response = {
+        "steps_completed": workflow_result.num_steps_completed,
+        "total_steps": workflow_result.num_steps_total,
+        "steps_output": workflow_result.steps_output,
+        "status": workflow_result.status,
+    }
+
+    emit("workflow_status", response)
 
 
 @app.route("/api/workflow/download", methods=["GET"])

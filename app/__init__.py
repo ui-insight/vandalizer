@@ -11,18 +11,23 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from datetime import timedelta
 from flask_cors import CORS
-#from app.utilities.llm_manager import LLMManager
+
+from flask_socketio import SocketIO
+
+# from app.utilities.llm_manager import LLMManager
 # from flask_basicauth import BasicAuth
 
 app = Flask(__name__)
 CORS(app)
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=60)
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
 app.permanent_session_lifetime = timedelta(days=60)
-app.config.from_object('app.configuration.DevelopmentConfig')
+app.config.from_object("app.configuration.DevelopmentConfig")
 
-me.connect('osp')
+me.connect("osp")
 
-bs = Bootstrap(app) #flask-bootstrap
+bs = Bootstrap(app)  # flask-bootstrap
 mail = Mail(app)
+
+socketio = SocketIO(app)
 
 from app import views, models

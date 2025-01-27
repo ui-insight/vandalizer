@@ -1,69 +1,68 @@
-{% extends "bootstrap/base.html" %}
+{% extends "bootstrap/base.html" %} {%block title%}Doc Scanner{%endblock%} {%
+block head %} {{super()}}
+<link
+  rel="shortcut icon"
+  href="{{ url_for('static', filename='images/favicon.ico') }}"
+/>
 
-{%block title%}Doc Scanner{%endblock%}
+{% endblock %} {% block styles %} {{super()}}
+<link
+  rel="stylesheet"
+  href="{{url_for('static', filename='fontawesome/css/fontawesome.css')}}?"
+/>
+<link
+  rel="stylesheet"
+  href="{{url_for('static', filename='fontawesome/css/brands.css')}}?"
+/>
+<link
+  rel="stylesheet"
+  href="{{url_for('static', filename='fontawesome/css/solid.css')}}?"
+/>
 
+{% endblock %} {% block scripts %} {{super()}}
 
-{% block head %}
-{{super()}}
-<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
-
-{% endblock %}
-
-{% block styles %}
-{{super()}}
-<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/fontawesome.css')}}?" />
-<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/brands.css')}}?" />
-<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/solid.css')}}?" />
-
-{% endblock %}
-
-{% block scripts %}
-{{super()}}
-
-
+<script
+  src="https://cdn.socket.io/4.8.1/socket.io.min.js"
+  integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
+  crossorigin="anonymous"
+></script>
 
 <!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-9YKGDDTQ94"></script>
+<script
+  async
+  src="https://www.googletagmanager.com/gtag/js?id=G-9YKGDDTQ94"
+></script>
 <script>
   window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
+  function gtag() {
+    dataLayer.push(arguments);
+  }
+  gtag("js", new Date());
 
-  gtag('config', 'G-9YKGDDTQ94');
+  gtag("config", "G-9YKGDDTQ94");
 </script>
 
-{% endblock %}
-
-{% block navbar %}
+{% endblock %} {% block navbar %}
 
 <nav class="navbar navbar-default">
-	<div class="container-fluid">
-		{% include "sitewide/header.html" %}
-	</div><!-- /.container-fluid -->
+  <div class="container-fluid">{% include "sitewide/header.html" %}</div>
+  <!-- /.container-fluid -->
 </nav>
 
-{% endblock %}
+{% endblock %} {%block content %}
 
-{%block content %}
-
-<div class="container" style="margin-bottom: 60px; min-height: 60vh;">
-
-    {% with messages = get_flashed_messages() %}
-	    {% if messages %}
-	    <div class="row">
-	    	<div class="col-md-4">
-			    <ul>
-			    {% for message in messages %}
-			        <li>{{ message }} </li>
-			    {% endfor %}
-			    </ul>
-			</div>
-		</div>
-	    {% endif %}
-    {% endwith %}
-
-	{%block main_content%}{%endblock%}
-
+<div class="container" style="margin-bottom: 60px; min-height: 60vh">
+  {% with messages = get_flashed_messages() %} {% if messages %}
+  <div class="row">
+    <div class="col-md-4">
+      <ul>
+        {% for message in messages %}
+        <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %} {% endwith %} {%block main_content%}{%endblock%}
 </div>
 
 {%endblock%}

@@ -5,6 +5,7 @@ import json
 import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from app import socketio
 
 import re
 import html
@@ -370,12 +371,34 @@ class WorkflowEngine:
                 )
             )
 
+            # send the data to the frontend
+            socketio.emit(
+                "workflow_status",
+                {
+                    "steps_completed": workflow_result.num_steps_completed,
+                    "total_steps": workflow_result.num_steps_total,
+                    "steps_output": workflow_result.steps_output,
+                    "status": workflow_result.status,
+                },
+            )
+
             workflow_result.save()
 
         if latest_output is None:
             return None, data
 
         workflow_result.status = "completed"
+
+        socketio.emit(
+            "workflow_status",
+            {
+                "steps_completed": workflow_result.num_steps_completed,
+                "total_steps": workflow_result.num_steps_total,
+                "steps_output": workflow_result.steps_output,
+                "status": workflow_result.status,
+            },
+        )
+
         workflow_result.save()
         return latest_output.get("output"), data
 
