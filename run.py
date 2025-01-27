@@ -1,13 +1,11 @@
 import os
-from app import app
+from app import app, socketio
 from dotenv import load_dotenv
 from langfuse.decorators import langfuse_context
 import logging
 from dotenv import load_dotenv
 
 load_dotenv()
-print("OPENAI_API_KEY:")
-print(os.environ.get("OPENAI_API_KEY"))
 
 import nest_asyncio
 
@@ -50,4 +48,8 @@ if __name__ == "__main__":
         os.environ["APP_ENV"] = "dev"
 
     port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port)
+    host = "0.0.0.0"
+    # app.run(host="0.0.0.0", port=port)
+    socketio.run(
+        app, host=host, port=port, use_reloader=True, debug=True, log_output=True
+    )

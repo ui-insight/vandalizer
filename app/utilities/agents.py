@@ -255,11 +255,12 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     # check if previous extraction exists in cache
     cache_key = f"Keys:{keys}\n\nText:{text}"
     llm_string = "pydantic_model:openai:gpt-4o"
-    cache_result = cache.lookup(cache_key, llm_string)
-    if cache_result:
-        result = json.loads(cache_result[0])
-        print("Cache hit: ", cache_result, result)
-        return result.get("entities", [])
+
+    # cache_result = cache.lookup(cache_key, llm_string)
+    # if cache_result:
+    #     result = json.loads(cache_result[0])
+    #     print("Cache hit: ", cache_result, result)
+    #     return result.get("entities", [])
 
     print("Cache miss")
 
