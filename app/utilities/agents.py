@@ -13,6 +13,11 @@ from app.utilities.document_manager import DocumentManager
 
 from langchain_redis import RedisCache
 
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Standard cache
 # cache ttl is 1 month
 ttl = 60 * 60 * 24 * 30

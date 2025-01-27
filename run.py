@@ -3,6 +3,11 @@ from app import app
 from dotenv import load_dotenv
 from langfuse.decorators import langfuse_context
 import logging
+from dotenv import load_dotenv
+
+load_dotenv()
+print("OPENAI_API_KEY:")
+print(os.environ.get("OPENAI_API_KEY"))
 
 import nest_asyncio
 
