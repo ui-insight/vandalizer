@@ -5,13 +5,11 @@ from flask import (Blueprint,
                    render_template, 
                    request, jsonify)
 
-from . import auth
+from . import feedback
 from app.utils import load_user
 from app import azure
 from app.models import User, ExtractionQualityRecord, Feedback, FeedbackCounter
 import json
-
-feedback = Blueprint('feedback', __name__)
 
 
 @feedback.route("/submit_rating", methods=["POST"])

@@ -91,7 +91,7 @@ function showFile() {
 
       $.ajax({
         type: "POST",
-        url: "/upload",
+        url: "/files/upload",
         data: JSON.stringify(model),
         processData: false,
         contentType: "application/json",
