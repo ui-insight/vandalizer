@@ -15,7 +15,7 @@ from itertools import chain
 
 from . import workflows
 
-@workflows.route("/api/create_workflow", methods=["POST"])
+@workflows.route("/create_workflow", methods=["POST"])
 def add_workflow():
     user = load_user()
     if user is None:
@@ -31,7 +31,7 @@ def add_workflow():
     return redirect("/home?section=Workflows")
 
 
-@workflows.route("/api/delete_workflow", methods=["GET"])
+@workflows.route("/delete_workflow", methods=["GET"])
 def delete_workflow():
     user = load_user()
     if user is None:
@@ -41,7 +41,7 @@ def delete_workflow():
     return redirect("/home?section=Workflows")
 
 
-@workflows.route("/api/update_workflow", methods=["POST"])
+@workflows.route("/update_workflow", methods=["POST"])
 def update_workflow():
     user = load_user()
     if user is None:
@@ -56,7 +56,7 @@ def update_workflow():
 
 
 ## MARK: ~~ Run in-app
-@workflows.route("/api/workflow/run", methods=["POST"])
+@workflows.route("/workflow/run", methods=["POST"])
 def run_workflow():
     user = load_user()
     if user is None:
@@ -200,7 +200,7 @@ def run_workflow_integrated():
     return jsonify({"output": output, "steps": data})
 
 
-@workflows.route("/api/workflow/status", methods=["GET"])
+@workflows.route("/workflow/status", methods=["GET"])
 def workflow_status():
     session_id = request.args.get("session_id")
 
@@ -251,7 +251,7 @@ def workflow_status_socket(data):
     emit("workflow_status", response)
 
 
-@workflows.route("/api/workflow/download", methods=["GET"])
+@workflows.route("/workflow/download", methods=["GET"])
 def workflow_download():
     session_id = request.args.get("session_id")
 
@@ -284,7 +284,7 @@ def workflow_download():
 
 
 ## MARK: ~~ Integrate
-@workflows.route("/api/workflows/integrate", methods=["POST"])
+@workflows.route("/workflows/integrate", methods=["POST"])
 def workflow_integrate():
     user = load_user()
     data = request.get_json()
@@ -301,7 +301,7 @@ def workflow_integrate():
     return jsonify(response)
 
 
-@workflows.route("/api/fetch_workflow", methods=["POST"])
+@workflows.route("/fetch_workflow", methods=["POST"])
 def fetch_workflow():
     data = request.get_json()
     workflow_id = data["workflow_uuid"]
@@ -319,7 +319,7 @@ def fetch_workflow():
     return jsonify(response)
 
 
-@workflows.route("/api/workflow/update_title", methods=["POST"])
+@workflows.route("/update_title", methods=["POST"])
 def update_workflow_title():
     user = load_user()
     if user is None:
@@ -335,7 +335,7 @@ def update_workflow_title():
 
 
 ## MARK: Workflow steps
-@workflows.route("/api/workflows/add_workflow_step", methods=["POST"])
+@workflows.route("/add_workflow_step", methods=["POST"])
 def add_workflow_step():
     user = load_user()
     if user is None:
@@ -360,7 +360,7 @@ def add_workflow_step():
     return jsonify(response)
 
 
-@workflows.route("/api/workflows/edit_step", methods=["POST"])
+@workflows.route("/edit_step", methods=["POST"])
 def edit_workflow_step():
     user = load_user()
     if user is None:
@@ -381,7 +381,7 @@ def edit_workflow_step():
     return jsonify(response)
 
 
-@workflows.route("/api/workflow/step/update_title", methods=["POST"])
+@workflows.route("/step/update_title", methods=["POST"])
 def update_workflow_step_title():
     user = load_user()
     if user is None:
@@ -397,7 +397,7 @@ def update_workflow_step_title():
     return jsonify(response)
 
 
-@workflows.route("/api/workflows/step/add_task", methods=["POST"])
+@workflows.route("/step/add_task", methods=["POST"])
 def add_workflow_add_task():
     user = load_user()
     if user is None:
@@ -419,7 +419,7 @@ def add_workflow_add_task():
     return jsonify(response)
 
 
-@workflows.route("/api/workflows/step/add_step_task", methods=["POST"])
+@workflows.route("/step/add_step_task", methods=["POST"])
 def add_workflow_step_task():
     user = load_user()
     if user is None:
@@ -438,7 +438,7 @@ def add_workflow_step_task():
     return jsonify({"complete": True})
 
 
-@workflows.route("/api/workflow/delete_step", methods=["POST"])
+@workflows.route("/delete_step", methods=["POST"])
 def delete_workflow_step():
     user = load_user()
     if user is None:
@@ -463,7 +463,7 @@ def delete_workflow_step():
     return jsonify({"success": True})
 
 
-@workflows.route("/api/workflow/delete_step_task", methods=["POST"])
+@workflows.route("/delete_step_task", methods=["POST"])
 def delete_workflow_step_task():
     user = load_user()
     if user is None:
@@ -484,7 +484,7 @@ def delete_workflow_step_task():
     return jsonify({"success": True})
 
 
-@workflows.route("/api/update_workflow_step", methods=["POST"])
+@workflows.route("/update_workflow_step", methods=["POST"])
 def update_workflow_step():
     user = load_user()
     if user is None:
@@ -503,7 +503,7 @@ def update_workflow_step():
 
 
 ## MARK: ~~ Extraction
-@workflows.route("/api/workflows/add_extraction_step", methods=["GET", "POST"])
+@workflows.route("/add_extraction_step", methods=["GET", "POST"])
 def workflow_add_extraction_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
@@ -608,7 +608,7 @@ def workflow_add_extraction_step():
 
 
 ## MARK: ~~ Attachments
-@workflows.route("/api/workflows/add_attachment", methods=["GET", "POST"])
+@workflows.route("/add_attachment", methods=["GET", "POST"])
 def workflow_add_attachment():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
@@ -648,7 +648,7 @@ def workflow_add_attachment():
 
 
 ## MARK: ~~ Prompts
-@workflows.route("/api/workflows/add_prompt_step", methods=["GET", "POST"])
+@workflows.route("/add_prompt_step", methods=["GET", "POST"])
 def workflow_add_prompt_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
@@ -739,7 +739,7 @@ def workflow_add_prompt_step():
 
 
 ## MARK: ~~ Formatting
-@workflows.route("/api/workflows/add_formatter_step", methods=["GET", "POST"])
+@workflows.route("/add_formatter_step", methods=["GET", "POST"])
 def workflow_add_format_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
@@ -830,7 +830,7 @@ def workflow_add_format_step():
 
 
 ## MARK: ~~ Documents
-@workflows.route("/api/workflows/add_document_step", methods=["GET", "POST"])
+@workflows.route("/add_document_step", methods=["GET", "POST"])
 def workflow_add_document_step():
     if request.method == "GET":
         # Handle GET request - retrieve and return the template

@@ -12,7 +12,8 @@ from pypdf import PdfReader, PdfWriter
 
 from . import tasks
 
-@tasks.route("/api/add_search_set", methods=["POST"])
+# Add a extraction set
+@tasks.route("/extraction/add_search_set", methods=["POST"])
 def add_search_set():
     user = load_user()
     if user is None:
@@ -35,8 +36,8 @@ def add_search_set():
     searchset.save()
     return jsonify({"complete": True, "uuid": searchset.uuid})
 
-
-@tasks.route("/api/add_search_term", methods=["POST"])
+# Add a term to a search set
+@tasks.route("/extraction/add_search_term", methods=["POST"])
 def add_search_term():
     data = request.get_json()
     print(data)
@@ -78,7 +79,7 @@ def add_search_term():
     return jsonify(response)
 
 
-@tasks.route("/api/add_prompt", methods=["POST"])
+@tasks.route("/add_prompt", methods=["POST"])
 def add_prompt():
     data = request.get_json()
     title = data["title"]
@@ -100,7 +101,7 @@ def add_prompt():
     return jsonify(response)
 
 
-@tasks.route("/api/tasks/edit_prompt", methods=["POST"])
+@tasks.route("/edit_prompt", methods=["POST"])
 def edit_prompt():
     data = request.get_json()
     uuid = data["uuid"]
@@ -118,7 +119,7 @@ def edit_prompt():
     return jsonify(response)
 
 
-@tasks.route("/api/tasks/update_prompt", methods=["POST"])
+@tasks.route("/update_prompt", methods=["POST"])
 def update_prompt():
     data = request.get_json()
     uuid = data["uuid"]
@@ -139,7 +140,7 @@ def update_prompt():
 
 
 ## MARK: Tasks - Extraction
-@tasks.route("/api/fetch_search_set_item", methods=["POST"])
+@tasks.route("/fetch_search_set_item", methods=["POST"])
 def fetch_search_set_item():
     data = request.get_json()
     uuid = data["uuid"]
@@ -150,7 +151,7 @@ def fetch_search_set_item():
     return jsonify(response)
 
 
-@tasks.route("/api/search_results", methods=["POST"])
+@tasks.route("/search_results", methods=["POST"])
 def grab_template():
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
@@ -203,7 +204,7 @@ def grab_template():
             return jsonify(response)
 
 
-@tasks.route("/api/extraction/update_title", methods=["POST"])
+@tasks.route("/extraction/update_title", methods=["POST"])
 def update_extraction_title():
     user = load_user()
     if user is None:
@@ -218,7 +219,7 @@ def update_extraction_title():
     return jsonify(response)
 
 
-@tasks.route("/api/semantic_search", methods=["POST"])
+@tasks.route("/semantic_search", methods=["POST"])
 def semantic_search():
     data = request.get_json()
     search_term = data["search_term"]
@@ -239,7 +240,7 @@ def semantic_search():
     return jsonify(response)
 
 
-@tasks.route("/api/begin_search", methods=["POST"])
+@tasks.route("/begin_search", methods=["POST"])
 def begin_search():
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
@@ -323,7 +324,7 @@ def begin_search():
         return jsonify(response)
 
 
-@tasks.route("/api/extract/build_from_document", methods=["POST"])
+@tasks.route("/extract/build_from_document", methods=["POST"])
 def build_extraction_from_document():
     data = request.get_json()
     print(data)
@@ -371,7 +372,7 @@ def build_extraction_from_document():
     return jsonify(response)
 
 
-@tasks.route("/api/delete_search_set", methods=["POST"])
+@tasks.route("/delete_search_set", methods=["POST"])
 def delete_search_set():
     data = request.get_json()
     search_set_uuid = data["uuid"]
@@ -381,7 +382,7 @@ def delete_search_set():
     return jsonify({"success": True})
 
 
-@tasks.route("/api/rename_search_set", methods=["POST"])
+@tasks.route("/rename_search_set", methods=["POST"])
 def rename_search_set():
     data = request.get_json()
     search_set_uuid = data["search_set_uuid"]
@@ -394,7 +395,7 @@ def rename_search_set():
     return jsonify({"complete": True})
 
 
-@tasks.route("/api/clone_search_set", methods=["POST"])
+@tasks.route("/clone_search_set", methods=["POST"])
 def clone_search_set():
     data = request.get_json()
     search_set_uuid = data["search_set_uuid"]
@@ -417,7 +418,7 @@ def clone_search_set():
     return jsonify({"complete": True})
 
 
-@tasks.route("/api/delete_search_set_item", methods=["POST"])
+@tasks.route("/delete_search_set_item", methods=["POST"])
 def delete_search_set_item():
     data = request.get_json()
     print("Deleting search set item")
@@ -428,7 +429,7 @@ def delete_search_set_item():
     return jsonify({"complete": True})
 
 
-@tasks.route("/api/begin_prompt_search", methods=["POST"])
+@tasks.route("/begin_prompt_search", methods=["POST"])
 def begin_prompt_search():
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]

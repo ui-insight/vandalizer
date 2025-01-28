@@ -133,7 +133,7 @@
             });
 
             $.ajax({
-                url: `/api/workflow/delete_step`,
+                url: `/workflows/delete_step`,
                 type: 'POST',
                 data: data,
                 contentType: 'application/json; charset=utf-8',
@@ -165,7 +165,7 @@
         });
         
         $.ajax({
-            url: `/api/workflows/step/add_task`,
+            url: `/workflows/step/add_task`,
             type: 'POST',
             data: data,
             contentType: 'application/json; charset=utf-8',
@@ -208,7 +208,7 @@
                 // Send new title to the server
                 const data = JSON.stringify({ title: newTitle, workflow_step_id: "{{ workflow_step_id }}" });
                 $.ajax({
-                    url: `/api/workflow/step/update_title`,
+                    url: `/workflows/step/update_title`,
                     type: 'POST',
                     data: data,
                     contentType: 'application/json; charset=utf-8',

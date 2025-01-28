@@ -37,7 +37,7 @@
 
                 showWorking();
                 $.ajax({
-                    url: '/api/begin_prompt_search',
+                    url: '/tasks/begin_prompt_search',
                     type: 'POST',
                     data: JSON.stringify({
                         search_set_uuid: datauuid,
@@ -93,7 +93,7 @@
             $("#promptinput").find('p').text("");
 
             $.ajax({
-                url: '/api/add_search_term',
+                url: '/tasks/extraction/add_search_term',
                 type: 'POST',
                 data: JSON.stringify({
                     search_set_uuid: prompt_set_add_uuid,
@@ -135,7 +135,7 @@
 
         $("#add-prompt-set-button").on("click", function () {
             $.ajax({
-                url: '/api/add_search_set',
+                url: '/tasks/extraction/add_search_set',
                 type: 'POST',
                 data: JSON.stringify({
                     title: $("#add-prompt-set-input")[0].value,

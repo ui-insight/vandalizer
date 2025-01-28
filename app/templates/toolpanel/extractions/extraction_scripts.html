@@ -160,7 +160,7 @@
         space_id: "{{ current_space_id }}",
       });
       $.ajax({
-        url: "/api/create_workflow",
+        url: "/workflows/create_workflow",
         type: "POST",
         data: data,
         contentType: "application/json; charset=utf-8",
@@ -177,7 +177,7 @@
     // PERFORM SEARCH
     function performSemanticSearch(term) {
       $.ajax({
-        url: "/api/semantic_search",
+        url: "/tasks/semantic_search",
         type: "POST",
         data: JSON.stringify({
           search_term: $("#add-search-term-input")[0].value,
@@ -226,7 +226,7 @@
         });
 
         $.ajax({
-          url: "/api/fetch_search_set_item",
+          url: "/tasks/fetch_search_set_item",
           type: "POST",
           data: data,
           contentType: "application/json; charset=utf-8",
@@ -269,7 +269,7 @@
       });
 
       $.ajax({
-        url: "/api/begin_search",
+        url: "/tasks/begin_search",
         type: "POST",
         data: data,
         contentType: "application/json; charset=utf-8",
@@ -313,7 +313,7 @@
         });
 
         $.ajax({
-          url: "/api/begin_search",
+          url: "/tasks/begin_search",
           type: "POST",
           data: data,
           contentType: "application/json; charset=utf-8",
@@ -444,7 +444,7 @@
         searchDict = createSearchTermDictionary();
         console.log("Exporting");
         var form = $("<form>", {
-          action: "/export_extraction",
+          action: "/tasks/export_extraction",
           method: "GET",
         });
 
@@ -475,7 +475,7 @@
         searchDict = createSearchTermDictionary();
         console.log("Exporting");
         var form = $("<form>", {
-          action: "/download_fillable",
+          action: "/tasks/download_fillable",
           method: "GET",
         });
 
@@ -547,7 +547,7 @@
       console.log("Performing search");
       console.log(document_uuids);
       $.ajax({
-        url: "/api/search_results",
+        url: "/tasks/search_results",
         type: "POST",
         data: JSON.stringify({
           search_set_uuid: set_uuid,
@@ -583,7 +583,7 @@
 
     function addSearchSetItem() {
       $.ajax({
-        url: "/api/add_search_term",
+        url: "/tasks/extraction/add_search_term",
         type: "POST",
         data: JSON.stringify({
           search_set_uuid: search_set_add_uuid,
@@ -612,7 +612,7 @@
 
     function addPrompt(title, prompt, prompt_type) {
       $.ajax({
-        url: "/api/add_prompt",
+        url: "/tasks/add_prompt",
         type: "POST",
         data: JSON.stringify({
           title: title,
@@ -642,7 +642,7 @@
       showScanning();
       showWorking();
       $.ajax({
-        url: "/api/extract/build_from_document",
+        url: "/tasks/extract/build_from_document",
         type: "POST",
         data: JSON.stringify({
           search_set_uuid: uuid,
@@ -687,7 +687,7 @@
 
     function addSearchSet(title, category) {
       $.ajax({
-        url: "/api/add_search_set",
+        url: "/tasks/extraction/add_search_set",
         type: "POST",
         data: JSON.stringify({
           title: title,

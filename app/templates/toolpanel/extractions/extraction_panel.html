@@ -175,7 +175,7 @@
                 // Send new title to the server
                 const data = JSON.stringify({ title: newTitle, extraction_uuid: "{{ search_set.uuid }}" });
                 $.ajax({
-                    url: `/api/extraction/update_title`,
+                    url: `/tasks/extraction/update_title`,
                     type: 'POST',
                     data: data,
                     contentType: 'application/json; charset=utf-8',
