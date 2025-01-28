@@ -4,8 +4,6 @@ from . import auth
 from app import azure
 from app.models import User
 
-auth = Blueprint('auth', __name__)
-
 @auth.route("/")
 def index():
     print("Not authorized")

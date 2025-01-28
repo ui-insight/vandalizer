@@ -13,7 +13,7 @@ from app import socketio
 from flask_socketio import emit, send
 from itertools import chain
 
-workflows = Blueprint('workflows', __name__)
+from . import workflows
 
 @workflows.route("/api/create_workflow", methods=["POST"])
 def add_workflow():

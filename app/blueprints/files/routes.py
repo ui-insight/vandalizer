@@ -9,8 +9,7 @@ import pypandoc
 from app.utilities.excel_helper import save_excel_to_html
 from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
-
-files = Blueprint('files', __name__)
+from . import files
 
 @files.route("/upload", methods=["POST"])
 @login_required

@@ -8,11 +8,10 @@ from itertools import chain
 from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
+from . import home
 
-main = Blueprint('main', __name__)
-
-@main.route("/home")
-def home():
+@home.route("/")
+def index():
     # production environment
     if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
         if not azure.authorized:
@@ -179,7 +178,7 @@ def home():
 
 
 
-@main.route("/api/chat", methods=["POST"])
+@home.route("/api/chat", methods=["POST"])
 def chat():
     data = request.get_json()
     message = data["message"]
@@ -220,7 +219,7 @@ def chat():
 
     user_id = load_user().user_id
     response = OpenAIInterface().ask_question_to_documents(
-        main.root_path,
+        home.root_path,
         documents,
         message,
         default_docs=docs,
@@ -234,7 +233,7 @@ def chat():
 
 
 
-@main.route("/static/fontawesome/webfonts/<path:filename>")
+@home.route("/static/fontawesome/webfonts/<path:filename>")
 def serve_fonts(filename):
     if filename.endswith(".woff2"):
         return send_from_directory(

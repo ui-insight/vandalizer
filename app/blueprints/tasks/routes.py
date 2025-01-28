@@ -10,7 +10,7 @@ import csv, os, uuid
 
 from pypdf import PdfReader, PdfWriter
 
-tasks = Blueprint('tasks', __name__)
+from . import tasks
 
 @tasks.route("/api/add_search_set", methods=["POST"])
 def add_search_set():

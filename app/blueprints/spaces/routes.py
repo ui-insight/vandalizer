@@ -1,8 +1,7 @@
 from flask import Blueprint, request, redirect, render_template
 from app.models import Space
 import uuid
-
-spaces = Blueprint('spaces', __name__)
+from . import spaces
 
 @spaces.route("/new", methods=["GET", "POST"])
 def new_space():
