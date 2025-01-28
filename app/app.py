@@ -1,0 +1,54 @@
+from flask import Flask
+from flask_bootstrap import Bootstrap
+import mongoengine as me
+from flask_login import LoginManager
+from flask_mail import Mail
+from datetime import timedelta
+from flask_cors import CORS
+from flask_socketio import SocketIO
+from oauthlib.oauth2.rfc6749.errors import TokenExpiredError
+from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
+from flask_dance.contrib.azure import azure, make_azure_blueprint
+
+def create_app():
+    app = Flask(__name__)
+    
+    CORS(app)
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
+    app.permanent_session_lifetime = timedelta(days=60)
+    app.config.from_object("app.configuration.DevelopmentConfig")
+
+    me.connect("osp")
+    bs = Bootstrap(app)  # flask-bootstrap
+    mail = Mail(app)
+    socketio = SocketIO(app)
+
+    # Setup blueprints
+    from .blueprints.auth import auth
+    from .blueprints.main import main
+    from .blueprints.workflows import workflows
+    from .blueprints.files import files
+    from .blueprints.spaces import spaces
+    from .blueprints.feedback import feedback
+    from .blueprints.tasks import tasks
+    
+    app.register_blueprint(auth)
+    app.register_blueprint(main, url_prefix='/main')
+    app.register_blueprint(workflows, url_prefix='/workflows')
+    app.register_blueprint(files, url_prefix='/files')
+    app.register_blueprint(spaces, url_prefix='/spaces')
+    app.register_blueprint(feedback, url_prefix='/feedback')
+    app.register_blueprint(tasks, url_prefix='/tasks')
+
+    # OAuth
+    blueprint = make_azure_blueprint(
+        client_id=app.config["CLIENT_ID"],
+        client_secret=app.config["CLIENT_SECRET"],
+        tenant=app.config["TENANT_NAME"],
+    )
+
+    app.register_blueprint(blueprint, url_prefix="/login")
+
+    # @auth.errorhandler(MismatchingStateError)
+    # def mismatching_state(e):
+    #     return redirect(url_for("azure.login"))
