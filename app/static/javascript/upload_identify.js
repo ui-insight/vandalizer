@@ -112,7 +112,10 @@ function showFile() {
           let newLink = $("<a>")
             .attr("href", "/home?docid=" + result.uuid)
             .text(filename);
-          let href = "/home?folder_id=" + result.folder_id;
+
+          
+          let href = "/home?docid=" + result.uuid;
+          console.log
           window.location.href = href;
           return;
 
