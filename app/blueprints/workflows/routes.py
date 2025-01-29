@@ -274,12 +274,9 @@ def workflow_download():
 
     output_file_path = os.path.join(current_app.root_path, "static", "workflow_output.txt")
     final_output = list(workflow_result.steps_output.values())[-1]
-    print("HERE IS THE OUTPUT")
-    print(final_output)
-    print("DONE")
 
     with open(output_file_path, "w") as f:  # Open as text file for string output
-        f.write(final_output["output"])  # Assuming output is a string
+        f.write(final_output["output"]["answer"])  # Assuming output is a string
 
     # Return the path to the CSV file
     return send_file(
