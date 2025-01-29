@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, send_file, session
+from flask import Blueprint, request, current_app, jsonify, redirect, url_for, render_template, send_file, session
 from app.models import SmartDocument, SearchSet, SearchSetItem, Workflow, WorkflowStepTask, WorkflowResult, WorkflowStep
 from app.models import User, Space, WorkflowAttachment
 from app.utils import load_user
@@ -15,6 +15,7 @@ from itertools import chain
 
 from . import workflows
 
+## MARK: ~~ Create
 @workflows.route("/create_workflow", methods=["POST"])
 def add_workflow():
     user = load_user()
@@ -28,9 +29,9 @@ def add_workflow():
         user_id=session["user_id"],
     )
     workflow.save()
-    return redirect("/home?section=Workflows")
+    return jsonify({"reroute": url_for("home.index", section="Workflows", workflow_id=str(workflow.id))})
 
-
+## MARK: ~~ Delete
 @workflows.route("/delete_workflow", methods=["GET"])
 def delete_workflow():
     user = load_user()
@@ -143,7 +144,7 @@ def run_workflow_integrated():
         uid = uuid.uuid4().hex.upper()
 
         # Create upload directory if it doesn't exist
-        upload_dir = os.path.join(workflows.root_path, "static", "uploads", str(user.id))
+        upload_dir = os.path.join(current_app.root_path, "static", "uploads", str(user.id))
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
@@ -268,9 +269,9 @@ def workflow_download():
     # time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
 
     # Ensure the static folder exists
-    os.makedirs(os.path.join(workflows.root_path, "static"), exist_ok=True)
+    os.makedirs(os.path.join(current_app.root_path, "static"), exist_ok=True)
 
-    output_file_path = os.path.join(workflows.root_path, "static", "workflow_output.txt")
+    output_file_path = os.path.join(current_app.root_path, "static", "workflow_output.txt")
     final_output = list(workflow_result.steps_output.values())[-1]
     print(final_output)
 

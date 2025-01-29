@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, render_template, send_file
+from flask import Blueprint, request, jsonify, current_app, redirect, url_for, render_template, send_file
 from app.models import SmartDocument, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utils import load_user
@@ -266,7 +266,7 @@ def begin_search():
 
     if len(keys) > 0:
         em = ExtractionManager3()
-        em.root_path = tasks.root_path
+        em.root_path = current_app.root_path
         results = em.extract(keys, document_paths)[0]
 
         if search_set.fillable_pdf_url != "" and search_set.fillable_pdf_url != None:
@@ -279,7 +279,7 @@ def begin_search():
             print(bindings)
             # Define the file path for the CSV file
             pdf_path = os.path.join(
-                tasks.root_path, "static", "uploads", search_set.fillable_pdf_url
+                current_app.root_path, "static", "uploads", search_set.fillable_pdf_url
             )
 
             print(pdf_path)
@@ -293,7 +293,7 @@ def begin_search():
                 writer.pages[0], bindings, auto_regenerate=False
             )
 
-            output_pdf_path = os.path.join(tasks.root_path, "static", "fillable_form.pdf")
+            output_pdf_path = os.path.join(current_app.root_path, "static", "fillable_form.pdf")
             with open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
@@ -341,7 +341,7 @@ def build_extraction_from_document():
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
     em = ExtractionManager2()
-    em.root_path = tasks.root_path
+    em.root_path = current_app.root_path
     keys = em.build_from_documents(document_paths)
     print(keys)
 
@@ -441,7 +441,7 @@ def begin_prompt_search():
 
     if len(items) > 0:
         llm = OpenAIInterface()
-        llm.load_document(tasks.root_path, document_path)
+        llm.load_document(current_app.root_path, document_path)
         results = {}
         for item in items:
             results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
@@ -478,7 +478,7 @@ def export_extraction():
         rows.append([key, value])
 
     # Define the file path for the CSV file
-    csv_file_path = os.path.join(tasks.root_path, "static", "export.csv")
+    csv_file_path = os.path.join(current_app.root_path, "static", "export.csv")
 
     print(rows)
     # Write the rows to the CSV file
@@ -505,7 +505,7 @@ def download_fillable():
     print(bindings)
     # Define the file path for the CSV file
     pdf_path = os.path.join(
-        tasks.root_path, "static", "uploads", search_set.fillable_pdf_url
+        current_app.root_path, "static", "uploads", search_set.fillable_pdf_url
     )
 
     print(pdf_path)
@@ -519,7 +519,7 @@ def download_fillable():
         writer.pages[0], bindings, auto_regenerate=False
     )
 
-    output_pdf_path = os.path.join(tasks.root_path, "static", "fillable_form.pdf")
+    output_pdf_path = os.path.join(current_app.root_path, "static", "fillable_form.pdf")
     with open(output_pdf_path, "wb") as f:
         writer.write(f)
 
