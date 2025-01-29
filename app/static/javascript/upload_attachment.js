@@ -58,7 +58,7 @@ function attachFile(){
 
       $.ajax({
          type: "POST",
-         url: "/read_pdf",
+         url: "/files/read_pdf",
          data: JSON.stringify(model),
                       processData: false,
          contentType: "application/json",

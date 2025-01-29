@@ -425,7 +425,7 @@
         formData.append("search_set_uuid", search_set_add_uuid);
         showFillableDocLoading();
         $.ajax({
-          url: "/upload_fillable_pdf",
+          url: "/files/upload_fillable_pdf",
           type: "POST",
           data: formData,
           processData: false,

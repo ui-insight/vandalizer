@@ -249,7 +249,7 @@ $(document).ready(function () {
   function renameDocument(uuid, newName) {
     $.ajax({
       type: "POST",
-      url: "/rename_document",
+      url: "/files/rename_document",
       data: JSON.stringify({ uuid: uuid, newName: newName }),
       processData: false,
       contentType: "application/json",
@@ -265,7 +265,7 @@ $(document).ready(function () {
   function renameFolder(uuid, newName) {
     $.ajax({
       type: "POST",
-      url: "/rename_folder",
+      url: "/files/rename_folder",
       data: JSON.stringify({ uuid: uuid, newName: newName }),
       processData: false,
       contentType: "application/json",
@@ -293,9 +293,9 @@ $(document).ready(function () {
       }
 
       if (folderId) {
-        window.location.href = `/delete_document?docid=${currentItemId}&folder_id=${folderId}`;
+        window.location.href = `/files/delete_document?docid=${currentItemId}&folder_id=${folderId}`;
       } else {
-        window.location.href = `/delete_document?docid=${currentItemId}`;
+        window.location.href = `/files/delete_document?docid=${currentItemId}`;
       }
     }
     hidePopupMenu();
@@ -436,7 +436,7 @@ $(document).ready(function () {
     
     $.ajax({
       type: "POST",
-      url: "/move_file",
+      url: "/files/move_file",
       data: JSON.stringify({
         fileUUID: fileUUID,
         folderID: folderID
