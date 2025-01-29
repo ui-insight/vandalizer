@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory
+from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
@@ -195,7 +195,7 @@ def chat():
                 html_files = [
                     f
                     for f in os.listdir(
-                        os.path.join(main.root_path, "static", "uploads")
+                        os.path.join(current_app.root_path, "static", "uploads")
                     )
                     if f.startswith(document.uuid)
                     and f != document.path
@@ -219,7 +219,7 @@ def chat():
 
     user_id = load_user().user_id
     response = OpenAIInterface().ask_question_to_documents(
-        home.root_path,
+        current_app.root_path,
         documents,
         message,
         default_docs=docs,

@@ -1,8 +1,7 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, session
+from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.document_manager import DocumentManager
-from flask_login import login_required
 import uuid, base64, os, threading, io
 from app.utils import load_user, ingest_semantics
 import pypandoc
@@ -12,7 +11,6 @@ from app.utilities.fillable_pdf_manager import FillablePDFManager
 from . import files
 
 @files.route("/upload", methods=["POST"])
-@login_required
 def upload():
     user = load_user()
     if user is None:
@@ -37,7 +35,7 @@ def upload():
     uid = uuid.uuid4().hex.upper()
 
     # Handle file upload and conversion
-    upload_dir = os.path.join(files.root_path, "static", "uploads")
+    upload_dir = os.path.join(current_app.root_path, "static", "uploads")
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
 
@@ -76,7 +74,6 @@ def upload():
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
 @files.route("/rename_document", methods=["POST"])
-@login_required
 def rename_document():
     data = request.get_json()
     document_uuid = data["uuid"]
@@ -88,7 +85,6 @@ def rename_document():
     return jsonify({"complete": True})
 
 @files.route("/rename_folder", methods=["POST"])
-@login_required
 def rename_folder():
     data = request.get_json()
     document_uuid = data["uuid"]
@@ -100,7 +96,6 @@ def rename_folder():
     return jsonify({"complete": True})
 
 @files.route("/move_file", methods=["POST"])
-@login_required
 def move_file():
     data = request.get_json()
     file_uuid = data["fileUUID"]
@@ -113,7 +108,6 @@ def move_file():
     return jsonify({"complete": True})
 
 @files.route("/delete_document")
-@login_required
 def delete_documents():
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
@@ -129,20 +123,19 @@ def delete_documents():
         if document.extension == "html":
             # Delete associated HTML files
             html_files = [
-                f for f in os.listdir(os.path.join(files.root_path, "static", "uploads"))
+                f for f in os.listdir(os.path.join(current_app.root_path, "static", "uploads"))
                 if f.startswith(document.uuid)
             ]
             for html_file in html_files:
-                os.remove(os.path.join(files.root_path, "static", "uploads", html_file))
+                os.remove(os.path.join(current_app.root_path, "static", "uploads", html_file))
     
     folder_id = request.args.get("folder_id")
     if folder_id:
-        return redirect(url_for("main.home", folder_id=folder_id))
+        return redirect(url_for("home.index", folder_id=folder_id))
 
-    return redirect(url_for("main.home"))
+    return redirect(url_for("home.index"))
 
 @files.route("/delete_folder")
-@login_required
 def delete_folder():
     folder_id = request.args.get("folder_id")
     SmartFolder.objects.filter(uuid=folder_id).delete()
@@ -151,10 +144,9 @@ def delete_folder():
     SmartFolder.objects.filter(parent_id=folder_id).delete()
     SmartDocument.objects.filter(folder=folder_id).delete()
     
-    return redirect(url_for("main.home"))
+    return redirect(url_for("home.index"))
 
 @files.route("/move_item", methods=["POST"])
-@login_required
 def move_item():
     item_type = request.form.get("item_type")
     item_id = request.form.get("item_id")
@@ -168,7 +160,6 @@ def move_item():
     return redirect(url_for("main.file_browser"))
 
 @files.route("/toggle_default_doc")
-@login_required
 def toggle_default_doc():
     user = load_user()
     doc_id = request.args.get("doc_id")
@@ -182,7 +173,6 @@ def toggle_default_doc():
     return redirect(f"/home?{redirect_url}")
 
 @files.route("/create_folder", methods=["POST"])
-@login_required
 def create_folder():
     parent_id = request.form["parent_id"]
     name = request.form["name"]
@@ -195,7 +185,7 @@ def create_folder():
         user_id=session["user_id"],
         uuid=uuid.uuid4().hex,
     )
-    return redirect(url_for("main.home"))
+    return redirect(url_for("home.index"))
 
 @files.route("/upload_fillable_pdf", methods=["POST"])
 def upload_fillable_pdf():
@@ -218,7 +208,7 @@ def upload_fillable_pdf():
 
     # Write to the filesystem
     # Save the file to the filesystem
-    file_path = os.path.join(files.root_path, "static", "uploads", file.filename)
+    file_path = os.path.join(current_app.root_path, "static", "uploads", file.filename)
     file.seek(0)  # Go back to the start of the file
     with open(file_path, "wb") as f:
         f.write(file.read())
@@ -267,10 +257,10 @@ def read_pdf():
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
-    with open(os.path.join(files.root_path, "static", "temp", f"{uid}.pdf"), "wb") as f:
+    with open(os.path.join(current_app.root_path, "static", "temp", f"{uid}.pdf"), "wb") as f:
         f.write(imgdata)
 
-    pdf = PdfReader(os.path.join(files.root_path, "static", "temp", f"{uid}.pdf"))
+    pdf = PdfReader(os.path.join(current_app.root_path, "static", "temp", f"{uid}.pdf"))
     number_of_pages = len(pdf.pages)
     full_text = ""
     for i in range(number_of_pages):
