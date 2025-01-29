@@ -252,7 +252,8 @@ def workflow_status_socket(data):
     emit("workflow_status", response)
 
 
-@workflows.route("/workflow/download", methods=["GET"])
+## MARK: Download
+@workflows.route("/download", methods=["GET"])
 def workflow_download():
     session_id = request.args.get("session_id")
 
@@ -273,7 +274,9 @@ def workflow_download():
 
     output_file_path = os.path.join(current_app.root_path, "static", "workflow_output.txt")
     final_output = list(workflow_result.steps_output.values())[-1]
+    print("HERE IS THE OUTPUT")
     print(final_output)
+    print("DONE")
 
     with open(output_file_path, "w") as f:  # Open as text file for string output
         f.write(final_output["output"])  # Assuming output is a string
@@ -285,7 +288,7 @@ def workflow_download():
 
 
 ## MARK: ~~ Integrate
-@workflows.route("/workflows/integrate", methods=["POST"])
+@workflows.route("/integrate", methods=["POST"])
 def workflow_integrate():
     user = load_user()
     data = request.get_json()
