@@ -8,6 +8,7 @@ from app.utilities.llm_helpers import remove_code_markers
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
+from pydantic_ai.models.ollama import OllamaModel
 
 from app.utilities.document_manager import DocumentManager
 
@@ -196,6 +197,11 @@ class ExtractionDeps:
     fields: Dict[str, tuple]
     text: str
 
+
+# model = OllamaModel(
+#     model_name="deepseek-r1:70b",
+#     base_url="https://mindrouter-api.nkn.uidaho.edu",
+# )
 
 extraction_agent = Agent(
     "openai:gpt-4o",

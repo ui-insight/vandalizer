@@ -1,5 +1,8 @@
 import os
 from datetime import datetime
+from devtools import debug
+
+import json
 import re
 from pathlib import Path
 import openai
@@ -16,6 +19,9 @@ import asyncio
 
 import time
 
+# from langchain_redis import RedisCache
+from app.utilities.redis_cache import RedisCache
+
 from app.models import (
     ChatHistory,
     ChatMessage,
@@ -28,6 +34,20 @@ from app.utilities.document_readers import extract_text_from_pdf, extract_text_f
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
 from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+    SystemPromptPart,
+)
+
+# 2h
+ttl = 60 * 60 * 1
+cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
@@ -188,14 +208,20 @@ class OpenAIInterface:
         print("prompt: ", prompt)
         deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
 
-        # Get previous messages
-        # latest_conversation_messages = AgentHistory.get_latest_conversation_messages(
-        #     user_id=user_id
-        # )
+        docs_ids_string = "_".join([str(doc.id) for doc in documents])
+        cache_key = f"chat_history_{user_id}_{docs_ids_string}"
+        llm_string = "pydantic_model:openai:gpt-4o"
         previous_messages = []
         latest_conversation_messages = []
         if session is not None:
-            latest_conversation_messages = session.get("chat_history", [])
+            # latest_conversation_messages = session.get("chat_history", [])
+            cache_result = cache.lookup(cache_key, llm_string)
+            if cache_result is not None:
+                debug(cache_result)
+                latest_conversation_messages = cache_result
+
+                # latest_conversation_messages =
+                ModelMessagesTypeAdapter.validate_python(latest_conversation_messages)
             previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
             parsed_messages = []
             for message in previous_messages:
@@ -230,9 +256,9 @@ class OpenAIInterface:
             previous_messages = parsed_messages
 
             print("previous messages: ", previous_messages)
-            previous_messages = ModelMessagesTypeAdapter.validate_python(
-                previous_messages
-            )
+            # previous_messages = ModelMessagesTypeAdapter.validate_python(
+            #     previous_messages
+            # )
 
         answer = rag_agent.run_sync(
             prompt,
@@ -242,65 +268,21 @@ class OpenAIInterface:
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())
-        if session is not None:
-            new_chat_history = latest_conversation_messages + answer.new_messages()
-            # save the latest max messages
-            session["chat_history"] = new_chat_history
+
+        # remove None
+        chat_history = json.loads(answer.new_messages_json())
+        debug(chat_history)
+        cache.update(cache_key, llm_string, chat_history)
+        # if session is not None:
+        #     new_chat_history = latest_conversation_messages + answer.new_messages()
+        #     # save the latest max messages
+        #     session["chat_history"] = new_chat_history
 
         return dict(
             question=question,
             answer=self.format_answer(answer.data),
             formatted_answer=self.format_answer(answer.data),
         )
-
-        # for new_message in answer.new_messages:
-
-        # prompt = (
-        #     """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
-        #     \n\nQuestion: """
-        #     + question
-        #     + "\n\n"
-        # )
-        # # append the question to the previous messages
-        # prompt += "Conversation history: \n"
-        # for message in previous_messages:
-        #     if message.role == ChatRole.USER:
-        #         prompt += "User: " + message.message + "\n"
-        #     elif message.role == ChatRole.SYSTEM:
-        #         prompt += "System: " + message.message + "\n\n"
-
-        # print("prompt: ", prompt)
-
-        # # prompt += full_text
-        # # use a tiktoken library for more accurate computation of the total token length for the context
-        # # print("total context length: ", total_context_length)
-        # # print("docs", documents)
-
-        # output = self.perform_llm_call(
-        #     prompt=prompt, question=question, full_text=full_text, root_path=root_path
-        # )
-
-        # if user_id is None:
-        #     return output
-
-        # # save the conversation
-        # user_message = ChatMessage(
-        #     role=ChatRole.USER,
-        #     message=question,
-        # )
-        # system_message = ChatMessage(
-        #     role=ChatRole.SYSTEM,
-        #     message=output["formatted_answer"],
-        # )
-        # user_message.save()
-        # system_message.save()
-        # print("messages: ", previous_messages + [user_message, system_message])
-        # conversation = ChatHistory(
-        #     user_id=user_id, messages=[user_message, system_message]
-        # )
-        # conversation.save()
-        # print("conversation saved", conversation)
-        # return output
 
     def perform_llm_call(self, prompt, **kwargs):
         full_text = kwargs.get("full_text")
