@@ -567,56 +567,56 @@
         });
 
 
-        // function performWorkflowStatus(session_id, workflow_time) {
-  //   $.ajax({
-  //           url: `/workflows/workflow/status?session_id=${session_id}`,
-  //           type: 'GET',
-  //           dataType: 'json',
-  //           success: function (data) {
-  //               console.log(data);
-  //               //const { steps_completed, total_steps, status } = data;
-  //               let steps_completed = data.steps_completed;
-  //               let total_steps = data.total_steps;
-  //
-  //               console.log(steps_completed);
-  //
-  //
-  //               if (steps_completed == active_step) {
-  //                   $('.workflow-step').removeClass('active');
-  //                   $('.step-connector').removeClass('active');
-  //
-  //                   $('.workflow-loader').hide();
-  //                   // Add 'active' class to the nth $('.workflow-step') element (0-based index)
-  //                   $('.workflow-step').eq(active_step).addClass('active');
-  //                   $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
-  //                   $('.workflow-loader').eq(active_step-1).fadeIn();
-  //                   active_step = steps_completed + 1;
-  //               }
-  //
-  //               // Update steps completed and time elapsed
-  //               $('.workflow-output-attachment-info').html(`
-  //                   <span>${steps_completed} / ${total_steps} steps completed</span>
-  //                   <span><i> ${workflow_time} seconds elapsed</i></span>
-  //               `);
-  //
-  //               // Check if the workflow is completed or has failed
-  //               if (status === 'completed' || status === 'failed') {
-  //                   clearInterval(intervalId); // Stop polling
-  //                   if (status === 'failed') {
-  //                       showToast("Workflow failed");
-  //                   } else {
-  //                       showToast("Workflow completed");
-  //                   }
-  //               }
-  //           },
-  //           error: function (xhr, ajaxOptions, thrownError) {
-  //               clearInterval(intervalId); // Stop polling on error
-  //               console.log(xhr.status);
-  //               console.log(thrownError);
-  //               showToast("Error polling workflow status");
-  //           }
-  //       });
-  // }
+        function performWorkflowStatus(session_id, workflow_time) {
+    $.ajax({
+            url: `/workflows/workflow/status?session_id=${session_id}`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                console.log(data);
+                //const { steps_completed, total_steps, status } = data;
+                let steps_completed = data.steps_completed;
+                let total_steps = data.total_steps;
+  
+                console.log(steps_completed);
+  
+  
+                if (steps_completed == active_step) {
+                    $('.workflow-step').removeClass('active');
+                    $('.step-connector').removeClass('active');
+  
+                    $('.workflow-loader').hide();
+                    // Add 'active' class to the nth $('.workflow-step') element (0-based index)
+                    $('.workflow-step').eq(active_step).addClass('active');
+                    $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
+                    $('.workflow-loader').eq(active_step-1).fadeIn();
+                    active_step = steps_completed + 1;
+                }
+  
+                // Update steps completed and time elapsed
+                $('.workflow-output-attachment-info').html(`
+                    <span>${steps_completed} / ${total_steps} steps completed</span>
+                    <span><i> ${workflow_time} seconds elapsed</i></span>
+                `);
+  
+                // Check if the workflow is completed or has failed
+                if (status === 'completed' || status === 'failed') {
+                    clearInterval(intervalId); // Stop polling
+                    if (status === 'failed') {
+                        showToast("Workflow failed");
+                    } else {
+                        showToast("Workflow completed");
+                    }
+                }
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                clearInterval(intervalId); // Stop polling on error
+                console.log(xhr.status);
+                console.log(thrownError);
+                showToast("Error polling workflow status");
+            }
+        });
+  }
 
         function downloadWorkflow(session_id) {
           window.location.href = `/workflows/download?session_id=${session_id}`;

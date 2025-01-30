@@ -5,13 +5,11 @@ from flask_login import LoginManager
 from flask_mail import Mail
 from datetime import timedelta
 from flask_cors import CORS
-from flask_socketio import SocketIO
 from oauthlib.oauth2.rfc6749.errors import TokenExpiredError
 from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
 from flask_dance.contrib.azure import azure, make_azure_blueprint
 import logging
 
-socketio = SocketIO(cors_allowed_origins="*", async_mode='threading')
 app = Flask(__name__)
     
 CORS(app)
@@ -22,7 +20,6 @@ app.config.from_object("app.configuration.DevelopmentConfig")
 me.connect("osp")
 Bootstrap(app)  # flask-bootstrap
 Mail(app)
-socketio.init_app(app)
 
     # Set up logging
 logging.basicConfig(level=logging.INFO)

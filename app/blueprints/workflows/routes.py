@@ -9,8 +9,7 @@ from werkzeug.utils import secure_filename
 import pypandoc, json
 from bson import ObjectId
 from app.utilities.excel_helper import save_excel_to_html
-from app import socketio
-from flask_socketio import emit, send
+# from app import socketio
 from itertools import chain
 
 from . import workflows
@@ -226,30 +225,30 @@ def workflow_status():
     return jsonify(response)
 
 
-@socketio.on("workflow_status")
-def workflow_status_socket(data):
-    print("Workflow websocket", data)
-    session_id = data.get("session_id")
+# @socketio.on("workflow_status")
+# def workflow_status_socket(data):
+#     print("Workflow websocket", data)
+#     session_id = data.get("session_id")
 
-    if not session_id:
-        emit("workflow_status", {"error": "session_id is required"})
-        return
+#     if not session_id:
+#         emit("workflow_status", {"error": "session_id is required"})
+#         return
 
-    # Get workflow status
-    workflow_result = WorkflowResult.objects(session_id=session_id).first()
+#     # Get workflow status
+#     workflow_result = WorkflowResult.objects(session_id=session_id).first()
 
-    if not workflow_result:
-        emit("workflow_status", {"error": "Workflow not found"})
-        return
+#     if not workflow_result:
+#         emit("workflow_status", {"error": "Workflow not found"})
+#         return
 
-    response = {
-        "steps_completed": workflow_result.num_steps_completed,
-        "total_steps": workflow_result.num_steps_total,
-        "steps_output": workflow_result.steps_output,
-        "status": workflow_result.status,
-    }
+#     response = {
+#         "steps_completed": workflow_result.num_steps_completed,
+#         "total_steps": workflow_result.num_steps_total,
+#         "steps_output": workflow_result.steps_output,
+#         "status": workflow_result.status,
+#     }
 
-    emit("workflow_status", response)
+#     emit("workflow_status", response)
 
 
 ## MARK: Download

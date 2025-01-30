@@ -1,11 +1,10 @@
 import os
 
-from app import app, socketio
+from app import app
 from dotenv import load_dotenv
 from langfuse.decorators import langfuse_context
 import logging
 from dotenv import load_dotenv
-from flask_socketio import SocketIO
 
 load_dotenv()
 
@@ -49,8 +48,4 @@ if __name__ == "__main__":
         os.environ["APP_ENV"] = "dev"
 
     port = int(os.environ.get("PORT", 5001))
-    host = "0.0.0.0"
- 
-    socketio.run(
-        app, host=host, port=port, use_reloader=True, debug=True, log_output=True
-    )
+    app.run(host="0.0.0.0", port=port)
