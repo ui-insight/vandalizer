@@ -53,25 +53,6 @@ cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 # it is taking so much time to execute the call
 
 
-def convert_messages(messages) -> list[ModelMessage]:
-    new_messages = []
-    for row in messages:
-        new_messages.extend(ModelMessagesTypeAdapter.validate_json(row[0]))
-    return new_messages
-
-
-def to_chat_message(m: ModelMessage):
-    first_part = m.parts[0]
-    if isinstance(m, ModelRequest):
-        if isinstance(first_part, UserPromptPart):
-            return m
-        if isinstance(first_part, SystemPromptPart):
-            return m
-    elif isinstance(m, ModelResponse):
-        if isinstance(first_part, TextPart):
-            return m
-
-
 # TODO we might need to rename the class
 class OpenAIInterface:
     loaded_doc = ""
@@ -227,12 +208,6 @@ class OpenAIInterface:
         print("prompt: ", prompt)
         deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
 
-        # Get previous messages
-        # latest_conversation_messages = AgentHistory.get_latest_conversation_messages(
-        #     user_id=user_id
-        # )
-
-        # TODO use redis to store the chat history
         docs_ids_string = "_".join([str(doc.id) for doc in documents])
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
         llm_string = "pydantic_model:openai:gpt-4o"
@@ -308,55 +283,6 @@ class OpenAIInterface:
             answer=self.format_answer(answer.data),
             formatted_answer=self.format_answer(answer.data),
         )
-
-        # for new_message in answer.new_messages:
-
-        # prompt = (
-        #     """Given the following conversation history, document(s), answer the following question. Return the answer as nicely formatted html with supportive information to display in a web interface chat bot.
-        #     \n\nQuestion: """
-        #     + question
-        #     + "\n\n"
-        # )
-        # # append the question to the previous messages
-        # prompt += "Conversation history: \n"
-        # for message in previous_messages:
-        #     if message.role == ChatRole.USER:
-        #         prompt += "User: " + message.message + "\n"
-        #     elif message.role == ChatRole.SYSTEM:
-        #         prompt += "System: " + message.message + "\n\n"
-
-        # print("prompt: ", prompt)
-
-        # # prompt += full_text
-        # # use a tiktoken library for more accurate computation of the total token length for the context
-        # # print("total context length: ", total_context_length)
-        # # print("docs", documents)
-
-        # output = self.perform_llm_call(
-        #     prompt=prompt, question=question, full_text=full_text, root_path=root_path
-        # )
-
-        # if user_id is None:
-        #     return output
-
-        # # save the conversation
-        # user_message = ChatMessage(
-        #     role=ChatRole.USER,
-        #     message=question,
-        # )
-        # system_message = ChatMessage(
-        #     role=ChatRole.SYSTEM,
-        #     message=output["formatted_answer"],
-        # )
-        # user_message.save()
-        # system_message.save()
-        # print("messages: ", previous_messages + [user_message, system_message])
-        # conversation = ChatHistory(
-        #     user_id=user_id, messages=[user_message, system_message]
-        # )
-        # conversation.save()
-        # print("conversation saved", conversation)
-        # return output
 
     def perform_llm_call(self, prompt, **kwargs):
         full_text = kwargs.get("full_text")
