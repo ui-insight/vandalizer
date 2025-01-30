@@ -2103,7 +2103,8 @@ def feedback():
     question = data.get("question")
     answer = data.get("answer")
     context = data.get("context")
-    context = " ".join(context)
+    if isinstance(context, list):
+        context = " ".join(context)
     docs_uuids = data.get("docs_uuids")
 
     print("feedback_type", feedback_type)
@@ -2128,9 +2129,9 @@ def feedback():
 
     feedback_counter.count += 1
     feedback_counter.save()
-    max_feedback_count = 100
+    # max_feedback_count = 100
 
-    print("feedback_counter", feedback_counter.count)
+    # print("feedback_counter", feedback_counter.count)
 
     # if feedback_counter.count >= max_feedback_count:
     #     feedback_counter.count = 0  # Reset count after 10 feedbacks

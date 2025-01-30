@@ -248,7 +248,7 @@ class ChatRole(Enum):
     USER = "user"
 
 
-MAX_CHAT_MESSAGES = 5
+MAX_CHAT_MESSAGES = 20
 
 
 class ChatMessage(me.Document):
