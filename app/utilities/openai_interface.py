@@ -1,5 +1,8 @@
 import os
 from datetime import datetime
+from devtools import debug
+
+import json
 import re
 from pathlib import Path
 import openai
@@ -16,6 +19,9 @@ import asyncio
 
 import time
 
+# from langchain_redis import RedisCache
+from app.utilities.redis_cache import RedisCache
+
 from app.models import (
     ChatHistory,
     ChatMessage,
@@ -28,9 +34,42 @@ from app.utilities.document_readers import extract_text_from_pdf, extract_text_f
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
 from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.exceptions import UnexpectedModelBehavior
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelMessagesTypeAdapter,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+    SystemPromptPart,
+)
+
+# 2h
+ttl = 60 * 60 * 1
+cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
+
+
+def convert_messages(messages) -> list[ModelMessage]:
+    new_messages = []
+    for row in messages:
+        new_messages.extend(ModelMessagesTypeAdapter.validate_json(row[0]))
+    return new_messages
+
+
+def to_chat_message(m: ModelMessage):
+    first_part = m.parts[0]
+    if isinstance(m, ModelRequest):
+        if isinstance(first_part, UserPromptPart):
+            return m
+        if isinstance(first_part, SystemPromptPart):
+            return m
+    elif isinstance(m, ModelResponse):
+        if isinstance(first_part, TextPart):
+            return m
 
 
 # TODO we might need to rename the class
@@ -192,10 +231,22 @@ class OpenAIInterface:
         # latest_conversation_messages = AgentHistory.get_latest_conversation_messages(
         #     user_id=user_id
         # )
+
+        # TODO use redis to store the chat history
+        docs_ids_string = "_".join([str(doc.id) for doc in documents])
+        cache_key = f"chat_history_{user_id}_{docs_ids_string}"
+        llm_string = "pydantic_model:openai:gpt-4o"
         previous_messages = []
         latest_conversation_messages = []
         if session is not None:
-            latest_conversation_messages = session.get("chat_history", [])
+            # latest_conversation_messages = session.get("chat_history", [])
+            cache_result = cache.lookup(cache_key, llm_string)
+            if cache_result is not None:
+                debug(cache_result)
+                latest_conversation_messages = cache_result
+
+                # latest_conversation_messages =
+                ModelMessagesTypeAdapter.validate_python(latest_conversation_messages)
             previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
             parsed_messages = []
             for message in previous_messages:
@@ -230,9 +281,9 @@ class OpenAIInterface:
             previous_messages = parsed_messages
 
             print("previous messages: ", previous_messages)
-            previous_messages = ModelMessagesTypeAdapter.validate_python(
-                previous_messages
-            )
+            # previous_messages = ModelMessagesTypeAdapter.validate_python(
+            #     previous_messages
+            # )
 
         answer = rag_agent.run_sync(
             prompt,
@@ -242,10 +293,15 @@ class OpenAIInterface:
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())
-        if session is not None:
-            new_chat_history = latest_conversation_messages + answer.new_messages()
-            # save the latest max messages
-            session["chat_history"] = new_chat_history
+
+        # remove None
+        chat_history = json.loads(answer.new_messages_json())
+        debug(chat_history)
+        cache.update(cache_key, llm_string, chat_history)
+        # if session is not None:
+        #     new_chat_history = latest_conversation_messages + answer.new_messages()
+        #     # save the latest max messages
+        #     session["chat_history"] = new_chat_history
 
         return dict(
             question=question,
