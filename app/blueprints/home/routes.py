@@ -13,7 +13,7 @@ from . import home
 @home.route("/")
 def index():
     # production environment
-    if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
+    if "dev" not in os.environ.get("APP_ENV") and "localhost" not in request.host:
         if not azure.authorized:
             return redirect(url_for("azure.login"))
         if "user_id" not in session:
