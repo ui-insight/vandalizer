@@ -41,9 +41,7 @@ rag_agent = Agent(
 
 
 @rag_agent.tool
-async def retrieve(
-    context: RunContext[RagDeps], question: str, docs_ids: list[str] = []
-):
+def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = []):
     """
     Retrieve documents for a given question
     Args:
