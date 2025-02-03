@@ -8,7 +8,7 @@ from app.utilities.document_manager import DocumentManager
 
 
 def load_user():
-    if "dev" in os.environ.get("APP_ENV"):
+    if is_dev():
         # Create a admin
         user = User.objects(user_id="0").first()
         if not user:
@@ -26,6 +26,15 @@ def load_user():
             print("Built new user" + user.user_id)
             return user
     return None
+
+
+def is_dev():
+    if "prod" in os.uname().nodename:
+        return False
+    elif "dev" in os.uname().nodename:
+        return True
+    else:
+        return True
 
 
 def ingest_semantics(document):

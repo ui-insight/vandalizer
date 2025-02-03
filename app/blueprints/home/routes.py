@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify, redirect, url_for, session, rende
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
-from app.utils import load_user, ingest_semantics
+from app.utils import load_user, ingest_semantics, is_dev
 from flask_dance.contrib.azure import azure
 from itertools import chain
 from mongoengine.queryset.visitor import Q
@@ -13,7 +13,7 @@ from . import home
 @home.route("/")
 def index():
     # production environment
-    if "prod" in os.environ.get("APP_ENV"):
+    if not is_dev():
         if not azure.authorized:
             return redirect(url_for("azure.login"))
         if "user_id" not in session:

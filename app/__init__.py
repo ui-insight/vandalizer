@@ -52,18 +52,6 @@ blueprint = make_azure_blueprint(
 
 app.register_blueprint(blueprint, url_prefix="/login")
 
-
-# if "dev" in hostname, then it is a dev server
-if "prod" in os.uname().nodename:
-    os.environ["APP_ENV"] = "prod"
-elif "dev" in os.uname().nodename:
-    os.environ["APP_ENV"] = "dev_prod"
-else:
-    os.environ["APP_ENV"] = "dev"
-
-print("The environment is")
-print(os.environ["APP_ENV"])
-
 # @auth.errorhandler(MismatchingStateError)
 # def mismatching_state(e):
 #     return redirect(url_for("azure.login"))

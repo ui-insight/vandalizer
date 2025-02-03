@@ -1,7 +1,7 @@
 # app/blueprints/auth/routes.py
 from flask import Blueprint, redirect, url_for, session, render_template, request
 from . import auth
-from app.utils import load_user
+from app.utils import load_user, is_dev
 from app import azure
 from app.models import User
 import os
@@ -14,7 +14,7 @@ def index():
 @auth.route("/login")
 def login():
     # Bypass Azure login in dev/local environments
-    if "dev" in os.environ.get("APP_ENV"):
+    if is_dev():
         user = load_user()
         if user:
             return redirect(url_for("home.index"))
