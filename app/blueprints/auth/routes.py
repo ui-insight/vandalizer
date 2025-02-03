@@ -14,7 +14,7 @@ def index():
 @auth.route("/login")
 def login():
     # Bypass Azure login in dev/local environments
-    if "dev" in os.environ.get("APP_ENV") or "localhost" in request.host:
+    if "dev" in os.environ.get("APP_ENV"):
         user = load_user()
         if user:
             return redirect(url_for("home.index"))
