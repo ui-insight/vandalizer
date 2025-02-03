@@ -14,12 +14,12 @@
         <!-- Tabbed navigation -->
         <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
         <div class="workflow-tab-container">
-            <button class="workflow-tab-btn {% if is_editing and 'search_set_uuid' in workflow_task.data %}active{% endif %}" 
+            <button class="workflow-tab-btn {% if not is_editing or (is_editing and 'search_set_uuid' in workflow_task.data) %}active{% endif %}" 
                     id="selectDropdownTab" 
                     onclick="openAddExtractionTab('selectDropdown')">
                 Select from Tasks
             </button>
-            <button class="workflow-tab-btn {% if not (is_editing and 'search_set_uuid' in workflow_task.data) %}active{% endif %}" 
+            <button class="workflow-tab-btn {% if (is_editing and 'search_set_uuid' not in workflow_task.data) %}active{% endif %}" 
                     id="manualInputTab" 
                     onclick="openAddExtractionTab('manualInput')">
                 Enter Manually
@@ -29,7 +29,7 @@
         <!-- Body -->
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
-            <div class="workflow-tab-content" id="selectDropdown" style="{% if not (is_editing and 'search_set_uuid' in workflow_task.data) %}display: none;{% else %}display: block;{% endif %}">
+            <div class="workflow-tab-content" id="selectDropdown" style="{% if not is_editing or (is_editing and 'search_set_uuid' in workflow_task.data) %}display: block;{% else %}display: none;{% endif %}">
                 <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
                 <select id="extractionSetDropdown" class="workflow-input-field">
                 {% for extraction in extraction_sets %}
@@ -40,7 +40,7 @@
 
             <!-- Tab content for manual input -->
             <div class="workflow-tab-content" id="manualInput" 
-            style="{% if not (is_editing and 'searchphrases' in workflow_task.data) %}display: none;{% else %}display: block;{% endif %} margin: 0 auto;">
+            style="{% if (is_editing and 'search_set_uuid' not in workflow_task.data) %}display: block;{% else %}display: none;{% endif %} margin: 0 auto;">
                 <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
                 <input type="text" id="extractionInput"
                         placeholder="e.g., Name, Age, Location"
