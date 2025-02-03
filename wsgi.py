@@ -2,7 +2,10 @@
 wsgi.py imports and starts our entire app
 """
 # Path to the virtual env associated with this app
+import os
 python_home = '/html/ospai/venv/'
+
+os.environ['APP_ENV'] = 'dev'
 
 import sys
 import site
