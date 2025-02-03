@@ -64,7 +64,12 @@ setup_event_loop()
 # ----------------------------------------
 
 if __name__ == "__main__":
-    
+    if "prod" in os.uname().nodename:
+        os.environ["APP_ENV"] = "prod"
+    elif "dev" in os.uname().nodename:
+        os.environ["APP_ENV"] = "dev_prod"
+    else:
+        os.environ["APP_ENV"] = "dev"
 
     port = int(os.environ.get("PORT", 5001))
     app.run(host="0.0.0.0", port=port)
