@@ -40,9 +40,15 @@ def index():
         space.save()
         spaces = list(Space.objects())
 
-    if request.args.get("id"):
-        current_space = Space.objects(uuid=request.args.get("id")).first()
+    if request.args.get("space_id"):
+        session["space_id"] = request.args.get("space_id")
+        current_space = Space.objects(uuid=request.args.get("space_id")).first()
+    elif "space_id" in session and session["space_id"] != "":
+        current_space = Space.objects(uuid=session["space_id"]).first()
     else:
+        current_space = spaces[0]
+
+    if current_space not in spaces:
         current_space = spaces[0]
 
     documents = []
