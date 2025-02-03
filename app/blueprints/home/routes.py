@@ -13,7 +13,7 @@ from . import home
 @home.route("/")
 def index():
     # production environment
-    if "dev" not in os.environ.get("APP_ENV") and "localhost" not in request.host:
+    if "prod" in os.environ.get("APP_ENV"):
         if not azure.authorized:
             return redirect(url_for("azure.login"))
         if "user_id" not in session:
@@ -40,9 +40,15 @@ def index():
         space.save()
         spaces = list(Space.objects())
 
-    if request.args.get("id"):
-        current_space = Space.objects(uuid=request.args.get("id")).first()
+    if request.args.get("space_id"):
+        session["space_id"] = request.args.get("space_id")
+        current_space = Space.objects(uuid=request.args.get("space_id")).first()
+    elif "space_id" in session and session["space_id"] != "":
+        current_space = Space.objects(uuid=session["space_id"]).first()
     else:
+        current_space = spaces[0]
+
+    if current_space not in spaces:
         current_space = spaces[0]
 
     documents = []
