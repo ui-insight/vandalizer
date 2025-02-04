@@ -1,10 +1,8 @@
-<div>
-    <h2>Action Items and Next Steps</h2>
-    <ul>
-        <li>Include task dates within the Scope of Work to ensure clarity and alignment.</li>
-        <li>For termination terms, aim to establish the right to terminate as mutual, requiring notice. This should include provisions for payment on non-cancelable commitments related to the project.</li>
-        <li>Consider modifying the termination clause from "sponsor can terminate" to "both parties can terminate," and specify a typical notice period of 30 days as requested by the University.</li>
-        <li>Evaluate and potentially replace the current termination language with the UI SRA Termination language.</li>
-        <li>Consider additional state funding language due to the implications of Idaho state funding requirements.</li>
-    </ul>
-</div>
+[
+    {
+        "Amount": "$4,546,903",
+        "Award Info": "Award Number: 2427549, Amendment ID: 000, Award Type: Standard Grant",
+        "Budget": "Amount Obligated by this Amendment: $4,546,903, Total Intended Award Amount: $4,546,903, Total Approved Cost Share or Matching Amount: $0, Total Amount Obligated to Date: $4,546,903",
+        "Investigator": "Principal Investigator: Sarah S Martonick (smartonick@uidaho.edu), Co-Principal Investigators: Barrie Robison (brobison@uidaho.edu), Lucas J Sheneman (sheneman@uidaho.edu), Sylvia Bradshaw (sylviabradshaw@suu.edu)"
+    }
+]

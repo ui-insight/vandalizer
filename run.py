@@ -13,8 +13,6 @@ import threading
 load_dotenv()
 
 
-
-
 def setup_event_loop():
     """Setup event loop for the current thread"""
     # Get thread id for debugging
@@ -49,15 +47,6 @@ langfuse_context.configure(
 
 load_dotenv()
 
-
-# Handle the event loop for the current thread
-@app.before_request
-def initialize_event_loop():
-    setup_event_loop()
-
-
-# Handle the event loop for the main thread
-setup_event_loop()
 
 # ----------------------------------------
 # launch
