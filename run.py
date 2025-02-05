@@ -27,6 +27,9 @@ def setup_event_loop():
     return loop
 
 
+# Set up the event loop for the current thread
+setup_event_loop()
+
 if os.environ.get("LOGFIRE") == "true":
     import logfire
 
