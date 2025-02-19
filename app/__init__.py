@@ -12,7 +12,21 @@ import logging
 
 app = Flask(__name__)
 
-CORS(app)
+# CORS(app)
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://localhost:3000",
+                "https://localhost",
+                "http://localhost",
+            ]
+        }
+    },
+)
+
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
 app.permanent_session_lifetime = timedelta(days=60)
 app.config.from_object("app.configuration.DevelopmentConfig")
@@ -33,6 +47,7 @@ from .blueprints.files import files
 from .blueprints.spaces import spaces
 from .blueprints.feedback import feedback
 from .blueprints.tasks import tasks
+from .blueprints.office import office
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")
@@ -41,6 +56,7 @@ app.register_blueprint(files, url_prefix="/files")
 app.register_blueprint(spaces, url_prefix="/spaces")
 app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
+app.register_blueprint(office, url_prefix="/office")
 import os
 
 # OAuth

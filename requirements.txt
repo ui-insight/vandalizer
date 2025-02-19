@@ -5,7 +5,7 @@ annotated-types==0.7.0
 anthropic==0.43.0
 anyio==4.4.0
 asgiref==3.8.1
-asttokens==3.0.0
+asttokens==2.4.1
 asyncer==0.0.8
 attrs==23.2.0
 backoff==2.2.1
@@ -20,6 +20,7 @@ charset-normalizer==3.3.2
 chroma-hnswlib==0.7.6
 chromadb==0.5.23
 click==8.1.7
+cohere==5.13.11
 colorama==0.4.6
 coloredlogs==15.0.1
 colorlog==6.8.2
@@ -27,6 +28,7 @@ dataclasses-json==0.6.7
 datasets==2.14.7
 decorator==5.1.1
 Deprecated==1.2.14
+devtools==0.12.2
 dill==0.3.7
 diskcache==5.6.3
 distro==1.9.0
@@ -40,6 +42,7 @@ eval_type_backport==0.2.2
 executing==2.1.0
 fastapi==0.111.0
 fastapi-cli==0.0.4
+fastavro==1.10.0
 filelock==3.14.0
 Flask==3.0.3
 Flask-Bootstrap==3.3.7.1
@@ -68,6 +71,7 @@ humanfriendly==10.0
 idna==3.7
 importlib-metadata==7.0.0
 importlib_resources==6.4.0
+iniconfig==2.0.0
 ipdb==0.13.13
 ipython==8.30.0
 itsdangerous==2.2.0
@@ -135,6 +139,8 @@ packaging==24.0
 pandas==2.2.2
 parso==0.8.4
 pexpect==4.9.0
+playwright==1.50.0
+pluggy==1.5.0
 posthog==3.5.0
 prompt_toolkit==3.0.48
 protobuf==5.29.3
@@ -146,11 +152,12 @@ pyarrow-hotfix==0.6
 pyasn1==0.6.0
 pyasn1_modules==0.4.0
 pydantic==2.10.3
-pydantic-ai==0.0.19
-pydantic-ai-slim==0.0.19
-pydantic-graph==0.0.19
+pydantic-ai==0.0.20
+pydantic-ai-slim==0.0.20
+pydantic-graph==0.0.20
 pydantic-settings==2.7.1
 pydantic_core==2.27.1
+pyee==12.1.1
 Pygments==2.18.0
 pymongo==4.7.2
 PyMuPDF==1.24.9
@@ -161,10 +168,14 @@ PyPDF2==3.0.1
 PyPika==0.48.9
 pyproject_hooks==1.1.0
 pysqlite3==0.5.3
+pytest==8.3.4
+pytest-base-url==2.1.0
+pytest-playwright==0.7.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.0.1
 python-engineio==4.10.1
 python-multipart==0.0.9
+python-slugify==8.0.4
 python-socketio==5.11.4
 python-ulid==2.7.0
 pytz==2024.1
@@ -191,11 +202,13 @@ structlog==24.4.0
 sympy==1.12
 tabulate==0.9.0
 tenacity==8.3.0
+text-unidecode==1.3
 tiktoken==0.7.0
 tokenizers==0.19.1
 tqdm==4.66.4
 traitlets==5.14.3
 typer==0.12.3
+types-requests==2.32.0.20241016
 typing-inspect==0.9.0
 typing_extensions==4.12.2
 tzdata==2024.1

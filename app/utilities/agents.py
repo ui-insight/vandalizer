@@ -33,10 +33,18 @@ class RagDeps:
     user_id: str
 
 
+chat_prompt = "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know."
+
 rag_agent = Agent(
     "openai:gpt-4o",
     deps_type=RagDeps,
-    system_prompt="You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.",
+    system_prompt=chat_prompt,
+)
+
+
+chat_agent = Agent(
+    "openai:gpt-4o",
+    system_prompt=chat_prompt,
 )
 
 
