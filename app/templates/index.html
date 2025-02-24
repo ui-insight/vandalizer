@@ -249,6 +249,10 @@
             <div class="search-results-panel" id="search-results-panel"
                     style="margin: 0px 0px; text-align: left;">
                     {{ workflow_template|safe }}
+
+                    {% if workflow_step_template != "" %}
+                        {{ workflow_step_template|safe }}
+                    {% endif %}
                     
             </div>     
                     

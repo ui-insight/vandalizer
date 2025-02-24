@@ -307,6 +307,15 @@
                       success: function (data) {
                           $('#newWorkflowStepModal').fadeOut();
                           $(data.template).hide().appendTo('#search-results-panel').fadeIn();
+                          let href = window.location.href;
+                          const qs = new URLSearchParams(href.split("?")[1]);
+                          qs.delete("workflow_step_id");
+                        qs.append("workflow_step_id", step_id);
+                        const newQs = qs.toString();
+                        const newhref = `/home?${newQs}`;
+                        window.history.pushState({}, "", newhref);
+
+
                           addWorkflowStepListeners();
                       },
                       error: function (xhr, ajaxOptions, thrownError) {
