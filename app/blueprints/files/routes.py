@@ -178,14 +178,14 @@ def create_folder():
     name = request.form["name"]
     space_id = request.form["space_id"]
     
-    SmartFolder.objects.create(
+    folder = SmartFolder.objects.create(
         title=name,
         parent_id=parent_id,
         space=space_id,
         user_id=session["user_id"],
         uuid=uuid.uuid4().hex,
     )
-    return redirect(url_for("home.index"))
+    return redirect(url_for("home.index", folder_id=folder.uuid))
 
 @files.route("/upload_fillable_pdf", methods=["POST"])
 def upload_fillable_pdf():
