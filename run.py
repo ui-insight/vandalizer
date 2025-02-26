@@ -2,13 +2,12 @@ import os
 
 from app import app
 from dotenv import load_dotenv
-from langfuse.decorators import langfuse_context
 import logging
-from dotenv import load_dotenv
 from contextvars import ContextVar
 import nest_asyncio
 import asyncio
 import threading
+from devtools import debug
 
 load_dotenv()
 
@@ -36,19 +35,21 @@ if os.environ.get("LOGFIRE") == "true":
     logfire.configure()
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
+debug(langfuse_enabled)
 
 # app.logger.info(f"Langfuse enabled: {langfuse_enabled}")
 # app.logger.info(f"Langfuse host: {os.environ.get('NEXTAUTH_URL')}")
 
-# Configure the Langfuse client
-langfuse_context.configure(
-    enabled=langfuse_enabled,
-    secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
-    public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
-    host=os.environ.get("NEXTAUTH_URL"),
-)
+# if langfuse_enabled:
+# from langfuse.decorators import langfuse_context
 
-load_dotenv()
+# # Configure the Langfuse client
+# langfuse_context.configure(
+#     enabled=langfuse_enabled,
+#     secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
+#     public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
+#     host=os.environ.get("NEXTAUTH_URL"),
+# )
 
 
 # ----------------------------------------
