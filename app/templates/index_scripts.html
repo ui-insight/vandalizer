@@ -362,19 +362,19 @@
     }
 
     function showScanning() {
-        if ($('.document')[0] == undefined) {
+        if ($('.document-scanner')[0] == undefined) {
             return;
         }
 
-        $('.document')[0].classList.add('scanning')
+        $('.document-scanner')[0].classList.add('scanning')
     }
 
     function stopScanning() {
-        if ($('.document')[0] == undefined) {
+        if ($('.document-scanner')[0] == undefined) {
             return;
         }
 
-        $('.document')[0].classList.remove('scanning')
+        $('.document-scanner')[0].classList.remove('scanning')
     }
 
     $('.rescan-button').on('click', function(e) {

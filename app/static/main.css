@@ -68,6 +68,7 @@
     position: absolute;
     top: 0;
     left: 0;
+    pointer-events: none;
     /* and sit in front */
     z-index: 1;
     /* gradient with a radar like fade */
