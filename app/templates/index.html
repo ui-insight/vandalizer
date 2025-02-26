@@ -218,6 +218,14 @@
                     <!-- Add more options as needed -->
                 </ul>
             </div>
+
+            {% if show_release_panel %}
+            <div id="release-panel">
+                <button onclick="dismissReleasePanel()">X</button>
+                <h3>New Release</h3>
+                <pre>{{ release_notes }}</pre>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
