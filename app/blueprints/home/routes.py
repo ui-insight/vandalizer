@@ -9,6 +9,7 @@ from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
 from . import home
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
 @home.route("/")
 def index():
@@ -162,6 +163,10 @@ def index():
     total_token_counts = 0
     for doc in folder_docs:
         total_token_counts += doc.token_count
+    
+    # Release Notes    
+    release_seen = request.cookies.get("release_seen")
+    show_release_panel = (release_seen != CURRENT_RELEASE_VERSION)
 
     return render_template(
         "index.html",
@@ -180,6 +185,9 @@ def index():
         workflows=workflows,
         workflow_template=workflow_template,
         workflow_id=workflow_id,
+        release_notes=RELEASE_NOTES, 
+        show_release_panel=show_release_panel, 
+        current_release=CURRENT_RELEASE_VERSION
     )
 
 
