@@ -11,31 +11,12 @@ from devtools import debug
 
 load_dotenv()
 
-
-def setup_event_loop():
-    """Setup event loop for the current thread"""
-    # Get thread id for debugging
-    thread_id = threading.current_thread().ident
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    nest_asyncio.apply()
-    return loop
-
-
-# Set up the event loop for the current thread
-setup_event_loop()
-
 if os.environ.get("LOGFIRE") == "true":
     import logfire
 
     logfire.configure()
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
-debug(langfuse_enabled)
 
 # app.logger.info(f"Langfuse enabled: {langfuse_enabled}")
 # app.logger.info(f"Langfuse host: {os.environ.get('NEXTAUTH_URL')}")

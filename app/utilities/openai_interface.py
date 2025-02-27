@@ -18,6 +18,9 @@ from app.utilities.prompt_optimization import (
 # from langfuse.decorators import observe
 import asyncio
 
+
+from app.utilities.async_utilities import class_method_event_loop_decorator
+
 import time
 
 # from langchain_redis import RedisCache
