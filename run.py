@@ -2,17 +2,14 @@ import os
 
 from app import app
 from dotenv import load_dotenv
-from langfuse.decorators import langfuse_context
 import logging
-from dotenv import load_dotenv
 from contextvars import ContextVar
 import nest_asyncio
 import asyncio
 import threading
+from devtools import debug
 
 load_dotenv()
-
-
 
 
 def setup_event_loop():
@@ -29,35 +26,31 @@ def setup_event_loop():
     return loop
 
 
+# Set up the event loop for the current thread
+setup_event_loop()
+
 if os.environ.get("LOGFIRE") == "true":
     import logfire
 
     logfire.configure()
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
+debug(langfuse_enabled)
 
 # app.logger.info(f"Langfuse enabled: {langfuse_enabled}")
 # app.logger.info(f"Langfuse host: {os.environ.get('NEXTAUTH_URL')}")
 
-# Configure the Langfuse client
-langfuse_context.configure(
-    enabled=langfuse_enabled,
-    secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
-    public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
-    host=os.environ.get("NEXTAUTH_URL"),
-)
+# if langfuse_enabled:
+# from langfuse.decorators import langfuse_context
 
-load_dotenv()
+# # Configure the Langfuse client
+# langfuse_context.configure(
+#     enabled=langfuse_enabled,
+#     secret_key=os.environ.get("LANGFUSE_SECRET_KEY"),
+#     public_key=os.environ.get("LANGFUSE_PUBLIC_KEY"),
+#     host=os.environ.get("NEXTAUTH_URL"),
+# )
 
-
-# Handle the event loop for the current thread
-@app.before_request
-def initialize_event_loop():
-    setup_event_loop()
-
-
-# Handle the event loop for the main thread
-setup_event_loop()
 
 # ----------------------------------------
 # launch
@@ -65,4 +58,4 @@ setup_event_loop()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, ssl_context=("certs/cert.pem", "certs/key.pem"))

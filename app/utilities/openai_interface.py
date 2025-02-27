@@ -14,7 +14,8 @@ from app.utilities.prompt_optimization import (
     multi_qa,
     simple_qa,
 )
-from langfuse.decorators import observe
+
+# from langfuse.decorators import observe
 import asyncio
 
 import time
@@ -61,7 +62,7 @@ class OpenAIInterface:
         full_path = os.path.join(root_path, "static", "uploads", document_path)
         self.loaded_doc = extract_text_from_pdf(full_path)
 
-    @observe()
+    # @observe()
     def ask_question_to_loaded_document(self, item):
         openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
         prompt = ""

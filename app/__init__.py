@@ -11,8 +11,32 @@ from flask_dance.contrib.azure import azure, make_azure_blueprint
 import logging
 
 app = Flask(__name__)
-    
-CORS(app)
+
+CURRENT_RELEASE_VERSION = "2.0.1"  # Update this when you have a new release.
+RELEASE_NOTES = """
+Release 2.0.1:
+- Multiple tasks in single workflow step combine.
+- Fixed numerous issues with redirects after actions
+- Added file upload button in addition to drag and drop functionality.
+- Other minor bug fixes
+"""
+
+
+# CORS(app)
+CORS(
+    app,
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://localhost:3000",
+                "https://localhost",
+                "http://localhost",
+            ]
+        }
+    },
+)
+
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
 app.permanent_session_lifetime = timedelta(days=60)
 app.config.from_object("app.configuration.DevelopmentConfig")
@@ -21,7 +45,7 @@ me.connect("osp")
 Bootstrap(app)  # flask-bootstrap
 Mail(app)
 
-    # Set up logging
+# Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
 
@@ -33,14 +57,16 @@ from .blueprints.files import files
 from .blueprints.spaces import spaces
 from .blueprints.feedback import feedback
 from .blueprints.tasks import tasks
+from .blueprints.office import office
 
 app.register_blueprint(auth)
-app.register_blueprint(home, url_prefix='/home')
-app.register_blueprint(workflows, url_prefix='/workflows')
-app.register_blueprint(files, url_prefix='/files')
-app.register_blueprint(spaces, url_prefix='/spaces')
-app.register_blueprint(feedback, url_prefix='/feedback')
-app.register_blueprint(tasks, url_prefix='/tasks')
+app.register_blueprint(home, url_prefix="/home")
+app.register_blueprint(workflows, url_prefix="/workflows")
+app.register_blueprint(files, url_prefix="/files")
+app.register_blueprint(spaces, url_prefix="/spaces")
+app.register_blueprint(feedback, url_prefix="/feedback")
+app.register_blueprint(tasks, url_prefix="/tasks")
+app.register_blueprint(office, url_prefix="/office")
 import os
 
 # OAuth

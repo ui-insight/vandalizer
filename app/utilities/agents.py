@@ -1,6 +1,4 @@
 from dataclasses import dataclass
-from langfuse.decorators import observe
-from langfuse import Langfuse
 from pydantic import create_model
 from typing import Dict, Optional, List, Any, Tuple, Union, List
 import json
@@ -8,11 +6,12 @@ from app.utilities.llm_helpers import remove_code_markers
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
-from pydantic_ai.models.ollama import OllamaModel
+from pydantic_ai.models.openai import OpenAIModel
 
 from app.utilities.document_manager import DocumentManager
 
 from langchain_redis import RedisCache
+from devtools import debug
 
 import os
 from dotenv import load_dotenv
@@ -24,7 +23,11 @@ load_dotenv()
 ttl = 60 * 60 * 24 * 30
 cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 
-langfuse = Langfuse()
+langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
+if langfuse_enabled:
+    from langfuse import Langfuse
+
+    langfuse = Langfuse()
 
 
 @dataclass
@@ -33,10 +36,21 @@ class RagDeps:
     user_id: str
 
 
+chat_prompt = "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know."
+
+# model = OpenAIModel("gpt-4o")
+model = "openai:gpt-4o"
+
 rag_agent = Agent(
-    "openai:gpt-4o",
+    model,
     deps_type=RagDeps,
-    system_prompt="You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.",
+    system_prompt=chat_prompt,
+)
+
+
+chat_agent = Agent(
+    model,
+    system_prompt=chat_prompt,
 )
 
 
@@ -70,7 +84,7 @@ class FieldInferenceDeps:
 
 
 field_inference_agent = Agent(
-    "openai:gpt-4o",
+    model,
     retries=3,
     deps_type=FieldInferenceDeps,
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
@@ -89,26 +103,23 @@ Field names:
 {f'Context: {context}' if context else ''}
 
 For each field, determine the most appropriate data type and description from these options:
-- str
-- int
-- float
-- bool
-- List[str]
-- List[int]
-- List[float]
 - Optional[str]
 - Optional[int]
 - Optional[float]
 - Optional[bool]
+- Optional[List[str]]
+- Optional[List[int]]
+- Optional[List[float]]
 
  CRITICAL:
-1. Treat monetary values as strings, not floats.
-2. Preserve ALL original formatting of numbers, including:
+1. Always make ALL fields Optional by default, as they might not appear in every document
+2. Treat monetary values as strings, not floats.
+3. Preserve ALL original formatting of numbers, including:
    - Keep ALL commas in numbers (e.g., "1,234,567")
    - Keep ALL currency symbols (e.g., "$1,234.56")
    - Keep ALL decimal places exactly as found
    - DO NOT convert formatted numbers into plain numbers
-3. Extract values exactly as they appear in the text, without any modifications
+4. Extract values exactly as they appear in the text, without any modifications
 
 Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above. Do not convert floating numbers to integers and vice versa, or change the number of decimal places, or change numbers locale encoding. Preserve commas and other punctuation in the extracted text and numbers.
 Consider making fields Optional if they might not always be present."""
@@ -128,6 +139,9 @@ type_mapping = {
     "Optional[int]": (int, None),
     "Optional[float]": (float, None),
     "Optional[bool]": (bool, None),
+    "Optional[List[str]]": (List[str], None),
+    "Optional[List[int]]": (List[int], None),
+    "Optional[List[float]]": (List[float], None),
 }
 
 reverse_type_mapping = {
@@ -138,6 +152,9 @@ reverse_type_mapping = {
     (List[str], ...): "List[str]",
     (List[int], ...): "List[int]",
     (List[float], ...): "List[float]",
+    (Optional[str], None): "Optional[str]",
+    (Optional[int], None): "Optional[int]",
+    (Optional[float], None): "Optional[float]",
     (Dict[str, str], ...): "Dict[str, str]",
     (str, None): "Optional[str]",
     (int, None): "Optional[int]",
@@ -154,10 +171,11 @@ def get_cache_key(key: str, context: str) -> str:
 @field_inference_agent.result_validator
 def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str):
     formatted_response = remove_code_markers(response)
-    langfuse.trace(
-        name="validate_fields_types",
-        input=formatted_response,
-    )
+    if langfuse_enabled:
+        langfuse.trace(
+            name="validate_fields_types",
+            input=formatted_response,
+        )
 
     try:
         inferred_fields = json.loads(formatted_response)
@@ -177,7 +195,8 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
 
             fields[key] = field_type
         except Exception as e:
-            langfuse.span(name="validation_error", input=e)
+            if langfuse_enabled:
+                langfuse.span(name="validation_error", input=e)
             raise ModelRetry(f"Invalid type for field {key}: {str(e)}")
 
     # Add fallback for missing keys (shouldn't happen but just in case)
@@ -202,7 +221,7 @@ class ExtractionDeps:
 # )
 
 extraction_agent = Agent(
-    "openai:gpt-4o",
+    model,
     deps_type=ExtractionDeps,
     retries=3,
 )
@@ -226,7 +245,9 @@ def extraction_system_prompt(
     )
 
     system_prompt = (
-        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format.",
+        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format."
+        'CRITICAL: Your response MUST be valid JSON with this exact format: {"entities": [...]}'
+        "Each entity should be a complete object with all requested fields (use null for missing values)."
     )
 
     return (
@@ -243,7 +264,7 @@ Text:
     )
 
 
-@observe()
+# @observe()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """
     Extract entities from text based on the provided extraction keys and return structured output.
@@ -326,7 +347,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     )
 
     extractor_agent = Agent(
-        "openai:gpt-4o",
+        model,
         deps_type=ExtractionDeps,
         result_type=ExtractionModel,
         result_retries=3,
@@ -336,11 +357,34 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     extractor_deps = ExtractionDeps(
         extraction_context=context, fields=inferred_fields, text=text
     )
-    extraction = extractor_agent.run_sync(text, deps=extractor_deps)
+    try:
+        debug(text)
+        extraction = extractor_agent.run_sync(text, deps=extractor_deps)
+        debug(extraction.data)
 
-    result = extraction.data.model_dump_json(indent=2)
-    print("Result: ", result)
-    # cache the result
-    cache.update(cache_key, llm_string, [result])
-    result = json.loads(result)
-    return result.get("entities", [])
+        result = extraction.data.model_dump_json(indent=2)
+        debug(result)
+        # cache the result
+        cache.update(cache_key, llm_string, [result])
+        result = json.loads(result)
+        return result.get("entities", [])
+    except AssertionError as e:
+        # Extract the dictionary from the error message
+        error_msg = str(e)
+        debug(e)
+        if error_msg.startswith("Expected code to be unreachable, but got: "):
+            try:
+                # Try to parse the dictionary from the error message
+                entity_str = error_msg.replace(
+                    "Expected code to be unreachable, but got: ", ""
+                )
+                # This may be incomplete JSON due to truncation in the error message
+                # You might need a more robust approach to reconstruct it
+                entity = json.loads(entity_str)
+                debug(entity)
+                return [entity]
+            except:
+                pass
+        # If we can't recover, return empty results
+        print(f"Error during extraction: {e}")
+        return []

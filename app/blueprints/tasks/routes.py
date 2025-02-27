@@ -1,4 +1,13 @@
-from flask import Blueprint, request, jsonify, current_app, redirect, url_for, render_template, send_file
+from flask import (
+    Blueprint,
+    request,
+    jsonify,
+    current_app,
+    redirect,
+    url_for,
+    render_template,
+    send_file,
+)
 from app.models import SmartDocument, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utils import load_user
@@ -7,10 +16,12 @@ from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.extraction_manager2 import ExtractionManager2
 from copy import deepcopy
 import csv, os, uuid
+from devtools import debug
 
 from pypdf import PdfReader, PdfWriter
 
 from . import tasks
+
 
 # Add a extraction set
 @tasks.route("/extraction/add_search_set", methods=["POST"])
@@ -20,6 +31,7 @@ def add_search_set():
         return redirect(url_for("login"))
 
     data = request.get_json()
+    debug(data)
     title = data["title"]
     space = data["space_id"]
     search_type = data["search_type"]
@@ -35,6 +47,7 @@ def add_search_set():
     #     searchset.is_global = True
     searchset.save()
     return jsonify({"complete": True, "uuid": searchset.uuid})
+
 
 # Add a term to a search set
 @tasks.route("/extraction/add_search_term", methods=["POST"])
@@ -86,6 +99,11 @@ def add_prompt():
     prompt = data["prompt"]
     space_id = data["space_id"]
     prompt_type = data["prompt_type"]
+    if title == "" or prompt == "":
+        return jsonify(
+            {"complete": False, "error": "Title and prompt cannot be empty."}
+        )
+
     user = load_user()
 
     searchsetitem = SearchSetItem(
@@ -293,7 +311,9 @@ def begin_search():
                 writer.pages[0], bindings, auto_regenerate=False
             )
 
-            output_pdf_path = os.path.join(current_app.root_path, "static", "fillable_form.pdf")
+            output_pdf_path = os.path.join(
+                current_app.root_path, "static", "fillable_form.pdf"
+            )
             with open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
@@ -463,8 +483,6 @@ def begin_prompt_search():
             "template": template,
         }
         return jsonify(response)
-    
-
 
 
 @tasks.route("/export_extraction", methods=["GET"])

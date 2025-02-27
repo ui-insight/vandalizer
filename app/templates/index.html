@@ -125,6 +125,7 @@
 
                 </div>
             </div>
+            
             <div style="padding: 0px 45px 45px 45px;">
          
                 <form action="/files/create_folder" method="post" id="add-folder-form">
@@ -134,6 +135,12 @@
                         name="name" placeholder="New folder name">
                     <button type="submit" id="add-folder-button" class="btn btn-primary"
                        >Add Folder</button>
+
+                    <!-- Styled file input -->
+                    <label for="file-input" class="btn btn-primary" style="margin: 0;">
+                        Upload File
+                        <input type="file" id="file-input" style="display: none;">
+                    </label>
                 </form>
                 <table class="styled-table" id="file-list" style="width: 100%;">
                     <tbody id="doc-body">
@@ -215,6 +222,14 @@
                     <!-- Add more options as needed -->
                 </ul>
             </div>
+
+            {% if show_release_panel %}
+            <div id="release-panel">
+                <button onclick="dismissReleasePanel()">X</button>
+                <h3>New Release</h3>
+                <pre>{{ release_notes }}</pre>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -242,6 +257,10 @@
             <div class="search-results-panel" id="search-results-panel"
                     style="margin: 0px 0px; text-align: left;">
                     {{ workflow_template|safe }}
+
+                    {% if workflow_step_template != "" %}
+                        {{ workflow_step_template|safe }}
+                    {% endif %}
                     
             </div>     
                     
