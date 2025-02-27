@@ -13,6 +13,9 @@ from app.utilities.config import model_type
 from app.utilities.llm import ChatLM
 
 
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+
 class ExtractionManager2:
     root_path = ""
 
@@ -35,7 +38,7 @@ class ExtractionManager2:
 
     def extract(self, extract_keys, pdf_paths, full_text=None):
         start_time = time.time()
-        openai.api_key = "***REMOVED***"
+        openai.api_key = OPENAI_API_KEY
         doc_text = ""
         if full_text is None:
             for pdf_path in pdf_paths:
@@ -84,20 +87,23 @@ class ExtractionManager2:
         else:
             print("Threw out: " + output)
             return
-        
+
     def build_from_documents(self, pdf_paths):
-        openai.api_key = "***REMOVED***"
+        openai.api_key = OPENAI_API_KEY
         doc_text = ""
         start_time = time.time()
         for pdf_path in pdf_paths:
             doc_text += "\n\n" + extract_text_from_doc(doc_path=pdf_path)
 
-        prompt = """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
-        
+        prompt = (
+            """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
+
           Passage: 
 
-        """ + doc_text
-        
+        """
+            + doc_text
+        )
+
         model = "gpt-4o"
 
         chat_lm = ChatLM(model_type)
@@ -126,6 +132,3 @@ class ExtractionManager2:
         else:
             print("Threw out: " + output)
             return
-        
-
-
