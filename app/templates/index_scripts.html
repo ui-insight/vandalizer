@@ -12,17 +12,6 @@
         {% endfor %}
     ];
 
-    function dismissReleasePanel() {
-            // Set a cookie 'release_seen' to the current release version.
-            var d = new Date();
-            // Cookie will expire in 30 days.
-            d.setTime(d.getTime() + (30*24*60*60*1000));
-            var expires = "expires=" + d.toUTCString();
-            document.cookie = "release_seen={{ current_release }}; " + expires + "; path=/";
-            // Hide the release panel immediately.
-            document.getElementById('release-panel').style.display = 'none';
-        }
-
     function addDocId(docId) {
         const url = new URL(window.location.href);
         url.searchParams.set('docid', docId);

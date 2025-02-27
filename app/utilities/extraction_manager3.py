@@ -16,15 +16,14 @@ from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM
 from app.utilities.llm_helpers import retry_llm_request
 from app.utilities.config import model_type
-
-# from langfuse.decorators import observe
-# from langfuse import Langfuse
+from langfuse.decorators import observe
+from langfuse import Langfuse
 
 from app.utilities.agents import extract_entities_with_agent
 
-# langfuse = Langfuse()
+langfuse = Langfuse()
 
-# trace = langfuse.trace()
+trace = langfuse.trace()
 
 
 class ExtractionManager3:
