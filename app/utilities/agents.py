@@ -12,6 +12,7 @@ from app.utilities.document_manager import DocumentManager
 
 from langchain_redis import RedisCache
 from devtools import debug
+from app.utilities.async_utilities import function_event_loop_decorator
 
 import os
 from dotenv import load_dotenv
@@ -265,6 +266,7 @@ Text:
 
 
 # @observe()
+@function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """
     Extract entities from text based on the provided extraction keys and return structured output.
