@@ -1,6 +1,5 @@
 //selecting all required elements
 var file;
-let fileInput = document.querySelector("#file-input");
 let dropArea = document.querySelector(".drag-area");
 if (dropArea) {
   let dragText = dropArea.querySelector("header"),
@@ -40,12 +39,6 @@ if (dropArea) {
     console.log("Looking for ifle");
     file = event.dataTransfer.files[0];
     console.log(file);
-    showFile(); //calling function
-  });
-  fileInput.addEventListener("change", function () {
-    //getting user select file and [0] this means if user select multiple files then we'll select only the first one
-    file = this.files[0];
-    dropArea.classList.add("active");
     showFile(); //calling function
   });
 }
@@ -120,8 +113,9 @@ function showFile() {
             .attr("href", "/home?docid=" + result.uuid)
             .text(filename);
 
+          
           let href = "/home?docid=" + result.uuid;
-          console.log;
+          console.log
           window.location.href = href;
           return;
 
@@ -356,14 +350,14 @@ $(document).ready(function () {
   const $loadingIndicator = $("#loading");
   let $draggedItem = null;
   let $dragGhost = null;
-
+  
   $fileList.on({
     dragstart: function (e) {
       const $target = $(e.target).closest(".file");
       if ($target.length) {
         $draggedItem = $target;
         setTimeout(() => $target.addClass("dragging"), 0);
-
+  
         // Create ghost element to indicate dragging
         $dragGhost = $('<div class="drag-ghost">Moving file...</div>');
         $("body").append($dragGhost);
@@ -397,28 +391,28 @@ $(document).ready(function () {
       if ($targetItem.length && !$draggedItem.is($targetItem)) {
         $targetItem.removeClass("drag-over");
         $loadingIndicator.show();
-
+  
         // Call the custom function when file is dropped on folder
         moveFileToFolder($draggedItem, $targetItem);
-
+  
         setTimeout(() => {
           $loadingIndicator.hide();
           $draggedItem.remove();
         }, 1000); // Simulating a 1-second delay
       }
-
+  
       // Remove dragging styles
       $draggedItem.removeClass("dragging");
       if ($dragGhost) {
         $dragGhost.remove();
         $(document).off("mousemove", moveDragGhost);
       }
-
+  
       // Remove any leftover drag-over class from folders
       $(".folder").removeClass("drag-over");
     },
   });
-
+  
   // Function to move the ghost element with the cursor
   function moveDragGhost(e) {
     $dragGhost.css({
@@ -426,28 +420,29 @@ $(document).ready(function () {
       left: e.pageX + 10 + "px",
     });
   }
-
+  
   // Custom function to handle file move logic
   function moveFileToFolder($file, $folder) {
     // Implement any server-side call or other logic here
-    console.log("Moving file");
+    console.log('Moving file');
     console.log($file);
     console.log($folder);
     // Get the data-doc-uuid of the file being moved
-    const fileUUID = $file.find("input:first").data("doc-uuid");
-
+    const fileUUID = $file.find('input:first').data('doc-uuid');
+    
     // Get the data-folder-id of the target folder
-    const folderID = $folder.find("input:first").data("doc-uuid");
+    const folderID = $folder.find('input:first').data('doc-uuid');
 
-    console.log("File UUID:", fileUUID);
-    console.log("Target Folder ID:", folderID);
+    console.log('File UUID:', fileUUID);
+    console.log('Target Folder ID:', folderID);
 
+    
     $.ajax({
       type: "POST",
       url: "/files/move_file",
       data: JSON.stringify({
         fileUUID: fileUUID,
-        folderID: folderID,
+        folderID: folderID
       }),
       processData: false,
       contentType: "application/json",
@@ -458,8 +453,9 @@ $(document).ready(function () {
         location.reload();
       },
     });
-  }
 
+  }
+  
   // Prevent opening the default drag-and-drop window in the browser
   $(document).on({
     dragover: function (e) {

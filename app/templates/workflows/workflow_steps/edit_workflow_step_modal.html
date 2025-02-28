@@ -113,9 +113,7 @@
         $('#closeWorkflowStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
-            const url = new URL(window.location.href);
-            url.searchParams.delete('workflow_step_id');
-            window.history.replaceState(null, '', url.toString());
+            
            
             
         });
@@ -124,9 +122,6 @@
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
             // window.location.href = `/home?workflow_id={{ workflow.id }}&section=Workflows`;
-            const url = new URL(window.location.href);
-            url.searchParams.delete('workflow_step_id');
-            window.history.replaceState(null, '', url.toString());
             location.reload();
         });
 
@@ -145,9 +140,6 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('workflow_step_id');
-                    window.history.replaceState(null, '', url.toString());
                     location.reload();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
