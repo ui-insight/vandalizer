@@ -15,9 +15,8 @@ import sys
 
 from app.utilities.llm import InsightLM
 import dspy
-
-# from dsp.trackers.langfuse_tracker import LangfuseTracker
-# from langfuse.decorators import observe
+from dsp.trackers.langfuse_tracker import LangfuseTracker
+from langfuse.decorators import observe
 from app.utilities import config
 
 
@@ -81,28 +80,28 @@ max_tokens = 1024 * 128
 # max_tokens = None
 
 
-# class CustomTracker(LangfuseTracker):
+class CustomTracker(LangfuseTracker):
 
-#     def call(self, *args, **kwargs):
-#         # Call the super class method if needed
-#         super().call(**kwargs)
+    def call(self, *args, **kwargs):
+        # Call the super class method if needed
+        super().call(**kwargs)
 
-#         # Unpack args if they are being used to pass i, o, etc.
-#         i = kwargs.get("i")
-#         o = kwargs.get("o")
-#         name = kwargs.get("name")
-#         o_content = o.choices[0].message.content if o else None
+        # Unpack args if they are being used to pass i, o, etc.
+        i = kwargs.get("i")
+        o = kwargs.get("o")
+        name = kwargs.get("name")
+        o_content = o.choices[0].message.content if o else None
 
-#         # Log trace to Langfuse via low-level SDK
-#         trace = self.langfuse.trace(name="custom-tracker", input=i, output=o_content)
-#         trace.generation(
-#             input=i,
-#             output=o_content,
-#             name=name,
-#             metadata=kwargs,
-#             usage_details=o.usage,
-#             model=o.model,
-#         )
+        # Log trace to Langfuse via low-level SDK
+        trace = self.langfuse.trace(name="custom-tracker", input=i, output=o_content)
+        trace.generation(
+            input=i,
+            output=o_content,
+            name=name,
+            metadata=kwargs,
+            usage_details=o.usage,
+            model=o.model,
+        )
 
 
 def format_docs(docs):
@@ -186,10 +185,10 @@ class SimpleQA(dspy.Module):
         return dspy.Prediction(context=full_text, answer=pred.answer, question=question)
 
 
-# @observe()
+@observe()
 def simple_qa(question, full_text, model_type="openai/gpt-4o"):
     llm = None
-    # langfuse = LangfuseTracker()
+    langfuse = LangfuseTracker()
     if model_type == "insight":
         llm = InsightLM(max_tokens=max_tokens)
         dspy.configure(lm=llm, trace=[])
@@ -280,7 +279,7 @@ def dspy_model(
         k=3,
     )
 
-    # langfuse = LangfuseTracker()
+    langfuse = LangfuseTracker()
     llm = None
     if model_type == "insight":
         llm = InsightLM(max_tokens=max_tokens)
@@ -299,7 +298,7 @@ def dspy_model(
     return model
 
 
-# @observe()
+@observe()
 def multi_qa(question, full_text, collection_name, persistent_directory, model_type):
     model = dspy_model(full_text, collection_name, persistent_directory, model_type)
     return model(question=question)

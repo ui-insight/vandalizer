@@ -1068,25 +1068,3 @@ textarea {
     border-radius: 0px;
     border: 1px solid #d3d3d3;
 }
-
-#release-panel {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 38%;
-    background-color: #f9f9f9;
-    border: 1px solid #ccc;
-    padding: 15px;
-    box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
-    z-index: 1000;
-}
-#release-panel h3 {
-    margin-top: 0;
-}
-#release-panel button {
-    float: right;
-    background: none;
-    border: none;
-    font-weight: bold;
-    cursor: pointer;
-}
