@@ -17,6 +17,9 @@ from app.utilities.prompt_optimization import (
 from langfuse.decorators import observe
 import asyncio
 
+
+from app.utilities.async_utilities import class_method_event_loop_decorator
+
 import time
 
 # from langchain_redis import RedisCache
@@ -63,7 +66,7 @@ class OpenAIInterface:
 
     @observe()
     def ask_question_to_loaded_document(self, item):
-        openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
+        openai.api_key = os.getenv("OPENAI_API_KEY")
         prompt = ""
         print("asking question")
         if len(item.text_blocks) > 0:
@@ -176,6 +179,7 @@ class OpenAIInterface:
             question=question,
         )
 
+    @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
         root_path,
@@ -198,7 +202,7 @@ class OpenAIInterface:
                 + " "
             )
 
-        openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
+        openai.api_key = os.getenv("OPENAI_API_KEY")
 
         print("Ask question to documents")
         prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div.

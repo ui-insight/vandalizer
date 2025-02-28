@@ -1,5 +1,27 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory, current_app
-from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow
+
+from flask import (
+    Blueprint,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    session,
+    render_template,
+    send_from_directory,
+    current_app,
+)
+from app.models import (
+    SmartDocument,
+    SmartFolder,
+    SearchSet,
+    SearchSetItem,
+    Space,
+    Workflow,
+    WorkflowStep,
+)
+
+
+
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
@@ -9,6 +31,8 @@ from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
 from . import home
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
+
 
 @home.route("/")
 def index():
@@ -95,6 +119,18 @@ def index():
             workflow=workflow,
         )
 
+        workflow_step_id = request.args.get("workflow_step_id", default=0)
+        if workflow_step_id != 0:
+            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+            workflow_step_template = render_template(
+                "workflows/workflow_steps/edit_workflow_step_modal.html",
+                workflow=workflow,
+                workflow_step_id=workflow_step.id,
+                workflow_step=workflow_step,
+            )
+
+    # Get workflow if it exists
+
     # Get the extraction and prompt sets
     global_extraction_sets = SearchSet.objects(
         space=current_space.uuid, is_global=True, set_type="extraction"
@@ -163,6 +199,10 @@ def index():
     for doc in folder_docs:
         total_token_counts += doc.token_count
 
+    # Release Notes
+    release_seen = request.cookies.get("release_seen")
+    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -180,8 +220,10 @@ def index():
         workflows=workflows,
         workflow_template=workflow_template,
         workflow_id=workflow_id,
+        release_notes=RELEASE_NOTES,
+        show_release_panel=show_release_panel,
+        current_release=CURRENT_RELEASE_VERSION,
     )
-
 
 
 @home.route("/chat", methods=["POST"])
@@ -235,8 +277,6 @@ def chat():
     response["question"] = message
     print(response)
     return jsonify(response)
-
-
 
 
 @home.route("/static/fontawesome/webfonts/<path:filename>")

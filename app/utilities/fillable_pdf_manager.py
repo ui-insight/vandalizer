@@ -4,10 +4,14 @@ import chardet
 from PyPDF2 import PdfReader
 from app.utilities.uillm import UILLM
 
+import os
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
 
 class FillablePDFManager:
     def build_set_from_items(self, items):
-        openai.api_key = "sk-proj-Tdb51ojrv5lwDtPH9S3tT3BlbkFJ6ty7hYO3Ow8weqXu6UjM"
+        openai.api_key = OPENAI_API_KEY
         prompt = ""
 
         prompt = (
