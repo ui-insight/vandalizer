@@ -10,6 +10,7 @@ from app.utilities.excel_helper import save_excel_to_html
 from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from . import files
+from devtools import debug
 
 @files.route("/upload", methods=["POST"])
 def upload():
@@ -44,28 +45,6 @@ def upload():
         f.write(imgdata)
 
     raw_text = ""
-
-    if extension == "docx":
-        # Convert to PDF
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        docx_path = os.path.join(upload_dir, f"{uid}.docx")
-        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
-        extension = "pdf"
-        raw_text =extract_text_from_doc(docx_path)
-
-    elif extension in ["xlsx", "xls"]:
-        # Convert to HTML
-        html_path = os.path.join(upload_dir, f"{uid}.html")
-        excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
-        save_excel_to_html(excel_path, html_path)
-        extension = "html"
-        raw_text = extract_text_from_html(html_path)
-
-    elif extension == "pdf":
-        # Extract text from PDF
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        raw_text = extract_text_from_doc(pdf_path)
-
     document = SmartDocument(
         title=filename,
         raw_text=raw_text,
@@ -76,6 +55,33 @@ def upload():
         space=space,
         folder=folder,
     )
+    if extension == "docx":
+        # Convert to PDF
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        docx_path = os.path.join(upload_dir, f"{uid}.docx")
+        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
+        extension = "pdf"
+        raw_text = extract_text_from_doc(docx_path)
+
+    elif extension in ["xlsx", "xls"]:
+        # Convert to HTML
+        html_path = os.path.join(upload_dir, f"{uid}.html")
+        excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        save_excel_to_html(excel_path, html_path)
+        extension = "html"
+        raw_text = extract_text_from_html(html_path)
+
+    elif extension == "pdf":
+        # Extract text from PDF in a background thread
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        thread = threading.Thread(
+            target=ocr_extract_text_from_pdf,
+            args=(pdf_path, document),)
+        thread.start()
+
+
+    debug("Saving document")
+    document.raw_text = raw_text
     document.save()
 
     # Create a new thread for semantic ingestion
