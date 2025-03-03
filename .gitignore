@@ -30,3 +30,4 @@ htmlcov/
 *,cover
 
 /app/static/db/
+/.python-version

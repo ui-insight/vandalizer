@@ -3,7 +3,27 @@
 from PyPDF2 import PdfReader
 from pathlib import Path
 from flask import current_app
+import httpx
+import pymupdf
 
+
+MIN_PDF_TEXT_LENGTH = 100
+doctr_url = "https://ocr.insight.uidaho.edu/doctr"
+
+def ocr_extract_text_from_pdf(pdf_path: str) -> str:
+    """
+    Extract text from a PDF file using PyMuPDF and OCR.
+    If the native text extraction is insufficient, OCR is applied.
+    """
+    doc = pymupdf.open(pdf_path)
+    all_text = ""
+    for page in doc:
+        all_text += page.get_text()
+    if len(all_text) < MIN_PDF_TEXT_LENGTH:
+        files = {"file": Path(pdf_path).read_bytes()}
+        response = httpx.post(doctr_url, files=files, timeout=300)
+        all_text = response.content.decode("utf-8")
+    return all_text
 
 def extract_text_from_pdf(pdf_path):
     # path has to contain static/uploads/ the file name

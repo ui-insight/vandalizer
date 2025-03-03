@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, redirect, url_for, session, curre
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.document_manager import DocumentManager
+from app.utilities.document_readers import ocr_extract_text_from_pdf, extract_text_from_doc, extract_text_from_html
 import uuid, base64, os, threading, io
 from app.utils import load_user, ingest_semantics
 import pypandoc
@@ -42,12 +43,15 @@ def upload():
     with open(os.path.join(upload_dir, f"{uid}.{extension}"), "wb") as f:
         f.write(imgdata)
 
+    raw_text = ""
+
     if extension == "docx":
         # Convert to PDF
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
         docx_path = os.path.join(upload_dir, f"{uid}.docx")
         pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
         extension = "pdf"
+        raw_text =extract_text_from_doc(docx_path)
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
@@ -55,9 +59,16 @@ def upload():
         excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
         save_excel_to_html(excel_path, html_path)
         extension = "html"
+        raw_text = extract_text_from_html(html_path)
+
+    elif extension == "pdf":
+        # Extract text from PDF
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        raw_text = extract_text_from_doc(pdf_path)
 
     document = SmartDocument(
         title=filename,
+        raw_text=raw_text,
         path=f"{uid}.{extension}",
         extension=extension,
         uuid=uid,

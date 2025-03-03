@@ -75,6 +75,14 @@
                     {% endif %}
                 </div>
                 <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
+                    {% if (documents != None) and documents|length > 0 %}
+                    <!-- Show Raw text icon -->
+                    <a style="padding-right: 30px; margin-top: 5px;" href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()">
+                        <span style="font-size: 2em; color: white;">
+                            <i class="fa-solid fa-file-lines"></i>
+                        </span>
+                    </a>
+                    {% endif %}
 
                 </div>
             </div>
@@ -261,6 +269,7 @@
         <div id="snackbar">Copied</div>
         <div class="modal-container">
         {% include "toolpanel/rename_modal.html" %}
+        {% include "toolpanel/raw_text_modal.html" %}
         {% include "toolpanel/attachment_modal.html" %}
         {% include "workflows/new_workflow_modal.html" %}
         {% include "toolpanel/tasks/new_task_modal.html" %}
