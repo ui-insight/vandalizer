@@ -35,20 +35,31 @@ def upload():
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
+    
+    # Update the stored path to include the user's id folder
+    relative_file_path = os.path.join(str(user.id), f"{uid}.{extension}")
 
-    # Handle file upload and conversion
-    upload_dir = os.path.join(current_app.root_path, "static", "uploads")
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
+    # Define base upload directory
+    base_upload_dir = os.path.join(current_app.root_path, "static", "uploads")
+    if not os.path.exists(base_upload_dir):
+        os.makedirs(base_upload_dir)
 
-    with open(os.path.join(upload_dir, f"{uid}.{extension}"), "wb") as f:
+    # Create a directory for the user based on their id
+    user_upload_dir = os.path.join(base_upload_dir, str(user.id))
+    if not os.path.exists(user_upload_dir):
+        os.makedirs(user_upload_dir)
+
+    # Save the file to the user's directory
+    file_path = os.path.join(user_upload_dir, f"{uid}.{extension}")
+    with open(file_path, "wb") as f:
         f.write(imgdata)
 
     raw_text = ""
+
     document = SmartDocument(
         title=filename,
         raw_text=raw_text,
-        path=f"{uid}.{extension}",
+        path=relative_file_path,
         extension=extension,
         uuid=uid,
         user_id=user.user_id,
@@ -57,23 +68,23 @@ def upload():
     )
     if extension == "docx":
         # Convert to PDF
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        docx_path = os.path.join(upload_dir, f"{uid}.docx")
+        pdf_path = os.path.join(user_upload_dir, f"{uid}.pdf")
+        docx_path = os.path.join(user_upload_dir, f"{uid}.docx")
         pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
         extension = "pdf"
         raw_text = extract_text_from_doc(docx_path)
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
-        html_path = os.path.join(upload_dir, f"{uid}.html")
-        excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        html_path = os.path.join(user_upload_dir, f"{uid}.html")
+        excel_path = os.path.join(user_upload_dir, f"{uid}.{extension}")
         save_excel_to_html(excel_path, html_path)
         extension = "html"
         raw_text = extract_text_from_html(html_path)
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        pdf_path = os.path.join(user_upload_dir, f"{uid}.pdf")
         thread = threading.Thread(
             target=ocr_extract_text_from_pdf,
             args=(pdf_path, document),)
@@ -89,6 +100,7 @@ def upload():
     thread.start()
     
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
+
 
 @files.route("/rename_document", methods=["POST"])
 def rename_document():
@@ -137,14 +149,8 @@ def delete_documents():
             user_id=session["user_id"], 
             document_id=document_uuid
         )
-        if document.extension == "html":
-            # Delete associated HTML files
-            html_files = [
-                f for f in os.listdir(os.path.join(current_app.root_path, "static", "uploads"))
-                if f.startswith(document.uuid)
-            ]
-            for html_file in html_files:
-                os.remove(os.path.join(current_app.root_path, "static", "uploads", html_file))
+        base_upload_dir = os.path.join(current_app.root_path, "static", "uploads", document.path)
+        os.remove(base_upload_dir)
     
     folder_id = request.args.get("folder_id")
     if folder_id:
