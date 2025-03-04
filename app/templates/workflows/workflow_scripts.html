@@ -397,7 +397,7 @@
                 workflow_session_id = session_id;
 
                 // Start the timer before making the API call
-                workflow_interval_id = startWorkflowTimer();
+   
 
                   console.log(current_space_id);
                   let data = JSON.stringify({
@@ -411,7 +411,7 @@
                   $('.add-step').hide();
                   $('.workflow-output').fadeIn();
 
-                  // let workflowIntervalId = pollWorkflowStatus(session_id);
+                  workflow_interval_id = pollWorkflowStatus(session_id);
 
                   $.ajax({
                       url: '/workflows/workflow/run',
@@ -496,31 +496,109 @@
                 });
             }
 
-          function startWorkflowTimer() {
-              // Clear any existing interval
-              if (workflow_interval_id) {
-                  clearInterval(workflow_interval_id);
-              }
-
-              // Reset elapsed time
-              workflow_elapsed_time = 0;
-
-              // Start new timer
-              workflow_interval_id = setInterval(() => {
-                  workflow_elapsed_time += 1;
-                  updateWorkflowStatus();
-              }, 1000);
-
-              return workflow_interval_id;
-          }
+        
 
           function updateWorkflowStatus() {
               // Update the UI with current elapsed time
               $('.workflow-output-attachment-info').html(`
-                  <span>${steps_completed} / ${total_steps} steps completed</span>
+                  <span>${steps_completed} / ${total_steps} tasks completed</span>
                   <span><i>${workflow_elapsed_time} seconds elapsed</i></span>
               `);
           }
+
+
+
+
+          function performWorkflowStatus(session_id, workflow_time) {
+      $.ajax({
+              url: `/workflows/workflow/status?session_id=${session_id}`,
+              type: 'GET',
+              dataType: 'json',
+              success: function (data) {
+                  console.log(data);
+                  //const { steps_completed, total_steps, status } = data;
+                  let steps_completed = data.steps_completed;
+                  let total_steps = data.total_steps;
+
+                  console.log(data);
+
+                  if (steps_completed >= total_steps) {
+                    if (workflow_interval_id) {
+                              clearInterval(workflow_interval_id);
+                          }
+                  }
+
+
+                  if (steps_completed == active_step) {
+                      $('.workflow-step').removeClass('active');
+                      $('.step-connector').removeClass('active');
+
+                      $('.workflow-loader').hide();
+                      // Add 'active' class to the nth $('.workflow-step') element (0-based index)
+                      $('.workflow-step').eq(active_step).addClass('active');
+                      $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
+                      $('.workflow-loader').eq(active_step-1).fadeIn();
+                      active_step = steps_completed + 1;
+                  }
+
+                  // Update steps completed and time elapsed
+                  $('.workflow-output-attachment-info').html(`
+                      <span>${steps_completed} / ${total_steps} steps completed</span>
+                      <span><i> ${workflow_time} seconds elapsed</i></span>
+                  `);
+
+                console.log(status);
+
+                  // Check if the workflow is completed or has failed
+                  if (status === 'completed' || status === 'failed') {
+                      clearInterval(intervalId); // Stop polling
+                      if (workflow_interval_id) {
+                              clearInterval(workflow_interval_id);
+                          }
+                      if (status === 'failed') {
+                          showToast("Workflow failed");
+                      } else {
+                                                  if (workflow_interval_id) {
+                              clearInterval(workflow_interval_id);
+                          }
+                          showToast("Workflow completed");
+                      }
+                  }
+              },
+              error: function (xhr, ajaxOptions, thrownError) {
+                  clearInterval(intervalId); // Stop polling on error
+                  console.log(xhr.status);
+                  console.log(thrownError);
+                  showToast("Error polling workflow status");
+              }
+          });
+    }
+
+          function downloadWorkflow(session_id) {
+            window.location.href = `/workflows/download?session_id=${session_id}`;
+          }
+
+          function pollWorkflowStatus(session_id) {
+            let startTime = Date.now(); // Capture start time to calculate elapsed time
+            const pollInterval = 1000; // Poll every second
+            const maxAttempts = 180; // Optional: Stop polling after 60 seconds to prevent infinite loop
+            workflow_elapsed_time = 0;
+
+            let intervalId = setInterval(() => {
+                workflow_elapsed_time += 1;
+
+                performWorkflowStatus(session_id, workflow_elapsed_time);
+
+                // Stop polling after max attempts
+                if (workflow_elapsed_time >= maxAttempts) {
+                    clearInterval(intervalId);
+                    showToast("Workflow status polling timed out");
+                }
+            }, pollInterval);
+
+            return intervalId;
+        }
+
 
 
           // socket.on('workflow_status', function(data) {
@@ -565,81 +643,4 @@
   //       }
   //   }
   // });
-
-
-          function performWorkflowStatus(session_id, workflow_time) {
-      $.ajax({
-              url: `/workflows/workflow/status?session_id=${session_id}`,
-              type: 'GET',
-              dataType: 'json',
-              success: function (data) {
-                  console.log(data);
-                  //const { steps_completed, total_steps, status } = data;
-                  let steps_completed = data.steps_completed;
-                  let total_steps = data.total_steps;
-
-                  console.log(steps_completed);
-
-
-                  if (steps_completed == active_step) {
-                      $('.workflow-step').removeClass('active');
-                      $('.step-connector').removeClass('active');
-
-                      $('.workflow-loader').hide();
-                      // Add 'active' class to the nth $('.workflow-step') element (0-based index)
-                      $('.workflow-step').eq(active_step).addClass('active');
-                      $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
-                      $('.workflow-loader').eq(active_step-1).fadeIn();
-                      active_step = steps_completed + 1;
-                  }
-
-                  // Update steps completed and time elapsed
-                  $('.workflow-output-attachment-info').html(`
-                      <span>${steps_completed} / ${total_steps} steps completed</span>
-                      <span><i> ${workflow_time} seconds elapsed</i></span>
-                  `);
-
-                  // Check if the workflow is completed or has failed
-                  if (status === 'completed' || status === 'failed') {
-                      clearInterval(intervalId); // Stop polling
-                      if (status === 'failed') {
-                          showToast("Workflow failed");
-                      } else {
-                          showToast("Workflow completed");
-                      }
-                  }
-              },
-              error: function (xhr, ajaxOptions, thrownError) {
-                  clearInterval(intervalId); // Stop polling on error
-                  console.log(xhr.status);
-                  console.log(thrownError);
-                  showToast("Error polling workflow status");
-              }
-          });
-    }
-
-          function downloadWorkflow(session_id) {
-            window.location.href = `/workflows/download?session_id=${session_id}`;
-          }
-
-          function pollWorkflowStatus(session_id) {
-            let startTime = Date.now(); // Capture start time to calculate elapsed time
-            const pollInterval = 1000; // Poll every second
-            const maxAttempts = 180; // Optional: Stop polling after 60 seconds to prevent infinite loop
-            workflow_elapsed_time = 0;
-
-            let intervalId = setInterval(() => {
-                workflow_elapsed_time += 1;
-
-                performWorkflowStatus(session_id, workflow_elapsed_time);
-
-                // Stop polling after max attempts
-                if (workflow_elapsed_time >= maxAttempts) {
-                    clearInterval(intervalId);
-                    showToast("Workflow status polling timed out");
-                }
-            }, pollInterval);
-
-            return intervalId;
-        }
 </script>
