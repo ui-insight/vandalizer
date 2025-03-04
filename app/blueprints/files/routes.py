@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, redirect, url_for, session, curre
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.document_manager import DocumentManager
+from app.utilities.document_readers import ocr_extract_text_from_pdf, extract_text_from_doc, extract_text_from_html
 import uuid, base64, os, threading, io
 from app.utils import load_user, ingest_semantics
 import pypandoc
@@ -33,6 +34,9 @@ def upload():
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
+    
+    # Update the stored path to include the user's id folder
+    relative_file_path = os.path.join(str(user.id), f"{uid}.{extension}")
 
     # Define base upload directory
     base_upload_dir = os.path.join(current_app.root_path, "static", "uploads")
@@ -48,6 +52,8 @@ def upload():
     file_path = os.path.join(user_upload_dir, f"{uid}.{extension}")
     with open(file_path, "wb") as f:
         f.write(imgdata)
+
+    raw_text = ""
 
     if extension == "docx":
         # Convert to PDF and extract text
@@ -67,11 +73,9 @@ def upload():
 
     elif extension == "pdf":
         # Extract text from PDF
-        pdf_path = os.path.join(user_upload_dir, f"{uid}.pdf")
-        raw_text = extract_text_from_doc(pdf_path)
+        raw_text = extract_text_from_doc(relative_file_path)
 
-    # Update the stored path to include the user's id folder
-    relative_file_path = os.path.join(str(user.id), f"{uid}.{extension}")
+    
 
     document = SmartDocument(
         title=filename,

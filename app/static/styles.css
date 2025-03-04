@@ -1068,3 +1068,8 @@ textarea {
     border-radius: 0px;
     border: 1px solid #d3d3d3;
 }
+
+.overflow-scroll {
+    overflow-y: auto;
+    max-height: 300px;
+}

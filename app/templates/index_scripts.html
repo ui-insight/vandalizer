@@ -3,6 +3,16 @@
     var document_uuids = [];
   var maxContextLength = parseInt("{{max_context_length}}");
 
+    {% if (documents != None) and documents|length > 0 %}
+    const documentData = {
+        id: "{{ documents[0].id|safe }}",
+        title: "{{ documents[0].title|safe }}",
+        raw_text: {{ documents[0].raw_text|tojson|safe }}
+    };
+    {% else %}
+    const documentData = null;
+    {% endif %}
+
    var folder_uuid = "{{current_folder_id}}"
 
 
@@ -29,6 +39,21 @@
         url.searchParams.delete('docid');
         window.location.href = url.toString();
     }
+
+    function showRawText() {
+        console.log("show raw text", documentData);
+        // Get the current document
+        if (documentData) { 
+            const modal = document.getElementById("rawTextModal");
+            const rawText = documentData.raw_text;
+            const rawTextContent = document.getElementById("rawTextContent");
+            rawTextContent.textContent = rawText;
+            $('#rawTextModal').show();
+        }
+    }
+    $("#closeRawTextModalBtn").on('click', function() {
+        $('#rawTextModal').hide();
+    });
 
     function setSection(sectionName) {
           // Use the tabTitle variable as needed
