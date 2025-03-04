@@ -274,7 +274,7 @@
             async: true,
             success: function(msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
-                $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().remove();
+                $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().parent().remove();
             },
             error: function(xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -351,19 +351,19 @@
     }
 
     function showScanning() {
-        if ($('.document')[0] == undefined) {
+        if ($('.document-scanner')[0] == undefined) {
             return;
         }
 
-        $('.document')[0].classList.add('scanning')
+        $('.document-scanner')[0].classList.add('scanning')
     }
 
     function stopScanning() {
-        if ($('.document')[0] == undefined) {
+        if ($('.document-scanner')[0] == undefined) {
             return;
         }
 
-        $('.document')[0].classList.remove('scanning')
+        $('.document-scanner')[0].classList.remove('scanning')
     }
 
     $('.rescan-button').on('click', function(e) {
