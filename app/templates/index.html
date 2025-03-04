@@ -55,35 +55,36 @@
 
 <div class="main-panel">
     <div class="left-panel">
-        <div class="header">
-            <div class="row" style="height:100%; background-color: #191919;">
-                <div class="col-md-3" style="height:100%; padding-top: 7.5px;">
+        <div class="header" style="padding: 0 15px;">
+            <div class="row" style="height:100%; background-color: #191919; display: flex; align-items: center;">
+                <div class="col-auto" style="padding-left: 30px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <a style="padding-left: 30px; margin-top: 5px;" href="javascript:void(0);" onclick="removeDocIdAndGo()">
-                        <span style="font-size: 2em;  color: white;">
+                    <a href="javascript:void(0);" onclick="removeDocIdAndGo()">
+                        <span style="font-size: 2em; color: white;">
                             <i class="fa-solid fa-arrow-left"></i>
                         </span>
                     </a>
                     {% endif %}
                 </div>
-                <div class="col-md-6">
-                    <p id="document-title">
+                
+                <div class="col" style="text-align: center; flex: 1;">
+                    <p id="document-title" style="margin: 0; padding-top: 0px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                         {% if (documents != None) and documents|length > 0 %}
-                        {{ documents[0].title }}</p>
-                    {% else %}
-                    Select or Upload PDFs</p>
-                    {% endif %}
+                            {{ documents[0].title }}
+                        {% else %}
+                            Select or Upload PDFs
+                        {% endif %}
+                    </p>
                 </div>
-                <div class="col-md-3" style="height:100%; padding-top: 7.5px; float: right;">
+                
+                <div class="col-auto" style="padding-right: 30px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <!-- Show Raw text icon -->
-                    <a style="padding-right: 30px; margin-top: 5px;" href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()">
-                        <span style="font-size: 2em; color: white;">
-                            <i class="fa-solid fa-file-lines"></i>
+                    <a href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()">
+                        <span style="font-size: 1em; color: rgba(255, 255, 255, 0.637);">
+                            <i class="fa-solid fa-code"></i>
                         </span>
                     </a>
                     {% endif %}
-
                 </div>
             </div>
         </div>
