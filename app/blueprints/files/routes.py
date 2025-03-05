@@ -75,8 +75,6 @@ def upload():
         # Extract text from PDF
         raw_text = extract_text_from_doc(relative_file_path)
 
-    
-
     document = SmartDocument(
         title=filename,
         raw_text=raw_text,

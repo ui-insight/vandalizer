@@ -6,6 +6,8 @@ import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 # from app import socketio
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
 
 import re
 import html
@@ -333,6 +335,7 @@ class WorkflowEngine:
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
         self.graph_built = False
+        self.max_workers = multiprocessing.cpu_count()
 
     def add_node(self, node):
         self.graph.add(node)

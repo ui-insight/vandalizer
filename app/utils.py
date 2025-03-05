@@ -47,5 +47,3 @@ def ingest_semantics(document):
         document_name=document.title,
         document_id=document.uuid,
     )
-    user_docs = document_manager.list_user_documents(document.user_id)
-

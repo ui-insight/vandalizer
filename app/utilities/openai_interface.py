@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 import openai
 from PyPDF2 import PdfReader
-from app.utilities.agents import RagDeps, rag_agent
+from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
 from app.utilities.prompt_optimization import (
@@ -204,13 +204,6 @@ class OpenAIInterface:
 
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
-        print("Ask question to documents")
-        prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div.
-        \nDocument(s): {[doc.path for doc in documents]}\n
-        Question: {question}
-        """
-        print("prompt: ", prompt)
-        deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
 
         docs_ids_string = "_".join([str(doc.id) for doc in documents])
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
@@ -264,11 +257,31 @@ class OpenAIInterface:
             #     previous_messages
             # )
 
-        answer = rag_agent.run_sync(
-            prompt,
-            deps=deps,
-            message_history=previous_messages,
-        )
+        prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div."""
+        debug(max_context_length)
+        if len(full_text) > max_context_length:
+            prompt += f"""
+            Do not include the question in your response.
+            {full_text}
+            """
+            answer = chat_agent.run_sync(
+                prompt,
+                message_history=previous_messages,
+                )
+            debug("llmchat", answer)
+
+        else:
+            prompt += f"""
+        \nDocument(s): {[doc.path for doc in documents]}\n
+        Question: {question}
+        """
+            debug("Rag chat", prompt)
+            deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0", documents=documents)
+            answer = rag_agent.run_sync(
+                prompt,
+                deps=deps,
+                message_history=previous_messages,
+            )
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())
