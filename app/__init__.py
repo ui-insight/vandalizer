@@ -10,6 +10,12 @@ from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
 from flask_dance.contrib.azure import azure, make_azure_blueprint
 import logging
 
+# Error Logging
+import os
+import rollbar
+import rollbar.contrib.flask
+from flask import got_request_exception
+
 CURRENT_RELEASE_VERSION = "2.0.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
 Release 2.0.1:
@@ -60,6 +66,22 @@ blueprint = make_azure_blueprint(
 )
 
 app.register_blueprint(blueprint, url_prefix="/login")
+
+
+with app.app_context():
+    """init rollbar module"""
+    rollbar.init(
+        # access token
+        '89d52707026e4341b6ce8451232e7585',
+        # environment name - any string, like 'production' or 'development'
+        'flasktest',
+        # server root directory, makes tracebacks prettier
+        root=os.path.dirname(os.path.realpath(__file__)),
+        # flask already sets up logging
+        allow_logging_basic_config=False)
+
+    # send exceptions from `app` to rollbar, using flask's signal system.
+    got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
 # @auth.errorhandler(MismatchingStateError)
 # def mismatching_state(e):
