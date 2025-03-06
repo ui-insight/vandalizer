@@ -202,17 +202,18 @@ class DocumentNode(Node):
         self.docs = data.get("docs", [])
         self.attachments = data.get("attachments", [])
         self.pdf_paths = []
+        user_id = data.get("user_id", "0")
 
         # self.filename = data.get("filename", "")
         # self.content = ""
         self.docs_uuids = []
         self.content = ""
         for doc in self.attachments:
-            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            doc_path = doc.absolute_path
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            doc_path = doc.absolute_path
             self.pdf_paths.append(doc_path)
 
         print("PDF Paths: ", self.pdf_paths)

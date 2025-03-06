@@ -38,12 +38,12 @@ def is_dev():
 
 
 def ingest_semantics(document):
-    semantics = SemanticIngest()
-    semantics.ingest(document=document)
+    # semantics = SemanticIngest()
+    # semantics.ingest(document=document)
     document_manager = DocumentManager()
     document_manager.add_document(
         user_id=document.user_id,
-        doc_path=document.path,
+        doc_path=document.absolute_path,
         document_name=document.title,
         document_id=document.uuid,
     )

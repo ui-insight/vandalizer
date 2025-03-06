@@ -92,6 +92,8 @@ class User(me.Document):
 
 class SmartDocument(me.Document):
     path = me.StringField(required=True, max_length=200)
+    absolute_path = me.StringField(required=True, max_length=200)
+    processing = me.BooleanField(default=False)
     title = me.StringField(required=True, max_length=200)
     raw_text = me.StringField(required=True, default="")
     extension = me.StringField(default="pdf", max_length=10)

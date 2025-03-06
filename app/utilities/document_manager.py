@@ -67,19 +67,18 @@ class DocumentManager:
         splits = []
         # if html file
         if doc_path.endswith(".html"):
-            file_path = self.upload_folder / doc_path
-            text = ocr_extract_text_from_pdf(file_path.as_posix())
-            with open(file_path, "r", encoding="utf-8") as file:
+            text = ocr_extract_text_from_pdf(doc_path)
+            with open(doc_path, "r", encoding="utf-8") as file:
                 text = file.read()
             text_splits = self.text_splitter.split_text(text)
             splits = self.text_splitter.create_documents(text_splits)
 
         else:
-            file_path = self.upload_folder / doc_path
-            text = ocr_extract_text_from_pdf(file_path.as_posix())
+            text = ocr_extract_text_from_pdf(doc_path)
+            debug(len(text))
             text_splits = self.text_splitter.split_text(text)
             splits = self.text_splitter.create_documents(text_splits)
-            debug(splits)
+            debug(len(splits))
 
         # Add metadata to each split
         for i, split in enumerate(splits):
