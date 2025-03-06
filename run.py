@@ -14,21 +14,6 @@ load_dotenv()
 
 
 
-
-def setup_event_loop():
-    """Setup event loop for the current thread"""
-    # Get thread id for debugging
-    thread_id = threading.current_thread().ident
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        # Create new event loop for this thread
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    nest_asyncio.apply()
-    return loop
-
-
 if os.environ.get("LOGFIRE") == "true":
     import logfire
 
@@ -49,15 +34,6 @@ langfuse_context.configure(
 
 load_dotenv()
 
-
-# Handle the event loop for the current thread
-@app.before_request
-def initialize_event_loop():
-    setup_event_loop()
-
-
-# Handle the event loop for the main thread
-setup_event_loop()
 
 # ----------------------------------------
 # launch
