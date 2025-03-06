@@ -1,4 +1,4 @@
-
+import os
 from flask import (
     Blueprint,
     request,
@@ -233,6 +233,7 @@ def chat():
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
+    user_id = load_user().user_id
     print(document_uuids)
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
@@ -243,7 +244,7 @@ def chat():
                 html_files = [
                     f
                     for f in os.listdir(
-                        os.path.join(current_app.root_path, "static", "uploads")
+                        os.path.join(current_app.root_path, "static", "uploads", user_id)
                     )
                     if f.startswith(document.uuid)
                     and f != document.path
@@ -253,6 +254,8 @@ def chat():
                     html_doc = SmartDocument(
                         title=document.title,
                         path=html_file,
+                        absolute_path=os.path.join(
+                            current_app.root_path, "static", "uploads", user_id, html_file),
                         extension="html",
                         uuid=uuid.uuid4().hex,
                         user_id=document.user_id,

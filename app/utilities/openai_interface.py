@@ -32,7 +32,7 @@ from app.models import (
     MAX_CHAT_MESSAGES,
     AgentHistory,
 )
-from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
+from app.utilities.document_readers import extract_text_from_doc
 
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
@@ -60,9 +60,8 @@ cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 class OpenAIInterface:
     loaded_doc = ""
 
-    def load_document(self, root_path, document_path):
-        full_path = os.path.join(root_path, "static", "uploads", document_path)
-        self.loaded_doc = extract_text_from_pdf(full_path)
+    def load_document(self, document_path):
+        self.loaded_doc = extract_text_from_doc(document_path)
 
     @observe()
     def ask_question_to_loaded_document(self, item):
@@ -194,11 +193,9 @@ class OpenAIInterface:
 
         full_text = ""
         for document in default_docs + documents:
-            full_path = os.path.join(root_path, "static", "uploads", document.path)
-            print("full path: ", full_path)
             full_text += (
                 "\n\nDocument: "
-                + extract_text_from_doc(doc=document, doc_path=full_path)
+                + extract_text_from_doc(doc=document, doc_path=document.absolute_path)
                 + " "
             )
 
@@ -257,12 +254,12 @@ class OpenAIInterface:
             #     previous_messages
             # )
 
-        prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div."""
+        prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
         debug(max_context_length)
         if len(full_text) > max_context_length:
             prompt += f"""
-            Do not include the question in your response.
-            {full_text}
+            Question: {question}
+            Document: {full_text}
             """
             answer = chat_agent.run_sync(
                 prompt,

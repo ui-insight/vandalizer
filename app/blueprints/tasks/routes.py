@@ -251,7 +251,7 @@ def begin_search():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        document_paths.append(document.path)
+        document_paths.append(document.absolute_path)
 
     print("Fetch loading template:" + searchset_uuid)
 
@@ -336,7 +336,7 @@ def build_extraction_from_document():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        document_paths.append(document.path)
+        document_paths.append(document.absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
@@ -439,9 +439,12 @@ def begin_prompt_search():
     keys = []
     items = search_set.items()
 
+    user_id = load_user().user_id
+
     if len(items) > 0:
         llm = OpenAIInterface()
-        llm.load_document(current_app.root_path, document_path)
+        document_path = os.path.join("static", "uploads", user_id, document_path)
+        llm.load_document(document_path)
         results = {}
         for item in items:
             results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
