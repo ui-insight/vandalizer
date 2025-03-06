@@ -18,7 +18,6 @@ from langfuse.decorators import observe
 import asyncio
 
 
-from app.utilities.async_utilities import class_method_event_loop_decorator
 
 import time
 
@@ -178,7 +177,6 @@ class OpenAIInterface:
             question=question,
         )
 
-    @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
         root_path,
