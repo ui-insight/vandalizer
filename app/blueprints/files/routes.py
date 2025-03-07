@@ -185,7 +185,7 @@ def delete_documents():
         )
         document_file_path = document.absolute_path
 
-        if not os.path.exists(document_file_path):
+        if os.path.exists(str(document_file_path)):
             user_id = load_user().user_id
             update_document_path(current_app.root_path, document, user_id)
             document_file_path = document.absolute_path

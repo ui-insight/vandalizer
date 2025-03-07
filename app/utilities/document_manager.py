@@ -21,7 +21,7 @@ from app.utilities.document_readers import ocr_extract_text_from_pdf
 
 
 def update_document_path(root_path, document, user_id):
-    if not os.path.exists(document.absolute_path):
+    if not os.path.exists(str(document.absolute_path)):
         document_file_path = os.path.join(
             root_path, "static", "uploads", user_id, document.path
         )

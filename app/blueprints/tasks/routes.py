@@ -263,7 +263,7 @@ def begin_search():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        if not os.path.exists(document.absolute_path):
+        if not os.path.exists(str(document.absolute_path)):
             user_id = load_user().user_id
             update_document_path(current_app.root_path, document, user_id)
         document_paths.append(document.absolute_path)
@@ -353,7 +353,7 @@ def build_extraction_from_document():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        if not os.path.exists(document.absolute_path):
+        if not os.path.exists(str(document.absolute_path)):
             user_id = load_user().user_id
             update_document_path(current_app.root_path, document, user_id)
         document_paths.append(document.absolute_path)
@@ -464,7 +464,7 @@ def begin_prompt_search():
     if len(items) > 0:
         llm = OpenAIInterface()
         document_file_path = os.path.join("static", "uploads", user_id, document_path)
-        if not os.path.exists(document_file_path):
+        if not os.path.exists(str(document_file_path)):
             document_file_path = os.path.join(
                 current_app.root_path, "static", "uploads", document_path
             )
