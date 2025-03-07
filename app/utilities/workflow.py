@@ -261,13 +261,13 @@ class DocumentNode(Node):
         self.content = ""
         for doc in self.attachments:
             doc_path = doc.absolute_path
-            if not os.path.exists(doc_path):
+            if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
             doc_path = doc.absolute_path
-            if not os.path.exists(doc_path):
+            if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
             self.pdf_paths.append(doc_path)
 

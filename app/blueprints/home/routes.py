@@ -239,7 +239,7 @@ def chat():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
-            if not os.path.exists(document.absolute_path):
+            if not os.path.exists(str(document.absolute_path)):
                 update_document_path(document)
 
             documents.append(document)
