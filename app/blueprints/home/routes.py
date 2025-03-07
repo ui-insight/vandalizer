@@ -241,7 +241,7 @@ def chat():
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
             if not os.path.exists(str(document.absolute_path)):
-                update_document_path(document)
+                update_document_path(current_app.root_path, document, user_id)
 
             documents.append(document)
             # find related html documents (excel converted to html)

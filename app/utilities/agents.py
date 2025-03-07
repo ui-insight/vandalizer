@@ -39,12 +39,75 @@ class RagDeps:
 rag_agent = Agent(
     "openai:gpt-4o",
     deps_type=RagDeps,
-    system_prompt="You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.",
+    system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
+
+When responding to queries:
+1. Carefully analyze the retrieved context documents for relevance to the query
+2. Synthesize information across multiple context fragments when appropriate
+3. Quote or paraphrase the retrieved information with precise attribution (e.g., "According to Document 1...")
+4. Maintain the original meaning and nuance from source documents
+5. Identify and reconcile any contradictions between different sources
+6. Distinguish between factual statements from the context and your own reasoning
+
+Response guidelines:
+- Begin with a direct answer to the question when possible
+- Structure complex answers with clear headings or numbered points
+- Highlight key information using formatting when helpful
+- Include relevant examples or illustrations from the context
+- Acknowledge information gaps explicitly rather than extrapolating
+- If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
+
+Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
 )
 
 chat_agent = Agent(
     "openai:gpt-4o",
-    system_prompt="You are a chatbot. Engage in a conversation with the user.",
+    system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+
+Your communication style:
+- Warm and approachable while maintaining professionalism
+- Concise but thorough - prioritize clarity over length
+- Personalized to the user's tone and level of formality
+- Balances helpfulness with respect for user autonomy
+
+When responding:
+1. Address the user's specific question or need first
+2. Provide relevant context or background when helpful
+3. If uncertain, acknowledge limitations rather than guessing
+4. For complex topics, break information into digestible segments
+5. Use natural, conversational language (contractions, varied sentence structure)
+6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+
+Content guidelines:
+- Cite sources for factual claims when possible
+- Present balanced perspectives on nuanced topics
+- Avoid unnecessary jargon unless the conversation indicates technical expertise
+- Respect privacy and security best practices
+
+Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
+)
+
+prompt_agent = Agent(
+    "openai:gpt-4o",
+    system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
+
+When generating search prompts:
+1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
+2. Include relevant synonyms and alternative phrasings to increase recall
+3. Remove conversational fillers and personal pronouns
+4. Prioritize domain-specific terminology when present
+5. Structure the prompt with the most important search terms first
+6. Include any contextual constraints (time periods, locations, etc.)
+7. Keep the prompt concise (under 100 words) but comprehensive
+8. Format technical terms precisely as they would appear in documentation
+
+Do not:
+- Include explanations or reasoning in your response
+- Ask clarifying questions
+- Provide answers to the user's question
+- Include special operators or syntax unless specified
+
+Your output should be the search prompt only, with no additional text.""",
 )
 
 
@@ -60,24 +123,36 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
     Returns:
         A list of documents that match the question
     """
+
+    prompt_response = prompt_agent.run_sync(
+        f"Generate a prompt for the following user question: {question}"
+    )
+    prompt = prompt_response.data
+    debug(prompt)
+
     results = context.deps.doc_manager.query_documents(
-        context.deps.user_id, question, docs_ids
+        context.deps.user_id, prompt, docs_ids, k=10
     )
     if len(results) == 0:
-        debug("Recreating vectorstore", context.deps.documents)
-        debug(context.deps.documents[0].raw_text[:100])
-        # recreate the vectorstore
+        # check if the document was added to the vectorstore
+        non_existent_docs = []
         for doc in context.deps.documents:
-            context.deps.doc_manager.add_document(
-                user_id=context.deps.user_id,
-                doc_path=doc.absolute_path,
-                document_name=doc.title,
-                document_id=doc.uuid,
+            if not context.deps.doc_manager.document_exists(doc.uuid):
+                non_existent_docs.append(doc)
+                debug(
+                    "Recreating vectorstore", context.deps.documents, non_existent_docs
+                )
+                context.deps.doc_manager.add_document(
+                    user_id=context.deps.user_id,
+                    doc_path=doc.absolute_path,
+                    document_name=doc.title,
+                    document_id=doc.uuid,
+                )
+        debug(context.deps.documents[0].raw_text[:100])
+        if len(non_existent_docs) > 0:
+            results = context.deps.doc_manager.query_documents(
+                context.deps.user_id, question, docs_ids
             )
-        results = context.deps.doc_manager.query_documents(
-            context.deps.user_id, question, docs_ids
-        )
-        debug("Recreated vectorstore")
 
     debug(results)
     content = "Context: \n"
