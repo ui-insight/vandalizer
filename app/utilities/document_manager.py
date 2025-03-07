@@ -19,6 +19,39 @@ from devtools import debug
 
 from app.utilities.document_readers import ocr_extract_text_from_pdf
 
+
+def update_document_path(root_path, document, user_id):
+    if not os.path.exists(document.absolute_path):
+        document_file_path = os.path.join(
+            root_path, "static", "uploads", user_id, document.path
+        )
+        document.absolute_path = document_file_path
+        # relative path
+        document.path = os.path.join(user_id, document.path)
+        document.save()
+        # move document and files
+        old_path = os.path.join(root_path, "static", "uploads", document.path)
+        os.rename(old_path, document_file_path)
+        if document.extension == "excel" or document.extension == "docx":
+            for f in os.listdir(os.path.join(root_path, "static", "uploads")):
+                if f.startswith(document.uuid):
+                    os.rename(
+                        os.path.join(
+                            root_path,
+                            "static",
+                            "uploads",
+                            f,
+                        ),
+                        os.path.join(
+                            root_path,
+                            "static",
+                            "uploads",
+                            user_id,
+                            f,
+                        ),
+                    )
+
+
 class DocumentManager:
     def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db"):
         """Initialize the document manager with a persistence directory."""

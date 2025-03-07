@@ -21,7 +21,6 @@ from app.models import (
 )
 
 
-
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
@@ -30,6 +29,7 @@ from itertools import chain
 from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.document_manager import update_document_path
 from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
@@ -235,27 +235,39 @@ def chat():
     documents = []
     user_id = load_user().user_id
     print(document_uuids)
+    # migrate to new document user's location
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
+            if not os.path.exists(document.absolute_path):
+                update_document_path(document)
+
             documents.append(document)
             # find related html documents (excel converted to html)
             if document.extension == "html":
                 html_files = [
                     f
                     for f in os.listdir(
-                        os.path.join(current_app.root_path, "static", "uploads", user_id)
+                        os.path.join(
+                            current_app.root_path, "static", "uploads", user_id
+                        )
                     )
                     if f.startswith(document.uuid)
                     and f != document.path
                     and f.endswith(".html")
                 ]
+
                 for html_file in html_files:
                     html_doc = SmartDocument(
                         title=document.title,
                         path=html_file,
                         absolute_path=os.path.join(
-                            current_app.root_path, "static", "uploads", user_id, html_file),
+                            current_app.root_path,
+                            "static",
+                            "uploads",
+                            user_id,
+                            html_file,
+                        ),
                         extension="html",
                         uuid=uuid.uuid4().hex,
                         user_id=document.user_id,

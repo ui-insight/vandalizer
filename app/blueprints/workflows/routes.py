@@ -1,18 +1,39 @@
-from flask import Blueprint, request, current_app, jsonify, redirect, url_for, render_template, send_file, session
-from app.models import SmartDocument, SearchSet, SearchSetItem, Workflow, WorkflowStepTask, WorkflowResult, WorkflowStep
+from flask import (
+    Blueprint,
+    request,
+    current_app,
+    jsonify,
+    redirect,
+    url_for,
+    render_template,
+    send_file,
+    session,
+)
+from app.models import (
+    SmartDocument,
+    SearchSet,
+    SearchSetItem,
+    Workflow,
+    WorkflowStepTask,
+    WorkflowResult,
+    WorkflowStep,
+)
 from app.models import User, Space, WorkflowAttachment
 from app.utils import load_user
 from copy import deepcopy
 import os, uuid
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
+from app.utilities.document_manager import update_document_path
 from werkzeug.utils import secure_filename
 import pypandoc, json
 from bson import ObjectId
 from app.utilities.excel_helper import save_excel_to_html
+
 # from app import socketio
 from itertools import chain
 
 from . import workflows
+
 
 ## MARK: ~~ Create
 @workflows.route("/create_workflow", methods=["POST"])
@@ -28,7 +49,14 @@ def add_workflow():
         user_id=session["user_id"],
     )
     workflow.save()
-    return jsonify({"reroute": url_for("home.index", section="Workflows", workflow_id=str(workflow.id))})
+    return jsonify(
+        {
+            "reroute": url_for(
+                "home.index", section="Workflows", workflow_id=str(workflow.id)
+            )
+        }
+    )
+
 
 ## MARK: ~~ Delete
 @workflows.route("/delete_workflow", methods=["GET"])
@@ -68,13 +96,20 @@ def run_workflow():
     document_uuids = workflow_data["document_uuids"]
     download = workflow_data.get("download", False)  # Get the 'download' flag
 
+    user_id = load_user().user_id
+
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
+    for attachment in attachments:
+        if not os.path.exists(attachment.absolute_path):
+            update_document_path(current_app.root_path, attachment, user_id)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
-    user_id = load_user().user_id
+    for doc in docs:
+        if not os.path.exists(doc.absolute_path):
+            update_document_path(current_app.root_path, doc, user_id)
     document_trigger_step = WorkflowStep(
         name="Document", data=dict(docs=docs, attachments=attachments, user_id=user_id)
     )
@@ -144,7 +179,9 @@ def run_workflow_integrated():
         uid = uuid.uuid4().hex.upper()
 
         # Create upload directory if it doesn't exist
-        upload_dir = os.path.join(current_app.root_path, "static", "uploads", str(user.id))
+        upload_dir = os.path.join(
+            current_app.root_path, "static", "uploads", str(user.id)
+        )
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
@@ -272,7 +309,9 @@ def workflow_download():
     # Ensure the static folder exists
     os.makedirs(os.path.join(current_app.root_path, "static"), exist_ok=True)
 
-    output_file_path = os.path.join(current_app.root_path, "static", "workflow_output.txt")
+    output_file_path = os.path.join(
+        current_app.root_path, "static", "workflow_output.txt"
+    )
     final_output = list(workflow_result.steps_output.values())[-1]
 
     with open(output_file_path, "w") as f:  # Open as text file for string output
@@ -876,4 +915,3 @@ def workflow_add_document_step():
         workflow = Workflow.objects(id=workflow_id).first()
 
         return jsonify({"response": "Placeholder"})
-
