@@ -18,7 +18,6 @@ from langfuse.decorators import observe
 import asyncio
 
 
-
 import time
 
 # from langchain_redis import RedisCache
@@ -199,7 +198,6 @@ class OpenAIInterface:
 
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
-
         docs_ids_string = "_".join([str(doc.id) for doc in documents])
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
         llm_string = "pydantic_model:openai:gpt-4o"
@@ -262,16 +260,20 @@ class OpenAIInterface:
             answer = chat_agent.run_sync(
                 prompt,
                 message_history=previous_messages,
-                )
+            )
             debug("llmchat", answer)
 
         else:
             prompt += f"""
-        \nDocument(s): {[doc.path for doc in documents]}\n
+        \nDocument(s): {[doc.uuid for doc in documents]}\n
         Question: {question}
         """
             debug("Rag chat", prompt)
-            deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0", documents=documents)
+            deps = RagDeps(
+                doc_manager=DocumentManager(),
+                user_id=user_id or "0",
+                documents=documents,
+            )
             answer = rag_agent.run_sync(
                 prompt,
                 deps=deps,

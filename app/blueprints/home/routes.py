@@ -20,6 +20,7 @@ from app.models import (
     WorkflowStep,
 )
 
+from devtools import debug
 
 from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
@@ -281,6 +282,8 @@ def chat():
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
     user_id = load_user().user_id
+    debug(documents)
+    debug(docs)
     response = OpenAIInterface().ask_question_to_documents(
         current_app.root_path,
         documents,

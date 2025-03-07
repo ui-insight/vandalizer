@@ -47,6 +47,7 @@ chat_agent = Agent(
     system_prompt="You are a chatbot. Engage in a conversation with the user.",
 )
 
+
 @rag_agent.tool
 def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = []):
     """
@@ -67,7 +68,12 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
         debug(context.deps.documents[0].raw_text[:100])
         # recreate the vectorstore
         for doc in context.deps.documents:
-            context.deps.doc_manager.add_document(user_id=context.deps.user_id, doc_path=doc.path, document_name=doc.title, document_id=doc.uuid)
+            context.deps.doc_manager.add_document(
+                user_id=context.deps.user_id,
+                doc_path=doc.absolute_path,
+                document_name=doc.title,
+                document_id=doc.uuid,
+            )
         results = context.deps.doc_manager.query_documents(
             context.deps.user_id, question, docs_ids
         )
