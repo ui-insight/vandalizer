@@ -11,4 +11,5 @@ model_category = "pydantic_ai"
 # we use less than this to be safe
 # max_context_length = 16 * 1024  # 16k tokens
 
-max_context_length = 90 * 1024  # 90k tokens
+# max_context_length = 90 * 1024  # 90k tokens
+max_context_length = 10 * 1024  # 90k tokens

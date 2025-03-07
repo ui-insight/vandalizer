@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 import openai
 from PyPDF2 import PdfReader
-from app.utilities.agents import RagDeps, rag_agent
+from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
 from app.utilities.prompt_optimization import (
@@ -18,7 +18,6 @@ from langfuse.decorators import observe
 import asyncio
 
 
-from app.utilities.async_utilities import class_method_event_loop_decorator
 
 import time
 
@@ -32,7 +31,7 @@ from app.models import (
     MAX_CHAT_MESSAGES,
     AgentHistory,
 )
-from app.utilities.document_readers import extract_text_from_pdf, extract_text_from_doc
+from app.utilities.document_readers import extract_text_from_doc
 
 from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
@@ -60,9 +59,8 @@ cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 class OpenAIInterface:
     loaded_doc = ""
 
-    def load_document(self, root_path, document_path):
-        full_path = os.path.join(root_path, "static", "uploads", document_path)
-        self.loaded_doc = extract_text_from_pdf(full_path)
+    def load_document(self, document_path):
+        self.loaded_doc = extract_text_from_doc(document_path)
 
     @observe()
     def ask_question_to_loaded_document(self, item):
@@ -179,7 +177,6 @@ class OpenAIInterface:
             question=question,
         )
 
-    @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
         root_path,
@@ -194,23 +191,14 @@ class OpenAIInterface:
 
         full_text = ""
         for document in default_docs + documents:
-            full_path = os.path.join(root_path, "static", "uploads", document.path)
-            print("full path: ", full_path)
             full_text += (
                 "\n\nDocument: "
-                + extract_text_from_doc(doc=document, doc_path=full_path)
+                + extract_text_from_doc(doc=document, doc_path=document.absolute_path)
                 + " "
             )
 
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
-        print("Ask question to documents")
-        prompt = f"""Given the following document(s), answer the following question. Return the result as nicely formatted html div.
-        \nDocument(s): {[doc.path for doc in documents]}\n
-        Question: {question}
-        """
-        print("prompt: ", prompt)
-        deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0")
 
         docs_ids_string = "_".join([str(doc.id) for doc in documents])
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
@@ -264,11 +252,31 @@ class OpenAIInterface:
             #     previous_messages
             # )
 
-        answer = rag_agent.run_sync(
-            prompt,
-            deps=deps,
-            message_history=previous_messages,
-        )
+        prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+        debug(max_context_length)
+        if len(full_text) > max_context_length:
+            prompt += f"""
+            Question: {question}
+            Document: {full_text}
+            """
+            answer = chat_agent.run_sync(
+                prompt,
+                message_history=previous_messages,
+                )
+            debug("llmchat", answer)
+
+        else:
+            prompt += f"""
+        \nDocument(s): {[doc.path for doc in documents]}\n
+        Question: {question}
+        """
+            debug("Rag chat", prompt)
+            deps = RagDeps(doc_manager=DocumentManager(), user_id=user_id or "0", documents=documents)
+            answer = rag_agent.run_sync(
+                prompt,
+                deps=deps,
+                message_history=previous_messages,
+            )
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())

@@ -8,13 +8,13 @@ from app.utilities.llm_helpers import remove_code_markers
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
-from pydantic_ai.models.ollama import OllamaModel
+from pydantic_ai.models.openai import OpenAIModel
+from app.models import SmartDocument
 
 from app.utilities.document_manager import DocumentManager
 
 from langchain_redis import RedisCache
 from devtools import debug
-from app.utilities.async_utilities import function_event_loop_decorator
 
 import os
 from dotenv import load_dotenv
@@ -33,6 +33,7 @@ langfuse = Langfuse()
 class RagDeps:
     doc_manager: DocumentManager
     user_id: str
+    documents: List[SmartDocument]
 
 
 rag_agent = Agent(
@@ -41,6 +42,10 @@ rag_agent = Agent(
     system_prompt="You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know.",
 )
 
+chat_agent = Agent(
+    "openai:gpt-4o",
+    system_prompt="You are a chatbot. Engage in a conversation with the user.",
+)
 
 @rag_agent.tool
 def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = []):
@@ -57,6 +62,18 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
     results = context.deps.doc_manager.query_documents(
         context.deps.user_id, question, docs_ids
     )
+    if len(results) == 0:
+        debug("Recreating vectorstore", context.deps.documents)
+        debug(context.deps.documents[0].raw_text[:100])
+        # recreate the vectorstore
+        for doc in context.deps.documents:
+            context.deps.doc_manager.add_document(user_id=context.deps.user_id, doc_path=doc.path, document_name=doc.title, document_id=doc.uuid)
+        results = context.deps.doc_manager.query_documents(
+            context.deps.user_id, question, docs_ids
+        )
+        debug("Recreated vectorstore")
+
+    debug(results)
     content = "Context: \n"
     for result in results:
         if result.get("metadata") is not None:
@@ -198,7 +215,7 @@ class ExtractionDeps:
     text: str
 
 
-# model = OllamaModel(
+# model = OpenAIModel(
 #     model_name="deepseek-r1:70b",
 #     base_url="https://mindrouter-api.nkn.uidaho.edu",
 # )
@@ -246,7 +263,6 @@ Text:
 
 
 # @observe()
-@function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """
     Extract entities from text based on the provided extraction keys and return structured output.

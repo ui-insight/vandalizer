@@ -10,6 +10,7 @@ from app.utilities.excel_helper import save_excel_to_html
 from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from . import files
+from devtools import debug
 
 @files.route("/upload", methods=["POST"])
 def upload():
@@ -23,6 +24,8 @@ def upload():
     extension = json_data["extension"]
     space = json_data["space"]
     folder = json_data["folder"]
+    user_id = user.user_id
+    debug(user_id)
 
     if folder is None or folder == "":
         folder = "0"
@@ -36,7 +39,8 @@ def upload():
     uid = uuid.uuid4().hex.upper()
     
     # Update the stored path to include the user's id folder
-    relative_file_path = os.path.join(str(user.id), f"{uid}.{extension}")
+    relative_file_path = os.path.join(user_id, f"{uid}.{extension}")
+    debug(relative_file_path)
 
     # Define base upload directory
     base_upload_dir = os.path.join(current_app.root_path, "static", "uploads")
@@ -44,42 +48,25 @@ def upload():
         os.makedirs(base_upload_dir)
 
     # Create a directory for the user based on their id
-    user_upload_dir = os.path.join(base_upload_dir, str(user.id))
-    if not os.path.exists(user_upload_dir):
-        os.makedirs(user_upload_dir)
+    upload_dir = os.path.join(base_upload_dir, user_id)
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+
+    document_file_path = os.path.join(upload_dir, f"{uid}.{extension}")
 
     # Save the file to the user's directory
-    file_path = os.path.join(user_upload_dir, f"{uid}.{extension}")
+    file_path = os.path.join(upload_dir, f"{uid}.{extension}")
     with open(file_path, "wb") as f:
         f.write(imgdata)
 
+    debug(file_path)
+
     raw_text = ""
-
-    if extension == "docx":
-        # Convert to PDF and extract text
-        pdf_path = os.path.join(user_upload_dir, f"{uid}.pdf")
-        docx_path = os.path.join(user_upload_dir, f"{uid}.docx")
-        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
-        extension = "pdf"
-        raw_text = extract_text_from_doc(docx_path)
-
-    elif extension in ["xlsx", "xls"]:
-        # Convert to HTML and extract text
-        html_path = os.path.join(user_upload_dir, f"{uid}.html")
-        excel_path = os.path.join(user_upload_dir, f"{uid}.{extension}")
-        save_excel_to_html(excel_path, html_path)
-        extension = "html"
-        raw_text = extract_text_from_html(html_path)
-
-    elif extension == "pdf":
-        # Extract text from PDF
-        raw_text = extract_text_from_doc(relative_file_path)
-
-    
-
     document = SmartDocument(
         title=filename,
+        processing=True,
         raw_text=raw_text,
+        absolute_path=document_file_path,
         path=relative_file_path,
         extension=extension,
         uuid=uid,
@@ -89,10 +76,50 @@ def upload():
     )
     document.save()
 
+    if extension == "docx":
+        # Convert to PDF
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        document.absolute_path = pdf_path
+        document.save()
+        docx_path = os.path.join(upload_dir, f"{uid}.docx")
+        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
+        extension = "pdf"
+        raw_text = extract_text_from_doc(docx_path)
+        document.raw_text = raw_text
+        document.processing = False
+        document.save()
+
+    elif extension in ["xlsx", "xls"]:
+        # Convert to HTML
+        html_path = os.path.join(upload_dir, f"{uid}.html")
+        document.absolute_path = html_path
+        excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        save_excel_to_html(excel_path, html_path)
+        extension = "html"
+        raw_text = extract_text_from_html(html_path)
+        document.raw_text = raw_text
+        document.processing = False
+        document.save()
+
+    elif extension == "pdf":
+        # Extract text from PDF in a background thread
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        document.absolute_path = pdf_path
+
+        def extract_thread():
+            extracted_text = ocr_extract_text_from_pdf(pdf_path)
+            document.raw_text = extracted_text
+            debug("Extraction completed, saving document", document.title, document.raw_text[:100])
+            document.processing = False
+            document.save()
+
+        extraction_thread = threading.Thread(target=extract_thread)
+        extraction_thread.start()
+
     # Create a new thread for semantic ingestion
     thread = threading.Thread(target=ingest_semantics, args=(document,))
     thread.start()
-    
+
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
 
@@ -136,15 +163,15 @@ def delete_documents():
     document = SmartDocument.objects(uuid=document_uuid).first()
     if document:
         document.delete()
-        semantics = SemanticIngest()
-        semantics.delete(document)
+        # semantics = SemanticIngest()
+        # semantics.delete(document)
         document_manager = DocumentManager()
         document_manager.delete_document(
             user_id=session["user_id"], 
             document_id=document_uuid
         )
-        base_upload_dir = os.path.join(current_app.root_path, "static", "uploads", document.path)
-        os.remove(base_upload_dir)
+        document_file_path = document.absolute_path
+        os.remove(document_file_path)
     
     folder_id = request.args.get("folder_id")
     if folder_id:

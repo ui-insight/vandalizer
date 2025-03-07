@@ -6,6 +6,9 @@ import openai
 from pydantic import BaseModel
 from dotenv import load_dotenv
 # from app import socketio
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from devtools import debug
 
 import re
 import html
@@ -193,6 +196,52 @@ class Node:
     def process(self, inputs):
         raise NotImplementedError
 
+    def __repr__(self):
+        node_class = self.__class__.__name__
+        return f"""{node_class}(name={self.name}, inputs={self.inputs}, outputs={self.outputs})"""
+
+
+class MultiTaskNode(Node):
+    def __init__(self, name):
+        super().__init__(name)
+        self.tasks = []
+        self.max_workers = multiprocessing.cpu_count()
+
+    def add_task(self, task):
+        self.tasks.append(task)
+
+    def add_tasks(self, tasks):
+        self.tasks.extend(tasks)
+
+    def process_task(self, task):
+        debug(task)
+        return task.process(task.inputs)
+
+    def process(self, inputs):
+        for task in self.tasks:
+            task.inputs = inputs
+        debug(self.tasks)
+        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
+
+            results = []
+
+            for future in as_completed(task_futures):
+                results.append(future.result())
+
+        debug(results)
+        # concatenate the results output
+        output = dict(input=inputs.get("input"), output=[], step_name=self.name)
+        for result in results:
+            debug(result)
+            if isinstance(result.get('output'), str):
+                output["output"].append(result.get("output", ""))
+            else:
+                output["output"].extend(result.get("output", {}))
+
+        debug(output)
+        return output
+
 
 class DocumentNode(Node):
     def __init__(self, data):
@@ -200,17 +249,18 @@ class DocumentNode(Node):
         self.docs = data.get("docs", [])
         self.attachments = data.get("attachments", [])
         self.pdf_paths = []
+        user_id = data.get("user_id", "0")
 
         # self.filename = data.get("filename", "")
         # self.content = ""
         self.docs_uuids = []
         self.content = ""
         for doc in self.attachments:
-            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            doc_path = doc.absolute_path
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            doc_path = os.path.join(app.root_path, "static", "uploads", doc.path)
+            doc_path = doc.absolute_path
             self.pdf_paths.append(doc_path)
 
         print("PDF Paths: ", self.pdf_paths)
@@ -263,6 +313,8 @@ class ExtractionNode(Node):
 
     def process(self, inputs):
         prev_step_name = inputs.get("step_name", None)
+
+        debug("Extraction", inputs, self.keys)
 
         step_input = None
         pdf_paths = None
@@ -333,6 +385,7 @@ class WorkflowEngine:
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
         self.graph_built = False
+        self.max_workers = multiprocessing.cpu_count()
 
     def add_node(self, node):
         self.graph.add(node)
@@ -357,6 +410,8 @@ class WorkflowEngine:
             if idx == 0:
                 output = node.process(dict())
             else:
+                debug(node)
+                debug(latest_output)
                 output = node.process(latest_output)
 
             workflow_result.steps_output[node.name] = output
@@ -417,6 +472,7 @@ def build_workflow_engine(steps, workflow):
             node = DocumentNode(step.data)
             nodes.append(node)
         else:  # this a task step
+            tasks = []
             for task in step.tasks:
                 print("Task: ", task.name, task.data)
                 if task.name == "Extraction":
@@ -430,17 +486,21 @@ def build_workflow_engine(steps, workflow):
                     node = ExtractionNode(
                         data=task.data,
                     )
-                    nodes.append(node)
+                    tasks.append(node)
                 elif task.name == "Prompt":
                     node = PromptNode(
                         data=task.data,
                     )
-                    nodes.append(node)
+                    tasks.append(node)
                 elif task.name == "Formatter":
                     node = FormatNode(
                         data=task.data,
                     )
-                    nodes.append(node)
+                    tasks.append(node)
+
+            node = MultiTaskNode(step.name)
+            node.add_tasks(tasks)
+            nodes.append(node)
 
         if node is not None:
             engine.add_node(node)

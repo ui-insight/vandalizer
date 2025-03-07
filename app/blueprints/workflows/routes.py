@@ -74,8 +74,9 @@ def run_workflow():
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
+    user_id = load_user().user_id
     document_trigger_step = WorkflowStep(
-        name="Document", data=dict(docs=docs, attachments=attachments)
+        name="Document", data=dict(docs=docs, attachments=attachments, user_id=user_id)
     )
     steps = [document_trigger_step]
     for step in workflow.steps:
