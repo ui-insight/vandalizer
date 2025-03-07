@@ -1,16 +1,27 @@
-from flask import Blueprint, request, jsonify, current_app, redirect, url_for, render_template, send_file
+from flask import (
+    Blueprint,
+    request,
+    jsonify,
+    current_app,
+    redirect,
+    url_for,
+    render_template,
+    send_file,
+)
 from app.models import SmartDocument, SearchSet, SearchSetItem
 from app.utilities.semantic_ingest import SemanticIngest
 from app.utils import load_user
 from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.document_manager import update_document_path
 from copy import deepcopy
 import csv, os, uuid
 
 from pypdf import PdfReader, PdfWriter
 
 from . import tasks
+
 
 # Add a extraction set
 @tasks.route("/extraction/add_search_set", methods=["POST"])
@@ -35,6 +46,7 @@ def add_search_set():
     #     searchset.is_global = True
     searchset.save()
     return jsonify({"complete": True, "uuid": searchset.uuid})
+
 
 # Add a term to a search set
 @tasks.route("/extraction/add_search_term", methods=["POST"])
@@ -251,6 +263,9 @@ def begin_search():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
+        if not os.path.exists(document.absolute_path):
+            user_id = load_user().user_id
+            update_document_path(current_app.root_path, document, user_id)
         document_paths.append(document.absolute_path)
 
     print("Fetch loading template:" + searchset_uuid)
@@ -293,7 +308,9 @@ def begin_search():
                 writer.pages[0], bindings, auto_regenerate=False
             )
 
-            output_pdf_path = os.path.join(current_app.root_path, "static", "fillable_form.pdf")
+            output_pdf_path = os.path.join(
+                current_app.root_path, "static", "fillable_form.pdf"
+            )
             with open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
@@ -336,6 +353,9 @@ def build_extraction_from_document():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
+        if not os.path.exists(document.absolute_path):
+            user_id = load_user().user_id
+            update_document_path(current_app.root_path, document, user_id)
         document_paths.append(document.absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
@@ -443,7 +463,11 @@ def begin_prompt_search():
 
     if len(items) > 0:
         llm = OpenAIInterface()
-        document_path = os.path.join("static", "uploads", user_id, document_path)
+        document_file_path = os.path.join("static", "uploads", user_id, document_path)
+        if not os.path.exists(document_file_path):
+            document_file_path = os.path.join(
+                current_app.root_path, "static", "uploads", document_path
+            )
         llm.load_document(document_path)
         results = {}
         for item in items:
@@ -466,8 +490,6 @@ def begin_prompt_search():
             "template": template,
         }
         return jsonify(response)
-    
-
 
 
 @tasks.route("/export_extraction", methods=["GET"])

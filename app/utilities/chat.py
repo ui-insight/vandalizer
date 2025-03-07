@@ -13,10 +13,7 @@ cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 
 from app.models import MAX_CHAT_MESSAGES
 
-from app.utilities.async_utilities import function_event_loop_decorator
 
-
-@function_event_loop_decorator()
 def chat_with_prompt(prompt: str, user_id=0) -> str:
 
     cache_key = f"chat_office_{user_id}"
