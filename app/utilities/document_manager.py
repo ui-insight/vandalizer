@@ -23,14 +23,23 @@ from app.utilities.document_readers import ocr_extract_text_from_pdf
 def update_document_path(root_path, document, user_id):
     if not os.path.exists(str(document.absolute_path)):
         document_file_path = os.path.join(
-            root_path, "static", "uploads", user_id, document.path
+            root_path, "static", "uploads", user_id, document.path.split("/")[-1]
         )
         document.absolute_path = document_file_path
+        # create user_id folder if not exists
+        if not os.path.exists(os.path.join(root_path, "static", "uploads", user_id)):
+            os.makedirs(os.path.join(root_path, "static", "uploads", user_id))
         # relative path
-        document.path = os.path.join(user_id, document.path)
+        if not user_id == document.path.split("/")[0]:
+            document.path = os.path.join(user_id, document.path)
         document.save()
         # move document and files
-        old_path = os.path.join(root_path, "static", "uploads", document.path)
+        old_path = os.path.join(
+            root_path,
+            "static",
+            "uploads",
+            document.path.split("/")[-1],
+        )
         os.rename(old_path, document_file_path)
         if document.extension == "excel" or document.extension == "docx":
             for f in os.listdir(os.path.join(root_path, "static", "uploads")):
@@ -178,6 +187,17 @@ class DocumentManager:
         print("formatted_results: ", formatted_results)
 
         return formatted_results
+
+    def document_exists(self, user_id: str, document_id: str) -> bool:
+        """Check if a specific document exists in a user's collection."""
+        vectorstore = self.get_user_collection(user_id)
+        # Get the raw collection to use ChromaDB's filtering
+        collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
+        if collection:
+            # Check if any chunks with matching document_id exist
+            results = collection.get(where={"document_id": document_id})
+            return bool(results)
+        return False
 
     def delete_document(self, user_id: str, document_id: str) -> None:
         """Delete a specific document from a user's collection."""

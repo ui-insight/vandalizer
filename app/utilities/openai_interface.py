@@ -10,10 +10,6 @@ from PyPDF2 import PdfReader
 from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
-from app.utilities.prompt_optimization import (
-    multi_qa,
-    simple_qa,
-)
 from langfuse.decorators import observe
 import asyncio
 
@@ -127,55 +123,6 @@ class OpenAIInterface:
 
         return formatted_answer
 
-    def handle_long_context(self, **kwargs):
-        question = kwargs.get("question")
-        full_text = kwargs.get("full_text", "")
-        print("Long context needed")
-        print("question: ", question)
-        root_path = kwargs.get("root_path", "")
-
-        print("using dspy model")
-        print("question: ", question)
-
-        persistent_directory = Path(root_path) / "static" / "uploads"
-        collection_name = "chat_dspy_model"
-        response = multi_qa(
-            full_text,
-            collection_name,
-            persistent_directory,
-            model_type=model_type,
-        )
-
-        print("dspy response: ", response.answer)
-        # return self.format_answer(response, question)
-        return dict(
-            answer=self.format_answer(response.answer),
-            formatted_answer=self.format_answer(response.answer),
-            context=response.context,
-            question=question,
-        )
-
-    def handle_short_context(self, **kwargs):
-        prompt = kwargs.get("prompt")
-        question = kwargs.get("question")
-        full_text = kwargs.get("full_text")
-        print("Short context needed")
-
-        response = simple_qa(
-            question=prompt, full_text=full_text, model_type=model_type
-        )
-
-        print("simple qa response: ", response.answer)
-
-        # return self.format_answer(response, prompt)
-        #
-        return dict(
-            answer=self.format_answer(response.answer),
-            formatted_answer=self.format_answer(response.answer),
-            context=response.context,
-            question=question,
-        )
-
     def ask_question_to_documents(
         self,
         root_path,
@@ -252,7 +199,8 @@ class OpenAIInterface:
 
         prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
         debug(max_context_length)
-        if len(full_text) > max_context_length:
+        debug(len(full_text))
+        if len(full_text) < max_context_length:
             prompt += f"""
             Question: {question}
             Document: {full_text}
@@ -297,16 +245,3 @@ class OpenAIInterface:
             answer=self.format_answer(answer.data),
             formatted_answer=self.format_answer(answer.data),
         )
-
-    def perform_llm_call(self, prompt, **kwargs):
-        full_text = kwargs.get("full_text")
-        context = prompt + full_text if full_text else prompt
-
-        total_context_length = num_tokens_from_text(context)
-        print("total context length: ", total_context_length)
-        print("max context length: ", max_context_length)
-        if total_context_length > max_context_length:
-            return self.handle_long_context(prompt=prompt, **kwargs)
-
-        else:
-            return self.handle_short_context(prompt=prompt, **kwargs)
