@@ -22,7 +22,6 @@ from app.models import (
 
 from devtools import debug
 
-from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
 from flask_dance.contrib.azure import azure
@@ -30,7 +29,11 @@ from itertools import chain
 from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.document_manager import update_document_path, get_absolute_path
+from app.utilities.document_manager import (
+    update_document_path,
+    get_absolute_path,
+    DocumentManager,
+)
 from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
@@ -54,6 +57,7 @@ def index():
                 session["user_id"] = user_id
 
     user = load_user()
+    user_id = user.user_id
     section = request.args.get("section", default="Chat").strip()
 
     document = None
@@ -78,14 +82,22 @@ def index():
 
     documents = []
     # Check for documents
+    document_manager = DocumentManager()
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
+        if not os.path.exists(get_absolute_path(document, user_id)):
+            update_document_path(document, user_id)
         documents.append(document)
         current_space = Space.objects(uuid=document.space).first()
-        semantics = SemanticIngest()
-        if not semantics.check_for_collection(document):
-            thread = threading.Thread(target=ingest_semantics, args=(document,))
+        if not document_manager.document_exists(user_id, document.uuid):
+            thread = threading.Thread(
+                target=ingest_semantics,
+                args=(
+                    document,
+                    user_id,
+                ),
+            )
             thread.start()
 
     if request.args.get("docids"):
@@ -95,12 +107,19 @@ def index():
             documents.append(document)
 
         current_space = Space.objects(uuid=document.first.space).first()
-        semantics = SemanticIngest()
         if documents.count == 1:
             try:
-                if not semantics.check_for_collection(documents.first):
+                document = documents.first()
+                document_id = document.uuid
+                if not os.path.exists(get_absolute_path(document, user_id)):
+                    update_document_path(document, user_id)
+                if not document_manager.document_exists(user_id, document_id):
                     thread = threading.Thread(
-                        target=ingest_semantics, args=(documents.first,)
+                        target=ingest_semantics,
+                        args=(
+                            documents.first,
+                            user_id,
+                        ),
                     )
                     thread.start()
             except:
@@ -213,6 +232,7 @@ def index():
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
+        documents_folder=user_id,
         folder_docs=folder_docs,
         spaces=spaces,
         current_space_id=spaces[0].uuid,
@@ -240,7 +260,7 @@ def chat():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
-            absolute_path = get_absolute_path(document)
+            absolute_path = get_absolute_path(document, user_id)
             if not os.path.exists(absolute_path):
                 update_document_path(document, user_id)
 
@@ -265,7 +285,7 @@ def chat():
                         path=html_file,
                         extension="html",
                         uuid=uuid.uuid4().hex,
-                        user_id=document.user_id,
+                        user_id=user_id,
                         space=document.space,
                         folder=document.folder,
                     )

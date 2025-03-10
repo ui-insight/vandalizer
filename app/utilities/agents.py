@@ -142,7 +142,7 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
                 debug(
                     "Recreating vectorstore", context.deps.documents, non_existent_docs
                 )
-                absolute_path = get_absolute_path(doc)
+                absolute_path = get_absolute_path(doc, user_id=context.deps.user_id)
 
                 context.deps.doc_manager.add_document(
                     user_id=context.deps.user_id,

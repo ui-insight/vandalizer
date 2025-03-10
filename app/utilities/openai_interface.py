@@ -137,7 +137,7 @@ class OpenAIInterface:
 
         full_text = ""
         for document in default_docs + documents:
-            absolute_path = get_absolute_path(document)
+            absolute_path = get_absolute_path(document, user_id)
             full_text += (
                 "\n\nDocument: "
                 + extract_text_from_doc(doc=document, doc_path=absolute_path)

@@ -22,8 +22,7 @@ from app.utilities.document_readers import ocr_extract_text_from_pdf
 from flask import current_app
 
 
-def get_absolute_path(document):
-    user_id = document.user_id
+def get_absolute_path(document, user_id):
     absolute_path = os.path.join(
         app.root_path, "static", "uploads", user_id, document.path
     )
@@ -32,7 +31,7 @@ def get_absolute_path(document):
 
 def update_document_path(document, user_id):
     root_path = current_app.root_path
-    absolute_path = get_absolute_path(document)
+    absolute_path = get_absolute_path(document, user_id)
     if not os.path.exists(absolute_path):
         document_file_path = absolute_path
         # create user_id folder if not exists

@@ -260,7 +260,7 @@ class DocumentNode(Node):
         self.docs_uuids = []
         self.content = ""
         for doc in self.attachments:
-            doc_path = get_absolute_path(doc)
+            doc_path = get_absolute_path(doc, user_id)
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
@@ -269,7 +269,7 @@ class DocumentNode(Node):
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            doc_path = get_absolute_path(doc)
+            doc_path = get_absolute_path(doc, user_id)
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
