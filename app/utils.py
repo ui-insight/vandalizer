@@ -2,7 +2,6 @@
 from app.models import User
 from flask import session
 import os
-from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.document_manager import DocumentManager, get_absolute_path
 
 
@@ -36,15 +35,15 @@ def is_dev():
         return True
 
 
-def ingest_semantics(document):
+def ingest_semantics(document, user_id):
     # semantics = SemanticIngest()
     # semantics.ingest(document=document)
     document_manager = DocumentManager()
 
-    document_path = get_absolute_path(document)
+    document_path = get_absolute_path(document, user_id)
 
     document_manager.add_document(
-        user_id=document.user_id,
+        user_id=user_id,
         document_name=document.title,
         document_id=document.uuid,
         doc_path=document_path,

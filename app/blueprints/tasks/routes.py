@@ -9,7 +9,6 @@ from flask import (
     send_file,
 )
 from app.models import SmartDocument, SearchSet, SearchSetItem
-from app.utilities.semantic_ingest import SemanticIngest
 from app.utils import load_user
 from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.extraction_manager3 import ExtractionManager3
@@ -264,7 +263,7 @@ def begin_search():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        absolute_path = get_absolute_path(document)
+        absolute_path = get_absolute_path(document, user_id)
         if not os.path.exists(absolute_path):
             update_document_path(document, user_id)
         document_paths.append(absolute_path)
@@ -355,7 +354,7 @@ def build_extraction_from_document():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        absolute_path = get_absolute_path(document)
+        absolute_path = get_absolute_path(document, user_id)
         if not os.path.exists(absolute_path):
             user_id = load_user().user_id
             update_document_path(document, user_id)

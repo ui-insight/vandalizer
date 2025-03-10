@@ -104,12 +104,12 @@ def run_workflow():
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     for attachment in attachments:
-        absolute_path = get_absolute_path(attachment)
+        absolute_path = get_absolute_path(attachment, user_id)
         if not os.path.exists(absolute_path):
             update_document_path(attachment, user_id)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     for doc in docs:
-        absolute_path = get_absolute_path(doc)
+        absolute_path = get_absolute_path(doc, user_id)
         if not os.path.exists(absolute_path):
             update_document_path(doc, user_id)
     document_trigger_step = WorkflowStep(

@@ -1,6 +1,5 @@
 from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
-from app.utilities.semantic_ingest import SemanticIngest
 from app.utilities.document_manager import DocumentManager, update_document_path
 from app.utilities.document_readers import (
     ocr_extract_text_from_pdf,
@@ -124,7 +123,13 @@ def upload():
         extraction_thread.start()
 
     # Create a new thread for semantic ingestion
-    thread = threading.Thread(target=ingest_semantics, args=(document,))
+    thread = threading.Thread(
+        target=ingest_semantics,
+        args=(
+            document,
+            user_id,
+        ),
+    )
     thread.start()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
@@ -180,11 +185,12 @@ def delete_documents():
             user_id=session["user_id"], document_id=document_uuid
         )
 
+        user_id = session["user_id"]
         document_file_path = os.path.join(
             current_app.root_path,
             "static",
             "uploads",
-            document.user_id,
+            user_id,
             document.path,
         )
         if not os.path.exists(str(document_file_path)):
