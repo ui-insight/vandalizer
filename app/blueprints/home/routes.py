@@ -29,11 +29,7 @@ from itertools import chain
 from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.document_manager import (
-    update_document_path,
-    get_absolute_path,
-    DocumentManager,
-)
+from app.utilities.document_manager import DocumentManager
 from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
@@ -86,8 +82,6 @@ def index():
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
-        if not os.path.exists(get_absolute_path(document, user_id)):
-            update_document_path(document, user_id)
         documents.append(document)
         current_space = Space.objects(uuid=document.space).first()
         if not document_manager.document_exists(user_id, document.uuid):
@@ -111,8 +105,6 @@ def index():
             try:
                 document = documents.first()
                 document_id = document.uuid
-                if not os.path.exists(get_absolute_path(document, user_id)):
-                    update_document_path(document, user_id)
                 if not document_manager.document_exists(user_id, document_id):
                     thread = threading.Thread(
                         target=ingest_semantics,
@@ -232,7 +224,6 @@ def index():
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
-        documents_folder=user_id,
         folder_docs=folder_docs,
         spaces=spaces,
         current_space_id=spaces[0].uuid,
@@ -260,10 +251,6 @@ def chat():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
-            absolute_path = get_absolute_path(document, user_id)
-            if not os.path.exists(absolute_path):
-                update_document_path(document, user_id)
-
             documents.append(document)
             # find related html documents (excel converted to html)
             if document.extension == "html":

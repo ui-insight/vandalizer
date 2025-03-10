@@ -23,7 +23,6 @@ from app.utils import load_user
 from copy import deepcopy
 import os, uuid
 from app.utilities.workflow import WorkflowThread, build_workflow_engine
-from app.utilities.document_manager import update_document_path, get_absolute_path
 from werkzeug.utils import secure_filename
 import pypandoc, json
 from bson import ObjectId
@@ -103,15 +102,7 @@ def run_workflow():
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
-    for attachment in attachments:
-        absolute_path = get_absolute_path(attachment, user_id)
-        if not os.path.exists(absolute_path):
-            update_document_path(attachment, user_id)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
-    for doc in docs:
-        absolute_path = get_absolute_path(doc, user_id)
-        if not os.path.exists(absolute_path):
-            update_document_path(doc, user_id)
     document_trigger_step = WorkflowStep(
         name="Document", data=dict(docs=docs, attachments=attachments, user_id=user_id)
     )
