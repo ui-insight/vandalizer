@@ -22,44 +22,6 @@ from app.utilities.document_readers import ocr_extract_text_from_pdf
 from flask import current_app
 
 
-def get_absolute_path(document, user_id):
-    absolute_path = os.path.join(
-        app.root_path, "static", "uploads", user_id, document.path
-    )
-    return absolute_path
-
-
-def update_document_path(document, user_id):
-    root_path = current_app.root_path
-    absolute_path = get_absolute_path(document, user_id)
-    if not os.path.exists(absolute_path):
-        document_file_path = absolute_path
-        # create user_id folder if not exists
-        if not os.path.exists(os.path.join(root_path, "static", "uploads", user_id)):
-            os.makedirs(os.path.join(root_path, "static", "uploads", user_id))
-        # move document and files
-        old_path = os.path.join(root_path, "static", "uploads", document.path)
-        os.rename(old_path, document_file_path)
-        if document.extension in ["xlsx", "xls", "docx"]:
-            for f in os.listdir(os.path.join(root_path, "static", "uploads")):
-                if f.startswith(document.uuid):
-                    os.rename(
-                        os.path.join(
-                            root_path,
-                            "static",
-                            "uploads",
-                            f,
-                        ),
-                        os.path.join(
-                            root_path,
-                            "static",
-                            "uploads",
-                            user_id,
-                            f,
-                        ),
-                    )
-
-
 class DocumentManager:
     def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db"):
         """Initialize the document manager with a persistence directory."""

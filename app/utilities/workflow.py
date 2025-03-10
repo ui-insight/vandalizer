@@ -21,7 +21,6 @@ from typing import List, Dict, Any
 from app import app
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.document_manager import update_document_path, get_absolute_path
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
@@ -260,7 +259,7 @@ class DocumentNode(Node):
         self.docs_uuids = []
         self.content = ""
         for doc in self.attachments:
-            doc_path = get_absolute_path(doc, user_id)
+            doc_path = doc.absolute_path
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
@@ -269,7 +268,7 @@ class DocumentNode(Node):
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            doc_path = get_absolute_path(doc, user_id)
+            doc_path = doc.absolute_path
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(

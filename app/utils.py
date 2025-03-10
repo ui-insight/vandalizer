@@ -2,7 +2,7 @@
 from app.models import User
 from flask import session
 import os
-from app.utilities.document_manager import DocumentManager, get_absolute_path
+from app.utilities.document_manager import DocumentManager
 
 
 def load_user():
@@ -40,7 +40,7 @@ def ingest_semantics(document, user_id):
     # semantics.ingest(document=document)
     document_manager = DocumentManager()
 
-    document_path = get_absolute_path(document, user_id)
+    document_path = document.absolute_path
 
     document_manager.add_document(
         user_id=user_id,

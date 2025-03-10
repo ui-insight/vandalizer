@@ -108,6 +108,10 @@ class SmartDocument(me.Document):
     token_count = me.IntField(default=0)
     num_pages = me.IntField(default=0)
 
+    @property
+    def absolute_path(self):
+        return os.path.join(app.root_path, "static", "uploads", self.path)
+
     def time_ago_in_words(self):
         now = datetime.datetime.now()
         diff = now - self.created_at

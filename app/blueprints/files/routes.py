@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
-from app.utilities.document_manager import DocumentManager, update_document_path
+from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import (
     ocr_extract_text_from_pdf,
     extract_text_from_doc,
@@ -73,7 +73,7 @@ def upload():
         title=filename,
         processing=True,
         raw_text=raw_text,
-        path=f"{uid}.{extension}",
+        path=relative_file_path,
         extension=extension,
         uuid=uid,
         user_id=user.user_id,
@@ -193,8 +193,6 @@ def delete_documents():
             user_id,
             document.path,
         )
-        if not os.path.exists(str(document_file_path)):
-            update_document_path(document, user_id)
         os.remove(document_file_path)
 
         document.delete()
