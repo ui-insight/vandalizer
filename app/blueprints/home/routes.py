@@ -30,7 +30,7 @@ from itertools import chain
 from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
 from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.document_manager import update_document_path
+from app.utilities.document_manager import update_document_path, get_absolute_path
 from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
@@ -240,8 +240,9 @@ def chat():
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document != None:
-            if not os.path.exists(str(document.absolute_path)):
-                update_document_path(current_app.root_path, document, user_id)
+            absolute_path = get_absolute_path(document)
+            if not os.path.exists(absolute_path):
+                update_document_path(document, user_id)
 
             documents.append(document)
             # find related html documents (excel converted to html)
@@ -262,13 +263,6 @@ def chat():
                     html_doc = SmartDocument(
                         title=document.title,
                         path=html_file,
-                        absolute_path=os.path.join(
-                            current_app.root_path,
-                            "static",
-                            "uploads",
-                            user_id,
-                            html_file,
-                        ),
                         extension="html",
                         uuid=uuid.uuid4().hex,
                         user_id=document.user_id,
@@ -281,7 +275,6 @@ def chat():
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    user_id = load_user().user_id
     debug(documents)
     debug(docs)
     response = OpenAIInterface().ask_question_to_documents(

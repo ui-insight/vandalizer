@@ -8,7 +8,7 @@ from pathlib import Path
 import openai
 from PyPDF2 import PdfReader
 from app.utilities.agents import RagDeps, rag_agent, chat_agent
-from app.utilities.document_manager import DocumentManager
+from app.utilities.document_manager import DocumentManager, get_absolute_path
 from app.utilities.llm import ChatLM
 from langfuse.decorators import observe
 import asyncio
@@ -137,9 +137,10 @@ class OpenAIInterface:
 
         full_text = ""
         for document in default_docs + documents:
+            absolute_path = get_absolute_path(document)
             full_text += (
                 "\n\nDocument: "
-                + extract_text_from_doc(doc=document, doc_path=document.absolute_path)
+                + extract_text_from_doc(doc=document, doc_path=absolute_path)
                 + " "
             )
 

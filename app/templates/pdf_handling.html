@@ -113,7 +113,9 @@
 
 
   if(extension == "pdf"){
-      pdfjsLib.getDocument('/static/uploads/{{ documents[0].path }}').promise.then(function (pdfDoc_) {
+      const pdfPath = '/static/uploads/{{ documents[0].user_id }}/{{ documents[0].path }}';
+      console.log("pdf path: " + pdfPath);
+      pdfjsLib.getDocument(pdfPath).promise.then(function (pdfDoc_) {
           pdfDoc = pdfDoc_;
 
           renderPDF();

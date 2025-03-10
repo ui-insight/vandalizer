@@ -60,8 +60,6 @@ def upload():
     if not os.path.exists(upload_dir):
         os.makedirs(upload_dir)
 
-    document_file_path = os.path.join(upload_dir, f"{uid}.{extension}")
-
     # Save the file to the user's directory
     file_path = os.path.join(upload_dir, f"{uid}.{extension}")
     with open(file_path, "wb") as f:
@@ -69,13 +67,14 @@ def upload():
 
     debug(file_path)
 
+    user_id = user.user_id
+
     raw_text = ""
     document = SmartDocument(
         title=filename,
         processing=True,
         raw_text=raw_text,
-        absolute_path=document_file_path,
-        path=relative_file_path,
+        path=f"{uid}.{extension}",
         extension=extension,
         uuid=uid,
         user_id=user.user_id,
@@ -87,8 +86,6 @@ def upload():
     if extension == "docx":
         # Convert to PDF
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        document.absolute_path = pdf_path
-        document.save()
         docx_path = os.path.join(upload_dir, f"{uid}.docx")
         pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
         extension = "pdf"
@@ -100,7 +97,6 @@ def upload():
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
         html_path = os.path.join(upload_dir, f"{uid}.html")
-        document.absolute_path = html_path
         excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
         save_excel_to_html(excel_path, html_path)
         extension = "html"
@@ -112,7 +108,6 @@ def upload():
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        document.absolute_path = pdf_path
 
         def extract_thread():
             extracted_text = ocr_extract_text_from_pdf(pdf_path)
@@ -180,15 +175,20 @@ def delete_documents():
         # semantics = SemanticIngest()
         # semantics.delete(document)
         document_manager = DocumentManager()
+        user_id = session["user_id"]
         document_manager.delete_document(
             user_id=session["user_id"], document_id=document_uuid
         )
-        document_file_path = document.absolute_path
 
-        if os.path.exists(str(document_file_path)):
-            user_id = load_user().user_id
-            update_document_path(current_app.root_path, document, user_id)
-            document_file_path = document.absolute_path
+        document_file_path = os.path.join(
+            current_app.root_path,
+            "static",
+            "uploads",
+            document.user_id,
+            document.path,
+        )
+        if not os.path.exists(str(document_file_path)):
+            update_document_path(document, user_id)
         os.remove(document_file_path)
 
         document.delete()

@@ -11,7 +11,7 @@ from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from app.models import SmartDocument
 
-from app.utilities.document_manager import DocumentManager
+from app.utilities.document_manager import DocumentManager, get_absolute_path
 
 from langchain_redis import RedisCache
 from devtools import debug
@@ -142,9 +142,11 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
                 debug(
                     "Recreating vectorstore", context.deps.documents, non_existent_docs
                 )
+                absolute_path = get_absolute_path(doc)
+
                 context.deps.doc_manager.add_document(
                     user_id=context.deps.user_id,
-                    doc_path=doc.absolute_path,
+                    doc_path=absolute_path,
                     document_name=doc.title,
                     document_id=doc.uuid,
                 )

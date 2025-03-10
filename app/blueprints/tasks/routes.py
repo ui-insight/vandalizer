@@ -14,7 +14,7 @@ from app.utils import load_user
 from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.extraction_manager2 import ExtractionManager2
-from app.utilities.document_manager import update_document_path
+from app.utilities.document_manager import update_document_path, get_absolute_path
 from copy import deepcopy
 import csv, os, uuid
 
@@ -260,13 +260,14 @@ def begin_search():
 
     documents = []
     document_paths = []
+    user_id = load_user().user_id
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        if not os.path.exists(str(document.absolute_path)):
-            user_id = load_user().user_id
-            update_document_path(current_app.root_path, document, user_id)
-        document_paths.append(document.absolute_path)
+        absolute_path = get_absolute_path(document)
+        if not os.path.exists(absolute_path):
+            update_document_path(document, user_id)
+        document_paths.append(absolute_path)
 
     print("Fetch loading template:" + searchset_uuid)
 
@@ -347,16 +348,18 @@ def build_extraction_from_document():
     print(data)
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
+    user_id = load_user().user_id
 
     documents = []
     document_paths = []
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
-        if not os.path.exists(str(document.absolute_path)):
+        absolute_path = get_absolute_path(document)
+        if not os.path.exists(absolute_path):
             user_id = load_user().user_id
-            update_document_path(current_app.root_path, document, user_id)
-        document_paths.append(document.absolute_path)
+            update_document_path(document, user_id)
+        document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
@@ -388,7 +391,6 @@ def build_extraction_from_document():
         "template": template,
     }
 
-    return jsonify(response)
     return jsonify(response)
 
 

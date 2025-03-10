@@ -19,29 +19,29 @@ from devtools import debug
 
 from app.utilities.document_readers import ocr_extract_text_from_pdf
 
+from flask import current_app
 
-def update_document_path(root_path, document, user_id):
-    if not os.path.exists(str(document.absolute_path)):
-        document_file_path = os.path.join(
-            root_path, "static", "uploads", user_id, document.path.split("/")[-1]
-        )
-        document.absolute_path = document_file_path
+
+def get_absolute_path(document):
+    user_id = document.user_id
+    absolute_path = os.path.join(
+        app.root_path, "static", "uploads", user_id, document.path
+    )
+    return absolute_path
+
+
+def update_document_path(document, user_id):
+    root_path = current_app.root_path
+    absolute_path = get_absolute_path(document)
+    if not os.path.exists(absolute_path):
+        document_file_path = absolute_path
         # create user_id folder if not exists
         if not os.path.exists(os.path.join(root_path, "static", "uploads", user_id)):
             os.makedirs(os.path.join(root_path, "static", "uploads", user_id))
-        # relative path
-        if not user_id == document.path.split("/")[0]:
-            document.path = os.path.join(user_id, document.path)
-        document.save()
         # move document and files
-        old_path = os.path.join(
-            root_path,
-            "static",
-            "uploads",
-            document.path.split("/")[-1],
-        )
+        old_path = os.path.join(root_path, "static", "uploads", document.path)
         os.rename(old_path, document_file_path)
-        if document.extension == "excel" or document.extension == "docx":
+        if document.extension in ["xlsx", "xls", "docx"]:
             for f in os.listdir(os.path.join(root_path, "static", "uploads")):
                 if f.startswith(document.uuid):
                     os.rename(
