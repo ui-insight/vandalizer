@@ -137,7 +137,7 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
         # check if the document was added to the vectorstore
         non_existent_docs = []
         for doc in context.deps.documents:
-            if not context.deps.doc_manager.document_exists(doc.uuid):
+            if not context.deps.doc_manager.document_exists(context.deps.user_id, doc):
                 non_existent_docs.append(doc)
                 absolute_path = doc.absolute_path
                 debug(
