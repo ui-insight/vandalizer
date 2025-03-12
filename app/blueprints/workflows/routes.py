@@ -30,8 +30,10 @@ from app.utilities.excel_helper import save_excel_to_html
 
 # from app import socketio
 from itertools import chain
+from devtools import debug
 
 from . import workflows
+import tempfile
 
 
 ## MARK: ~~ Create
@@ -305,15 +307,19 @@ def workflow_download():
     output_file_path = os.path.join(
         current_app.root_path, "static", "workflow_output.txt"
     )
+
     final_output = list(workflow_result.steps_output.values())[-1]
 
-    with open(output_file_path, "w") as f:  # Open as text file for string output
-        f.write(final_output["output"]["answer"])  # Assuming output is a string
+    # debug(final_output)
+
+    # with open(output_file_path, "w") as f:  # Open as text file for string output
+    #     f.write(json.dumps(final_output["output"], indent=4))
+    tmp_file = tempfile.TemporaryFile()
+    tmp_file.write(json.dumps(final_output["output"], indent=4).encode())
+    tmp_file.seek(0)
 
     # Return the path to the CSV file
-    return send_file(
-        "static/workflow_output.txt", mimetype="text/plain", as_attachment=True
-    )
+    return send_file(tmp_file, download_name="workflow_output.txt", as_attachment=True)
 
 
 ## MARK: ~~ Integrate

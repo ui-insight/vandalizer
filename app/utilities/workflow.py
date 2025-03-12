@@ -31,6 +31,8 @@ from threading import Thread
 
 from app.models import SmartDocument, SearchSet
 
+from devtools import debug
+
 from uuid import uuid4
 
 import re
@@ -77,34 +79,6 @@ def remove_document_from_workflow_step(document, workflow_step):
         workflow_step.data["documents"] = documents
         workflow_step.save()
     return workflow_step
-
-
-# TODO prompt and formatter
-#
-# def format_llm_output(text: str) -> str:
-#     """
-#     Format LLM output text for HTML display.
-
-#     Args:
-#         text (str): Raw LLM output text containing \n literals and markdown formatting
-
-#     Returns:
-#         str: Formatted HTML-safe string
-#     """
-#     # Replace explicit \n with actual newlines
-#     text = text.replace("\\n", "\n")
-
-#     # Escape HTML special characters
-#     text = html.escape(text)
-
-#     # Convert markdown-style bold to HTML
-#     text = re.sub(r"\*\*(.*?)\*\*", r"<strong>\1</strong>", text)
-
-#     # Convert newlines to <br> tags
-#     text = text.replace("\n", "<br>")
-
-#     # Remove any extra whitespace at start/end
-#     return text.strip()
 
 
 def format_llm_output(text: str) -> str:
@@ -156,6 +130,9 @@ def llm_chat_model(prompt, data=None, docs=[]):
         output = open_ai_interface.ask_question_to_documents(
             root_path=app.root_path, documents=docs, question=prompt
         )
+        output = output.get("answer", "")
+        output = format_llm_output(output)
+        debug(output)
     return output
 
 
@@ -193,8 +170,9 @@ class Node:
         self.name = name
         self.inputs = {}
         self.outputs = {}
+        self.tasks = []
 
-    def process(self, inputs):
+    def process(self, inputs, data=dict()):
         raise NotImplementedError
 
     def __repr__(self):
@@ -278,7 +256,7 @@ class DocumentNode(Node):
 
         print("PDF Paths: ", self.pdf_paths)
 
-    def process(self, inputs=None):
+    def process(self, inputs=None, data=dict()):
 
         # data = inputs.get("data", None)
 
@@ -290,9 +268,11 @@ class DocumentNode(Node):
 class FormatNode(Node):
     def __init__(self, data):
         super().__init__("Formatter")
-        self.formatting_prompt = data.get("prompt", "")
 
-    def process(self, inputs):
+    def process(self, inputs, data=dict()):
+
+        formatting_prompt = data.get("prompt", "")
+
         data = inputs.get("output", None)
         prev_step_name = inputs.get("step_name", None)
         text = None
@@ -311,7 +291,7 @@ class FormatNode(Node):
         else:
             text = data
 
-        prompt, output = format_model(self.formatting_prompt, text)
+        prompt, output = format_model(formatting_prompt, text)
         return {"output": output, "input": prompt, "step_name": self.name}
 
 
@@ -319,12 +299,12 @@ class ExtractionNode(Node):
     def __init__(self, data):
         super().__init__("Extraction")
 
-        self.keys = data.get("searchphrases", [])
-        if len(self.keys) == 0:
-            self.keys = data.get("keys", [])
-        print("keys: ", self.keys, data)
+    def process(self, inputs, data=dict()):
+        keys = data.get("searchphrases", [])
+        if len(keys) == 0:
+            keys = data.get("keys", [])
+        print("keys: ", keys, data)
 
-    def process(self, inputs):
         prev_step_name = inputs.get("step_name", None)
 
         debug("Extraction", inputs, self.keys)
@@ -338,23 +318,23 @@ class ExtractionNode(Node):
                 return {"output": None}
             step_input = pdf_paths
 
-            extraction_response = data_extraction_model(self.keys, pdf_paths)
+            extraction_response = data_extraction_model(keys, pdf_paths)
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
                 step_input = step_input.get("answer")
             extraction_response = data_extraction_model(
-                self.keys, pdf_paths, full_text=step_input
+                keys, pdf_paths, full_text=step_input
             )
         elif prev_step_name == "Extraction":
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
-                self.keys, pdf_paths, full_text=step_input
+                keys, pdf_paths, full_text=step_input
             )
         elif prev_step_name == "Formatter":
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
-                self.keys, pdf_paths, full_text=step_input
+                keys, pdf_paths, full_text=step_input
             )
 
         return {
@@ -367,13 +347,17 @@ class ExtractionNode(Node):
 class PromptNode(Node):
     def __init__(self, data):
         super().__init__("Prompt")
-        self.prompt = data.get("prompt", "Enter prompt")
 
-    def process(self, inputs):
+    def process(self, inputs, data=dict()):
+        prompt = data.get("prompt", "Enter prompt")
+        debug(data)
+        debug(prompt)
+
         prev_step_name = inputs.get("step_name", None)
         chat_response = None
         if prev_step_name == "Document":
             docs_paths = inputs.get("output", None)
+            debug(docs_paths)
             docs_uuids = []
             for doc_path in docs_paths:
                 doc_uuid = doc_path.split("/")[-1].split(".")[0]
@@ -382,13 +366,15 @@ class PromptNode(Node):
                 SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
             ]
 
-            chat_response = llm_chat_model(docs=docs, prompt=self.prompt)
+            chat_response = llm_chat_model(docs=docs, prompt=prompt)
+            debug(chat_response)
         else:
             data = inputs.get("output", None)
             print("Prompt Data: ", data)
 
-            chat_response = llm_chat_model(docs=[], prompt=self.prompt, data=data)
-        return {"output": chat_response, "input": self.prompt, "step_name": self.name}
+            chat_response = llm_chat_model(docs=[], prompt=prompt, data=data)
+            debug(chat_response)
+        return {"output": chat_response, "input": prompt, "step_name": self.name}
 
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
@@ -412,30 +398,64 @@ class WorkflowEngine:
     def execute(self, workflow_result):
         data = []
         nodes = self.get_topological_order()
-        print("Nodes: ", nodes)
+        debug(nodes)
 
         workflow_result.num_steps_completed = 0
         workflow_result.num_steps_total = len(nodes) - 1
         latest_output = None
         for idx, node in enumerate(nodes):
-            print(f"Processing node {node}")
+            debug(node)
 
+            node_outputs = []
             if idx == 0:
-                output = node.process(dict())
+                output = node.process()
+                debug(output)
+                latest_output = output
             else:
                 debug(node)
                 debug(latest_output)
                 output = node.process(latest_output)
+                for task in node.tasks:
+                    process_node = None
+
+                    if task.name == "Extraction":
+                        process_node = ExtractionNode(
+                            data=task.data,
+                        )
+                    elif task.name == "Prompt":
+                        process_node = PromptNode(
+                            data=task.data,
+                        )
+                    elif task.name == "Formatter":
+                        process_node = FormatNode(
+                            data=task.data,
+                        )
+                    else:
+                        process_node = Node(task.name)
+
+                    output = process_node.process(latest_output, task.data)
+                    task_output = output.get("output", "")
+                    if isinstance(task_output, list):
+                        node_outputs.extend(output.get("output", ""))
+                    else:
+                        node_outputs.append(output.get("output", ""))
+                # combine the outputs
+                debug(node_outputs)
+                latest_output = {
+                    "output": node_outputs,
+                    "input": output.get("input", ""),
+                }
+                # debug(latest_output)
 
             workflow_result.steps_output[node.name] = output
             workflow_result.num_steps_completed += 1
 
-            latest_output = output
+            debug(latest_output)
             data.append(
                 dict(
                     name=node.name,
-                    output=output.get("output", None),
-                    input=output.get("input", None),
+                    output=latest_output.get("output", None),
+                    input=latest_output.get("input", None),
                 )
             )
 
@@ -479,6 +499,7 @@ def build_workflow_engine(steps, workflow):
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
         node = None
+        debug(step)
         print("Step: ", step.name, step.data, step.tasks)
         if step.name == "Document":  # this the trigger step
             # node_objects[node_id] = DocumentNode(step.data)
@@ -513,8 +534,19 @@ def build_workflow_engine(steps, workflow):
 
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)
-            nodes.append(node)
 
+        for task in step.tasks:
+            print("Task: ", task.name, task.data)
+            if task.name == "Extraction":
+                if task.data.get("search_set_uuid"):
+                    search_set = SearchSet.objects(
+                        uuid=task.data.get("search_set_uuid")
+                    ).first()
+                    search_items = search_set.items()
+                    print("Search Items: ", search_items, search_set.title)
+                    task.data["keys"] = [item.searchphrase for item in search_items]
+            if node is not None:
+                node.tasks.append(task)
         if node is not None:
             engine.add_node(node)
 

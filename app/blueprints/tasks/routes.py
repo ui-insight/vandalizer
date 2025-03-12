@@ -15,6 +15,7 @@ from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.extraction_manager2 import ExtractionManager2
 from copy import deepcopy
 import csv, os, uuid
+from devtools import debug
 
 from pypdf import PdfReader, PdfWriter
 
@@ -29,6 +30,7 @@ def add_search_set():
         return redirect(url_for("login"))
 
     data = request.get_json()
+    debug(data)
     title = data["title"]
     space = data["space_id"]
     search_type = data["search_type"]
@@ -96,6 +98,11 @@ def add_prompt():
     prompt = data["prompt"]
     space_id = data["space_id"]
     prompt_type = data["prompt_type"]
+    if title == "" or prompt == "":
+        return jsonify(
+            {"complete": False, "error": "Title and prompt cannot be empty."}
+        )
+
     user = load_user()
 
     searchsetitem = SearchSetItem(

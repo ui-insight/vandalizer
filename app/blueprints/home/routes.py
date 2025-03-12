@@ -22,6 +22,9 @@ from app.models import (
 
 from devtools import debug
 
+from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory, current_app
+from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow, WorkflowStep
+from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
 from flask_dance.contrib.azure import azure
@@ -122,6 +125,7 @@ def index():
 
     # Get workflow if it exists
     workflow_template = ""
+    workflow_step_template = ""
     workflow_id = request.args.get("workflow_id", default=0)
     if workflow_id != 0:
         workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
@@ -130,6 +134,20 @@ def index():
             "workflows/workflow.html",
             workflow=workflow,
         )
+        
+        workflow_step_id = request.args.get("workflow_step_id", default=0)
+        if workflow_step_id != 0:
+            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+            workflow_step_template = render_template(
+                "workflows/workflow_steps/edit_workflow_step_modal.html",
+                workflow=workflow,
+                workflow_step_id=workflow_step.id,
+                workflow_step=workflow_step,
+            )
+        
+    # Get workflow if it exists
+    
+    
 
         workflow_step_id = request.args.get("workflow_step_id", default=0)
         if workflow_step_id != 0:
@@ -210,6 +228,10 @@ def index():
     total_token_counts = 0
     for doc in folder_docs:
         total_token_counts += doc.token_count
+    
+    # Release Notes    
+    release_seen = request.cookies.get("release_seen")
+    show_release_panel = (release_seen != CURRENT_RELEASE_VERSION)
 
     # Release Notes
     release_seen = request.cookies.get("release_seen")
@@ -231,6 +253,7 @@ def index():
         max_context_length=max_context_length,
         workflows=workflows,
         workflow_template=workflow_template,
+        workflow_step_template=workflow_step_template,
         workflow_id=workflow_id,
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
