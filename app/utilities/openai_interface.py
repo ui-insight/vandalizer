@@ -11,10 +11,6 @@ from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
 from langfuse.decorators import observe
-from app.utilities.prompt_optimization import (
-    multi_qa,
-    simple_qa,
-)
 
 # from langfuse.decorators import observe
 import asyncio

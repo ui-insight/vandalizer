@@ -155,11 +155,11 @@ pyarrow-hotfix==0.6
 pyasn1==0.6.0
 pyasn1_modules==0.4.0
 pydantic==2.10.3
-pydantic-ai==0.0.35
-pydantic-ai-slim==0.0.35
-pydantic-graph==0.0.35
+pydantic-ai==0.0.19
+pydantic-ai-slim==0.0.19
+pydantic-graph==0.0.19
 pydantic-settings==2.7.1
-pydantic_core==2.27.2
+pydantic_core==2.27.1
 pyee==12.1.1
 Pygments==2.18.0
 pymongo==4.7.2

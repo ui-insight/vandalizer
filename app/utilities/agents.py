@@ -113,8 +113,7 @@ Do not:
 - Provide answers to the user's question
 - Include special operators or syntax unless specified
 
-Your output should be the search prompt only, with no additional text.""",
-    system_prompt=chat_prompt,
+Your output should be the search prompt only, with no additional text."""
 )
 
 
