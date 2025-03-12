@@ -24,7 +24,6 @@ from devtools import debug
 
 from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow, WorkflowStep
-from app.utilities.semantic_ingest import SemanticIngest
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
 from flask_dance.contrib.azure import azure
