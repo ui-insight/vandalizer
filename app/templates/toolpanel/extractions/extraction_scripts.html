@@ -24,8 +24,6 @@
   function hideWorking() {
     $("#navbar-img")[0].classList.remove("spin");
   }
-  
-
 
   // TAB MENU
   const tabMenu = document.querySelector(".tab-menu");
@@ -98,8 +96,8 @@
       $(".name-add-task-container").hide();
       $("#name-add-task-prompt-container").hide();
       $("#newTaskBtn").hide();
-      $('#newTaskPromptName')[0].value = "";
-      $('#newTaskPrompt')[0].value = "";
+      $("#newTaskPromptName")[0].value = "";
+      $("#newTaskPrompt")[0].value = "";
       newTaskType = "";
 
       $("#add-extraction-task-btn")
@@ -142,6 +140,7 @@
       if (newTaskType == "extraction") {
         let title = $("#newTaskName")[0].value;
         if (title == "" || newTaskType == "") {
+          showToast("Title cannot be empty");
           return;
         }
         addSearchSet(title, newTaskType);
@@ -168,7 +167,6 @@
         async: true,
         success: function (data) {
           location.href = data.reroute;
-
         },
         error: function (xhr, ajaxOptions, thrownError) {
           console.log(xhr.status);
@@ -295,7 +293,6 @@
 
     function performSearch(search_set_uuid, datatitle) {
       showScanning();
-      
 
       search_set_add_uuid = search_set_uuid;
       $("#adding-search-set-title").text(datatitle);
@@ -395,8 +392,6 @@
         $("#fillable-pdf-input").click();
       });
 
-     
-
       $(".delete-set-item-button").on("click", function (e) {
         e.preventDefault();
         let uuid = $(this).attr("data-uuid");
@@ -407,8 +402,6 @@
         let uuid = $(this).attr("data-uuid");
         updateSearchSetPanel(uuid, true);
       });
-
-      
 
       $(".collapsible-pdf").click(function () {
         $(this).toggleClass("active");
@@ -660,7 +653,6 @@
             return;
           }
 
-          
           stopScanning();
           hideWorking();
 
@@ -668,8 +660,6 @@
           $("#search-results-panel").empty();
           $(msg.template).hide().appendTo("#search-results-panel").fadeIn();
           addResultListeners();
-         
-         
         },
         error: function (xhr, ajaxOptions, thrownError) {
           console.log(xhr.status);
@@ -685,6 +675,7 @@
     });
 
     $("#add-search-set-button").on("click", function () {
+      console.log("Adding search set");
       addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 

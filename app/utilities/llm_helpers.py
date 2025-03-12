@@ -5,7 +5,8 @@ import tiktoken
 from typing import Any, Callable, List, Dict, Type
 from pydantic import BaseModel, ValidationError
 from app.utilities.config import model_type
-from langfuse.decorators import observe
+
+# from langfuse.decorators import observe
 
 import chardet
 
@@ -165,7 +166,7 @@ def process_large_prompt(
     return " ".join(full_response)
 
 
-@observe
+# @observe
 def retry_llm_request(
     client: Any,
     messages: List[Dict[str, str]],

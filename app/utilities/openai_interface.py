@@ -11,6 +11,12 @@ from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
 from langfuse.decorators import observe
+from app.utilities.prompt_optimization import (
+    multi_qa,
+    simple_qa,
+)
+
+# from langfuse.decorators import observe
 import asyncio
 
 
@@ -57,7 +63,7 @@ class OpenAIInterface:
     def load_document(self, document_path):
         self.loaded_doc = extract_text_from_doc(document_path)
 
-    @observe()
+    # @observe()
     def ask_question_to_loaded_document(self, item):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         prompt = ""
