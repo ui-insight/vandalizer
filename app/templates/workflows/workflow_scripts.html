@@ -152,14 +152,6 @@
           function addWorkflowStepListeners() {
               console.log("Adding step listeners");
 
-              $('.edit-workflow-step-task-btn').off("click").on("click", function (e) {
-                      e.preventDefault();  // Prevent default behavior, if needed
-                      let task_id = $(this).attr("data-task-id");
-                      let step_id = $(this).attr("data-step-id");
-                      let task_type = $(this).attr("data-task-type");
-                      console.log("Editing step task");
-                      workflowEditStepTaskType(step_id, task_id, task_type);
-                  });
           }
 
 
