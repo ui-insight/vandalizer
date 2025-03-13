@@ -16,26 +16,13 @@ import rollbar
 import rollbar.contrib.flask
 from flask import got_request_exception
 
-CURRENT_RELEASE_VERSION = "2.0.1"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.0.1:
-- Multiple tasks in single workflow step combine.
-- Fixed numerous issues with redirects after actions
-- Added file upload button in addition to drag and drop functionality.
-- Other minor bug fixes
+Release 2.0.1=2:
+- Bug fixes and stability improvements.
 """
 
 app = Flask(__name__)
-
-CURRENT_RELEASE_VERSION = "2.0.1"  # Update this when you have a new release.
-RELEASE_NOTES = """
-Release 2.0.1:
-- Multiple tasks in single workflow step combine.
-- Fixed numerous issues with redirects after actions
-- Added file upload button in addition to drag and drop functionality.
-- Other minor bug fixes
-"""
-
 
 # CORS(app)
 CORS(
