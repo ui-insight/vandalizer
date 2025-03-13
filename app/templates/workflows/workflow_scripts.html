@@ -432,12 +432,16 @@
                             chat_response = data.output;
                         }
 
-                        // check if response if json or string
                         if (typeof chat_response === 'object') {
-                            chat_response = JSON.stringify(chat_response, null, 2);
+                            // Check if it's an array with a single HTML string
+                            if (Array.isArray(chat_response) && chat_response.length === 1 && typeof chat_response[0] === 'string') {
+                                // Just use the HTML string directly
+                                chat_response = chat_response[0];
+                            } else {
+                                // Otherwise stringify the object
+                                chat_response = JSON.stringify(chat_response, null, 2);
+                            }
                         }
-                        // const outputText = JSON.stringify(chat_response).replace(/^"|"$/g, '');
-                        // remove ```html at the beginning and ``` at the end of the response`
                         let outputText = chat_response
                             .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
 
