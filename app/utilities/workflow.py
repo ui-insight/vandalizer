@@ -172,7 +172,7 @@ class Node:
         self.outputs = {}
         self.tasks = []
 
-    def process(self, inputs, data=dict()):
+    def process(self, inputs):
         raise NotImplementedError
 
     def __repr__(self):
@@ -256,7 +256,7 @@ class DocumentNode(Node):
 
         print("PDF Paths: ", self.pdf_paths)
 
-    def process(self, inputs=None, data=dict()):
+    def process(self, inputs=None):
 
         # data = inputs.get("data", None)
 
@@ -268,10 +268,11 @@ class DocumentNode(Node):
 class FormatNode(Node):
     def __init__(self, data):
         super().__init__("Formatter")
+        self.data = data
 
-    def process(self, inputs, data=dict()):
+    def process(self, inputs):
 
-        formatting_prompt = data.get("prompt", "")
+        formatting_prompt = self.data.get("prompt", "")
 
         data = inputs.get("output", None)
         prev_step_name = inputs.get("step_name", None)
@@ -298,16 +299,19 @@ class FormatNode(Node):
 class ExtractionNode(Node):
     def __init__(self, data):
         super().__init__("Extraction")
+        self.data = data
 
-    def process(self, inputs, data=dict()):
-        keys = data.get("searchphrases", [])
+    def process(self, inputs):
+        data = self.data
+        debug(data)
+        keys = self.data.get("searchphrases", [])
         if len(keys) == 0:
             keys = data.get("keys", [])
         print("keys: ", keys, data)
 
         prev_step_name = inputs.get("step_name", None)
 
-        debug("Extraction", inputs, self.keys)
+        debug("Extraction", inputs, keys)
 
         step_input = None
         pdf_paths = None
@@ -347,8 +351,10 @@ class ExtractionNode(Node):
 class PromptNode(Node):
     def __init__(self, data):
         super().__init__("Prompt")
+        self.data = data
 
-    def process(self, inputs, data=dict()):
+    def process(self, inputs):
+        data = self.data
         prompt = data.get("prompt", "Enter prompt")
         debug(data)
         debug(prompt)
@@ -408,7 +414,7 @@ class WorkflowEngine:
 
             node_outputs = []
             if idx == 0:
-                output = node.process()
+                output = node.process(dict())
                 debug(output)
                 latest_output = output
             else:
@@ -433,7 +439,7 @@ class WorkflowEngine:
                     else:
                         process_node = Node(task.name)
 
-                    output = process_node.process(latest_output, task.data)
+                    output = process_node.process(latest_output)
                     task_output = output.get("output", "")
                     if isinstance(task_output, list):
                         node_outputs.extend(output.get("output", ""))
@@ -517,10 +523,12 @@ def build_workflow_engine(steps, workflow):
                         search_items = search_set.items()
                         print("Search Items: ", search_items, search_set.title)
                         task.data["keys"] = [item.searchphrase for item in search_items]
+                    debug(task.data)
                     node = ExtractionNode(
                         data=task.data,
                     )
                     tasks.append(node)
+                    debug(tasks)
                 elif task.name == "Prompt":
                     node = PromptNode(
                         data=task.data,
@@ -534,22 +542,12 @@ def build_workflow_engine(steps, workflow):
 
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)
+            nodes.append(node)
 
-        for task in step.tasks:
-            print("Task: ", task.name, task.data)
-            if task.name == "Extraction":
-                if task.data.get("search_set_uuid"):
-                    search_set = SearchSet.objects(
-                        uuid=task.data.get("search_set_uuid")
-                    ).first()
-                    search_items = search_set.items()
-                    print("Search Items: ", search_items, search_set.title)
-                    task.data["keys"] = [item.searchphrase for item in search_items]
-            if node is not None:
-                node.tasks.append(task)
         if node is not None:
             engine.add_node(node)
 
+    debug(nodes)
     # connect the steps
     for idx in range(len(nodes)):
         if idx == 0:
