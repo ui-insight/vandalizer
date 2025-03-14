@@ -190,7 +190,6 @@ def delete_documents():
             current_app.root_path,
             "static",
             "uploads",
-            user_id,
             document.path,
         )
         os.remove(document_file_path)
