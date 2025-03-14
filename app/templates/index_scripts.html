@@ -4,7 +4,7 @@
   var maxContextLength = parseInt("{{max_context_length}}");
 
     {% if (documents != None) and documents|length > 0 %}
-    const documentData = {
+    var documentData = {
         id: "{{ documents[0].id|safe }}",
         title: "{{ documents[0].title|safe }}",
         raw_text: {{ documents[0].raw_text|tojson|safe }}
@@ -414,8 +414,59 @@
         }
     }
 
+    function pollStatus(docUuid) {
+    $.get('/files/poll_status', {docid: docUuid}, function(data) {
+        if (data.complete) {
+            console.log(data);
+            // Processing is complete, update UI
+            $('#loading-spinner').hide();
+            $('#processing-indicator').hide();
+            $('#raw-text-icon').show();
+            updateDocumentSelections();
+            documentData = {
+                id: docUuid,
+                title: "",
+                raw_text: data.raw_text
+            };
+            
+
+            // No additional refresh needed per the requirement
+        } else {
+            // Still processing, poll again after 5 seconds
+            setTimeout(function() {
+                pollStatus(docUuid);
+            }, 5000);
+
+            var counters = $('.doc-selected-counter')
+            for (var i = 0; i < counters.length; i++) {
+            counters[i].textContent = `Preparing your document...`;
+            }
+        }
+    });
+}
+
 
     $(document).ready(function() {
+        var docContainer = $('.document-container');
+    
+    // Check if the document container exists (i.e., a document is loaded)
+    if (docContainer.length > 0) {
+        var docUuid = docContainer.data('doc-uuid');
+        var isProcessing = docContainer.data('processing');
+        
+        if (isProcessing) {
+            // Show loading indicators
+            $('#loading-spinner').show();
+            $('#processing-indicator').show();
+            // Hide regular content
+            $('#raw-text-icon').hide();
+            // Start polling
+            pollStatus(docUuid);
+        } else {
+            // Show regular content
+            $('#raw-text-icon').show();
+        }
+    }
 
         $('.tasks-btn').on('click', function(e) {
             e.preventDefault();

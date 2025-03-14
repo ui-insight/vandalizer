@@ -1094,3 +1094,8 @@ textarea {
     font-weight: bold;
     cursor: pointer;
 }
+
+.loading-spinner {
+    font-size: 1em;
+    color: rgba(255, 255, 255, 0.637);
+}
