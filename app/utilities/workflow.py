@@ -407,7 +407,7 @@ class WorkflowEngine:
         debug(nodes)
 
         workflow_result.num_steps_completed = 0
-        workflow_result.num_steps_total = len(nodes) - 1
+        workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
