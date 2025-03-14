@@ -134,6 +134,11 @@ def upload():
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
+@files.route("/poll_status", methods=["GET"])
+def poll_status():
+    document_uuid = request.args.get("docid")
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    return jsonify({"complete": not document.processing and document.raw_text != "", "raw_text": document.raw_text if not document.processing else ""})
 
 @files.route("/rename_document", methods=["POST"])
 def rename_document():

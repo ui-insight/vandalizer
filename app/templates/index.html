@@ -79,7 +79,10 @@
                 
                 <div class="col-auto" style="padding-right: 30px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <a href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()">
+                    <span id="loading-spinner" class="loading-spinner" style="display: {% if documents[0].processing %}block{% else %}none{% endif %};">
+                        <i class="fa-solid fa-spinner fa-spin"></i>
+                    </span>
+                    <a href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()" style="display: {% if not documents[0].processing %}block{% else %}none{% endif %};">
                         <span style="font-size: 1em; color: rgba(255, 255, 255, 0.637);">
                             <i class="fa-solid fa-code"></i>
                         </span>
@@ -89,7 +92,8 @@
             </div>
         </div>
         {% if (documents != None) and documents|length > 0 %}
-        <div class="document-container">
+        <div class="document-container" data-doc-uuid="{{ documents[0].uuid }}" data-processing="{{ 'true' if documents[0].processing else 'false' }}">
+                                
             <div class="document-scanner"></div>
             <div class="document" id="document"></div>
             <div class="semantic-panel" id="semantic-panel">
