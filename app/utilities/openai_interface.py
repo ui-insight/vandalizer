@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 from devtools import debug
 
+from app.utilities.async_utilities import class_method_event_loop_decorator
+
 import json
 import re
 from pathlib import Path
@@ -124,7 +126,8 @@ class OpenAIInterface:
         formatted_answer = "\n".join(formatted_lines)
 
         return formatted_answer
-
+    
+    @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
         root_path,

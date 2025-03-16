@@ -3,6 +3,7 @@ from pydantic import create_model
 from typing import Dict, Optional, List, Any, Tuple, Union, List
 import json
 from app.utilities.llm_helpers import remove_code_markers
+from app.utilities.async_utilities import function_event_loop_decorator
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
@@ -366,6 +367,7 @@ Text:
 
 
 # @observe()
+@function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """
     Extract entities from text based on the provided extraction keys and return structured output.
