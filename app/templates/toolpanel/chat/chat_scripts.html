@@ -244,53 +244,80 @@
     });
   }
 
-  function copyRichTextToClipboard(htmlContent) {
-    // Create a temporary element to hold the content
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = htmlContent;
-
-    // Create a range and selection
-    const range = document.createRange();
-    range.selectNodeContents(tempDiv);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-
+function copyRichTextToClipboard(htmlContent) {
+  // Check if the browser supports the modern Clipboard API
+  if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
     try {
-      // Copy both plain text and HTML
-      const plainText = tempDiv.innerText;
+      // Create a temporary element to get plain text
+      const tempDiv = document.createElement("div");
+      tempDiv.innerHTML = htmlContent;
+      const plainText = tempDiv.innerText || tempDiv.textContent;
 
       const clipboardItem = new ClipboardItem({
         "text/html": new Blob([htmlContent], { type: "text/html" }),
         "text/plain": new Blob([plainText], { type: "text/plain" }),
       });
 
-      navigator.clipboard
-        .write([clipboardItem])
+      navigator.clipboard.write([clipboardItem])
         .then(() => {
           showToast("Copied with formatting");
-          selection.removeAllRanges(); // Clear selection
         })
         .catch((err) => {
-          console.error("Failed to copy rich text:", err);
-          fallbackRichTextCopy(htmlContent, plainText);
+          console.error("Modern clipboard API failed:", err);
+          useFallbackMethod(htmlContent, plainText);
         });
     } catch (err) {
-      console.error("Rich text copy failed:", err);
-      fallbackRichTextCopy(htmlContent, tempDiv.innerText);
+      console.error("Modern clipboard API error:", err);
+      useFallbackMethod(htmlContent);
     }
+  } else {
+    // Browser doesn't support modern Clipboard API, use fallback immediately
+    useFallbackMethod(htmlContent);
+  }
+}
+
+function useFallbackMethod(htmlContent, plainText) {
+  // Create a temporary element if plainText wasn't provided
+  if (!plainText) {
+    const tempDiv = document.createElement("div");
+    tempDiv.innerHTML = htmlContent;
+    plainText = tempDiv.innerText || tempDiv.textContent;
   }
 
-  function fallbackRichTextCopy(htmlContent, plainText) {
-    // Fallback method for browsers that don't support ClipboardItem
-    const listener = function (ev) {
-      ev.preventDefault();
-      ev.clipboardData.setData("text/html", htmlContent);
-      ev.clipboardData.setData("text/plain", plainText);
-    };
-    document.addEventListener("copy", listener);
-    document.execCommand("copy");
-    document.removeEventListener("copy", listener);
+  // For Safari, we need to use a different approach
+  const tempElement = document.createElement("div");
+  tempElement.setAttribute("contenteditable", true);
+  tempElement.innerHTML = htmlContent;
+  tempElement.style.position = "fixed";
+  tempElement.style.left = "-9999px";
+  tempElement.style.top = "0";
+  document.body.appendChild(tempElement);
+
+  // Select the content
+  const range = document.createRange();
+  range.selectNodeContents(tempElement);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+
+  // Execute copy command
+  let success = false;
+  try {
+    success = document.execCommand("copy");
+  } catch (err) {
+    console.error("execCommand error:", err);
   }
+
+  // Clean up
+  document.body.removeChild(tempElement);
+  selection.removeAllRanges();
+
+  if (success) {
+    showToast("Copied with formatting");
+  } else {
+    console.error("Fallback copy failed");
+    showToast("Copy failed. Please try again.");
+  }
+}
 
 </script>
