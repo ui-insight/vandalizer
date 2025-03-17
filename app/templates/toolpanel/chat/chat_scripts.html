@@ -113,22 +113,6 @@
         "</div></p>",
     );
 
-    function createFeedbackButtons() {
-      const feedbackDiv = document.createElement("div");
-      feedbackDiv.className = "feedback-buttons";
-      feedbackDiv.style.marginTop = "20px";
-
-      const copyButton = document.createElement("button");
-      copyButton.innerHTML =
-        '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
-      copyButton.className = "copy-btn";
-      copyButton.style.marginRight = "5px"; // Add margin to create space
-
-      feedbackDiv.appendChild(copyButton);
-
-      return feedbackDiv;
-    }
-
     // Attach a delegated event listener to the parent container
     $(document).on(
       "click",
@@ -232,9 +216,9 @@
 
           copyRichTextToClipboard(responseHtml);
 
-          navigator.clipboard.writeText(responseHtml).then(function () {
-            showToast("Copied to clipboard");
-          });
+          // navigator.clipboard.writeText(responseHtml).then(function () {
+          //   showToast("Copied to clipboard");
+          // });
         });
       },
       error: function (xhr, ajaxOptions, thrownError) {
@@ -244,80 +228,73 @@
     });
   }
 
-function copyRichTextToClipboard(htmlContent) {
-  // Check if the browser supports the modern Clipboard API
-  if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-    try {
-      // Create a temporary element to get plain text
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = htmlContent;
-      const plainText = tempDiv.innerText || tempDiv.textContent;
+function copyRichTextToClipboard(html) {
+  // Create a temporary element
+  const container = document.createElement('div');
+  container.innerHTML = html;
 
-      const clipboardItem = new ClipboardItem({
-        "text/html": new Blob([htmlContent], { type: "text/html" }),
-        "text/plain": new Blob([plainText], { type: "text/plain" }),
-      });
-
-      navigator.clipboard.write([clipboardItem])
-        .then(() => {
-          showToast("Copied with formatting");
-        })
-        .catch((err) => {
-          console.error("Modern clipboard API failed:", err);
-          useFallbackMethod(htmlContent, plainText);
-        });
-    } catch (err) {
-      console.error("Modern clipboard API error:", err);
-      useFallbackMethod(htmlContent);
-    }
-  } else {
-    // Browser doesn't support modern Clipboard API, use fallback immediately
-    useFallbackMethod(htmlContent);
-  }
-}
-
-function useFallbackMethod(htmlContent, plainText) {
-  // Create a temporary element if plainText wasn't provided
-  if (!plainText) {
-    const tempDiv = document.createElement("div");
-    tempDiv.innerHTML = htmlContent;
-    plainText = tempDiv.innerText || tempDiv.textContent;
-  }
-
-  // For Safari, we need to use a different approach
-  const tempElement = document.createElement("div");
-  tempElement.setAttribute("contenteditable", true);
-  tempElement.innerHTML = htmlContent;
-  tempElement.style.position = "fixed";
-  tempElement.style.left = "-9999px";
-  tempElement.style.top = "0";
-  document.body.appendChild(tempElement);
-
-  // Select the content
-  const range = document.createRange();
-  range.selectNodeContents(tempElement);
-  const selection = window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(range);
-
-  // Execute copy command
-  let success = false;
+  // Try to use the modern clipboard API first
   try {
-    success = document.execCommand("copy");
+    // For plain text fallback
+    const textContent = container.textContent || container.innerText;
+
+    // Try to copy as HTML if supported
+    if (navigator.clipboard && navigator.clipboard.write) {
+      const blob = new Blob([html], { type: 'text/html' });
+      const clipboardItem = new ClipboardItem({ 'text/html': blob });
+      return navigator.clipboard.write([clipboardItem]).then(() => {
+        console.log('Rich text copied');
+        showToast("Copied to clipboard");
+      })
+        .catch(err => {
+          console.warn('Rich text copy failed, falling back to plain text', err);
+          return navigator.clipboard.writeText(textContent);
+        });
+    } else {
+      // Fall back to plain text
+      return navigator.clipboard.writeText(textContent);
+    }
   } catch (err) {
-    console.error("execCommand error:", err);
-  }
+    console.warn('Modern clipboard API failed, using fallback', err);
+    // Fallback for Safari and older browsers
+    return new Promise((resolve, reject) => {
+      const textarea = document.createElement('textarea');
+      textarea.value = container.textContent || container.innerText;
+      textarea.style.position = 'fixed';
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
 
-  // Clean up
-  document.body.removeChild(tempElement);
-  selection.removeAllRanges();
-
-  if (success) {
-    showToast("Copied with formatting");
-  } else {
-    console.error("Fallback copy failed");
-    showToast("Copy failed. Please try again.");
+      try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+          resolve();
+        } else {
+          reject(new Error('execCommand failed'));
+        }
+      } catch (err) {
+        reject(err);
+      } finally {
+        document.body.removeChild(textarea);
+      }
+    });
   }
 }
+
+// Fix the createFeedbackButtons function
+function createFeedbackButtons() {
+  const feedbackDiv = document.createElement("div");
+  feedbackDiv.className = "feedback-buttons";
+  feedbackDiv.style.marginTop = "20px";
+
+  const copyButton = document.createElement("button");
+  copyButton.innerHTML = '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
+  copyButton.className = "copy-btn";
+  copyButton.style.marginRight = "5px";
+
+  feedbackDiv.appendChild(copyButton);
+  return feedbackDiv;
+}
+
 
 </script>
