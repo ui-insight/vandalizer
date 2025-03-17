@@ -1,9 +1,12 @@
-from flask import (Blueprint, 
-                   redirect, 
-                   url_for, 
-                   session, 
-                   render_template, 
-                   request, jsonify)
+from flask import (
+    Blueprint,
+    redirect,
+    url_for,
+    session,
+    render_template,
+    request,
+    jsonify,
+)
 
 from . import feedback
 from app.utils import load_user
@@ -30,47 +33,3 @@ def submit_rating():
     record.save()
     return jsonify({"complete": True})
 
-####### Feedback #######
-## MARK: Feedback
-@feedback.route("/feedback", methods=["POST"])
-def feedback():
-
-    user = load_user()
-    user_id = user.user_id
-    data = request.get_json()
-
-    feedback_type = data.get("feedback_type")
-    question = data.get("question")
-    answer = data.get("answer")
-    context = data.get("context")
-    context = " ".join(context)
-    docs_uuids = data.get("docs_uuids")
-
-    print("feedback_type", feedback_type)
-    print("question", question)
-    print("docs_uuids", docs_uuids)
-    feedback = Feedback(
-        user_id=user_id,
-        feedback=feedback_type,
-        question=question,
-        answer=answer,
-        context=context,
-        docs_uuids=docs_uuids,
-    )
-
-    feedback.save()
-
-    # Maintain feedback count
-    feedback_counter = FeedbackCounter.objects().first()
-
-    if not feedback_counter:
-        feedback_counter = FeedbackCounter(count=0)
-
-    feedback_counter.count += 1
-    feedback_counter.save()
-    max_feedback_count = 100
-
-    response = {
-        "complete": True,
-    }
-    return jsonify(response)
