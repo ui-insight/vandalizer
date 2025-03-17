@@ -16,6 +16,9 @@ class TestLogin:
     def test_vandalizer_dev_login(self):
         self.driver.get("https://vandalizer-dev.nkn.uidaho.edu/")
         # Wait for the sign-in button to be clickable
+        WebDriverWait(self.driver, 5).until(
+            EC.presence_of_element_located((By.LINK_TEXT, "SIGN IN"))
+        )
         signInButton = WebDriverWait(self.driver, 5).until(
             EC.element_to_be_clickable((By.LINK_TEXT, "SIGN IN"))
         )
@@ -30,7 +33,7 @@ class TestLogin:
 
 @pytest.mark.usefixtures("setup_driver")
 class TestNavigation:
-    def loads_home_page(self):
+    def test_loads_home_page(self):
         self.driver.get("https://vandalizer-dev.nkn.uidaho.edu/home/")
         title = self.driver.title
         assert title == "Home | Vandalizer"
@@ -39,14 +42,22 @@ class TestNavigation:
             EC.url_matches("https://vandalizer-dev.nkn.uidaho.edu/home/")
         )
 
-    def enters_directory(self):
+    def test_enters_directory(self):
+        WebDriverWait(self.driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'test')]"))
+        )
         directory = WebDriverWait(self.driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(),'test')]"))
         )
         directory.click()
         # Wait until the URL has the specified value
         WebDriverWait(self.driver, 10).until(
-            EC.url_contains("/folder_id=18d04abb0c2c4194bba3b69a175bdcab")
+            EC.url_contains("folder_id=18d04abb0c2c4194bba3b69a175bdcab")
+        )
+    
+    def test_enters_file(self):
+        WebDriverWait(self.driver, 5).until(
+            EC.presence_of_element_located((By.XPATH, "//span[contains(text(),'L19AC00167.pdf')]"))
         )
         file = WebDriverWait(self.driver, 5).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(),'L19AC00167.pdf')]"))
@@ -54,7 +65,7 @@ class TestNavigation:
         file.click()
         # Wait until the URL has the specified value
         WebDriverWait(self.driver, 10).until(
-            EC.url_contains("/folder_id=18d04abb0c2c4194bba3b69a175bdcab&docid=0B1EF085C7724C8481BCB450211C916C")
+            EC.url_contains("docid=0B1EF085C7724C8481BCB450211C916C")
         )
 
 if __name__ == "__main__":
