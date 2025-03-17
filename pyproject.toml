@@ -20,7 +20,7 @@ dependencies = [
 
 
 [project.optional-dependencies]
-dev = ["tox", "pytest", "pytest-cov", "ruff"]
+dev = ["tox", "pytest", "pytest-cov", "ruff", "selenium"]
 
 [tool.setuptools.packages.find]
 exclude = ["certs", "tests", "vandalizer-dev"]
@@ -31,8 +31,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.tox]
 envlist = ["selenium"]
+no_package = true
 
 [tool.tox.selenium]
+description = "Run Selenium tests"
+skip_install = true
 deps = [
     "selenium-webdriver",
     "pytest"
