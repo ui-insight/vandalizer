@@ -6,15 +6,51 @@ authors = [{ name = "John Brunsfeld", email = "jbrunsfeld@uidaho.edu" }]
 readme = "README.md"
 requires-python = "<4.0,>=3.9"
 dependencies = [
+    "chardet",
+    "chromadb",
+    "datasets",
+    "dspy",
+    "fitz",
     "flask",
     "flask-bootstrap",
     "flask-cors",
     "flask-dance",
     "flask-login",
     "flask-mail",
-    "flask-socketio",
     "flask-wtf",
     "wtforms",
+    "httpx",
+    "itsdangerous",
+    "langchain",
+    "langchain_chroma",
+    "langchain_community",
+    "langchain_openai",
+    "langchain_redis",
+    "langchain_text_splitters",
+    "langfuse",
+    "markdownify",
+    "mongoengine",
+    "nest_asyncio",
+    "nltk",
+    "oauthlib",
+    "openai",
+    "openpyxl",
+    "pandas",
+    "pydantic",
+    "pydantic_ai",
+    "pymongo",
+    "pymupdf",
+    "pymupdf4llm",
+    "pypandoc",
+    "pypdf",
+    "PyPDF2",
+    "pysqlite3",
+    "python-dotenv",
+    "redis",
+    "requests",
+    "rollbar",
+    "tiktoken",
+    "wtforms"
 ]
 
 
@@ -33,6 +69,9 @@ build-backend = "setuptools.build_meta"
 envlist = ["selenium"]
 no_package = true
 
+[tool.tox.env.selenium.set_env]
+BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
+
 [tool.tox.env.selenium]
 description = "Run Selenium tests"
 skip_install = true
@@ -40,6 +79,4 @@ deps = [
     "selenium",
     "pytest"
 ]
-commands = [[
-    "pytest"
-]]
+commands = [[ "pytest" ]]

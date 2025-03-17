@@ -5,8 +5,8 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 class TestLogin:
-    def test_vandalizer_dev_login(self, driver):
-        driver.get("https://vandalizer-dev.nkn.uidaho.edu/")
+    def test_vandalizer_dev_login(self, driver, base_url):
+        driver.get(base_url)
         WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.LINK_TEXT, "SIGN IN"))
         )
@@ -15,14 +15,14 @@ class TestLogin:
         )
         signInButton.click()
         WebDriverWait(driver, 10).until(
-            EC.url_matches("https://vandalizer-dev.nkn.uidaho.edu/home/")
+            EC.url_matches(base_url+'/'+"home/")
         )
 
 class TestNavigation:
-    def test_loads_home_page(self, driver):
-        driver.get("https://vandalizer-dev.nkn.uidaho.edu/home/")
+    def test_loads_home_page(self, driver, base_url):
+        driver.get(base_url+'/'+"home/")
         WebDriverWait(driver, 10).until(
-            EC.url_matches("https://vandalizer-dev.nkn.uidaho.edu/home/")
+            EC.url_matches(base_url+'/'+"home/")
         )
         assert driver.title == "Home | Vandalizer"
 
