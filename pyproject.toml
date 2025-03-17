@@ -71,6 +71,7 @@ no_package = true
 
 [tool.tox.env.selenium.set_env]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
+TEST_BROWSER_HEADLESS = "true"
 
 [tool.tox.env.selenium]
 description = "Run Selenium tests"
