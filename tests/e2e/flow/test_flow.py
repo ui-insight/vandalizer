@@ -1,3 +1,7 @@
+"""
+Test basic page flows for Vandalizer.
+"""
+
 import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
