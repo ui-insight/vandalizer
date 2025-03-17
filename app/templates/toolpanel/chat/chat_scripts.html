@@ -113,7 +113,7 @@
         "</div></p>",
     );
 
-    function createFeedbackButtons(question, answer, context, document_uuids) {
+    function createFeedbackButtons() {
       const feedbackDiv = document.createElement("div");
       feedbackDiv.className = "feedback-buttons";
       feedbackDiv.style.marginTop = "20px";
@@ -124,20 +124,7 @@
       copyButton.className = "copy-btn";
       copyButton.style.marginRight = "5px"; // Add margin to create space
 
-      const positiveButton = document.createElement("button");
-      positiveButton.innerHTML = '<i class="fas fa-thumbs-up"></i>';
-      positiveButton.className = "feedback-button-positive";
-      positiveButton.dataset.feedbackType = "positive";
-      positiveButton.style.marginRight = "5px"; // Add margin to create space
-
-      const negativeButton = document.createElement("button");
-      negativeButton.innerHTML = '<i class="fas fa-thumbs-down"></i>';
-      negativeButton.className = "feedback-button-negative";
-      negativeButton.dataset.feedbackType = "negative";
-
       feedbackDiv.appendChild(copyButton);
-      feedbackDiv.appendChild(positiveButton);
-      feedbackDiv.appendChild(negativeButton);
 
       return feedbackDiv;
     }
@@ -160,14 +147,6 @@
           .attr("data-document-uuids")
           .split(",");
 
-        sendFeedback(
-          feedbackType,
-          question,
-          answer,
-          context,
-          documentUuids,
-          this,
-        );
       },
     );
 
@@ -217,7 +196,7 @@
 
         responseDiv.html(formatted_answer);
         responseDiv.append(
-          createFeedbackButtons(question, answer, context, document_uuids),
+          createFeedbackButtons(),
         );
 
         // reload page
@@ -255,16 +234,6 @@
 
           navigator.clipboard.writeText(responseHtml).then(function () {
             showToast("Copied to clipboard");
-
-            // Send feedback for copy action
-            sendFeedback(
-              "The user copied the answer, thus it can be considered a good answer.",
-              question,
-              answer,
-              context,
-              document_uuids,
-              this,
-            );
           });
         });
       },
@@ -324,37 +293,4 @@
     document.removeEventListener("copy", listener);
   }
 
-  function sendFeedback(
-    feedback_type,
-    question,
-    answer,
-    context,
-    document_uuids,
-    button,
-  ) {
-    $.ajax({
-      url: "/feedback",
-      type: "POST",
-      data: JSON.stringify({
-        feedback_type: feedback_type,
-        question: question,
-        answer: answer,
-        context: context,
-        docs_uuids: document_uuids,
-      }),
-      contentType: "application/json; charset=utf-8",
-      dataType: "json",
-      async: true,
-      success: function (response) {
-        // $(button).attr("disabled", true);
-        // $(button).attr("style", "cursor: not-allowed;");
-        // $(button).siblings("button").attr("disabled", true);
-        console.log("Feedback sent successfully", response);
-      },
-      error: function (xhr, ajaxOptions, thrownError) {
-        console.log(xhr.status);
-        console.log(thrownError);
-      },
-    });
-  }
 </script>
