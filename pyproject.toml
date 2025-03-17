@@ -33,13 +33,13 @@ build-backend = "setuptools.build_meta"
 envlist = ["selenium"]
 no_package = true
 
-[tool.tox.selenium]
+[tool.tox.env.selenium]
 description = "Run Selenium tests"
 skip_install = true
 deps = [
-    "selenium-webdriver",
+    "selenium",
     "pytest"
 ]
-commands =[
+commands = [[
     "pytest"
-]
+]]
