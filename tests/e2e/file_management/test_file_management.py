@@ -1,5 +1,7 @@
 """
 Test basic file management flows for Vandalizer.
+
+Makes sure that a file is loaded, and text extracted.
 """
 
 from pathlib import Path
@@ -49,6 +51,37 @@ class TestFileManagement:
         )["docid"][0]
 
         assert len(shared_state["doc_id"]) > 0
+
+    def test_loading_spinner_exists(self, driver):
+        WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.ID, "loading-spinner"))
+        )
+
+    def test_loading_spinner_ends(self, driver):
+        WebDriverWait(driver, 60).until_not(
+            EC.visibility_of_element_located((By.ID, "loading-spinner"))
+        )
+
+    def test_code_button_appears(self, driver):
+        code_button = WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.CLASS_NAME, "fa-code"))
+        )
+
+        WebDriverWait(driver, 5).until(EC.element_to_be_clickable(code_button))
+
+        code_button.click()
+
+    def test_modal_appears(self, driver):
+        WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.ID, "rawTextModal"))
+        )
+
+    def test_modal_has_title(self, driver):
+        modal_paragraph = WebDriverWait(driver, 5).until(
+            EC.visibility_of_element_located((By.ID, "rawTextContent"))
+        )
+
+        assert "PDF test file" in modal_paragraph.text
 
     def test_navigate_to_root(self, driver, config):
         driver.get(config["home_url"])
