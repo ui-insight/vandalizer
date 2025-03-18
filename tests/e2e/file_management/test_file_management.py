@@ -4,20 +4,16 @@ Test basic file management flows for Vandalizer.
 
 from urllib import parse as urlparse
 
-import pytest
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
 
-@pytest.fixture(scope="class")
-def shared_state():
-    return {}
+class TestFolderManagement:
+    def test_get_home_page(self, driver, config):
+        driver.get(config["home_url"])
 
-
-class TestFileManagement:
-    def test_click_add_folder(self, driver, base_url):
-        driver.get(base_url + "/" + "home/")
+    def test_click_add_folder(self, driver):
         WebDriverWait(driver, 5).until(
             EC.visibility_of_element_located((By.ID, "add-folder-button"))
         )
@@ -47,8 +43,8 @@ class TestFileManagement:
 
         assert len(shared_state["folder_id"]) > 0
 
-    def test_navigate_to_root(self, driver, base_url):
-        driver.get(base_url + "/" + "home/")
+    def test_navigate_to_root(self, driver, config):
+        driver.get(config["home_url"])
 
     def test_folder_exists(self, driver, shared_state):
         folder_button = WebDriverWait(driver, 5).until(

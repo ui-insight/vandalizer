@@ -5,6 +5,11 @@ from selenium import webdriver
 
 
 @pytest.fixture(scope="class")
+def shared_state():
+    return {}
+
+
+@pytest.fixture(scope="class")
 def driver(request):
     if os.getenv("TEST_BROWSER", "").lower() == "chrome":
         options = webdriver.ChromeOptions()
@@ -27,9 +32,19 @@ def driver(request):
 
 
 @pytest.fixture(scope="session")
-def base_url():
+def config():
     base_url = os.getenv("BASE_URL", False)
-    if base_url:
-        return base_url.removesuffix("/")
-    port = os.getenv("PORT", "5001")
-    return f"http://localhost:{port}"
+    if not base_url:
+        port = os.getenv("PORT", "5001")
+        base_url = f"http://localhost:{port}"
+    base_url = base_url.removesuffix("/") + "/"
+    return {
+        "base_url": base_url,
+        "home_url": base_url + "home/",
+        "create_folder_name": "auto_test_folder",
+        "create_file_name": "example.pdf",
+        "examples_directory_name": "auto_test_examples",
+        "examples_directory_id": "58111be9429948b6894636805bbf75ed",
+        "extract_file_name": "example.pdf",
+        "extract_file_id": "16366A017B6144A2B2A9E02956F22339",
+    }
