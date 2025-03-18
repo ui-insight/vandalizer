@@ -10,6 +10,10 @@ from flask import (
     send_from_directory,
     current_app,
 )
+
+from app.utilities.document_readers import (
+    ocr_extract_text_from_pdf,
+)
 from app.models import (
     SmartDocument,
     SmartFolder,
@@ -22,8 +26,26 @@ from app.models import (
 
 from devtools import debug
 
-from flask import Blueprint, request, jsonify, redirect, url_for, session, render_template, send_from_directory, current_app
-from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem, Space, Workflow, WorkflowStep
+from flask import (
+    Blueprint,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    session,
+    render_template,
+    send_from_directory,
+    current_app,
+)
+from app.models import (
+    SmartDocument,
+    SmartFolder,
+    SearchSet,
+    SearchSetItem,
+    Space,
+    Workflow,
+    WorkflowStep,
+)
 import uuid, os, threading
 from app.utils import load_user, ingest_semantics, is_dev
 from flask_dance.contrib.azure import azure
@@ -79,6 +101,19 @@ def index():
         current_space = spaces[0]
 
     documents = []
+
+    # raw text extraction thread
+    def extract_thread(doc, pdf_path):
+        extracted_text = ocr_extract_text_from_pdf(pdf_path)
+        doc.raw_text = extracted_text
+        debug(
+            "Extraction completed, saving document",
+            doc.title,
+            doc.raw_text[:100],
+        )
+        doc.processing = False
+        doc.save()
+
     # Check for documents
     document_manager = DocumentManager()
     if request.args.get("docid"):
@@ -116,6 +151,7 @@ def index():
                         ),
                     )
                     thread.start()
+
             except:
                 print("Error checking for collection")
 
@@ -133,7 +169,7 @@ def index():
             "workflows/workflow.html",
             workflow=workflow,
         )
-        
+
         workflow_step_id = request.args.get("workflow_step_id", default=0)
         if workflow_step_id != 0:
             workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
@@ -143,10 +179,8 @@ def index():
                 workflow_step_id=workflow_step.id,
                 workflow_step=workflow_step,
             )
-        
-    # Get workflow if it exists
-    
-    
+
+        # Get workflow if it exists
 
         workflow_step_id = request.args.get("workflow_step_id", default=0)
         if workflow_step_id != 0:
@@ -224,13 +258,29 @@ def index():
             user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
         ).all()
 
+    for doc in folder_docs:
+        if not doc.raw_text or (doc.raw_text and len(doc.raw_text) == 0):
+            debug("Processing document", doc.title, doc.raw_text)
+
+            doc.processing = True
+            doc.save()
+            pdf_path = doc.absolute_path
+            extraction_thread = threading.Thread(
+                target=extract_thread,
+                args=(
+                    doc,
+                    pdf_path,
+                ),
+            )
+            extraction_thread.start()
+
     total_token_counts = 0
     for doc in folder_docs:
         total_token_counts += doc.token_count
-    
-    # Release Notes    
+
+    # Release Notes
     release_seen = request.cookies.get("release_seen")
-    show_release_panel = (release_seen != CURRENT_RELEASE_VERSION)
+    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
 
     # Release Notes
     release_seen = request.cookies.get("release_seen")

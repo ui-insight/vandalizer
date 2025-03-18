@@ -32,25 +32,6 @@ MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def extract_text_from_pdf(pdf_path: str) -> str:
-    """
-    Extract text from a PDF file using PyMuPDF and OCR.
-    If the native text extraction is insufficient, OCR is applied.
-    """
-    doc = pymupdf.open(pdf_path)
-    all_text = ""
-    for page in doc:
-        all_text += page.get_text()
-    if len(all_text) < MIN_PDF_TEXT_LENGTH:
-        files = {"file": Path(pdf_path).read_bytes()}
-        response = httpx.post(doctr_url, files=files, timeout=300)
-        debug(response)
-        all_text = response.content.decode("utf-8")
-
-    debug(all_text)
-    return all_text
-
-
 class DocumentManager:
     def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db"):
         """Initialize the document manager with a persistence directory."""
@@ -111,13 +92,6 @@ class DocumentManager:
             text_splits = self.text_splitter.split_text(text)
             splits = self.text_splitter.create_documents(text_splits)
             debug(len(splits))
-            file_path = self.upload_folder / doc_path
-            # loader = PyPDFLoader(file_path.as_posix())
-            # pages = loader.load()
-            # splits = self.text_splitter.split_documents(pages)
-            text = extract_text_from_pdf(file_path.as_posix())
-            text_splits = self.text_splitter.split_text(text)
-            splits = self.text_splitter.create_documents(text_splits)
 
         # Add metadata to each split
         for i, split in enumerate(splits):
