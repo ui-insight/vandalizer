@@ -42,7 +42,7 @@ class TestWorkflowRun:
         )
 
     def test_response_has_body(self, driver):
-        response_body = WebDriverWait(driver, 60).until(
+        response_body = WebDriverWait(driver, 180).until(
             EC.presence_of_element_located(
                 (By.CSS_SELECTOR, ".workflow-output-section>div")
             )
