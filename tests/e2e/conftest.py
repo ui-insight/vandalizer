@@ -55,6 +55,8 @@ def config():
         "extract_file_name": "example.pdf",
         "extract_file_id": extract_file_id,
         "extract_file_url": f"{home_url}?docid={extract_file_id}",
+        "extract_workflow_id": "67d9ca885037b4497daf9be2",
+        "extract_workflow_name": "auto_test_workflow",
     }
 
 

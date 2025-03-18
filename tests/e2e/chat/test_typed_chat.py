@@ -28,7 +28,7 @@ class TestTypedChat:
         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(submit_button))
         submit_button.click()
 
-    def test_get_response(self, driver):
+    def test_has_throbber(self, driver):
         WebDriverWait(driver, 5).until(
             EC.visibility_of_element_located((By.CLASS_NAME, "chat-loader"))
         )

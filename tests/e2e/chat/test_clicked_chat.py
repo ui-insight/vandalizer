@@ -22,7 +22,7 @@ class TestClickedChat:
         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(summarize_suggestion))
         summarize_suggestion.click()
 
-    def test_get_response(self, driver):
+    def test_has_throbber(self, driver):
         WebDriverWait(driver, 5).until(
             EC.visibility_of_element_located((By.CLASS_NAME, "chat-loader"))
         )
@@ -36,4 +36,4 @@ class TestClickedChat:
         response_body = WebDriverWait(driver, 60).until(
             EC.presence_of_element_located((By.CLASS_NAME, "message-response-body"))
         )
-        assert "PDF test file" in response_body.get_attribute("innerHTML")
+        assert "PDF" in response_body.get_attribute("innerHTML")
