@@ -1,4 +1,7 @@
 import os
+import uuid
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pytest
 from selenium import webdriver
@@ -38,13 +41,21 @@ def config():
         port = os.getenv("PORT", "5001")
         base_url = f"http://localhost:{port}"
     base_url = base_url.removesuffix("/") + "/"
+    id = uuid.uuid4()
     return {
         "base_url": base_url,
         "home_url": base_url + "home/",
-        "create_folder_name": "auto_test_folder",
-        "create_file_name": "example.pdf",
+        "create_folder_name": f"auto_test_folder_{id}",
+        "create_file_source": "auto_test_example.pdf",
+        "create_file_name": f"auto_test_example_{id}.pdf",
         "examples_directory_name": "auto_test_examples",
         "examples_directory_id": "58111be9429948b6894636805bbf75ed",
         "extract_file_name": "example.pdf",
         "extract_file_id": "16366A017B6144A2B2A9E02956F22339",
     }
+
+
+@pytest.fixture(scope="class")
+def temp_dir():
+    with TemporaryDirectory() as temp_dir_object:
+        yield Path(temp_dir_object)
