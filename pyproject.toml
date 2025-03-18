@@ -66,14 +66,29 @@ requires = ["setuptools", "cython"]
 build-backend = "setuptools.build_meta"
 
 [tool.tox]
-envlist = ["selenium"]
+envlist = ["selenium_firefox", "selenium_chrome"]
 no_package = true
 
-[tool.tox.env.selenium.set_env]
+[tool.tox.env.selenium_firefox.set_env]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
+TEST_BROWSER = "firefox"
 
-[tool.tox.env.selenium]
+[tool.tox.env.selenium_firefox]
+description = "Run Selenium tests"
+skip_install = true
+deps = [
+    "selenium",
+    "pytest"
+]
+commands = [[ "pytest" ]]
+
+[tool.tox.env.selenium_chrome.set_env]
+BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
+TEST_BROWSER_HEADLESS = "true"
+TEST_BROWSER = "chrome"
+
+[tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"
 skip_install = true
 deps = [
