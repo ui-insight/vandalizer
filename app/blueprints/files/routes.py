@@ -1,6 +1,10 @@
 from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
-from app.utilities.document_manager import DocumentManager
+from app.utilities.document_manager import (
+    DocumentManager,
+    perform_ocr_and_update,
+    perform_semantic_ingestion,
+)
 from app.utilities.document_readers import (
     ocr_extract_text_from_pdf,
     extract_text_from_doc,
@@ -14,6 +18,7 @@ from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from . import files
 from devtools import debug
+from concurrent.futures import ThreadPoolExecutor
 
 
 @files.route("/upload", methods=["POST"])
@@ -92,6 +97,10 @@ def upload():
         document.raw_text = raw_text
         document.processing = False
         document.save()
+        thread = threading.Thread(
+            target=perform_semantic_ingestion, args=(document, user_id)
+        )
+        thread.start()
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
@@ -103,42 +112,39 @@ def upload():
         document.raw_text = raw_text
         document.processing = False
         document.save()
+        thread = threading.Thread(
+            target=perform_semantic_ingestion, args=(document, user_id)
+        )
+        thread.start()
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-
-        def extract_thread():
-            extracted_text = ocr_extract_text_from_pdf(pdf_path)
-            document.raw_text = extracted_text
-            debug(
-                "Extraction completed, saving document",
-                document.title,
-                document.raw_text[:100],
-            )
-            document.processing = False
-            document.save()
-
-        extraction_thread = threading.Thread(target=extract_thread)
-        extraction_thread.start()
-
-    # Create a new thread for semantic ingestion
-    thread = threading.Thread(
-        target=ingest_semantics,
-        args=(
-            document,
-            user_id,
-        ),
-    )
-    thread.start()
+        # Start OCR extraction in a separate thread
+        ocr_thread = threading.Thread(
+            target=perform_ocr_and_update,
+            args=(
+                document,
+                pdf_path,
+                lambda raw_text: perform_semantic_ingestion(document, user_id, raw_text),
+            ),
+        )
+        ocr_thread.start()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
+
 
 @files.route("/poll_status", methods=["GET"])
 def poll_status():
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
-    return jsonify({"complete": not document.processing and document.raw_text != "", "raw_text": document.raw_text if not document.processing else ""})
+    return jsonify(
+        {
+            "complete": not document.processing and document.raw_text != "",
+            "raw_text": document.raw_text if not document.processing else "",
+        }
+    )
+
 
 @files.route("/rename_document", methods=["POST"])
 def rename_document():
@@ -253,7 +259,7 @@ def create_folder():
     parent_id = request.form["parent_id"]
     name = request.form["name"]
     space_id = request.form["space_id"]
-    
+
     folder = SmartFolder.objects.create(
         title=name,
         parent_id=parent_id,

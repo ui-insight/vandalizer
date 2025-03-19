@@ -63,7 +63,6 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
                 output_path=None,
             )
             output = processor.parse(extract_images=False, extract_tables=False)
-            debug(output)
             if output.status != "error":
                 return output.text
         except Exception as e:

@@ -1,6 +1,8 @@
 import sys
+
 try:
     import pysqlite3
+
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
@@ -30,6 +32,41 @@ from flask import current_app
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
+
+
+def perform_ocr_and_update(document, pdf_path, callback):
+    try:
+        extracted_text = ocr_extract_text_from_pdf(pdf_path)
+        document.raw_text = extracted_text
+        debug(
+            "Extraction completed, saving document",
+            document.title,
+            document.raw_text[:100],
+        )
+        document.processing = False
+        document.save()
+        if callback:
+            callback()  # Trigger semantic ingestion after OCR
+    except Exception:
+        document.processing = False
+        document.raw_text = ""
+        document.save()
+
+
+def perform_semantic_ingestion(document, user_id):
+    if not document.raw_text:
+        debug("Skipping semantic ingestion due to empty raw_text.")
+        return
+    document_manager = DocumentManager()
+
+    document_path = document.absolute_path
+
+    document_manager.add_document(
+        user_id=user_id,
+        document_name=document.title,
+        document_id=document.uuid,
+        doc_path=document_path,
+    )
 
 
 class DocumentManager:
@@ -70,7 +107,7 @@ class DocumentManager:
 
     def add_document(
         self, user_id: str, doc_path: str, document_name: str, document_id: str
-    ) -> str:
+        , raw_text="") -> str:
         """
         Add a document to a user's collection.
         Returns the document ID for future reference.
@@ -87,7 +124,9 @@ class DocumentManager:
             splits = self.text_splitter.create_documents(text_splits)
 
         else:
-            text = ocr_extract_text_from_pdf(doc_path)
+            text = raw_text
+            if len(text) == 0:
+                text = ocr_extract_text_from_pdf(doc_path)
             debug(len(text))
             text_splits = self.text_splitter.split_text(text)
             splits = self.text_splitter.create_documents(text_splits)

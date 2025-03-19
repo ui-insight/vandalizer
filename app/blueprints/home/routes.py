@@ -259,8 +259,8 @@ def index():
         ).all()
 
     for doc in folder_docs:
-        if not doc.raw_text or (doc.raw_text and len(doc.raw_text) == 0):
-            debug("Processing document", doc.title, doc.raw_text)
+        if not doc.raw_text:
+            debug("Processing document", doc.title)
 
             doc.processing = True
             doc.save()
