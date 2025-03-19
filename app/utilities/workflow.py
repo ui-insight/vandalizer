@@ -143,6 +143,18 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
         output = extraction_manager.extract(keys, pdf_paths=[], full_text=full_text)
     else:
         output = extraction_manager.extract(keys, pdf_paths)
+
+    debug(output)
+    prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
+    prompt += "\n\n"
+    prompt += json.dumps(output, indent=4)
+    chat_lm = ChatLM(model_type)
+    response = chat_lm.completion(
+        messages=[{"role": "user", "content": prompt}],
+    )
+    debug(response)
+    output = response
+
     return output
 
 
@@ -257,7 +269,6 @@ class DocumentNode(Node):
         print("PDF Paths: ", self.pdf_paths)
 
     def process(self, inputs=None):
-
         # data = inputs.get("data", None)
 
         output = {"step_name": self.name, "output": self.pdf_paths, "input": None}
@@ -271,7 +282,6 @@ class FormatNode(Node):
         self.data = data
 
     def process(self, inputs):
-
         formatting_prompt = self.data.get("prompt", "")
 
         data = inputs.get("output", None)
@@ -498,7 +508,6 @@ class WorkflowEngine:
 
 
 def build_workflow_engine(steps, workflow):
-
     engine = WorkflowEngine()
     nodes = []
 

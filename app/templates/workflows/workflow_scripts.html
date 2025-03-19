@@ -431,6 +431,7 @@
                         else {
                             chat_response = data.output;
                         }
+                        console.log("chat response:", chat_response);
 
                         if (typeof chat_response === 'object') {
                             // Check if it's an array with a single HTML string
@@ -444,6 +445,10 @@
                         }
                         let outputText = chat_response
                             .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+
+                        // replace \",\" with <hr> in the html output
+                        outputText = outputText.replace(/\",\"/g, '<hr>');
+
 
                         $('.workflow-output-section').append(`${outputText}<br>`);
                         $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
