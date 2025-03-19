@@ -88,7 +88,11 @@
   function chat() {
     // Add the message response bubble with the icon and loader
     let question = $("#chatinput")[0].textContent;
+    chat(question);
+   
+  }
 
+  function chat(question) {
     performChat(document_uuids, question, folder_uuid);
 
     search_set_add_uuid = "";
@@ -107,11 +111,20 @@
     console.log("Display question:" + display_question);
     console.log("Question:" + question);
 
-    $("#chat-panel").append(
-      "<p><div class='message-you'>" +
-        (display_question == "" ? question : display_question) +
+    if (isProcessingFile) {
+      processingFileOriginalText = (display_question == "" ? question : display_question);
+      $("#chat-panel").append(
+      "<p><div class='message-you processing-file-text-question-holder'>" +
+       "Processing your document..." +
         "</div></p>",
     );
+    } else {
+      $("#chat-panel").append(
+        "<p><div class='message-you'>" +
+          (display_question == "" ? question : display_question) +
+          "</div></p>",
+      );
+    }
 
     // Attach a delegated event listener to the parent container
     $(document).on(

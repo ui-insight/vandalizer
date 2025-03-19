@@ -14,6 +14,8 @@
     {% endif %}
 
    var folder_uuid = "{{current_folder_id}}"
+   var isProcessingFile = false;
+   var processingFileOriginalText = "";
 
 
     document_uuids = [
@@ -177,7 +179,7 @@
                 $('.chat-window').append(`
                 <div class="answer-card" style="padding: 30px; ">
                     <p style="font-size: 30; color: #5D6F81;">
-                        Question: <i>${question}</i>
+                        Question: <i>${isProcessingFile ? "Processing your document.." : question}</i>
                     </p>
                     <p style="font-size: 30; color: #5D6F81;">
                         ${answer}
@@ -422,13 +424,21 @@
             $('#loading-spinner').hide();
             $('#processing-indicator').hide();
             $('#raw-text-icon').show();
+            isProcessingFile = false;
+
+            if (processingFileOriginalText != "") {
+                $('.processing-file-text-question-holder').text(processingFileOriginalText);
+                $('.message-response').remove();
+                $('.message-you').remove();
+                chat(processingFileOriginalText);
+                processingFileOriginalText = "";
+            }
             updateDocumentSelections();
             documentData = {
                 id: docUuid,
                 title: "",
                 raw_text: data.raw_text
             };
-            
 
             // No additional refresh needed per the requirement
         } else {
@@ -437,10 +447,7 @@
                 pollStatus(docUuid);
             }, 5000);
 
-            var counters = $('.doc-selected-counter')
-            for (var i = 0; i < counters.length; i++) {
-            counters[i].textContent = `Preparing your document...`;
-            }
+            isProcessingFile = true;
         }
     });
 }
