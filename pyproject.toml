@@ -50,9 +50,8 @@ dependencies = [
     "requests",
     "rollbar",
     "tiktoken",
-    "wtforms"
+    "wtforms",
 ]
-
 
 
 [project.optional-dependencies]
@@ -77,11 +76,8 @@ TEST_BROWSER = "firefox"
 [tool.tox.env.selenium_firefox]
 description = "Run Selenium tests"
 skip_install = true
-deps = [
-    "selenium",
-    "pytest"
-]
-commands = [[ "pytest" ]]
+deps = ["selenium", "pytest"]
+commands = [["pytest"]]
 
 [tool.tox.env.selenium_chrome.set_env]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
@@ -91,8 +87,5 @@ TEST_BROWSER = "chrome"
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"
 skip_install = true
-deps = [
-    "selenium",
-    "pytest"
-]
-commands = [[ "pytest" ]]
+deps = ["selenium", "pytest"]
+commands = [["pytest"]]
