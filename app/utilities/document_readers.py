@@ -53,6 +53,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     If the native text extraction is insufficient, OCR is applied.
     """
     debug("Extracting text with ocr for ", pdf_path)
+    extracted_text = ""
     for i in range(retries):
         try:
             processor = PDFProcessor(
@@ -63,7 +64,8 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
                 output_path=None,
             )
             output = processor.parse(extract_images=False, extract_tables=False)
-            if output.status != "error":
+            extracted_text = output.text
+            if output.status != "error" and len(extracted_text) > 0:
                 return output.text
         except Exception as e:
             debug(f"Error extracting text from PDF: {e}")

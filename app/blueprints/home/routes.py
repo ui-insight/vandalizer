@@ -17,6 +17,7 @@ from app.utilities.document_readers import (
 from app.utilities.document_manager import (
     perform_semantic_ingestion,
     extract_text_from_doc,
+    perform_extraction_and_update,
 )
 from app.models import (
     SmartDocument,
@@ -60,6 +61,36 @@ from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.document_manager import DocumentManager
 from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
+
+
+def update_old_document(document, user_id):
+    debug("Updating old document", document.title)
+    debug("Document processing", document.processing)
+
+    document_manager = DocumentManager()
+    if not document.processing:
+        document.processing = True
+        document.save()
+        if not document.raw_text or document.raw_text == "":
+            pdf_path = document.absolute_path
+            thread = threading.Thread(
+                target=perform_extraction_and_update,
+                args=(
+                    document,
+                    pdf_path,
+                ),
+            )
+            thread.start()
+
+        if not document_manager.document_exists(user_id, document.uuid):
+            thread = threading.Thread(
+                target=perform_semantic_ingestion,
+                args=(
+                    document,
+                    user_id,
+                ),
+            )
+            thread.start()
 
 
 @home.route("/")
@@ -222,6 +253,10 @@ def index():
         .order_by("-created_at")
         .all()
     )
+    # Check for OCR and semantic ingestion for documents in the folder
+    # This should resolve the issue with old documents not being processed
+    for document in folder_docs:
+        update_old_document(document, user_id)
 
     if current_folder_id != 0 and current_folder_id != "0":
         folder_docs = (

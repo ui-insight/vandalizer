@@ -2,7 +2,6 @@ from flask import Blueprint, request, jsonify, redirect, url_for, session, curre
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
 from app.utilities.document_manager import (
     DocumentManager,
-    perform_ocr_and_update,
     perform_semantic_ingestion,
     perform_ocr_and_semantic_ingestion,
 )

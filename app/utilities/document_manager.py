@@ -37,10 +37,11 @@ MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def perform_ocr_and_update(document, pdf_path):
+def perform_extraction_and_update(document, doc_path):
+    debug("Performing OCR on document", document.title)
     document.processing = True
     try:
-        extracted_text = ocr_extract_text_from_pdf(pdf_path)
+        extracted_text = extract_text_from_doc(doc_path)
         document.raw_text = extracted_text
         debug(
             "Extraction completed, saving document",
@@ -75,7 +76,7 @@ def perform_semantic_ingestion(document, user_id, raw_text=None):
 def perform_ocr_and_semantic_ingestion(document, user_id):
     document.processing = True
     document_path = document.absolute_path
-    perform_ocr_and_update(document, document_path)
+    perform_extraction_and_update(document, document_path)
     document = document.reload()
     perform_semantic_ingestion(document, user_id, document.raw_text)
     document.processing = False
