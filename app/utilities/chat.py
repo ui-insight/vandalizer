@@ -15,7 +15,6 @@ from app.models import MAX_CHAT_MESSAGES
 
 
 def chat_with_prompt(prompt: str, user_id=0) -> str:
-
     cache_key = f"chat_office_{user_id}"
     llm_string = "pydantic_model:openai:gpt-4o"
     previous_messages = []

@@ -55,7 +55,6 @@ class ContractReviewManagerChained:
         return ret_arr
 
     def prepare_splits(self, document):
-
         # self.load_documents()
         print("Root Path: ", self.root_path)
         loader = PyPDFLoader(

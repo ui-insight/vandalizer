@@ -22,7 +22,6 @@ import dspy
 # For prod, change to pysqlite3
 
 if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
-
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
     # Turn off caching
     os.environ["DSP_CACHEBOOL"] = "false"
@@ -53,7 +52,6 @@ from dspy.evaluate.metrics import (
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
-
 
 
 from langchain_openai import OpenAIEmbeddings

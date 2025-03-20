@@ -12,7 +12,6 @@ from devtools import debug
 import re
 
 
-
 from app import app
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
@@ -25,7 +24,6 @@ from app.utilities.config import model_type
 from threading import Thread
 
 from app.models import SmartDocument, SearchSet
-
 
 
 import graphlib

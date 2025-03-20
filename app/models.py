@@ -191,7 +191,6 @@ class SearchSet(me.Document):
         return fields
 
     def to_workflow_step_data(self):
-
         workflow_data = {
             "search_set_type": self.set_type,
             "search_set_uuid": self.uuid,
