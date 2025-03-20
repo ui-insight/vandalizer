@@ -1,5 +1,5 @@
-import PyPDF2
 import nltk
+import PyPDF2
 
 
 # Load PDF
@@ -26,9 +26,6 @@ def chunk_pdf(pdf_path):
     # Extract n-grams (phrases) from sentences
     n = 3
     ngrams = [list(nltk.ngrams(sent, n)) for sent in tokenized_sentences]
-
-    # Flattened list of words, phrases, sentences, paragraphs
-    words = [w for sent in tokenized_sentences for w in sent]
 
     phrases = [p for ng in ngrams for p in ng]
 

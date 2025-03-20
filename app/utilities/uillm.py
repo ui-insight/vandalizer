@@ -1,6 +1,7 @@
 import json
-import requests
 import re
+
+import requests
 
 
 class UILLM:
@@ -28,7 +29,7 @@ class UILLM:
             try:
                 output = response.json()
                 content = output["choices"][0]["message"]["content"]
-                if content == None:
+                if content is None:
                     print("Failed on output: " + output)
 
                 if is_json:
@@ -109,7 +110,7 @@ class UILLM:
             # raise the JSONDecodeError as the ask_question_to_model() method handles this exception
             raise e
 
-    def list_embeddings():
+    def list_embeddings(data):
         endpoint = "https://mindrouter-api.nkn.uidaho.edu/api/tags"
 
         response = requests.get(endpoint)

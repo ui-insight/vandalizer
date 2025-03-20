@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 
-from PyPDF2 import PdfReader
-from devtools import debug
 import os
-import fitz
-import requests
-import pymupdf4llm
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from markdownify import markdownify as md
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import fitz
+import pymupdf4llm
+import requests
+from devtools import debug
+from markdownify import markdownify as md
+from PyPDF2 import PdfReader
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
@@ -482,7 +483,7 @@ def process_page(
         tables = {}
 
     # OCR the page if the ocr indicator is active
-    if ocr_page == True:
+    if ocr_page:
         print(f"Using OCR tool @ {endpoint} to extract page {page_number}")
         # freeze current page to pdf
         fp = save_page_to_pdf(document, page_number, output_dir)

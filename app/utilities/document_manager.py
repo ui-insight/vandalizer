@@ -200,7 +200,7 @@ class DocumentManager:
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
         """Check if a specific document exists in a user's collection."""
-        vectorstore = self.get_user_collection(user_id)
+        self.get_user_collection(user_id)
         # Get the raw collection to use ChromaDB's filtering
         collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
         if collection:
@@ -211,7 +211,7 @@ class DocumentManager:
 
     def delete_document(self, user_id: str, document_id: str) -> None:
         """Delete a specific document from a user's collection."""
-        vectorstore = self.get_user_collection(user_id)
+        self.get_user_collection(user_id)
         # Get the raw collection to use ChromaDB's filtering
         collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
         if collection:

@@ -1,12 +1,12 @@
-import openai
-import time
 import os
-from app.utilities.document_readers import extract_text_from_doc
+import time
+
+import openai
 
 # from langfuse.decorators import observe
 # from langfuse import Langfuse
-
 from app.utilities.agents import extract_entities_with_agent
+from app.utilities.document_readers import extract_text_from_doc
 
 # langfuse = Langfuse()
 
@@ -20,8 +20,6 @@ class ExtractionManager3:
     root_path = ""
 
     def extract(self, extract_keys, pdf_paths, full_text=None):
-        api_key = OPENAI_API_KEY
-
         # extractor = EntityExtractor(api_key)
 
         # if extract_keys is string convert to list by splitting on comma

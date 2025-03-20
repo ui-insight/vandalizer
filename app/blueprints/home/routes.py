@@ -300,7 +300,7 @@ def chat():
     # migrate to new document user's location
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
-        if document != None:
+        if document is not None:
             documents.append(document)
             # find related html documents (excel converted to html)
             if document.extension == "html":
