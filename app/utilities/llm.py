@@ -61,7 +61,6 @@ class InsightLM(LM):
         }
 
     def request(self, messages=None, **kwargs):
-
         data = {
             "model": self.model,
             "messages": messages,

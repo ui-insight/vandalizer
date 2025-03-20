@@ -25,4 +25,3 @@ def submit_rating():
     )
     record.save()
     return jsonify({"complete": True})
-

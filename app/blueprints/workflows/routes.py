@@ -815,7 +815,6 @@ def workflow_add_format_step():
         return jsonify(response)
 
     elif request.method == "POST":
-
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_step_id = (
