@@ -3,7 +3,6 @@ from langchain.llms import OpenAI
 from langchain.document_loaders import PyPDFLoader  # pdf loading
 from langchain.embeddings import OpenAIEmbeddings  # embeddings
 from langchain.vectorstores import Chroma  # vector store
-from langchain.chains import ChatVectorDBChain  # chatting with pdf
 import os
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
@@ -12,9 +11,6 @@ from langchain.chains import ConversationalRetrievalChain
 from langchain.chains.summarize import load_summarize_chain
 from langchain.chains import AnalyzeDocumentChain
 from langchain.chains.question_answering import load_qa_chain
-from langchain.document_loaders import TextLoader
-from langchain.chains.question_answering import load_qa_chain
-from langchain.llms import OpenAI
 
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

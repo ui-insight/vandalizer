@@ -1,6 +1,5 @@
 import os
 from flask import (
-    Blueprint,
     request,
     jsonify,
     redirect,
@@ -11,12 +10,8 @@ from flask import (
     current_app,
 )
 
-from app.utilities.document_readers import (
-    ocr_extract_text_from_pdf,
-)
 from app.utilities.document_manager import (
     perform_semantic_ingestion,
-    extract_text_from_doc,
     perform_extraction_and_update,
 )
 from app.models import (
@@ -31,27 +26,8 @@ from app.models import (
 
 from devtools import debug
 
-from flask import (
-    Blueprint,
-    request,
-    jsonify,
-    redirect,
-    url_for,
-    session,
-    render_template,
-    send_from_directory,
-    current_app,
-)
-from app.models import (
-    SmartDocument,
-    SmartFolder,
-    SearchSet,
-    SearchSetItem,
-    Space,
-    Workflow,
-    WorkflowStep,
-)
-import uuid, os, threading
+import uuid
+import threading
 from app.utils import load_user, is_dev
 from flask_dance.contrib.azure import azure
 from itertools import chain

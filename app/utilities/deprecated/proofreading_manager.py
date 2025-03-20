@@ -1,18 +1,9 @@
-from langchain.llms import OpenAI
-from langchain.document_loaders import PyPDFLoader # pdf loading
-from langchain.embeddings import OpenAIEmbeddings # embeddings
-from langchain.vectorstores import Chroma # vector store
-from langchain.chains import ChatVectorDBChain # chatting with pdf
-import os
-import csv
-from io import StringIO
-from app.utilities.llm_manager import LLMManager
 
 
 class ProofreadingManager:
-    llmManager = None;
-    document_sections = [];
-    compliance_results = [];
+    llmManager = None
+    document_sections = []
+    compliance_results = []
 
     def __init__(self, manager):
         self.llmManager = manager

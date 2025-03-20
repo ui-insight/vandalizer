@@ -1,4 +1,4 @@
-from flask import Blueprint, request, redirect, render_template
+from flask import request, redirect, render_template
 from app.models import Space
 import uuid
 from . import spaces

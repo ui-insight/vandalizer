@@ -1,23 +1,14 @@
 #!/usr/bin/env python3
 
 from PyPDF2 import PdfReader
-from pathlib import Path
-from flask import current_app
-import httpx
-import pymupdf
 from devtools import debug
 import os
 import fitz
 import requests
-import subprocess
 import pymupdf4llm
-import fitz
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from markdownify import markdownify as md
 import re
-import os
-import requests
-from dataclasses import dataclass
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
@@ -184,7 +175,7 @@ class PDFProcessor:
             images_found = quality_response["images"]
             pdf_quality = quality_response["text_quality"]
 
-        except Exception as e:
+        except Exception:
             api_response.status = ("Error",)
             api_response.message = (quality_response["message"],)
             api_response.http_status = str(quality_response["http_status"])

@@ -6,9 +6,8 @@ import pandas as pd
 from pathlib import Path
 
 
-from typing import List, Literal
+from typing import Literal
 
-from datasets import Dataset
 from dspy.datasets import DataLoader
 
 import sys
@@ -18,13 +17,11 @@ import dspy
 
 # from dsp.trackers.langfuse_tracker import LangfuseTracker
 # from langfuse.decorators import observe
-from app.utilities import config
 
 
 # For prod, change to pysqlite3
 
 if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
-    import pysqlite3
 
     sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
     # Turn off caching
@@ -32,7 +29,6 @@ if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
     # create a cache directory in the current working directory
     os.environ["DSP_CACHEDIR"] = os.path.join(os.getcwd(), "cache")
 
-from app.models import Feedback
 
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 # from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
@@ -42,9 +38,8 @@ from langchain.schema import Document
 
 import chromadb
 
-import dspy
 from dspy.evaluate import Evaluate
-from dspy.teleprompt import MIPROv2, BootstrapFewShot, BootstrapFewShotWithRandomSearch
+from dspy.teleprompt import BootstrapFewShot
 
 from dsp.utils import deduplicate
 
@@ -59,13 +54,11 @@ from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
 
-from langchain_community.document_loaders import PyPDFLoader
 
 
 from langchain_openai import OpenAIEmbeddings
 
 
-from pathlib import Path
 import dotenv
 
 

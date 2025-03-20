@@ -20,6 +20,5 @@ site_packages = python_home + '/lib/python%s/site-packages' % python_version
 site.addsitedir(site_packages)
 
 # Import our create_app function from our package
-from app import app as application
 
 

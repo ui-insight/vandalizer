@@ -2,8 +2,6 @@ import os
 
 from app import app
 from dotenv import load_dotenv
-import logging
-from contextvars import ContextVar
 import nest_asyncio
 import asyncio
 import threading

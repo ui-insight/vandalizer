@@ -69,7 +69,6 @@ app.register_blueprint(spaces, url_prefix="/spaces")
 app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
-import os
 
 # OAuth
 blueprint = make_azure_blueprint(

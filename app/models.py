@@ -1,21 +1,15 @@
 import mongoengine as me
 from datetime import datetime
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
 import datetime
 import os
 from pypdf import PdfReader
 from app import app
-from uuid import uuid4
 from enum import Enum
 import json
 from pydantic_ai.messages import (
     ModelMessage,
-    ModelMessagesTypeAdapter,
     ModelRequest,
     ModelResponse,
-    TextPart,
-    UserPromptPart,
 )
 
 

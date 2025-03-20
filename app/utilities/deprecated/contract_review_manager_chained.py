@@ -1,8 +1,6 @@
-from langchain.llms import OpenAI
 from langchain.document_loaders import PyPDFLoader  # pdf loading
 from langchain.embeddings import OpenAIEmbeddings  # embeddings
 from langchain.vectorstores import Chroma  # vector store
-from langchain.chains import ChatVectorDBChain  # chatting with pdf
 from langchain.document_loaders import Docx2txtLoader
 from langchain.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
@@ -12,9 +10,6 @@ from langchain.chains import ConversationalRetrievalChain
 import time
 
 import os
-import re
-import csv
-from io import StringIO
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 

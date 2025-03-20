@@ -1,10 +1,9 @@
 # app/blueprints/auth/routes.py
-from flask import Blueprint, redirect, url_for, session, render_template, request
+from flask import redirect, url_for, session, render_template
 from . import auth
 from app.utils import load_user, is_dev
 from app import azure
 from app.models import User
-import os
 
 @auth.route("/")
 def index():

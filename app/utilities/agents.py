@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from pydantic import create_model
-from typing import Dict, Optional, List, Any, Tuple, Union, List
+from typing import Dict, Optional, Any, List
 import json
 from app.utilities.llm_helpers import remove_code_markers
 from app.utilities.async_utilities import function_event_loop_decorator
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
-from pydantic_ai.models.openai import OpenAIModel
 from app.models import SmartDocument
 from app.utilities.document_manager import DocumentManager
 

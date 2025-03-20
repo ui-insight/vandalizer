@@ -1,5 +1,4 @@
 from flask import (
-    Blueprint,
     request,
     jsonify,
     current_app,
@@ -14,7 +13,9 @@ from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.extraction_manager2 import ExtractionManager2
 from copy import deepcopy
-import csv, os, uuid
+import csv
+import os
+import uuid
 from devtools import debug
 
 from pypdf import PdfReader, PdfWriter

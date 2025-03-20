@@ -2,7 +2,7 @@
 
 import json
 import tiktoken
-from typing import Any, Callable, List, Dict, Type
+from typing import Any, List, Dict, Type
 from pydantic import BaseModel, ValidationError
 from app.utilities.config import model_type
 
@@ -10,7 +10,6 @@ from app.utilities.config import model_type
 
 import chardet
 
-import tiktoken
 from app.utilities.llm import ChatLM
 
 

@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
+from flask import request, jsonify, redirect, url_for, session, current_app
 from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
 from app.utilities.document_manager import (
     DocumentManager,
@@ -6,19 +6,21 @@ from app.utilities.document_manager import (
     perform_ocr_and_semantic_ingestion,
 )
 from app.utilities.document_readers import (
-    ocr_extract_text_from_pdf,
     extract_text_from_doc,
     extract_text_from_html,
 )
-import uuid, base64, os, threading, io
-from app.utils import load_user, ingest_semantics
+import uuid
+import base64
+import os
+import threading
+import io
+from app.utils import load_user
 import pypandoc
 from app.utilities.excel_helper import save_excel_to_html
 from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from . import files
 from devtools import debug
-from concurrent.futures import ThreadPoolExecutor
 
 
 @files.route("/upload", methods=["POST"])

@@ -1,10 +1,6 @@
 import time
 import openai
-from pypdf import PdfReader
 import os
-import re
-import csv
-from io import StringIO
 import json
 
 

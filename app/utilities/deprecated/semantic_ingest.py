@@ -1,14 +1,10 @@
 import sys
-import pysqlite3
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
 import chromadb
-from chromadb.config import Settings
 import os
 from app import app
-from app.models import SmartDocument
 from app.utilities import pdf_helper
-import nltk
 
 class SemanticIngest:
     def search(self, search_term, document):

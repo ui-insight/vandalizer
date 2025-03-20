@@ -1,10 +1,7 @@
 import os
 import openai
-import chardet
-from PyPDF2 import PdfReader
 from app.utilities.uillm import UILLM
 
-import os
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 

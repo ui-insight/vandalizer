@@ -1,7 +1,5 @@
-import sys
 import json
 import requests
-from multiprocessing.pool import ThreadPool
 import re
 
 class UILLM:
@@ -87,7 +85,7 @@ class UILLM:
 
 
             print(f"Model: {name}")
-            print(f"  Details:")
+            print("  Details:")
             print(f"    Family: {family}")
             print(f"    Parameter Size: {parameter_size}")
             print(f"    Quantization Level: {quantization_level}")

@@ -1,50 +1,28 @@
 import os
-from datetime import datetime
 from devtools import debug
 
 from app.utilities.async_utilities import class_method_event_loop_decorator
 
 import json
-import re
-from pathlib import Path
 import openai
-from PyPDF2 import PdfReader
 from app.utilities.agents import RagDeps, rag_agent, chat_agent
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm import ChatLM
-from langfuse.decorators import observe
 
 # from langfuse.decorators import observe
-import asyncio
 
 
-import time
 
 # from langchain_redis import RedisCache
 from app.utilities.redis_cache import RedisCache
 
 from app.models import (
-    ChatHistory,
-    ChatMessage,
-    ChatRole,
     MAX_CHAT_MESSAGES,
-    AgentHistory,
 )
 from app.utilities.document_readers import extract_text_from_doc
 
-from app.utilities.llm_helpers import num_tokens_from_text
 from app.utilities.config import max_context_length, model_type
 from pydantic_ai.messages import ModelMessagesTypeAdapter
-from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelMessagesTypeAdapter,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    UserPromptPart,
-    SystemPromptPart,
-)
 
 # 2h
 ttl = 60 * 60 * 1
@@ -182,7 +160,7 @@ class OpenAIInterface:
             #     previous_messages
             # )
 
-        prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
 
         debug(previous_messages)
 
