@@ -2,8 +2,10 @@ import sys
 
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
-import chromadb
 import os
+
+import chromadb
+
 from app import app
 from app.utilities import pdf_helper
 
@@ -31,7 +33,7 @@ class SemanticIngest:
     def check_for_collection(self, document):
         try:
             client = chromadb.HttpClient(host="localhost", port=5028)
-            collection = client.get_collection(name=document.uuid)
+            client.get_collection(name=document.uuid)
             return True
         except:
             return False

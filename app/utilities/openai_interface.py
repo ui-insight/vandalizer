@@ -1,27 +1,23 @@
-import os
-from devtools import debug
-
-from app.utilities.async_utilities import class_method_event_loop_decorator
-
 import json
+import os
+
 import openai
-from app.utilities.agents import RagDeps, rag_agent, chat_agent
-from app.utilities.document_manager import DocumentManager
-from app.utilities.llm import ChatLM
-
-# from langfuse.decorators import observe
-
-
-# from langchain_redis import RedisCache
-from app.utilities.redis_cache import RedisCache
+from devtools import debug
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.models import (
     MAX_CHAT_MESSAGES,
 )
-from app.utilities.document_readers import extract_text_from_doc
-
+from app.utilities.agents import RagDeps, chat_agent, rag_agent
+from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import max_context_length, model_type
-from pydantic_ai.messages import ModelMessagesTypeAdapter
+from app.utilities.document_manager import DocumentManager
+from app.utilities.document_readers import extract_text_from_doc
+from app.utilities.llm import ChatLM
+
+# from langfuse.decorators import observe
+# from langchain_redis import RedisCache
+from app.utilities.redis_cache import RedisCache
 
 # 2h
 ttl = 60 * 60 * 1
@@ -86,7 +82,6 @@ class OpenAIInterface:
         # Split the text into lines
         lines = answer.split("\n")
         formatted_lines = []
-        skip_line = False
 
         for line in lines:
             # Check for code block markers with or without language specification

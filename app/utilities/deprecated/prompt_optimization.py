@@ -2,18 +2,15 @@
 
 import os
 import re
-import pandas as pd
+import sys
 from pathlib import Path
-
-
 from typing import Literal
 
+import dspy
+import pandas as pd
 from dspy.datasets import DataLoader
 
-import sys
-
 from app.utilities.llm import InsightLM
-import dspy
 
 # from dsp.trackers.langfuse_tracker import LangfuseTracker
 # from langfuse.decorators import observe
@@ -31,34 +28,24 @@ if "dev" in os.uname().nodename or "prod" in os.environ.get("APP_ENV", "prod"):
 
 # from langchain_openai import OpenAI, ChatOpenAI, OpenAIEmbeddings
 # from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from langchain.schema import Document
-
 import chromadb
-
-from dspy.evaluate import Evaluate
-from dspy.teleprompt import BootstrapFewShot
-
+import dotenv
 from dsp.utils import deduplicate
-
-from dspy.retrieve.chromadb_rm import ChromadbRM
+from dspy.evaluate import Evaluate
 from dspy.evaluate.metrics import (
     answer_exact_match,
     answer_exact_match_str,
     answer_passage_match,
 )
-
+from dspy.retrieve.chromadb_rm import ChromadbRM
+from dspy.teleprompt import BootstrapFewShot
+from langchain.schema import Document
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
-
-
+from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
-
-
-import dotenv
-
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 dotenv.load_dotenv()
 os.environ["OPENAI_API_KEY"] = (
@@ -143,7 +130,7 @@ def validate_context_and_answer_and_hops(example, pred, trace=None):
 def all_queries_distinct(prev_queries):
     query_distinct = True
     for i, query in enumerate(prev_queries):
-        if validate_query_distinction_local(prev_queries[:i], query) == False:
+        if validate_query_distinction_local(prev_queries[:i], query) is False:
             query_distinct = False
             break
     return query_distinct
@@ -464,11 +451,8 @@ def background_retrain_model(feedback_list, root_path):
     # baseline_eval_score = evaluate(program, devset=valset)
 
     # Compile
-    N = 10  # The number of instructions and fewshot examples that we will generate and optimize over
-    batches = 30  # The number of optimization trials to be run (we will test out a new combination of instructions and fewshot examples in each trial)
-    temperature = 1.0  # The temperature configured for generating new instructions
 
-    eval_kwargs = dict(num_threads=16, display_progress=True, display_table=2)
+    # eval_kwargs = dict(num_threads=16, display_progress=True, display_table=2)
     # teleprompter = MIPROv2(
     #     prompt_model=prompt_model,
     #     task_model=task_model,

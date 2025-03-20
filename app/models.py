@@ -177,7 +177,7 @@ class SearchSet(me.Document):
         return SearchSetItem.objects(searchset=self.uuid)
 
     def get_fillable_fields(self):
-        if self.fillable_pdf_url == None or self.fillable_pdf_url == "":
+        if self.fillable_pdf_url is None or self.fillable_pdf_url == "":
             return []
         pdf_path = os.path.join(
             app.root_path, "static", "uploads", self.fillable_pdf_url

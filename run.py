@@ -13,7 +13,7 @@ load_dotenv()
 def setup_event_loop():
     """Setup event loop for the current thread"""
     # Get thread id for debugging
-    thread_id = threading.current_thread().ident
+    threading.current_thread().ident
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:

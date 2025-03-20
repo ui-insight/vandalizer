@@ -1,10 +1,11 @@
+import random
+import uuid
+from datetime import datetime
+
+import openai
 import requests
 from dspy import LM
-from datetime import datetime
-import uuid
-import openai
 from openai import OpenAI
-import random
 
 
 class ChatLM:
@@ -86,7 +87,7 @@ class InsightLM(LM):
 
     def __call__(self, prompt=None, messages=None, **kwargs):
         # Build the request.
-        cache = kwargs.pop("cache", self.cache)
+        kwargs.pop("cache", self.cache)
         messages = messages or [{"role": "user", "content": prompt}]
         kwargs = {**self.kwargs, **kwargs}
 
