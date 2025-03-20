@@ -26,7 +26,10 @@ from devtools import debug
 import httpx
 from devtools import debug
 
-from app.utilities.document_readers import ocr_extract_text_from_pdf
+from app.utilities.document_readers import (
+    ocr_extract_text_from_pdf,
+    extract_text_from_doc,
+)
 
 from flask import current_app
 
@@ -34,7 +37,8 @@ MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def perform_ocr_and_update(document, pdf_path, callback):
+def perform_ocr_and_update(document, pdf_path):
+    document.processing = True
     try:
         extracted_text = ocr_extract_text_from_pdf(pdf_path)
         document.raw_text = extracted_text
@@ -45,18 +49,14 @@ def perform_ocr_and_update(document, pdf_path, callback):
         )
         document.processing = False
         document.save()
-        if callback:
-            callback()  # Trigger semantic ingestion after OCR
     except Exception:
         document.processing = False
         document.raw_text = ""
         document.save()
 
 
-def perform_semantic_ingestion(document, user_id):
-    if not document.raw_text:
-        debug("Skipping semantic ingestion due to empty raw_text.")
-        return
+def perform_semantic_ingestion(document, user_id, raw_text=None):
+    document.processing = True
     document_manager = DocumentManager()
 
     document_path = document.absolute_path
@@ -66,7 +66,20 @@ def perform_semantic_ingestion(document, user_id):
         document_name=document.title,
         document_id=document.uuid,
         doc_path=document_path,
+        raw_text=raw_text,
     )
+    document.processing = False
+    document.save()
+
+
+def perform_ocr_and_semantic_ingestion(document, user_id):
+    document.processing = True
+    document_path = document.absolute_path
+    perform_ocr_and_update(document, document_path)
+    document = document.reload()
+    perform_semantic_ingestion(document, user_id, document.raw_text)
+    document.processing = False
+    document.save()
 
 
 class DocumentManager:
@@ -106,8 +119,13 @@ class DocumentManager:
         return vectorstore
 
     def add_document(
-        self, user_id: str, doc_path: str, document_name: str, document_id: str
-        , raw_text="") -> str:
+        self,
+        user_id: str,
+        doc_path: str,
+        document_name: str,
+        document_id: str,
+        raw_text=None,
+    ) -> str:
         """
         Add a document to a user's collection.
         Returns the document ID for future reference.
@@ -115,22 +133,13 @@ class DocumentManager:
         # Load and split the document
         debug(doc_path)
         splits = []
-        # if html file
-        if doc_path.endswith(".html"):
-            text = ocr_extract_text_from_pdf(doc_path)
-            with open(doc_path, "r", encoding="utf-8") as file:
-                text = file.read()
-            text_splits = self.text_splitter.split_text(text)
-            splits = self.text_splitter.create_documents(text_splits)
-
-        else:
-            text = raw_text
-            if len(text) == 0:
-                text = ocr_extract_text_from_pdf(doc_path)
-            debug(len(text))
-            text_splits = self.text_splitter.split_text(text)
-            splits = self.text_splitter.create_documents(text_splits)
-            debug(len(splits))
+        text = raw_text
+        if not text or (text and len(text) == 0):
+            text = extract_text_from_doc(doc_path)
+        debug(len(text))
+        text_splits = self.text_splitter.split_text(text)
+        splits = self.text_splitter.create_documents(text_splits)
+        debug(len(splits))
 
         # Add metadata to each split
         for i, split in enumerate(splits):

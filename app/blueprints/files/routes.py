@@ -4,6 +4,7 @@ from app.utilities.document_manager import (
     DocumentManager,
     perform_ocr_and_update,
     perform_semantic_ingestion,
+    perform_ocr_and_semantic_ingestion,
 )
 from app.utilities.document_readers import (
     ocr_extract_text_from_pdf,
@@ -98,7 +99,7 @@ def upload():
         document.processing = False
         document.save()
         thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id)
+            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
         )
         thread.start()
 
@@ -113,23 +114,17 @@ def upload():
         document.processing = False
         document.save()
         thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id)
+            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
         )
         thread.start()
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        # Start OCR extraction in a separate thread
-        ocr_thread = threading.Thread(
-            target=perform_ocr_and_update,
-            args=(
-                document,
-                pdf_path,
-                lambda raw_text: perform_semantic_ingestion(document, user_id, raw_text),
-            ),
+        thread = threading.Thread(
+            target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
         )
-        ocr_thread.start()
+        thread.start()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 

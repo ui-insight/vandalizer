@@ -14,6 +14,10 @@ from flask import (
 from app.utilities.document_readers import (
     ocr_extract_text_from_pdf,
 )
+from app.utilities.document_manager import (
+    perform_semantic_ingestion,
+    extract_text_from_doc,
+)
 from app.models import (
     SmartDocument,
     SmartFolder,
@@ -47,7 +51,7 @@ from app.models import (
     WorkflowStep,
 )
 import uuid, os, threading
-from app.utils import load_user, ingest_semantics, is_dev
+from app.utils import load_user, is_dev
 from flask_dance.contrib.azure import azure
 from itertools import chain
 from mongoengine.queryset.visitor import Q
@@ -102,18 +106,6 @@ def index():
 
     documents = []
 
-    # raw text extraction thread
-    def extract_thread(doc, pdf_path):
-        extracted_text = ocr_extract_text_from_pdf(pdf_path)
-        doc.raw_text = extracted_text
-        debug(
-            "Extraction completed, saving document",
-            doc.title,
-            doc.raw_text[:100],
-        )
-        doc.processing = False
-        doc.save()
-
     # Check for documents
     document_manager = DocumentManager()
     if request.args.get("docid"):
@@ -121,15 +113,6 @@ def index():
         document = SmartDocument.objects(uuid=doc_id).first()
         documents.append(document)
         current_space = Space.objects(uuid=document.space).first()
-        if not document_manager.document_exists(user_id, document.uuid):
-            thread = threading.Thread(
-                target=ingest_semantics,
-                args=(
-                    document,
-                    user_id,
-                ),
-            )
-            thread.start()
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
@@ -144,7 +127,7 @@ def index():
                 document_id = document.uuid
                 if not document_manager.document_exists(user_id, document_id):
                     thread = threading.Thread(
-                        target=ingest_semantics,
+                        target=perform_semantic_ingestion,
                         args=(
                             documents.first,
                             user_id,
@@ -257,22 +240,6 @@ def index():
         folders = SmartFolder.objects(
             user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
         ).all()
-
-    for doc in folder_docs:
-        if not doc.raw_text:
-            debug("Processing document", doc.title)
-
-            doc.processing = True
-            doc.save()
-            pdf_path = doc.absolute_path
-            extraction_thread = threading.Thread(
-                target=extract_thread,
-                args=(
-                    doc,
-                    pdf_path,
-                ),
-            )
-            extraction_thread.start()
 
     total_token_counts = 0
     for doc in folder_docs:

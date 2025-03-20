@@ -85,7 +85,7 @@ def extract_text_from_html(html_path):
 
 
 def extract_text_from_doc(doc_path, doc=None):
-    if doc and len(doc.raw_text) > 1000:
+    if doc and doc.raw_text and len(doc.raw_text) > 0:
         return doc.raw_text
 
     doc_path_str = str(doc_path)
@@ -93,7 +93,7 @@ def extract_text_from_doc(doc_path, doc=None):
 
     if doc is None:
         if doc_path_str.endswith(".pdf"):
-            return extract_text_from_pdf(doc_path_str)
+            return ocr_extract_text_from_pdf(doc_path_str)
         elif doc_path_str.endswith(".html"):
             return extract_text_from_html(doc_path_str)
     else:

@@ -126,7 +126,7 @@ class OpenAIInterface:
         formatted_answer = "\n".join(formatted_lines)
 
         return formatted_answer
-    
+
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
@@ -140,15 +140,6 @@ class OpenAIInterface:
         default_docs = list(default_docs)
         documents = list(documents)
 
-        full_text = ""
-        for document in default_docs + documents:
-            absolute_path = document.absolute_path
-            full_text += (
-                "\n\nDocument: "
-                + extract_text_from_doc(doc=document, doc_path=absolute_path)
-                + " "
-            )
-
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
         docs_ids_string = "_".join([str(doc.id) for doc in documents])
@@ -156,9 +147,11 @@ class OpenAIInterface:
         llm_string = "pydantic_model:openai:gpt-4o"
         previous_messages = []
         latest_conversation_messages = []
+        debug(session)
         if session is not None:
             # latest_conversation_messages = session.get("chat_history", [])
             cache_result = cache.lookup(cache_key, llm_string)
+            debug(cache_result)
             if cache_result is not None:
                 debug(cache_result)
                 latest_conversation_messages = cache_result
@@ -179,31 +172,37 @@ class OpenAIInterface:
 
                 if message["parts"] == []:
                     continue
-                if "timestamp" not in message:
-                    continue
-                try:
-                    # check if timestamp is already a datetime object
-                    if isinstance(message["timestamp"], datetime):
-                        continue
-                    # Adjust format string if necessary
-                    timestamp_obj = datetime.strptime(
-                        message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT"
-                    )
-                    message["timestamp"] = timestamp_obj
-                    parsed_messages.append(message)
-                except ValueError:
-                    # Handle parsing errors (optional)
-                    print(f"Failed to parse timestamp for message: {message}")
-                    pass  # Skip the message if parsing fails
+                # remove timestamp if exists in message
+                if "timestamp" in message:
+                    del message["timestamp"]
 
             previous_messages = parsed_messages
 
-            print("previous messages: ", previous_messages)
             # previous_messages = ModelMessagesTypeAdapter.validate_python(
             #     previous_messages
             # )
 
         prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+
+        debug(previous_messages)
+
+        full_text = ""
+        for document in default_docs + documents:
+            absolute_path = document.absolute_path
+            document_content_in_previous_messages = False
+            for message in previous_messages:
+                for part in message["parts"]:
+                    if f"Document: {document.title}" in part["content"]:
+                        document_content_in_previous_messages = True
+                        break
+            if document_content_in_previous_messages:
+                full_text += f"\n\nDocument: {document.title} "
+                continue
+            full_text += (
+                "\n\nDocument: "
+                + extract_text_from_doc(doc=document, doc_path=absolute_path)
+                + " "
+            )
         debug(max_context_length)
         debug(len(full_text))
         if len(full_text) < max_context_length:
