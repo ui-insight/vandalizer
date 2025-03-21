@@ -63,42 +63,39 @@ from . import home
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
 
-def update_old_document(document, user_id):
+def verify_document(document, user_id):
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
 
     document_manager = DocumentManager()
-    if not document.processing:
-        print("REPROCESSING")
-        
-        if not document.raw_text or document.raw_text == "":
-            document.processing = True
-            document.save()
-            
-            pdf_path = document.absolute_path
-            thread = threading.Thread(
-                target=perform_extraction_and_update,
-                args=(
-                    document,
-                    pdf_path,
-                ),
-            )
-            thread.start()
-            return
+    
+    if not document.raw_text or document.raw_text == "":
+        pdf_path = document.absolute_path
+        thread = threading.Thread(
+            target=perform_extraction_and_update,
+            args=(
+                document,
+                pdf_path,
+            ),
+        )
+        thread.start()
+    elif document.processing:
+        document.processing = False
+        document.save()
 
-        if not document_manager.document_exists(user_id, document.uuid):
-            document.processing = True
-            document.save()
-            
-            thread = threading.Thread(
-                target=perform_semantic_ingestion,
-                args=(
-                    document,
-                    user_id,
-                ),
-            )
-            thread.start()
-            return
+    # Check if the document is in chroma
+    if not document_manager.document_exists(user_id, document.uuid):
+        document.processing = True
+        document.save()
+        
+        thread = threading.Thread(
+            target=perform_semantic_ingestion,
+            args=(
+                document,
+                user_id,
+            ),
+        )
+        thread.start()
 
 
 @home.route("/")
@@ -124,7 +121,6 @@ def index():
     section = request.args.get("section", default="Chat").strip()
 
     document = None
-
     # Get the space
     spaces = list(Space.objects())
     if len(spaces) == 0:
@@ -151,32 +147,17 @@ def index():
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
         documents.append(document)
+        verify_document(document, user_id)
         current_space = Space.objects(uuid=document.space).first()
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
         for doc_id in doc_ids:
             document = SmartDocument.objects(uuid=doc_id).first()
-            update_old_document(document, user_id)
             documents.append(document)
+            verify_document(document, user_id)
 
         current_space = Space.objects(uuid=document.first.space).first()
-        if documents.count == 1:
-            try:
-                document = documents.first()
-                document_id = document.uuid
-                if not document_manager.document_exists(user_id, document_id):
-                    thread = threading.Thread(
-                        target=perform_semantic_ingestion,
-                        args=(
-                            documents.first,
-                            user_id,
-                        ),
-                    )
-                    thread.start()
-
-            except:
-                print("Error checking for collection")
 
     spaces.remove(current_space)
     spaces.insert(0, current_space)
