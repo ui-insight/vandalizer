@@ -57,7 +57,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     for i in range(retries):
         try:
             processor = PDFProcessor(
-                ocr_tool="olmocr",
+                ocr_tool="doctr",
                 format="markdown",
                 garble_ratio=0.2,
                 file_path=pdf_path,
