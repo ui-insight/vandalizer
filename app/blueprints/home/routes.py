@@ -69,6 +69,7 @@ def update_old_document(document, user_id):
 
     document_manager = DocumentManager()
     if not document.processing:
+        print("REPROCESSING")
         document.processing = True
         document.save()
         if not document.raw_text or document.raw_text == "":
@@ -149,6 +150,7 @@ def index():
         doc_ids = request.args.get("docids").split(",")
         for doc_id in doc_ids:
             document = SmartDocument.objects(uuid=doc_id).first()
+            update_old_document(document, user_id)
             documents.append(document)
 
         current_space = Space.objects(uuid=document.first.space).first()
@@ -255,8 +257,7 @@ def index():
     )
     # Check for OCR and semantic ingestion for documents in the folder
     # This should resolve the issue with old documents not being processed
-    for document in folder_docs:
-        update_old_document(document, user_id)
+    
 
     if current_folder_id != 0 and current_folder_id != "0":
         folder_docs = (
