@@ -157,8 +157,6 @@ class DocumentManager:
                 }
             )
 
-        print("splits[0]: ", splits[0])
-        print("len(splits): ", len(splits))
 
         # Get the user's collection and add the document
         vectorstore = self.get_user_collection(user_id)
