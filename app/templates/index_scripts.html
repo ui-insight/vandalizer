@@ -416,45 +416,59 @@
         }
     }
 
+    var pollTimeout = null;
+    var pollingActive = true;
     function pollStatus(docUuid) {
-    $.get('/files/poll_status', {docid: docUuid}, function(data) {
-        if (data.complete) {
-            console.log(data);
-            // Processing is complete, update UI
-            $('#loading-spinner').hide();
-            $('#processing-indicator').hide();
-            $('#raw-text-icon').show();
-            isProcessingFile = false;
+        if (!pollingActive) return;
 
-            if (processingFileOriginalText != "") {
-                $('.processing-file-text-question-holder').text(processingFileOriginalText);
-                $('.message-response').remove();
-                $('.message-you').remove();
-                chat(processingFileOriginalText);
-                processingFileOriginalText = "";
+        $.get('/files/poll_status', {docid: docUuid}, function(data) {
+            if (data.complete) {
+                
+                // Processing is complete, update UI
+                $('#loading-spinner').hide();
+                $('#processing-indicator').hide();
+                $('#raw-text-icon').show();
+                isProcessingFile = false;
+
+                if (processingFileOriginalText != "") {
+                    $('.processing-file-text-question-holder').text(processingFileOriginalText);
+                    $('.message-response').remove();
+                    $('.message-you').remove();
+                    chat(processingFileOriginalText);
+                    processingFileOriginalText = "";
+                }
+
+                updateDocumentSelections();
+                
+                documentData = {
+                    id: docUuid,
+                    title: "",
+                    raw_text: data.raw_text
+                };
+
+                // No additional refresh needed per the requirement
+            } else {
+                // Still processing, poll again after 5 seconds
+                pollTimeout = setTimeout(function() {
+                    pollStatus(docUuid);
+                }, 5000);
+
+                isProcessingFile = true;
             }
-            updateDocumentSelections();
-            documentData = {
-                id: docUuid,
-                title: "",
-                raw_text: data.raw_text
-            };
-
-            // No additional refresh needed per the requirement
-        } else {
-            // Still processing, poll again after 5 seconds
-            setTimeout(function() {
-                pollStatus(docUuid);
-            }, 5000);
-
-            isProcessingFile = true;
-        }
-    });
-}
+        });
+    }
 
 
     $(document).ready(function() {
         var docContainer = $('.document-container');
+
+        // Stop polling when the user navigates away from the page
+        window.addEventListener('beforeunload', function() {
+            pollingActive = false;
+            if (pollTimeout) {
+                clearTimeout(pollTimeout);
+            }
+        });
     
     // Check if the document container exists (i.e., a document is loaded)
     if (docContainer.length > 0) {
