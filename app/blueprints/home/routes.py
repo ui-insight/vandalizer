@@ -70,9 +70,11 @@ def update_old_document(document, user_id):
     document_manager = DocumentManager()
     if not document.processing:
         print("REPROCESSING")
-        document.processing = True
-        document.save()
+        
         if not document.raw_text or document.raw_text == "":
+            document.processing = True
+            document.save()
+            
             pdf_path = document.absolute_path
             thread = threading.Thread(
                 target=perform_extraction_and_update,
@@ -82,8 +84,12 @@ def update_old_document(document, user_id):
                 ),
             )
             thread.start()
+            return
 
         if not document_manager.document_exists(user_id, document.uuid):
+            document.processing = True
+            document.save()
+            
             thread = threading.Thread(
                 target=perform_semantic_ingestion,
                 args=(
@@ -92,6 +98,7 @@ def update_old_document(document, user_id):
                 ),
             )
             thread.start()
+            return
 
 
 @home.route("/")
