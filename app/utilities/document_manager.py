@@ -57,7 +57,6 @@ def perform_extraction_and_update(document, doc_path):
 
 
 def perform_semantic_ingestion(document, user_id, raw_text=None):
-    document.processing = True
     document_manager = DocumentManager()
 
     document_path = document.absolute_path
@@ -74,7 +73,6 @@ def perform_semantic_ingestion(document, user_id, raw_text=None):
 
 
 def perform_ocr_and_semantic_ingestion(document, user_id):
-    document.processing = True
     document_path = document.absolute_path
     perform_extraction_and_update(document, document_path)
     document = document.reload()
