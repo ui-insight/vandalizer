@@ -68,17 +68,18 @@ def verify_document(document, user_id):
     debug("Document processing", document.processing)
 
     document_manager = DocumentManager()
-    
+
     if not document.raw_text or document.raw_text == "":
         pdf_path = document.absolute_path
-        thread = threading.Thread(
-            target=perform_extraction_and_update,
-            args=(
-                document,
-                pdf_path,
-            ),
-        )
-        thread.start()
+        # thread = threading.Thread(
+        #     target=perform_extraction_and_update,
+        #     args=(
+        #         document,
+        #         pdf_path,
+        #     ),
+        # )
+        # thread.start()
+        perform_extraction_and_update.delay(document.uuid, pdf_path)
     elif document.processing:
         document.processing = False
         document.save()
@@ -87,15 +88,16 @@ def verify_document(document, user_id):
     if not document_manager.document_exists(user_id, document.uuid):
         document.processing = True
         document.save()
-        
-        thread = threading.Thread(
-            target=perform_semantic_ingestion,
-            args=(
-                document,
-                user_id,
-            ),
-        )
-        thread.start()
+
+        # thread = threading.Thread(
+        #     target=perform_semantic_ingestion,
+        #     args=(
+        #         document,
+        #         user_id,
+        #     ),
+        # )
+        # thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
 
 
 @home.route("/")
@@ -245,7 +247,6 @@ def index():
     )
     # Check for OCR and semantic ingestion for documents in the folder
     # This should resolve the issue with old documents not being processed
-    
 
     if current_folder_id != 0 and current_folder_id != "0":
         folder_docs = (
