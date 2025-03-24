@@ -1,5 +1,7 @@
 import sys
 
+from app.models import SmartDocument
+
 try:
     import pysqlite3
 
@@ -32,12 +34,15 @@ from app.utilities.document_readers import (
 )
 
 from flask import current_app
+from app.celery import celery_app
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def perform_extraction_and_update(document, doc_path):
+@celery_app.task
+def perform_extraction_and_update(document_uuid, doc_path):
+    document = SmartDocument.objects(uuid=document_uuid).first()
     debug("Performing OCR on document", document.title)
     document.processing = True
     try:
@@ -56,7 +61,10 @@ def perform_extraction_and_update(document, doc_path):
         document.save()
 
 
-def perform_semantic_ingestion(document, user_id, raw_text=None):
+@celery_app.task
+def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
+    document = SmartDocument.objects(uuid=document_uuid).first()
+
     document_manager = DocumentManager()
 
     document_path = document.absolute_path
@@ -72,11 +80,12 @@ def perform_semantic_ingestion(document, user_id, raw_text=None):
     document.save()
 
 
-def perform_ocr_and_semantic_ingestion(document, user_id):
+def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
+    document = SmartDocument.objects(uuid=document_uuid).first()
     document_path = document.absolute_path
-    perform_extraction_and_update(document, document_path)
+    perform_extraction_and_update.delay(document.uuid, document_path)
     document = document.reload()
-    perform_semantic_ingestion(document, user_id, document.raw_text)
+    perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
     document.processing = False
     document.save()
 
@@ -154,7 +163,6 @@ class DocumentManager:
                     "user_id": user_id,
                 }
             )
-
 
         # Get the user's collection and add the document
         vectorstore = self.get_user_collection(user_id)

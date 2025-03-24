@@ -97,10 +97,11 @@ def upload():
         document.raw_text = raw_text
         document.processing = False
         document.save()
-        thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
-        )
-        thread.start()
+        # thread = threading.Thread(
+        #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
+        # )
+        # thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
@@ -112,18 +113,20 @@ def upload():
         document.raw_text = raw_text
         document.processing = False
         document.save()
-        thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
-        )
-        thread.start()
+        # thread = threading.Thread(
+        #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
+        # )
+        # thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        thread = threading.Thread(
-            target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
-        )
-        thread.start()
+        # thread = threading.Thread(
+        #     target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
+        # )
+        # thread.start()
+        perform_ocr_and_semantic_ingestion(document.uuid, user_id)
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 

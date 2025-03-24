@@ -16,13 +16,44 @@ import rollbar
 import rollbar.contrib.flask
 from flask import got_request_exception
 
+from celery import Celery, Task
+
 CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
 RELEASE_NOTES = """
 Release 2.0.1=2:
 - Bug fixes and stability improvements.
 """
 
-app = Flask(__name__)
+
+def celery_init_app(app: Flask) -> Celery:
+    class FlaskTask(Task):
+        def __call__(self, *args: object, **kwargs: object) -> object:
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery_app = Celery(app.name, task_cls=FlaskTask)
+    celery_app.config_from_object(app.config["CELERY"])
+    celery_app.set_default()
+    app.extensions["celery"] = celery_app
+    return celery_app
+
+
+# Use app factory pattern
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.config.from_mapping(
+        CELERY=dict(
+            broker_url="redis://localhost:6379/",
+            result_backend="redis://localhost:6379/",
+            task_ignore_result=True,
+        ),
+    )
+    app.config.from_prefixed_env()
+    celery_init_app(app)
+    return app
+
+
+app = create_app()
 
 # CORS(app)
 CORS(
@@ -85,13 +116,14 @@ with app.app_context():
     """init rollbar module"""
     rollbar.init(
         # access token
-        '89d52707026e4341b6ce8451232e7585',
+        "89d52707026e4341b6ce8451232e7585",
         # environment name - any string, like 'production' or 'development'
-        'flasktest',
+        "flasktest",
         # server root directory, makes tracebacks prettier
         root=os.path.dirname(os.path.realpath(__file__)),
         # flask already sets up logging
-        allow_logging_basic_config=False)
+        allow_logging_basic_config=False,
+    )
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
