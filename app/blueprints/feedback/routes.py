@@ -1,17 +1,10 @@
 from flask import (
-    Blueprint,
-    redirect,
-    url_for,
-    session,
-    render_template,
     request,
     jsonify,
 )
 
 from . import feedback
-from app.utils import load_user
-from app import azure
-from app.models import User, ExtractionQualityRecord, Feedback, FeedbackCounter
+from app.models import ExtractionQualityRecord
 import json
 
 
@@ -32,4 +25,3 @@ def submit_rating():
     )
     record.save()
     return jsonify({"complete": True})
-

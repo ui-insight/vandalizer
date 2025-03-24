@@ -2,8 +2,6 @@
 
 import os
 import json
-import openai
-from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # from app import socketio
@@ -12,11 +10,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from devtools import debug
 
 import re
-import html
 
-from pypdf import PdfReader
-
-from typing import List, Dict, Any
 
 from app import app
 from app.utilities.document_readers import extract_text_from_doc
@@ -31,11 +25,7 @@ from threading import Thread
 
 from app.models import SmartDocument, SearchSet
 
-from devtools import debug
 
-from uuid import uuid4
-
-import re
 import graphlib
 
 load_dotenv()

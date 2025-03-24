@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
 
 import json
-import tiktoken
-from typing import Any, Callable, List, Dict, Type
-from pydantic import BaseModel, ValidationError
-from app.utilities.config import model_type
+from typing import Any, Dict, List, Type
 
 # from langfuse.decorators import observe
-
 import chardet
-
 import tiktoken
+from pydantic import BaseModel, ValidationError
+
+from app.utilities.config import model_type
 from app.utilities.llm import ChatLM
 
 
@@ -27,7 +25,6 @@ def remove_code_markers(text: str) -> str:
     # Split the text into lines
     lines = text.split("\n")
     formatted_lines = []
-    skip_line = False
 
     for line in lines:
         # Check for code block markers with or without language specification

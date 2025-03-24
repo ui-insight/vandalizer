@@ -2,8 +2,6 @@ import os
 
 from app import app
 from dotenv import load_dotenv
-import logging
-from contextvars import ContextVar
 import nest_asyncio
 import asyncio
 import threading
@@ -15,7 +13,7 @@ load_dotenv()
 def setup_event_loop():
     """Setup event loop for the current thread"""
     # Get thread id for debugging
-    thread_id = threading.current_thread().ident
+    threading.current_thread().ident
     try:
         loop = asyncio.get_event_loop()
     except RuntimeError:

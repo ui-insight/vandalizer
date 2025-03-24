@@ -1,39 +1,42 @@
-from flask import (
-    Blueprint,
-    request,
-    current_app,
-    jsonify,
-    redirect,
-    url_for,
-    render_template,
-    send_file,
-    session,
-)
-from app.models import (
-    SmartDocument,
-    SearchSet,
-    SearchSetItem,
-    Workflow,
-    WorkflowStepTask,
-    WorkflowResult,
-    WorkflowStep,
-)
-from app.models import User, Space, WorkflowAttachment
-from app.utils import load_user
-from copy import deepcopy
-import os, uuid
-from app.utilities.workflow import WorkflowThread, build_workflow_engine
-from werkzeug.utils import secure_filename
-import pypandoc, json
-from bson import ObjectId
-from app.utilities.excel_helper import save_excel_to_html
+import json
+import os
+import tempfile
+import uuid
 
 # from app import socketio
 from itertools import chain
-from devtools import debug
+
+import pypandoc
+from bson import ObjectId
+from flask import (
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from werkzeug.utils import secure_filename
+
+from app.models import (
+    SearchSet,
+    SearchSetItem,
+    SmartDocument,
+    Space,
+    User,
+    Workflow,
+    WorkflowAttachment,
+    WorkflowResult,
+    WorkflowStep,
+    WorkflowStepTask,
+)
+from app.utilities.excel_helper import save_excel_to_html
+from app.utilities.workflow import WorkflowThread, build_workflow_engine
+from app.utils import load_user
 
 from . import workflows
-import tempfile
 
 
 ## MARK: ~~ Create
@@ -95,7 +98,6 @@ def run_workflow():
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
     document_uuids = workflow_data["document_uuids"]
-    download = workflow_data.get("download", False)  # Get the 'download' flag
 
     user_id = load_user().user_id
 
@@ -304,10 +306,6 @@ def workflow_download():
     # Ensure the static folder exists
     os.makedirs(os.path.join(current_app.root_path, "static"), exist_ok=True)
 
-    output_file_path = os.path.join(
-        current_app.root_path, "static", "workflow_output.txt"
-    )
-
     final_output = list(workflow_result.steps_output.values())[-1]
 
     # debug(final_output)
@@ -464,9 +462,7 @@ def add_workflow_step_task():
     if user is None:
         return redirect(url_for("login"))
     workflow_step_data = request.get_json()
-    workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
-    workflow = Workflow.objects(id=workflow_id).first()
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
     task_name = workflow_step_data["task_name"]
     task_data = workflow_step_data["task_data"]
@@ -607,7 +603,7 @@ def workflow_add_extraction_step():
             searchset = SearchSet.objects(uuid=search_set_id).first()
 
             workflow_step_task = None
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     workflow_step_task.data = searchset.to_workflow_step_data()
@@ -623,7 +619,7 @@ def workflow_add_extraction_step():
                 workflow_step.save()
 
         elif manual_input:
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 print("----- FOUND A TASK ID")
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
@@ -744,7 +740,7 @@ def workflow_add_prompt_step():
             workflow_step_task = None
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
             # Editing
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     print("SETTING UP DATA FROM SEARCH SET ITEM")
@@ -760,7 +756,7 @@ def workflow_add_prompt_step():
         elif manual_input:
             workflow_step_task = None
             # Editing
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     print("SETTING UP DATA FROM MANUAL")
@@ -816,7 +812,6 @@ def workflow_add_format_step():
         return jsonify(response)
 
     elif request.method == "POST":
-
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_step_id = (
@@ -837,7 +832,7 @@ def workflow_add_format_step():
 
         if search_set_item_id:
             searchsetitem = SearchSetItem.objects(id=search_set_item_id).first()
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     workflow_step_task.data = searchsetitem.to_workflow_step_data()
@@ -850,7 +845,7 @@ def workflow_add_format_step():
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
         elif manual_input:
-            if task_id != None and task_id != 0:
+            if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     workflow_step_task.data = {"prompt": manual_input}

@@ -69,7 +69,6 @@ app.register_blueprint(spaces, url_prefix="/spaces")
 app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
-import os
 
 # OAuth
 blueprint = make_azure_blueprint(
@@ -85,13 +84,14 @@ with app.app_context():
     """init rollbar module"""
     rollbar.init(
         # access token
-        '89d52707026e4341b6ce8451232e7585',
+        "89d52707026e4341b6ce8451232e7585",
         # environment name - any string, like 'production' or 'development'
-        'flasktest',
+        "flasktest",
         # server root directory, makes tracebacks prettier
         root=os.path.dirname(os.path.realpath(__file__)),
         # flask already sets up logging
-        allow_logging_basic_config=False)
+        allow_logging_basic_config=False,
+    )
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)

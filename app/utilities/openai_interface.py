@@ -1,50 +1,23 @@
-import os
-from datetime import datetime
-from devtools import debug
-
-from app.utilities.async_utilities import class_method_event_loop_decorator
-
 import json
-import re
-from pathlib import Path
+import os
+
 import openai
-from PyPDF2 import PdfReader
-from app.utilities.agents import RagDeps, rag_agent, chat_agent
-from app.utilities.document_manager import DocumentManager
-from app.utilities.llm import ChatLM
-from langfuse.decorators import observe
-
-# from langfuse.decorators import observe
-import asyncio
-
-
-import time
-
-# from langchain_redis import RedisCache
-from app.utilities.redis_cache import RedisCache
+from devtools import debug
+from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.models import (
-    ChatHistory,
-    ChatMessage,
-    ChatRole,
     MAX_CHAT_MESSAGES,
-    AgentHistory,
 )
-from app.utilities.document_readers import extract_text_from_doc
-
-from app.utilities.llm_helpers import num_tokens_from_text
+from app.utilities.agents import RagDeps, chat_agent, rag_agent
+from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import max_context_length, model_type
-from pydantic_ai.messages import ModelMessagesTypeAdapter
-from pydantic_ai.exceptions import UnexpectedModelBehavior
-from pydantic_ai.messages import (
-    ModelMessage,
-    ModelMessagesTypeAdapter,
-    ModelRequest,
-    ModelResponse,
-    TextPart,
-    UserPromptPart,
-    SystemPromptPart,
-)
+from app.utilities.document_manager import DocumentManager
+from app.utilities.document_readers import extract_text_from_doc
+from app.utilities.llm import ChatLM
+
+# from langfuse.decorators import observe
+# from langchain_redis import RedisCache
+from app.utilities.redis_cache import RedisCache
 
 # 2h
 ttl = 60 * 60 * 1
@@ -109,7 +82,6 @@ class OpenAIInterface:
         # Split the text into lines
         lines = answer.split("\n")
         formatted_lines = []
-        skip_line = False
 
         for line in lines:
             # Check for code block markers with or without language specification
@@ -182,7 +154,7 @@ class OpenAIInterface:
             #     previous_messages
             # )
 
-        prompt = f"""Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
 
         debug(previous_messages)
 

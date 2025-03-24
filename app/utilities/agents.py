@@ -1,13 +1,12 @@
 from dataclasses import dataclass
 from pydantic import create_model
-from typing import Dict, Optional, List, Any, Tuple, Union, List
+from typing import Dict, Optional, Any, List
 import json
 from app.utilities.llm_helpers import remove_code_markers
 from app.utilities.async_utilities import function_event_loop_decorator
 
 from pydantic_ai import RunContext, ModelRetry
 from pydantic_ai.agent import Agent
-from pydantic_ai.models.openai import OpenAIModel
 from app.models import SmartDocument
 from app.utilities.document_manager import DocumentManager
 
@@ -114,7 +113,7 @@ Do not:
 - Provide answers to the user's question
 - Include special operators or syntax unless specified
 
-Your output should be the search prompt only, with no additional text."""
+Your output should be the search prompt only, with no additional text.""",
 )
 
 
@@ -197,12 +196,12 @@ field_inference_agent = Agent(
 def field_inference_system_prompt(context: RunContext[FieldInferenceDeps]):
     keys = context.deps.keys
     prompt_context = context.deps.extraction_context
-    prompt = f"""Given these field names{' and prompt_context' if prompt_context else ''}:
+    prompt = f"""Given these field names{" and prompt_context" if prompt_context else ""}:
 
 Field names:
 {json.dumps(keys, indent=2)}
 
-{f'Context: {context}' if context else ''}
+{f"Context: {context}" if context else ""}
 
 For each field, determine the most appropriate data type and description from these options:
 - Optional[str]
