@@ -149,7 +149,9 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
 
 
 def format_model(formatting_prompt, text):
-    prompt = f"{formatting_prompt}\n\n {text}"
+    system_prompt = "Format the provided text based on the following prompt. By default use html formatting if no format is provided in the prompt. The formatted text will be used to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not coode tag such as ```html before the output."
+    # prompt = f"{formatting_prompt}\n\n {text}"
+    prompt = f"{system_prompt}\n\n Prompt: {formatting_prompt}\n\n {text}"
     chat_lm = ChatLM(model_type)
     response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
@@ -212,7 +214,6 @@ class MultiTaskNode(Node):
             for future in as_completed(task_futures):
                 results.append(future.result())
 
-        debug(results)
         # concatenate the results output
         output = dict(input=inputs.get("input"), output=[], step_name=self.name)
         for result in results:
@@ -359,8 +360,6 @@ class PromptNode(Node):
     def process(self, inputs):
         data = self.data
         prompt = data.get("prompt", "Enter prompt")
-        debug(data)
-        debug(prompt)
 
         prev_step_name = inputs.get("step_name", None)
         chat_response = None
@@ -376,13 +375,11 @@ class PromptNode(Node):
             ]
 
             chat_response = llm_chat_model(docs=docs, prompt=prompt)
-            debug(chat_response)
         else:
             data = inputs.get("output", None)
             print("Prompt Data: ", data)
 
             chat_response = llm_chat_model(docs=[], prompt=prompt, data=data)
-            debug(chat_response)
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
 
