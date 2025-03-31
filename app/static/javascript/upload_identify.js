@@ -310,6 +310,11 @@ $(document).ready(function () {
     hidePopupMenu();
   });
 
+  $("#download-option").on("click", function () {
+    // Implement rename functionality
+    window.location.href = `/files/download_document?docid=${currentItemId}`;
+  });
+
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
       var folderId = null;
