@@ -6,7 +6,7 @@ import uuid
 
 import pypandoc
 from devtools import debug
-from flask import current_app, jsonify, redirect, request, session, url_for
+from flask import current_app, jsonify, redirect, request, session, url_for, send_file, abort
 from pypdf import PdfReader
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
@@ -180,6 +180,32 @@ def move_file():
     document.save()
 
     return jsonify({"complete": True})
+
+
+
+@files.route("/download_document")
+def download_document():
+    document_uuid = request.args.get("docid")
+    
+    if not document_uuid:
+        abort(400, description="Missing document UUID")
+
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        abort(404, description="Document not found")
+
+    document_file_path = os.path.join(
+        current_app.root_path,
+        "static",
+        "uploads",
+        document.path,
+    )
+
+    if not os.path.isfile(document_file_path):
+        abort(404, description="File not found on server")
+
+    return send_file(document_file_path, as_attachment=True)
+
 
 
 @files.route("/delete_document")
