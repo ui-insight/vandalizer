@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 # from app import socketio
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from devtools import debug
 
 import re
@@ -26,10 +26,11 @@ from app.utilities.openai_interface import (
     OpenAIInterface,
 )
 from app.utilities.config import model_type
+from app.celery import celery_app
 
 from threading import Thread
 
-from app.models import SmartDocument, SearchSet
+from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult
 
 from devtools import debug
 
@@ -212,7 +213,7 @@ class MultiTaskNode(Node):
         for task in self.tasks:
             task.inputs = inputs
         debug(self.tasks)
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             task_futures = [
                 executor.submit(self.process_task, task) for task in self.tasks
             ]
@@ -564,3 +565,41 @@ def build_workflow_engine(steps, workflow):
         engine.connect(nodes[idx - 1], nodes[idx])
 
     return engine
+
+
+@celery_app.task(bind=True, name="workflow.execute_workflow")
+def execute_workflow_task(self, workflow_result_id, workflow_id):
+    workflow_result = WorkflowResult.objects(id=workflow_result_id).first()
+    workflow = Workflow.objects(id=workflow_id).first()
+
+    if not workflow_result:
+        return {
+            "status": "error",
+            "error": "Workflow result not found",
+        }
+    if not workflow:
+        return {
+            "status": "error",
+            "error": "Workflow not found",
+        }
+
+    workflow_result.status = "running"
+    workflow_result.num_steps_completed = 0
+    workflow_result.num_steps_total = len(workflow.steps)
+    workflow_result.steps_output = {}
+    workflow_result.save()
+
+    engine = build_workflow_engine(workflow.steps, workflow)
+
+    final_output, data = engine.execute(workflow_result)
+    print(
+        f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
+    )
+
+    return {
+        "status": "completed",
+        "result_id": workflow_result_id,
+        "workflow_id": workflow_id,
+        "output": final_output,
+        "history": data,
+    }

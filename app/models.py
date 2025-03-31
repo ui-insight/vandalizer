@@ -20,7 +20,6 @@ from pydantic_ai.messages import (
 
 
 class WorkflowStepTask(me.Document):
-    # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
@@ -39,7 +38,6 @@ class WorkflowStepTask(me.Document):
 
 
 class WorkflowStep(me.Document):
-    # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     tasks = me.ListField(me.ReferenceField(WorkflowStepTask))
 
@@ -63,7 +61,6 @@ class WorkflowAttachment(me.Document):
 
 
 class Workflow(me.Document):
-    # id = me.StringField(default=uuid4().hex)
     name = me.StringField(required=True, max_length=50)
     description = me.StringField(required=False, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
@@ -197,7 +194,6 @@ class SearchSet(me.Document):
         return fields
 
     def to_workflow_step_data(self):
-
         workflow_data = {
             "search_set_type": self.set_type,
             "search_set_uuid": self.uuid,
