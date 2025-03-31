@@ -22,7 +22,7 @@ from app.models import User, Space, WorkflowAttachment
 from app.utils import load_user
 from copy import deepcopy
 import os, uuid
-from app.utilities.workflow import WorkflowThread, build_workflow_engine
+from app.utilities.workflow import execute_workflow_task
 from werkzeug.utils import secure_filename
 import pypandoc, json
 from bson import ObjectId
@@ -101,6 +101,7 @@ def run_workflow():
 
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
+    workflow_result.save()
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
@@ -116,14 +117,24 @@ def run_workflow():
 
     # TODO add the ability to cancel the thread (same for the chat)
     # maybe store the thread id in the user's session.
-    engine = build_workflow_engine(steps, workflow=workflow)
-    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
-    workflow_thread.start()
-    result = workflow_thread.join()
-    output = None
-    data = None
-    if result:
-        output, data = result
+    # engine = build_workflow_engine(steps, workflow=workflow)
+    # workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
+    # workflow_thread.start()
+    # result = workflow_thread.join()
+    # output = None
+    # data = None
+    workflow_id = str(workflow.id)
+    workflow_result_id = str(workflow_result.id)
+    print("Running workflow", workflow_id, workflow_result_id)
+    asyn_result = execute_workflow_task.delay(
+        workflow_result_id=workflow_result_id, workflow_id=workflow_id
+    )
+    print("Async result", asyn_result)
+    workflow_output = asyn_result.get(timeout=300)
+    if workflow_output is None:
+        return jsonify({"error": "Workflow execution failed"})
+    output = workflow_output["output"]
+    data = workflow_output["history"]
 
     return {"output": output, "steps": data}
 
@@ -224,10 +235,12 @@ def run_workflow_integrated():
     steps = [document_trigger_step] + workflow.steps
 
     # **6. Execute the Workflow**
-    engine = build_workflow_engine(steps, workflow=workflow)
-    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
-    workflow_thread.start()
-    output, data = workflow_thread.join()
+    workflow_output = execute_workflow_task.delay(
+        workflow_result_id=str(workflow_result.id), workflow_id=str(workflow.id)
+    )
+    workflow_output = workflow_output.get()
+    output = workflow_output["output"]
+    data = workflow_output["history"]
 
     # **7. Return the Response**
     return jsonify({"output": output, "steps": data})
@@ -816,7 +829,6 @@ def workflow_add_format_step():
         return jsonify(response)
 
     elif request.method == "POST":
-
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_step_id = (
