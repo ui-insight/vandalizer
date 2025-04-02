@@ -1,14 +1,14 @@
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileRequired, FileField, FileAllowed
-from wtforms import StringField, TextAreaField, DateTimeField, DateField, PasswordField, SubmitField, SelectField, BooleanField, RadioField, FloatField
-from wtforms.validators import DataRequired, Email, EqualTo
-from datetime import datetime
+from wtforms import StringField, PasswordField, SubmitField
+from wtforms.validators import DataRequired, Email
+
 
 class LoginForm(FlaskForm):
-    email = StringField('Email',validators=[DataRequired(), Email()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Login')
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    password = PasswordField("Password", validators=[DataRequired()])
+    submit = SubmitField("Login")
+
 
 class SpaceForm(FlaskForm):
-    title = StringField('Title',validators=[DataRequired()])
-    submit = SubmitField('Login')
+    title = StringField("Title", validators=[DataRequired()])
+    submit = SubmitField("Login")

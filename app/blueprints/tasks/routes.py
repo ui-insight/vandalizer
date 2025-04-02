@@ -1,23 +1,26 @@
-from flask import (
-    Blueprint,
-    request,
-    jsonify,
-    current_app,
-    redirect,
-    url_for,
-    render_template,
-    send_file,
-)
-from app.models import SmartDocument, SearchSet, SearchSetItem
-from app.utils import load_user
-from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.extraction_manager2 import ExtractionManager2
+import csv
+import os
+import uuid
 from copy import deepcopy
-import csv, os, uuid
-from devtools import debug
 
+from devtools import debug
+from flask import (
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from pypdf import PdfReader, PdfWriter
+
+from app.models import SearchSet, SearchSetItem, SmartDocument
+from app.utilities.extraction_manager2 import ExtractionManager2
+from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.openai_interface import OpenAIInterface
+from app.utils import load_user
 
 from . import tasks
 
@@ -122,7 +125,7 @@ def add_prompt():
 def edit_prompt():
     data = request.get_json()
     uuid = data["uuid"]
-    user = load_user()
+    load_user()
     prompt = SearchSetItem.objects(id=uuid).first()
 
     template = render_template(
@@ -142,7 +145,7 @@ def update_prompt():
     uuid = data["uuid"]
     title = data["title"]
     prompt = data["prompt"]
-    user = load_user()
+    load_user()
     prompt_item = SearchSetItem.objects(id=uuid).first()
 
     prompt_item.title = title
@@ -238,23 +241,9 @@ def update_extraction_title():
 
 @tasks.route("/semantic_search", methods=["POST"])
 def semantic_search():
-    data = request.get_json()
-    search_term = data["search_term"]
-    document_uuids = data["document_uuids"]
-
-    documents = []
-    for doc_uuid in document_uuids:
-        document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-
-    semantics = SemanticIngest()
-    results = semantics.search(search_term, documents.first)
-    print(results)
-
-    response = {
-        "results": results,
-    }
-    return jsonify(response)
+    # Semantic Search endpoint was broken, missing import for depreciated SemanticIngest()
+    abort(403)
+    return jsonify({"error": "This endpoint is not available."})
 
 
 @tasks.route("/begin_search", methods=["POST"])
@@ -265,7 +254,7 @@ def begin_search():
 
     documents = []
     document_paths = []
-    user_id = load_user().user_id
+    load_user()
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
@@ -288,7 +277,10 @@ def begin_search():
         em.root_path = current_app.root_path
         results = em.extract(keys, document_paths)[0]
 
-        if search_set.fillable_pdf_url != "" and search_set.fillable_pdf_url != None:
+        if (
+            search_set.fillable_pdf_url != ""
+            and search_set.fillable_pdf_url is not None
+        ):
             bindings = {}
             for key in results:
                 print(key)
@@ -303,7 +295,7 @@ def begin_search():
 
             print(pdf_path)
             reader = PdfReader(pdf_path)
-            fields = reader.get_fields()
+            reader.get_fields()
             writer = PdfWriter()
             writer.append(reader)
 
@@ -351,7 +343,7 @@ def build_extraction_from_document():
     print(data)
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
-    user_id = load_user().user_id
+    load_user()
 
     documents = []
     document_paths = []
@@ -458,7 +450,6 @@ def begin_prompt_search():
     document_path = data["document"]
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    keys = []
     items = search_set.items()
 
     user_id = load_user().user_id
@@ -537,7 +528,7 @@ def download_fillable():
 
     print(pdf_path)
     reader = PdfReader(pdf_path)
-    fields = reader.get_fields()
+    reader.get_fields()
     writer = PdfWriter()
     writer.append(reader)
 

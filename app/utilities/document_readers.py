@@ -1,23 +1,15 @@
 #!/usr/bin/env python3
 
-from PyPDF2 import PdfReader
-from pathlib import Path
-from flask import current_app
-import httpx
-import pymupdf
-from devtools import debug
 import os
-import fitz
-import requests
-import subprocess
-import pymupdf4llm
-import fitz
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from markdownify import markdownify as md
 import re
-import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import fitz
+import pymupdf4llm
 import requests
-from dataclasses import dataclass
+from devtools import debug
+from markdownify import markdownify as md
+from PyPDF2 import PdfReader
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
@@ -184,7 +176,7 @@ class PDFProcessor:
             images_found = quality_response["images"]
             pdf_quality = quality_response["text_quality"]
 
-        except Exception as e:
+        except Exception:
             api_response.status = ("Error",)
             api_response.message = (quality_response["message"],)
             api_response.http_status = str(quality_response["http_status"])
@@ -491,7 +483,7 @@ def process_page(
         tables = {}
 
     # OCR the page if the ocr indicator is active
-    if ocr_page == True:
+    if ocr_page:
         print(f"Using OCR tool @ {endpoint} to extract page {page_number}")
         # freeze current page to pdf
         fp = save_page_to_pdf(document, page_number, output_dir)

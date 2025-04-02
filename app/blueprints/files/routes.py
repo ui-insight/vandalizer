@@ -1,24 +1,29 @@
-from flask import Blueprint, request, jsonify, redirect, url_for, session, current_app
-from app.models import SmartDocument, SmartFolder, SearchSet, SearchSetItem
+import base64
+import io
+import os
+import threading
+import uuid
+
+import pypandoc
+from devtools import debug
+from flask import current_app, jsonify, redirect, request, session, url_for, send_file, abort
+from pypdf import PdfReader
+
+from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
 from app.utilities.document_manager import (
     DocumentManager,
-    perform_semantic_ingestion,
     perform_ocr_and_semantic_ingestion,
+    perform_semantic_ingestion,
 )
 from app.utilities.document_readers import (
-    ocr_extract_text_from_pdf,
     extract_text_from_doc,
     extract_text_from_html,
 )
-import uuid, base64, os, threading, io
-from app.utils import load_user, ingest_semantics
-import pypandoc
 from app.utilities.excel_helper import save_excel_to_html
-from pypdf import PdfReader
 from app.utilities.fillable_pdf_manager import FillablePDFManager
+from app.utils import load_user
+
 from . import files
-from devtools import debug
-from concurrent.futures import ThreadPoolExecutor
 
 
 @files.route("/upload", methods=["POST"])
@@ -174,6 +179,32 @@ def move_file():
     return jsonify({"complete": True})
 
 
+
+@files.route("/download_document")
+def download_document():
+    document_uuid = request.args.get("docid")
+    
+    if not document_uuid:
+        abort(400, description="Missing document UUID")
+
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        abort(404, description="Document not found")
+
+    document_file_path = os.path.join(
+        current_app.root_path,
+        "static",
+        "uploads",
+        document.path,
+    )
+
+    if not os.path.isfile(document_file_path):
+        abort(404, description="File not found on server")
+
+    return send_file(document_file_path, as_attachment=True)
+
+
+
 @files.route("/delete_document")
 def delete_documents():
     document_uuid = request.args.get("docid")
@@ -182,12 +213,10 @@ def delete_documents():
         # semantics = SemanticIngest()
         # semantics.delete(document)
         document_manager = DocumentManager()
-        user_id = session["user_id"]
         document_manager.delete_document(
             user_id=session["user_id"], document_id=document_uuid
         )
 
-        user_id = session["user_id"]
         document_file_path = os.path.join(
             current_app.root_path,
             "static",
@@ -233,9 +262,9 @@ def move_item():
 
 @files.route("/toggle_default_doc")
 def toggle_default_doc():
-    user = load_user()
+    load_user()
     doc_id = request.args.get("doc_id")
-    folder_id = request.args.get("folder_id")
+    request.args.get("folder_id")
     redirect_url = request.args.get("redirect_url")
 
     doc = SmartDocument.objects(uuid=doc_id).first()
@@ -326,7 +355,7 @@ def read_pdf():
 
     json_data = request.get_json()
     blob = json_data["contentAsBase64String"]
-    filename = json_data["fileName"]
+    json_data["fileName"]
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()

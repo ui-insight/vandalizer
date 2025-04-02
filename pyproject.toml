@@ -9,6 +9,7 @@ dependencies = [
     "chardet",
     "chromadb",
     "datasets",
+    "devtools",
     "dspy",
     "fitz",
     "flask",

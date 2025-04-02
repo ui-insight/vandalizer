@@ -9,32 +9,24 @@ try:
 except ImportError:
     pass
 from typing import List, Dict, Any
-import os
 from datetime import datetime
 from pathlib import Path
-from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma.vectorstores import Chroma
 import chromadb
 from chromadb.config import Settings
-import uuid
-import httpx
 
-from pathlib import Path
 from app import app
-import pymupdf
-from devtools import debug
-import httpx
 from devtools import debug
 
 from app.utilities.document_readers import (
-    ocr_extract_text_from_pdf,
     extract_text_from_doc,
 )
 
 from flask import current_app
 from app.celery import celery_app
+
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
@@ -216,7 +208,7 @@ class DocumentManager:
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
         """Check if a specific document exists in a user's collection."""
-        vectorstore = self.get_user_collection(user_id)
+        self.get_user_collection(user_id)
         # Get the raw collection to use ChromaDB's filtering
         collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
         if collection:
@@ -227,7 +219,7 @@ class DocumentManager:
 
     def delete_document(self, user_id: str, document_id: str) -> None:
         """Delete a specific document from a user's collection."""
-        vectorstore = self.get_user_collection(user_id)
+        self.get_user_collection(user_id)
         # Get the raw collection to use ChromaDB's filtering
         collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
         if collection:
