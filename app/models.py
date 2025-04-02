@@ -1,16 +1,18 @@
-import mongoengine as me
-from datetime import datetime
 import datetime
-import os
-from pypdf import PdfReader
-from app import app
-from enum import Enum
 import json
+import os
+from datetime import datetime
+from enum import Enum
+
+import mongoengine as me
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
 )
+from pypdf import PdfReader
+
+from app import app
 
 
 class WorkflowStepTask(me.Document):
@@ -58,8 +60,8 @@ class WorkflowAttachment(me.Document):
 
 class Workflow(me.Document):
     # id = me.StringField(default=uuid4().hex)
-    name = me.StringField(required=True, max_length=50)
-    description = me.StringField(required=False, max_length=200)
+    name = me.StringField(required=True, max_length=500)
+    description = me.StringField(required=False, max_length=2000)
     user_id = me.StringField(required=True, max_length=200)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
