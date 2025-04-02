@@ -266,6 +266,7 @@ def workflow_status():
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
         # "time_elapsed": int(time_elapsed)
+        "status": workflow_result.status,
     }
 
     return jsonify(response)

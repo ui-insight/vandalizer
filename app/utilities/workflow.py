@@ -417,8 +417,8 @@ class WorkflowEngine:
         nodes = self.get_topological_order()
         debug(nodes)
 
-        workflow_result.num_steps_completed = 0
-        workflow_result.num_steps_total = len(nodes)
+        # workflow_result.num_steps_completed = 0
+        # workflow_result.num_steps_total = len(nodes) + 1
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
@@ -456,6 +456,9 @@ class WorkflowEngine:
                         node_outputs.extend(output.get("output", ""))
                     else:
                         node_outputs.append(output.get("output", ""))
+
+                workflow_result.num_steps_completed += 1
+
                 # combine the outputs
                 debug(node_outputs)
                 latest_output = {
@@ -465,7 +468,8 @@ class WorkflowEngine:
                 # debug(latest_output)
 
             workflow_result.steps_output[node.name] = output
-            workflow_result.num_steps_completed += 1
+
+            workflow_result.save()
 
             debug(latest_output)
             data.append(
