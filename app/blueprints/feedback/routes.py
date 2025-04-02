@@ -1,17 +1,22 @@
+"""Handles feedback routing."""
+
+import json
+
 from flask import (
-    request,
     jsonify,
+    request,
 )
+from flask.typing import ResponseReturnValue
+
+from app.models import ExtractionQualityRecord
 
 from . import feedback
-from app.models import ExtractionQualityRecord
-import json
 
 
 @feedback.route("/submit_rating", methods=["POST"])
-def submit_rating():
+def submit_rating() -> ResponseReturnValue:
+    """Handle the submission of a rating and feedback for an extraction."""
     data = request.get_json()
-    print(data)
     pdf_title = data["pdf_title"]
     rating = data["rating"]
     comment = data["comment"]

@@ -30,6 +30,4 @@ def chunk_pdf(pdf_path):
     phrases = [p for ng in ngrams for p in ng]
 
     three_word_phrases = [" ".join(phrase) for phrase in phrases if len(phrase) == 3]
-    chunks = sentences + three_word_phrases
-    print("Number of chunks:", len(chunks))
-    return chunks
+    return sentences + three_word_phrases

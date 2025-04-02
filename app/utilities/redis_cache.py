@@ -1,12 +1,12 @@
-from redis import Redis
-
 import hashlib
 from typing import Any, Optional
+
+from redis import Redis
 from redis.commands.json.path import Path
 
 
 class RedisCache:
-    """Redis-based cache implementation based on langchain_redis"""
+    """Redis-based cache implementation based on langchain_redis."""
 
     def __init__(
         self,
@@ -14,7 +14,7 @@ class RedisCache:
         ttl: Optional[int] = None,
         prefix: Optional[str] = "redis",
         redis_client: Optional[Redis] = None,
-    ):
+    ) -> None:
         self.redis = redis_client or Redis.from_url(redis_url)
         self.ttl = ttl
         self.prefix = prefix
@@ -38,10 +38,10 @@ class RedisCache:
 
         Returns:
             Any: The cached result if found, or None if not present in the cache.
+
         """
         key = self._key(prompt, llm_string)
-        result = self.redis.json().get(key)
-        return result
+        return self.redis.json().get(key)
 
     def update(self, prompt: str, llm_string: str, return_val: Any) -> None:
         """Update the cache with a new result for a given prompt and language model.
@@ -76,13 +76,16 @@ class RedisCache:
 
         Returns:
             None
+
         """
         cursor = 0
         pipe = self.redis.pipeline()
         while True:
             try:
                 cursor, keys = self.redis.scan(
-                    cursor, match=f"{self.prefix}:*", count=100
+                    cursor,
+                    match=f"{self.prefix}:*",
+                    count=100,
                 )  # type: ignore[misc]
                 if keys:
                     pipe.delete(*keys)

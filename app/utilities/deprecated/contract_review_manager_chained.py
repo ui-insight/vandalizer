@@ -1,15 +1,16 @@
-from langchain.document_loaders import PyPDFLoader  # pdf loading
-from langchain.embeddings import OpenAIEmbeddings  # embeddings
-from langchain.vectorstores import Chroma  # vector store
-from langchain.document_loaders import Docx2txtLoader
-from langchain.document_loaders import TextLoader
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
-from langchain.chains import ConversationalRetrievalChain
+import os
 import time
 
-import os
+from langchain.chains import ConversationalRetrievalChain, RetrievalQA
+from langchain.chat_models import ChatOpenAI
+from langchain.document_loaders import (
+    Docx2txtLoader,
+    PyPDFLoader,  # pdf loading
+    TextLoader,
+)
+from langchain.embeddings import OpenAIEmbeddings  # embeddings
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import Chroma  # vector store
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -20,30 +21,28 @@ class ContractReviewManagerChained:
     embeddings = None
     root_path = ""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
         self.review_vector_db = Chroma(
-            embedding_function=self.embeddings, persist_directory="./review_vectordb"
+            embedding_function=self.embeddings, persist_directory="./review_vectordb",
         )
 
-    def extract_sections(self, document):
+    def extract_sections(self, document) -> None:
         vectordb = self.load_contract(document)
         llm = ChatOpenAI(model_name="gpt-3.5-turbo", openai_api_key=OPENAI_API_KEY)
         retreiver = vectordb.as_retriever(search_kwargs={"k": 1})
         pdf_qa = ConversationalRetrievalChain.from_llm(llm, retreiver)
 
-        result = pdf_qa(
+        pdf_qa(
             {
                 "question": "Give me a list of all sections in the contract, formatted as a csv with a comma between each section.",
                 "chat_history": "",
-            }
+            },
         )
-        print(result["answer"])
 
     def prepare_splits2(self, document):
-        print("Root Path: ", self.root_path)
         loader = PyPDFLoader(
-            os.path.join(self.root_path, "static", "uploads", document)
+            os.path.join(self.root_path, "static", "uploads", document),
         )
         loader.load()
         pages = loader.load_and_split()
@@ -56,9 +55,8 @@ class ContractReviewManagerChained:
 
     def prepare_splits(self, document):
         # self.load_documents()
-        print("Root Path: ", self.root_path)
         loader = PyPDFLoader(
-            os.path.join(self.root_path, "static", "uploads", document)
+            os.path.join(self.root_path, "static", "uploads", document),
         )
         docs = loader.load()
         # text_splitter = CharacterTextSplitter(chunk_size=15000, chunk_overlap=0)
@@ -73,13 +71,11 @@ class ContractReviewManagerChained:
             + doc_string
             + ". Give me a list of all sections in the contract, formatted as a csv with a comma between each section."
         )
-        prediction = llm.predict(text)
-        return prediction
+        return llm.predict(text)
 
     def get_compliance(self, document):
-        start = time.time()
+        time.time()
         prompt = "You are an expert in compliance, using the provided review guide and your knowledge of University rules and laws, review the the contract. Explain if anything is out of compliance. "
-        print(prompt)
         llm = ChatOpenAI(model_name="gpt-3.5-turbo-16k", openai_api_key=OPENAI_API_KEY)
         retreiver = self.load_vectordb(document).as_retriever(search_kwargs={"k": 5})
         rqa = RetrievalQA.from_chain_type(
@@ -89,8 +85,7 @@ class ContractReviewManagerChained:
             return_source_documents=True,
         )
         result = rqa(prompt)
-        end = time.time()
-        print(end - start)
+        time.time()
         return result["result"]
 
     def load_vectordb(self, document):
@@ -107,7 +102,7 @@ class ContractReviewManagerChained:
         chunked_documents = text_splitter.split_documents(documents)
         return Chroma.from_documents(chunked_documents, embedding=self.embeddings)
 
-    def load_documents(self):
+    def load_documents(self) -> None:
         documents = []
 
         # self.delete_db()
@@ -116,7 +111,7 @@ class ContractReviewManagerChained:
                 pdf_path = os.path.join(self.root_path, "reviewdata", file)
                 loader = PyPDFLoader(pdf_path)
                 documents.extend(loader.load())
-            elif file.endswith(".docx") or file.endswith(".doc"):
+            elif file.endswith((".docx", ".doc")):
                 doc_path = os.path.join("static", "uploads", file)
                 loader = Docx2txtLoader(doc_path)
                 documents.extend(loader.load())
@@ -136,7 +131,7 @@ class ContractReviewManagerChained:
 
     def load_contract(self, document):
         loader = PyPDFLoader(
-            os.path.join(self.root_path, "static", "uploads", document)
+            os.path.join(self.root_path, "static", "uploads", document),
         )
         pages = loader.load()
 

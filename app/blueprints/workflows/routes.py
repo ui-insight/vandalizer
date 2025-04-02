@@ -1,9 +1,9 @@
+"""Handle workflow routes."""
+
 import json
 import os
 import tempfile
 import uuid
-
-# from app import socketio
 from itertools import chain
 
 import pypandoc
@@ -18,6 +18,7 @@ from flask import (
     session,
     url_for,
 )
+from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
 from app.models import (
@@ -39,14 +40,13 @@ from app.utils import load_user
 from . import workflows
 
 
-## MARK: ~~ Create
 @workflows.route("/create_workflow", methods=["POST"])
-def add_workflow():
+def add_workflow() -> ResponseReturnValue:
+    """Create a new workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
     workflow_data = request.get_json()
-    print("workflow_data", workflow_data)
     workflow = Workflow(
         name=workflow_data["name"],
         description=workflow_data["description"],
@@ -56,15 +56,17 @@ def add_workflow():
     return jsonify(
         {
             "reroute": url_for(
-                "home.index", section="Workflows", workflow_id=str(workflow.id)
-            )
-        }
+                "home.index",
+                section="Workflows",
+                workflow_id=str(workflow.id),
+            ),
+        },
     )
 
 
-## MARK: ~~ Delete
 @workflows.route("/delete_workflow", methods=["GET"])
-def delete_workflow():
+def delete_workflow() -> ResponseReturnValue:
+    """Delete a workflow by ID."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -74,7 +76,8 @@ def delete_workflow():
 
 
 @workflows.route("/update_workflow", methods=["POST"])
-def update_workflow():
+def update_workflow() -> ResponseReturnValue:
+    """Update a workflow by ID."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -87,9 +90,9 @@ def update_workflow():
     return redirect("/home?section=Workflows")
 
 
-## MARK: ~~ Run in-app
 @workflows.route("/workflow/run", methods=["POST"])
-def run_workflow():
+def run_workflow() -> ResponseReturnValue:
+    """Run a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -108,15 +111,14 @@ def run_workflow():
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     document_trigger_step = WorkflowStep(
-        name="Document", data=dict(docs=docs, attachments=attachments, user_id=user_id)
+        name="Document",
+        data={"docs": docs, "attachments": attachments, "user_id": user_id},
     )
     steps = [document_trigger_step]
     for step in workflow.steps:
         steps.append(step)
 
-    print("Running workflow", steps)
-
-    # TODO add the ability to cancel the thread (same for the chat)
+    # @TODO add the ability to cancel the thread (same for the chat)
     # maybe store the thread id in the user's session.
     engine = build_workflow_engine(steps, workflow=workflow)
     workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
@@ -130,9 +132,10 @@ def run_workflow():
     return {"output": output, "steps": data}
 
 
-## MARK: ~~ Run integration
+# @MARK: ~~ Run integration
 @workflows.route("/workflow/run", methods=["GET", "POST"])
-def run_workflow_integrated():
+def run_workflow_integrated() -> ResponseReturnValue:
+    """Run the integrated workflow and return the result."""
     # **1. Authenticate User via API Key**
     api_key = request.headers.get("x-api-key")
     if not api_key:
@@ -155,14 +158,13 @@ def run_workflow_integrated():
         return jsonify({"error": "Workflow not found"}), 404
 
     # **4. Handle File Uploads**
-    print(request.files)
     uploaded_files = request.files.getlist("file")
     if not uploaded_files:
         return (
             jsonify(
                 {
-                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash."
-                }
+                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash.",
+                },
             ),
             400,
         )
@@ -177,7 +179,10 @@ def run_workflow_integrated():
 
         # Create upload directory if it doesn't exist
         upload_dir = os.path.join(
-            current_app.root_path, "static", "uploads", str(user.id)
+            current_app.root_path,
+            "static",
+            "uploads",
+            str(user.id),
         )
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
@@ -220,10 +225,11 @@ def run_workflow_integrated():
     docs = [SmartDocument.objects(uuid=uuid).first() for uuid in document_uuids]
 
     document_trigger_step = WorkflowStep(
-        name="Document", data={"docs": docs, "attachments": attachments}
+        name="Document",
+        data={"docs": docs, "attachments": attachments},
     )
 
-    steps = [document_trigger_step] + workflow.steps
+    steps = [document_trigger_step, *workflow.steps]
 
     # **6. Execute the Workflow**
     engine = build_workflow_engine(steps, workflow=workflow)
@@ -236,7 +242,8 @@ def run_workflow_integrated():
 
 
 @workflows.route("/workflow/status", methods=["GET"])
-def workflow_status():
+def workflow_status() -> ResponseReturnValue:
+    """Poll the workflow status."""
     session_id = request.args.get("session_id")
 
     if not session_id:
@@ -247,9 +254,6 @@ def workflow_status():
 
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
-
-    # # Calculate time elapsed in seconds
-    # time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
 
     response = {
         "steps_completed": workflow_result.num_steps_completed,
@@ -286,9 +290,10 @@ def workflow_status():
 #     emit("workflow_status", response)
 
 
-## MARK: Download
+## @MARK: Download
 @workflows.route("/download", methods=["GET"])
-def workflow_download():
+def workflow_download() -> ResponseReturnValue:
+    """Download workflow results."""
     session_id = request.args.get("session_id")
 
     if not session_id:
@@ -300,18 +305,11 @@ def workflow_download():
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
 
-    # # Calculate time elapsed in seconds
-    # time_elapsed = (datetime.now() - workflow["start_time"]).total_seconds()
-
     # Ensure the static folder exists
     os.makedirs(os.path.join(current_app.root_path, "static"), exist_ok=True)
 
     final_output = list(workflow_result.steps_output.values())[-1]
 
-    # debug(final_output)
-
-    # with open(output_file_path, "w") as f:  # Open as text file for string output
-    #     f.write(json.dumps(final_output["output"], indent=4))
     tmp_file = tempfile.TemporaryFile()
     tmp_file.write(json.dumps(final_output["output"], indent=4).encode())
     tmp_file.seek(0)
@@ -320,9 +318,10 @@ def workflow_download():
     return send_file(tmp_file, download_name="workflow_output.txt", as_attachment=True)
 
 
-## MARK: ~~ Integrate
+## @MARK: ~~ Integrate
 @workflows.route("/integrate", methods=["POST"])
-def workflow_integrate():
+def workflow_integrate() -> ResponseReturnValue:
+    """Integrate a workflow template."""
     user = load_user()
     data = request.get_json()
     workflow_id = data.get("workflow_id")
@@ -339,7 +338,8 @@ def workflow_integrate():
 
 
 @workflows.route("/fetch_workflow", methods=["POST"])
-def fetch_workflow():
+def fetch_workflow() -> ResponseReturnValue:
+    """Fetch a specific workflow."""
     data = request.get_json()
     workflow_id = data["workflow_uuid"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -357,7 +357,8 @@ def fetch_workflow():
 
 
 @workflows.route("/update_title", methods=["POST"])
-def update_workflow_title():
+def update_workflow_title() -> ResponseReturnValue:
+    """Update the title of a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -373,7 +374,8 @@ def update_workflow_title():
 
 ## MARK: Workflow steps
 @workflows.route("/add_workflow_step", methods=["POST"])
-def add_workflow_step():
+def add_workflow_step() -> ResponseReturnValue:
+    """Add a new step to a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -398,7 +400,8 @@ def add_workflow_step():
 
 
 @workflows.route("/edit_step", methods=["POST"])
-def edit_workflow_step():
+def edit_workflow_step() -> ResponseReturnValue:
+    """Edit a step in a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -419,12 +422,12 @@ def edit_workflow_step():
 
 
 @workflows.route("/step/update_title", methods=["POST"])
-def update_workflow_step_title():
+def update_workflow_step_title() -> ResponseReturnValue:
+    """Update the title of a workflow step."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
     workflow_step_data = request.get_json()
-    print(workflow_step_data)
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
     workflow_step.name = workflow_step_data["title"]
@@ -435,12 +438,12 @@ def update_workflow_step_title():
 
 
 @workflows.route("/step/add_task", methods=["POST"])
-def add_workflow_add_task():
+def add_workflow_add_task() -> ResponseReturnValue:
+    """Add a task to a workflow step."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
     workflow_step_data = request.get_json()
-    print("Workflow step data", workflow_step_data)
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -457,7 +460,8 @@ def add_workflow_add_task():
 
 
 @workflows.route("/step/add_step_task", methods=["POST"])
-def add_workflow_step_task():
+def add_workflow_step_task() -> ResponseReturnValue:
+    """Add a task to a specific step in a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -474,7 +478,8 @@ def add_workflow_step_task():
 
 
 @workflows.route("/delete_step", methods=["POST"])
-def delete_workflow_step():
+def delete_workflow_step() -> ResponseReturnValue:
+    """Delete a specific step in a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -499,7 +504,8 @@ def delete_workflow_step():
 
 
 @workflows.route("/delete_step_task", methods=["POST"])
-def delete_workflow_step_task():
+def delete_workflow_step_task() -> ResponseReturnValue:
+    """Delete a specific task in a workflow step."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -520,7 +526,8 @@ def delete_workflow_step_task():
 
 
 @workflows.route("/update_workflow_step", methods=["POST"])
-def update_workflow_step():
+def update_workflow_step() -> ResponseReturnValue:
+    """Update a specific step in a workflow."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -537,12 +544,13 @@ def update_workflow_step():
     return redirect("/home?section=Workflows")
 
 
-## MARK: ~~ Extraction
+## @MARK: ~~ Extraction
 @workflows.route("/add_extraction_step", methods=["GET", "POST"])
-def workflow_add_extraction_step():
+def workflow_add_extraction_step() -> ResponseReturnValue:
+    """Add an extraction step to a workflow."""
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
@@ -554,14 +562,16 @@ def workflow_add_extraction_step():
         if is_editing:
             workflow_task_id = data.get("workflow_task_id")
             workflow_task = WorkflowStepTask.objects(
-                id=ObjectId(workflow_task_id)
+                id=ObjectId(workflow_task_id),
             ).first()
 
         workflow = Workflow.objects(id=workflow_id).first()
 
         current_space = Space.objects(uuid=space_id).first()
         global_extraction_sets = SearchSet.objects(
-            space=current_space.uuid, is_global=True, set_type="extraction"
+            space=current_space.uuid,
+            is_global=True,
+            set_type="extraction",
         ).all()
         user_extraction_sets = SearchSet.objects(
             user_id=workflow.user_id,
@@ -570,7 +580,7 @@ def workflow_add_extraction_step():
             set_type="extraction",
         ).all()
         extraction_sets_objects = list(
-            chain(global_extraction_sets, user_extraction_sets)
+            chain(global_extraction_sets, user_extraction_sets),
         )
 
         template = render_template(
@@ -584,17 +594,15 @@ def workflow_add_extraction_step():
         response = {"template": template}
         return jsonify(response)
 
-    elif request.method == "POST":
+    if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
 
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        search_set_id = data["search_set_id"] if "search_set_id" in data else None
-        manual_input = data["manual_input"] if "manual_input" in data else None
-        workflow_step_id = (
-            data["workflow_step_id"] if "workflow_step_id" in data else None
-        )
-        task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
+        search_set_id = data.get("search_set_id", None)
+        manual_input = data.get("manual_input", None)
+        workflow_step_id = data.get("workflow_step_id", None)
+        task_id = data.get("workflow_task_id", None)
         workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
@@ -610,7 +618,8 @@ def workflow_add_extraction_step():
                     workflow_step_task.save()
             else:
                 workflow_step_task = WorkflowStepTask(
-                    name="Extraction", data=searchset.to_workflow_step_data()
+                    name="Extraction",
+                    data=searchset.to_workflow_step_data(),
                 )
                 workflow_step_task.save()
                 if workflow_step.tasks is None:
@@ -620,34 +629,33 @@ def workflow_add_extraction_step():
 
         elif manual_input:
             if task_id is not None and task_id != 0:
-                print("----- FOUND A TASK ID")
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
                     workflow_step_task.data = {"searchphrases": manual_input}
                     workflow_step_task.save()
                 return jsonify({"response": "success"})
-            else:
-                print("----- NO TASK ID")
-                print(data)
-                workflow_step_task = WorkflowStepTask(
-                    name="Extraction", data={"searchphrases": manual_input}
-                )
-                workflow_step_task.save()
+            workflow_step_task = WorkflowStepTask(
+                name="Extraction",
+                data={"searchphrases": manual_input},
+            )
+            workflow_step_task.save()
 
-                if workflow_step.tasks is None:
-                    workflow_step.tasks = []
-                workflow_step.tasks.append(workflow_step_task)
-                workflow_step.save()
+            if workflow_step.tasks is None:
+                workflow_step.tasks = []
+            workflow_step.tasks.append(workflow_step_task)
+            workflow_step.save()
 
         return jsonify({"response": "success"})
+    return None
 
 
-## MARK: ~~ Attachments
+## @MARK: ~~ Attachments
 @workflows.route("/add_attachment", methods=["GET", "POST"])
-def workflow_add_attachment():
+def workflow_add_attachment() -> ResponseReturnValue:
+    """Handle the addition of attachments to a workflow step."""
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
@@ -667,7 +675,7 @@ def workflow_add_attachment():
         )
         response = {"template": template}
         return jsonify(response)
-    elif request.method == "POST":
+    if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
@@ -680,14 +688,16 @@ def workflow_add_attachment():
         workflow.save()
 
         return jsonify({"response": "Placeholder"})
+    return None
 
 
-## MARK: ~~ Prompts
+## @MARK: ~~ Prompts
 @workflows.route("/add_prompt_step", methods=["GET", "POST"])
-def workflow_add_prompt_step():
+def workflow_add_prompt_step() -> ResponseReturnValue:
+    """Add a prompt step to the workflow."""
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         workflow_step_id = data.get("workflow_step_id")
@@ -721,18 +731,14 @@ def workflow_add_prompt_step():
         response = {"template": template}
         return jsonify(response)
 
-    elif request.method == "POST":
+    if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
-        workflow_step_id = (
-            data["workflow_step_id"] if "workflow_step_id" in data else None
-        )
-        task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
-        search_set_item_id = (
-            data["search_set_item_id"] if "search_set_item_id" in data else None
-        )
-        manual_input = data["manual_input"] if "manual_input" in data else None
+        workflow_step_id = data.get("workflow_step_id", None)
+        task_id = data.get("workflow_task_id", None)
+        search_set_item_id = data.get("search_set_item_id", None)
+        manual_input = data.get("manual_input", None)
         workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
@@ -743,12 +749,12 @@ def workflow_add_prompt_step():
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
-                    print("SETTING UP DATA FROM SEARCH SET ITEM")
                     workflow_step_task.data = searchsetitem.to_workflow_step_data()
                     workflow_step_task.save()
             else:
                 workflow_step_task = WorkflowStepTask(
-                    name="Prompt", data=searchsetitem.to_workflow_step_data()
+                    name="Prompt",
+                    data=searchsetitem.to_workflow_step_data(),
                 )
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
@@ -759,26 +765,28 @@ def workflow_add_prompt_step():
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
-                    print("SETTING UP DATA FROM MANUAL")
                     workflow_step_task.data = {"prompt": manual_input}
                     workflow_step_task.save()
             else:
                 workflow_step_task = WorkflowStepTask(
-                    name="Prompt", data={"prompt": manual_input}
+                    name="Prompt",
+                    data={"prompt": manual_input},
                 )
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
 
         return jsonify({"response": "success"})
+    return None
 
 
-## MARK: ~~ Formatting
+## @MARK: ~~ Formatting
 @workflows.route("/add_formatter_step", methods=["GET", "POST"])
-def workflow_add_format_step():
+def workflow_add_format_step() -> ResponseReturnValue:
+    """Add a formatter step to the workflow."""
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
@@ -811,22 +819,17 @@ def workflow_add_format_step():
         response = {"template": template}
         return jsonify(response)
 
-    elif request.method == "POST":
+    if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
-        workflow_step_id = (
-            data["workflow_step_id"] if "workflow_step_id" in data else None
-        )
-        task_id = data["workflow_task_id"] if "workflow_task_id" in data else None
+        workflow_step_id = data.get("workflow_step_id", None)
+        task_id = data.get("workflow_task_id", None)
 
         workflow_id = data["workflow_uuid"]
-        search_set_item_id = (
-            data["search_set_item_id"] if "search_set_item_id" in data else None
-        )
-        manual_input = data["manual_input"] if "manual_input" in data else None
+        search_set_item_id = data.get("search_set_item_id", None)
+        manual_input = data.get("manual_input", None)
         workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
-        print("Workflow step", workflow_step)
 
         workflow_step_task = None
 
@@ -839,7 +842,8 @@ def workflow_add_format_step():
                     workflow_step_task.save()
             else:
                 workflow_step_task = WorkflowStepTask(
-                    name="Formatter", data=searchsetitem.to_workflow_step_data()
+                    name="Formatter",
+                    data=searchsetitem.to_workflow_step_data(),
                 )
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
@@ -852,7 +856,8 @@ def workflow_add_format_step():
                     workflow_step_task.save()
             else:
                 workflow_step_task = WorkflowStepTask(
-                    name="Formatter", data={"prompt": manual_input}
+                    name="Formatter",
+                    data={"prompt": manual_input},
                 )
                 workflow_step_task.save()
                 if workflow_step.tasks is None:
@@ -861,14 +866,16 @@ def workflow_add_format_step():
                 workflow_step.save()
 
         return jsonify({"response": "success"})
+    return None
 
 
-## MARK: ~~ Documents
+## @MARK: ~~ Documents
 @workflows.route("/add_document_step", methods=["GET", "POST"])
-def workflow_add_document_step():
+def workflow_add_document_step() -> ResponseReturnValue:
+    """Add a document step to the workflow."""
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
-        data_str = list(request.args.keys())[0]  # Get the JSON string key
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
@@ -877,7 +884,9 @@ def workflow_add_document_step():
 
         current_space = Space.objects(uuid=space_id).first()
         global_extraction_sets = SearchSet.objects(
-            space=current_space.uuid, is_global=True, set_type="document"
+            space=current_space.uuid,
+            is_global=True,
+            set_type="document",
         ).all()
         user_extraction_sets = SearchSet.objects(
             user_id=workflow.user_id,
@@ -886,7 +895,7 @@ def workflow_add_document_step():
             set_type="extraction",
         ).all()
         extraction_sets_objects = list(
-            chain(global_extraction_sets, user_extraction_sets)
+            chain(global_extraction_sets, user_extraction_sets),
         )
         extraction_sets = [
             extraction["title"]
@@ -902,10 +911,11 @@ def workflow_add_document_step():
         response = {"template": template}
         return jsonify(response)
 
-    elif request.method == "POST":
+    if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
         workflow_id = data["workflow_uuid"]
         workflow = Workflow.objects(id=workflow_id).first()
 
         return jsonify({"response": "Placeholder"})
+    return None

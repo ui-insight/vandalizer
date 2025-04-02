@@ -1,32 +1,28 @@
 #!/usr/bin/env python3
 
-import os
+import graphlib
 import json
-from dotenv import load_dotenv
 
 # from app import socketio
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from devtools import debug
-
+import os
 import re
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from threading import Thread
+from typing import NoReturn
 
+from devtools import debug
+from dotenv import load_dotenv
 
 from app import app
+from app.models import SearchSet, SmartDocument
+from app.utilities.config import model_type
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-from app.utilities.config import model_type
-
-from threading import Thread
-
-from app.models import SmartDocument, SearchSet
-
-
-import graphlib
 
 load_dotenv()
 
@@ -36,15 +32,23 @@ load_dotenv()
 
 class WorkflowThread(Thread):
     def __init__(
-        self, group=None, target=None, name=None, args=(), kwargs={}, verbose=None
-    ):
+        self,
+        group=None,
+        target=None,
+        name=None,
+        args=(),
+        kwargs=None,
+        verbose=None,
+    ) -> None:
+        if kwargs is None:
+            kwargs = {}
         super().__init__(group, target, name, args, kwargs)
         self._return = None
         self._target = target
         self._args = args
         self._kwargs = kwargs
 
-    def run(self):
+    def run(self) -> None:
         if self._target is not None:
             self._return = self._target(*self._args, **self._kwargs)
 
@@ -72,8 +76,7 @@ def remove_document_from_workflow_step(document, workflow_step):
 
 
 def format_llm_output(text: str) -> str:
-    """
-    Format raw LLM text output to clean up escape characters and extra whitespace.
+    r"""Format raw LLM text output to clean up escape characters and extra whitespace.
     Returns clean text that can be safely placed in HTML elements on the frontend.
 
     Args:
@@ -81,6 +84,7 @@ def format_llm_output(text: str) -> str:
 
     Returns:
         str: Cleaned text string
+
     """
     # Replace explicit \n escapes with actual newlines
     text = text.replace("\n", "")
@@ -93,7 +97,9 @@ def format_llm_output(text: str) -> str:
     return text.strip()
 
 
-def llm_chat_model(prompt, data=None, docs=[]):
+def llm_chat_model(prompt, data=None, docs=None):
+    if docs is None:
+        docs = []
     open_ai_interface = OpenAIInterface()
     output = None
     if len(docs) == 0:
@@ -108,7 +114,6 @@ def llm_chat_model(prompt, data=None, docs=[]):
             messages=[{"role": "user", "content": output_prompt}],
             max_tokens=None,
         )
-        print("llm chat response: ", output)
         output = format_llm_output(output).strip()
         # output = open_ai_interface.handle_short_context(
         #     prompt=prompt, full_text=full_text
@@ -118,7 +123,9 @@ def llm_chat_model(prompt, data=None, docs=[]):
 
     else:
         output = open_ai_interface.ask_question_to_documents(
-            root_path=app.root_path, documents=docs, question=prompt
+            root_path=app.root_path,
+            documents=docs,
+            question=prompt,
         )
         output = output.get("answer", "")
         output = format_llm_output(output)
@@ -143,9 +150,7 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
         messages=[{"role": "user", "content": prompt}],
     )
     debug(response)
-    output = response
-
-    return output
+    return response
 
 
 def format_model(formatting_prompt, text):
@@ -165,35 +170,34 @@ def format_model(formatting_prompt, text):
     if match is not None:
         formatted_text = match.group(2)
         return prompt, formatted_text
-    else:
-        return prompt, response
+    return prompt, response
 
 
 class Node:
-    def __init__(self, name):
+    def __init__(self, name) -> None:
         self.name = name
         self.inputs = {}
         self.outputs = {}
         self.tasks = []
 
-    def process(self, inputs):
+    def process(self, inputs) -> NoReturn:
         raise NotImplementedError
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         node_class = self.__class__.__name__
         return f"""{node_class}(name={self.name}, inputs={self.inputs}, outputs={self.outputs})"""
 
 
 class MultiTaskNode(Node):
-    def __init__(self, name):
+    def __init__(self, name) -> None:
         super().__init__(name)
         self.tasks = []
         self.max_workers = multiprocessing.cpu_count()
 
-    def add_task(self, task):
+    def add_task(self, task) -> None:
         self.tasks.append(task)
 
-    def add_tasks(self, tasks):
+    def add_tasks(self, tasks) -> None:
         self.tasks.extend(tasks)
 
     def process_task(self, task):
@@ -215,7 +219,7 @@ class MultiTaskNode(Node):
                 results.append(future.result())
 
         # concatenate the results output
-        output = dict(input=inputs.get("input"), output=[], step_name=self.name)
+        output = {"input": inputs.get("input"), "output": [], "step_name": self.name}
         for result in results:
             debug(result)
             if isinstance(result.get("output"), str):
@@ -228,7 +232,7 @@ class MultiTaskNode(Node):
 
 
 class DocumentNode(Node):
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         super().__init__("Document")
         self.docs = data.get("docs", [])
         self.attachments = data.get("attachments", [])
@@ -246,32 +250,37 @@ class DocumentNode(Node):
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
-                    app.root_path, "static", "uploads", user_id, doc.path
+                    app.root_path,
+                    "static",
+                    "uploads",
+                    user_id,
+                    doc.path,
                 )
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            if doc is None: continue
+            if doc is None:
+                continue
             doc_path = doc.absolute_path
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
-                    app.root_path, "static", "uploads", user_id, doc.path
+                    app.root_path,
+                    "static",
+                    "uploads",
+                    user_id,
+                    doc.path,
                 )
             self.pdf_paths.append(doc_path)
-
-        print("PDF Paths: ", self.pdf_paths)
 
     def process(self, inputs=None):
         # data = inputs.get("data", None)
 
-        output = {"step_name": self.name, "output": self.pdf_paths, "input": None}
-
-        return output
+        return {"step_name": self.name, "output": self.pdf_paths, "input": None}
 
 
 class FormatNode(Node):
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         super().__init__("Formatter")
         self.data = data
 
@@ -282,10 +291,7 @@ class FormatNode(Node):
         prev_step_name = inputs.get("step_name", None)
         text = None
         if prev_step_name == "Prompt":
-            if isinstance(data, dict):
-                text = data.get("formatted_answer", "")
-            else:
-                text = data
+            text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         if prev_step_name == "Document":
             doc_paths = inputs.get("output", None)
             text = ""
@@ -301,7 +307,7 @@ class FormatNode(Node):
 
 
 class ExtractionNode(Node):
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         super().__init__("Extraction")
         self.data = data
 
@@ -311,7 +317,6 @@ class ExtractionNode(Node):
         keys = self.data.get("searchphrases", [])
         if len(keys) == 0:
             keys = data.get("keys", [])
-        print("keys: ", keys, data)
 
         prev_step_name = inputs.get("step_name", None)
 
@@ -332,17 +337,16 @@ class ExtractionNode(Node):
             if isinstance(step_input, dict):
                 step_input = step_input.get("answer")
             extraction_response = data_extraction_model(
-                keys, pdf_paths, full_text=step_input
+                keys,
+                pdf_paths,
+                full_text=step_input,
             )
-        elif prev_step_name == "Extraction":
+        elif prev_step_name in {"Extraction", "Formatter"}:
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
-                keys, pdf_paths, full_text=step_input
-            )
-        elif prev_step_name == "Formatter":
-            step_input = inputs.get("output", None)
-            extraction_response = data_extraction_model(
-                keys, pdf_paths, full_text=step_input
+                keys,
+                pdf_paths,
+                full_text=step_input,
             )
 
         return {
@@ -353,7 +357,7 @@ class ExtractionNode(Node):
 
 
 class PromptNode(Node):
-    def __init__(self, data):
+    def __init__(self, data) -> None:
         super().__init__("Prompt")
         self.data = data
 
@@ -377,7 +381,6 @@ class PromptNode(Node):
             chat_response = llm_chat_model(docs=docs, prompt=prompt)
         else:
             data = inputs.get("output", None)
-            print("Prompt Data: ", data)
 
             chat_response = llm_chat_model(docs=[], prompt=prompt, data=data)
         return {"output": chat_response, "input": prompt, "step_name": self.name}
@@ -385,17 +388,17 @@ class PromptNode(Node):
 
 # TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
-    def __init__(self):
+    def __init__(self) -> None:
         self.nodes = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
         self.graph_built = False
         self.max_workers = multiprocessing.cpu_count()
 
-    def add_node(self, node):
+    def add_node(self, node) -> None:
         self.graph.add(node)
 
-    def connect(self, from_node, to_node):
+    def connect(self, from_node, to_node) -> None:
         self.graph.add(from_node, to_node)
 
     def get_topological_order(self):
@@ -414,7 +417,7 @@ class WorkflowEngine:
 
             node_outputs = []
             if idx == 0:
-                output = node.process(dict())
+                output = node.process({})
                 debug(output)
                 latest_output = output
             else:
@@ -458,11 +461,11 @@ class WorkflowEngine:
 
             debug(latest_output)
             data.append(
-                dict(
-                    name=node.name,
-                    output=latest_output.get("output", None),
-                    input=latest_output.get("input", None),
-                )
+                {
+                    "name": node.name,
+                    "output": latest_output.get("output", None),
+                    "input": latest_output.get("input", None),
+                },
             )
 
             # send the data to the frontend
@@ -505,7 +508,6 @@ def build_workflow_engine(steps, workflow):
         # node_id = uuid4().hex
         node = None
         debug(step)
-        print("Step: ", step.name, step.data, step.tasks)
         if step.name == "Document":  # this the trigger step
             # node_objects[node_id] = DocumentNode(step.data)
             node = DocumentNode(step.data)
@@ -513,14 +515,12 @@ def build_workflow_engine(steps, workflow):
         else:  # this a task step
             tasks = []
             for task in step.tasks:
-                print("Task: ", task.name, task.data)
                 if task.name == "Extraction":
                     if task.data.get("search_set_uuid"):
                         search_set = SearchSet.objects(
-                            uuid=task.data.get("search_set_uuid")
+                            uuid=task.data.get("search_set_uuid"),
                         ).first()
                         search_items = search_set.items()
-                        print("Search Items: ", search_items, search_set.title)
                         task.data["keys"] = [item.searchphrase for item in search_items]
                     debug(task.data)
                     node = ExtractionNode(

@@ -85,24 +85,23 @@ def pytest_runtest_makereport(item, call):
 
 
 # check if a test has failed
-@pytest.fixture(scope="function", autouse=True)
+@pytest.fixture(autouse=True)
 def test_failed_check(request):
     yield
     # request.node is an "item" because we use the default
     # "function" scope
     if request.node.rep_setup.failed:
-        print("setting up a test failed!", request.node.nodeid)
-    elif request.node.rep_setup.passed:
-        if request.node.rep_call.failed:
-            driver = request.node.funcargs["driver"]
-            take_screenshot(driver, request.node.nodeid)
-            print("executing test failed", request.node.nodeid)
+        pass
+    elif request.node.rep_setup.passed and request.node.rep_call.failed:
+        driver = request.node.funcargs["driver"]
+        take_screenshot(driver, request.node.nodeid)
 
 
 # make a screenshot with a name of the test, date and time
-def take_screenshot(driver, nodeid):
+def take_screenshot(driver, nodeid) -> None:
     sleep(1)
     file_name = f"{nodeid}_{datetime.today().strftime('%Y-%m-%d_%H:%M')}.png".replace(
-        "/", "_"
+        "/",
+        "_",
     ).replace("::", "__")
     driver.save_screenshot(file_name)
