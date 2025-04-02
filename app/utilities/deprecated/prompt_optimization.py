@@ -103,28 +103,22 @@ def sanitize_filename(filename: str) -> str:
 
     # Limit the length (Chroma might have a maximum length for collection names)
     max_length = 63  # Adjust this if Chroma has a different limit
-    sanitized = sanitized[:max_length]
-
-    return sanitized
+    return sanitized[:max_length]
 
 
-def validate_query_distinction_local(previous_queries, query):
-    """check if query is distinct from previous queries"""
+
+def validate_query_distinction_local(previous_queries, query) -> bool:
+    """Check if query is distinct from previous queries."""
     if previous_queries == []:
         return True
-    if answer_exact_match_str(query, previous_queries, frac=0.8):
-        return False
-    return True
+    return not answer_exact_match_str(query, previous_queries, frac=0.8)
 
 
-def validate_context_and_answer_and_hops(example, pred, trace=None):
+def validate_context_and_answer_and_hops(example, pred, trace=None) -> bool:
     if not answer_exact_match(example, pred):
         return False
 
-    if not answer_passage_match(example, pred):
-        return False
-
-    return True
+    return answer_passage_match(example, pred)
 
 
 def all_queries_distinct(prev_queries):
@@ -150,12 +144,12 @@ class GenerateSearchQuery(dspy.Signature):
     context: str = dspy.InputField(desc="may contain relevant facts")
     question: str = dspy.InputField(desc="complex question")
     query: str = dspy.OutputField(
-        desc="A Retrieval Augmented Generation (RAG) search query to retrieve relevant facts"
+        desc="A Retrieval Augmented Generation (RAG) search query to retrieve relevant facts",
     )
 
 
 class SimpleQA(dspy.Module):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self.model = dspy.ChainOfThought("context, question -> answer")
 
@@ -180,7 +174,7 @@ def simple_qa(question, full_text, model_type="openai/gpt-4o"):
 
 
 class MultiHopQAModel(dspy.Module):
-    def __init__(self, passages_per_hop=2, max_hops=2):
+    def __init__(self, passages_per_hop=2, max_hops=2) -> None:
         super().__init__()
 
         self.generate_query = [
@@ -202,10 +196,10 @@ class MultiHopQAModel(dspy.Module):
             query = self.generate_query[hop](
                 context=context,
                 question=question,
-                config=dict(temperature=0.7 + 0.0001 * hop),
+                config={"temperature": 0.7 + 0.0001 * hop},
             ).query
             # prev_queries.append(query)
-            prev_queries = deduplicate(prev_queries + [query])
+            prev_queries = deduplicate([*prev_queries, query])
             passages = self.retrieve(query).passages
             context = deduplicate(context + passages)
 
@@ -214,8 +208,7 @@ class MultiHopQAModel(dspy.Module):
 
         pred = self.generate_answer(context=context, question=question)
 
-        pred = dspy.Prediction(context=context, answer=pred.answer, question=question)
-        return pred
+        return dspy.Prediction(context=context, answer=pred.answer, question=question)
 
 
 def dspy_model(
@@ -231,7 +224,6 @@ def dspy_model(
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=100)
     docs = text_splitter.split_documents([Document(page_content=full_text)])
 
-    print("collection_name: ", collection_name)
 
     # Check if the collection already exists
 
@@ -324,8 +316,7 @@ feedback_judge = dspy.ChainOfThought(LLMAnswerFeedbackJudge, max_tokens=max_toke
 
 
 def llm_judge_metric(example, pred, trace=None):
-    """
-    Judge if the predicted answer is correct based on the true answer.
+    """Judge if the predicted answer is correct based on the true answer.
     Judge if the answer is factually correct based on the context.
     """
     # Check if the predicted answer is correct based on the true answer
@@ -354,13 +345,12 @@ def llm_judge_metric(example, pred, trace=None):
 
     if trace is None:  # if we're doing evaluation or optimization
         return (answer_match + fact_match + feedback_match) / 3.0
-    else:  # if we're doing bootstrapping, i.e. self-generating good demonstrations of each step
-        return answer_match and fact_match and feedback_match
+    # if we're doing bootstrapping, i.e. self-generating good demonstrations of each step
+    return answer_match and fact_match and feedback_match
 
 
-def background_retrain_model(feedback_list, root_path):
+def background_retrain_model(feedback_list, root_path) -> None:
     # Implement your model retraining code here
-    print("Retraining the model with the following feedback:")
 
     persistent_directory = Path(root_path) / "static" / "uploads"
     collection_name = "chat_dspy_model"
@@ -416,7 +406,7 @@ def background_retrain_model(feedback_list, root_path):
                 "answer": feedback.answer,
                 "feedback": feedback.feedback,
                 "context": retrieved_context,
-            }
+            },
         )
 
     # for index, feedback in enumerate(feedback_data):
@@ -440,7 +430,7 @@ def background_retrain_model(feedback_list, root_path):
     valset = [x.with_inputs("question") for x in valset]
 
     NUM_THREADS = 4
-    kwargs = dict(num_threads=NUM_THREADS, display_progress=True)
+    kwargs = {"num_threads": NUM_THREADS, "display_progress": True}
     # metric = answer_exact_match
     metric = llm_judge_metric
 
@@ -485,10 +475,8 @@ def background_retrain_model(feedback_list, root_path):
     # TODO maybe use LabeledFewShot to optimize the prompt use both positive and negative feedback
 
     # Evaluate the compiled program
-    bayesian_train_score = evaluate(compiled_program, devset=trainset)
-    bayesian_eval_score = evaluate(compiled_program, devset=valset)
-    print("Bayesian train score: ", bayesian_train_score)
-    print("Bayesian eval score: ", bayesian_eval_score)
+    evaluate(compiled_program, devset=trainset)
+    evaluate(compiled_program, devset=valset)
 
     # save the model
     compiled_program.save("compiled_program")

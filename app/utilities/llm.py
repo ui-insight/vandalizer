@@ -9,7 +9,7 @@ from openai import OpenAI
 
 
 class ChatLM:
-    def __init__(self, model_type="insight"):
+    def __init__(self, model_type="insight") -> None:
         self.model_type = model_type
 
     def completion(self, structured_output=False, stream=False, **kwargs):
@@ -20,17 +20,14 @@ class ChatLM:
                 api_key = kwargs.pop("api_key", None)
                 client = OpenAI(api_key=api_key)
                 return client.beta.chat.completions.parse(
-                    model=model, messages=messages, **kwargs
+                    model=model, messages=messages, **kwargs,
                 )
-            else:
-                completion = openai.chat.completions.create(
-                    model=model, messages=messages, **kwargs
-                )
-                output = completion.choices[0].message.content
-                return output
+            completion = openai.chat.completions.create(
+                model=model, messages=messages, **kwargs,
+            )
+            return completion.choices[0].message.content
         lm = InsightLM()
-        response = lm(stream=stream, **kwargs)
-        return response
+        return lm(stream=stream, **kwargs)
 
 
 class InsightLM(LM):
@@ -42,7 +39,7 @@ class InsightLM(LM):
         stream=False,
         endpoint="v1/chat/completions",
         **kwargs,
-    ):
+    ) -> None:
         super().__init__(model=model, cache=cache, **kwargs)
         self.api_key = api_key
         self.stream = stream
@@ -72,16 +69,14 @@ class InsightLM(LM):
         response = requests.post(self.host, json=data, headers=self.headers)
 
         if response.status_code != 200:
-            print("Error: ", response.text)
             return None
         response = response.json()
         if response.get("error") == "No instances available for model":
             data["model"] = random.choice(
-                ["mistral-large:123b", "qwen2.5:72b", "llama3.2:3b"]
+                ["mistral-large:123b", "qwen2.5:72b", "llama3.2:3b"],
             )
             response = requests.post(self.host, json=data, headers=self.headers)
             response = response.json()
-        print("chat response: ", response)
 
         return response
 
@@ -100,17 +95,16 @@ class InsightLM(LM):
         if response.get("choices") is None:
             outputs = response["message"]["content"]
         else:
-            outputs = [c["message"]["content"] for c in response["choices"]][0]
+            outputs = next(c["message"]["content"] for c in response["choices"])
 
-        print("outputs: ", outputs)
         # Logging, with removed api key & where `cost` is None on cache hit.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("api_")}
-        entry = dict(prompt=prompt, messages=messages, kwargs=kwargs, response=response)
+        entry = {"prompt": prompt, "messages": messages, "kwargs": kwargs, "response": response}
         if response.get("usage"):
             entry = dict(**entry, outputs=outputs, usage=dict(response["usage"]))
         if response.get("response_cost"):
             entry = dict(
-                **entry, cost=response.get("_hidden_params", {}).get("response_cost")
+                **entry, cost=response.get("_hidden_params", {}).get("response_cost"),
             )
         entry = dict(
             **entry,

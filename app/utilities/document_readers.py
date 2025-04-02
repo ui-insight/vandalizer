@@ -27,7 +27,7 @@ class APIResponse:
         text=None,
         tables=None,
         images=None,
-    ):
+    ) -> None:
         self.status = status
         self.message = message
         self.http_status = http_status
@@ -35,18 +35,17 @@ class APIResponse:
         self.tables = tables
         self.images = images
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"APIResponse(status={self.status}, message={self.message}, http_status={self.http_status}, text={self.text}, tables={self.tables}, images={self.images})"
 
 
 def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
-    """
-    Extract text from a PDF file using PyMuPDF and OCR.
+    """Extract text from a PDF file using PyMuPDF and OCR.
     If the native text extraction is insufficient, OCR is applied.
     """
     debug("Extracting text with ocr for ", pdf_path)
     extracted_text = ""
-    for i in range(retries):
+    for _i in range(retries):
         try:
             processor = PDFProcessor(
                 ocr_tool="doctr",
@@ -63,6 +62,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
             debug(f"Error extracting text from PDF: {e}")
             return ""
         return ""
+    return None
 
 
 def extract_text_from_pdf(pdf_path):
@@ -74,7 +74,7 @@ def extract_text_from_pdf(pdf_path):
 
 
 def extract_text_from_html(html_path):
-    with open(html_path, "r", encoding="utf-8") as file:
+    with open(html_path, encoding="utf-8") as file:
         return file.read()
 
 
@@ -88,21 +88,22 @@ def extract_text_from_doc(doc_path, doc=None):
     if doc is None:
         if doc_path_str.endswith(".pdf"):
             return ocr_extract_text_from_pdf(doc_path_str)
-        elif doc_path_str.endswith(".html"):
+        if doc_path_str.endswith(".html"):
             return extract_text_from_html(doc_path_str)
-    else:
-        if doc.extension == "pdf" or doc.extension == "docx":
-            # return extract_text_from_pdf(doc_path_str)
-            return ocr_extract_text_from_pdf(doc_path_str)
-        elif doc.extension == "html":
-            return extract_text_from_html(doc_path_str)
+        return None
+    if doc.extension in {"pdf", "docx"}:
+        # return extract_text_from_pdf(doc_path_str)
+        return ocr_extract_text_from_pdf(doc_path_str)
+    if doc.extension == "html":
+        return extract_text_from_html(doc_path_str)
+    return None
 
 
 class PDFProcessor:
-    """Core PDF processing functionality that can be used both natively and as an API resource"""
+    """Core PDF processing functionality that can be used both natively and as an API resource."""
 
-    def __init__(self, format, garble_ratio, ocr_tool, file_path, output_path):
-        """Initialize with configuration"""
+    def __init__(self, format, garble_ratio, ocr_tool, file_path, output_path) -> None:
+        """Initialize with configuration."""
         self.fallback = "ocr"
         self.format = format
         self.garble_ratio = garble_ratio
@@ -120,7 +121,7 @@ class PDFProcessor:
         except Exception as e:
             pdf_document = None
             message, status = (
-                f"Error - there was a problem uploading your document: {str(e)}",
+                f"Error - there was a problem uploading your document: {e!s}",
                 500,
             )
 
@@ -138,9 +139,8 @@ class PDFProcessor:
                         messages += [f"Text is garbled on page #{page_number}"]
                         pdf_status.append(True)
                         break
-                    else:
-                        messages += [f"Text is clear on page #{page_number}"]
-                        pdf_status.append(False)
+                    messages += [f"Text is clear on page #{page_number}"]
+                    pdf_status.append(False)
                 else:
                     messages += [f"No native text found on page #{page_number}"]
                     pdf_status.append(True)
@@ -149,10 +149,8 @@ class PDFProcessor:
                     image_status.append(True)
                     messages += [f"An image was found on page #{page_number}"]
                     break
-                else:
-                    image_status.append(False)
+                image_status.append(False)
 
-            print("\n".join(messages))
             message, status = "document successfully checked", 200
 
         except Exception as e:
@@ -185,7 +183,7 @@ class PDFProcessor:
 
         try:
             # if OCR not necessary proceed with basic text extraction
-            if not any(images_found) and not any(pdf_quality) or self.fallback != "ocr":
+            if (not any(images_found) and not any(pdf_quality)) or self.fallback != "ocr":
                 full_text, tables, images = parse_basic(
                     document=pdf_document,
                     upload_path=self.file_path,
@@ -205,33 +203,32 @@ class PDFProcessor:
 
                 return api_response
 
-            else:
-                # if images or low quality send to OCR
-                try:
-                    with open(self.file_path, "rb") as f:
-                        files = {"file": f}
+            # if images or low quality send to OCR
+            try:
+                with open(self.file_path, "rb") as f:
+                    files = {"file": f}
 
-                        ocr_response = requests.post(
-                            OCR_ENDPOINT + self.ocr_tool, files=files, timeout=300
-                        )
+                    ocr_response = requests.post(
+                        OCR_ENDPOINT + self.ocr_tool, files=files, timeout=300,
+                    )
 
-                    api_response.status = ("Success",)
-                    api_response.message = ("document successfully parsed by OCR",)
-                    api_response.http_status = "200"
-                    api_response.text = ocr_response.text
-                    api_response.tables = []
-                    api_response.images = []
-                    # response = ocrmypdf(upload_path = file_path, output_path = file_output_path, return_as = format_type)
-                    pdf_document.close()
+                api_response.status = ("Success",)
+                api_response.message = ("document successfully parsed by OCR",)
+                api_response.http_status = "200"
+                api_response.text = ocr_response.text
+                api_response.tables = []
+                api_response.images = []
+                # response = ocrmypdf(upload_path = file_path, output_path = file_output_path, return_as = format_type)
+                pdf_document.close()
 
-                    return api_response
+                return api_response
 
-                except Exception as e:
-                    pdf_document.close()
-                    api_response.status = "error"
-                    api_response.message = f"Error - OCR tool @ {OCR_ENDPOINT + self.ocr_tool} failed with message: {e}"
-                    api_response.http_status = "500"
-                    return api_response
+            except Exception as e:
+                pdf_document.close()
+                api_response.status = "error"
+                api_response.message = f"Error - OCR tool @ {OCR_ENDPOINT + self.ocr_tool} failed with message: {e}"
+                api_response.http_status = "500"
+                return api_response
 
         except Exception as e:
             pdf_document.close()
@@ -251,7 +248,7 @@ class PDFProcessor:
         except Exception as e:
             api_response.status = "error"
             api_response.message = (
-                f"Error - there was a problem uploading your document: {str(e)}"
+                f"Error - there was a problem uploading your document: {e!s}"
             )
             api_response.http_status = "500"
 
@@ -294,7 +291,7 @@ class PDFProcessor:
         except Exception as e:
             api_response.status = "error"
             api_response.message = (
-                f"Error - there was a problem uploading your document: {str(e)}"
+                f"Error - there was a problem uploading your document: {e!s}"
             )
             api_response.http_status = "500"
 
@@ -330,15 +327,17 @@ class PDFProcessor:
 
 
 def is_text_garbled(text, threshold=0.2):
-    """
-    Check if the text is garbled by analyzing the proportion of non-alphanumeric characters.
+    """Check if the text is garbled by analyzing the proportion of non-alphanumeric characters.
 
-    Parameters:
+    Parameters
+    ----------
     - text (str): The text to analyze.
     - threshold (float): The proportion of non-alphanumeric characters above which text is considered garbled.
 
-    Returns:
+    Returns
+    -------
     - bool: True if text is considered garbled, False otherwise.
+
     """
     if not text:
         return True
@@ -362,12 +361,11 @@ def is_text_garbled(text, threshold=0.2):
 def clean_markdown(text):
     text = re.sub(r"\\(\d+\.)", r"\1", text)
     text = re.sub(r"\\([\.#\-_])", r"\1", text)
-    text = re.sub(r"\\([\$\+])", r"\1", text)
-    return text
+    return re.sub(r"\\([\$\+])", r"\1", text)
 
 
 def parse_basic(
-    document, upload_path, format, extract_tables=True, extract_images=True
+    document, upload_path, format, extract_tables=True, extract_images=True,
 ):
     full_text = ""
     tables = {}
@@ -375,25 +373,22 @@ def parse_basic(
     if format == "plain text":
         for page_number in range(document.page_count):
             page = document.load_page(page_number)
-            if extract_tables:
-                if page.find_tables():
-                    tables = tables | {f"page{page_number}": page.find_tables()}
+            if extract_tables and page.find_tables():
+                tables = tables | {f"page{page_number}": page.find_tables()}
 
-            if extract_images:
-                if page.get_images():
-                    xrefs = [i[0] for i in page.get_images()]
-                    imagebytes = {
-                        {f"image{i}": fitz.Pixmap(document, ref).tobytes()}
-                        for i, ref in enumerate(xrefs)
-                    }
-                    images = images | {f"page{page_number}": imagebytes}
+            if extract_images and page.get_images():
+                xrefs = [i[0] for i in page.get_images()]
+                imagebytes = {
+                    {f"image{i}": fitz.Pixmap(document, ref).tobytes()}
+                    for i, ref in enumerate(xrefs)
+                }
+                images = images | {f"page{page_number}": imagebytes}
 
             full_text += page.get_text("text")
 
         return full_text, tables, images
-    else:
-        full_text = pymupdf4llm.to_markdown(upload_path)
-        return full_text, {}, {}
+    full_text = pymupdf4llm.to_markdown(upload_path)
+    return full_text, {}, {}
 
 
 def save_page_to_pdf(doc, page_number, output_path):
@@ -410,8 +405,7 @@ def save_page_to_pdf(doc, page_number, output_path):
         # Save the new PDF document
         new_doc.save(page_path)
         new_doc.close()
-    except Exception as e:
-        print(f"ERROR: There was a problem saving page {page_number} to .pdf: {e}")
+    except Exception:
         new_doc.close()
 
     return page_path
@@ -435,15 +429,11 @@ def process_page(
     if page.get_text():
         bad_text = is_text_garbled(page.get_text("text", sort=True), gr)
         if bad_text:
-            print(f"text on page {page_number} is garbled")
+            pass
     else:
         bad_text = False
 
-    if page.get_images():
-        found_im = True
-        print(f"An image was found on page {page_number}")
-    else:
-        found_im = False
+    found_im = bool(page.get_images())
 
     # determine if the page needs OCR
     if any([found_im, bad_text]):
@@ -458,8 +448,7 @@ def process_page(
                     for i, ref in enumerate(xrefs)
                 }
                 images = {f"page{page_number}": imagebytes}
-            except Exception as e:
-                print(f"ERROR: {e}")
+            except Exception:
                 images = {}
         else:
             images = {}
@@ -475,34 +464,32 @@ def process_page(
                 tables = {f"page{page_number}": [i.extract() for i in tabs]}
         except Exception as e:
             if not page.get_text() or "not a textpage" in str(e):
-                print("Page is not a textpage")
+                pass
             else:
-                print(f"ERROR: {e}")
+                pass
             tables = {}
     else:
         tables = {}
 
     # OCR the page if the ocr indicator is active
     if ocr_page:
-        print(f"Using OCR tool @ {endpoint} to extract page {page_number}")
         # freeze current page to pdf
         fp = save_page_to_pdf(document, page_number, output_dir)
         try:
             with open(
-                fp, "rb"
+                fp, "rb",
             ) as f:  # Use 'with' to ensure the file is closed properly
                 files = {"file": f}
                 ocr_response = requests.post(endpoint, files=files, timeout=300)
                 page_text = ocr_response.text
 
-        except Exception as e:
-            print(f"ERROR: {e}")
+        except Exception:
             page_text = ""
 
         try:
             os.remove(fp)  # Clean up the uploaded file
-        except Exception as e:
-            print(f"There was an error with file cleanup: \n{e}")
+        except Exception:
+            pass
 
     # use regular text extraction when OCR is not needed
     else:
@@ -520,9 +507,8 @@ def assemble_page_text(page_indices, page_texts):
     sorted_texts = [index_to_text[i] for i in sorted(index_to_text.keys())]
 
     # Join the retrieved texts together
-    assembled_text = " ".join(sorted_texts)
+    return " ".join(sorted_texts)
 
-    return assembled_text
 
 
 # threaded page extraction
@@ -569,7 +555,7 @@ def parse_fast(
     try:
         if format == "plain text":
             return all_text, tables, images
-        elif format == "markdown":
+        if format == "markdown":
             markdown_text = md(
                 all_text,
                 escape_underscores=False,
@@ -577,8 +563,8 @@ def parse_fast(
                 strip=["a", "span"],
             )
         return clean_markdown(markdown_text), tables, images
-    except Exception as e:
-        print(f"ERROR {e}")
+    except Exception:
+        pass
 
 
 def parse_fast_by_page(
@@ -630,7 +616,7 @@ def parse_fast_by_page(
                 tables,
                 images,
             )  # Return list of page texts instead of merged text
-        elif format == "markdown":
+        if format == "markdown":
             markdown_texts = [
                 md(
                     text,
@@ -642,5 +628,5 @@ def parse_fast_by_page(
             ]
             cleaned_texts = [clean_markdown(md_text) for md_text in markdown_texts]
             return cleaned_texts, tables, images
-    except Exception as e:
-        print(f"ERROR {e}")
+    except Exception:
+        pass

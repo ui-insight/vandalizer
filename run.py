@@ -1,17 +1,18 @@
+import asyncio
 import os
+import threading
+
+import nest_asyncio
+from devtools import debug
+from dotenv import load_dotenv
 
 from app import app
-from dotenv import load_dotenv
-import nest_asyncio
-import asyncio
-import threading
-from devtools import debug
 
 load_dotenv()
 
 
 def setup_event_loop():
-    """Setup event loop for the current thread"""
+    """Setup event loop for the current thread."""
     # Get thread id for debugging
     threading.current_thread().ident
     try:

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import json
-from typing import Any, Dict, List, Type
+from typing import Any
 
 # from langfuse.decorators import observe
 import chardet
@@ -13,14 +13,14 @@ from app.utilities.llm import ChatLM
 
 
 def remove_code_markers(text: str) -> str:
-    """
-    Removes code block markers and language specifiers from LLM responses.
+    """Removes code block markers and language specifiers from LLM responses.
 
     Args:
         answer (str): The raw LLM response text
 
     Returns:
         str: Formatted text with code blocks and language specifiers removed
+
     """
     # Split the text into lines
     lines = text.split("\n")
@@ -38,9 +38,8 @@ def remove_code_markers(text: str) -> str:
         formatted_lines.append(line)
 
     # Join the lines back together
-    formatted_text = "\n".join(formatted_lines)
+    return "\n".join(formatted_lines)
 
-    return formatted_text
 
 
 # Implementation based on the discussion:
@@ -51,7 +50,6 @@ def num_tokens_from_text(text: str, model="gpt-4o"):
     try:
         encoding = tiktoken.encoding_for_model(model)
     except KeyError:
-        print("Warning: model not found. Using cl100k_base encoding.")
         encoding = tiktoken.get_encoding("cl100k_base")
 
     # List of models that use the same tokenizer
@@ -69,20 +67,17 @@ def num_tokens_from_text(text: str, model="gpt-4o"):
     }:
         # These models use the same tokenizer, so we can just encode and count
         return len(encoding.encode(text))
-    elif model == "gpt-3.5-turbo-0301":
+    if model == "gpt-3.5-turbo-0301":
         # This model might have slightly different tokenization
-        print("Warning: gpt-3.5-turbo-0301 may have slightly different tokenization.")
         return len(encoding.encode(text))
-    elif "gpt-3.5-turbo" in model:
-        print("Warning: gpt-3.5-turbo may update over time. Using current encoding.")
+    if "gpt-3.5-turbo" in model:
         return len(encoding.encode(text))
-    elif "gpt-4" in model:
-        print("Warning: gpt-4 may update over time. Using current encoding.")
+    if "gpt-4" in model:
         return len(encoding.encode(text))
-    else:
-        raise NotImplementedError(
-            f"""num_tokens_from_text() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how text is converted to tokens."""
-        )
+    msg = f"""num_tokens_from_text() is not implemented for model {model}. See https://github.com/openai/openai-python/blob/main/chatml.md for information on how text is converted to tokens."""
+    raise NotImplementedError(
+        msg,
+    )
 
 
 def detect_encoding(file_path):
@@ -97,10 +92,9 @@ def process_large_prompt(
     user_prompt: str,
     max_tokens=120000,
     model="gpt-4o",
-    response_format={"type": "json_object"},
+    response_format=None,
 ):
-    """
-    Process large prompts by chunking them while preserving the system prompt.
+    """Process large prompts by chunking them while preserving the system prompt.
 
     Args:
         system_prompt (str): The system prompt to maintain context
@@ -110,8 +104,11 @@ def process_large_prompt(
 
     Returns:
         str: Concatenated response from processing chunks
+
     """
     # Initialize tokenizer
+    if response_format is None:
+        response_format = {"type": "json_object"}
     tokenizer = tiktoken.encoding_for_model(model)
 
     # Encode system and user prompts
@@ -140,7 +137,6 @@ def process_large_prompt(
             # Call OpenAI API with system prompt and current chunk
 
             chat_lm = ChatLM(model_type)
-            print("model schema: ", response_format.model_json_schema())
             response = chat_lm.completion(
                 structured_output=True,
                 format=response_format.model_json_schema(),
@@ -149,13 +145,11 @@ def process_large_prompt(
                     {"role": "user", "content": chunk_text},
                 ],
             )
-            print("response: ", response)
 
             # Append chunk response
             full_response.append(response)
 
-        except Exception as e:
-            print(f"Error processing chunk: {e}")
+        except Exception:
             # Optional: add error handling or logging
             break
 
@@ -166,12 +160,12 @@ def process_large_prompt(
 # @observe
 def retry_llm_request(
     client: Any,
-    messages: List[Dict[str, str]],
-    model_class: Type[BaseModel],
+    messages: list[dict[str, str]],
+    model_class: type[BaseModel],
     max_retries: int = 5,
     model_type="openai",
 ):
-    for attempt in range(max_retries):
+    for _attempt in range(max_retries):
         try:
             # data = process_large_prompt(
             #     system_prompt=messages[0]["content"],
@@ -184,17 +178,16 @@ def retry_llm_request(
             system_prompt = messages[0]["content"]
             user_prompt = messages[1]["content"]
             response_format = model_class
-            print("model schema: ", response_format)
-            kwargs = dict()
+            kwargs = {}
             if model_type == "openai":
                 kwargs["structured_output"] = True
                 kwargs["model"] = "gpt-4o"
                 kwargs["response_format"] = model_class
             else:
-                kwargs = dict(
-                    structured_output=True,
-                    format=response_format,
-                )
+                kwargs = {
+                    "structured_output": True,
+                    "format": response_format,
+                }
 
             response = chat_lm.completion(
                 messages=[
@@ -203,14 +196,12 @@ def retry_llm_request(
                 ],
                 **kwargs,
             )
-            print("response: ", response)
             if model_type == "openai":
                 data = json.loads(response.choices[0].message.content)
                 return data.get("entities", [])
 
-            else:
-                data = json.loads(response)
-                return data.get("entities", [])
+            data = json.loads(response)
+            return data.get("entities", [])
 
             # validated_output = model_class.model_validate(output)
 
@@ -239,17 +230,13 @@ def retry_llm_request(
             for error in ve.errors():
                 loc = " -> ".join(map(str, error["loc"]))
                 field_guidance.append(
-                    f"- Field {loc}: {error['msg']} (Type: {error.get('type', 'unspecified')})"
+                    f"- Field {loc}: {error['msg']} (Type: {error.get('type', 'unspecified')})",
                 )
 
             improvement_prompt += "\n" + "\n".join(field_guidance)
 
             messages.append({"role": "system", "content": improvement_prompt})
 
-            print(
-                f"Validation attempt {attempt + 1} failed. Retrying with detailed guidance."
-            )
-            print("Improvement Prompt: ", improvement_prompt)
 
     return (
         f"Failed to generate valid {model_class.__name__} after {max_retries} attempts"

@@ -3,6 +3,7 @@ import sys
 sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
 
 import os
+from typing import Optional
 
 import chromadb
 
@@ -15,22 +16,21 @@ class SemanticIngest:
         try:
             client = chromadb.HttpClient(host="localhost", port=5028)
             collection = client.get_collection(name=document.uuid)
-            results = collection.query(
+            return collection.query(
                 query_texts=[search_term],
                 n_results=20,
             )
-            return results
         except:
             return []
 
-    def delete(self, document):
+    def delete(self, document) -> None:
         try:
             client = chromadb.HttpClient(host="localhost", port=5028)
             client.delete_collection(name=document.uuid)
         except:
             pass
 
-    def check_for_collection(self, document):
+    def check_for_collection(self, document) -> Optional[bool]:
         try:
             client = chromadb.HttpClient(host="localhost", port=5028)
             client.get_collection(name=document.uuid)
@@ -38,20 +38,19 @@ class SemanticIngest:
         except:
             return False
 
-    def ingest(self, document):
+    def ingest(self, document) -> None:
         try:
             client = chromadb.HttpClient(host="localhost", port=5028)
             collection = client.create_collection(name=document.uuid)
 
-            print("Ingesting " + str(document.uuid))
             path = os.path.join(
-                app.root_path, "static", "uploads", f"{document.uuid}.pdf"
+                app.root_path, "static", "uploads", f"{document.uuid}.pdf",
             )
             chunks = pdf_helper.chunk_pdf(path)
             metadatas = []
             ids = []
 
-            for i, chunk in enumerate(chunks):
+            for i, _chunk in enumerate(chunks):
                 metadatas.append({"source": str(document.uuid)})
                 ids.append("Part: " + str(i))
 

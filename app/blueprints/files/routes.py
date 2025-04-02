@@ -1,12 +1,25 @@
+"""Handles file routing."""
+
 import base64
 import io
 import os
 import threading
 import uuid
+from pathlib import Path
 
 import pypandoc
 from devtools import debug
-from flask import current_app, jsonify, redirect, request, session, url_for, send_file, abort
+from flask import (
+    abort,
+    current_app,
+    jsonify,
+    redirect,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from flask.typing import ResponseReturnValue
 from pypdf import PdfReader
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
@@ -27,7 +40,8 @@ from . import files
 
 
 @files.route("/upload", methods=["POST"])
-def upload():
+def upload() -> ResponseReturnValue:
+    """Handle file upload."""
     user = load_user()
     if user is None:
         return redirect(url_for("auth.login"))
@@ -46,7 +60,10 @@ def upload():
 
     if (
         SmartDocument.objects(
-            title=filename, space=space, user_id=user.user_id, folder=folder
+            title=filename,
+            space=space,
+            user_id=user.user_id,
+            folder=folder,
         ).count()
         > 0
     ):
@@ -56,22 +73,22 @@ def upload():
     uid = uuid.uuid4().hex.upper()
 
     # Update the stored path to include the user's id folder
-    relative_file_path = os.path.join(user_id, f"{uid}.{extension}")
+    relative_file_path = Path(user_id) / f"{uid}.{extension}"
     debug(relative_file_path)
 
     # Define base upload directory
-    base_upload_dir = os.path.join(current_app.root_path, "static", "uploads")
-    if not os.path.exists(base_upload_dir):
+    base_upload_dir = Path(current_app.root_path) / "static" / "uploads"
+    if not Path.exists(base_upload_dir):
         os.makedirs(base_upload_dir)
 
     # Create a directory for the user based on their id
-    upload_dir = os.path.join(base_upload_dir, user_id)
-    if not os.path.exists(upload_dir):
+    upload_dir = Path(base_upload_dir) / user_id
+    if not Path.exists(upload_dir):
         os.makedirs(upload_dir)
 
     # Save the file to the user's directory
-    file_path = os.path.join(upload_dir, f"{uid}.{extension}")
-    with open(file_path, "wb") as f:
+    file_path = Path(upload_dir) / f"{uid}.{extension}"
+    with Path.open(file_path, "wb") as f:
         f.write(imgdata)
 
     debug(file_path)
@@ -94,8 +111,8 @@ def upload():
 
     if extension == "docx":
         # Convert to PDF
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        docx_path = os.path.join(upload_dir, f"{uid}.docx")
+        pdf_path = Path(upload_dir) / f"{uid}.pdf"
+        docx_path = Path(upload_dir) / f"{uid}.docx"
         pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
         extension = "pdf"
         raw_text = extract_text_from_doc(docx_path)
@@ -103,14 +120,15 @@ def upload():
         document.processing = False
         document.save()
         thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
+            target=perform_semantic_ingestion,
+            args=(document, user_id, raw_text),
         )
         thread.start()
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
-        html_path = os.path.join(upload_dir, f"{uid}.html")
-        excel_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        html_path = Path(upload_dir) / f"{uid}.html"
+        excel_path = Path(upload_dir) / f"{uid}.{extension}"
         save_excel_to_html(excel_path, html_path)
         extension = "html"
         raw_text = extract_text_from_html(html_path)
@@ -118,15 +136,17 @@ def upload():
         document.processing = False
         document.save()
         thread = threading.Thread(
-            target=perform_semantic_ingestion, args=(document, user_id, raw_text)
+            target=perform_semantic_ingestion,
+            args=(document, user_id, raw_text),
         )
         thread.start()
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        pdf_path = Path(upload_dir) / f"{uid}.pdf"
         thread = threading.Thread(
-            target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
+            target=perform_ocr_and_semantic_ingestion,
+            args=(document, user_id),
         )
         thread.start()
 
@@ -134,19 +154,21 @@ def upload():
 
 
 @files.route("/poll_status", methods=["GET"])
-def poll_status():
+def poll_status() -> ResponseReturnValue:
+    """Poll the status of a document's processing."""
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
     return jsonify(
         {
             "complete": not document.processing and document.raw_text != "",
             "raw_text": document.raw_text if not document.processing else "",
-        }
+        },
     )
 
 
 @files.route("/rename_document", methods=["POST"])
-def rename_document():
+def rename_document() -> ResponseReturnValue:
+    """Rename a document."""
     data = request.get_json()
     document_uuid = data["uuid"]
     new_title = data["newName"]
@@ -158,7 +180,8 @@ def rename_document():
 
 
 @files.route("/rename_folder", methods=["POST"])
-def rename_folder():
+def rename_folder() -> ResponseReturnValue:
+    """Rename a folder."""
     data = request.get_json()
     document_uuid = data["uuid"]
     new_title = data["newName"]
@@ -170,7 +193,8 @@ def rename_folder():
 
 
 @files.route("/move_file", methods=["POST"])
-def move_file():
+def move_file() -> ResponseReturnValue:
+    """Move a file to another folder."""
     data = request.get_json()
     file_uuid = data["fileUUID"]
     folder_id = data["folderID"]
@@ -182,11 +206,11 @@ def move_file():
     return jsonify({"complete": True})
 
 
-
 @files.route("/download_document")
-def download_document():
+def download_document() -> ResponseReturnValue:
+    """Download a document."""
     document_uuid = request.args.get("docid")
-    
+
     if not document_uuid:
         abort(400, description="Missing document UUID")
 
@@ -194,37 +218,30 @@ def download_document():
     if not document:
         abort(404, description="Document not found")
 
-    document_file_path = os.path.join(
-        current_app.root_path,
-        "static",
-        "uploads",
-        document.path,
+    document_file_path = (
+        Path(current_app.root_path) / "static" / "uploads" / document.path
     )
 
-    if not os.path.isfile(document_file_path):
+    if not Path.isfile(document_file_path):
         abort(404, description="File not found on server")
 
     return send_file(document_file_path, as_attachment=True)
 
 
-
 @files.route("/delete_document")
-def delete_documents():
+def delete_documents() -> ResponseReturnValue:
+    """Delete a document."""
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
     if document:
-        # semantics = SemanticIngest()
-        # semantics.delete(document)
         document_manager = DocumentManager()
         document_manager.delete_document(
-            user_id=session["user_id"], document_id=document_uuid
+            user_id=session["user_id"],
+            document_id=document_uuid,
         )
 
-        document_file_path = os.path.join(
-            current_app.root_path,
-            "static",
-            "uploads",
-            document.path,
+        document_file_path = (
+            Path(current_app.root_path) / "static" / "uploads" / document.path
         )
         os.remove(document_file_path)
 
@@ -238,7 +255,8 @@ def delete_documents():
 
 
 @files.route("/delete_folder")
-def delete_folder():
+def delete_folder() -> ResponseReturnValue:
+    """Delete a folder and all its contents."""
     folder_id = request.args.get("folder_id")
     SmartFolder.objects.filter(uuid=folder_id).delete()
 
@@ -250,7 +268,8 @@ def delete_folder():
 
 
 @files.route("/move_item", methods=["POST"])
-def move_item():
+def move_item() -> ResponseReturnValue:
+    """Move a document or folder to another folder."""
     item_type = request.form.get("item_type")
     item_id = request.form.get("item_id")
     target_folder_id = request.form.get("target_folder_id")
@@ -264,7 +283,8 @@ def move_item():
 
 
 @files.route("/toggle_default_doc")
-def toggle_default_doc():
+def toggle_default_doc() -> ResponseReturnValue:
+    """Toggle the default document status."""
     load_user()
     doc_id = request.args.get("doc_id")
     request.args.get("folder_id")
@@ -278,7 +298,8 @@ def toggle_default_doc():
 
 
 @files.route("/create_folder", methods=["POST"])
-def create_folder():
+def create_folder() -> ResponseReturnValue:
+    """Create a new folder."""
     parent_id = request.form["parent_id"]
     name = request.form["name"]
     space_id = request.form["space_id"]
@@ -294,7 +315,8 @@ def create_folder():
 
 
 @files.route("/upload_fillable_pdf", methods=["POST"])
-def upload_fillable_pdf():
+def upload_fillable_pdf() -> ResponseReturnValue:
+    """Upload a fillable PDF."""
     if "file" not in request.files:
         return jsonify({"error": "No file part"}), 400
 
@@ -314,9 +336,9 @@ def upload_fillable_pdf():
 
     # Write to the filesystem
     # Save the file to the filesystem
-    file_path = os.path.join(current_app.root_path, "static", "uploads", file.filename)
+    file_path = Path(current_app.root_path) / "static" / "uploads" / file.filename
     file.seek(0)  # Go back to the start of the file
-    with open(file_path, "wb") as f:
+    with Path.open(file_path, "wb") as f:
         f.write(file.read())
 
     searchset.fillable_pdf_url = file.filename
@@ -332,46 +354,42 @@ def upload_fillable_pdf():
 
     fillable_manager = FillablePDFManager()
     output = fillable_manager.build_set_from_items(field_options)
-    # output = json.loads(output)
+
     bindings = output["fields"]
-    print(output)
 
     for item in bindings:
-        key = list(item.keys())[0]
+        key = next(iter(item.keys()))
         value = item[key]
-        item = SearchSetItem(
+        item_obj = SearchSetItem(
             searchphrase=value,
             searchset=search_set_uuid,
             searchtype="extraction",
             pdf_binding=key,
         )
-        item.save()
+        item_obj.save()
 
     return jsonify("Success"), 200
 
 
 @files.route("/read_pdf", methods=["POST"])
-def read_pdf():
-    # user = load_user()
-    # if user is None:
-    # 	return redirect(url_for('login'))
-
+def read_pdf() -> ResponseReturnValue:
+    """Read a PDF file from base64 string and extract text."""
     json_data = request.get_json()
     blob = json_data["contentAsBase64String"]
     json_data["fileName"]
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
-    with open(
-        os.path.join(current_app.root_path, "static", "temp", f"{uid}.pdf"), "wb"
+    with Path.open(
+        Path(current_app.root_path) / "static" / "temp" / f"{uid}.pdf",
+        "wb",
     ) as f:
         f.write(imgdata)
 
-    pdf = PdfReader(os.path.join(current_app.root_path, "static", "temp", f"{uid}.pdf"))
+    pdf = PdfReader(Path(current_app.root_path) / "static" / "temp" / f"{uid}.pdf")
     number_of_pages = len(pdf.pages)
     full_text = ""
     for i in range(number_of_pages):
         full_text = full_text + pdf.pages[i].extract_text() + " "
 
-    print(full_text)
     return jsonify({"full_text": full_text})
