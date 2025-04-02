@@ -71,14 +71,8 @@ def verify_document(document, user_id):
 
     if not document.raw_text or document.raw_text == "":
         pdf_path = document.absolute_path
-        # thread = threading.Thread(
-        #     target=perform_extraction_and_update,
-        #     args=(
-        #         document,
-        #         pdf_path,
-        #     ),
-        # )
-        # thread.start()
+        document.processing = True
+        document.save()
         perform_extraction_and_update.delay(document.uuid, pdf_path)
     elif document.processing:
         document.processing = False
@@ -88,15 +82,6 @@ def verify_document(document, user_id):
     if not document_manager.document_exists(user_id, document.uuid):
         document.processing = True
         document.save()
-
-        # thread = threading.Thread(
-        #     target=perform_semantic_ingestion,
-        #     args=(
-        #         document,
-        #         user_id,
-        #     ),
-        # )
-        # thread.start()
         perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
 
 

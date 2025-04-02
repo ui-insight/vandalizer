@@ -95,12 +95,7 @@ def upload():
         extension = "pdf"
         raw_text = extract_text_from_doc(docx_path)
         document.raw_text = raw_text
-        document.processing = False
         document.save()
-        # thread = threading.Thread(
-        #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
-        # )
-        # thread.start()
         perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension in ["xlsx", "xls"]:
@@ -111,7 +106,6 @@ def upload():
         extension = "html"
         raw_text = extract_text_from_html(html_path)
         document.raw_text = raw_text
-        document.processing = False
         document.save()
         # thread = threading.Thread(
         #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
