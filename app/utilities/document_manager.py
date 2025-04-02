@@ -6,28 +6,27 @@ try:
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
-from typing import List, Dict, Any
 from datetime import datetime
 from pathlib import Path
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_chroma.vectorstores import Chroma
+from typing import Any, Optional
+
 import chromadb
 from chromadb.config import Settings
+from devtools import debug
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_chroma.vectorstores import Chroma
+from langchain_openai import OpenAIEmbeddings
 
 from app import app
-from devtools import debug
-
 from app.utilities.document_readers import (
     extract_text_from_doc,
 )
-
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def perform_extraction_and_update(document, doc_path):
+def perform_extraction_and_update(document, doc_path) -> None:
     debug("Performing OCR on document", document.title)
     document.processing = True
     try:
@@ -46,7 +45,7 @@ def perform_extraction_and_update(document, doc_path):
         document.save()
 
 
-def perform_semantic_ingestion(document, user_id, raw_text=None):
+def perform_semantic_ingestion(document, user_id, raw_text=None) -> None:
     document_manager = DocumentManager()
 
     document_path = document.absolute_path
@@ -62,7 +61,7 @@ def perform_semantic_ingestion(document, user_id, raw_text=None):
     document.save()
 
 
-def perform_ocr_and_semantic_ingestion(document, user_id):
+def perform_ocr_and_semantic_ingestion(document, user_id) -> None:
     document_path = document.absolute_path
     perform_extraction_and_update(document, document_path)
     document = document.reload()
@@ -72,13 +71,13 @@ def perform_ocr_and_semantic_ingestion(document, user_id):
 
 
 class DocumentManager:
-    def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db"):
+    def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db") -> None:
         """Initialize the document manager with a persistence directory."""
         self.upload_folder = Path(app.root_path) / "static" / "uploads"
         self.persist_directory = persist_directory.as_posix()
         self.embeddings = OpenAIEmbeddings()
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200, length_function=len
+            chunk_size=1000, chunk_overlap=200, length_function=len,
         )
 
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
@@ -98,14 +97,13 @@ class DocumentManager:
             # Collection doesn't exist, create an empty collection
             self.client.create_collection(name=collection_name)
 
-        vectorstore = Chroma(
+        return Chroma(
             client=self.client,  # Use the existing client
             collection_name=collection_name,
             embedding_function=self.embeddings,
             persist_directory=self.persist_directory,
         )
 
-        return vectorstore
 
     def add_document(
         self,
@@ -115,8 +113,7 @@ class DocumentManager:
         document_id: str,
         raw_text=None,
     ) -> str:
-        """
-        Add a document to a user's collection.
+        """Add a document to a user's collection.
         Returns the document ID for future reference.
         """
         # Load and split the document
@@ -142,7 +139,7 @@ class DocumentManager:
                     "total_chunks": len(splits),
                     "timestamp": datetime.now().isoformat(),
                     "user_id": user_id,
-                }
+                },
             )
 
 
@@ -153,10 +150,9 @@ class DocumentManager:
         vectorstore.add_documents(splits)
 
     def query_documents(
-        self, user_id: str, query: str, filter_docs: List[str] = None, k: int = 4
-    ) -> List[Dict[str, Any]]:
-        """
-        Query a user's documents, optionally filtering by document IDs.
+        self, user_id: str, query: str, filter_docs: Optional[list[str]] = None, k: int = 4,
+    ) -> list[dict[str, Any]]:
+        """Query a user's documents, optionally filtering by document IDs.
         Returns relevant document chunks with their metadata.
         """
         vectorstore = self.get_user_collection(user_id)
@@ -172,7 +168,6 @@ class DocumentManager:
             # filter_dict = {
             #     "$and": [{"document_id": {"$eq": doc_id}} for doc_id in filter_docs]
             # }
-            print("filter_dict: ", filter_dict)
             results = vectorstore.similarity_search(
                 query,
                 k=k,
@@ -181,18 +176,11 @@ class DocumentManager:
         else:
             results = vectorstore.similarity_search(query, k=k)
 
-        formatted_results = [
+        return [
             {"content": doc.page_content, "metadata": doc.metadata} for doc in results
         ]
 
-        print("query: ", query)
-        print("user_id: ", user_id)
-        print("filter_docs: ", filter_docs)
-        print("k: ", k)
-        print("results: ", results)
-        print("formatted_results: ", formatted_results)
 
-        return formatted_results
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
         """Check if a specific document exists in a user's collection."""
@@ -214,7 +202,7 @@ class DocumentManager:
             # Delete all chunks with matching document_id
             collection.delete(where={"document_id": document_id})
 
-    def list_user_documents(self, user_id: str) -> List[Dict[str, Any]]:
+    def list_user_documents(self, user_id: str) -> list[dict[str, Any]]:
         """List all documents in a user's collection with metadata."""
         collection = self.client.get_collection(name=f"user_{user_id}_docs")
         # Get all unique document IDs and their metadata
@@ -222,7 +210,7 @@ class DocumentManager:
 
         # Group by document_id to get unique documents
         documents = {}
-        for i, metadata in enumerate(results["metadatas"]):
+        for _i, metadata in enumerate(results["metadatas"]):
             if not metadata:
                 continue
             doc_id = metadata.get("document_id")

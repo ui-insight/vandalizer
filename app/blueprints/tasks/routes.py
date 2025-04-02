@@ -2,6 +2,7 @@ import csv
 import os
 import uuid
 from copy import deepcopy
+from pathlib import Path
 
 from devtools import debug
 from flask import (
@@ -14,6 +15,7 @@ from flask import (
     send_file,
     url_for,
 )
+from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument
@@ -27,7 +29,8 @@ from . import tasks
 
 # Add a extraction set
 @tasks.route("/extraction/add_search_set", methods=["POST"])
-def add_search_set():
+def add_search_set() -> ResponseReturnValue:
+    """Add a new search set."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -45,25 +48,22 @@ def add_search_set():
         status="active",
         set_type=search_type,
     )
-    # if user.is_admin:
-    #     searchset.is_global = True
+
     searchset.save()
     return jsonify({"complete": True, "uuid": searchset.uuid})
 
 
 # Add a term to a search set
 @tasks.route("/extraction/add_search_term", methods=["POST"])
-def add_search_term():
+def add_search_term() -> ResponseReturnValue:
+    """Add a term to an existing search set."""
     data = request.get_json()
-    print(data)
     searchphrase = data["term"]
     searchset_uuid = data["search_set_uuid"]
     searchset = SearchSet.objects(uuid=searchset_uuid).first()
     searchtype = data["searchtype"]
 
-    attachments = data["attachments"] if "attachments" in data else None
-    print(searchphrase)
-    print(attachments)
+    attachments = data.get("attachments", None)
 
     if searchset.is_global:
         user = load_user()
@@ -72,20 +72,23 @@ def add_search_term():
                 {
                     "complete": False,
                     "error": "You do not have permission to add to this search set.",
-                }
+                },
             )
 
     searchsetitem = SearchSetItem(
-        searchphrase=searchphrase, searchset=searchset_uuid, searchtype=searchtype
+        searchphrase=searchphrase,
+        searchset=searchset_uuid,
+        searchtype=searchtype,
     )
     if attachments:
         searchsetitem.text_blocks = attachments
 
     searchsetitem.save()
 
-    print(searchsetitem)
     template = render_template(
-        "toolpanel/search_set_item.html", search_set=searchset, item=searchsetitem
+        "toolpanel/search_set_item.html",
+        search_set=searchset,
+        item=searchsetitem,
     )
     response = {
         "complete": True,
@@ -95,7 +98,8 @@ def add_search_term():
 
 
 @tasks.route("/add_prompt", methods=["POST"])
-def add_prompt():
+def add_prompt() -> ResponseReturnValue:
+    """Add a new prompt to the database."""
     data = request.get_json()
     title = data["title"]
     prompt = data["prompt"]
@@ -103,7 +107,7 @@ def add_prompt():
     prompt_type = data["prompt_type"]
     if title == "" or prompt == "":
         return jsonify(
-            {"complete": False, "error": "Title and prompt cannot be empty."}
+            {"complete": False, "error": "Title and prompt cannot be empty."},
         )
 
     user = load_user()
@@ -122,7 +126,8 @@ def add_prompt():
 
 
 @tasks.route("/edit_prompt", methods=["POST"])
-def edit_prompt():
+def edit_prompt() -> ResponseReturnValue:
+    """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
     load_user()
@@ -140,7 +145,8 @@ def edit_prompt():
 
 
 @tasks.route("/update_prompt", methods=["POST"])
-def update_prompt():
+def update_prompt() -> ResponseReturnValue:
+    """Update an existing prompt in the database."""
     data = request.get_json()
     uuid = data["uuid"]
     title = data["title"]
@@ -159,9 +165,9 @@ def update_prompt():
     return jsonify(response)
 
 
-## MARK: Tasks - Extraction
 @tasks.route("/fetch_search_set_item", methods=["POST"])
-def fetch_search_set_item():
+def fetch_search_set_item() -> ResponseReturnValue:
+    """Fetch a specific search set item by UUID."""
     data = request.get_json()
     uuid = data["uuid"]
 
@@ -172,7 +178,8 @@ def fetch_search_set_item():
 
 
 @tasks.route("/search_results", methods=["POST"])
-def grab_template():
+def grab_template() -> ResponseReturnValue:
+    """Grab the template for displaying search results."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
@@ -184,8 +191,6 @@ def grab_template():
         documents.append(document)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
-
-    print("Document count: " + str(len(documents)))
 
     if search_set is None:
         return jsonify({"error": "Search set not found."})
@@ -201,31 +206,30 @@ def grab_template():
         }
 
         return jsonify(response)
-    else:
-        if edit_mode:
-            template = render_template(
-                "toolpanel/prompts/edit_prompt_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-            return jsonify(response)
-        else:
-            template = render_template(
-                "toolpanel/prompts/prompt_results.html",
-                search_set=search_set,
-                documents=documents,
-            )
-            response = {
-                "template": template,
-            }
-            return jsonify(response)
+    if edit_mode:
+        template = render_template(
+            "toolpanel/prompts/edit_prompt_results.html",
+            search_set=search_set,
+            documents=documents,
+        )
+        response = {
+            "template": template,
+        }
+        return jsonify(response)
+    template = render_template(
+        "toolpanel/prompts/prompt_results.html",
+        search_set=search_set,
+        documents=documents,
+    )
+    response = {
+        "template": template,
+    }
+    return jsonify(response)
 
 
 @tasks.route("/extraction/update_title", methods=["POST"])
-def update_extraction_title():
+def update_extraction_title() -> ResponseReturnValue:
+    """Update the title of an extraction step."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
@@ -240,14 +244,15 @@ def update_extraction_title():
 
 
 @tasks.route("/semantic_search", methods=["POST"])
-def semantic_search():
-    # Semantic Search endpoint was broken, missing import for depreciated SemanticIngest()
+def semantic_search() -> ResponseReturnValue:
+    """Perform a semantic search."""
     abort(403)
     return jsonify({"error": "This endpoint is not available."})
 
 
 @tasks.route("/begin_search", methods=["POST"])
-def begin_search():
+def begin_search() -> ResponseReturnValue:
+    """Begin a search."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
@@ -260,8 +265,6 @@ def begin_search():
         documents.append(document)
         absolute_path = document.absolute_path
         document_paths.append(absolute_path)
-
-    print("Fetch loading template:" + searchset_uuid)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     keys = []
@@ -283,17 +286,17 @@ def begin_search():
         ):
             bindings = {}
             for key in results:
-                print(key)
                 search_set_item = SearchSetItem.objects(searchphrase=key).first()
                 bindings[search_set_item.pdf_binding] = results[key]
 
-            print(bindings)
             # Define the file path for the CSV file
-            pdf_path = os.path.join(
-                current_app.root_path, "static", "uploads", search_set.fillable_pdf_url
+            pdf_path = (
+                Path(current_app.root_path)
+                / "static"
+                / "uploads"
+                / search_set.fillable_pdf_url
             )
 
-            print(pdf_path)
             reader = PdfReader(pdf_path)
             reader.get_fields()
             writer = PdfWriter()
@@ -301,18 +304,22 @@ def begin_search():
 
             # for page in reader.pages:
             writer.update_page_form_field_values(
-                writer.pages[0], bindings, auto_regenerate=False
+                writer.pages[0],
+                bindings,
+                auto_regenerate=False,
             )
 
-            output_pdf_path = os.path.join(
-                current_app.root_path, "static", "fillable_form.pdf"
+            output_pdf_path = (
+                Path(current_app.root_path) / "static" / "fillable_form.pdf"
             )
-            with open(output_pdf_path, "wb") as f:
+            with Path.open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
             # Return the path to the CSV file
             return send_file(
-                "static/fillable_form.pdf", mimetype="text/pdf", as_attachment=True
+                "static/fillable_form.pdf",
+                mimetype="text/pdf",
+                as_attachment=True,
             )
 
         template = render_template(
@@ -325,22 +332,21 @@ def begin_search():
             "template": template,
         }
         return jsonify(response)
-    else:
-        template = render_template(
-            "toolpanel/extractions/extraction_panel.html",
-            search_set=search_set,
-            documents=documents,
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
+    template = render_template(
+        "toolpanel/extractions/extraction_panel.html",
+        search_set=search_set,
+        documents=documents,
+    )
+    response = {
+        "template": template,
+    }
+    return jsonify(response)
 
 
 @tasks.route("/extract/build_from_document", methods=["POST"])
-def build_extraction_from_document():
+def build_extraction_from_document() -> ResponseReturnValue:
+    """Build extraction from document."""
     data = request.get_json()
-    print(data)
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
     load_user()
@@ -358,17 +364,16 @@ def build_extraction_from_document():
     em = ExtractionManager2()
     em.root_path = current_app.root_path
     keys = em.build_from_documents(document_paths)
-    print(keys)
 
     if "entities" in keys:
         bindings = keys["entities"]
         for item in bindings:
-            item = SearchSetItem(
+            item_obj = SearchSetItem(
                 searchphrase=item,
                 searchset=search_set.uuid,
                 searchtype="extraction",
             )
-            item.save()
+            item_obj.save()
     else:
         response = {
             "complete": False,
@@ -387,21 +392,21 @@ def build_extraction_from_document():
 
 
 @tasks.route("/delete_search_set", methods=["POST"])
-def delete_search_set():
+def delete_search_set() -> ResponseReturnValue:
+    """Delete a search set."""
     data = request.get_json()
     search_set_uuid = data["uuid"]
-    print(search_set_uuid)
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
     search_set.delete()
     return jsonify({"success": True})
 
 
 @tasks.route("/rename_search_set", methods=["POST"])
-def rename_search_set():
+def rename_search_set() -> ResponseReturnValue:
+    """Rename a search set."""
     data = request.get_json()
     search_set_uuid = data["search_set_uuid"]
     new_title = data["new_title"]
-    print(search_set_uuid)
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
     search_set.title = new_title
     search_set.save()
@@ -410,10 +415,10 @@ def rename_search_set():
 
 
 @tasks.route("/clone_search_set", methods=["POST"])
-def clone_search_set():
+def clone_search_set() -> ResponseReturnValue:
+    """Clone a search set."""
     data = request.get_json()
     search_set_uuid = data["search_set_uuid"]
-    print(search_set_uuid)
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
     new_search_set = deepcopy(search_set)
     new_search_set.id = None
@@ -433,18 +438,18 @@ def clone_search_set():
 
 
 @tasks.route("/delete_search_set_item", methods=["POST"])
-def delete_search_set_item():
+def delete_search_set_item() -> ResponseReturnValue:
+    """Delete a search set item."""
     data = request.get_json()
-    print("Deleting search set item")
     search_set_item_uuid = data["uuid"]
-    print(search_set_item_uuid)
     search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
     search_set.delete()
     return jsonify({"complete": True})
 
 
 @tasks.route("/begin_prompt_search", methods=["POST"])
-def begin_prompt_search():
+def begin_prompt_search() -> ResponseReturnValue:
+    """Begin a prompt search."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_path = data["document"]
@@ -456,16 +461,16 @@ def begin_prompt_search():
 
     if len(items) > 0:
         llm = OpenAIInterface()
-        document_file_path = os.path.join("static", "uploads", user_id, document_path)
-        if not os.path.exists(str(document_file_path)):
-            document_file_path = os.path.join(
-                current_app.root_path, "static", "uploads", document_path
+        document_file_path = Path("static") / "uploads" / user_id / document_path
+        if not Path.exists(str(document_file_path)):
+            document_file_path = (
+                Path(current_app.root_path) / "static" / "uploads" / document_path
             )
+
         llm.load_document(document_path)
         results = {}
         for item in items:
             results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
-        print(results)
         template = render_template(
             "toolpanel/prompts/prompt_results.html",
             search_set=search_set,
@@ -475,20 +480,20 @@ def begin_prompt_search():
             "template": template,
         }
         return jsonify(response)
-    else:
-        template = render_template(
-            "toolpanel/prompts/prompt_results.html", search_set=search_set
-        )
-        response = {
-            "template": template,
-        }
-        return jsonify(response)
+    template = render_template(
+        "toolpanel/prompts/prompt_results.html",
+        search_set=search_set,
+    )
+    response = {
+        "template": template,
+    }
+    return jsonify(response)
 
 
 @tasks.route("/export_extraction", methods=["GET"])
-def export_extraction():
+def export_extraction() -> ResponseReturnValue:
+    """Export the extraction results to a CSV file."""
     result_json = request.args.to_dict()
-    # result_json = data['result_json']
 
     # Convert the dictionary to a list of rows
     rows = []
@@ -496,11 +501,10 @@ def export_extraction():
         rows.append([key, value])
 
     # Define the file path for the CSV file
-    csv_file_path = os.path.join(current_app.root_path, "static", "export.csv")
+    csv_file_path = Path(current_app.root_path) / "static" / "export.csv"
 
-    print(rows)
     # Write the rows to the CSV file
-    with open(csv_file_path, "w", newline="") as f:
+    with Path.open(csv_file_path, "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerows(rows)
 
@@ -509,24 +513,25 @@ def export_extraction():
 
 
 @tasks.route("/download_fillable", methods=["GET"])
-def download_fillable():
+def download_fillable() -> ResponseReturnValue:
+    """Download a fillable PDF with the extraction results."""
     result_json = request.args.to_dict()
     bindings = {}
     search_set_uuid = result_json["search_set_uuid"]
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
     del result_json["search_set_uuid"]
     for key, value in result_json.items():
-        print(key)
         search_set_item = SearchSetItem.objects(searchphrase=key).first()
         bindings[search_set_item.pdf_binding] = value
 
-    print(bindings)
     # Define the file path for the CSV file
     pdf_path = os.path.join(
-        current_app.root_path, "static", "uploads", search_set.fillable_pdf_url
+        current_app.root_path,
+        "static",
+        "uploads",
+        search_set.fillable_pdf_url,
     )
 
-    print(pdf_path)
     reader = PdfReader(pdf_path)
     reader.get_fields()
     writer = PdfWriter()
@@ -534,14 +539,18 @@ def download_fillable():
 
     # for page in reader.pages:
     writer.update_page_form_field_values(
-        writer.pages[0], bindings, auto_regenerate=False
+        writer.pages[0],
+        bindings,
+        auto_regenerate=False,
     )
 
-    output_pdf_path = os.path.join(current_app.root_path, "static", "fillable_form.pdf")
-    with open(output_pdf_path, "wb") as f:
+    output_pdf_path = Path(current_app.root_path) / "static" / "fillable_form.pdf"
+    with Path.open(output_pdf_path, "wb") as f:
         writer.write(f)
 
     # Return the path to the CSV file
     return send_file(
-        "static/fillable_form.pdf", mimetype="text/pdf", as_attachment=True
+        "static/fillable_form.pdf",
+        mimetype="text/pdf",
+        as_attachment=True,
     )

@@ -1,13 +1,13 @@
-from langchain.llms import OpenAI
+import os
+
+from langchain.callbacks import get_openai_callback
+from langchain.chains import ConversationalRetrievalChain
+from langchain.chat_models import ChatOpenAI
 from langchain.document_loaders import PyPDFLoader  # pdf loading
 from langchain.embeddings import OpenAIEmbeddings  # embeddings
-from langchain.vectorstores import Chroma  # vector store
+from langchain.llms import OpenAI
 from langchain.text_splitter import CharacterTextSplitter
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import ConversationalRetrievalChain
-from langchain.callbacks import get_openai_callback
-
-import os
+from langchain.vectorstores import Chroma  # vector store
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -18,12 +18,12 @@ class PromptLabManager:
     embeddings = None
     root_path = ""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
     def run(self, model, promptChain, documents, vector):
         ## LLM
-        if model == "gpt-4" or model == "gpt-3.5-turbo-16k" or model == "gpt-3.5-turbo":
+        if model in {"gpt-4", "gpt-3.5-turbo-16k", "gpt-3.5-turbo"}:
             llm = ChatOpenAI(model_name=model, openai_api_key=OPENAI_API_KEY)
         else:
             llm = OpenAI(model_name=model, openai_api_key=OPENAI_API_KEY)
@@ -39,7 +39,6 @@ class PromptLabManager:
             )
             result = pdf_qa({"question": promptChain, "chat_history": ""})
 
-            print(cb)
             return result["answer"], str(cb)
 
     ##########################################
@@ -47,23 +46,18 @@ class PromptLabManager:
     ##########################################
     def load_vectordb(self, documents):
         split_documents = []
-        print(documents)
         for document in documents:
-            print("Starting")
             pdf_path = os.path.join(self.root_path, "static", "uploads", document)
-            print(pdf_path)
             loader = PyPDFLoader(pdf_path)
             split_documents.extend(loader.load())
 
         text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunked_documents = text_splitter.split_documents(split_documents)
-        print("Creating vector store")
-        print("Documents: ", len(chunked_documents))
         return Chroma.from_documents(chunked_documents, embedding=self.embeddings)
 
-    def load_text_chunks(self, documents):
+    def load_text_chunks(self, documents) -> None:
         loader = PyPDFLoader(
-            os.path.join(self.root_path, "static", "uploads", document)
+            os.path.join(self.root_path, "static", "uploads", document),
         )
         docs = loader.load()
         # text_splitter = CharacterTextSplitter(chunk_size=15000, chunk_overlap=0)

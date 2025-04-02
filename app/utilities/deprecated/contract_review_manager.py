@@ -5,7 +5,7 @@ class ContractReviewManager:
     review_vector_db = None
     embeddings = None
 
-    def __init__(self, manager):
+    def __init__(self, manager) -> None:
         self.llmManager = manager
 
     def scan(self, document):
@@ -16,9 +16,8 @@ class ContractReviewManager:
         document_sections = self.llmManager.ask_all_documents(
             "Consider the document: "
             + document
-            + ". Give me a list of all sections in the contract, formatted as a csv with a comma between each section."
+            + ". Give me a list of all sections in the contract, formatted as a csv with a comma between each section.",
         )
-        print(document_sections)
         return document_sections.split(",")
 
     def get_compliance(self, document, section):

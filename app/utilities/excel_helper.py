@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-import openpyxl
-import pandas as pd
 from pathlib import Path
 
+import openpyxl
+import pandas as pd
 
-def save_excel_to_html(excel_file_path, html_file_path):
+
+def save_excel_to_html(excel_file_path, html_file_path) -> None:
     wb = openpyxl.load_workbook(excel_file_path, data_only=True)
     sheets = wb.sheetnames
     active_sheet = wb.active
