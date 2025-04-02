@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Application initialization and configuration. Defines Flask and its components."""
+
 import logging
 
 # Error Logging
@@ -12,16 +15,6 @@ from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
-
-# Setup blueprints
-from .blueprints.auth import auth
-from .blueprints.feedback import feedback
-from .blueprints.files import files
-from .blueprints.home import home
-from .blueprints.office import office
-from .blueprints.spaces import spaces
-from .blueprints.tasks import tasks
-from .blueprints.workflows import workflows
 
 CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -57,6 +50,15 @@ Mail(app)
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
 
+# Setup blueprints
+from .blueprints.auth import auth  # noqa: E402
+from .blueprints.feedback import feedback  # noqa: E402
+from .blueprints.files import files  # noqa: E402
+from .blueprints.home import home  # noqa: E402
+from .blueprints.office import office  # noqa: E402
+from .blueprints.spaces import spaces  # noqa: E402
+from .blueprints.tasks import tasks  # noqa: E402
+from .blueprints.workflows import workflows  # noqa: E402
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")
