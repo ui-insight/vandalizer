@@ -150,13 +150,23 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
 
 
 def format_model(formatting_prompt, text):
-    system_prompt = "Format the provided text based on the following prompt. By default use html formatting if no format is provided in the prompt. The formatted text will be used to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not coode tag such as ```html before the output."
+    system_prompt = """
+Follow the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. Always use html instead of markdown. Convert markdown to html. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.
+CRITICAL:
+- The formatted text should be a list of bullet points with the extracted data json data.
+- The bullet points should be in a list format.
+- Do not use markdown or json format by default, but use html format.
+- If the user requests some formatting that looks like markdown, convert it as html.
+    """
+
     # prompt = f"{formatting_prompt}\n\n {text}"
-    prompt = f"{system_prompt}\n\n Prompt: {formatting_prompt}\n\n {text}"
+    prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_lm = ChatLM(model_type)
     response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
+
+    debug(response)
 
     if response is None:
         return None, None
@@ -252,7 +262,8 @@ class DocumentNode(Node):
             self.pdf_paths.append(doc_path)
 
         for doc in self.docs:
-            if doc is None: continue
+            if doc is None:
+                continue
             doc_path = doc.absolute_path
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
@@ -407,8 +418,8 @@ class WorkflowEngine:
         nodes = self.get_topological_order()
         debug(nodes)
 
-        # workflow_result.num_steps_completed = 0
-        # workflow_result.num_steps_total = len(nodes) + 1
+        workflow_result.num_steps_completed = 0
+        workflow_result.num_steps_total = len(nodes)
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
@@ -447,7 +458,6 @@ class WorkflowEngine:
                     else:
                         node_outputs.append(output.get("output", ""))
 
-                workflow_result.num_steps_completed += 1
 
                 # combine the outputs
                 debug(node_outputs)
@@ -458,6 +468,7 @@ class WorkflowEngine:
                 # debug(latest_output)
 
             workflow_result.steps_output[node.name] = output
+            workflow_result.num_steps_completed += 1
 
             workflow_result.save()
 
