@@ -64,6 +64,8 @@ def perform_extraction_and_update(document_uuid, doc_path):
 @celery_app.task
 def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    document.processing = True
+    document.save()
 
     document_manager = DocumentManager()
 
