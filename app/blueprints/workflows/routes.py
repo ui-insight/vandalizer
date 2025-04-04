@@ -121,23 +121,16 @@ def run_workflow() -> ResponseReturnValue:
         name="Document",
         data={"docs": docs, "attachments": attachments, "user_id": user_id},
     )
-    steps = [document_trigger_step]
-    for step in workflow.steps:
-        steps.append(step)
+    document_trigger_step.save()
 
-    # @TODO add the ability to cancel the thread (same for the chat)
-    # maybe store the thread id in the user's session.
-    # engine = build_workflow_engine(steps, workflow=workflow)
-    # workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
-    # workflow_thread.start()
-    # result = workflow_thread.join()
-    # output = None
-    # data = None
     workflow_id = str(workflow.id)
     workflow_result_id = str(workflow_result.id)
-    print("Running workflow", workflow_id, workflow_result_id)
+    workflow_trigger_step_id = str(document_trigger_step.id)
+    print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
     asyn_result = execute_workflow_task.delay(
-        workflow_result_id=workflow_result_id, workflow_id=workflow_id
+        workflow_result_id=workflow_result_id,
+        workflow_id=workflow_id,
+        workflow_trigger_step_id=workflow_trigger_step_id,
     )
     print("Async result", asyn_result)
     workflow_output = asyn_result.get(timeout=300)
@@ -246,11 +239,13 @@ def run_workflow_integrated() -> ResponseReturnValue:
         data={"docs": docs, "attachments": attachments},
     )
 
-    steps = [document_trigger_step, *workflow.steps]
+    workflow_trigger_step_id = str(document_trigger_step.id)
 
     # **6. Execute the Workflow**
     workflow_output = execute_workflow_task.delay(
-        workflow_result_id=str(workflow_result.id), workflow_id=str(workflow.id)
+        workflow_result_id=str(workflow_result.id),
+        workflow_id=str(workflow.id),
+        workflow_trigger_step_id=workflow_trigger_step_id,
     )
     workflow_output = workflow_output.get()
     output = workflow_output["output"]

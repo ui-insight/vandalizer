@@ -24,6 +24,14 @@ from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
+from app.utilities.config import model_type
+from app.celery import celery_app
+
+from threading import Thread
+
+from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult, WorkflowStep
+
+import graphlib
 
 load_dotenv()
 
@@ -574,9 +582,12 @@ def build_workflow_engine(steps, workflow):
 
 
 @celery_app.task(bind=True, name="workflow.execute_workflow")
-def execute_workflow_task(self, workflow_result_id, workflow_id):
+def execute_workflow_task(
+    self, workflow_result_id, workflow_id, workflow_trigger_step_id
+):
     workflow_result = WorkflowResult.objects(id=workflow_result_id).first()
     workflow = Workflow.objects(id=workflow_id).first()
+    workflow_trigger_step = WorkflowStep.objects(id=workflow_trigger_step_id).first()
 
     if not workflow_result:
         return {
@@ -588,6 +599,11 @@ def execute_workflow_task(self, workflow_result_id, workflow_id):
             "status": "error",
             "error": "Workflow not found",
         }
+    if not workflow_trigger_step:
+        return {
+            "status": "error",
+            "error": "Workflow trigger step not found",
+        }
 
     workflow_result.status = "running"
     workflow_result.num_steps_completed = 0
@@ -595,7 +611,13 @@ def execute_workflow_task(self, workflow_result_id, workflow_id):
     workflow_result.steps_output = {}
     workflow_result.save()
 
-    engine = build_workflow_engine(workflow.steps, workflow)
+    steps = [workflow_trigger_step]
+    for step in workflow.steps:
+        steps.append(step)
+
+    debug(steps)
+
+    engine = build_workflow_engine(steps, workflow)
 
     final_output, data = engine.execute(workflow_result)
     print(
