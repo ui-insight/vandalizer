@@ -74,7 +74,7 @@ def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
 def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document_path = document.absolute_path
-    perform_extraction_and_update.delay(document.uuid, document_path)
+    perform_extraction_and_update.delay(document.uuid, str(document_path))
     document = document.reload()
     perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
     document.processing = False

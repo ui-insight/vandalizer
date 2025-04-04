@@ -99,7 +99,7 @@ def upload() -> ResponseReturnValue:
         title=filename,
         processing=True,
         raw_text=raw_text,
-        path=relative_file_path,
+        path=str(relative_file_path),
         extension=extension,
         uuid=uid,
         user_id=user.user_id,
@@ -128,19 +128,12 @@ def upload() -> ResponseReturnValue:
         raw_text = extract_text_from_html(html_path)
         document.raw_text = raw_text
         document.save()
-        # thread = threading.Thread(
-        #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
-        # )
-        # thread.start()
+
         perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        # thread = threading.Thread(
-        #     target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
-        # )
-        # thread.start()
         perform_ocr_and_semantic_ingestion(document.uuid, user_id)
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})

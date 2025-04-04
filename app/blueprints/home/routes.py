@@ -51,7 +51,7 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
         pdf_path = document.absolute_path
         document.processing = True
         document.save()
-        perform_extraction_and_update.delay(document.uuid, pdf_path)
+        perform_extraction_and_update.delay(document.uuid, str(pdf_path))
     elif document.processing:
         document.processing = False
         document.save()
