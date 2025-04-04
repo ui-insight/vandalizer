@@ -254,9 +254,9 @@ class DocumentNode(Node):
                     "static",
                     "uploads",
                     user_id,
-                    doc.path,
+                    str(doc.path),
                 )
-            self.pdf_paths.append(doc_path)
+            self.pdf_paths.append(str(doc_path))
 
         for doc in self.docs:
             if doc is None:
@@ -269,9 +269,12 @@ class DocumentNode(Node):
                     "static",
                     "uploads",
                     user_id,
-                    doc.path,
+                    str(doc.path),
                 )
-            self.pdf_paths.append(doc_path)
+            self.pdf_paths.append(str(doc_path))
+
+        debug(self.docs[0])
+        debug(self.pdf_paths)
 
     def process(self, inputs=None):
         # data = inputs.get("data", None)
