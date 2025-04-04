@@ -1,24 +1,8 @@
 """Handles primary routing for the home page and related functionalities."""
 
 import os
-import threading
 import uuid
 from itertools import chain
-
-from devtools import debug
-from flask import (
-    current_app,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    send_from_directory,
-    session,
-    url_for,
-)
-from flask.typing import ResponseReturnValue
-from flask_dance.contrib.azure import azure
-from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
@@ -38,6 +22,20 @@ from app.utilities.document_manager import (
 )
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import is_dev, load_user
+from devtools import debug
+from flask import (
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
+from flask.typing import ResponseReturnValue
+from flask_dance.contrib.azure import azure
+from mongoengine.queryset.visitor import Q
 
 from . import home
 
@@ -51,14 +49,9 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
 
     if not document.raw_text or document.raw_text == "":
         pdf_path = document.absolute_path
-        thread = threading.Thread(
-            target=perform_extraction_and_update,
-            args=(
-                document,
-                pdf_path,
-            ),
-        )
-        thread.start()
+        document.processing = True
+        document.save()
+        perform_extraction_and_update.delay(document.uuid, pdf_path)
     elif document.processing:
         document.processing = False
         document.save()
@@ -67,15 +60,7 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     if not document_manager.document_exists(user_id, document.uuid):
         document.processing = True
         document.save()
-
-        thread = threading.Thread(
-            target=perform_semantic_ingestion,
-            args=(
-                document,
-                user_id,
-            ),
-        )
-        thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
 
 
 @home.route("/")

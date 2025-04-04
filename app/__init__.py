@@ -16,13 +16,43 @@ from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
+from celery import Celery, Task
+
 CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
 RELEASE_NOTES = """
 Release 2.0.1=2:
 - Bug fixes and stability improvements.
 """
 
-app = Flask(__name__)
+
+def celery_init_app(app: Flask) -> Celery:
+    class FlaskTask(Task):
+        def __call__(self, *args: object, **kwargs: object) -> object:
+            with app.app_context():
+                return self.run(*args, **kwargs)
+
+    celery_app = Celery(app.name, task_cls=FlaskTask)
+    celery_app.config_from_object(app.config["CELERY"])
+    celery_app.set_default()
+    app.extensions["celery"] = celery_app
+    return celery_app
+
+
+# Use app factory pattern
+def create_app() -> Flask:
+    app = Flask(__name__)
+    app.config.from_mapping(
+        CELERY=dict(
+            broker_url="redis://localhost:6379/",
+            result_backend="redis://localhost:6379/",
+        ),
+    )
+    app.config.from_prefixed_env()
+    celery_init_app(app)
+    return app
+
+
+app = create_app()
 
 CORS(
     app,
