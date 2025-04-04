@@ -3,7 +3,6 @@
 import base64
 import io
 import os
-import threading
 import uuid
 from pathlib import Path
 
@@ -117,13 +116,8 @@ def upload() -> ResponseReturnValue:
         extension = "pdf"
         raw_text = extract_text_from_doc(docx_path)
         document.raw_text = raw_text
-        document.processing = False
         document.save()
-        thread = threading.Thread(
-            target=perform_semantic_ingestion,
-            args=(document, user_id, raw_text),
-        )
-        thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
@@ -133,22 +127,21 @@ def upload() -> ResponseReturnValue:
         extension = "html"
         raw_text = extract_text_from_html(html_path)
         document.raw_text = raw_text
-        document.processing = False
         document.save()
-        thread = threading.Thread(
-            target=perform_semantic_ingestion,
-            args=(document, user_id, raw_text),
-        )
-        thread.start()
+        # thread = threading.Thread(
+        #     target=perform_semantic_ingestion, args=(document, user_id, raw_text)
+        # )
+        # thread.start()
+        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
-        pdf_path = Path(upload_dir) / f"{uid}.pdf"
-        thread = threading.Thread(
-            target=perform_ocr_and_semantic_ingestion,
-            args=(document, user_id),
-        )
-        thread.start()
+        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+        # thread = threading.Thread(
+        #     target=perform_ocr_and_semantic_ingestion, args=(document, user_id)
+        # )
+        # thread.start()
+        perform_ocr_and_semantic_ingestion(document.uuid, user_id)
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 

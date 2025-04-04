@@ -7,7 +7,7 @@ import json
 import multiprocessing
 import os
 import re
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
 from typing import NoReturn
 
@@ -15,7 +15,8 @@ from devtools import debug
 from dotenv import load_dotenv
 
 from app import app
-from app.models import SearchSet, SmartDocument
+from app.celery import celery_app
+from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult
 from app.utilities.config import model_type
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
@@ -23,6 +24,14 @@ from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
+from app.utilities.config import model_type
+from app.celery import celery_app
+
+from threading import Thread
+
+from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult, WorkflowStep
+
+import graphlib
 
 load_dotenv()
 
@@ -154,13 +163,23 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
 
 
 def format_model(formatting_prompt, text):
-    system_prompt = "Format the provided text based on the following prompt. By default use html formatting if no format is provided in the prompt. The formatted text will be used to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not coode tag such as ```html before the output."
+    system_prompt = """
+Follow the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. Always use html instead of markdown. Convert markdown to html. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.
+CRITICAL:
+- The formatted text should be a list of bullet points with the extracted data json data.
+- The bullet points should be in a list format.
+- Do not use markdown or json format by default, but use html format.
+- If the user requests some formatting that looks like markdown, convert it as html.
+    """
+
     # prompt = f"{formatting_prompt}\n\n {text}"
-    prompt = f"{system_prompt}\n\n Prompt: {formatting_prompt}\n\n {text}"
+    prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_lm = ChatLM(model_type)
     response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
+
+    debug(response)
 
     if response is None:
         return None, None
@@ -208,7 +227,7 @@ class MultiTaskNode(Node):
         for task in self.tasks:
             task.inputs = inputs
         debug(self.tasks)
-        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             task_futures = [
                 executor.submit(self.process_task, task) for task in self.tasks
             ]
@@ -451,6 +470,7 @@ class WorkflowEngine:
                         node_outputs.extend(output.get("output", ""))
                     else:
                         node_outputs.append(output.get("output", ""))
+
                 # combine the outputs
                 debug(node_outputs)
                 latest_output = {
@@ -461,6 +481,8 @@ class WorkflowEngine:
 
             workflow_result.steps_output[node.name] = output
             workflow_result.num_steps_completed += 1
+
+            workflow_result.save()
 
             debug(latest_output)
             data.append(
@@ -557,3 +579,55 @@ def build_workflow_engine(steps, workflow):
         engine.connect(nodes[idx - 1], nodes[idx])
 
     return engine
+
+
+@celery_app.task(bind=True, name="workflow.execute_workflow")
+def execute_workflow_task(
+    self, workflow_result_id, workflow_id, workflow_trigger_step_id
+):
+    workflow_result = WorkflowResult.objects(id=workflow_result_id).first()
+    workflow = Workflow.objects(id=workflow_id).first()
+    workflow_trigger_step = WorkflowStep.objects(id=workflow_trigger_step_id).first()
+
+    if not workflow_result:
+        return {
+            "status": "error",
+            "error": "Workflow result not found",
+        }
+    if not workflow:
+        return {
+            "status": "error",
+            "error": "Workflow not found",
+        }
+    if not workflow_trigger_step:
+        return {
+            "status": "error",
+            "error": "Workflow trigger step not found",
+        }
+
+    workflow_result.status = "running"
+    workflow_result.num_steps_completed = 0
+    workflow_result.num_steps_total = len(workflow.steps)
+    workflow_result.steps_output = {}
+    workflow_result.save()
+
+    steps = [workflow_trigger_step]
+    for step in workflow.steps:
+        steps.append(step)
+
+    debug(steps)
+
+    engine = build_workflow_engine(steps, workflow)
+
+    final_output, data = engine.execute(workflow_result)
+    print(
+        f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
+    )
+
+    return {
+        "status": "completed",
+        "result_id": workflow_result_id,
+        "workflow_id": workflow_id,
+        "output": final_output,
+        "history": data,
+    }

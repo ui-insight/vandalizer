@@ -1,5 +1,5 @@
 <script>
-          var active_step = 1;
+          var active_step = 0;
           var current_workflow_id = "{{ workflow_id }}";
           var current_space_id = "{{ current_space_id }}"
           var workflow_elapsed_time = 0;
@@ -530,7 +530,7 @@
                   let steps_completed = data.steps_completed;
                   let total_steps = data.total_steps;
 
-                  console.log(data);
+                  console.log("workflow status data: ", data, steps_completed, total_steps, active_step);
 
                   if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
@@ -545,10 +545,11 @@
 
                       $('.workflow-loader').hide();
                       // Add 'active' class to the nth $('.workflow-step') element (0-based index)
-                      $('.workflow-step').eq(active_step).addClass('active');
-                      $('.workflow-step').eq(active_step).find('.step-connector').addClass('active');
-                      $('.workflow-loader').eq(active_step-1).fadeIn();
-                      active_step = steps_completed + 1;
+                      $('.workflow-step').eq(active_step+1).addClass('active');
+                      $('.workflow-step').eq(active_step+1).find('.step-connector').addClass('active');
+                      $('.workflow-loader').eq(active_step).fadeIn();
+                    // $('.workflow-loader').eq(active_step-1).fadeIn();
+                    active_step = steps_completed + 1;
                   }
 
                   // Update steps completed and time elapsed
@@ -557,7 +558,7 @@
                       <span><i> ${workflow_time} seconds elapsed</i></span>
                   `);
 
-                console.log(status);
+                console.log("workflow status: ", status);
 
                   // Check if the workflow is completed or has failed
                   if (status === 'completed' || status === 'failed') {
@@ -573,6 +574,11 @@
                           }
                           showToast("Workflow completed");
                       }
+
+                      $('.workflow-step').eq(active_step).find('.step-connector').removeClass('active');
+                      $('.workflow-loader').hide();
+                      $('.workflow-step').eq(active_step).removeClass('active');
+                      $('.workflow-output').addClass('active');
                   }
               },
               error: function (xhr, ajaxOptions, thrownError) {
