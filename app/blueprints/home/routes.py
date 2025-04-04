@@ -1,45 +1,47 @@
-import os
-from flask import (
-    request,
-    jsonify,
-    redirect,
-    url_for,
-    session,
-    render_template,
-    send_from_directory,
-    current_app,
-)
+"""Handles primary routing for the home page and related functionalities."""
 
-from app.utilities.document_manager import (
-    perform_semantic_ingestion,
-    perform_extraction_and_update,
-)
+import os
+import uuid
+from itertools import chain
+
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
-    SmartDocument,
-    SmartFolder,
     SearchSet,
     SearchSetItem,
+    SmartDocument,
+    SmartFolder,
     Space,
     Workflow,
     WorkflowStep,
 )
-
-from devtools import debug
-
-import uuid
-import threading
-from app.utils import load_user, is_dev
-from flask_dance.contrib.azure import azure
-from itertools import chain
-from mongoengine.queryset.visitor import Q
 from app.utilities.config import max_context_length
+from app.utilities.document_manager import (
+    DocumentManager,
+    perform_extraction_and_update,
+    perform_semantic_ingestion,
+)
 from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.document_manager import DocumentManager
+from app.utils import is_dev, load_user
+from devtools import debug
+from flask import (
+    current_app,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
+from flask.typing import ResponseReturnValue
+from flask_dance.contrib.azure import azure
+from mongoengine.queryset.visitor import Q
+
 from . import home
-from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 
 
-def verify_document(document, user_id):
+def verify_document(document: SmartDocument, user_id: str) -> None:
+    """Verify and update the document if necessary."""
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
 
@@ -62,20 +64,21 @@ def verify_document(document, user_id):
 
 
 @home.route("/")
-def index():
+def index() -> ResponseReturnValue:
+    """Primary entry point."""
     # production environment
     if not is_dev():
         if not azure.authorized:
             return redirect(url_for("azure.login"))
         if "user_id" not in session:
-            print("No user session")
+            debug("No user session")
             resp = azure.get("/v1.0/me")
             user_info = resp.json()
             if "id" not in user_info:
-                print("Got nothing from azure")
+                debug("Got nothing from azure")
                 session["user_id"] = "admin"
             else:
-                print("Got user info from azure")
+                debug("Got user info from azure")
                 user_id = user_info["id"]
                 session["user_id"] = user_id
 
@@ -105,7 +108,6 @@ def index():
     documents = []
 
     # Check for documents
-    document_manager = DocumentManager()
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
@@ -163,7 +165,9 @@ def index():
 
     # Get the extraction and prompt sets
     global_extraction_sets = SearchSet.objects(
-        space=current_space.uuid, is_global=True, set_type="extraction"
+        space=current_space.uuid,
+        is_global=True,
+        set_type="extraction",
     ).all()
     user_extraction_sets = SearchSet.objects(
         user_id=user.user_id,
@@ -176,17 +180,20 @@ def index():
     # Get the prompt sets
 
     prompts = SearchSetItem.objects(
-        user_id=user.user_id, space_id=current_space.uuid, searchtype="prompt"
+        user_id=user.user_id,
+        space_id=current_space.uuid,
+        searchtype="prompt",
     ).all()
 
     formatters = SearchSetItem.objects(
-        user_id=user.user_id, space_id=current_space.uuid, searchtype="formatter"
+        user_id=user.user_id,
+        space_id=current_space.uuid,
+        searchtype="formatter",
     ).all()
 
     # Workflows
     workflows = Workflow.objects(
         user_id=user.user_id,
-        # space=current_space.uuid,
     ).all()
 
     # Get the folders
@@ -196,7 +203,9 @@ def index():
         current_folder_id = request.args.get("folder_id")
 
     base_query = Q(
-        user_id=user.user_id, space=current_space.uuid, folder=current_folder_id
+        user_id=user.user_id,
+        space=current_space.uuid,
+        folder=current_folder_id,
     )
 
     default_doc_query = Q(user_id=user.user_id, is_default=True)
@@ -209,7 +218,7 @@ def index():
     # Check for OCR and semantic ingestion for documents in the folder
     # This should resolve the issue with old documents not being processed
 
-    if current_folder_id != 0 and current_folder_id != "0":
+    if current_folder_id not in {0, "0"}:
         folder_docs = (
             SmartDocument.objects(base_query | default_doc_query)
             .order_by("-created_at")
@@ -220,11 +229,15 @@ def index():
         if folder:
             current_folder_parent_id = folder.parent_id
     folders = SmartFolder.objects(
-        user_id=user.user_id, space=current_space.uuid, parent_id="0"
+        user_id=user.user_id,
+        space=current_space.uuid,
+        parent_id="0",
     ).all()
     if current_folder_id != 0:
         folders = SmartFolder.objects(
-            user_id=user.user_id, space=current_space.uuid, parent_id=current_folder_id
+            user_id=user.user_id,
+            space=current_space.uuid,
+            parent_id=current_folder_id,
         ).all()
 
     total_token_counts = 0
@@ -264,14 +277,15 @@ def index():
 
 
 @home.route("/chat", methods=["POST"])
-def chat():
+def chat() -> ResponseReturnValue:
+    """Handle chat requests."""
     data = request.get_json()
     message = data["message"]
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
     user_id = load_user().user_id
-    print(document_uuids)
+    debug(document_uuids)
     # migrate to new document user's location
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
@@ -283,8 +297,11 @@ def chat():
                     f
                     for f in os.listdir(
                         os.path.join(
-                            current_app.root_path, "static", "uploads", user_id
-                        )
+                            current_app.root_path,
+                            "static",
+                            "uploads",
+                            user_id,
+                        ),
                     )
                     if f.startswith(document.uuid)
                     and f != document.path
@@ -303,7 +320,7 @@ def chat():
                     )
                     documents.append(html_doc)
 
-    print("Documents", [document.extension for document in documents])
+    debug("Documents", [document.extension for document in documents])
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
@@ -318,7 +335,6 @@ def chat():
         session=session,
     )
     response["question"] = message
-    print(response)
     return jsonify(response)
 
 
@@ -326,11 +342,14 @@ def chat():
 def serve_fonts(filename):
     if filename.endswith(".woff2"):
         return send_from_directory(
-            "static/fontawesome/webfonts", filename, mimetype="font/woff2"
+            "static/fontawesome/webfonts",
+            filename,
+            mimetype="font/woff2",
         )
-    elif filename.endswith(".ttf"):
+    if filename.endswith(".ttf"):
         return send_from_directory(
-            "static/fontawesome/webfonts", filename, mimetype="font/ttf"
+            "static/fontawesome/webfonts",
+            filename,
+            mimetype="font/ttf",
         )
-    else:
-        return send_from_directory("static/fontawesome/webfonts", filename)
+    return send_from_directory("static/fontawesome/webfonts", filename)

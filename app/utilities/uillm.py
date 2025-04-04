@@ -6,7 +6,11 @@ import requests
 
 class UILLM:
     def ask_question(
-        question, is_json=False, model="", temperature=0.7, max_tokens=3000
+        self,
+        is_json=False,
+        model="",
+        temperature=0.7,
+        max_tokens=3000,
     ):
         endpoint = "https://mindrouter-api.nkn.uidaho.edu/v1/chat/completions"
 
@@ -16,7 +20,7 @@ class UILLM:
         data = {
             "model": model,
             "temperature": temperature,
-            "messages": [{"role": "user", "content": question}],
+            "messages": [{"role": "user", "content": self}],
         }
 
         if is_json:
@@ -30,68 +34,57 @@ class UILLM:
                 output = response.json()
                 content = output["choices"][0]["message"]["content"]
                 if content is None:
-                    print("Failed on output: " + output)
+                    pass
 
                 if is_json:
-                    jsoncontent = json.loads(content)
-                    return jsoncontent
-                else:
-                    return content
+                    return json.loads(content)
+                return content
             except json.JSONDecodeError:
-                print("Invalid JSON format")
-                print(output)
+                pass
         else:
-            print("SERVER ERROR")
-            print(response.status_code)
-            print(response.text)
+            return None
 
-    def list_models(display="pretty", verbose=False):
+    def list_models(self="pretty", verbose=False):
         endpoint = "https://mindrouter-api.nkn.uidaho.edu/api/tags"
 
         response = requests.get(endpoint)
         # allow users to silence the print
         if verbose:
-            print(response.text)
+            pass
         data = json.loads(response.text)
         # default view is a pretty print
-        if display == "pretty":
+        if self == "pretty":
             UILLM.display_models(data)
         # list option returns a list with only the model names
-        elif display == "list":
+        elif self == "list":
             return UILLM.display_models_list(data)
+        return None
 
-    def display_models_list(data):
-        return [x.get("name") for x in data.get("models")]
+    def display_models_list(self):
+        return [x.get("name") for x in self.get("models")]
 
-    def display_models(data):
-        models = data.get("models", [])
+    def display_models(self) -> None:
+        models = self.get("models", [])
         if not models:
-            print("No models available.")
             return
 
         for model in models:
-            name = model.get("name", "N/A")
+            model.get("name", "N/A")
             details = model.get("details", {})
-            family = details.get("family", "N/A")
-            parameter_size = details.get("parameter_size", "N/A")
-            quantization_level = details.get("quantization_level", "N/A")
+            details.get("family", "N/A")
+            details.get("parameter_size", "N/A")
+            details.get("quantization_level", "N/A")
 
-            print(f"Model: {name}")
-            print("  Details:")
-            print(f"    Family: {family}")
-            print(f"    Parameter Size: {parameter_size}")
-            print(f"    Quantization Level: {quantization_level}")
-            print("-" * 40)
-
-    def parse_command_R(data):
+    def parse_command_R(self):
         # strip leading and trailing newline characters
-        data = data.strip("\n")
+        self = self.strip("\n")
 
         # use a regular expression to extract the JSON part
-        json_match = re.search(r"{.*}", data, re.DOTALL)
+        json_match = re.search(r"{.*}", self, re.DOTALL)
         if not json_match:
+            msg = f"Unexpected response from command-r. JSON string not found in data: {self}"
             raise ValueError(
-                f"Unexpected response from command-r. JSON string not found in data: {data}"
+                msg,
             )
 
         json_str = json_match.group(0)
@@ -101,32 +94,23 @@ class UILLM:
         json_str = re.sub(r'(?<=["\]}])\s*(?=["\[{])', ",", json_str)
         try:
             # parse the JSON string into a Python dictionary
-            parsed_json = json.loads(json_str)
-            return parsed_json
-        except json.JSONDecodeError as e:
-            print(
-                f"Invalid JSON provided by command-r. Error: {e.msg}, Content: {json_str}"
-            )
+            return json.loads(json_str)
+        except json.JSONDecodeError:
             # raise the JSONDecodeError as the ask_question_to_model() method handles this exception
-            raise e
+            raise
 
-    def list_embeddings(data):
+    def list_embeddings(self) -> None:
         endpoint = "https://mindrouter-api.nkn.uidaho.edu/api/tags"
 
-        response = requests.get(endpoint)
-        print(response.text)
-        UILLM.display_models(data)
+        requests.get(endpoint)
+        UILLM.display_models(self)
 
-    def convert_string_to_embeddings(string, model="EMBED/all-minilm:22m"):
+    def convert_string_to_embeddings(self, model="EMBED/all-minilm:22m"):
         endpoint = "https://mindrouter-api.nkn.uidaho.edu/api/embeddings"
 
-        data = {"model": model, "prompt": string}
+        data = {"model": model, "prompt": self}
 
         response = requests.post(endpoint, json=data, headers={})
         if response.status_code == 200:
-            output = response.json()
-            return output
-        else:
-            print("SERVER ERROR")
-            print(response.status_code)
-            print(response.text)
+            return response.json()
+        return None

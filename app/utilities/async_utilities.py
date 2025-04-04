@@ -1,6 +1,7 @@
 import asyncio
-import nest_asyncio
 from functools import wraps
+
+import nest_asyncio
 
 
 def function_event_loop_decorator():

@@ -29,24 +29,21 @@ class ExtractionManager3:
             fields_to_extract = extract_keys
         # Extract entities
 
-        print("Extracting keys: ", extract_keys, pdf_paths)
 
-        start_time = time.time()
+        time.time()
         openai.api_key = OPENAI_API_KEY
         doc_text = ""
         extractions = []
-        start_time = time.time()
+        time.time()
         if full_text is None:
             for pdf_path in pdf_paths:
                 doc_text = extract_text_from_doc(doc_path=pdf_path)
                 if doc_text:
                     # data = extractor.extract_entities(doc_text, fields_to_extract)
                     data = extract_entities_with_agent(
-                        text=doc_text, keys=fields_to_extract
+                        text=doc_text, keys=fields_to_extract,
                     )
                     extractions = data
-                    print("Data item: ", data)
-                    print("Extracting: ", extractions)
 
         else:
             doc_text = full_text
@@ -58,9 +55,7 @@ class ExtractionManager3:
         # if len(prompt) > 50000:
         #    model = "gpt-4-turbo"
 
-        print("Extraction: ", extractions)
         # print(data.model_dump_json(indent=2))
 
-        print(f"Completion processing time: {time.time() - start_time:.2f} seconds")
 
         return extractions
