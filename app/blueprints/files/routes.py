@@ -222,9 +222,6 @@ def download_document() -> ResponseReturnValue:
         Path(current_app.root_path) / "static" / "uploads" / document.path
     )
 
-    if not Path.isfile(document_file_path):
-        abort(404, description="File not found on server")
-
     return send_file(document_file_path, as_attachment=True)
 
 
