@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 
-from app.utilities.redis_cache import RedisCache
-from app.utilities.agents import chat_agent
-
-from pydantic_ai.messages import ModelMessagesTypeAdapter
-from devtools import debug
 from datetime import datetime
+
+from devtools import debug
+from pydantic_ai.messages import ModelMessagesTypeAdapter
+
+from app.utilities.agents import chat_agent
+from app.utilities.redis_cache import RedisCache
 
 # 2h
 ttl = 60 * 60 * 1
@@ -34,7 +35,6 @@ def chat_with_prompt(prompt: str, user_id=0) -> str:
         for part in message["parts"]:
             # remove tool_call
             if "tool-call" in part["part_kind"]:
-                print("removing tool call", part)
                 continue
             new_parts.append(part)
         message["parts"] = new_parts
@@ -49,14 +49,14 @@ def chat_with_prompt(prompt: str, user_id=0) -> str:
                 continue
             # Adjust format string if necessary
             timestamp_obj = datetime.strptime(
-                message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT"
+                message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT",
             )
             message["timestamp"] = timestamp_obj
             parsed_messages.append(message)
         except ValueError:
             # Handle parsing errors (optional)
-            print(f"Failed to parse timestamp for message: {message}")
-            pass  # Skip the message if parsing fails
+            pass
+            # Skip the message if parsing fails
 
     previous_messages = parsed_messages
     debug(previous_messages)

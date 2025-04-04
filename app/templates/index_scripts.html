@@ -1,39 +1,39 @@
 <script>
     var askingDocument = '';
     var document_uuids = [];
-  var maxContextLength = parseInt("{{max_context_length}}");
+    var maxContextLength = parseInt("{{max_context_length}}");
 
-    {% if (documents != None) and documents|length > 0 %}
+    {% if (documents != None) and documents | length > 0 %}
     var documentData = {
         id: "{{ documents[0].id|safe }}",
         title: "{{ documents[0].title|safe }}",
-        raw_text: {{ documents[0].raw_text|tojson|safe }}
+        raw_text: {{ documents[0].raw_text| tojson | safe }}
     };
     {% else %}
     const documentData = null;
     {% endif %}
 
-   var folder_uuid = "{{current_folder_id}}"
-   var isProcessingFile = false;
-   var processingFileOriginalText = "";
+    var folder_uuid = "{{current_folder_id}}"
+    var isProcessingFile = false;
+    var processingFileOriginalText = "";
 
 
     document_uuids = [
         {% for document in documents %}
-            "{{document.uuid}}",
+    "{{document.uuid}}",
         {% endfor %}
     ];
 
     function dismissReleasePanel() {
-            // Set a cookie 'release_seen' to the current release version.
-            var d = new Date();
-            // Cookie will expire in 30 days.
-            d.setTime(d.getTime() + (30*24*60*60*1000));
-            var expires = "expires=" + d.toUTCString();
-            document.cookie = "release_seen={{ current_release }}; " + expires + "; path=/";
-            // Hide the release panel immediately.
-            document.getElementById('release-panel').style.display = 'none';
-        }
+        // Set a cookie 'release_seen' to the current release version.
+        var d = new Date();
+        // Cookie will expire in 30 days.
+        d.setTime(d.getTime() + (30 * 24 * 60 * 60 * 1000));
+        var expires = "expires=" + d.toUTCString();
+        document.cookie = "release_seen={{ current_release }}; " + expires + "; path=/";
+        // Hide the release panel immediately.
+        document.getElementById('release-panel').style.display = 'none';
+    }
 
     function addDocId(docId) {
         const url = new URL(window.location.href);
@@ -56,7 +56,7 @@
     function showRawText() {
         console.log("show raw text", documentData);
         // Get the current document
-        if (documentData) { 
+        if (documentData) {
             const modal = document.getElementById("rawTextModal");
             const rawText = documentData.raw_text;
             const rawTextContent = document.getElementById("rawTextContent");
@@ -64,20 +64,20 @@
             $('#rawTextModal').show();
         }
     }
-    $("#closeRawTextModalBtn").on('click', function() {
+    $("#closeRawTextModalBtn").on('click', function () {
         $('#rawTextModal').hide();
     });
 
     function setSection(sectionName) {
-          // Use the tabTitle variable as needed
-          let href = window.location.href;
-      const qs = new URLSearchParams(href.split("?")[1]);
-      qs.delete("section");
-      qs.append("section", sectionName);
-      const newQs = qs.toString();
-      const newhref = `/home?${newQs}`;
-      window.history.pushState({}, "", newhref);
-  }
+        // Use the tabTitle variable as needed
+        let href = window.location.href;
+        const qs = new URLSearchParams(href.split("?")[1]);
+        qs.delete("section");
+        qs.append("section", sectionName);
+        const newQs = qs.toString();
+        const newhref = `/home?${newQs}`;
+        window.history.pushState({}, "", newhref);
+    }
 
     function updateDocumentSelections() {
         var checkedCheckboxes = $('.document-selector:checked');
@@ -92,7 +92,7 @@
                 continue;
             }
             var numDocs = checkbox.attributes['data-num-documents'].value
-           
+
             // totalTokenCounts += parseInt(checkbox.attributes['data-token-count'].value);
 
             if (checkbox.attributes['data-doc-uuid'] != undefined) {
@@ -126,7 +126,7 @@
 
         var counters = $('.doc-selected-counter')
         for (var i = 0; i < counters.length; i++) {
-            if(totalDocs == 0) {
+            if (totalDocs == 0) {
                 counters[i].textContent = `Select documents to begin`;
             } else if (totalDocs == 1) {
                 // counters[i].textContent = `${totalDocs} document selected (${totalTokenCounts} tokens)`;
@@ -135,7 +135,7 @@
 
             } else {
                 // counters[i].textContent = `${totalDocs} documents selected (${totalTokenCounts} tokens)`;
-            counters[i].textContent = `${totalDocs} documents selected`;
+                counters[i].textContent = `${totalDocs} documents selected`;
             }
             // if (totalTokenCounts > maxContextLength) {
             //     counters[i].innerHTML += contextLengthWarning;
@@ -145,22 +145,22 @@
 
     console.log("Document UUIDs", document_uuids);
 
-    $('#ask-question-btn').on('click', function(e) {
+    $('#ask-question-btn').on('click', function (e) {
         e.preventDefault()
         let question = $('#ask-question-input')[0].value;
         askQuestion(question);
     });
 
     function askQuestion(question) {
-    // Call API to get answer
-    if (askingDocument != '') {
-        askDocumentQuestion(question);
-        return;
-    }
+        // Call API to get answer
+        if (askingDocument != '') {
+            askDocumentQuestion(question);
+            return;
+        }
 
-    openChatWindow();
-    showChatLoading();
-    $.ajax({
+        openChatWindow();
+        showChatLoading();
+        $.ajax({
             url: '/api/ask',
             type: 'POST',
             data: JSON.stringify({
@@ -171,7 +171,7 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 let answer = msg.answer;
                 $('#ask-question-input')[0].value = ''
                 openChatWindow();
@@ -187,7 +187,7 @@
                 </div>
             `)
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -195,9 +195,9 @@
     }
 
     function askDocumentQuestion(question) {
-    // Call API to get answer
-    showChatLoading();
-    $.ajax({
+        // Call API to get answer
+        showChatLoading();
+        $.ajax({
             url: '/api/ask_document',
             type: 'POST',
             data: JSON.stringify({
@@ -208,7 +208,7 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 let answer = msg.answer;
                 $('#ask-question-input')[0].value = ''
                 openChatWindow();
@@ -216,7 +216,7 @@
                 $('.chat-window').append(`
                 <div class="answer-card" style="padding: 30px; ">
                     <p style="font-size: 30; color: #5D6F81;">
-                        Asking ${askingDocument }: <i>${question}</i>
+                        Asking ${askingDocument}: <i>${question}</i>
                     </p>
                     <p style="font-size: 30; color: #5D6F81;">
                         ${answer}
@@ -226,7 +226,7 @@
 
 
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -248,10 +248,10 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 location.reload();
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -270,10 +270,10 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 location.reload();
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -290,10 +290,10 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 location.href = "/home?section=Tasks"
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -310,11 +310,11 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
                 $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().parent().remove();
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -334,7 +334,7 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             async: true,
-            success: function(msg) {
+            success: function (msg) {
                 let answer = msg.answer;
                 $('#ask-question-input')[0].value = ''
                 openChatWindow();
@@ -362,7 +362,7 @@
 
 
             },
-            error: function(xhr, ajaxOptions, thrownError) {
+            error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
             }
@@ -404,7 +404,7 @@
         $('.document-scanner')[0].classList.remove('scanning')
     }
 
-    $('.rescan-button').on('click', function(e) {
+    $('.rescan-button').on('click', function (e) {
         e.preventDefault()
         showScanning();
     });
@@ -421,9 +421,9 @@
     function pollStatus(docUuid) {
         if (!pollingActive) return;
 
-        $.get('/files/poll_status', {docid: docUuid}, function(data) {
+        $.get('/files/poll_status', { docid: docUuid }, function (data) {
             if (data.complete) {
-                
+
                 // Processing is complete, update UI
                 $('#loading-spinner').hide();
                 $('#processing-indicator').hide();
@@ -439,7 +439,7 @@
                 }
 
                 updateDocumentSelections();
-                
+
                 documentData = {
                     id: docUuid,
                     title: "",
@@ -449,7 +449,7 @@
                 // No additional refresh needed per the requirement
             } else {
                 // Still processing, poll again after 5 seconds
-                pollTimeout = setTimeout(function() {
+                pollTimeout = setTimeout(function () {
                     pollStatus(docUuid);
                 }, 5000);
 
@@ -459,43 +459,43 @@
     }
 
 
-    $(document).ready(function() {
+    $(document).ready(function () {
         var docContainer = $('.document-container');
 
         // Stop polling when the user navigates away from the page
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function () {
             pollingActive = false;
             if (pollTimeout) {
                 clearTimeout(pollTimeout);
             }
         });
-    
-    // Check if the document container exists (i.e., a document is loaded)
-    if (docContainer.length > 0) {
-        var docUuid = docContainer.data('doc-uuid');
-        var isProcessing = docContainer.data('processing');
-        
-        if (isProcessing) {
-            // Show loading indicators
-            $('#loading-spinner').show();
-            $('#processing-indicator').show();
-            // Hide regular content
-            $('#raw-text-icon').hide();
-            // Start polling
-            pollStatus(docUuid);
-        } else {
-            // Show regular content
-            $('#raw-text-icon').show();
-        }
-    }
 
-        $('.tasks-btn').on('click', function(e) {
+        // Check if the document container exists (i.e., a document is loaded)
+        if (docContainer.length > 0) {
+            var docUuid = docContainer.data('doc-uuid');
+            var isProcessing = docContainer.data('processing');
+
+            if (isProcessing) {
+                // Show loading indicators
+                $('#loading-spinner').show();
+                $('#processing-indicator').show();
+                // Hide regular content
+                $('#raw-text-icon').hide();
+                // Start polling
+                pollStatus(docUuid);
+            } else {
+                // Show regular content
+                $('#raw-text-icon').show();
+            }
+        }
+
+        $('.tasks-btn').on('click', function (e) {
             e.preventDefault();
             $("#tasks-panel").show();
             setSection("Tasks");
         });
 
-        $('.tasks-close-button').off('click').on('click', function(e) {
+        $('.tasks-close-button').off('click').on('click', function (e) {
             e.preventDefault();
             console.log("here");
             setSection("Chat");
@@ -505,21 +505,21 @@
         // call this function to refresh the document selection on load
         updateDocumentSelections();
 
-        $('.file').on('click', function(e) {
+        $('.file').on('click', function (e) {
             e.stopPropagation();
             var checkbox = $(this).find('.document-selector');
             checkbox.prop('checked', !checkbox.prop('checked'));
             updateDocumentSelections();
         });
 
-        $('.folder').on('click', function(e) {
+        $('.folder').on('click', function (e) {
             e.stopPropagation();
             var checkbox = $(this).find('.document-selector');
             checkbox.prop('checked', !checkbox.prop('checked'));
             updateDocumentSelections();
         });
 
-        $('.document-selector').on('click', function(e) {
+        $('.document-selector').on('click', function (e) {
             e.stopPropagation();
             if ($(this)[0].attributes['data-doc-type'].value == 'all_folder') {
                 var checked = $(this).prop('checked');
@@ -533,20 +533,11 @@
             updateDocumentSelections();
         });
 
-        
 
-        $('#add-folder-button').on('click', function(e) {
-            e.preventDefault()
-            let addFolderField = $('#add-folder-field')[0];
-            if (addFolderField.style.display == 'none') {
-                $('#add-folder-field').show();
-            } else {
-                let addFolderForm = $('#add-folder-form')[0];
-                addFolderForm.submit();
-            }
-        });
 
-        $('.space-select').on('change', function(e) {
+
+
+        $('.space-select').on('change', function (e) {
             e.preventDefault()
             var selectedOption = $(this).val();
             console.log(selectedOption);
@@ -562,27 +553,79 @@
         });
 
         // When the user clicks on <span> (x), close the modal
-        $('#closeRenameBtn').on('click', function() {
+        $('#closeRenameBtn').on('click', function () {
             $('#renameModal').hide();
         });
 
-        $('#closeAttachBtn').on('click', function() {
+        $('#closeAttachBtn').on('click', function () {
             $('#attachmentModal').hide();
         });
 
-        $('#closeNewWorkflowBtn').on('click', function() {
+        $('#closeNewWorkflowBtn').on('click', function () {
             $('#newWorkflowModal').hide();
         });
 
-        $('#closeNewTaskBtn').on('click', function() {
+        $('#closeNewTaskBtn').on('click', function () {
             $('#newTaskModal').hide();
         });
 
         // When the user clicks anywhere outside of the modal, close it
-        $(window).on('click', function(event) {
+        $(window).on('click', function (event) {
             if ($(event.target).is($('#renameModal'))) {
                 $('#renameModal').hide();
             }
+        });
+
+        // $('#add-folder-button').on('click', function (e) {
+        //     e.preventDefault()
+        //     let addFolderField = $('#add-folder-field')[0];
+        //     if (addFolderField.style.display == 'none') {
+        //         $('#add-folder-field').show();
+        //     } else {
+        //         let addFolderForm = $('#add-folder-form')[0];
+        //         addFolderForm.submit();
+        //     }
+        // });
+
+        $('#add-folder-button').on('click', function (e) {
+            e.preventDefault();
+            var $form = $('#add-folder-form');
+            var $field = $('#add-folder-field');
+            if ($field.is(':hidden')) {
+                $field.show();
+                return; // Wait for the user to input a name
+            }
+            // Trigger the form's submit event via jQuery, so your handler runs
+            $form.trigger("submit");
+        });
+
+        // Folder creation checks
+        $("#add-folder-form").on("submit", function (event) {
+            event.preventDefault(); // Intercept the submission
+            console.log("Intercepting form submit");
+
+            var folderName = $("#add-folder-field").val().trim();
+            if (!folderName) {
+                showToast("Folder name cannot be empty");
+                return;
+            }
+
+            var folderExists = false;
+            // Adjust the selector as needed if your folder name is not directly in .folder span
+            $(".folder span").each(function () {
+                if ($(this).text().trim().toLowerCase() === folderName.toLowerCase()) {
+                    folderExists = true;
+                    return false; // Break out of the loop
+                }
+            });
+
+            if (folderExists) {
+                showToast("Folder already exists");
+                return;
+            }
+
+            // If validation passes, remove the submit handler and submit the form
+            $(this).off("submit").submit();
         });
     });
 

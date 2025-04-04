@@ -3,10 +3,8 @@ import os
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-class Config(object):
-    """
-    Configuration base, for all environments.
-    """
+class Config:
+    """Configuration base, for all environments."""
 
     DEBUG = False
     TESTING = False
@@ -36,12 +34,18 @@ class Config(object):
 
 
 class ProductionConfig(Config):
+    """Production configuration."""
+
     DEBUG = False
 
 
 class DevelopmentConfig(Config):
+    """Development configuration."""
+
     DEBUG = True
 
 
 class TestingConfig(Config):
+    """Testing configuration."""
+
     TESTING = True

@@ -1,20 +1,21 @@
-from dataclasses import dataclass
-from pydantic import create_model
-from typing import Dict, Optional, Any, List
+"""Utilities for agents."""
+
 import json
-from app.utilities.llm_helpers import remove_code_markers
-from app.utilities.async_utilities import function_event_loop_decorator
-
-from pydantic_ai import RunContext, ModelRetry
-from pydantic_ai.agent import Agent
-from app.models import SmartDocument
-from app.utilities.document_manager import DocumentManager
-
-from langchain_redis import RedisCache
-from devtools import debug
-
 import os
+from dataclasses import dataclass
+from typing import Any, Optional
+
+from devtools import debug
 from dotenv import load_dotenv
+from langchain_redis import RedisCache
+from pydantic import create_model
+from pydantic_ai import ModelRetry, RunContext
+from pydantic_ai.agent import Agent
+
+from app.models import SmartDocument
+from app.utilities.async_utilities import function_event_loop_decorator
+from app.utilities.document_manager import DocumentManager
+from app.utilities.llm_helpers import remove_code_markers
 
 load_dotenv()
 
@@ -34,12 +35,12 @@ if langfuse_enabled:
 class RagDeps:
     doc_manager: DocumentManager
     user_id: str
-    documents: List[SmartDocument]
+    documents: list[SmartDocument]
 
 
 chat_prompt = "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know."
 
-# model = OpenAIModel("gpt-4o")
+# @ model = OpenAIModel("gpt-4o")
 model = "openai:gpt-4o"
 
 rag_agent = Agent(
@@ -124,38 +125,49 @@ chat_agent = Agent(
 
 
 @rag_agent.tool
-def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = []):
-    """
-    Retrieve documents for a given question
+def retrieve(
+    context: RunContext[RagDeps],
+    question: str,
+    docs_ids: Optional[list[str]] = None,
+):
+    """Retrieve documents for a given question
     Args:
         context: The call context
         question: The question of the user
-        docs_ids: A list of document IDs to search in (optional)
+        docs_ids: A list of document IDs to search in (optional).
 
     Returns:
         A list of documents that match the question
-    """
 
+    """
+    if docs_ids is None:
+        docs_ids = []
     prompt_response = prompt_agent.run_sync(
-        f"Generate a prompt for the following user question: {question}"
+        f"Generate a prompt for the following user question: {question}",
     )
     prompt = prompt_response.data
     debug(prompt)
 
     results = context.deps.doc_manager.query_documents(
-        context.deps.user_id, prompt, docs_ids, k=10
+        context.deps.user_id,
+        prompt,
+        docs_ids,
+        k=10,
     )
     if len(results) == 0:
         # check if the document was added to the vectorstore
         non_existent_docs = []
         for doc in context.deps.documents:
             if not context.deps.doc_manager.document_exists(
-                context.deps.user_id, doc.uuid
+                context.deps.user_id,
+                doc.uuid,
             ):
                 non_existent_docs.append(doc)
                 absolute_path = doc.absolute_path
                 debug(
-                    "Recreating vectorstore", context.deps.documents, non_existent_docs
+                    "Recreating vectorstore",
+                    context.deps.documents,
+                    non_existent_docs,
                 )
                 context.deps.doc_manager.add_document(
                     user_id=context.deps.user_id,
@@ -166,7 +178,9 @@ def retrieve(context: RunContext[RagDeps], question: str, docs_ids: list[str] = 
         debug(context.deps.documents[0].raw_text[:100])
         if len(non_existent_docs) > 0:
             results = context.deps.doc_manager.query_documents(
-                context.deps.user_id, question, docs_ids
+                context.deps.user_id,
+                question,
+                docs_ids,
             )
 
     debug(results)
@@ -193,10 +207,10 @@ field_inference_agent = Agent(
 
 
 @field_inference_agent.system_prompt
-def field_inference_system_prompt(context: RunContext[FieldInferenceDeps]):
+def field_inference_system_prompt(context: RunContext[FieldInferenceDeps]) -> str:
     keys = context.deps.keys
     prompt_context = context.deps.extraction_context
-    prompt = f"""Given these field names{" and prompt_context" if prompt_context else ""}:
+    return f"""Given these field names{" and prompt_context" if prompt_context else ""}:
 
 Field names:
 {json.dumps(keys, indent=2)}
@@ -224,7 +238,6 @@ For each field, determine the most appropriate data type and description from th
 
 Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above. Do not convert floating numbers to integers and vice versa, or change the number of decimal places, or change numbers locale encoding. Preserve commas and other punctuation in the extracted text and numbers.
 Consider making fields Optional if they might not always be present."""
-    return prompt
 
 
 type_mapping = {
@@ -232,17 +245,17 @@ type_mapping = {
     "int": (int, ...),
     "float": (float, ...),
     "bool": (bool, ...),
-    "List[str]": (List[str], ...),
-    "List[int]": (List[int], ...),
-    "List[float]": (List[float], ...),
-    "Dict[str, str]": (Dict[str, str], ...),
+    "List[str]": (list[str], ...),
+    "List[int]": (list[int], ...),
+    "List[float]": (list[float], ...),
+    "Dict[str, str]": (dict[str, str], ...),
     "Optional[str]": (str, None),
     "Optional[int]": (int, None),
     "Optional[float]": (float, None),
     "Optional[bool]": (bool, None),
-    "Optional[List[str]]": (List[str], None),
-    "Optional[List[int]]": (List[int], None),
-    "Optional[List[float]]": (List[float], None),
+    "Optional[List[str]]": (list[str], None),
+    "Optional[List[int]]": (list[int], None),
+    "Optional[List[float]]": (list[float], None),
 }
 
 reverse_type_mapping = {
@@ -250,13 +263,13 @@ reverse_type_mapping = {
     (int, ...): "int",
     (float, ...): "float",
     (bool, ...): "bool",
-    (List[str], ...): "List[str]",
-    (List[int], ...): "List[int]",
-    (List[float], ...): "List[float]",
+    (list[str], ...): "List[str]",
+    (list[int], ...): "List[int]",
+    (list[float], ...): "List[float]",
     (Optional[str], None): "Optional[str]",
     (Optional[int], None): "Optional[int]",
     (Optional[float], None): "Optional[float]",
-    (Dict[str, str], ...): "Dict[str, str]",
+    (dict[str, str], ...): "Dict[str, str]",
     (str, None): "Optional[str]",
     (int, None): "Optional[int]",
     (float, None): "Optional[float]",
@@ -265,7 +278,7 @@ reverse_type_mapping = {
 
 
 def get_cache_key(key: str, context: str) -> str:
-    """Generate consistent cache key for a field"""
+    """Generate consistent cache key for a field."""
     return f"field_type:{key}:{context}"
 
 
@@ -281,7 +294,8 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
     try:
         inferred_fields = json.loads(formatted_response)
     except Exception as e:
-        raise ModelRetry(f"Failed to parse type inference response: {str(e)}")
+        msg = f"Failed to parse type inference response: {e!s}"
+        raise ModelRetry(msg)
 
     # Modified validation logic
     fields = {}
@@ -298,7 +312,8 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
         except Exception as e:
             if langfuse_enabled:
                 langfuse.span(name="validation_error", input=e)
-            raise ModelRetry(f"Invalid type for field {key}: {str(e)}")
+            msg = f"Invalid type for field {key}: {e!s}"
+            raise ModelRetry(msg)
 
     # Add fallback for missing keys (shouldn't happen but just in case)
     requested_keys = context.deps.keys
@@ -312,7 +327,7 @@ def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str
 @dataclass
 class ExtractionDeps:
     extraction_context: Optional[str]
-    fields: Dict[str, tuple]
+    fields: dict[str, tuple]
     text: str
 
 
@@ -368,8 +383,7 @@ Text:
 # @observe()
 @function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
-    """
-    Extract entities from text based on the provided extraction keys and return structured output.
+    """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
         text: Input text to extract information from
@@ -377,8 +391,8 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
 
     Returns:
         A JSON object with extracted entities
-    """
 
+    """
     # check if previous extraction exists in cache
     cache_key = f"Keys:{keys}\n\nText:{text}"
     llm_string = "pydantic_model:openai:gpt-4o"
@@ -386,10 +400,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     cache_result = cache.lookup(cache_key, llm_string)
     if cache_result:
         result = json.loads(cache_result[0])
-        print("Cache hit: ", cache_result, result)
         return result.get("entities", [])
-
-    print("Cache miss")
 
     # field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
     # fields = field_inference_agent.run_sync(
@@ -403,7 +414,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         keys = [k.strip() for k in keys]
 
     # Individual field type caching
-    inferred_fields = dict()
+    inferred_fields = {}
     uncached_keys = []
 
     # Check cache for each individual key
@@ -416,14 +427,14 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             uncached_keys.append(key)
 
     # Process uncached keys in a single batch if any
-    print("Uncached keys: ", len(uncached_keys), uncached_keys)
-    print("Inferred fields: ", len(inferred_fields), inferred_fields)
     if uncached_keys:
         field_inference_deps = FieldInferenceDeps(
-            extraction_context=context, keys=uncached_keys
+            extraction_context=context,
+            keys=uncached_keys,
         )
         new_fields = field_inference_agent.run_sync(
-            "Infer the types of the keys", deps=field_inference_deps
+            "Infer the types of the keys",
+            deps=field_inference_deps,
         ).data
 
         # Cache newly inferred fields individually
@@ -445,7 +456,8 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     # Proceed with entity extraction
     DynamicModel = create_model("DynamicEntity", **inferred_fields)
     ExtractionModel = create_model(
-        "ExtractionModel", entities=(List[DynamicModel], ...)
+        "ExtractionModel",
+        entities=(list[DynamicModel], ...),
     )
 
     extractor_agent = Agent(
@@ -457,7 +469,9 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     )
 
     extractor_deps = ExtractionDeps(
-        extraction_context=context, fields=inferred_fields, text=text
+        extraction_context=context,
+        fields=inferred_fields,
+        text=text,
     )
     try:
         debug(text)
@@ -478,7 +492,8 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             try:
                 # Try to parse the dictionary from the error message
                 entity_str = error_msg.replace(
-                    "Expected code to be unreachable, but got: ", ""
+                    "Expected code to be unreachable, but got: ",
+                    "",
                 )
                 # This may be incomplete JSON due to truncation in the error message
                 # You might need a more robust approach to reconstruct it
@@ -488,5 +503,4 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             except:
                 pass
         # If we can't recover, return empty results
-        print(f"Error during extraction: {e}")
         return []

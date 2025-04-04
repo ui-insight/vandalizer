@@ -1,20 +1,20 @@
-from flask import Flask
-from flask_bootstrap import Bootstrap
-import mongoengine as me
-from flask_login import LoginManager
-from flask_mail import Mail
-from datetime import timedelta
-from flask_cors import CORS
-from oauthlib.oauth2.rfc6749.errors import TokenExpiredError
-from oauthlib.oauth2.rfc6749.errors import MismatchingStateError
-from flask_dance.contrib.azure import azure, make_azure_blueprint
+#!/usr/bin/env python3
+"""Application initialization and configuration. Defines Flask and its components."""
+
 import logging
 
 # Error Logging
 import os
+from datetime import timedelta
+
+import mongoengine as me
 import rollbar
 import rollbar.contrib.flask
-from flask import got_request_exception
+from flask import Flask, got_request_exception
+from flask_bootstrap import Bootstrap
+from flask_cors import CORS
+from flask_dance.contrib.azure import make_azure_blueprint
+from flask_mail import Mail
 
 from celery import Celery, Task
 
@@ -54,7 +54,6 @@ def create_app() -> Flask:
 
 app = create_app()
 
-# CORS(app)
 CORS(
     app,
     resources={
@@ -64,8 +63,8 @@ CORS(
                 "https://localhost:3000",
                 "https://localhost",
                 "http://localhost",
-            ]
-        }
+            ],
+        },
     },
 )
 
@@ -82,14 +81,14 @@ logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
 
 # Setup blueprints
-from .blueprints.auth import auth
-from .blueprints.home import home
-from .blueprints.workflows import workflows
-from .blueprints.files import files
-from .blueprints.spaces import spaces
-from .blueprints.feedback import feedback
-from .blueprints.tasks import tasks
-from .blueprints.office import office
+from .blueprints.auth import auth  # noqa: E402
+from .blueprints.feedback import feedback  # noqa: E402
+from .blueprints.files import files  # noqa: E402
+from .blueprints.home import home  # noqa: E402
+from .blueprints.office import office  # noqa: E402
+from .blueprints.spaces import spaces  # noqa: E402
+from .blueprints.tasks import tasks  # noqa: E402
+from .blueprints.workflows import workflows  # noqa: E402
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")
@@ -125,7 +124,3 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
-
-# @auth.errorhandler(MismatchingStateError)
-# def mismatching_state(e):
-#     return redirect(url_for("azure.login"))

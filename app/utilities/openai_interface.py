@@ -31,14 +31,13 @@ cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 class OpenAIInterface:
     loaded_doc = ""
 
-    def load_document(self, document_path):
+    def load_document(self, document_path) -> None:
         self.loaded_doc = extract_text_from_doc(document_path)
 
     # @observe()
     def ask_question_to_loaded_document(self, item):
         openai.api_key = os.getenv("OPENAI_API_KEY")
         prompt = ""
-        print("asking question")
         if len(item.text_blocks) > 0:
             prompt = (
                 """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted html div.\nQuestion:\n"""
@@ -51,7 +50,6 @@ class OpenAIInterface:
             prompt += "\n\nDocument:\n" + self.loaded_doc
             # print(prompt)
         else:
-            print("no text blocks")
             prompt = (
                 """Given the following document, answer the following question. Return the result as nicely formatted html.:\nQuestion:\n"""
                 + item.searchphrase
@@ -60,24 +58,23 @@ class OpenAIInterface:
             )
 
         chat_lm = ChatLM(model_type)
-        completion = chat_lm.completion(
+        return chat_lm.completion(
             messages=[{"role": "user", "content": prompt}],
         )
-        return completion
 
     # def format_answer(self, answer):
     #     regex = r"^```(html|json|markdown)?\s*|\s*```$"
     #     formatted_answer = re.sub(regex, "", answer)
     #     return formatted_answer
     def format_answer(self, answer):
-        """
-        Removes code block markers and language specifiers from LLM responses.
+        """Removes code block markers and language specifiers from LLM responses.
 
         Args:
             answer (str): The raw LLM response text
 
         Returns:
             str: Formatted text with code blocks and language specifiers removed
+
         """
         # Split the text into lines
         lines = answer.split("\n")
@@ -95,9 +92,8 @@ class OpenAIInterface:
             formatted_lines.append(line)
 
         # Join the lines back together
-        formatted_answer = "\n".join(formatted_lines)
+        return "\n".join(formatted_lines)
 
-        return formatted_answer
 
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
@@ -107,8 +103,10 @@ class OpenAIInterface:
         question,
         session=None,
         user_id=None,
-        default_docs=[],
+        default_docs=None,
     ):
+        if default_docs is None:
+            default_docs = []
         default_docs = list(default_docs)
         documents = list(documents)
 
@@ -137,7 +135,6 @@ class OpenAIInterface:
                 for part in message["parts"]:
                     # remove tool_call
                     if "tool-call" in part["part_kind"]:
-                        print("removing tool call", part)
                         continue
                     new_parts.append(part)
                 message["parts"] = new_parts
@@ -217,8 +214,8 @@ class OpenAIInterface:
         #     # save the latest max messages
         #     session["chat_history"] = new_chat_history
 
-        return dict(
-            question=question,
-            answer=self.format_answer(answer.data),
-            formatted_answer=self.format_answer(answer.data),
-        )
+        return {
+            "question": question,
+            "answer": self.format_answer(answer.data),
+            "formatted_answer": self.format_answer(answer.data),
+        }
