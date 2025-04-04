@@ -33,9 +33,15 @@ from app.models import (
     WorkflowStep,
     WorkflowStepTask,
 )
-from app.utilities.excel_helper import save_excel_to_html
-from app.utilities.workflow import WorkflowThread, build_workflow_engine
+from app.models import User, Space, WorkflowAttachment
 from app.utils import load_user
+from copy import deepcopy
+import os, uuid
+from app.utilities.workflow import execute_workflow_task
+from werkzeug.utils import secure_filename
+import pypandoc, json
+from bson import ObjectId
+from app.utilities.excel_helper import save_excel_to_html
 
 from . import workflows
 
@@ -106,6 +112,7 @@ def run_workflow() -> ResponseReturnValue:
 
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
+    workflow_result.save()
     attachments = [
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
@@ -114,20 +121,23 @@ def run_workflow() -> ResponseReturnValue:
         name="Document",
         data={"docs": docs, "attachments": attachments, "user_id": user_id},
     )
-    steps = [document_trigger_step]
-    for step in workflow.steps:
-        steps.append(step)
+    document_trigger_step.save()
 
-    # @TODO add the ability to cancel the thread (same for the chat)
-    # maybe store the thread id in the user's session.
-    engine = build_workflow_engine(steps, workflow=workflow)
-    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
-    workflow_thread.start()
-    result = workflow_thread.join()
-    output = None
-    data = None
-    if result:
-        output, data = result
+    workflow_id = str(workflow.id)
+    workflow_result_id = str(workflow_result.id)
+    workflow_trigger_step_id = str(document_trigger_step.id)
+    print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
+    asyn_result = execute_workflow_task.delay(
+        workflow_result_id=workflow_result_id,
+        workflow_id=workflow_id,
+        workflow_trigger_step_id=workflow_trigger_step_id,
+    )
+    print("Async result", asyn_result)
+    workflow_output = asyn_result.get(timeout=300)
+    if workflow_output is None:
+        return jsonify({"error": "Workflow execution failed"})
+    output = workflow_output["output"]
+    data = workflow_output["history"]
 
     return {"output": output, "steps": data}
 
@@ -229,13 +239,17 @@ def run_workflow_integrated() -> ResponseReturnValue:
         data={"docs": docs, "attachments": attachments},
     )
 
-    steps = [document_trigger_step, *workflow.steps]
+    workflow_trigger_step_id = str(document_trigger_step.id)
 
     # **6. Execute the Workflow**
-    engine = build_workflow_engine(steps, workflow=workflow)
-    workflow_thread = WorkflowThread(target=engine.execute, args=(workflow_result,))
-    workflow_thread.start()
-    output, data = workflow_thread.join()
+    workflow_output = execute_workflow_task.delay(
+        workflow_result_id=str(workflow_result.id),
+        workflow_id=str(workflow.id),
+        workflow_trigger_step_id=workflow_trigger_step_id,
+    )
+    workflow_output = workflow_output.get()
+    output = workflow_output["output"]
+    data = workflow_output["history"]
 
     # **7. Return the Response**
     return jsonify({"output": output, "steps": data})
@@ -259,6 +273,7 @@ def workflow_status() -> ResponseReturnValue:
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
         # "time_elapsed": int(time_elapsed)
+        "status": workflow_result.status,
     }
 
     return jsonify(response)

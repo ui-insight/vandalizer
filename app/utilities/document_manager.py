@@ -1,5 +1,7 @@
 import sys
 
+from app.models import SmartDocument
+
 try:
     import pysqlite3
 
@@ -18,6 +20,7 @@ from langchain_chroma.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 from app import app
+from app.celery import celery_app
 from app.utilities.document_readers import (
     extract_text_from_doc,
 )
@@ -26,7 +29,9 @@ MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-def perform_extraction_and_update(document, doc_path) -> None:
+@celery_app.task
+def perform_extraction_and_update(document_uuid, doc_path):
+    document = SmartDocument.objects(uuid=document_uuid).first()
     debug("Performing OCR on document", document.title)
     document.processing = True
     try:
@@ -45,7 +50,12 @@ def perform_extraction_and_update(document, doc_path) -> None:
         document.save()
 
 
-def perform_semantic_ingestion(document, user_id, raw_text=None) -> None:
+@celery_app.task
+def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    document.processing = True
+    document.save()
+
     document_manager = DocumentManager()
 
     document_path = document.absolute_path
@@ -61,23 +71,28 @@ def perform_semantic_ingestion(document, user_id, raw_text=None) -> None:
     document.save()
 
 
-def perform_ocr_and_semantic_ingestion(document, user_id) -> None:
+def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
+    document = SmartDocument.objects(uuid=document_uuid).first()
     document_path = document.absolute_path
-    perform_extraction_and_update(document, document_path)
+    perform_extraction_and_update.delay(document.uuid, document_path)
     document = document.reload()
-    perform_semantic_ingestion(document, user_id, document.raw_text)
+    perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
     document.processing = False
     document.save()
 
 
 class DocumentManager:
-    def __init__(self, persist_directory: Path = Path(app.root_path) / "static" / "db") -> None:
+    def __init__(
+        self, persist_directory: Path = Path(app.root_path) / "static" / "db"
+    ) -> None:
         """Initialize the document manager with a persistence directory."""
         self.upload_folder = Path(app.root_path) / "static" / "uploads"
         self.persist_directory = persist_directory.as_posix()
         self.embeddings = OpenAIEmbeddings()
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000, chunk_overlap=200, length_function=len,
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len,
         )
 
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
@@ -103,7 +118,6 @@ class DocumentManager:
             embedding_function=self.embeddings,
             persist_directory=self.persist_directory,
         )
-
 
     def add_document(
         self,
@@ -142,7 +156,6 @@ class DocumentManager:
                 },
             )
 
-
         # Get the user's collection and add the document
         vectorstore = self.get_user_collection(user_id)
 
@@ -150,7 +163,11 @@ class DocumentManager:
         vectorstore.add_documents(splits)
 
     def query_documents(
-        self, user_id: str, query: str, filter_docs: Optional[list[str]] = None, k: int = 4,
+        self,
+        user_id: str,
+        query: str,
+        filter_docs: Optional[list[str]] = None,
+        k: int = 4,
     ) -> list[dict[str, Any]]:
         """Query a user's documents, optionally filtering by document IDs.
         Returns relevant document chunks with their metadata.
@@ -179,8 +196,6 @@ class DocumentManager:
         return [
             {"content": doc.page_content, "metadata": doc.metadata} for doc in results
         ]
-
-
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
         """Check if a specific document exists in a user's collection."""
