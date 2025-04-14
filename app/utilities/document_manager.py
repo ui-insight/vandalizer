@@ -20,7 +20,7 @@ from langchain_chroma.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
 
 from app import app
-from app.celery import celery_app
+from app.celery_worker import celery_app
 from app.utilities.document_readers import (
     extract_text_from_doc,
 )
