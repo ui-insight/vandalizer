@@ -1,3 +1,3 @@
 #!/usr/bin/env sh
 
-celery -A app.celery.celery_app worker --loglevel INFO
+celery -A app.celery_worker.celery_app worker --loglevel INFO

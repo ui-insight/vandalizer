@@ -15,7 +15,7 @@ from devtools import debug
 from dotenv import load_dotenv
 
 from app import app
-from app.celery import celery_app
+from app.celery_worker import celery_app
 from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult
 from app.utilities.config import model_type
 from app.utilities.document_readers import extract_text_from_doc
@@ -25,7 +25,6 @@ from app.utilities.openai_interface import (
     OpenAIInterface,
 )
 from app.utilities.config import model_type
-from app.celery import celery_app
 
 from threading import Thread
 
