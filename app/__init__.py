@@ -10,18 +10,19 @@ from datetime import timedelta
 import mongoengine as me
 import rollbar
 import rollbar.contrib.flask
+from celery import Celery, Task
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
-from celery import Celery, Task
-
-CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.1.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.0.1=2:
-- Bug fixes and stability improvements.
+Release 2.1.1:
+- Background task handling
+- Timeout fixes
+- Bug fixes and improvements
 """
 
 
