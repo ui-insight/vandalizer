@@ -11,6 +11,7 @@ from devtools import debug
 from flask import (
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     request,
@@ -212,28 +213,56 @@ def download_document() -> ResponseReturnValue:
 
 
 @files.route("/delete_document")
-def delete_documents() -> ResponseReturnValue:
-    """Delete a document."""
-    document_uuid = request.args.get("docid")
-    document = SmartDocument.objects(uuid=document_uuid).first()
-    if document:
-        document_manager = DocumentManager()
-        document_manager.delete_document(
-            user_id=session["user_id"],
-            document_id=document_uuid,
-        )
+def delete_document() -> ResponseReturnValue:
+    """Delete a document record and its file, but never crash the server."""
+    doc_id = request.args.get("docid")
+    if not doc_id:
+        flash("No document specified.", "warning")
+        return _redirect_home()
 
-        document_file_path = (
-            Path(current_app.root_path) / "static" / "uploads" / document.path
-        )
-        os.remove(document_file_path)
+    document = SmartDocument.objects(uuid=doc_id).first()
+    if not document:
+        flash("Document not found.", "warning")
+        return _redirect_home()
 
+    # 1) Delete via manager (e.g. remove metadata/storage)
+    try:
+        DocumentManager().delete_document(
+            user_id=session.get("user_id"), document_id=doc_id
+        )
+    except Exception as e:
+        current_app.logger.error(f"[delete_document] manager error: {e}")
+        flash("Could not remove document metadata.", "danger")
+
+    # 2) Try removing the file (but don’t bail out if it’s missing)
+    upload_folder = Path(current_app.root_path) / "static" / "uploads"
+    file_path = upload_folder / document.path
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            current_app.logger.error(f"[delete_document] file delete error: {e}")
+            flash("Failed to delete document file.", "danger")
+    else:
+        current_app.logger.warning(f"[delete_document] file not found: {file_path}")
+        flash("Document file was already gone.", "info")
+
+    # 3) Always attempt to delete the DB record
+    try:
         document.delete()
+    except Exception as e:
+        current_app.logger.error(f"[delete_document] db delete error: {e}")
+        flash("Failed to delete document record.", "danger")
+    else:
+        flash("Document deleted successfully.", "success")
 
+    return _redirect_home()
+
+
+def _redirect_home():
     folder_id = request.args.get("folder_id")
     if folder_id:
         return redirect(url_for("home.index", folder_id=folder_id))
-
     return redirect(url_for("home.index"))
 
 
