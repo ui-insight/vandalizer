@@ -91,11 +91,16 @@ def extract_text_from_doc(doc_path, doc=None):
         if doc_path_str.endswith(".html"):
             return extract_text_from_html(doc_path_str)
         return None
-    if doc.extension in {"pdf", "docx"}:
-        # return extract_text_from_pdf(doc_path_str)
-        return ocr_extract_text_from_pdf(doc_path_str)
-    if doc.extension == "html":
-        return extract_text_from_html(doc_path_str)
+    else:
+        debug(doc.extension)
+        if doc.extension in {"pdf", "docx"}:
+            # return extract_text_from_pdf(doc_path_str)
+            return ocr_extract_text_from_pdf(doc_path_str)
+        if doc.extension == "html":
+            return extract_text_from_html(doc_path_str)
+        if doc.extension in {"txt", "md", "csv"}:
+            with open(doc_path_str, encoding="utf-8") as file:
+                return file.read()
     return None
 
 
@@ -183,7 +188,9 @@ class PDFProcessor:
 
         try:
             # if OCR not necessary proceed with basic text extraction
-            if (not any(images_found) and not any(pdf_quality)) or self.fallback != "ocr":
+            if (
+                not any(images_found) and not any(pdf_quality)
+            ) or self.fallback != "ocr":
                 full_text, tables, images = parse_basic(
                     document=pdf_document,
                     upload_path=self.file_path,
@@ -209,7 +216,9 @@ class PDFProcessor:
                     files = {"file": f}
 
                     ocr_response = requests.post(
-                        OCR_ENDPOINT + self.ocr_tool, files=files, timeout=300,
+                        OCR_ENDPOINT + self.ocr_tool,
+                        files=files,
+                        timeout=300,
                     )
 
                 api_response.status = ("Success",)
@@ -365,7 +374,11 @@ def clean_markdown(text):
 
 
 def parse_basic(
-    document, upload_path, format, extract_tables=True, extract_images=True,
+    document,
+    upload_path,
+    format,
+    extract_tables=True,
+    extract_images=True,
 ):
     full_text = ""
     tables = {}
@@ -477,7 +490,8 @@ def process_page(
         fp = save_page_to_pdf(document, page_number, output_dir)
         try:
             with open(
-                fp, "rb",
+                fp,
+                "rb",
             ) as f:  # Use 'with' to ensure the file is closed properly
                 files = {"file": f}
                 ocr_response = requests.post(endpoint, files=files, timeout=300)
@@ -508,7 +522,6 @@ def assemble_page_text(page_indices, page_texts):
 
     # Join the retrieved texts together
     return " ".join(sorted_texts)
-
 
 
 # threaded page extraction

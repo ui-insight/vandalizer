@@ -34,6 +34,7 @@ from app.utilities.document_readers import (
 from app.utilities.excel_helper import save_excel_to_html
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from app.utils import load_user
+from app.utilities.upload_manager import perform_document_validation
 
 from . import files
 
@@ -108,6 +109,21 @@ def upload() -> ResponseReturnValue:
     )
     document.save()
 
+    if extension in ["txt", "csv", "md"]:
+        # Extract text from the file
+        raw_text = extract_text_from_doc(file_path, document)
+        document.raw_text = raw_text
+        document.processing = True
+        document.valid = False
+        document.save()
+        print("Raw text extracted:", raw_text[:100])
+
+        async_task = perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
+        task_id = async_task.task_id
+        perform_document_validation.delay(
+            document.uuid, str(file_path), raw_text, task_id
+        )
+
     if extension == "docx":
         # Convert to PDF
         pdf_path = Path(upload_dir) / f"{uid}.pdf"
@@ -117,7 +133,12 @@ def upload() -> ResponseReturnValue:
         raw_text = extract_text_from_doc(docx_path)
         document.raw_text = raw_text
         document.save()
-        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
+        async_task = perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
+
+        task_id = async_task.task_id
+        perform_document_validation.delay(
+            document.uuid, str(file_path), raw_text, task_id=None
+        )
 
     elif extension in ["xlsx", "xls"]:
         # Convert to HTML
@@ -129,12 +150,21 @@ def upload() -> ResponseReturnValue:
         document.raw_text = raw_text
         document.save()
 
-        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
+        async_task = perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
+
+        task_id = async_task.task_id
+        perform_document_validation.delay(
+            document.uuid, str(file_path), raw_text, task_id
+        )
 
     elif extension == "pdf":
         # Extract text from PDF in a background thread
         pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
         perform_ocr_and_semantic_ingestion(document.uuid, user_id)
+
+        perform_document_validation.delay(
+            document.uuid, str(file_path), raw_text, task_id=None
+        )
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
@@ -146,8 +176,12 @@ def poll_status() -> ResponseReturnValue:
     document = SmartDocument.objects(uuid=document_uuid).first()
     return jsonify(
         {
-            "complete": not document.processing and document.raw_text != "",
+            "complete": not document.processing
+            and document.raw_text != ""
+            and document.valid,
             "raw_text": document.raw_text if not document.processing else "",
+            "validation_feedback": document.validation_feedback,
+            "valid": document.valid,
         },
     )
 

@@ -101,6 +101,8 @@ class SmartDocument(me.Document):
 
     path = me.StringField(required=True, max_length=200)
     processing = me.BooleanField(default=False)
+    valid = me.BooleanField(default=False)
+    validation_feedback = me.StringField(required=False, max_length=5000)
     title = me.StringField(required=True, max_length=200)
     raw_text = me.StringField(required=True, default="")
     extension = me.StringField(default="pdf", max_length=10)
