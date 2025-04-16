@@ -68,6 +68,7 @@ function showFile() {
     "application/pdf", // PDF
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // Word
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // Excel
+    "text/plain"
   ]; //adding some valid image extensions in array
   if (validExtensions.includes(fileType)) {
     //if user selected file is an image file
@@ -171,10 +172,10 @@ $(document).ready(function () {
     const rect =
       e.type === "contextmenu"
         ? {
-            left: e.clientX,
-            top: e.clientY,
-            bottom: e.clientY,
-          }
+          left: e.clientX,
+          top: e.clientY,
+          bottom: e.clientY,
+        }
         : $displaytarget[0].getBoundingClientRect();
 
     const popupHeight = $popupMenu.outerHeight();

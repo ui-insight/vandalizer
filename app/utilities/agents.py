@@ -8,7 +8,7 @@ from typing import Any, Optional
 from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
-from pydantic import create_model
+from pydantic import create_model, BaseModel
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.agent import Agent
 
@@ -16,6 +16,11 @@ from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm_helpers import remove_code_markers
+from app.utilities import config
+from app.utilities.document_readers import extract_text_from_doc
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import asyncio
 
 load_dotenv()
 
@@ -116,6 +121,95 @@ Do not:
 
 Your output should be the search prompt only, with no additional text.""",
 )
+
+
+class UploadResult(BaseModel):
+    feedback: str
+    valid: bool
+
+
+upload_agent = Agent(
+    model,
+    system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+    result_type=UploadResult,
+)
+
+
+async def validate_document(document_path, document_text, chunk_size=8000):
+    """
+    Validate the document and return the result.
+    Args:
+        document_path (str): The path to the document.
+        document_text (str): The text content of the document.
+    Returns:
+        dict: The result of the validation.
+    """
+    text = document_text
+    if not text:
+        text = extract_text_from_doc(document_path)
+
+    print("text: ", text)
+
+    compliance = config.upload_compliance
+
+    chunked_text = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
+    debug("number of chunks:", len(chunked_text))
+    tasks = []
+
+    for i, chunk in enumerate(chunked_text):
+        chunk_prompt = f"""Validate that the following document chunk ({i + 1}/{len(chunked_text)}) meets the compliance requirements:
+        Compliance Requirements: \n{compliance}
+        Document Path: {document_path}
+        Document Text Chunk: \n{chunk}
+        """
+        tasks.append(upload_agent.run(chunk_prompt))
+
+    chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    valid_results = []
+    feedbacks = []
+
+    results = []
+    for i, result in enumerate(chunk_results):
+        if isinstance(result, Exception):
+            debug(f"Error processing chunk {i + 1}: {result}")
+            feedbacks.append(f"Error processing chunk {i + 1}: {result}")
+            valid_results.append(False)
+        else:
+            result_output = result.output
+            results.append(result_output)
+            valid_results.append(result_output.valid)
+            feedbacks.append(f"Chunk {i + 1}: {result_output.feedback}")
+
+    is_valid = all(valid_results)
+
+    # combined_feedback = "\n\n".join(feedbacks)
+    combined_feedback = ""
+    if is_valid:
+        combined_feedback = (
+            "All document sections passed validation.\n\n" + combined_feedback
+        )
+    else:
+        # combined_feedback = (
+        #     "Document failed validation in one or more sections.\n\n"
+        #     + combined_feedback
+        # )
+        for item in results:
+            if not item.valid:
+                combined_feedback += item.feedback + "\n\n"
+
+    # summarize the feedback
+    feedback_summary = await chat_agent.run(
+        f"Check if there are any valiation failure and summaryize them in the following: {combined_feedback}"
+    )
+
+    result = UploadResult(
+        valid=is_valid,
+        feedback=feedback_summary.data,
+    )
+
+    debug("Final Validation Result:", result)
+    return result
 
 
 chat_agent = Agent(
@@ -463,7 +557,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     extractor_agent = Agent(
         model,
         deps_type=ExtractionDeps,
-        result_type=ExtractionModel,
+        output_type=ExtractionModel,
         result_retries=3,
         retries=3,
     )

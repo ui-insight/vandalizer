@@ -38,20 +38,21 @@ dependencies = [
     "openpyxl",
     "pandas",
     "pydantic",
-    "pydantic_ai",
+    "pydantic-ai",
     "pymongo",
     "pymupdf",
     "pymupdf4llm",
     "pypandoc",
     "pypdf",
     "PyPDF2",
-    "pysqlite3",
+    # "pysqlite3",
     "python-dotenv",
     "redis",
     "requests",
     "rollbar",
     "tiktoken",
     "wtforms",
+    "celery>=5.5.1",
 ]
 
 
