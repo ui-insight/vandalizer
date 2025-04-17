@@ -71,9 +71,21 @@ CORS(
 
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
 app.permanent_session_lifetime = timedelta(days=60)
-app.config.from_object("app.configuration.DevelopmentConfig")
 
-me.connect("osp")
+# SET FLASK_ENV FOR EACH SERVER
+env = os.getenv("FLASK_ENV", "development").lower()
+
+if env == "production":
+    config_class = "app.configuration.ProductionConfig"
+elif env == "testing":
+    config_class = "app.configuration.TestingConfig"
+else:
+    # anything else (including 'development') → development settings
+    config_class = "app.configuration.DevelopmentConfig"
+
+app.config.from_object(config_class)
+
+
 Bootstrap(app)  # flask-bootstrap
 Mail(app)
 
@@ -125,3 +137,6 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
+
+
+me.connect(app.config["MONGO_DB"])

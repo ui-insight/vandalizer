@@ -36,16 +36,19 @@ class Config:
 class ProductionConfig(Config):
     """Production configuration."""
 
+    MONGO_DB = "osp"
     DEBUG = False
 
 
 class DevelopmentConfig(Config):
     """Development configuration."""
 
+    MONGO_DB = "osp"
     DEBUG = True
 
 
 class TestingConfig(Config):
     """Testing configuration."""
 
+    MONGO_DB = "osp-staging"
     TESTING = True
