@@ -83,6 +83,11 @@ else:
     # anything else (including 'development') → development settings
     config_class = "app.configuration.DevelopmentConfig"
 
+# Log which env/config we're using
+logging.basicConfig(level=logging.INFO)
+app.logger.info(f"Starting server in '{env}' environment → loading {config_class!r}")
+
+
 app.config.from_object(config_class)
 
 
