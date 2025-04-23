@@ -103,6 +103,10 @@ class SmartDocument(me.Document):
     processing = me.BooleanField(default=False)
     valid = me.BooleanField(default=False)
     validation_feedback = me.StringField(required=False, max_length=5000)
+    task_id = me.StringField(
+        default=None,
+        required=False, max_length=200
+    )  # Celery task ID for processing
     title = me.StringField(required=True, max_length=200)
     raw_text = me.StringField(required=True, default="")
     extension = me.StringField(default="pdf", max_length=10)

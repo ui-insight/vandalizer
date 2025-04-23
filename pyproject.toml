@@ -45,7 +45,7 @@ dependencies = [
     "pypandoc",
     "pypdf",
     "PyPDF2",
-    # "pysqlite3",
+    "pysqlite3",
     "python-dotenv",
     "redis",
     "requests",

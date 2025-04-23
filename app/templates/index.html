@@ -204,15 +204,30 @@
                                            {% endif %}>
                                 </span>
                         
-                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')">
-                                    <span><i class="fa-solid fa-file"></i></span>
-                                    <span class="file-name">{{ doc.title }}</span>
+                                <a
+                                href="javascript:void(0);"
+                                class="file-link{% if not doc.valid and not doc.processing %} invalid{% endif %}"
+                                onclick="addDocId('{{ doc.uuid }}')"
+                                    disabled={{not doc.valid}}
+                                >
+                                <span><i class="fa-solid fa-file"></i></span>
+                                <span class="file-name">{{ doc.title }}</span>
                                 </a>
 
-                                                   <!-- Show default tag if doc is default -->
-                                                   {% if doc.is_default %}
-                                                   <span class="default-tag">Default</span>
-                                                   {% endif %}
+                                {% if not doc.valid and not doc.processing %}
+                                <span class="token-warning">
+                                    <i class="fa-solid fa-info-circle invalid-icon"></i>
+                                    <span class="tooltiptext">
+                                    {{ doc.validation_feedback }}
+                                    </span>
+                                </span>
+                                {% endif %}
+
+
+                                <!-- Show default tag if doc is default -->
+                                {% if doc.is_default %}
+                                <span class="default-tag">Default</span>
+                                {% endif %}
                         
                                 <!-- Show date if there's room -->
                                 <span class="file-date">{{ doc.time_ago_in_words() }}</span>
@@ -296,46 +311,73 @@
 
         <div id="snackbar">Copied</div>
         <div class="modal-container">
-        {% include "toolpanel/rename_modal.html" %}
-        {% include "toolpanel/raw_text_modal.html" %}
-        {% include "toolpanel/attachment_modal.html" %}
-        {% include "workflows/new_workflow_modal.html" %}
-        {% include "toolpanel/tasks/new_task_modal.html" %}
+            {% include "toolpanel/rename_modal.html" %}
+            {% include "toolpanel/raw_text_modal.html" %}
+            {% include "toolpanel/attachment_modal.html" %}
+            {% include "workflows/new_workflow_modal.html" %}
+            {% include "toolpanel/tasks/new_task_modal.html" %}
         </div>
     </div>
 </div>
 
 
 <style>
-    .token-warning {
-        color: #FFA500;
-        cursor: help;
-        margin-left: 5px;
-        position: relative;
-        display: inline-block;
-    }
 
-    .token-warning .tooltiptext {
-        visibility: hidden;
-        width: 300px;
-        background-color: #555;
-        color: #fff;
-        text-align: center;
-        border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
-        opacity: 0;
-        transition: opacity 0.1s;
-    }
+ /* style the invalid link */
+ .file-link.invalid .file-name {
+     color: red;
+     text-decoration: line-through;
+ }
 
-    .token-warning:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
+ /* style the info icon */
+ .invalid-icon {
+     color: red;
+     margin-left: 8px;
+     cursor: pointer;
+ }
+
+ .token-warning {
+     position: relative;
+     z-index: 1000;
+ }
+
+ .token-warning .tooltiptext {
+     visibility: hidden;
+     width: 250px;
+     background-color: #555;
+     color: #fff;
+     text-align: left;
+     border-radius: 6px;
+     padding: 8px 12px;
+     position: fixed;         /* Change from absolute to fixed */
+     z-index: 9999;
+     opacity: 0;
+     transition: opacity 0.2s;
+     word-wrap: break-word;
+     overflow-wrap: break-word;
+     white-space: normal;
+     line-height: 1.4;
+     box-sizing: border-box;
+     max-height: 80vh;
+     overflow-y: auto;
+ }
+
+ /* Position the tooltip dynamically with JavaScript instead of CSS */
+ .token-warning:hover .tooltiptext {
+     visibility: visible;
+     opacity: 1;
+ }
+
+ /* Arrow styling */
+ .token-warning .tooltiptext::after {
+     content: "";
+     position: absolute;
+     top: 10px;
+     left: 100%;
+     border-width: 6px;
+     border-style: solid;
+     border-color: transparent transparent transparent #555;
+ }
 </style>
 
 

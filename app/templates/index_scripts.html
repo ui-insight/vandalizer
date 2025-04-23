@@ -448,27 +448,6 @@
 
                 // No additional refresh needed per the requirement
             }
-            if (!data.valid) {
-                // Processing failed, update UI
-                $('#loading-spinner').hide();
-                $('#processing-indicator').hide();
-                $('#raw-text-icon').show();
-                isProcessingFile = false;
-
-                const validationFeedback = data.validation_feedback;
-                console.log("Validation feedback: " + validationFeedback, data);
-
-                if (processingFileOriginalText != "") {
-                    $('.processing-file-text-question-holder').text(processingFileOriginalText);
-                    $('.message-response').remove();
-                    $('.message-you').remove();
-                    chat(processingFileOriginalText);
-                    processingFileOriginalText = "";
-                }
-
-                showToast("Document processing failed: " + validationFeedback);
-                updateDocumentSelections();
-            }
 
             else {
                 // Still processing, poll again after 5 seconds

@@ -3,6 +3,7 @@
 import os
 import uuid
 from itertools import chain
+from pathlib import Path
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
@@ -19,6 +20,11 @@ from app.utilities.document_manager import (
     DocumentManager,
     perform_extraction_and_update,
     perform_semantic_ingestion,
+    cleanup_document,
+    update_document_fields,
+)
+from app.utilities.upload_manager import (
+    perform_document_validation,
 )
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import is_dev, load_user
@@ -45,22 +51,40 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
 
-    document_manager = DocumentManager()
+    extension = document.extension
+    upload_dir = Path(current_app.root_path) / "static" / "uploads" / user_id
+    document_uuid = document.uuid
+    file_path = Path(upload_dir) / f"{document_uuid}.{extension}"
 
     if not document.raw_text or document.raw_text == "":
         pdf_path = document.absolute_path
         document.processing = True
         document.save()
-        perform_extraction_and_update.delay(document.uuid, str(pdf_path))
-    elif document.processing:
-        document.processing = False
-        document.save()
+        # check if there is a task running
+        if not document.task_id:
+            extraction_task = perform_extraction_and_update.s(
+                document_uuid=document.uuid,
+                doc_path=str(file_path),
+                extension=extension,
+                upload_dir=str(upload_dir),
+            )
 
-    # Check if the document is in chroma
-    if not document_manager.document_exists(user_id, document.uuid):
-        document.processing = True
-        document.save()
-        perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
+            validation_task = perform_document_validation.s(
+                document_uuid=document.uuid,
+                document_path=str(file_path),
+            )
+
+            ingestion_task = perform_semantic_ingestion.s(
+                document.uuid,
+                user_id,
+            )
+            workflow = extraction_task | validation_task | ingestion_task
+            workflow_task_result = workflow.apply_async(
+                link=update_document_fields.si(document.uuid),
+                link_error=cleanup_document.si(document.uuid),
+            )
+            document.task_id = workflow_task_result.id
+            document.save()
 
 
 @home.route("/")

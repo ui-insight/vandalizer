@@ -88,17 +88,23 @@ def extract_text_from_doc(doc_path, doc=None):
     if doc is None:
         if doc_path_str.endswith(".pdf"):
             return ocr_extract_text_from_pdf(doc_path_str)
-        if doc_path_str.endswith(".html"):
+        elif doc_path_str.endswith(".html"):
             return extract_text_from_html(doc_path_str)
+        elif doc_path_str.endswith((".txt", ".md", ".csv")):
+            with open(doc_path_str, encoding="utf-8") as file:
+                return file.read()
+
         return None
     else:
         debug(doc.extension)
-        if doc.extension in {"pdf", "docx"}:
+        if doc.extension in {"pdf"}:
             # return extract_text_from_pdf(doc_path_str)
             return ocr_extract_text_from_pdf(doc_path_str)
-        if doc.extension == "html":
+        elif doc.extension in {"docx", "doc"}:
+            return extract_text_from_pdf(doc_path_str)
+        elif doc.extension == "html":
             return extract_text_from_html(doc_path_str)
-        if doc.extension in {"txt", "md", "csv"}:
+        elif doc.extension in {"txt", "md", "csv"}:
             with open(doc_path_str, encoding="utf-8") as file:
                 return file.read()
     return None
