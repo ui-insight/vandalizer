@@ -94,7 +94,6 @@ class OpenAIInterface:
         # Join the lines back together
         return "\n".join(formatted_lines)
 
-
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
@@ -105,6 +104,14 @@ class OpenAIInterface:
         user_id=None,
         default_docs=None,
     ):
+        for document in documents:
+            if not document.valid:
+                return {
+                    "question": question,
+                    "answer": f"The document {document.title} failed validation, please fix the validation errors and try again: \n\n{document.validation_feedback}",
+                    "formatted_answer": f"The document {document.title} failed validation, please fix the validation errors and try again: \n\n{document.validation_feedback}",
+                }
+
         if default_docs is None:
             default_docs = []
         default_docs = list(default_docs)

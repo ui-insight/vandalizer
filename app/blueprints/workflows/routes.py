@@ -117,6 +117,17 @@ def run_workflow() -> ResponseReturnValue:
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
+    for doc in docs:
+        if not doc.valid:
+            return jsonify(
+                {
+                    "output": [
+                        f"The document {doc.title} failed validation, please fix the validation errors and try again: \n\n{doc.validation_feedback}"
+                    ],
+                    "steps": [],
+                }
+            )
+
     document_trigger_step = WorkflowStep(
         name="Document",
         data={"docs": docs, "attachments": attachments, "user_id": user_id},
