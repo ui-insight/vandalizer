@@ -127,17 +127,24 @@ def run_workflow() -> ResponseReturnValue:
     workflow_result_id = str(workflow_result.id)
     workflow_trigger_step_id = str(document_trigger_step.id)
     print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
-    asyn_result = execute_workflow_task.delay(
+    async_result = execute_workflow_task.delay(
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
     )
-    print("Async result", asyn_result)
-    workflow_output = asyn_result.get(timeout=300)
+    print("Async result", async_result)
+    workflow_output = async_result.get(timeout=600)
     if workflow_output is None:
         return jsonify({"error": "Workflow execution failed"})
-    output = workflow_output["output"]
-    data = workflow_output["history"]
+    output = workflow_output.get("output")
+    data = workflow_output.get("history")
+    if not output:
+        return {
+            "output": [],
+            "steps": [],
+            "status": "error",
+            "error": "Workflow failed to execute",
+        }
 
     return {"output": output, "steps": data}
 

@@ -5,6 +5,8 @@ import openai
 from devtools import debug
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
+import asyncio
+
 from app.models import (
     MAX_CHAT_MESSAGES,
 )
@@ -94,7 +96,6 @@ class OpenAIInterface:
         # Join the lines back together
         return "\n".join(formatted_lines)
 
-
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
@@ -174,16 +175,27 @@ class OpenAIInterface:
             )
         debug(max_context_length)
         debug(len(full_text))
+        answer = None
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         if len(full_text) < max_context_length:
             prompt += f"""
             Question: {question}
             Document: {full_text}
             """
-            answer = chat_agent.run_sync(
-                prompt,
-                message_history=previous_messages,
-            )
-            debug("llmchat", answer)
+            try:
+                answer = loop.run_until_complete(
+                    chat_agent.run(
+                        prompt,
+                        message_history=previous_messages,
+                    )
+                )
+
+                debug("llmchat", answer)
+            except Exception as e:
+                debug(f"Error during LLM chat: {e}")
 
         else:
             prompt += f"""
@@ -196,10 +208,12 @@ class OpenAIInterface:
                 user_id=user_id or "0",
                 documents=documents,
             )
-            answer = rag_agent.run_sync(
+            answer = loop.run_until_complete(
+            rag_agent.run_sync(
                 prompt,
                 deps=deps,
                 message_history=previous_messages,
+            )
             )
         # print("answer: ", answer.new_messages_json())
         # Save new messages
