@@ -119,6 +119,8 @@ def run_workflow() -> ResponseReturnValue:
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     for doc in docs:
         if not doc.valid:
+            workflow_result.status = "failed"
+            workflow_result.save()
             return jsonify(
                 {
                     "output": [
