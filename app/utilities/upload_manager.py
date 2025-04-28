@@ -78,7 +78,7 @@ def validate_chunk(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(upload_agent.run(prompt))
-        output = result.output
+        output = result.data
         return {"valid": output.valid, "feedback": output.feedback, "index": index}
     except Exception as exc:
         debug(f"Retrying chunk {index} due to error: {exc}")
