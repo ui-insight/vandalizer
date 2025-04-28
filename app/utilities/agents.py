@@ -19,10 +19,12 @@ from app.utilities.llm_helpers import remove_code_markers
 
 load_dotenv()
 
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+
 # Standard cache
 # cache ttl is 1 month
 ttl = 60 * 60 * 24 * 30
-cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
 if langfuse_enabled:

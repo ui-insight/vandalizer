@@ -16,6 +16,7 @@ from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
+from dotenv import load_dotenv
 
 CURRENT_RELEASE_VERSION = "2.1.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -24,6 +25,11 @@ Release 2.1.1:
 - Timeout fixes
 - Bug fixes and improvements
 """
+
+# Load environment variables from .env file
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -44,8 +50,8 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
         CELERY=dict(
-            broker_url="redis://localhost:6379/",
-            result_backend="redis://localhost:6379/",
+            broker_url=f"redis://{REDIS_HOST}:6379/0",
+            result_backend=f"redis://{REDIS_HOST}:6379/1",
         ),
     )
     app.config.from_prefixed_env()
