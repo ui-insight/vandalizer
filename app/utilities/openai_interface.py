@@ -21,9 +21,16 @@ from app.utilities.llm import ChatLM
 # from langchain_redis import RedisCache
 from app.utilities.redis_cache import RedisCache
 
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+
 # 2h
 ttl = 60 * 60 * 1
-cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
@@ -209,11 +216,11 @@ class OpenAIInterface:
                 documents=documents,
             )
             answer = loop.run_until_complete(
-            rag_agent.run_sync(
-                prompt,
-                deps=deps,
-                message_history=previous_messages,
-            )
+                rag_agent.run_sync(
+                    prompt,
+                    deps=deps,
+                    message_history=previous_messages,
+                )
             )
         # print("answer: ", answer.new_messages_json())
         # Save new messages
