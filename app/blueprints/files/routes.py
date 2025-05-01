@@ -32,7 +32,7 @@ from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
 )
-from app.utilities.excel_helper import save_excel_to_html
+from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from app.utils import load_user
 

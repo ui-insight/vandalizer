@@ -3,7 +3,6 @@
 import graphlib
 import json
 
-# from app import socketio
 import multiprocessing
 import os
 import re
@@ -24,18 +23,12 @@ from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-from app.utilities.config import model_type
 
-from threading import Thread
 
-from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult, WorkflowStep
+from app.models import SmartDocument, SearchSet, WorkflowResult, WorkflowStep
 
-import graphlib
 
 load_dotenv()
-
-# TODO add the option to choose the llm model
-# TODO add the option to choose the way we get the document content (luke's model, or pdfreader)
 
 
 class WorkflowThread(Thread):
@@ -123,11 +116,6 @@ def llm_chat_model(prompt, data=None, docs=None):
             max_tokens=None,
         )
         output = format_llm_output(output).strip()
-        # output = open_ai_interface.handle_short_context(
-        #     prompt=prompt, full_text=full_text
-        # )
-        # if output is not None:
-        #     output = output.get("answer", "")
 
     else:
         output = open_ai_interface.ask_question_to_documents(
@@ -407,7 +395,6 @@ class PromptNode(Node):
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
 
-# TODO track the execution of the workflow. The various steps, etc. Maybe return a list of steps executed
 class WorkflowEngine:
     def __init__(self) -> None:
         self.nodes = []
@@ -492,33 +479,12 @@ class WorkflowEngine:
                 },
             )
 
-            # send the data to the frontend
-            # socketio.emit(
-            #     "workflow_status",
-            #     {
-            #         "steps_completed": workflow_result.num_steps_completed,
-            #         "total_steps": workflow_result.num_steps_total,
-            #         "steps_output": workflow_result.steps_output,
-            #         "status": workflow_result.status,
-            #     },
-            # )
-
             workflow_result.save()
 
         if latest_output is None:
             return None, data
 
         workflow_result.status = "completed"
-
-        # socketio.emit(
-        #     "workflow_status",
-        #     {
-        #         "steps_completed": workflow_result.num_steps_completed,
-        #         "total_steps": workflow_result.num_steps_total,
-        #         "steps_output": workflow_result.steps_output,
-        #         "status": workflow_result.status,
-        #     },
-        # )
 
         workflow_result.save()
         return latest_output.get("output"), data
@@ -533,7 +499,6 @@ def build_workflow_engine(steps, workflow):
         node = None
         debug(step)
         if step.name == "Document":  # this the trigger step
-            # node_objects[node_id] = DocumentNode(step.data)
             node = DocumentNode(step.data)
             nodes.append(node)
         else:  # this a task step

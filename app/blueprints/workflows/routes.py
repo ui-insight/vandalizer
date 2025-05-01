@@ -41,7 +41,7 @@ from app.utilities.workflow import execute_workflow_task
 from werkzeug.utils import secure_filename
 import pypandoc, json
 from bson import ObjectId
-from app.utilities.excel_helper import save_excel_to_html
+from app.utilities.document_helpers import save_excel_to_html
 
 from . import workflows
 

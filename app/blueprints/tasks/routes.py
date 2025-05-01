@@ -19,7 +19,6 @@ from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument
-from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import load_user
@@ -361,7 +360,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
-    em = ExtractionManager2()
+    em = ExtractionManager3()
     em.root_path = current_app.root_path
     keys = em.build_from_documents(document_paths)
 
