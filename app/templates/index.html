@@ -69,9 +69,7 @@
                 </div>
 
                 <div class="col" style="text-align: center; flex: 1;">
-                    <p id="document-title"
-                        style="margin: 0; padding-top: 0px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                        {% if (documents != None) and documents|length > 0 %}
+                    <p id="document-title"> {% if (documents !=None) and documents|length> 0 %}
                         {{ documents[0].title }}
                         {% else %}
                         Select or Upload PDFs
@@ -209,7 +207,12 @@
                                         doc.is_default %} checked disabled {% endif %}>
                                 </span>
 
+<<<<<<< Updated upstream
                                 <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')">
+=======
+                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')"
+                                    disabled={{not doc.valid}}>
+>>>>>>> Stashed changes
                                     <span><i class="fa-solid fa-file"></i></span>
                                     <span class="file-name">{{ doc.title }}</span>
                                 </a>
