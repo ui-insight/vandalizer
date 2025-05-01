@@ -15,7 +15,7 @@ from pydantic_ai.agent import Agent
 from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
 from app.utilities.document_manager import DocumentManager
-from app.utilities.llm_helpers import remove_code_markers
+from app.utilities.llm import remove_code_markers
 
 load_dotenv()
 
