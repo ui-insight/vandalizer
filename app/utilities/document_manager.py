@@ -32,9 +32,12 @@ doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 @celery_app.task
 def perform_extraction_and_update(document_uuid, doc_path):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug("Document not found", document_uuid)
+        return
     debug("Performing OCR on document", document.title)
-    document.processing = True
     try:
+        document.processing = True
         extracted_text = extract_text_from_doc(doc_path)
         document.raw_text = extracted_text
         debug(
@@ -53,6 +56,9 @@ def perform_extraction_and_update(document_uuid, doc_path):
 @celery_app.task
 def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug("Document not found", document_uuid)
+        return
     document.processing = True
     document.save()
 
@@ -73,6 +79,9 @@ def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
 
 def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug("Document not found", document_uuid)
+        return
     document_path = document.absolute_path
     perform_extraction_and_update.delay(document.uuid, str(document_path))
     document = document.reload()
