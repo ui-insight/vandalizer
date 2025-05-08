@@ -1,5 +1,9 @@
 import sys
 
+import pypandoc
+
+from flask import current_app
+
 from app.models import SmartDocument
 
 try:
@@ -12,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from app.utilities.excel_helper import save_excel_to_html
+
 import chromadb
 from chromadb.config import Settings
 from devtools import debug
@@ -21,46 +27,94 @@ from langchain_openai import OpenAIEmbeddings
 
 from app import app
 from app.celery_worker import celery_app
+
 from app.utilities.document_readers import (
     extract_text_from_doc,
+    extract_text_from_html,
 )
+import os
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
 @celery_app.task
-def perform_extraction_and_update(document_uuid, doc_path):
+def perform_extraction_and_update(document_uuid, doc_path, extension, upload_dir):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    if not document:
-        debug("Document not found", document_uuid)
-        return
-    debug("Performing OCR on document", document.title)
+    debug("Performing OCR on document", document.title, extension)
+    document.processing = True
+    raw_text = ""
     try:
-        document.processing = True
-        extracted_text = extract_text_from_doc(doc_path)
-        document.raw_text = extracted_text
+        if extension == "docx":
+            pdf_path = Path(upload_dir) / f"{document_uuid}.pdf"
+            docx_path = Path(upload_dir) / f"{document_uuid}.docx"
+            pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
+            extension = "pdf"
+            raw_text = extract_text_from_doc(pdf_path)
+
+        elif extension in ["xlsx", "xls"]:
+            # Convert to HTML
+            html_path = Path(upload_dir) / f"{document_uuid}.html"
+            excel_path = Path(upload_dir) / f"{document_uuid}.{extension}"
+            save_excel_to_html(excel_path, html_path)
+            extension = "html"
+            raw_text = extract_text_from_html(html_path)
+
+        elif extension == "pdf":
+            # Extract text from PDF in a background thread
+            pdf_path = os.path.join(upload_dir, f"{document_uuid}.pdf")
+
+            raw_text = extract_text_from_doc(doc_path)
+        else:
+            # For other file types, use the generic text extraction
+            raw_text = extract_text_from_doc(doc_path)
+
+        document.raw_text = raw_text
         debug(
             "Extraction completed, saving document",
             document.title,
             document.raw_text[:100],
         )
-        document.processing = False
         document.save()
     except Exception:
-        document.processing = False
         document.raw_text = ""
         document.save()
+    return raw_text
 
 
 @celery_app.task
-def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
+def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    if not document:
-        debug("Document not found", document_uuid)
-        return
-    document.processing = True
+    document.processing = False
+    document.task_id = None
     document.save()
+
+
+@celery_app.task
+def cleanup_document(document_uuid: str):
+    """
+    Delete the document record and its file when validation or ingestion fails.
+    """
+    document = SmartDocument.objects(uuid=document_uuid).first()
+
+    document_file_path = (
+        Path(current_app.root_path) / "static" / "uploads" / document.path
+    )
+    document.processing = False
+    document.task_id = None
+    document.save()
+    # if document:
+    #     try:
+    #         os.remove(document_file_path)
+    #     except Exception as e:
+    #         debug(f"Error removing file {document_file_path}: {e}")
+
+    #     document.delete()
+
+
+@celery_app.task
+def perform_semantic_ingestion(raw_text, document_uuid, user_id):
+    document = SmartDocument.objects(uuid=document_uuid).first()
 
     document_manager = DocumentManager()
 
@@ -75,13 +129,11 @@ def perform_semantic_ingestion(document_uuid, user_id, raw_text=None):
     )
     document.processing = False
     document.save()
+    return document.uuid
 
 
 def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    if not document:
-        debug("Document not found", document_uuid)
-        return
     document_path = document.absolute_path
     perform_extraction_and_update.delay(document.uuid, str(document_path))
     document = document.reload()

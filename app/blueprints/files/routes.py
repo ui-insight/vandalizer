@@ -25,8 +25,10 @@ from pypdf import PdfReader
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
 from app.utilities.document_manager import (
     DocumentManager,
-    perform_ocr_and_semantic_ingestion,
+    perform_extraction_and_update,
     perform_semantic_ingestion,
+    cleanup_document,
+    update_document_fields,
 )
 from app.utilities.document_readers import (
     extract_text_from_doc,
@@ -106,36 +108,33 @@ def upload() -> ResponseReturnValue:
         user_id=user.user_id,
         space=space,
         folder=folder,
+        task_id=None,
     )
     document.save()
+    extraction_task = perform_extraction_and_update.s(
+        document_uuid=document.uuid,
+        doc_path=str(file_path),
+        extension=extension,
+        upload_dir=str(upload_dir),
+    )
+
+    ingestion_task = perform_semantic_ingestion.s(
+        document.uuid,
+        user_id,
+    )
+    workflow = extraction_task | ingestion_task
+    workflow_task_result = workflow.apply_async(
+        link=update_document_fields.si(document.uuid),
+        link_error=cleanup_document.si(document.uuid),
+    )
+    document.task_id = workflow_task_result.id
 
     if extension == "docx":
-        # Convert to PDF
-        pdf_path = Path(upload_dir) / f"{uid}.pdf"
-        docx_path = Path(upload_dir) / f"{uid}.docx"
-        pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
-        extension = "pdf"
-        raw_text = extract_text_from_doc(docx_path)
-        document.raw_text = raw_text
-        document.save()
-        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
-
-    elif extension in ["xlsx", "xls"]:
-        # Convert to HTML
-        html_path = Path(upload_dir) / f"{uid}.html"
-        excel_path = Path(upload_dir) / f"{uid}.{extension}"
-        save_excel_to_html(excel_path, html_path)
-        extension = "html"
-        raw_text = extract_text_from_html(html_path)
-        document.raw_text = raw_text
-        document.save()
-
-        perform_semantic_ingestion.delay(document.uuid, user_id, raw_text)
-
-    elif extension == "pdf":
-        # Extract text from PDF in a background thread
-        pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
-        perform_ocr_and_semantic_ingestion(document.uuid, user_id)
+        relative_file_path = relative_file_path.with_suffix(".pdf")
+        document.path = str(relative_file_path)
+    elif extension == "xlsx":
+        document.path = str(relative_file_path.with_suffix(".html"))
+    document.save()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
