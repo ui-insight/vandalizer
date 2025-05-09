@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
+import asyncio
+
 from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
@@ -144,8 +146,13 @@ def retrieve(
     """
     if docs_ids is None:
         docs_ids = []
-    prompt_response = prompt_agent.run_sync(
-        f"Generate a prompt for the following user question: {question}",
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    prompt_response = loop.run_until_complete(
+        prompt_agent.run(
+            f"Generate a prompt for the following user question: {question}",
+        )
     )
     prompt = prompt_response.output
     debug(prompt)
@@ -404,7 +411,6 @@ def filter_empty_entities(result: dict) -> list:
 
 
 # @observe()
-@function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """Extract entities from text based on the provided extraction keys and return structured output.
 
@@ -420,15 +426,17 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     cache_key = f"Keys:{keys}\n\nText:{text}"
     llm_string = "pydantic_model:openai:gpt-4o"
 
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except RuntimeError:
+        # Handle the case where the event loop is already running
+        loop = asyncio.get_event_loop()
+
     cache_result = cache.lookup(cache_key, llm_string)
     if cache_result:
         result = json.loads(cache_result[0])
         return result.get("entities", [])
-
-    # field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
-    # fields = field_inference_agent.run_sync(
-    #     "Infer the types of the keys", deps=field_inference_deps
-    # ).data
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -455,10 +463,14 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             extraction_context=context,
             keys=uncached_keys,
         )
-        new_fields = field_inference_agent.run_sync(
-            "Infer the types of the keys",
-            deps=field_inference_deps,
-        ).output
+
+        result = loop.run_until_complete(
+            field_inference_agent.run(
+                "Infer the types of the keys",
+                deps=field_inference_deps,
+            )
+        )
+        new_fields = result.output
 
         debug(new_fields)
 
@@ -524,8 +536,10 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         text=text,
     )
     try:
-        debug(text)
-        extraction = extractor_agent.run_sync(text, deps=extractor_deps)
+        # Run the agent synchronously
+        extraction = loop.run_until_complete(
+            extractor_agent.run(text, deps=extractor_deps)
+        )
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)

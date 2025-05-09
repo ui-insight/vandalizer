@@ -53,7 +53,7 @@ class ExtractionManager3:
             return json.loads(output.strip())
         return None
 
-    def extract(self, extract_keys, pdf_paths, full_text=None):
+    def extract(self, extract_keys, document_uuids, full_text=None):
         # if extract_keys is string convert to list by splitting on comma
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
@@ -63,22 +63,15 @@ class ExtractionManager3:
 
         time.time()
         openai.api_key = OPENAI_API_KEY
-        doc_text = ""
-        extractions = []
         time.time()
+        extraction = []
         if full_text is None:
-            for pdf_path in pdf_paths:
-                doc_text = extract_text_from_doc(doc_path=pdf_path)
-                if doc_text:
-                    data = extract_entities_with_agent(
-                        text=doc_text,
-                        keys=fields_to_extract,
-                    )
-                    extractions = data
-
+            for document_uuid in document_uuids:
+                doc = SmartDocument.objects(uuid=document_uuid).first()
+                doc_text = doc.raw_text
+                result = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
+                extraction.extend(result)
         else:
-            doc_text = full_text
-            data = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
-            extractions = data
+            extraction = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
 
-        return extractions
+        return extraction
