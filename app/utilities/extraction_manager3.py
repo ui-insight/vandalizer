@@ -69,9 +69,14 @@ class ExtractionManager3:
             for document_uuid in document_uuids:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
                 doc_text = doc.raw_text
-                result = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
+                result = extract_entities_with_agent(
+                    text=doc_text, keys=fields_to_extract
+                )
                 extraction.extend(result)
         else:
-            extraction = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
+            doc_text = full_text
+            extraction = extract_entities_with_agent(
+                text=doc_text, keys=fields_to_extract
+            )
 
         return extraction

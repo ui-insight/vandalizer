@@ -211,7 +211,7 @@ field_inference_agent = Agent(
     model,
     retries=3,
     deps_type=FieldInferenceDeps,
-    output_type=dict[str, str],
+    # output_type=dict[str, str],
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
 )
 
@@ -470,7 +470,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
                 deps=field_inference_deps,
             )
         )
-        new_fields = result.output
+        new_fields = remove_code_markers(result.output)
 
         debug(new_fields)
 

@@ -225,10 +225,14 @@ class MultiTaskNode(Node):
         output = {"input": inputs.get("input"), "output": [], "step_name": self.name}
         for result in results:
             debug(result)
-            if isinstance(result.get("output"), str):
-                output["output"].append(result.get("output", ""))
+            result_output = result.get("output", None)
+            # add the step name to the output
+            if result_output is None:
+                continue
+            elif isinstance(result_output, str):
+                output["output"].append(result_output)
             else:
-                output["output"].extend(result.get("output", {}))
+                output["output"].extend(result_output)
 
         debug(output)
         return output
@@ -327,10 +331,10 @@ class ExtractionNode(Node):
 
         prev_step_name = inputs.get("step_name", None)
 
-        debug("Extraction", inputs, keys)
+        debug("Extraction", inputs, keys, data)
 
         step_input = None
-        pdf_paths = None
+        docs_uuids = []
         extraction_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
@@ -340,16 +344,18 @@ class ExtractionNode(Node):
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
                 step_input = step_input.get("answer")
+            elif isinstance(step_input, list):
+                step_input = "\n".join(step_input)
             extraction_response = data_extraction_model(
                 keys,
-                pdf_paths,
+                docs_uuids,
                 full_text=step_input,
             )
         elif prev_step_name in {"Extraction", "Formatter"}:
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
                 keys,
-                pdf_paths,
+                docs_uuids,
                 full_text=step_input,
             )
 
@@ -370,6 +376,7 @@ class PromptNode(Node):
         prompt = data.get("prompt", "Enter prompt")
 
         prev_step_name = inputs.get("step_name", None)
+        debug("Prompt", inputs, prompt)
         chat_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
@@ -441,17 +448,21 @@ class WorkflowEngine:
                         process_node = Node(task.name)
 
                     output = process_node.process(latest_output)
+                    debug(output)
                     task_output = output.get("output", "")
+                    # add the input and the step_name to the output
+                    node_output = output.get("output", "")
                     if isinstance(task_output, list):
-                        node_outputs.extend(output.get("output", ""))
+                        node_outputs.extend(node_output)
                     else:
-                        node_outputs.append(output.get("output", ""))
+                        node_outputs.append(node_output)
 
                 # combine the outputs
                 debug(node_outputs)
                 latest_output = {
                     "output": node_outputs,
                     "input": output.get("input", ""),
+                    "step_name": output.get("step_name", ""),
                 }
                 # debug(latest_output)
 
