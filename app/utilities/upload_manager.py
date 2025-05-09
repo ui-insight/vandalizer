@@ -34,7 +34,7 @@ def validate_chunk(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(upload_agent.run(prompt))
-        output = result.data
+        output = result.output
         return {"valid": output.valid, "feedback": output.feedback, "index": index}
     except Exception as exc:
         debug(f"Retrying chunk {index} due to error: {exc}")
@@ -68,10 +68,10 @@ def summarize_results(results: list, document_uuid: str) -> dict:
     # Persist to DB
     doc = SmartDocument.objects(uuid=document_uuid).first()
     doc.valid = all_valid
-    doc.validation_feedback = summary.data
+    doc.validation_feedback = summary.output
     doc.save()
     debug(f"Document {document_uuid} validation updated: valid={all_valid}")
-    return {"valid": all_valid, "feedback": summary.data}
+    return {"valid": all_valid, "feedback": summary.output}
 
 
 @celery_app.task

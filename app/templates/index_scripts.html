@@ -54,7 +54,6 @@
     }
 
     function showRawText() {
-        console.log("show raw text", documentData);
         // Get the current document
         if (documentData) {
             const modal = document.getElementById("rawTextModal");
@@ -81,7 +80,6 @@
 
     function updateDocumentSelections() {
         var checkedCheckboxes = $('.document-selector:checked');
-        console.log("Updating document selections", checkedCheckboxes);
         var totalDocs = 0;
         // var totalTokenCounts = 0;
         var uuids = [];
@@ -116,7 +114,6 @@
             }
         }
 
-        console.log("Reset uuids: " + uuids.length);
         totalDocs += uuids.length;
         document_uuids = uuids;
 
@@ -143,7 +140,6 @@
         }
     }
 
-    console.log("Document UUIDs", document_uuids);
 
     $('#ask-question-btn').on('click', function (e) {
         e.preventDefault()
@@ -498,7 +494,6 @@
 
         $('.tasks-close-button').off('click').on('click', function (e) {
             e.preventDefault();
-            console.log("here");
             setSection("Chat");
             $("#tasks-panel").hide();
         });
@@ -541,7 +536,6 @@
         $('.space-select').on('change', function (e) {
             e.preventDefault()
             var selectedOption = $(this).val();
-            console.log(selectedOption);
             if (selectedOption == "Create New Space") {
                 window.location.href = "/spaces/new";
             } else if (selectedOption == "New Space") {
@@ -603,7 +597,6 @@
         // Folder creation checks
         $("#add-folder-form").on("submit", function (event) {
             event.preventDefault(); // Intercept the submission
-            console.log("Intercepting form submit");
 
             var folderName = $("#add-folder-field").val().trim();
             if (!folderName) {

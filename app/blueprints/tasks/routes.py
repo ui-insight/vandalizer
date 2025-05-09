@@ -277,7 +277,11 @@ def begin_search() -> ResponseReturnValue:
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_paths)[0]
+        results = em.extract(keys, document_paths)
+        if len(results) == 1:
+            results = results[0]
+
+        debug(results)
 
         if (
             search_set.fillable_pdf_url != ""

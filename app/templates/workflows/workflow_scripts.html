@@ -540,8 +540,6 @@
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
 
-                console.log("workflow status data: ", data, steps_completed, total_steps, active_step);
-
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
@@ -567,8 +565,6 @@
                       <span>${steps_completed} / ${total_steps} steps completed</span>
                       <span><i> ${workflow_time} seconds elapsed</i></span>
                   `);
-
-                console.log("workflow status: ", status);
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {

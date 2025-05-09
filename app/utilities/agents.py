@@ -147,7 +147,7 @@ def retrieve(
     prompt_response = prompt_agent.run_sync(
         f"Generate a prompt for the following user question: {question}",
     )
-    prompt = prompt_response.data
+    prompt = prompt_response.output
     debug(prompt)
 
     results = context.deps.doc_manager.query_documents(
@@ -204,6 +204,7 @@ field_inference_agent = Agent(
     model,
     retries=3,
     deps_type=FieldInferenceDeps,
+    output_type=dict[str, str],
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
 )
 
@@ -382,6 +383,26 @@ Text:
     )
 
 
+def filter_empty_entities(result: dict) -> list:
+    """Filter out empty entities from the list.
+
+    Args:
+        result: The result dictionary containing entities
+
+    Returns:
+        Filtered list of entities
+
+    """
+    raw_entities = result.get("entities", [])
+
+    def is_non_empty(e: dict) -> bool:
+        if not isinstance(e, dict) or not e:
+            return False
+        return any(v not in (None, "", [], {}) for v in e.values())
+
+    return [e for e in raw_entities if is_non_empty(e)]
+
+
 # @observe()
 @function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
@@ -437,16 +458,43 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         new_fields = field_inference_agent.run_sync(
             "Infer the types of the keys",
             deps=field_inference_deps,
-        ).data
+        ).output
 
-        # Cache newly inferred fields individually
-        for key, field_type in new_fields.items():
-            key_cache_key = get_cache_key(key, context)
-            type_str = reverse_type_mapping.get(field_type, "Any")
-            cache.update(key_cache_key, "field_inference", [type_str])
+        debug(new_fields)
 
-        inferred_fields.update(new_fields)
+        if isinstance(new_fields, str):
+            try:
+                new_fields = json.loads(new_fields)
+            except json.JSONDecodeError:
+                new_fields = {}
+                # Handle the case where JSON parsing fails
+                debug(
+                    "Failed to parse field inference response as JSON.",
+                    new_fields,
+                    field_inference_deps,
+                )
 
+        elif isinstance(new_fields, dict):
+            # Cache newly inferred fields individually
+            for key, field_type in new_fields.items():
+                key_cache_key = get_cache_key(key, context)
+                type_str = reverse_type_mapping.get(field_type, "Any")
+                cache.update(key_cache_key, "field_inference", [type_str])
+        else:
+            # Handle the case where the response is not a dict
+            debug(
+                "Unexpected field inference response format.",
+                new_fields,
+                field_inference_deps,
+            )
+            new_fields = {}
+
+        if isinstance(new_fields, dict):
+            for key_name, key_type in new_fields.items():
+                if key_name not in inferred_fields:
+                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
+
+    debug(inferred_fields)
     # DynamicModel = create_model(
     #     "DynamicEntity",
     #     **{field_name: field_spec for field_name, field_spec in fields.items()},
@@ -478,14 +526,21 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     try:
         debug(text)
         extraction = extractor_agent.run_sync(text, deps=extractor_deps)
-        debug(extraction.data)
+        debug(extraction.output)
 
-        result = extraction.data.model_dump_json(indent=2)
+        result = extraction.output.model_dump_json(indent=2)
         debug(result)
-        # cache the result
-        cache.update(cache_key, llm_string, [result])
+
         result = json.loads(result)
-        return result.get("entities", [])
+        filtered_entities = []
+        # cache the result if it is not empty
+        if result and "entities" in result and len(result["entities"]) > 0:
+            filtered_entities = filter_empty_entities(
+                result,
+            )
+            if filtered_entities and len(filtered_entities) > 0:
+                cache.update(cache_key, llm_string, [json.dumps(result)])
+        return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message
         error_msg = str(e)
