@@ -1,7 +1,6 @@
 import sys
 
 import pypandoc
-
 from flask import current_app
 
 from app.models import SmartDocument
@@ -12,11 +11,10 @@ try:
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
-
-from app.utilities.excel_helper import save_excel_to_html
 
 import chromadb
 from chromadb.config import Settings
@@ -27,12 +25,11 @@ from langchain_openai import OpenAIEmbeddings
 
 from app import app
 from app.celery_worker import celery_app
-
+from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
 )
-import os
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
