@@ -39,6 +39,7 @@ class APIResponse:
         return f"APIResponse(status={self.status}, message={self.message}, http_status={self.http_status}, text={self.text}, tables={self.tables}, images={self.images})"
 
 
+
 def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     """Extract text from a PDF file using PyMuPDF and OCR.
     If the native text extraction is insufficient, OCR is applied.
@@ -88,15 +89,27 @@ def extract_text_from_doc(doc_path, doc=None):
     if doc is None:
         if doc_path_str.endswith(".pdf"):
             return ocr_extract_text_from_pdf(doc_path_str)
-        if doc_path_str.endswith(".html"):
+        elif doc_path_str.endswith(".html"):
             return extract_text_from_html(doc_path_str)
+        elif doc_path_str.endswith((".txt", ".md", ".csv")):
+            with open(doc_path_str, encoding="utf-8") as file:
+                return file.read()
+
         return None
-    if doc.extension in {"pdf", "docx"}:
-        # return extract_text_from_pdf(doc_path_str)
-        return ocr_extract_text_from_pdf(doc_path_str)
-    if doc.extension == "html":
-        return extract_text_from_html(doc_path_str)
+    else:
+        debug(doc.extension)
+        if doc.extension in {"pdf"}:
+            # return extract_text_from_pdf(doc_path_str)
+            return ocr_extract_text_from_pdf(doc_path_str)
+        elif doc.extension in {"docx", "doc"}:
+            return extract_text_from_pdf(doc_path_str)
+        elif doc.extension == "html":
+            return extract_text_from_html(doc_path_str)
+        elif doc.extension in {"txt", "md", "csv"}:
+            with open(doc_path_str, encoding="utf-8") as file:
+                return file.read()
     return None
+
 
 
 class PDFProcessor:
