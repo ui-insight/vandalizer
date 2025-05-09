@@ -129,13 +129,10 @@ def llm_chat_model(prompt, data=None, docs=None):
     return output
 
 
-def data_extraction_model(keys, pdf_paths, full_text=None):
+def data_extraction_model(keys, document_uuids=[], full_text=None):
     output = None
     extraction_manager = ExtractionManager3()
-    if pdf_paths is None:
-        output = extraction_manager.extract(keys, pdf_paths=[], full_text=full_text)
-    else:
-        output = extraction_manager.extract(keys, pdf_paths)
+    output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
 
     debug(output)
     prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
@@ -253,6 +250,7 @@ class DocumentNode(Node):
             if doc is None:
                 continue
             doc_path = doc.absolute_path
+            self.docs_uuids.append(doc.uuid)
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
@@ -268,6 +266,7 @@ class DocumentNode(Node):
             if doc is None:
                 continue
             doc_path = doc.absolute_path
+            self.docs_uuids.append(doc.uuid)
             user_id = doc.user_id
             if not os.path.exists(str(doc_path)):
                 doc_path = os.path.join(
@@ -285,7 +284,7 @@ class DocumentNode(Node):
     def process(self, inputs=None):
         # data = inputs.get("data", None)
 
-        return {"step_name": self.name, "output": self.pdf_paths, "input": None}
+        return {"step_name": self.name, "output": self.docs_uuids, "input": None}
 
 
 class FormatNode(Node):
@@ -302,12 +301,11 @@ class FormatNode(Node):
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         if prev_step_name == "Document":
-            doc_paths = inputs.get("output", None)
+            docs_uuids = inputs.get("output", None)
             text = ""
-            for doc_path in doc_paths:
-                doc_text = extract_text_from_doc(doc_path)
-                if doc_text is not None:
-                    text += doc_text
+            for doc_uuid in docs_uuids:
+                doc = SmartDocument.objects(uuid=doc_uuid).first()
+                text += doc.raw_text
         else:
             text = data
 
@@ -335,12 +333,9 @@ class ExtractionNode(Node):
         pdf_paths = None
         extraction_response = None
         if prev_step_name == "Document":
-            pdf_paths = inputs.get("output", None)
-            if pdf_paths is None:
-                return {"output": None}
-            step_input = pdf_paths
-
-            extraction_response = data_extraction_model(keys, pdf_paths)
+            docs_uuids = inputs.get("output", None)
+            step_input = docs_uuids
+            extraction_response = data_extraction_model(keys, docs_uuids)
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
@@ -377,12 +372,7 @@ class PromptNode(Node):
         prev_step_name = inputs.get("step_name", None)
         chat_response = None
         if prev_step_name == "Document":
-            docs_paths = inputs.get("output", None)
-            debug(docs_paths)
-            docs_uuids = []
-            for doc_path in docs_paths:
-                doc_uuid = doc_path.split("/")[-1].split(".")[0]
-                docs_uuids.append(doc_uuid)
+            docs_uuids = inputs.get("output", None)
             docs = [
                 SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
             ]
