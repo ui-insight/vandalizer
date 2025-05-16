@@ -29,7 +29,7 @@ def login() -> ResponseReturnValue:
 
     if not azure.authorized:
         return redirect(url_for("azure.login"))
-    return redirect(url_for("main.home"))
+    return redirect(url_for("home.index"))
 
 
 @auth.route("/logout")
