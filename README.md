@@ -13,6 +13,11 @@ Wee!
 - Rollbar error tracking
 - Email notifications
 
+## Displaying Release Notes
+1. You can show release notes to the users by updating __init__.py
+2. Simply iterate the CURRENT_RELEASE_VERSION to a higher number
+3. Update RELEASE_NOTES with your text
+
 ## Deployment
 
 Before deploying to each environment, update the configuration by:
