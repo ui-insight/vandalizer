@@ -1,6 +1,5 @@
 """Handles authorization routing."""
 
-from devtools import debug
 from flask import redirect, render_template, session, url_for
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
@@ -14,7 +13,7 @@ from . import auth
 @auth.route("/")
 def index() -> ResponseReturnValue:
     """Render the landing page if not authorized."""
-    debug("Not authorized")
+    # debug("Not authorized")
     return render_template("landing.html")
 
 
