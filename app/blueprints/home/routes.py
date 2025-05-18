@@ -50,18 +50,14 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
 
     extension = document.extension
     upload_dir = Path(current_app.root_path) / "static" / "uploads" / user_id
-    document_uuid = document.uuid
-    file_path = Path(upload_dir) / f"{document_uuid}.{extension}"
 
     if not document.raw_text or document.raw_text == "":
-        pdf_path = document.absolute_path
         document.processing = True
         document.save()
         # check if there is a task running
         if not document.task_id:
             extraction_task = perform_extraction_and_update.s(
                 document_uuid=document.uuid,
-                doc_path=str(file_path),
                 extension=extension,
                 upload_dir=str(upload_dir),
             )
