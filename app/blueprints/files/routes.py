@@ -113,7 +113,6 @@ def upload() -> ResponseReturnValue:
     document.save()
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
-        doc_path=str(file_path),
         extension=extension,
         upload_dir=str(upload_dir),
     )
