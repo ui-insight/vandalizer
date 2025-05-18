@@ -72,9 +72,11 @@ def perform_extraction_and_update(document_uuid, doc_path, extension, upload_dir
             document.title,
             document.raw_text[:100],
         )
+        document.processing = False
         document.save()
     except Exception:
         document.raw_text = ""
+        document.processing = False
         document.save()
     return raw_text
 
@@ -97,7 +99,6 @@ def cleanup_document(document_uuid: str):
     document_file_path = (
         Path(current_app.root_path) / "static" / "uploads" / document.path
     )
-    document.processing = False
     document.task_id = None
     document.save()
     # if document:
@@ -124,7 +125,6 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
         doc_path=document_path,
         raw_text=raw_text,
     )
-    document.processing = False
     document.save()
     return document.uuid
 
@@ -135,7 +135,6 @@ def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
     perform_extraction_and_update.delay(document.uuid, str(document_path))
     document = document.reload()
     perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
-    document.processing = False
     document.save()
 
 
