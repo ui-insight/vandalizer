@@ -36,7 +36,7 @@ doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
 @celery_app.task
-def perform_extraction_and_update(document_uuid, extension, upload_dir):
+def perform_extraction_and_update(document_uuid, extension):
     document = SmartDocument.objects(uuid=document_uuid).first()
     absolute_path = document.absolute_path
     debug("Performing OCR on document", document.title, absolute_path)
@@ -47,18 +47,13 @@ def perform_extraction_and_update(document_uuid, extension, upload_dir):
             # replace the extension with .docx
             docx_path = absolute_path.with_suffix(".docx")
             pdf_path = absolute_path.with_suffix(".pdf")
-            try:
-                pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
-            except Exception as e:
-                debug(
-                    "Error converting docx to pdf",
-                    docx_path,
-                    pdf_path,
-                    e,
-                )
 
+            raw_text = pypandoc.convert_file(docx_path, "plain")
+            debug("Extracted text from docx", raw_text[:100])
+            pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
 
-            raw_text = extract_text_from_doc(pdf_path)
+            document.extension = "pdf"
+            document.path = str(Path(document.path).with_suffix(".pdf"))
 
         elif extension in ["xlsx", "xls"]:
             # Convert to HTML
@@ -66,6 +61,8 @@ def perform_extraction_and_update(document_uuid, extension, upload_dir):
             excel_path = absolute_path.with_suffix(".xlsx")
             save_excel_to_html(excel_path, html_path)
             raw_text = extract_text_from_html(html_path)
+            document.extension = "html"
+            document.path = str(Path(document.path).with_suffix(".html"))
 
         else:
             # For other file types, use the generic text extraction
@@ -133,15 +130,6 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     )
     document.save()
     return document.uuid
-
-
-def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
-    document = SmartDocument.objects(uuid=document_uuid).first()
-    document_path = document.absolute_path
-    perform_extraction_and_update.delay(document.uuid)
-    document = document.reload()
-    perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
-    document.save()
 
 
 class DocumentManager:

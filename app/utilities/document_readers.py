@@ -4,7 +4,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import fitz
+import pymupdf
 import pymupdf4llm
 import requests
 from devtools import debug
@@ -129,7 +129,7 @@ class PDFProcessor:
         image_status = []
         # Extract text from PDF
         try:
-            pdf_document = fitz.open(self.file_path)
+            pdf_document = pymupdf.open(self.file_path)
 
         except Exception as e:
             pdf_document = None
@@ -256,7 +256,7 @@ class PDFProcessor:
         api_response = APIResponse()
 
         try:
-            pdf_document = fitz.open(self.file_path)
+            pdf_document = pymupdf.open(self.file_path)
 
         except Exception as e:
             api_response.status = "error"
@@ -299,7 +299,7 @@ class PDFProcessor:
         api_response = APIResponse()
 
         try:
-            pdf_document = fitz.open(self.file_path)
+            pdf_document = pymupdf.open(self.file_path)
 
         except Exception as e:
             api_response.status = "error"
@@ -392,7 +392,7 @@ def parse_basic(
             if extract_images and page.get_images():
                 xrefs = [i[0] for i in page.get_images()]
                 imagebytes = {
-                    {f"image{i}": fitz.Pixmap(document, ref).tobytes()}
+                    {f"image{i}": pymupdf.Pixmap(document, ref).tobytes()}
                     for i, ref in enumerate(xrefs)
                 }
                 images = images | {f"page{page_number}": imagebytes}
@@ -407,7 +407,7 @@ def parse_basic(
 def save_page_to_pdf(doc, page_number, output_path):
     try:
         # Create a new PDF document
-        new_doc = fitz.open()
+        new_doc = pymupdf.open()
 
         # Insert the page from the original document to the new document
         new_doc.insert_pdf(doc, from_page=page_number, to_page=page_number)
@@ -457,7 +457,7 @@ def process_page(
             try:
                 xrefs = [i[0] for i in page.get_images()]
                 imagebytes = {
-                    {f"image{i}": fitz.Pixmap(document, ref).tobytes()}
+                    {f"image{i}": pymupdf.Pixmap(document, ref).tobytes()}
                     for i, ref in enumerate(xrefs)
                 }
                 images = {f"page{page_number}": imagebytes}

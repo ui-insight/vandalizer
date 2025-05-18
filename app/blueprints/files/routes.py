@@ -114,7 +114,6 @@ def upload() -> ResponseReturnValue:
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
         extension=extension,
-        upload_dir=str(upload_dir),
     )
 
     ingestion_task = perform_semantic_ingestion.s(
@@ -128,12 +127,12 @@ def upload() -> ResponseReturnValue:
     )
     document.task_id = workflow_task_result.id
 
-    if extension == "docx":
-        relative_file_path = relative_file_path.with_suffix(".pdf")
-        document.path = str(relative_file_path)
-    elif extension == "xlsx":
-        document.path = str(relative_file_path.with_suffix(".html"))
-    document.save()
+    # if extension == "docx":
+    #     relative_file_path = relative_file_path.with_suffix(".pdf")
+    #     document.path = str(relative_file_path)
+    # elif extension == "xlsx":
+    #     document.path = str(relative_file_path.with_suffix(".html"))
+    # document.save()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
