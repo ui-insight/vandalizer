@@ -105,6 +105,7 @@ def cleanup_document(document_uuid: str):
         Path(current_app.root_path) / "static" / "uploads" / document.path
     )
     document.task_id = None
+    document.processing = False
     document.save()
     # if document:
     #     try:
