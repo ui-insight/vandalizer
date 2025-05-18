@@ -49,7 +49,6 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     debug("Document processing", document.processing)
 
     extension = document.extension
-    upload_dir = Path(current_app.root_path) / "static" / "uploads" / user_id
 
     if not document.raw_text or document.raw_text == "":
         document.processing = True
@@ -59,7 +58,6 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
             extraction_task = perform_extraction_and_update.s(
                 document_uuid=document.uuid,
                 extension=extension,
-                upload_dir=str(upload_dir),
             )
 
             ingestion_task = perform_semantic_ingestion.s(

@@ -10,7 +10,6 @@ dependencies = [
     "chromadb",
     "datasets",
     "devtools",
-    "fitz",
     "flask",
     "flask-bootstrap",
     "flask-cors",
@@ -52,6 +51,7 @@ dependencies = [
     "tiktoken",
     "wtforms",
     "celery>=5.5.2",
+    "pypandoc-binary>=1.15",
 ]
 
 
