@@ -1,7 +1,6 @@
 import sys
 
 import pypandoc
-
 from flask import current_app
 
 from app.models import SmartDocument
@@ -12,6 +11,7 @@ try:
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -27,7 +27,7 @@ from langchain_openai import OpenAIEmbeddings
 
 from app import app
 from app.celery_worker import celery_app
-
+from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
@@ -39,35 +39,37 @@ doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
 @celery_app.task
-def perform_extraction_and_update(document_uuid, doc_path, extension, upload_dir):
+def perform_extraction_and_update(document_uuid, extension):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    debug("Performing OCR on document", document.title, extension)
+    absolute_path = document.absolute_path
+    debug("Performing OCR on document", document.title, absolute_path)
     document.processing = True
     raw_text = ""
     try:
         if extension == "docx":
-            pdf_path = Path(upload_dir) / f"{document_uuid}.pdf"
-            docx_path = Path(upload_dir) / f"{document_uuid}.docx"
+            # replace the extension with .docx
+            docx_path = absolute_path.with_suffix(".docx")
+            pdf_path = absolute_path.with_suffix(".pdf")
+
+            raw_text = pypandoc.convert_file(docx_path, "plain")
+            debug("Extracted text from docx", raw_text[:100])
             pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
-            extension = "pdf"
-            raw_text = extract_text_from_doc(pdf_path)
+
+            document.extension = "pdf"
+            document.path = str(Path(document.path).with_suffix(".pdf"))
 
         elif extension in ["xlsx", "xls"]:
             # Convert to HTML
-            html_path = Path(upload_dir) / f"{document_uuid}.html"
-            excel_path = Path(upload_dir) / f"{document_uuid}.{extension}"
+            html_path = absolute_path.with_suffix(".html")
+            excel_path = absolute_path.with_suffix(".xlsx")
             save_excel_to_html(excel_path, html_path)
-            extension = "html"
             raw_text = extract_text_from_html(html_path)
+            document.extension = "html"
+            document.path = str(Path(document.path).with_suffix(".html"))
 
-        elif extension == "pdf":
-            # Extract text from PDF in a background thread
-            pdf_path = os.path.join(upload_dir, f"{document_uuid}.pdf")
-
-            raw_text = extract_text_from_doc(doc_path)
         else:
             # For other file types, use the generic text extraction
-            raw_text = extract_text_from_doc(doc_path)
+            raw_text = extract_text_from_doc(document.absolute_path)
 
         document.raw_text = raw_text
         debug(
@@ -78,6 +80,7 @@ def perform_extraction_and_update(document_uuid, doc_path, extension, upload_dir
         document.save()
     except Exception:
         document.raw_text = ""
+        document.processing = False
         document.save()
     return raw_text
 
@@ -97,20 +100,9 @@ def cleanup_document(document_uuid: str):
     """
     document = SmartDocument.objects(uuid=document_uuid).first()
 
-    if not document:
-        debug("Document not found for cleanup:", document_uuid)
-        return
-
-    document.processing = False
     document.task_id = None
+    document.processing = False
     document.save()
-    # if document:
-    #     try:
-    #         os.remove(document_file_path)
-    #     except Exception as e:
-    #         debug(f"Error removing file {document_file_path}: {e}")
-
-    #     document.delete()
 
 
 @celery_app.task
@@ -132,16 +124,6 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document.processing = False
     document.save()
     return document.uuid
-
-
-def perform_ocr_and_semantic_ingestion(document_uuid, user_id):
-    document = SmartDocument.objects(uuid=document_uuid).first()
-    document_path = document.absolute_path
-    perform_extraction_and_update.delay(document.uuid, str(document_path))
-    document = document.reload()
-    perform_semantic_ingestion.delay(document.uuid, user_id, document.raw_text)
-    document.processing = False
-    document.save()
 
 
 class DocumentManager:

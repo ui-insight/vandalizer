@@ -15,16 +15,20 @@ from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm import ChatLM
+from app.utilities.llm import ChatLM, remove_code_markers
+from app.utilities.redis_cache import RedisCache
 from app.models import ModelConfig
 
-# from langfuse.decorators import observe
-# from langchain_redis import RedisCache
-from app.utilities.redis_cache import RedisCache
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 
 # 2h
 ttl = 60 * 60 * 1
-cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
@@ -69,69 +73,13 @@ class OpenAIInterface:
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(
             chat_agent.run(
-            messages=[{"role": "user", "content": prompt}],
-        ))
+                messages=[{"role": "user", "content": prompt}],
+            )
+        )
 
         return result.output
 
-    # def format_answer(self, answer):
-    #     regex = r"^```(html|json|markdown)?\s*|\s*```$"
-    #     formatted_answer = re.sub(regex, "", answer)
-    #     return formatted_answer
-    def format_answer(self, answer):
-        """Removes code block markers and language specifiers from LLM responses.
-
-        Args:
-            answer (str): The raw LLM response text
-
-        Returns:
-            str: Formatted text with code blocks and language specifiers removed
-
-        """
-        # Split the text into lines
-        lines = answer.split("\n")
-        formatted_lines = []
-
-        for line in lines:
-            # Check for code block markers with or without language specification
-            if "```" in line:
-                # If line only contains the code block marker with optional language
-                if line.strip().startswith("```") and len(line.strip().split()) <= 2:
-                    continue
-                # If code block marker is part of a content line, remove just the markers
-                line = line.replace("```", "")
-
-            formatted_lines.append(line)
-
-        # Join the lines back together
-        return "\n".join(formatted_lines)
-
-    @class_method_event_loop_decorator()
-    def ask_question_to_documents(
-        self,
-        root_path,
-        documents,
-        question,
-        session=None,
-        user_id=None,
-        default_docs=None,
-    ):
-        for document in documents:
-            if not document.valid:
-                return {
-                    "question": question,
-                    "answer": f"The document {document.title} failed validation, please fix the validation errors and try again: \n\n{document.validation_feedback}",
-                    "formatted_answer": f"The document {document.title} failed validation, please fix the validation errors and try again: \n\n{document.validation_feedback}",
-                }
-
-        if default_docs is None:
-            default_docs = []
-        default_docs = list(default_docs)
-        documents = list(documents)
-
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-
-        docs_ids_string = "_".join([str(doc.id) for doc in documents])
+    def get_cache_messages(user_id, docs_ids_string, session=None):
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
         llm_string = "pydantic_model:openai:gpt-4o"
         previous_messages = []
@@ -164,15 +112,11 @@ class OpenAIInterface:
 
             previous_messages = parsed_messages
 
-            # previous_messages = ModelMessagesTypeAdapter.validate_python(
-            #     previous_messages
-            # )
+        return previous_messages, cache_key, llm_string
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
-
-
+    def get_full_text(documents, previous_messages):
         full_text = ""
-        for document in default_docs + documents:
+        for document in documents:
             absolute_path = document.absolute_path
             document_content_in_previous_messages = False
             for message in previous_messages:
@@ -188,58 +132,91 @@ class OpenAIInterface:
                 + extract_text_from_doc(doc=document, doc_path=absolute_path)
                 + " "
             )
-        debug(settings.max_context_length)
+        return full_text
+
+    @class_method_event_loop_decorator()
+    def ask_question_to_documents(
+        self,
+        root_path,
+        documents,
+        question,
+        session=None,
+        user_id=None,
+        default_docs=None,
+    ):
+        if default_docs is None:
+            default_docs = []
+        default_docs = list(default_docs)
+        documents = list(documents)
+        docs = default_docs + documents
+
+        openai.api_key = os.getenv("OPENAI_API_KEY")
+
+        docs_ids_string = "_".join([str(doc.id) for doc in docs])
+
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+
+        previous_messages, cache_key, llm_string = OpenAIInterface.get_cache_messages(
+            user_id=user_id,
+            docs_ids_string=docs_ids_string,
+            session=session,
+        )
+
+        max_context_length = settings.max_context_length
+
+        full_text = OpenAIInterface.get_full_text(documents, previous_messages)
+        debug(max_context_length)
         debug(len(full_text))
         model_config = ModelConfig.objects(user_id=user_id).first()
         if model_config is not None:
             model = model_config.name
         else:
             model = settings.base_model
-        
-        if len(full_text) < settings.max_context_length:
-            prompt += f"""
-            Question: {question}
-            Document: {full_text}
-            """
-            chat_agent = create_chat_agent(model)
-            answer = chat_agent.run_sync(
-                prompt,
-                message_history=previous_messages,
-            )
-            debug("llmchat", answer)
 
+        answer = None
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        if len(full_text) < max_context_length:
+            prompt += f"""Question: {question} Document: {full_text}"""
+            try:
+                chat_agent = create_chat_agent(model)
+                answer = loop.run_until_complete(
+                    chat_agent.run(
+                        prompt,
+                        message_history=previous_messages,
+                    )
+                )
+
+                debug("llmchat", answer)
+            except Exception as e:
+                debug(f"Error during LLM chat: {e}")
         else:
-            prompt += f"""
-        \nDocument(s): {[doc.uuid for doc in documents]}\n
-        Question: {question}
-        """
+            prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
             debug("Rag chat", prompt)
-            with DocumentManager() as doc_manager:
+            try:
+                rag_agent = create_rag_agent(model)
                 deps = RagDeps(
-                    doc_manager=doc_manager,
+                    doc_manager=DocumentManager(),
                     user_id=user_id or "0",
                     documents=documents,
                 )
-                rag_agent = create_rag_agent(model)
-                answer = rag_agent.run_sync(
-                    prompt,
-                    deps=deps,
-                    message_history=previous_messages,
+                answer = loop.run_until_complete(
+                    rag_agent.run_sync(
+                        prompt,
+                        deps=deps,
+                        message_history=previous_messages,
+                    )
                 )
-        # print("answer: ", answer.new_messages_json())
-        # Save new messages
-        # AgentHistory.save_messages(user_id, answer.new_messages_json())
+            except Exception as e:
+                debug("Error in rag chat", e)
 
-        # remove None
         chat_history = json.loads(answer.new_messages_json())
         cache.update(cache_key, llm_string, chat_history)
-        # if session is not None:
-        #     new_chat_history = latest_conversation_messages + answer.new_messages()
-        #     # save the latest max messages
-        #     session["chat_history"] = new_chat_history
 
         return {
             "question": question,
-            "answer": self.format_answer(answer.data),
-            "formatted_answer": self.format_answer(answer.data),
+            "answer": remove_code_markers(answer.data),
+            "formatted_answer": remove_code_markers(answer.data),
         }

@@ -10,7 +10,6 @@ dependencies = [
     "chromadb",
     "datasets",
     "devtools",
-    "dspy",
     "flask",
     "flask-bootstrap",
     "flask-cors",
@@ -30,7 +29,7 @@ dependencies = [
     "langfuse",
     "markdownify",
     "mongoengine",
-    "nest_asyncio",
+    "nest-asyncio",
     "nltk",
     "oauthlib",
     "openai",
@@ -51,9 +50,10 @@ dependencies = [
     "rollbar",
     "tiktoken",
     "wtforms",
-    "celery>=5.5.1",
     "pydantic-settings>=2.8.1",
     "uillm",
+    "celery>=5.5.2",
+    "pypandoc-binary>=1.15",
 ]
 
 

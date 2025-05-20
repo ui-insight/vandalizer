@@ -11,6 +11,7 @@ from devtools import debug
 from flask import (
     abort,
     current_app,
+    flash,
     jsonify,
     redirect,
     request,
@@ -33,7 +34,7 @@ from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
 )
-from app.utilities.excel_helper import save_excel_to_html
+from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.fillable_pdf_manager import FillablePDFManager
 from app.utils import load_user
 from app.utilities.upload_manager import (
@@ -118,9 +119,7 @@ def upload() -> ResponseReturnValue:
 
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
-        doc_path=str(file_path),
         extension=extension,
-        upload_dir=str(upload_dir),
     )
 
     validation_task = perform_document_validation.s(
@@ -138,13 +137,6 @@ def upload() -> ResponseReturnValue:
         link_error=cleanup_document.si(document.uuid),
     )
     document.task_id = workflow_task_result.id
-
-    if extension == "docx":
-        relative_file_path = relative_file_path.with_suffix(".pdf")
-        document.path = str(relative_file_path)
-    elif extension == "xlsx":
-        document.path = str(relative_file_path.with_suffix(".html"))
-    document.save()
 
     return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
 
@@ -223,32 +215,54 @@ def download_document() -> ResponseReturnValue:
     return send_file(document_file_path, as_attachment=True)
 
 
-@files.route("/delete_document")
-def delete_documents() -> ResponseReturnValue:
-    """Delete a document."""
-    document_uuid = request.args.get("docid")
-    document = SmartDocument.objects(uuid=document_uuid).first()
-    if document:
-        with DocumentManager() as document_manager:
-            try:
-                document_manager.delete_document(
-                    user_id=session["user_id"],
-                    document_id=document_uuid,
-                )
-            except Exception as e:
-                debug(e)
-                return jsonify({"error": str(e)}), 400
+def delete_document() -> ResponseReturnValue:
+    """Delete a document record and its file, but never crash the server."""
+    doc_id = request.args.get("docid")
+    if not doc_id:
+        flash("No document specified.", "warning")
+        return _redirect_home()
+    document = SmartDocument.objects(uuid=doc_id).first()
+    if not document:
+        flash("Document not found.", "warning")
+        return _redirect_home()
 
-        document_file_path = document.absolute_path
-        if os.path.exists(document_file_path):
-            os.remove(document_file_path)
+    # 1) Delete via manager (e.g. remove metadata/storage)
+    try:
+        DocumentManager().delete_document(
+            user_id=session.get("user_id"), document_id=doc_id
+        )
+    except Exception as e:
+        current_app.logger.error(f"[delete_document] manager error: {e}")
+        flash("Could not remove document metadata.", "danger")
 
+    # 2) Try removing the file (but don’t bail out if it’s missing)
+    file_path = document.absolute_path
+    if file_path.exists():
+        try:
+            file_path.unlink()
+        except Exception as e:
+            current_app.logger.error(f"[delete_document] file delete error: {e}")
+            flash("Failed to delete document file.", "danger")
+    else:
+        current_app.logger.warning(f"[delete_document] file not found: {file_path}")
+        flash("Document file was already gone.", "info")
+
+    # 3) Always attempt to delete the DB record
+    try:
         document.delete()
+    except Exception as e:
+        current_app.logger.error(f"[delete_document] db delete error: {e}")
+        flash("Failed to delete document record.", "danger")
+    else:
+        flash("Document deleted successfully.", "success")
 
+    return _redirect_home()
+
+
+def _redirect_home():
     folder_id = request.args.get("folder_id")
     if folder_id:
         return redirect(url_for("home.index", folder_id=folder_id))
-
     return redirect(url_for("home.index"))
 
 

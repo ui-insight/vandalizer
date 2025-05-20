@@ -3,6 +3,12 @@ from typing import Any, Optional
 
 from redis import Redis
 from redis.commands.json.path import Path
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 
 
 class RedisCache:
@@ -10,7 +16,7 @@ class RedisCache:
 
     def __init__(
         self,
-        redis_url: str = "redis://localhost:6379",
+        redis_url: str = f"redis://{REDIS_HOST}:6379/0",
         ttl: Optional[int] = None,
         prefix: Optional[str] = "redis",
         redis_client: Optional[Redis] = None,

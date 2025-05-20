@@ -10,20 +10,26 @@ from datetime import timedelta
 import mongoengine as me
 import rollbar
 import rollbar.contrib.flask
+from celery import Celery, Task
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
+from dotenv import load_dotenv
 
-
-from celery import Celery, Task
-
-CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.1.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.0.1=2:
-- Bug fixes and stability improvements.
+Release 2.1.1:
+- Background task handling
+- Timeout fixes
+- Bug fixes and improvements
 """
+
+# Load environment variables from .env file
+load_dotenv()
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 
 
 def celery_init_app(app: Flask) -> Celery:
@@ -44,8 +50,8 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
         CELERY=dict(
-            broker_url="redis://localhost:6379/",
-            result_backend="redis://localhost:6379/",
+            broker_url=f"redis://{REDIS_HOST}:6379/0",
+            result_backend=f"redis://{REDIS_HOST}:6379/1",
         ),
     )
     app.config.from_prefixed_env()
@@ -71,9 +77,26 @@ CORS(
 
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=60)
 app.permanent_session_lifetime = timedelta(days=60)
-app.config.from_object("app.configuration.DevelopmentConfig")
 
-me.connect("osp")
+# SET FLASK_ENV FOR EACH SERVER
+env = os.getenv("FLASK_ENV", "development").lower()
+
+if env == "production":
+    config_class = "app.configuration.ProductionConfig"
+elif env == "testing":
+    config_class = "app.configuration.TestingConfig"
+else:
+    # anything else (including 'development') → development settings
+    config_class = "app.configuration.DevelopmentConfig"
+
+# Log which env/config we're using
+logging.basicConfig(level=logging.INFO)
+app.logger.info(f"Starting server in '{env}' environment → loading {config_class!r}")
+
+
+app.config.from_object(config_class)
+
+
 Bootstrap(app)  # flask-bootstrap
 Mail(app)
 
@@ -127,3 +150,4 @@ with app.app_context():
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
 
+me.connect(app.config["MONGO_DB"])

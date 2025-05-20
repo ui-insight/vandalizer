@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
+import asyncio
+
 from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
@@ -18,19 +20,19 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
 from app.utilities.document_manager import DocumentManager
-from app.utilities.llm_helpers import remove_code_markers
-from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
-
 import asyncio
 from app.utilities.config import settings
+from app.utilities.llm import remove_code_markers
 
 load_dotenv()
+
+REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 
 # Standard cache
 # cache ttl is 1 month
 ttl = 60 * 60 * 24 * 30
-cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 langfuse_enabled = os.environ.get("LOG_ENABLED", "false").lower() == "true"
 if langfuse_enabled:
@@ -282,9 +284,13 @@ def retrieve(
     """
     if docs_ids is None:
         docs_ids = []
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
 
-    prompt_response = prompt_agent.run_sync(
-        f"Generate a prompt for the following user question: {question}",
+    prompt_response = loop.run_until_complete(
+        prompt_agent.run(
+            f"Generate a prompt for the following user question: {question}",
+        )
     )
     prompt = prompt_response.output
     debug(prompt)
@@ -343,6 +349,7 @@ field_inference_agent = Agent(
     model,
     retries=3,
     deps_type=FieldInferenceDeps,
+    # output_type=dict[str, str],
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
 )
 
@@ -527,8 +534,27 @@ Text:
     )
 
 
+def filter_empty_entities(result: dict) -> list:
+    """Filter out empty entities from the list.
+
+    Args:
+        result: The result dictionary containing entities
+
+    Returns:
+        Filtered list of entities
+
+    """
+    raw_entities = result.get("entities", [])
+
+    def is_non_empty(e: dict) -> bool:
+        if not isinstance(e, dict) or not e:
+            return False
+        return any(v not in (None, "", [], {}) for v in e.values())
+
+    return [e for e in raw_entities if is_non_empty(e)]
+
+
 # @observe()
-@function_event_loop_decorator()
 def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     """Extract entities from text based on the provided extraction keys and return structured output.
 
@@ -544,15 +570,17 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     cache_key = f"Keys:{keys}\n\nText:{text}"
     llm_string = "pydantic_model:openai:gpt-4o"
 
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    except RuntimeError:
+        # Handle the case where the event loop is already running
+        loop = asyncio.get_event_loop()
+
     cache_result = cache.lookup(cache_key, llm_string)
     if cache_result:
         result = json.loads(cache_result[0])
         return result.get("entities", [])
-
-    # field_inference_deps = FieldInferenceDeps(extraction_context=context, keys=keys)
-    # fields = field_inference_agent.run_sync(
-    #     "Infer the types of the keys", deps=field_inference_deps
-    # ).data
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -579,19 +607,50 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             extraction_context=context,
             keys=uncached_keys,
         )
-        new_fields = field_inference_agent.run_sync(
-            "Infer the types of the keys",
-            deps=field_inference_deps,
-        ).output
 
-        # Cache newly inferred fields individually
-        for key, field_type in new_fields.items():
-            key_cache_key = get_cache_key(key, context)
-            type_str = reverse_type_mapping.get(field_type, "Any")
-            cache.update(key_cache_key, "field_inference", [type_str])
+        result = loop.run_until_complete(
+            field_inference_agent.run(
+                "Infer the types of the keys",
+                deps=field_inference_deps,
+            )
+        )
+        new_fields = remove_code_markers(result.output)
 
-        inferred_fields.update(new_fields)
+        debug(new_fields)
 
+        if isinstance(new_fields, str):
+            try:
+                new_fields = json.loads(new_fields)
+            except json.JSONDecodeError:
+                new_fields = {}
+                # Handle the case where JSON parsing fails
+                debug(
+                    "Failed to parse field inference response as JSON.",
+                    new_fields,
+                    field_inference_deps,
+                )
+
+        elif isinstance(new_fields, dict):
+            # Cache newly inferred fields individually
+            for key, field_type in new_fields.items():
+                key_cache_key = get_cache_key(key, context)
+                type_str = reverse_type_mapping.get(field_type, "Any")
+                cache.update(key_cache_key, "field_inference", [type_str])
+        else:
+            # Handle the case where the response is not a dict
+            debug(
+                "Unexpected field inference response format.",
+                new_fields,
+                field_inference_deps,
+            )
+            new_fields = {}
+
+        if isinstance(new_fields, dict):
+            for key_name, key_type in new_fields.items():
+                if key_name not in inferred_fields:
+                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
+
+    debug(inferred_fields)
     # DynamicModel = create_model(
     #     "DynamicEntity",
     #     **{field_name: field_spec for field_name, field_spec in fields.items()},
@@ -621,16 +680,25 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         text=text,
     )
     try:
-        debug(text)
-        extraction = extractor_agent.run_sync(text, deps=extractor_deps)
+        # Run the agent synchronously
+        extraction = loop.run_until_complete(
+            extractor_agent.run(text, deps=extractor_deps)
+        )
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)
         debug(result)
-        # cache the result
-        cache.update(cache_key, llm_string, [result])
+
         result = json.loads(result)
-        return result.get("entities", [])
+        filtered_entities = []
+        # cache the result if it is not empty
+        if result and "entities" in result and len(result["entities"]) > 0:
+            filtered_entities = filter_empty_entities(
+                result,
+            )
+            if filtered_entities and len(filtered_entities) > 0:
+                cache.update(cache_key, llm_string, [json.dumps(result)])
+        return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message
         error_msg = str(e)

@@ -1,17 +1,12 @@
 import os
 import time
-
 import openai
-
-# from langfuse.decorators import observe
-# from langfuse import Langfuse
+import json
 from app.utilities.agents import extract_entities_with_agent
 from app.utilities.document_readers import extract_text_from_doc
-
-# langfuse = Langfuse()
-
-# trace = langfuse.trace()
-
+from app.utilities.config import model_type
+from app.utilities.llm import ChatLM
+from app.models import SmartDocument
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -19,9 +14,46 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 class ExtractionManager3:
     root_path = ""
 
-    def extract(self, extract_keys, pdf_paths, full_text=None):
-        # extractor = EntityExtractor(api_key)
+    def build_from_documents(self, document_uuids):
+        openai.api_key = OPENAI_API_KEY
+        doc_text = ""
+        time.time()
+        for document_uuid in document_uuids:
+            doc = SmartDocument.objects(uuid=document_uuid).first()
+            doc_text += doc.raw_text
 
+        prompt = (
+            """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
+
+          Passage:
+
+        """
+            + doc_text
+        )
+
+        model = "gpt-4o"
+
+        chat_lm = ChatLM(model_type)
+        output = chat_lm.completion(
+            model=model,
+            response_format={"type": "json_object"},
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. ",
+                },
+                {"role": "user", "content": prompt},
+            ],
+        )
+        output = output.replace("\\n", "")
+        output = output.replace("```json", "")
+        output = output.replace("```", "")
+
+        if "{" in output and "}" in output:
+            return json.loads(output.strip())
+        return None
+
+    def extract(self, extract_keys, document_uuids, full_text=None):
         # if extract_keys is string convert to list by splitting on comma
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
@@ -29,33 +61,22 @@ class ExtractionManager3:
             fields_to_extract = extract_keys
         # Extract entities
 
-
         time.time()
         openai.api_key = OPENAI_API_KEY
-        doc_text = ""
-        extractions = []
         time.time()
+        extraction = []
         if full_text is None:
-            for pdf_path in pdf_paths:
-                doc_text = extract_text_from_doc(doc_path=pdf_path)
-                if doc_text:
-                    # data = extractor.extract_entities(doc_text, fields_to_extract)
-                    data = extract_entities_with_agent(
-                        text=doc_text, keys=fields_to_extract,
-                    )
-                    extractions = data
-
+            for document_uuid in document_uuids:
+                doc = SmartDocument.objects(uuid=document_uuid).first()
+                doc_text = doc.raw_text
+                result = extract_entities_with_agent(
+                    text=doc_text, keys=fields_to_extract
+                )
+                extraction.extend(result)
         else:
             doc_text = full_text
-            data = extract_entities_with_agent(text=doc_text, keys=fields_to_extract)
-            # data = extractor.extract_entities(doc_text, fields_to_extract)
-            extractions = data
+            extraction = extract_entities_with_agent(
+                text=doc_text, keys=fields_to_extract
+            )
 
-        # model = "gpt-3.5-turbo-0125"
-        # if len(prompt) > 50000:
-        #    model = "gpt-4-turbo"
-
-        # print(data.model_dump_json(indent=2))
-
-
-        return extractions
+        return extraction
