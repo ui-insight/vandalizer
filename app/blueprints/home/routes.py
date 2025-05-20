@@ -4,7 +4,6 @@ import os
 import uuid
 from itertools import chain
 from pathlib import Path
-import json
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
@@ -54,37 +53,24 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     debug("Document processing", document.processing)
 
     extension = document.extension
-    upload_dir = Path(current_app.root_path) / "static" / "uploads" / user_id
-    document_uuid = document.uuid
-    file_path = Path(upload_dir) / f"{document_uuid}.{extension}"
 
     if not document.raw_text or document.raw_text == "":
-        pdf_path = document.absolute_path
-        document.processing = True
-        document.save()
         # check if there is a task running
         if not document.task_id:
+            document.processing = True
             extraction_task = perform_extraction_and_update.s(
-                document_uuid=document.uuid,
-                doc_path=str(file_path),
-                extension=extension,
-                upload_dir=str(upload_dir),
+                document_uuid=document.uuid, extension=extension
             )
 
             validation_task = perform_document_validation.s(
-                document_uuid=document.uuid,
-                document_path=str(file_path),
+                document_uuid=document.uuid, document_path=document.absolute_path
             )
 
             ingestion_task = perform_semantic_ingestion.s(
                 document.uuid,
                 user_id,
             )
-            workflow = extraction_task | validation_task | ingestion_task
-            workflow_task_result = workflow.apply_async(
-                link=update_document_fields.si(document.uuid),
-                link_error=cleanup_document.si(document.uuid),
-            )
+            workflow_task_result = extraction_task | validation_task | ingestion_task
             document.task_id = workflow_task_result.id
             document.save()
 

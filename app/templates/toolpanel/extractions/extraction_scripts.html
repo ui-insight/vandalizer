@@ -103,7 +103,6 @@
       $("#add-extraction-task-btn")
         .off("click")
         .on("click", function () {
-          console.log("here");
           newTaskType = "extraction";
           $("#add-task-container").hide();
           $("#name-add-task-container").show();
@@ -255,7 +254,6 @@
     });
 
     function performExtraction(search_set_uuid) {
-      console.log("PERFORM EXTRACTION");
 
       if (document_uuids == null || document_uuids == "") {
         showToast("Please select a document");
@@ -388,7 +386,6 @@
 
       $("#build-extraction-from-fillable-pdf-btn").on("click", function () {
         let uuid = $(this).attr("data-uuid");
-        console.log("here");
         $("#fillable-pdf-input").click();
       });
 
@@ -405,7 +402,6 @@
 
       $(".collapsible-pdf").click(function () {
         $(this).toggleClass("active");
-        console.log("Collapsible");
         var content = $(this).next(".fillable-pdf-content");
         content.slideToggle("fast");
       });
@@ -438,7 +434,6 @@
       $("#export").on("click", function (e) {
         e.preventDefault();
         searchDict = createSearchTermDictionary();
-        console.log("Exporting");
         var form = $("<form>", {
           action: "/tasks/export_extraction",
           method: "GET",
@@ -469,7 +464,6 @@
       $("#download-fillable").on("click", function (e) {
         e.preventDefault();
         searchDict = createSearchTermDictionary();
-        console.log("Exporting");
         var form = $("<form>", {
           action: "/tasks/download_fillable",
           method: "GET",
@@ -675,7 +669,6 @@
     });
 
     $("#add-search-set-button").on("click", function () {
-      console.log("Adding search set");
       addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 

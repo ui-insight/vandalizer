@@ -987,7 +987,17 @@ tr {
   margin-top: 0;
 }
 
+.main-panel .header .row .col {
+    /* bootstrap’s .col is already flex: 1 1 0%, but if yours isn’t: */
+    flex: 1 1 0;
+    /* THIS is the magic: let it go below its content’s “auto” min-width */
+    min-width: 0;
+  }
+
 #document-title {
+    display: block;
+    width: calc(100% - 60px);
+    max-width: 100%
     text-align: center;
     padding-top: 15px;
     font-size: 18px;
@@ -996,6 +1006,8 @@ tr {
     white-space: nowrap; /* Prevents line breaks */
     overflow: hidden; /* Hides overflow text */
     text-overflow: ellipsis; /* Adds ellipsis */
+    margin: 0 30px; 
+    padding-top: 0px;
   }
 
 

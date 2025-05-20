@@ -20,7 +20,6 @@ from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, ModelConfig
-from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import load_user
@@ -374,7 +373,11 @@ def begin_search() -> ResponseReturnValue:
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_paths)[0]
+        results = em.extract(keys, document_uuids)
+        if len(results) == 1:
+            results = results[0]
+
+        debug(results)
 
         if (
             search_set.fillable_pdf_url != ""
@@ -448,18 +451,12 @@ def build_extraction_from_document() -> ResponseReturnValue:
     load_user()
 
     documents = []
-    document_paths = []
-    for doc_uuid in document_uuids:
-        document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-        absolute_path = document.absolute_path
-        document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
-    em = ExtractionManager2()
+    em = ExtractionManager3()
     em.root_path = current_app.root_path
-    keys = em.build_from_documents(document_paths)
+    keys = em.build_from_documents(document_uuids)
 
     if "entities" in keys:
         bindings = keys["entities"]

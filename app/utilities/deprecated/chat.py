@@ -7,11 +7,16 @@ from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.utilities.agents import create_chat_agent
 from app.utilities.redis_cache import RedisCache
+from dotenv import load_dotenv
+import os
 from app.utilities.config import settings
+
+load_dotenv()
 
 # 2h
 ttl = 60 * 60 * 1
-cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 from app.models import MAX_CHAT_MESSAGES
 from app.models import ModelConfig
@@ -51,7 +56,8 @@ def chat_with_prompt(prompt: str, user_id=0) -> str:
                 continue
             # Adjust format string if necessary
             timestamp_obj = datetime.strptime(
-                message["timestamp"], "%a, %d %b %Y %H:%M:%S GMT",
+                message["timestamp"],
+                "%a, %d %b %Y %H:%M:%S GMT",
             )
             message["timestamp"] = timestamp_obj
             parsed_messages.append(message)
@@ -71,7 +77,7 @@ def chat_with_prompt(prompt: str, user_id=0) -> str:
         # Fallback to a default model if no config is found
         model = settings.base_model
 
-    chat_agent=create_chat_agent(
+    chat_agent = create_chat_agent(
         model=model,
         user_id=user_id,
         cache=cache,
