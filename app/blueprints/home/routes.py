@@ -4,6 +4,7 @@ import os
 import uuid
 from itertools import chain
 from pathlib import Path
+import json
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
@@ -15,7 +16,7 @@ from app.models import (
     Workflow,
     WorkflowStep,
 )
-from app.utilities.config import max_context_length
+from app.utilities.config import settings, ModelConfig
 from app.utilities.document_manager import (
     DocumentManager,
     perform_extraction_and_update,
@@ -26,6 +27,7 @@ from app.utilities.document_manager import (
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
+from app.models import ModelConfig
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import is_dev, load_user
 from devtools import debug
@@ -276,10 +278,25 @@ def index() -> ResponseReturnValue:
     release_seen = request.cookies.get("release_seen")
     show_release_panel = release_seen != CURRENT_RELEASE_VERSION
 
+    user = load_user()
+
+    model_config = ModelConfig.objects(
+        user_id=user.user_id,
+    ).first()
+    model = settings.base_model
+    if model_config is None:
+        model_config = ModelConfig(user_id=user.user_id, name=model)
+        model_config.available_models = [m.model_dump() for m in settings.models]
+        model_config.save()
+
+    models = model_config.available_models
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
         prompts=prompts,
+        models=models,
+        current_model=model,
         formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
@@ -289,7 +306,7 @@ def index() -> ResponseReturnValue:
         spaces=spaces,
         current_space_id=spaces[0].uuid,
         section=section,
-        max_context_length=max_context_length,
+        max_context_length=settings.max_context_length,
         workflows=workflows,
         workflow_template=workflow_template,
         workflow_step_template=workflow_step_template,

@@ -5,15 +5,18 @@ import openai
 from devtools import debug
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
+import asyncio
+
 from app.models import (
     MAX_CHAT_MESSAGES,
 )
-from app.utilities.agents import RagDeps, chat_agent, rag_agent
+from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.async_utilities import class_method_event_loop_decorator
-from app.utilities.config import max_context_length, model_type
+from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM
+from app.models import ModelConfig
 
 # from langfuse.decorators import observe
 # from langchain_redis import RedisCache
@@ -57,10 +60,19 @@ class OpenAIInterface:
                 + self.loaded_doc
             )
 
-        chat_lm = ChatLM(model_type)
-        return chat_lm.completion(
+        model = settings.base_model
+        model_config = ModelConfig.objects(user_id=item.user_id).first()
+        if model_config is not None:
+            model = model_config.name
+        chat_agent = create_chat_agent(model)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            chat_agent.run(
             messages=[{"role": "user", "content": prompt}],
-        )
+        ))
+
+        return result.output
 
     # def format_answer(self, answer):
     #     regex = r"^```(html|json|markdown)?\s*|\s*```$"
@@ -128,9 +140,7 @@ class OpenAIInterface:
         if session is not None:
             # latest_conversation_messages = session.get("chat_history", [])
             cache_result = cache.lookup(cache_key, llm_string)
-            debug(cache_result)
             if cache_result is not None:
-                debug(cache_result)
                 latest_conversation_messages = cache_result
 
                 # latest_conversation_messages =
@@ -160,7 +170,6 @@ class OpenAIInterface:
 
         prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
 
-        debug(previous_messages)
 
         full_text = ""
         for document in default_docs + documents:
@@ -179,13 +188,20 @@ class OpenAIInterface:
                 + extract_text_from_doc(doc=document, doc_path=absolute_path)
                 + " "
             )
-        debug(max_context_length)
+        debug(settings.max_context_length)
         debug(len(full_text))
-        if len(full_text) < max_context_length:
+        model_config = ModelConfig.objects(user_id=user_id).first()
+        if model_config is not None:
+            model = model_config.name
+        else:
+            model = settings.base_model
+        
+        if len(full_text) < settings.max_context_length:
             prompt += f"""
             Question: {question}
             Document: {full_text}
             """
+            chat_agent = create_chat_agent(model)
             answer = chat_agent.run_sync(
                 prompt,
                 message_history=previous_messages,
@@ -198,23 +214,24 @@ class OpenAIInterface:
         Question: {question}
         """
             debug("Rag chat", prompt)
-            deps = RagDeps(
-                doc_manager=DocumentManager(),
-                user_id=user_id or "0",
-                documents=documents,
-            )
-            answer = rag_agent.run_sync(
-                prompt,
-                deps=deps,
-                message_history=previous_messages,
-            )
+            with DocumentManager() as doc_manager:
+                deps = RagDeps(
+                    doc_manager=doc_manager,
+                    user_id=user_id or "0",
+                    documents=documents,
+                )
+                rag_agent = create_rag_agent(model)
+                answer = rag_agent.run_sync(
+                    prompt,
+                    deps=deps,
+                    message_history=previous_messages,
+                )
         # print("answer: ", answer.new_messages_json())
         # Save new messages
         # AgentHistory.save_messages(user_id, answer.new_messages_json())
 
         # remove None
         chat_history = json.loads(answer.new_messages_json())
-        debug(chat_history)
         cache.update(cache_key, llm_string, chat_history)
         # if session is not None:
         #     new_chat_history = latest_conversation_messages + answer.new_messages()

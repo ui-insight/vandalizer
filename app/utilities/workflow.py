@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import asyncio
+
 import graphlib
 import json
 
@@ -17,18 +19,18 @@ from dotenv import load_dotenv
 from app import app
 from app.celery_worker import celery_app
 from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult
-from app.utilities.config import model_type
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-from app.utilities.config import model_type
+from app.utilities.config import settings
 
 from threading import Thread
 
 from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult, WorkflowStep
+from app.utilities.agents import create_chat_agent
 
 import graphlib
 
@@ -105,7 +107,7 @@ def format_llm_output(text: str) -> str:
     return text.strip()
 
 
-def llm_chat_model(prompt, data=None, docs=None):
+def llm_chat_model(prompt, user_id, data=None, docs=None):
     if docs is None:
         docs = []
     open_ai_interface = OpenAIInterface()
@@ -115,19 +117,16 @@ def llm_chat_model(prompt, data=None, docs=None):
         full_text = json.dumps(data)
         output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
 
-        chat_lm = ChatLM(model_type)
-
-        output = chat_lm.completion(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": output_prompt}],
-            max_tokens=None,
-        )
+        model_config = ModelConfig.Objects(user_id=user_id).first()
+        model = settings.base_model
+        if model_config is not None:
+            model = model_config.name
+        chat_agent = create_chat_agent(model)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(chat_agent.run(output_prompt))
+        output = result.output
         output = format_llm_output(output).strip()
-        # output = open_ai_interface.handle_short_context(
-        #     prompt=prompt, full_text=full_text
-        # )
-        # if output is not None:
-        #     output = output.get("answer", "")
 
     else:
         output = open_ai_interface.ask_question_to_documents(
@@ -141,7 +140,7 @@ def llm_chat_model(prompt, data=None, docs=None):
     return output
 
 
-def data_extraction_model(keys, pdf_paths, full_text=None):
+def data_extraction_model(keys, pdf_paths, user_id, full_text=None):
     output = None
     extraction_manager = ExtractionManager3()
     if pdf_paths is None:
@@ -153,12 +152,16 @@ def data_extraction_model(keys, pdf_paths, full_text=None):
     prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
     prompt += "\n\n"
     prompt += json.dumps(output, indent=4)
-    chat_lm = ChatLM(model_type)
-    response = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
-    )
-    debug(response)
-    return response
+    loop = asyncio.new_event_loop()
+
+    model_config = ModelConfig.objects(user_id=user_id).first()
+    model = settings.base_model
+    if model_config is not None:
+        model = model_config.name
+    chat_agent = create_chat_agent(model)
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(chat_agent.run(prompt))
+    return result.output
 
 
 def format_model(formatting_prompt, text):
@@ -173,7 +176,7 @@ CRITICAL:
 
     # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
-    chat_lm = ChatLM(model_type)
+    chat_lm = ChatLM(settings.model_type)
     response = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
@@ -331,6 +334,7 @@ class ExtractionNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Extraction")
         self.data = data
+        self.user_id = data.get("user_id", "0")
 
     def process(self, inputs):
         data = self.data
@@ -352,7 +356,7 @@ class ExtractionNode(Node):
                 return {"output": None}
             step_input = pdf_paths
 
-            extraction_response = data_extraction_model(keys, pdf_paths)
+            extraction_response = data_extraction_model(keys, pdf_paths, user_id=self.user_id)
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
@@ -360,6 +364,7 @@ class ExtractionNode(Node):
             extraction_response = data_extraction_model(
                 keys,
                 pdf_paths,
+                user_id=self.user_id,
                 full_text=step_input,
             )
         elif prev_step_name in {"Extraction", "Formatter"}:
@@ -367,6 +372,7 @@ class ExtractionNode(Node):
             extraction_response = data_extraction_model(
                 keys,
                 pdf_paths,
+                user_id=self.user_id,
                 full_text=step_input,
             )
 
@@ -381,6 +387,7 @@ class PromptNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Prompt")
         self.data = data
+        self.user_id = data.get("user_id", "0")
 
     def process(self, inputs):
         data = self.data
@@ -399,11 +406,11 @@ class PromptNode(Node):
                 SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
             ]
 
-            chat_response = llm_chat_model(docs=docs, prompt=prompt)
+            chat_response = llm_chat_model(user_id=self.user_id, docs=docs, prompt=prompt)
         else:
             data = inputs.get("output", None)
 
-            chat_response = llm_chat_model(docs=[], prompt=prompt, data=data)
+            chat_response = llm_chat_model(user_id=self.user_id, docs=[], prompt=prompt, data=data)
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
 
@@ -524,7 +531,7 @@ class WorkflowEngine:
         return latest_output.get("output"), data
 
 
-def build_workflow_engine(steps, workflow):
+def build_workflow_engine(steps, workflow, user_id=None):
     engine = WorkflowEngine()
     nodes = []
 
@@ -546,6 +553,8 @@ def build_workflow_engine(steps, workflow):
                         ).first()
                         search_items = search_set.items()
                         task.data["keys"] = [item.searchphrase for item in search_items]
+                    
+                    task.data["user_id"] = user_id
                     debug(task.data)
                     node = ExtractionNode(
                         data=task.data,
@@ -553,11 +562,14 @@ def build_workflow_engine(steps, workflow):
                     tasks.append(node)
                     debug(tasks)
                 elif task.name == "Prompt":
+
+                    task.data["user_id"] = user_id
                     node = PromptNode(
                         data=task.data,
                     )
                     tasks.append(node)
                 elif task.name == "Formatter":
+                    task.data["user_id"] = user_id
                     node = FormatNode(
                         data=task.data,
                     )
@@ -616,7 +628,7 @@ def execute_workflow_task(
 
     debug(steps)
 
-    engine = build_workflow_engine(steps, workflow)
+    engine = build_workflow_engine(steps, workflow, user_id=workflow.user_id)
 
     final_output, data = engine.execute(workflow_result)
     print(

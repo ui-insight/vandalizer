@@ -6,6 +6,7 @@ import json
 import os
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 import mongoengine as me
 from pydantic_ai.messages import (
@@ -16,6 +17,16 @@ from pydantic_ai.messages import (
 from pypdf import PdfReader
 
 from app import app
+
+
+class ModelConfig(me.Document):
+    """User configuration model. Represents user-specific settings."""
+
+    user_id = me.StringField(required=True, max_length=200)
+    name = me.StringField(required=True, max_length=200)
+    temperature = me.FloatField(default=0.7)
+    top_p = me.FloatField(default=0.9)
+    available_models = me.ListField(me.DictField(), required=False, default=[])
 
 
 class WorkflowStepTask(me.Document):
@@ -101,11 +112,10 @@ class SmartDocument(me.Document):
 
     path = me.StringField(required=True, max_length=200)
     processing = me.BooleanField(default=False)
-    valid = me.BooleanField(default=False)
+    valid = me.BooleanField(default=True)
     validation_feedback = me.StringField(required=False, max_length=5000)
     task_id = me.StringField(
-        default=None,
-        required=False, max_length=200
+        default=None, required=False, max_length=200
     )  # Celery task ID for processing
     title = me.StringField(required=True, max_length=200)
     raw_text = me.StringField(required=True, default="")

@@ -4,7 +4,7 @@ import time
 
 import openai
 
-from app.utilities.config import model_type
+from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM
 
@@ -51,7 +51,7 @@ class ExtractionManager2:
 
         time.time()
 
-        chat_lm = ChatLM(model_type)
+        chat_lm = ChatLM(settings.model_type)
         output = chat_lm.completion(
             model=model,
             response_format={"type": "json_object"},
@@ -66,7 +66,6 @@ class ExtractionManager2:
         output = output.replace("\\n", "")
         output = output.replace("```json", "")
         output = output.replace("```", "")
-
 
         if "{" in output and "}" in output:
             return json.loads(output.strip())
@@ -90,7 +89,7 @@ class ExtractionManager2:
 
         model = "gpt-4o"
 
-        chat_lm = ChatLM(model_type)
+        chat_lm = ChatLM(Settings.model_type)
         output = chat_lm.completion(
             model=model,
             response_format={"type": "json_object"},
@@ -105,7 +104,6 @@ class ExtractionManager2:
         output = output.replace("\\n", "")
         output = output.replace("```json", "")
         output = output.replace("```", "")
-
 
         if "{" in output and "}" in output:
             return json.loads(output.strip())

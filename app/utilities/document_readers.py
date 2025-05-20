@@ -83,6 +83,7 @@ def extract_text_from_doc(doc_path, doc=None):
         return doc.raw_text
 
     doc_path_str = str(doc_path)
+    debug(doc)
     debug(doc_path_str)
 
     if doc is None:

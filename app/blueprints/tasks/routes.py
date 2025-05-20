@@ -1,6 +1,7 @@
 import csv
 import os
 import uuid
+import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -18,13 +19,108 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument
+from app.models import SearchSet, SearchSetItem, SmartDocument, ModelConfig
 from app.utilities.extraction_manager2 import ExtractionManager2
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import load_user
+from app.utilities.config import settings
+
+from flask import g
+from app.utils import load_user
+from app.utilities.config import settings
+from app.models import ModelConfig
+from app import app
 
 from . import tasks
+
+
+@app.context_processor
+def inject_current_model():
+    """
+    Runs on *every* template render.  Looks up the user's ModelConfig,
+    and makes `current_model` available in all templates.
+    """
+    user = load_user()
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    debug(model_config)
+    if not model_config:
+        # fallback to your default
+        current = settings.base_model
+    else:
+        current = model_config.name
+    return {"current_model": current}
+
+
+@tasks.route("/model/filter", methods=["POST"])
+def filter_models() -> ResponseReturnValue:
+    data = request.get_json()
+    uuids = data.get("uuids", [])
+    debug(data)
+    validation_failed = False
+    if len(uuids) == 0:
+        return jsonify({"models": []})
+    for uuid in uuids:
+        doc = SmartDocument.objects(uuid=uuid).first()
+        if not doc.valid:
+            validation_failed = True
+            break
+    user = load_user()
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    if not model_config:
+        model_config = ModelConfig(user_id=user.user_id, name=settings.base_model)
+        model_config.available_models = [m.model_dump() for m in settings.models]
+        debug(model_config)
+        model_config.save()
+
+    current_model = settings.base_model
+    if validation_failed:
+        current_model = "llama3.3"
+        debug(model_config.available_models)
+        # filter out the external models
+        config_models = [
+            m for m in model_config.available_models if not m.get("external")
+        ]
+        debug(config_models)
+        model_config.available_models = config_models
+    else:
+        if len(model_config.available_models) < len(settings.models):
+            model_config.available_models = [m.model_dump() for m in settings.models]
+            debug(model_config)
+
+    debug(model_config.available_models)
+
+    model_config.save()
+
+    filtered_models = json.dumps(model_config.available_models)
+
+    return jsonify({"models": filtered_models, "current_model": current_model})
+
+
+@tasks.route("/model/update", methods=["POST"])
+def update_model() -> ResponseReturnValue:
+    """Update the model for a search set."""
+    data = request.get_json()
+    debug(data)
+    name = data.get("name")
+    temperature = data.get("temperature", 0.7)
+    top_p = data.get("top_p", 0.9)
+
+    user = load_user()
+
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    if model_config is None:
+        model_config = ModelConfig(
+            user_id=user.user_id, name=name, temperature=temperature, top_p=top_p
+        )
+    else:
+        model_config.name = name
+        model_config.temperature = temperature
+        model_config.top_p = top_p
+    model_config.save()
+
+    response = {"complete": True}
+    return jsonify(response)
 
 
 # Add a extraction set

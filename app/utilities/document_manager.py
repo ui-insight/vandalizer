@@ -97,9 +97,10 @@ def cleanup_document(document_uuid: str):
     """
     document = SmartDocument.objects(uuid=document_uuid).first()
 
-    document_file_path = (
-        Path(current_app.root_path) / "static" / "uploads" / document.path
-    )
+    if not document:
+        debug("Document not found for cleanup:", document_uuid)
+        return
+
     document.processing = False
     document.task_id = None
     document.save()
@@ -119,17 +120,15 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
         debug("Document not validated, reason: ", document.validation_feedback)
         return
 
-    document_manager = DocumentManager()
-
-    document_path = document.absolute_path
-
-    document_manager.add_document(
-        user_id=user_id,
-        document_name=document.title,
-        document_id=document.uuid,
-        doc_path=document_path,
-        raw_text=raw_text,
-    )
+    with DocumentManager() as document_manager:
+        document_path = document.absolute_path
+        document_manager.add_document(
+            user_id=user_id,
+            document_name=document.title,
+            document_id=document.uuid,
+            doc_path=document_path,
+            raw_text=raw_text,
+        )
     document.processing = False
     document.save()
     return document.uuid
@@ -165,6 +164,25 @@ class DocumentManager:
             path=persist_directory.as_posix(),
             settings=Settings(anonymized_telemetry=False, is_persistent=True),
         )
+
+    def close(self):
+        """Explicitly close the ChromaDB client to prevent resource leaks."""
+        if hasattr(self, "client") and self.client:
+            try:
+                self.client.close()
+            except Exception as e:
+                print(f"Error closing ChromaDB client: {e}")
+
+    def __del__(self):
+        """Destructor to ensure client is closed if object is garbage collected."""
+        self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        # always close—even if an exception is raised
+        self.close()
 
     def get_user_collection(self, user_id: str) -> Chroma:
         """Get or create a collection for a specific user."""
@@ -274,12 +292,21 @@ class DocumentManager:
 
     def delete_document(self, user_id: str, document_id: str) -> None:
         """Delete a specific document from a user's collection."""
-        self.get_user_collection(user_id)
+        # Check if the document exists before deleting
+        if not self.document_exists(user_id, document_id):
+            debug(f"Document {document_id} does not exist for user {user_id}.")
+            return
         # Get the raw collection to use ChromaDB's filtering
-        collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
-        if collection:
+        try:
+            collection = self.client.get_or_create_collection(
+                name=f"user_{user_id}_docs"
+            )
             # Delete all chunks with matching document_id
             collection.delete(where={"document_id": document_id})
+        except Exception as e:
+            debug(f"Error deleting document {document_id} for user {user_id}: {e}")
+            raise
+            # close the client
 
     def list_user_documents(self, user_id: str) -> list[dict[str, Any]]:
         """List all documents in a user's collection with metadata."""

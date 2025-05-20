@@ -2,6 +2,8 @@
     var askingDocument = '';
     var document_uuids = [];
     var maxContextLength = parseInt("{{max_context_length}}");
+    var model = "{{model}}";
+
 
     {% if (documents != None) and documents | length > 0 %}
     var documentData = {
@@ -53,6 +55,37 @@
         window.location.href = url.toString();
     }
 
+ function updateModel(model) {
+        console.log("Updating model to: " + model);
+        $.ajax({
+            url: '/tasks/model/update',
+            type: 'POST',
+            data: JSON.stringify({
+                name: model
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (msg) {
+                location.reload();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    function showModelModal() {
+        console.log("show model modal");
+        const modal = document.getElementById("model-modal");
+        $('#model-modal').show();
+
+    }
+    $("#closeModelModalBtn").on('click', function () {
+        $('#model-modal').hide();
+    });
+
     function showRawText() {
         console.log("show raw text", documentData);
         // Get the current document
@@ -78,6 +111,69 @@
         const newhref = `/home?${newQs}`;
         window.history.pushState({}, "", newhref);
     }
+
+    function filterAvailableModels(uuids) {
+    $.ajax({
+        url: '/tasks/model/filter',
+        type: 'POST',
+        contentType: 'application/json; charset=utf-8',
+        data: JSON.stringify({ uuids }),
+        dataType: 'json',
+        success: function (msg) {
+
+        let models = msg.models;
+        if (typeof models === "string") {
+            try {
+            models = JSON.parse(models);
+            } catch (e) {
+            console.error("Couldn’t JSON‐parse models:", models, e);
+            return;
+            }
+        }
+        console.log("models: ", models);
+
+        // Safety: ensure this is really an Array
+        if (!Array.isArray(models)) {
+            console.error('Expected msg.models to be an array, got:', models);
+            try {
+            models = JSON.parse(models);
+            if (!Array.isArray(models)) {
+                console.error('Still not an array after parsing:', models);
+                return;
+            }
+            } catch (_) {
+            return;
+            }
+        }
+
+        // Remove exact duplicates by name
+        const seen = new Set();
+        models = models.filter(m => {
+            if (seen.has(m.name)) return false;
+            seen.add(m.name);
+            return true;
+        });
+
+        // Grab current selected model from the modal’s data-context
+        const currentModel = $('#model-modal').data('context');
+
+        // Build all <option> tags in one go
+        const optionsHtml = models
+            .map(m => {
+            const sel = m.name === currentModel ? ' selected' : '';
+            return `<option value="${m.name}"${sel}>${m.name}</option>`;
+            })
+            .join('');
+
+        $('#model-select').html(optionsHtml);
+        },
+        error: function (xhr, status, err) {
+        console.error('Error filtering models:', status, err);
+        }
+    });
+    }
+
+
 
     function updateDocumentSelections() {
         var checkedCheckboxes = $('.document-selector:checked');
@@ -119,6 +215,11 @@
         console.log("Reset uuids: " + uuids.length);
         totalDocs += uuids.length;
         document_uuids = uuids;
+
+        // filter user available models
+        filterAvailableModels(uuids);
+
+
 
         var contextLengthWarning = `
                                     <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>

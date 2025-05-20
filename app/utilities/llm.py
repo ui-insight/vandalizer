@@ -4,33 +4,50 @@ from datetime import datetime
 
 import openai
 import requests
-from dspy import LM
 from openai import OpenAI
+from app.models import ModelConfig
+from devtools import debug
 
 
 class ChatLM:
-    def __init__(self, model_type="insight") -> None:
+    def __init__(self, model=None, user_id=None) -> None:
+        model_type, model_name = "openai", "gpt-4o"
+        if model is not None:
+            model_type, model_name = model.split("/")
+        else:
+            if user_id is not None:
+                model_config = ModelConfig.objects.first(user=user_id)
+                if model_config is not None:
+                    model_type, model_name = model_config.name.split("/")
+
         self.model_type = model_type
+        self.model_name = model_name
+        debug(f"Model type: {self.model_type}")
+        debug(f"Model name: {self.model_name}")
 
     def completion(self, structured_output=False, stream=False, **kwargs):
         if self.model_type == "openai":
-            model = kwargs.pop("model", "gpt-4o")
+            # model = kwargs.pop("model", "gpt-4o")
             messages = kwargs.pop("messages", [])
             if structured_output:
                 api_key = kwargs.pop("api_key", None)
                 client = OpenAI(api_key=api_key)
                 return client.beta.chat.completions.parse(
-                    model=model, messages=messages, **kwargs,
+                    model=self.model_name,
+                    messages=messages,
+                    **kwargs,
                 )
             completion = openai.chat.completions.create(
-                model=model, messages=messages, **kwargs,
+                model=self.model,
+                messages=messages,
+                **kwargs,
             )
             return completion.choices[0].message.content
         lm = InsightLM()
         return lm(stream=stream, **kwargs)
 
 
-class InsightLM(LM):
+class InsightLM():
     def __init__(
         self,
         model="llama3.3:70b",
@@ -99,12 +116,18 @@ class InsightLM(LM):
 
         # Logging, with removed api key & where `cost` is None on cache hit.
         kwargs = {k: v for k, v in kwargs.items() if not k.startswith("api_")}
-        entry = {"prompt": prompt, "messages": messages, "kwargs": kwargs, "response": response}
+        entry = {
+            "prompt": prompt,
+            "messages": messages,
+            "kwargs": kwargs,
+            "response": response,
+        }
         if response.get("usage"):
             entry = dict(**entry, outputs=outputs, usage=dict(response["usage"]))
         if response.get("response_cost"):
             entry = dict(
-                **entry, cost=response.get("_hidden_params", {}).get("response_cost"),
+                **entry,
+                cost=response.get("_hidden_params", {}).get("response_cost"),
             )
         entry = dict(
             **entry,

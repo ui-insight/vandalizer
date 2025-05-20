@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-# the model type to use, either openai or insight server (ollama)
-# model_type = "insight"
-model_type = "openai"
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import BaseModel, Field
+from dotenv import load_dotenv
+from typing import List, Optional
+import os
+from pydantic import ValidationError
+from uillm import UILLM
+from devtools import debug
+import re
 
-# model category to use, either pydantic_ai or dspy
-model_category = "pydantic_ai"
-
-# 128K is the max context length for the GPT-4o model
-# we use less than this to be safe
-max_context_length = 120000 * 4
-
+# Load environment variables from .env file
+load_dotenv()
 
 upload_compliance = """
 Upload Compliance:
@@ -24,3 +25,114 @@ Upload Compliance:
     - The document should not contain Personally Identifiable Information (PII) (for example student ID numbers, social security numbers, etc.).
     Personally identifiable information is information contained in any record which makes a student's identity easily traceable. A student's ID number, for example, is personally identifiable information. Personally identifiable information cannot be released to third parties without the student's written consent, except under very narrow circumstances.
 """
+
+try:
+    list_of_models = UILLM.list_models()
+except Exception as e:
+    print(f"Error listing models: {e}")
+    list_of_models = ""
+models = []
+if isinstance(list_of_models, str):
+    base_models = list_of_models.split("\n")
+    # filter out to show only those that start with "Model:" or "EMBED"
+    base_models = [model for model in base_models if model.startswith("Model:")]
+    external_providers = [
+        "openai",
+        "google",
+        "x-ai",
+        "microsoft",
+        "amazon",
+        "meta-llama",
+        "anthropic",
+        "mistralai",
+        "nousresearch",
+        "deepseek",
+        "qwen",
+    ]
+
+    for model in base_models:
+        name = model.split(":")[1].strip()
+        if name.startswith("EMBED"):
+            continue
+        # check if the model is an external provider
+        external = any(
+            provider in name.split("/")[0] for provider in external_providers
+        )
+        models.append({"name": name, "external": external})
+debug(models)
+max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
+
+
+class ModelConfig(BaseModel):
+    """Model configuration class for LLM tasks."""
+
+    # Model name
+    name: str = Field(description="The specific model to use for LLM tasks.")
+
+    # Model type
+    provider: str = Field(description="Type of the model to use (openai or insight).")
+
+    # Model parameters
+    temperature: float = Field(
+        default=0.7,
+        description="Temperature for the model's response generation.",
+    )
+    top_p: float = Field(
+        default=0.9,
+        description="Top-p sampling for the model's response generation.",
+    )
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ModelConfig":
+        """Create a ModelConfig instance from a dictionary."""
+        try:
+            return cls(**data)
+        except ValidationError as e:
+            raise ValueError(f"Invalid model configuration: {e}")
+
+
+class ModelType(BaseModel):
+    name: str
+    external: bool
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="allow"
+    )
+
+    insight_endpoint: str = Field(
+        default="https://mindrouter-api.nkn.uidaho.edu/v1",
+        description="Endpoint for the insight server.",
+    )
+
+    # Model configuration
+    # the model type to use, either openai or insight server (ollama)
+    # model_type = "insight" or "openai"
+    model_type: str = Field(
+        default="openai", description="Type of the model to use (openai or insight)."
+    )
+
+    base_model: str = Field(
+        default="openai/gpt-4o", description="The specific model to use for LLM tasks."
+    )
+    models: list[ModelType] = Field(
+        default=models,
+        description="List of available models for LLM tasks.",
+    )
+    # 128K is the max context length for the GPT-4o model
+    # we use less than this to be safe
+    max_context_length: int = Field(
+        default=max_length, description="Maximum context length for the model."
+    )
+
+    upload_compliance: str = Field(
+        default=upload_compliance,
+        description="Compliance guidelines for document uploads.",
+    )
+
+    openai_api_key: str
+    redis_host: str
+
+
+settings = Settings()

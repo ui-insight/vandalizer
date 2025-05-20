@@ -11,16 +11,19 @@ from langchain_redis import RedisCache
 from pydantic import create_model, BaseModel
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.agent import Agent
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
+
 
 from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
 from app.utilities.document_manager import DocumentManager
 from app.utilities.llm_helpers import remove_code_markers
-from app.utilities import config
+from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import asyncio
+from app.utilities.config import settings
 
 load_dotenv()
 
@@ -48,79 +51,117 @@ chat_prompt = "You are an assistant for question-answering tasks. Use the follow
 # @ model = OpenAIModel("gpt-4o")
 model = "openai:gpt-4o"
 
-rag_agent = Agent(
-    model,
-    deps_type=RagDeps,
-    system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
 
-When responding to queries:
-1. Carefully analyze the retrieved context documents for relevance to the query
-2. Synthesize information across multiple context fragments when appropriate
-3. Quote or paraphrase the retrieved information with precise attribution (e.g., "According to Document 1...")
-4. Maintain the original meaning and nuance from source documents
-5. Identify and reconcile any contradictions between different sources
-6. Distinguish between factual statements from the context and your own reasoning
+def get_agent_model(agent_model):
+    model_config = []
+    if "/" in agent_model:
+        # use insight server model
+        model_config = agent_model.split("/")
+    elif ":" in agent_model:
+        model_config = agent_model.split(":")
 
-Response guidelines:
-- Begin with a direct answer to the question when possible
-- Structure complex answers with clear headings or numbered points
-- Highlight key information using formatting when helpful
-- Include relevant examples or illustrations from the context
-- Acknowledge information gaps explicitly rather than extrapolating
-- If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
+    if len(model_config) == 1:
+        model_config = agent_model.split(":")
+    if len(model_config) != 2:
+        raise ValueError(
+            f"Invalid model configuration: {agent_model}. Expected format: <model_type>/<model_name>"
+        )
+    model_type, model_name = model_config[0], model_config[1]
+    if model_type == "openai":
+        # use openai model
+        model = OpenAIModel(
+            model_name=model_name,
+        )
+    else:
+        model = OpenAIModel(
+            model_name=model_name,
+            provider=OpenAIProvider(base_url=settings.insight_endpoint),
+        )
+    return model
 
-Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
-)
 
-chat_agent = Agent(
-    "openai:gpt-4o",
-    system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+def create_rag_agent(agent_model):
+    model = get_agent_model(agent_model)
 
-Your communication style:
-- Warm and approachable while maintaining professionalism
-- Concise but thorough - prioritize clarity over length
-- Personalized to the user's tone and level of formality
-- Balances helpfulness with respect for user autonomy
+    return Agent(
+        model,
+        deps_type=RagDeps,
+        system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
 
-When responding:
-1. Address the user's specific question or need first
-2. Provide relevant context or background when helpful
-3. If uncertain, acknowledge limitations rather than guessing
-4. For complex topics, break information into digestible segments
-5. Use natural, conversational language (contractions, varied sentence structure)
-6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+    When responding to queries:
+    1. Carefully analyze the retrieved context documents for relevance to the query
+    2. Synthesize information across multiple context fragments when appropriate
+    3. Quote or paraphrase the retrieved information with precise attribution (e.g., "According to Document 1...")
+    4. Maintain the original meaning and nuance from source documents
+    5. Identify and reconcile any contradictions between different sources
+    6. Distinguish between factual statements from the context and your own reasoning
 
-Content guidelines:
-- Cite sources for factual claims when possible
-- Present balanced perspectives on nuanced topics
-- Avoid unnecessary jargon unless the conversation indicates technical expertise
-- Respect privacy and security best practices
+    Response guidelines:
+    - Begin with a direct answer to the question when possible
+    - Structure complex answers with clear headings or numbered points
+    - Highlight key information using formatting when helpful
+    - Include relevant examples or illustrations from the context
+    - Acknowledge information gaps explicitly rather than extrapolating
+    - If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
 
-Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
-)
+    Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
+    )
 
-prompt_agent = Agent(
-    "openai:gpt-4o",
-    system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
 
-When generating search prompts:
-1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
-2. Include relevant synonyms and alternative phrasings to increase recall
-3. Remove conversational fillers and personal pronouns
-4. Prioritize domain-specific terminology when present
-5. Structure the prompt with the most important search terms first
-6. Include any contextual constraints (time periods, locations, etc.)
-7. Keep the prompt concise (under 100 words) but comprehensive
-8. Format technical terms precisely as they would appear in documentation
+def create_chat_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
 
-Do not:
-- Include explanations or reasoning in your response
-- Ask clarifying questions
-- Provide answers to the user's question
-- Include special operators or syntax unless specified
+    Your communication style:
+    - Warm and approachable while maintaining professionalism
+    - Concise but thorough - prioritize clarity over length
+    - Personalized to the user's tone and level of formality
+    - Balances helpfulness with respect for user autonomy
 
-Your output should be the search prompt only, with no additional text.""",
-)
+    When responding:
+    1. Address the user's specific question or need first
+    2. Provide relevant context or background when helpful
+    3. If uncertain, acknowledge limitations rather than guessing
+    4. For complex topics, break information into digestible segments
+    5. Use natural, conversational language (contractions, varied sentence structure)
+    6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+
+    Content guidelines:
+    - Cite sources for factual claims when possible
+    - Present balanced perspectives on nuanced topics
+    - Avoid unnecessary jargon unless the conversation indicates technical expertise
+    - Respect privacy and security best practices
+
+    Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
+    )
+
+
+def create_prompt_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        "openai:gpt-4o",
+        system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
+
+    When generating search prompts:
+    1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
+    2. Include relevant synonyms and alternative phrasings to increase recall
+    3. Remove conversational fillers and personal pronouns
+    4. Prioritize domain-specific terminology when present
+    5. Structure the prompt with the most important search terms first
+    6. Include any contextual constraints (time periods, locations, etc.)
+    7. Keep the prompt concise (under 100 words) but comprehensive
+    8. Format technical terms precisely as they would appear in documentation
+
+    Do not:
+    - Include explanations or reasoning in your response
+    - Ask clarifying questions
+    - Provide answers to the user's question
+    - Include special operators or syntax unless specified
+
+    Your output should be the search prompt only, with no additional text.""",
+    )
 
 
 class UploadResult(BaseModel):
@@ -128,11 +169,16 @@ class UploadResult(BaseModel):
     valid: bool
 
 
-upload_agent = Agent(
-    model,
-    system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
-    result_type=UploadResult,
-)
+def create_upload_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+        result_type=UploadResult,
+    )
+
+
+upload_agent = create_upload_agent("openai/gpt-4o")
 
 
 async def validate_document(document_path, document_text, chunk_size=8000):
@@ -148,9 +194,9 @@ async def validate_document(document_path, document_text, chunk_size=8000):
     if not text:
         text = extract_text_from_doc(document_path)
 
-    print("text: ", text)
+    debug("text: ", text)
 
-    compliance = config.upload_compliance
+    compliance = settings.upload_compliance
 
     chunked_text = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
     debug("number of chunks:", len(chunked_text))
@@ -199,23 +245,23 @@ async def validate_document(document_path, document_text, chunk_size=8000):
                 combined_feedback += item.feedback + "\n\n"
 
     # summarize the feedback
+    chat_agent = create_chat_agent(settings.base_model)
     feedback_summary = await chat_agent.run(
         f"Check if there are any valiation failure and summaryize them in the following: {combined_feedback}"
     )
 
     result = UploadResult(
         valid=is_valid,
-        feedback=feedback_summary.data,
+        feedback=feedback_summary.output,
     )
 
     debug("Final Validation Result:", result)
     return result
 
 
-chat_agent = Agent(
-    model,
-    system_prompt=chat_prompt,
-)
+rag_agent = create_rag_agent(model)
+
+prompt_agent = create_prompt_agent(model)
 
 
 @rag_agent.tool
@@ -236,10 +282,11 @@ def retrieve(
     """
     if docs_ids is None:
         docs_ids = []
+
     prompt_response = prompt_agent.run_sync(
         f"Generate a prompt for the following user question: {question}",
     )
-    prompt = prompt_response.data
+    prompt = prompt_response.output
     debug(prompt)
 
     results = context.deps.doc_manager.query_documents(
@@ -430,11 +477,17 @@ class ExtractionDeps:
 #     base_url="https://mindrouter-api.nkn.uidaho.edu",
 # )
 
-extraction_agent = Agent(
-    model,
-    deps_type=ExtractionDeps,
-    retries=3,
-)
+
+def create_extraction_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        deps_type=ExtractionDeps,
+        retries=3,
+    )
+
+
+extraction_agent = create_extraction_agent(model)
 
 
 @extraction_agent.system_prompt
@@ -529,7 +582,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         new_fields = field_inference_agent.run_sync(
             "Infer the types of the keys",
             deps=field_inference_deps,
-        ).data
+        ).output
 
         # Cache newly inferred fields individually
         for key, field_type in new_fields.items():
@@ -570,9 +623,9 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     try:
         debug(text)
         extraction = extractor_agent.run_sync(text, deps=extractor_deps)
-        debug(extraction.data)
+        debug(extraction.output)
 
-        result = extraction.data.model_dump_json(indent=2)
+        result = extraction.output.model_dump_json(indent=2)
         debug(result)
         # cache the result
         cache.update(cache_key, llm_string, [result])

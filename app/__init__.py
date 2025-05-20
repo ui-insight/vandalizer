@@ -16,6 +16,7 @@ from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
+
 from celery import Celery, Task
 
 CURRENT_RELEASE_VERSION = "2.0.2"  # Update this when you have a new release.
@@ -124,3 +125,5 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
+
+

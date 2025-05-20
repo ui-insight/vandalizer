@@ -5,14 +5,16 @@ from datetime import datetime
 from devtools import debug
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
-from app.utilities.agents import chat_agent
+from app.utilities.agents import create_chat_agent
 from app.utilities.redis_cache import RedisCache
+from app.utilities.config import settings
 
 # 2h
 ttl = 60 * 60 * 1
 cache = RedisCache(redis_url="redis://localhost:6379", ttl=ttl)
 
 from app.models import MAX_CHAT_MESSAGES
+from app.models import ModelConfig
 
 
 def chat_with_prompt(prompt: str, user_id=0) -> str:
@@ -60,6 +62,20 @@ def chat_with_prompt(prompt: str, user_id=0) -> str:
 
     previous_messages = parsed_messages
     debug(previous_messages)
+
+    model_config = ModelConfig.objects(user_id=user_id).first()
+    if model_config is not None:
+        # Use the model_config to set the model
+        model = model_config.name
+    else:
+        # Fallback to a default model if no config is found
+        model = settings.base_model
+
+    chat_agent=create_chat_agent(
+        model=model,
+        user_id=user_id,
+        cache=cache,
+    )
 
     answer = chat_agent.run_sync(
         prompt,

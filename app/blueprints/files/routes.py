@@ -104,7 +104,7 @@ def upload() -> ResponseReturnValue:
     document = SmartDocument(
         title=filename,
         processing=True,
-        valid=False,
+        valid=True,
         raw_text=raw_text,
         path=str(relative_file_path),
         extension=extension,
@@ -229,16 +229,19 @@ def delete_documents() -> ResponseReturnValue:
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
     if document:
-        document_manager = DocumentManager()
-        document_manager.delete_document(
-            user_id=session["user_id"],
-            document_id=document_uuid,
-        )
+        with DocumentManager() as document_manager:
+            try:
+                document_manager.delete_document(
+                    user_id=session["user_id"],
+                    document_id=document_uuid,
+                )
+            except Exception as e:
+                debug(e)
+                return jsonify({"error": str(e)}), 400
 
-        document_file_path = (
-            Path(current_app.root_path) / "static" / "uploads" / document.path
-        )
-        os.remove(document_file_path)
+        document_file_path = document.absolute_path
+        if os.path.exists(document_file_path):
+            os.remove(document_file_path)
 
         document.delete()
 

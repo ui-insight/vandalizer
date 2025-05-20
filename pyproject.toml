@@ -4,14 +4,13 @@ version = "2.0.0"
 description = "Vandalizer"
 authors = [{ name = "John Brunsfeld", email = "jbrunsfeld@uidaho.edu" }]
 readme = "README.md"
-requires-python = "<4.0,>=3.9"
+requires-python = "<4.0,>=3.12"
 dependencies = [
     "chardet",
     "chromadb",
     "datasets",
     "devtools",
     "dspy",
-    "fitz",
     "flask",
     "flask-bootstrap",
     "flask-cors",
@@ -53,6 +52,8 @@ dependencies = [
     "tiktoken",
     "wtforms",
     "celery>=5.5.1",
+    "pydantic-settings>=2.8.1",
+    "uillm",
 ]
 
 
@@ -85,6 +86,9 @@ commands = [["pytest"]]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
 TEST_BROWSER = "chrome"
+
+[tool.uv.sources]
+uillm = { git = "ssh://git@github.com/ui-insight/insight-helpers.git" }
 
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"

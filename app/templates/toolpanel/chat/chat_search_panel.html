@@ -2,7 +2,14 @@
      style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
     <div id="add-item-panel">
         <p style="font-size: 24px; font-weight: 600;">How can I help?</p>
-
+        <div style="display: flex; align-items: center; margin-top: 10px; margin-bottom: 10px;">
+            <a href="javascript:void(0);" id="model-text-icon" onclick="showModelModal()">
+                <span style="font-size: 1em">
+                    <i class="fa-solid fa-robot"></i>
+                    {{ current_model }}
+                </span>
+            </a>
+        </div>
         <div class="ask-question-container">
             <div class="ask-question">
                 <div class="w-full sticky bottom-0  mx-auto">
