@@ -1,17 +1,17 @@
-<div id="model-modal" class="modal" data-context="{{model}}" data-uuid="">
-    <div class="modal-content" style="min-height: 300px;">
-        <h3 style="position: absolute; top: 15px; left: 15px; font-weight: 600; padding-top: 5px; margin-top: 0px;">Model: {{currentModel}}</h3>
+<div id="model-modal" class="modal" data-context="{{current_model}}" data-uuid="">
+    <div class="modal-content" style="min-height: 150px;">
+        <h3 style="position: absolute; top: 15px; left: 15px; font-weight: 600; padding-top: 5px; margin-top: 0px;">Model: {{current_model}}</h3>
         <!-- Selection of model -->
-        <div style="position: absolute; top: 55px; left: 5px; font-weight: 600; padding-top: 5px; margin-top: 0px;">
+        <div style="position: absolute; top: 55px; left: 15px; font-weight: 600; padding-top: 5px; margin-top: 0px;">
             <select id="model-select" class="form-select" aria-label="Default select example"
-                    selected="{{currentModel}}"
+                    selected="{{current_model}}"
                     onchange="updateModel(this.value)">
             >
                 {% for model in models %}
-                    <option value="{{model.name}}" {% if model.name == currentModel %}selected{% endif %}>{{model.name}}</option>
+                    <option value="{{model.name}}" {% if model.name == current_model %}selected{% endif %}>{{model.name}}</option>
                 {% endfor %}
             </select>
-        <button id="closeModelModalBtn" class="btn btn-primary" style="position: absolute; top: 55px; left: 250px;">
+        <button id="closeModelModalBtn" class="btn btn-primary" style="position: absolute; top: 10px; left: 300px;">
                 Close</button>
     </div>
 </div>

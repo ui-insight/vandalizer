@@ -5,6 +5,8 @@ import openai
 from devtools import debug
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
+from app.utilities.llm import ChatLM
+
 import asyncio
 
 from app.models import (
@@ -137,6 +139,7 @@ class OpenAIInterface:
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
+        model,
         root_path,
         documents,
         question,
@@ -167,11 +170,6 @@ class OpenAIInterface:
         full_text = OpenAIInterface.get_full_text(documents, previous_messages)
         debug(max_context_length)
         debug(len(full_text))
-        model_config = ModelConfig.objects(user_id=user_id).first()
-        if model_config is not None:
-            model = model_config.name
-        else:
-            model = settings.base_model
 
         answer = None
 
@@ -212,11 +210,12 @@ class OpenAIInterface:
             except Exception as e:
                 debug("Error in rag chat", e)
 
+        debug(answer)
         chat_history = json.loads(answer.new_messages_json())
         cache.update(cache_key, llm_string, chat_history)
 
         return {
             "question": question,
-            "answer": remove_code_markers(answer.data),
-            "formatted_answer": remove_code_markers(answer.data),
+            "answer": remove_code_markers(answer.output),
+            "formatted_answer": remove_code_markers(answer.output),
         }

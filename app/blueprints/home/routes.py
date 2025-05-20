@@ -4,6 +4,8 @@ import os
 import uuid
 from itertools import chain
 from pathlib import Path
+import json
+from app import app
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
 from app.models import (
@@ -45,6 +47,26 @@ from flask_dance.contrib.azure import azure
 from mongoengine.queryset.visitor import Q
 
 from . import home
+
+
+@app.context_processor
+def inject_current_model():
+    """
+    Runs on *every* template render.  Looks up the user's ModelConfig,
+    and makes `current_model` available in all templates.
+    """
+    user = load_user()
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    models = [m.model_dump() for m in settings.models]
+    current_model = settings.base_model
+    if model_config:
+        current_model = model_config.name
+        if len(model_config.available_models) > 0:
+            models = json.loads(json.dumps(model_config.available_models))
+
+    debug(current_model)
+    debug(models)
+    return {"current_model": current_model, "models": models}
 
 
 def verify_document(document: SmartDocument, user_id: str) -> None:
@@ -264,25 +286,32 @@ def index() -> ResponseReturnValue:
     release_seen = request.cookies.get("release_seen")
     show_release_panel = release_seen != CURRENT_RELEASE_VERSION
 
-    user = load_user()
+    # user = load_user()
+    # models = []
 
-    model_config = ModelConfig.objects(
-        user_id=user.user_id,
-    ).first()
-    model = settings.base_model
-    if model_config is None:
-        model_config = ModelConfig(user_id=user.user_id, name=model)
-        model_config.available_models = [m.model_dump() for m in settings.models]
-        model_config.save()
+    # model_config = ModelConfig.objects(
+    #     user_id=user.user_id,
+    # ).first()
+    # model = settings.base_model
+    # settings_models = [m.model_dump() for m in settings.models]
+    # if model_config is None:
+    #     model_config = ModelConfig(user_id=user.user_id, name=model)
+    #     model_config.available_models = [m.model_dump() for m in settings.models]
+    #     model_config.save()
+    #     models = settings_models
+    # else:
+    #     if len(model_config.available_models) == 0:
+    #         models = settings_models
 
-    models = model_config.available_models
+    # debug(models)
+    # debug(settings.models)
 
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
         prompts=prompts,
-        models=models,
-        current_model=model,
+        # models=models,
+        # current_model=model,
         formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
@@ -351,9 +380,17 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
+    user = load_user()
+
     debug(documents)
     debug(docs)
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
     response = OpenAIInterface().ask_question_to_documents(
+        model,
         current_app.root_path,
         documents,
         message,

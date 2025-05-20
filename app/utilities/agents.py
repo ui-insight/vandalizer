@@ -61,10 +61,15 @@ def get_agent_model(agent_model):
         model_config = agent_model.split("/")
     elif ":" in agent_model:
         model_config = agent_model.split(":")
+    else:
+        return OpenAIModel(
+            model_name=agent_model,
+            provider=OpenAIProvider(base_url=settings.insight_endpoint),
+        )
 
     if len(model_config) == 1:
         model_config = agent_model.split(":")
-    if len(model_config) != 2:
+    elif len(model_config) != 2:
         raise ValueError(
             f"Invalid model configuration: {agent_model}. Expected format: <model_type>/<model_name>"
         )

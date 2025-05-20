@@ -34,66 +34,54 @@ from app import app
 from . import tasks
 
 
-@app.context_processor
-def inject_current_model():
-    """
-    Runs on *every* template render.  Looks up the user's ModelConfig,
-    and makes `current_model` available in all templates.
-    """
-    user = load_user()
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
-    debug(model_config)
-    if not model_config:
-        # fallback to your default
-        current = settings.base_model
-    else:
-        current = model_config.name
-    return {"current_model": current}
-
-
 @tasks.route("/model/filter", methods=["POST"])
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])
     debug(data)
     validation_failed = False
+    user = load_user()
+
+    settings_models = [m.model_dump() for m in settings.models]
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    current_model = settings.base_model
     if len(uuids) == 0:
-        return jsonify({"models": []})
+        if model_config:
+            current_model = model_config.name
+        return jsonify({"models": settings_models, "current_model": current_model})
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
         if not doc.valid:
             validation_failed = True
             break
-    user = load_user()
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
-    if not model_config:
-        model_config = ModelConfig(user_id=user.user_id, name=settings.base_model)
-        model_config.available_models = [m.model_dump() for m in settings.models]
-        debug(model_config)
-        model_config.save()
-
-    current_model = settings.base_model
     if validation_failed:
-        current_model = "llama3.3"
-        debug(model_config.available_models)
-        # filter out the external models
         config_models = [
             m for m in model_config.available_models if not m.get("external")
         ]
-        debug(config_models)
-        model_config.available_models = config_models
+        current_model = "llama3.3"
+        # filter out the external models
+        if model_config:
+            model_config.available_models = config_models
+            model_config.save()
+        else:
+            model_config = ModelConfig(user_id=user.user_id, name=current_model)
+            model_config.available_models = config_models
+            model_config.save()
     else:
-        if len(model_config.available_models) < len(settings.models):
-            model_config.available_models = [m.model_dump() for m in settings.models]
-            debug(model_config)
+        if not model_config:
+            model_config = ModelConfig(user_id=user.user_id, name=settings.base_model)
+            model_config.available_models = settings_models
+            model_config.save()
+        else:
+            current_model = model_config.name
 
-    debug(model_config.available_models)
+            model_config.available_models = settings_models
+            model_config.save()
 
-    model_config.save()
+    models = json.loads(json.dumps(model_config.available_models))
+    debug(current_model)
 
-    filtered_models = json.dumps(model_config.available_models)
-
-    return jsonify({"models": filtered_models, "current_model": current_model})
+    return jsonify({"models": models, "current_model": current_model})
 
 
 @tasks.route("/model/update", methods=["POST"])
@@ -118,7 +106,7 @@ def update_model() -> ResponseReturnValue:
         model_config.top_p = top_p
     model_config.save()
 
-    response = {"complete": True}
+    response = {"current_model": name}
     return jsonify(response)
 
 
@@ -456,7 +444,13 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     em = ExtractionManager3()
     em.root_path = current_app.root_path
-    keys = em.build_from_documents(document_uuids)
+
+    user = load_user()
+    model_config = ModelConfig.objects(user_id=user.user_id)
+    model = settings.base_model
+    if model_config is not None:
+        model = model_config.name
+    keys = em.build_from_documents(document_uuids, model)
 
     if "entities" in keys:
         bindings = keys["entities"]
@@ -550,7 +544,8 @@ def begin_prompt_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     items = search_set.items()
 
-    user_id = load_user().user_id
+    user = load_user()
+    user_id = user.user_id
 
     if len(items) > 0:
         llm = OpenAIInterface()

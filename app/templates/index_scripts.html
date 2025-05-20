@@ -119,52 +119,27 @@
         data: JSON.stringify({ uuids }),
         dataType: 'json',
         success: function (msg) {
+            const newModel = msg.current_model;
+            const models = msg.models;
+            // Update the modal's data-context so it's in sync
+            $('#model-modal').data('context', newModel);
 
-        let models = msg.models;
-        if (typeof models === "string") {
-            try {
-            models = JSON.parse(models);
-            } catch (e) {
-            console.error("Couldn’t JSON‐parse models:", models, e);
-            return;
-            }
-        }
-        console.log("models: ", models);
+            // Update the visible text in the UI
+            $('#current_selected_model').text(newModel);
 
-        // Safety: ensure this is really an Array
-        if (!Array.isArray(models)) {
-            console.error('Expected msg.models to be an array, got:', models);
-            try {
-            models = JSON.parse(models);
-            if (!Array.isArray(models)) {
-                console.error('Still not an array after parsing:', models);
-                return;
-            }
-            } catch (_) {
-            return;
-            }
-        }
 
-        // Remove exact duplicates by name
-        const seen = new Set();
-        models = models.filter(m => {
-            if (seen.has(m.name)) return false;
-            seen.add(m.name);
-            return true;
-        });
+            const $modelSelect = $('#model-select');
+            $modelSelect.empty(); // clear existing options
 
-        // Grab current selected model from the modal’s data-context
-        const currentModel = $('#model-modal').data('context');
+            models.forEach(model => {
+                const option = $('<option>', {
+                    value: model.name,
+                    text: model.name,
+                    selected: model.name === newModel
+                });
+                $modelSelect.append(option);
+            });
 
-        // Build all <option> tags in one go
-        const optionsHtml = models
-            .map(m => {
-            const sel = m.name === currentModel ? ' selected' : '';
-            return `<option value="${m.name}"${sel}>${m.name}</option>`;
-            })
-            .join('');
-
-        $('#model-select').html(optionsHtml);
         },
         error: function (xhr, status, err) {
         console.error('Error filtering models:', status, err);

@@ -22,6 +22,8 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
+from app.utilities.config import settings
+
 from app.models import (
     SearchSet,
     SearchSetItem,
@@ -33,6 +35,7 @@ from app.models import (
     WorkflowResult,
     WorkflowStep,
     WorkflowStepTask,
+    ModelConfig,
 )
 from app.models import User, Space, WorkflowAttachment
 from app.utils import load_user
@@ -137,6 +140,11 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
+    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
     workflow_id = str(workflow.id)
     workflow_result_id = str(workflow_result.id)
     workflow_trigger_step_id = str(document_trigger_step.id)
@@ -145,6 +153,7 @@ def run_workflow() -> ResponseReturnValue:
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
+        model=model,
     )
     print("Async result", async_result)
     workflow_output = async_result.get(timeout=600)

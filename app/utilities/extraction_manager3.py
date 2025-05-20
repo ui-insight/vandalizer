@@ -4,7 +4,7 @@ import openai
 import json
 from app.utilities.agents import extract_entities_with_agent
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.config import model_type
+from app.utilities.config import settings
 from app.utilities.llm import ChatLM
 from app.models import SmartDocument
 
@@ -14,7 +14,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 class ExtractionManager3:
     root_path = ""
 
-    def build_from_documents(self, document_uuids):
+    def build_from_documents(self, document_uuids, model):
         openai.api_key = OPENAI_API_KEY
         doc_text = ""
         time.time()
@@ -33,7 +33,7 @@ class ExtractionManager3:
 
         model = "gpt-4o"
 
-        chat_lm = ChatLM(model_type)
+        chat_lm = ChatLM(model)
         output = chat_lm.completion(
             model=model,
             response_format={"type": "json_object"},

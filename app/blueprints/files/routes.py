@@ -215,6 +215,7 @@ def download_document() -> ResponseReturnValue:
     return send_file(document_file_path, as_attachment=True)
 
 
+@files.route("/delete_document")
 def delete_document() -> ResponseReturnValue:
     """Delete a document record and its file, but never crash the server."""
     doc_id = request.args.get("docid")
@@ -229,7 +230,7 @@ def delete_document() -> ResponseReturnValue:
     # 1) Delete via manager (e.g. remove metadata/storage)
     try:
         DocumentManager().delete_document(
-            user_id=session.get("user_id"), document_id=doc_id
+            user_id=session.get("user_id"), document_id=doc_id  # noqa: COM812
         )
     except Exception as e:
         current_app.logger.error(f"[delete_document] manager error: {e}")
