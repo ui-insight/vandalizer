@@ -1,7 +1,6 @@
 import sys
 
 import pypandoc
-from flask import current_app
 
 from app.models import SmartDocument
 
@@ -11,12 +10,9 @@ try:
     sys.modules["sqlite3"] = pysqlite3
 except ImportError:
     pass
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
-
-from app.utilities.excel_helper import save_excel_to_html
 
 import chromadb
 from chromadb.config import Settings
@@ -32,7 +28,7 @@ from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
 )
-import os
+from app.utilities.excel_helper import save_excel_to_html
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
@@ -88,7 +84,6 @@ def perform_extraction_and_update(document_uuid, extension):
 @celery_app.task
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    document.processing = False
     document.task_id = None
     document.save()
 
@@ -121,7 +116,6 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
             doc_path=document_path,
             raw_text=raw_text,
         )
-    document.processing = False
     document.save()
     return document.uuid
 
