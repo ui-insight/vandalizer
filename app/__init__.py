@@ -152,5 +152,5 @@ with app.app_context():
 
 me.connect(
     app.config["MONGO_DB"],
-    host=os.getenv("MONGO_HOST", "mongodb://localhost:27018/").lower(),
+    host=os.getenv("MONGO_HOST", "mongodb://localhost:27017/").lower(),
 )
