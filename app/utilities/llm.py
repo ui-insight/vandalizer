@@ -4,10 +4,11 @@ from datetime import datetime
 
 import openai
 import requests
-from openai import OpenAI
-from app.models import ModelConfig
-from devtools import debug
 import tiktoken
+from devtools import debug
+from openai import OpenAI
+
+from app.models import UserModelConfig
 
 
 class ChatLM:
@@ -18,7 +19,7 @@ class ChatLM:
             model_type, model_name = model.split("/")
         else:
             if user_id is not None:
-                model_config = ModelConfig.objects.first(user=user_id)
+                model_config = UserModelConfig.objects.first(user=user_id)
                 self.model = model_config.name
                 if model_config is not None:
                     model_type, model_name = model_config.name.split("/")

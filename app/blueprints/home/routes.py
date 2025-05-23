@@ -1,36 +1,10 @@
 """Handles primary routing for the home page and related functionalities."""
 
+import json
 import os
 import uuid
 from itertools import chain
-from pathlib import Path
-import json
-from app import app
 
-from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
-from app.models import (
-    SearchSet,
-    SearchSetItem,
-    SmartDocument,
-    SmartFolder,
-    Space,
-    Workflow,
-    WorkflowStep,
-)
-from app.utilities.config import settings, ModelConfig
-from app.utilities.document_manager import (
-    DocumentManager,
-    perform_extraction_and_update,
-    perform_semantic_ingestion,
-    cleanup_document,
-    update_document_fields,
-)
-from app.utilities.upload_manager import (
-    perform_document_validation,
-)
-from app.models import ModelConfig
-from app.utilities.openai_interface import OpenAIInterface
-from app.utils import is_dev, load_user
 from devtools import debug
 from flask import (
     current_app,
@@ -46,6 +20,28 @@ from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
 from mongoengine.queryset.visitor import Q
 
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
+from app.models import (
+    SearchSet,
+    SearchSetItem,
+    SmartDocument,
+    SmartFolder,
+    Space,
+    UserModelConfig,
+    Workflow,
+    WorkflowStep,
+)
+from app.utilities.config import settings
+from app.utilities.document_manager import (
+    perform_extraction_and_update,
+    perform_semantic_ingestion,
+)
+from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
+from app.utils import is_dev, load_user
+
 from . import home
 
 
@@ -56,7 +52,7 @@ def inject_current_model():
     and makes `current_model` available in all templates.
     """
     user = load_user()
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     models = [m.model_dump() for m in settings.models]
     current_model = settings.base_model
     if model_config:
@@ -79,7 +75,6 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     if not document.raw_text or document.raw_text == "":
         # check if there is a task running
         if not document.task_id:
-            document.processing = True
             extraction_task = perform_extraction_and_update.s(
                 document_uuid=document.uuid, extension=extension
             )
@@ -384,7 +379,7 @@ def chat() -> ResponseReturnValue:
 
     debug(documents)
     debug(docs)
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name

@@ -1,28 +1,23 @@
+import asyncio
 import json
 import os
 
 import openai
 from devtools import debug
+from dotenv import load_dotenv
 from pydantic_ai.messages import ModelMessagesTypeAdapter
-
-from app.utilities.llm import ChatLM
-
-import asyncio
 
 from app.models import (
     MAX_CHAT_MESSAGES,
+    UserModelConfig,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm import ChatLM, remove_code_markers
+from app.utilities.llm import remove_code_markers
 from app.utilities.redis_cache import RedisCache
-from app.models import ModelConfig
-
-from dotenv import load_dotenv
-
 
 load_dotenv()
 
@@ -67,7 +62,7 @@ class OpenAIInterface:
             )
 
         model = settings.base_model
-        model_config = ModelConfig.objects(user_id=item.user_id).first()
+        model_config = UserModelConfig.objects(user_id=item.user_id).first()
         if model_config is not None:
             model = model_config.name
         chat_agent = create_chat_agent(model)

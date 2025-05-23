@@ -18,7 +18,7 @@ from pypdf import PdfReader
 from app import app
 
 
-class ModelConfig(me.Document):
+class UserModelConfig(me.Document):
     """User configuration model. Represents user-specific settings."""
 
     user_id = me.StringField(required=True, max_length=200)

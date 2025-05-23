@@ -117,7 +117,6 @@ def upload() -> ResponseReturnValue:
     )
 
     document.validating = True
-    document.processing = False
     document.save()
 
     validation_task = perform_document_validation.s(

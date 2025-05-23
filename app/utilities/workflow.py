@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import asyncio
-
 import graphlib
 import json
-
 import multiprocessing
 import os
 import re
@@ -17,20 +15,19 @@ from dotenv import load_dotenv
 
 from app import app
 from app.celery_worker import celery_app
-from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult
-from app.utilities.document_readers import extract_text_from_doc
+from app.models import (
+    SearchSet,
+    SmartDocument,
+    Workflow,
+    WorkflowResult,
+    WorkflowStep,
+)
+from app.utilities.agents import create_chat_agent
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-from app.utilities.config import settings
-from app.models import ModelConfig
-
-
-from app.models import SmartDocument, SearchSet, Workflow, WorkflowResult, WorkflowStep
-from app.utilities.agents import create_chat_agent
-
 
 load_dotenv()
 

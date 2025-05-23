@@ -5,7 +5,6 @@ import os
 import tempfile
 import uuid
 from itertools import chain
-from devtools import debug
 
 import pypandoc
 from bson import ObjectId
@@ -22,30 +21,23 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
 
-from app.utilities.config import settings
-
 from app.models import (
     SearchSet,
     SearchSetItem,
     SmartDocument,
     Space,
     User,
+    UserModelConfig,
     Workflow,
     WorkflowAttachment,
     WorkflowResult,
     WorkflowStep,
     WorkflowStepTask,
-    ModelConfig,
 )
-from app.models import User, Space, WorkflowAttachment
-from app.utils import load_user
-from copy import deepcopy
-import os, uuid
-from app.utilities.workflow import execute_workflow_task
-from werkzeug.utils import secure_filename
-import pypandoc, json
-from bson import ObjectId
+from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.workflow import execute_workflow_task
+from app.utils import load_user
 
 from . import workflows
 
@@ -140,7 +132,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name

@@ -65,7 +65,7 @@ def perform_extraction_and_update(document_uuid, extension):
 
         else:
             # For other file types, use the generic text extraction
-            raw_text = extract_text_from_doc(document.absolute_path)
+            raw_text = extract_text_from_doc(document.absolute_path, doc=document)
 
         document.raw_text = raw_text
         debug(
@@ -73,6 +73,7 @@ def perform_extraction_and_update(document_uuid, extension):
             document.title,
             document.raw_text[:100],
         )
+        document.processing = False
         document.save()
     except Exception:
         document.raw_text = ""

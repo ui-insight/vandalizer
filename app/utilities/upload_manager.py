@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 
-from app.celery_worker import celery_app
-from app.models import SmartDocument
-from devtools import debug
-from app.utilities.agents import validate_document
-import time
-from celery.result import AsyncResult
-from celery import chord, group
 import asyncio
-from app.utilities.agents import upload_agent, create_chat_agent
-from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.config import settings
-from app.models import ModelConfig
+
+from celery import chord
+from devtools import debug
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-import asyncio
+from app.celery_worker import celery_app
+from app.models import SmartDocument
+from app.utilities.agents import create_chat_agent, upload_agent
+from app.utilities.config import settings
+from app.utilities.document_readers import extract_text_from_doc
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=5)
@@ -72,7 +68,8 @@ def summarize_results(results: list, document_uuid: str) -> dict:
 
 Validation feedback:
 {combined}
-"""))
+""")
+    )
 
     # Persist to DB
     doc = SmartDocument.objects(uuid=document_uuid).first()

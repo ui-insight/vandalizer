@@ -1,7 +1,7 @@
 import csv
+import json
 import os
 import uuid
-import json
 from copy import deepcopy
 from pathlib import Path
 
@@ -19,17 +19,11 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument, ModelConfig
+from app.models import SearchSet, SearchSetItem, SmartDocument
+from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import load_user
-from app.utilities.config import settings
-
-from flask import g
-from app.utils import load_user
-from app.utilities.config import settings
-from app.models import ModelConfig
-from app import app
 
 from . import tasks
 
@@ -43,7 +37,7 @@ def filter_models() -> ResponseReturnValue:
     user = load_user()
 
     settings_models = [m.model_dump() for m in settings.models]
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     current_model = settings.base_model
     if len(uuids) == 0:
         if model_config:
@@ -64,12 +58,14 @@ def filter_models() -> ResponseReturnValue:
             model_config.available_models = config_models
             model_config.save()
         else:
-            model_config = ModelConfig(user_id=user.user_id, name=current_model)
+            model_config = UserModelConfig(user_id=user.user_id, name=current_model)
             model_config.available_models = config_models
             model_config.save()
     else:
         if not model_config:
-            model_config = ModelConfig(user_id=user.user_id, name=settings.base_model)
+            model_config = UserModelConfig(
+                user_id=user.user_id, name=settings.base_model
+            )
             model_config.available_models = settings_models
             model_config.save()
         else:
@@ -95,9 +91,9 @@ def update_model() -> ResponseReturnValue:
 
     user = load_user()
 
-    model_config = ModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config is None:
-        model_config = ModelConfig(
+        model_config = UserModelConfig(
             user_id=user.user_id, name=name, temperature=temperature, top_p=top_p
         )
     else:
@@ -446,7 +442,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
     em.root_path = current_app.root_path
 
     user = load_user()
-    model_config = ModelConfig.objects(user_id=user.user_id)
+    model_config = UserModelConfig.objects(user_id=user.user_id)
     model = settings.base_model
     if model_config is not None:
         model = model_config.name
