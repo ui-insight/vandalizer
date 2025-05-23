@@ -18,8 +18,6 @@ from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
-from .uillm.uillm import UILLM
-
 CURRENT_RELEASE_VERSION = "2.1.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
 Release 2.1.1:
@@ -60,8 +58,6 @@ def create_app() -> Flask:
     celery_init_app(app)
     return app
 
-
-UILLM.ask_question("hello world")
 
 app = create_app()
 
