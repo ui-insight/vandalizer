@@ -9,6 +9,7 @@ dependencies = [
     "chardet",
     "chromadb",
     "datasets",
+    "gunicorn",
     "devtools",
     "flask",
     "flask-bootstrap",
@@ -43,7 +44,6 @@ dependencies = [
     "pypandoc",
     "pypdf",
     "PyPDF2",
-    # "pysqlite3",
     "python-dotenv",
     "redis",
     "requests",
@@ -54,6 +54,9 @@ dependencies = [
     "uillm",
     "celery>=5.5.2",
     "pypandoc-binary>=1.15",
+    "easyocr>=1.7.2",
+    "pdf2image>=1.17.0",
+    "pytesseract>=0.3.13",
 ]
 
 

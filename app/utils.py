@@ -27,11 +27,8 @@ def load_user():
 
 
 def is_dev() -> bool:
-    if "prod" in os.uname().nodename:
-        return False
-    if "dev" in os.uname().nodename:
-        return True
-    return True
+    env = os.getenv("FLASK_ENV", "development").lower()
+    return env != "production"
 
 
 def ingest_semantics(document, user_id) -> None:
