@@ -11,12 +11,14 @@ import mongoengine as me
 import rollbar
 import rollbar.contrib.flask
 from celery import Celery, Task
+from dotenv import load_dotenv
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
-from dotenv import load_dotenv
+
+from .uillm.uillm import UILLM
 
 CURRENT_RELEASE_VERSION = "2.1.1"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -58,6 +60,8 @@ def create_app() -> Flask:
     celery_init_app(app)
     return app
 
+
+UILLM.ask_question("hello world")
 
 app = create_app()
 
@@ -150,4 +154,7 @@ with app.app_context():
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
 
 
-me.connect(app.config["MONGO_DB"])
+me.connect(
+    app.config["MONGO_DB"],
+    host=os.getenv("MONGO_HOST", "mongodb://localhost:27018/").lower(),
+)

@@ -1,0 +1,56 @@
+services:
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - '6379:6379'
+    networks:
+      - vandalizer
+  mongo:
+    image: mongo:latest
+    ports:
+      - '27018:27017'
+    networks:
+      - vandalizer
+  celery:
+    build:
+      context: .
+      dockerfile: Celery.Containerfile
+    depends_on:
+      - redis
+      - mongo
+    env_file: .env
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_HOST=mongodb://mongo:27017
+    networks:
+      - vandalizer
+    volumes:
+      - /tmp/vandalizer:/app/static/uploads
+
+  web:
+    build:
+      context: .
+      dockerfile: Web.Containerfile
+    ports:
+      - '8000:8000'
+    depends_on:
+      - redis
+      - mongo
+      - celery
+    env_file: .env
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_HOST=mongodb://mongo:27017
+      - FLASK_ENV=development
+    networks:
+      - vandalizer
+    volumes:
+      - /tmp/vandalizer:/app/static/uploads
+
+networks:
+  vandalizer: 
+    external: false
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.20.0.0/24
