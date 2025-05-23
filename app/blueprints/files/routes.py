@@ -6,7 +6,6 @@ import os
 import uuid
 from pathlib import Path
 
-import pypandoc
 from devtools import debug
 from flask import (
     abort,
@@ -25,21 +24,16 @@ from pypdf import PdfReader
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
 from app.utilities.document_manager import (
     DocumentManager,
+    cleanup_document,
     perform_extraction_and_update,
     perform_semantic_ingestion,
-    cleanup_document,
     update_document_fields,
 )
-from app.utilities.document_readers import (
-    extract_text_from_doc,
-    extract_text_from_html,
-)
-from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.fillable_pdf_manager import FillablePDFManager
-from app.utils import load_user
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
+from app.utils import load_user
 
 from . import files
 
@@ -122,10 +116,17 @@ def upload() -> ResponseReturnValue:
         extension=extension,
     )
 
+    document.validating = True
+    document.processing = False
+    document.save()
+
     validation_task = perform_document_validation.s(
         document_uuid=document.uuid,
         document_path=str(file_path),
     )
+
+    document.validating = False
+    document.save()
 
     ingestion_task = perform_semantic_ingestion.s(
         document.uuid,
@@ -230,7 +231,8 @@ def delete_document() -> ResponseReturnValue:
     # 1) Delete via manager (e.g. remove metadata/storage)
     try:
         DocumentManager().delete_document(
-            user_id=session.get("user_id"), document_id=doc_id  # noqa: COM812
+            user_id=session.get("user_id"),
+            document_id=doc_id,  # noqa: COM812
         )
     except Exception as e:
         current_app.logger.error(f"[delete_document] manager error: {e}")

@@ -6,7 +6,6 @@ import json
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 import mongoengine as me
 from pydantic_ai.messages import (
@@ -112,6 +111,7 @@ class SmartDocument(me.Document):
 
     path = me.StringField(required=True, max_length=200)
     processing = me.BooleanField(default=False)
+    validating = me.BooleanField(default=False)
     valid = me.BooleanField(default=True)
     validation_feedback = me.StringField(required=False, max_length=5000)
     task_id = me.StringField(
@@ -121,8 +121,7 @@ class SmartDocument(me.Document):
     raw_text = me.StringField(required=True, default="")
     extension = me.StringField(default="pdf", max_length=10)
     task_id = me.StringField(
-        default=None,
-        required=False, max_length=200
+        default=None, required=False, max_length=200
     )  # Celery task ID for processing
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
