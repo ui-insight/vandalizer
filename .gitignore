@@ -1,3 +1,4 @@
+uv.lock
 app/static/fillable_form.pdf
 app/static/temp/*
 venv/*
