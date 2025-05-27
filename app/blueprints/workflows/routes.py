@@ -5,7 +5,6 @@ import os
 import tempfile
 import uuid
 from itertools import chain
-from devtools import debug
 
 import pypandoc
 from bson import ObjectId
@@ -34,15 +33,9 @@ from app.models import (
     WorkflowStep,
     WorkflowStepTask,
 )
-from app.models import User, Space, WorkflowAttachment
-from app.utils import load_user
-from copy import deepcopy
-import os, uuid
-from app.utilities.workflow import execute_workflow_task
-from werkzeug.utils import secure_filename
-import pypandoc, json
-from bson import ObjectId
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.workflow import execute_workflow_task
+from app.utils import load_user
 
 from . import workflows
 
@@ -71,15 +64,36 @@ def add_workflow() -> ResponseReturnValue:
     )
 
 
-@workflows.route("/delete_workflow", methods=["GET"])
+@workflows.route("/edit", methods=["POST"])
+def edit_workflow() -> ResponseReturnValue:
+    """Edit an existing prompt."""
+    data = request.get_json()
+    uuid = data["uuid"]
+    load_user()
+    workflow = Workflow.objects(id=uuid).first()
+
+    template = render_template(
+        "workflows/edit_workflow.html",
+        workflow=workflow,
+    )
+    response = {
+        "template": template,
+    }
+
+    return jsonify(response)
+
+
+@workflows.route("/delete", methods=["POST"])
 def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
     user = load_user()
     if user is None:
         return redirect(url_for("login"))
-    workflow_id = request.args.get("workflow_id")
-    Workflow.objects(id=workflow_id).delete()
-    return redirect("/home?section=Workflows")
+    data = request.get_json()
+    uuid = data["uuid"]
+    print(uuid)
+    Workflow.objects(id=uuid).delete()
+    return {"success": True}
 
 
 @workflows.route("/update_workflow", methods=["POST"])
@@ -94,7 +108,7 @@ def update_workflow() -> ResponseReturnValue:
     workflow.name = workflow_data["name"]
     workflow.description = workflow_data["description"]
     workflow.save()
-    return redirect("/home?section=Workflows")
+    return {"success": True}
 
 
 @workflows.route("/workflow/run", methods=["POST"])

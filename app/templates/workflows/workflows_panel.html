@@ -1,40 +1,80 @@
 <div class="tab-content" id="workflows-panel" style="{% if section != 'Workflows' %}display: none;{% endif %}">
     <div id="search-set-panel" style="margin: 0px 30px 30px 30px; text-align: left;">
         <p style="font-size: 24px; font-weight: 600;">Workflows</p>
-        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class=""><i>Workflows perform a series of tasks on your selected documents, and output to different formats.</i></p>
-        
+        <p style="font-size: 12px; font-weight: 300; color: #00000077;" class=""><i>Workflows perform a series of tasks
+                on your selected documents, and output to different formats.</i></p>
+
         <div class="search-set-container" style="padding: 15px 0px;">
             {% for workflow in workflows %}
             <div class="expandable-container">
                 <div class="workflow-item" data-uuid="{{ workflow.id }}" data-title="{{ workflow.title }}">
                     <div class="set-content">
-                
+
                         <span style="float: left; font-size: 1em; color: #191919;">
                             <i class="fa-solid fa-chevron-right"></i>
-                        </span>                        
+                        </span>
 
                         <p class="set-title"
                             style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
-                        
-                            {{
-                            workflow.name }}</p>
-                            <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: right; text-align: right; color: #0000007d; font-size: 12px; font-weight: 300;">
-                        
-                            {{
-                            workflow.description }}</p>
+
+                            <b>{{
+                                workflow.name }}</b>
+                            <br>
+                            <span style="color: #000000a2; font-weight: 500; font-size: 12px;">{{
+                                workflow.description }}</span>
+                        </p>
+                        <p class="set-title"
+                            style="margin-left: 5px; padding: 0px 10px; float: left; text-align: left; color: #0000007d; font-size: 12px; font-weight: 300;">
+
+                        </p>
 
                         <p class="set-items" style="text-align: right; ">
+                        <p class="set-items" style="text-align: right; ">
+                            <a class="edit-workflow-button" style="color: #adadad99;" data-uuid="{{workflow.id}}"
+                                data-type="workflow">
+                                <span><i class="fa-regular fa-pen-to-square"></i></span></a>
 
+                        </p>
                         </p>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
-
-        
-
-        
     </div>
 </div>
+
+<script>
+    $(".edit-workflow-button").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("here");
+        $("#add-task-container").hide();
+        let uuid = $(this).attr("data-uuid");
+        const data = JSON.stringify({
+            uuid: uuid,
+        });
+
+        $.ajax({
+            url: '/workflows/edit',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                console.log(data.template);
+                $("#search-results-panel").show();
+                $("#search-results-panel").empty();
+                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    });
+
+
+</script>
