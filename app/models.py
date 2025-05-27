@@ -129,7 +129,7 @@ class SmartDocument(me.Document):
     @property
     def absolute_path(self) -> Path:
         """Returns the absolute path to the document file."""
-        return Path(app.root_path) / "static" / "uploads" / self.path
+        return Path(app.root_path) / "static" / "uploads" / self.user_id / self.path
 
     def time_ago_in_words(self) -> str:
         """Returns a human-readable string representing the time elapsed since the document was created."""

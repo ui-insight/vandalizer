@@ -1,30 +1,8 @@
 """Handles primary routing for the home page and related functionalities."""
 
-import os
 import uuid
 from itertools import chain
-from pathlib import Path
 
-from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
-from app.models import (
-    SearchSet,
-    SearchSetItem,
-    SmartDocument,
-    SmartFolder,
-    Space,
-    Workflow,
-    WorkflowStep,
-)
-from app.utilities.config import max_context_length
-from app.utilities.document_manager import (
-    DocumentManager,
-    perform_extraction_and_update,
-    perform_semantic_ingestion,
-    cleanup_document,
-    update_document_fields,
-)
-from app.utilities.openai_interface import OpenAIInterface
-from app.utils import is_dev, load_user
 from devtools import debug
 from flask import (
     current_app,
@@ -39,6 +17,26 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
 from mongoengine.queryset.visitor import Q
+
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
+from app.models import (
+    SearchSet,
+    SearchSetItem,
+    SmartDocument,
+    SmartFolder,
+    Space,
+    Workflow,
+    WorkflowStep,
+)
+from app.utilities.config import max_context_length
+from app.utilities.document_manager import (
+    cleanup_document,
+    perform_extraction_and_update,
+    perform_semantic_ingestion,
+    update_document_fields,
+)
+from app.utilities.openai_interface import OpenAIInterface
+from app.utils import is_dev, load_user
 
 from . import home
 
@@ -302,33 +300,33 @@ def chat() -> ResponseReturnValue:
         if document is not None:
             documents.append(document)
             # find related html documents (excel converted to html)
-            if document.extension == "html":
-                html_files = [
-                    f
-                    for f in os.listdir(
-                        os.path.join(
-                            current_app.root_path,
-                            "static",
-                            "uploads",
-                            user_id,
-                        ),
-                    )
-                    if f.startswith(document.uuid)
-                    and f != document.path
-                    and f.endswith(".html")
-                ]
+            # if document.extension == "html":
+            #     html_files = [
+            #         f
+            #         for f in os.listdir(
+            #             os.path.join(
+            #                 current_app.root_path,
+            #                 "static",
+            #                 "uploads",
+            #                 user_id,
+            #             ),
+            #         )
+            #         if f.startswith(document.uuid)
+            #         and f != document.path
+            #         and f.endswith(".html")
+            #     ]
 
-                for html_file in html_files:
-                    html_doc = SmartDocument(
-                        title=document.title,
-                        path=html_file,
-                        extension="html",
-                        uuid=uuid.uuid4().hex,
-                        user_id=user_id,
-                        space=document.space,
-                        folder=document.folder,
-                    )
-                    documents.append(html_doc)
+            #     for html_file in html_files:
+            #         html_doc = SmartDocument(
+            #             title=document.title,
+            #             path=html_file,
+            #             extension="html",
+            #             uuid=uuid.uuid4().hex,
+            #             user_id=user_id,
+            #             space=document.space,
+            #             folder=document.folder,
+            #         )
+            #         documents.append(html_doc)
 
     debug("Documents", [document.extension for document in documents])
     # default context docs
