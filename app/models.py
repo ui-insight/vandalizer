@@ -8,6 +8,7 @@ from enum import Enum
 from pathlib import Path
 
 import mongoengine as me
+from mongoengine import CASCADE
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -51,7 +52,9 @@ class WorkflowStep(me.Document):
     """Workflow step model. Represents a step within a workflow."""
 
     name = me.StringField(required=True, max_length=50)
-    tasks = me.ListField(me.ReferenceField(WorkflowStepTask))
+    tasks = me.ListField(
+        me.ReferenceField(WorkflowStepTask, reverse_delete_rule=CASCADE),
+    )
 
     data = me.DictField(required=False)
 
@@ -81,8 +84,12 @@ class Workflow(me.Document):
     user_id = me.StringField(required=True, max_length=200)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
-    steps = me.ListField(me.ReferenceField(WorkflowStep))
-    attachments = me.ListField(me.ReferenceField(WorkflowAttachment))
+    steps = me.ListField(
+        me.ReferenceField(WorkflowStep, reverse_delete_rule=CASCADE),
+    )
+    attachments = me.ListField(
+        me.ReferenceField(WorkflowAttachment, reverse_delete_rule=CASCADE),
+    )
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
 

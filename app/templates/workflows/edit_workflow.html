@@ -1,0 +1,94 @@
+<div class="search-results-content">
+    <h2 class="search-results-header ">
+        <span id="extractionTitle">Edit Workflow</span>
+        <span style="float: right; font-size: 1em; color: #191919;">
+            <a id="edit-prompt-close-button">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </span>
+    </h2>
+
+    <!-- Description -->
+    <hr>
+    <p style="font-size: 12px; font-weight: 300; color: #00000077;"
+        class="doc-selected-counter workflow-modal-subtitle">
+    <div style="margin: 0px 30px; padding: 15px 0px;">
+        <input style="width: 100%; padding: 15px; height: 50px;" type="text" id="newWorkflowName"
+            placeholder="Name your workflow" value="{{ workflow.name }}">
+    </div>
+    </p>
+    <div class="search-results-content-body">
+        <div style="padding-bottom: 15px; width: 100%;">
+            <textarea id="newWorkflowDescription" placeholder="A one sentence description of the workflow's purpose."
+                rows="10"> {{ workflow.description }}</textarea>
+        </div>
+
+        <a class="btn btn-primary" id="update-workflow-button" data-uuid="{{ workflow.id }}"
+            style="float: right;">UPDATE WORKFLOW</a>
+        <a class="btn btn-secondary" id="delete-workflow-button" data-uuid="{{ workflow.id }}"
+            style="float: right; margin-right: 15px;">DELETE</a>
+    </div>
+
+    <script>
+        $('#edit-prompt-close-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            $("#search-results-panel").hide();
+            $("#search-results-panel").empty();
+        });
+
+        $('#update-workflow-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                workflow_id: uuid,
+                name: $('#newWorkflowName')[0].value,
+                description: $('#newWorkflowDescription')[0].value
+            });
+
+            $.ajax({
+                url: '/workflows/update_workflow',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    location.href = "/home?section=Workflows"
+
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $('#delete-workflow-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                uuid: uuid,
+            });
+
+            $.ajax({
+                url: '/workflows/delete',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    location.href = "/home?section=Workflows"
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+    </script>
+
+</div>

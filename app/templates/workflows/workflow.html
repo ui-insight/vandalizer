@@ -1,18 +1,18 @@
-
 <div class="workflow-container">
     <div>
-    <p style="font-size: 24px; font-weight: 600;">
-        <span id="workflowTitle">{{ workflow.name }}<i class="fa-regular fa-pen-to-square" id="editWorkflowTitleBtn" style="margin-left: 7.5px; padding-bottom: 5px; font-size: 14px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
-        <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
-        
-    
-        <span id="workflow-close-button" style="float: right; font-size: 1em; color: #191919;">
-            <a>
-                <i class="fa-solid fa-circle-xmark"></i>
-            </a>
-        </span>
-    </p>
-</div>
+        <p style="font-size: 24px; font-weight: 600;">
+            <span id="workflowTitle">{{ workflow.name }}<i class="fa-regular fa-pen-to-square" id="editWorkflowTitleBtn"
+                    style="margin-left: 7.5px; padding-bottom: 5px; font-size: 14px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
+            <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
+
+
+            <span id="workflow-close-button" style="float: right; font-size: 1em; color: #191919;">
+                <a>
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </a>
+            </span>
+        </p>
+    </div>
     <div class="trigger">Trigger</div>
 
     <div class="workflow-step active">
@@ -22,7 +22,8 @@
             </div>
             <div class="step-header">
                 <span>Documents Selected</span>
-                <span class="attachment-info"><span class="doc-selected-counter">None selected</span> <span>+ {{ workflow.attachments|length }} attached</span></span>
+                <span class="attachment-info"><span class="doc-selected-counter">None selected</span> <span>+ {{
+                        workflow.attachments|length }} attached</span></span>
             </div>
             <div class="step-icon edit-workflow-attachments-btn">
                 <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
@@ -34,10 +35,11 @@
 
     {% for step in workflow.steps %}
 
-   
+
     <div class="workflow-step">
-        <div class="step-connector top"></div>
-        <div class="step-content">
+        <div class=" step-connector top"></div>
+        <div class="step-content edit-workflow-step-btn" data-step-id="{{ step.id }}"
+            data-step-type="{{ step.name|lower }}">
             <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
                 {{ loop.index }}
             </div>
@@ -46,12 +48,12 @@
                 <span class="item-info">
                     {{ step.tasks|length }} tasks
                 </span>
-                
+
             </div>
-           
+
             <span class="workflow-loader" style="display: none;"></span>
-            <div class="step-icon edit-workflow-step-btn" data-step-id="{{ step.id }}" data-step-type="{{ step.name|lower }}">
-                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+            <div class="step-icon">
+                <i class=" fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
             </div>
         </div>
         <div class="step-connector bottom"></div>
@@ -72,7 +74,8 @@
             </div>
             <div class="step-header">
                 <span>View output</span>
-                <span class="workflow-output-attachment-info"><span>0 / 3 steps completed</span> <span> <i> 1 second elapsed</i></span></span>
+                <span class="workflow-output-attachment-info"><span>Preparing</span> <span> <i> 1 second
+                            elapsed</i></span></span>
             </div>
 
         </div>
@@ -106,7 +109,7 @@
             if (newTitle) {
                 // Update title text
                 $('#workflowTitle').text(newTitle).show();
-                
+
                 // Send new title to the server
                 const data = JSON.stringify({ title: newTitle, uuid: "{{ workflow.id }}" });
                 $.ajax({

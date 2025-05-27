@@ -329,6 +329,31 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
+def normalize_results(results):
+    from collections import defaultdict
+
+    if isinstance(results, list):
+        collected = defaultdict(list)
+
+        for d in results:
+            if isinstance(d, dict):
+                for k, v in d.items():
+                    if v not in collected[k]:
+                        collected[k].append(v)
+
+        # Convert to string or comma-separated string
+        flattened = {
+            k: v[0] if len(v) == 1 else ", ".join(str(val) for val in v)
+            for k, v in collected.items()
+        }
+        return flattened
+
+    elif isinstance(results, dict):
+        return results
+
+    return {}
+
+
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
     """Begin a search."""
@@ -405,10 +430,12 @@ def begin_search() -> ResponseReturnValue:
                 as_attachment=True,
             )
 
+        normalized_results = normalize_results(results)
+        print(normalize_results)
         template = render_template(
             "toolpanel/extractions/extraction_panel.html",
             search_set=search_set,
-            results=results,
+            results=normalized_results,
             documents=documents,
         )
         response = {

@@ -173,6 +173,7 @@ class OpenAIInterface:
 
         if len(full_text) < max_context_length:
             prompt += f"""Question: {question} Document: {full_text}"""
+            print(prompt)
             try:
                 chat_agent = create_chat_agent(model)
                 answer = loop.run_until_complete(
