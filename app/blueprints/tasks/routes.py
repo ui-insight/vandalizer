@@ -19,7 +19,7 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument
+from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
