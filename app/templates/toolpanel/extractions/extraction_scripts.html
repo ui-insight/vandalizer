@@ -275,6 +275,8 @@
         dataType: "json",
         async: true,
         success: function (data) {
+          console.log("Got some data!");
+          console.log(data);
           hideWorking();
           stopScanning();
           $("#search-results-panel").show();

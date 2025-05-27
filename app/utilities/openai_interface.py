@@ -1,11 +1,11 @@
+import asyncio
 import json
 import os
 
 import openai
 from devtools import debug
+from dotenv import load_dotenv
 from pydantic_ai.messages import ModelMessagesTypeAdapter
-
-import asyncio
 
 from app.models import (
     MAX_CHAT_MESSAGES,
@@ -17,9 +17,6 @@ from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm import ChatLM, remove_code_markers
 from app.utilities.redis_cache import RedisCache
-
-from dotenv import load_dotenv
-
 
 load_dotenv()
 
@@ -163,6 +160,7 @@ class OpenAIInterface:
 
         if len(full_text) < max_context_length:
             prompt += f"""Question: {question} Document: {full_text}"""
+            print(prompt)
             try:
                 answer = loop.run_until_complete(
                     chat_agent.run(
