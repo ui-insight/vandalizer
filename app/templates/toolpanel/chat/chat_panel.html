@@ -1,15 +1,25 @@
-<div class="tab-content" id="chat-panel" style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
-    <p style="font-size: 12px; font-weight: 300; color: #00000077;"  class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></i></p>
+<div class="tab-content" id="chat-panel"
+    style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
+    <p style="font-size: 12px; font-weight: 300; color: #00000077;" class="doc-selected-counter"><i>{{ documents|length
+            }} documents selected</i></i></p>
     <div class="chat-card-container" style="margin-top: 30px;">
+        <div class="loading-event-progress-container">
+            <div id="loading-event-progress">
+                <h2 id="loading-event-title"></h2>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill"></div>
+                </div>
+                <p id="loading-event-message"></p>
+            </div>
+        </div>
         <div class="chat-card-suggestion" id="chat-suggestion-3">
             <i class="fas fa-wrench" style="color: #F1B300;"></i>
             <p>Teach me how to use Vandalizer on this</p>
-            
+
         </div>
         <div class="chat-card-suggestion" id="chat-suggestion-1">
             <i class="fas fa-file-alt" style="color: #d22121bd;"></i>
             <p>Summarize the document(s)</p>
-            
         </div>
 
         <div class="chat-card-suggestion" id="chat-suggestion-2">
@@ -18,3 +28,81 @@
         </div>
     </div>
 </div>
+
+<script>
+    const steps = [
+        {
+            title: "Processing document",
+            messages: ["Reading layout…", "Extracting text…", "Perfoming OCR…"],
+            duration: 5000
+        },
+        {
+            title: "Performing security check",
+            messages: ["Analyzing document content…", "Searching for private information…", "Scanning for compliance…"],
+            duration: 4000
+        },
+        {
+            title: "Preparing document for AI",
+            messages: ["Getting ready…", "Document passed check…"],
+            duration: 2500
+        },
+        {
+            title: "Done!",
+            messages: ["All set ✅"],
+            duration: 1500
+        }
+    ];
+
+    const container = document.getElementById("loading-event-progress");
+    const titleEl = document.getElementById("loading-event-title");
+    const messageEl = document.getElementById("loading-event-message");
+    const progressEl = document.querySelector(".loading-progress-fill");
+
+    async function runSteps() {
+        // fade container in once at start
+        container.classList.add("fade-in");
+
+        for (let { title, messages, duration } of steps) {
+            titleEl.textContent = title;
+            messageEl.textContent = "";
+            progressEl.style.width = "0%";
+
+            // cycle through messages during progress
+            let msgIdx = 0;
+            const msgInterval = setInterval(() => {
+                messageEl.textContent = messages[msgIdx % messages.length];
+                msgIdx++;
+            }, duration / messages.length);
+
+            // animate fill
+            await new Promise(res => {
+                progressEl.style.transition = `width ${duration}ms linear`;
+                // trigger layout so transition takes effect
+                requestAnimationFrame(() => {
+                    progressEl.style.width = "100%";
+                });
+                setTimeout(() => {
+                    clearInterval(msgInterval);
+                    res();
+                }, duration);
+            });
+
+            // fade out before next
+            await new Promise(res => {
+                container.classList.remove("fade-in");
+                container.classList.add("fade-out");
+                setTimeout(() => {
+                    container.classList.remove("fade-out");
+                    container.classList.add("fade-in");
+                    res();
+                }, 500);
+            });
+        }
+
+        // optional: leave the last "Done!" visible a bit longer
+        setTimeout(() => container.classList.add("fade-out"), 1000);
+    }
+
+    // kick it off
+    runSteps();
+</script>
