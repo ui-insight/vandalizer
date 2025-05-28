@@ -144,8 +144,16 @@ class SmartDocument(me.Document):
 
     @property
     def absolute_path(self) -> Path:
+        doc_path = Path(app.root_path) / "static" / "uploads" / self.path
         """Returns the absolute path to the document file."""
-        return Path(app.root_path) / "static" / "uploads" / self.path
+        if not os.path.exists(str(doc_path)):
+            print("Does not exist adjusting path")
+            doc_path = (
+                Path(app.root_path) / "static" / "uploads" / self.user_id / self.path
+            )
+        else:
+            print("Exists returning path")
+        return doc_path
 
     def time_ago_in_words(self) -> str:
         """Returns a human-readable string representing the time elapsed since the document was created."""

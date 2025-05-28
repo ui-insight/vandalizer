@@ -1,7 +1,6 @@
 """Handles primary routing for the home page and related functionalities."""
 
 import json
-import os
 import uuid
 from itertools import chain
 
@@ -343,33 +342,33 @@ def chat() -> ResponseReturnValue:
         if document is not None:
             documents.append(document)
             # find related html documents (excel converted to html)
-            if document.extension == "html":
-                html_files = [
-                    f
-                    for f in os.listdir(
-                        os.path.join(
-                            current_app.root_path,
-                            "static",
-                            "uploads",
-                            user_id,
-                        ),
-                    )
-                    if f.startswith(document.uuid)
-                    and f != document.path
-                    and f.endswith(".html")
-                ]
+            # if document.extension == "html":
+            #     html_files = [
+            #         f
+            #         for f in os.listdir(
+            #             os.path.join(
+            #                 current_app.root_path,
+            #                 "static",
+            #                 "uploads",
+            #                 user_id,
+            #             ),
+            #         )
+            #         if f.startswith(document.uuid)
+            #         and f != document.path
+            #         and f.endswith(".html")
+            #     ]
 
-                for html_file in html_files:
-                    html_doc = SmartDocument(
-                        title=document.title,
-                        path=html_file,
-                        extension="html",
-                        uuid=uuid.uuid4().hex,
-                        user_id=user_id,
-                        space=document.space,
-                        folder=document.folder,
-                    )
-                    documents.append(html_doc)
+            #     for html_file in html_files:
+            #         html_doc = SmartDocument(
+            #             title=document.title,
+            #             path=html_file,
+            #             extension="html",
+            #             uuid=uuid.uuid4().hex,
+            #             user_id=user_id,
+            #             space=document.space,
+            #             folder=document.folder,
+            #         )
+            #         documents.append(html_doc)
 
     debug("Documents", [document.extension for document in documents])
     # default context docs
