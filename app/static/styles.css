@@ -1111,3 +1111,7 @@ textarea {
     font-size: 1em;
     color: rgba(255, 255, 255, 0.637);
 }
+
+#rawTextContent {
+    white-space: pre-wrap; /* CSS3 */
+}
