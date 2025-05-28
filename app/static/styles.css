@@ -1115,3 +1115,79 @@ textarea {
 #rawTextContent {
     white-space: pre-wrap; /* CSS3 */
 }
+
+
+
+
+.loading-event-progress-container {
+    background-color: rgba(0, 0, 0, 0.05);
+    padding:10px 22px;
+}
+
+ /* container */
+#loading-event-progress {
+    text-align: center;
+    font-family: sans-serif;
+    opacity: 0;
+
+}
+
+/* shimmer title */
+#loading-event-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(
+    90deg,
+    #4b4b4b 25%,
+    #303030 50%,
+    #747474 75%
+    );
+    background-size: 200% 100%;
+    color: transparent;
+    -webkit-background-clip: text;
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0%   { background-position: -200% 0 }
+    100% { background-position: 200% 0 }
+}
+
+/* fade in/out */
+.fade-in {
+    animation: fadeIn 0.5s forwards;
+}
+.fade-out {
+    animation: fadeOut 0.5s forwards;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px) }
+    to   { opacity: 1; transform: translateY(0)   }
+}
+@keyframes fadeOut {
+    from { opacity: 1 }
+    to   { opacity: 0 }
+}
+
+/* progress bar */
+.loading-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #f0f0f0;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 0.5rem 0;
+}
+.loading-progress-fill {
+    width: 0;
+    height: 100%;
+    background: #f1b300;
+    transition: width linear;
+}
+
+/* message text */
+#loading-event-message {
+    min-height: 1.2em;
+    font-size: 0.9rem;
+    color: #b8b8b8;
+}
