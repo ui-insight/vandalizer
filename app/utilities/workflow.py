@@ -2,7 +2,6 @@
 
 import graphlib
 import json
-
 import multiprocessing
 import os
 import re
@@ -15,18 +14,13 @@ from dotenv import load_dotenv
 
 from app import app
 from app.celery_worker import celery_app
-from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult
+from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult, WorkflowStep
 from app.utilities.config import model_type
-from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
-
-
-from app.models import SmartDocument, SearchSet, WorkflowResult, WorkflowStep
-
 
 load_dotenv()
 
@@ -261,7 +255,6 @@ class DocumentNode(Node):
                     app.root_path,
                     "static",
                     "uploads",
-                    user_id,
                     str(doc.path),
                 )
             self.pdf_paths.append(str(doc_path))
@@ -277,7 +270,6 @@ class DocumentNode(Node):
                     app.root_path,
                     "static",
                     "uploads",
-                    user_id,
                     str(doc.path),
                 )
             self.pdf_paths.append(str(doc_path))
