@@ -548,6 +548,7 @@ def delete_workflow_step_task() -> ResponseReturnValue:
         return redirect(url_for("login"))
 
     workflow_data = request.get_json()
+    print(workflow_data)
     workflow_task_id = workflow_data["workflow_task_id"]
     task = WorkflowStepTask.objects(id=workflow_task_id).first()
     if not task:

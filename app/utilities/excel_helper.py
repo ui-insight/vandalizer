@@ -53,6 +53,7 @@ def save_excel_to_html(excel_file_path, html_file_path) -> None:
         # HTML styles
         style = """
         <style>
+        body { font-family: Arial, sans-serif; background-color: white; }
         table { border-width: 1px !important; }
         </style>
         """
