@@ -37,16 +37,18 @@
             </div>
         </div>
 
-        <div class="loading-event-progress-container">
-            <div id="loading-event-progress">
-                <h2 id="loading-event-title"></h2>
-                <div class="loading-progress-bar">
-                    <div class="loading-progress-fill"></div>
+        <div style="padding: 30px;">
+            <div class="loading-event-progress-container hidden">
+                <div id="loading-event-progress">
+                    <h2 id="loading-event-title"></h2>
+                    <div class="loading-progress-bar">
+                        <div class="loading-progress-fill"></div>
+                    </div>
+                    <p id="loading-event-message"></p>
+                    <p id="loading-event-content"></p>
                 </div>
-                <p id="loading-event-message"></p>
             </div>
         </div>
-
         <div class="bottom-toolbar" style>
             <div>
                 <!-- Action buttons -->
@@ -69,55 +71,140 @@
     </div>
 
     <script>
-        // Close this section
-        $('#closeAddPromptToWorkflowBtn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            $('#workflowAddPromptModal').remove();
-        });
+        const container = document.getElementById("loading-event-progress");
+        const titleEl = document.getElementById("loading-event-title");
+        const messageEl = document.getElementById("loading-event-message");
+        const contentEl = document.getElementById("loading-event-content");
+        const progressEl = document.querySelector(".loading-progress-fill");
+        const outtercontainer = document.querySelector(".loading-event-progress-container");
+        // Initially hide the container
+        let loadingCancelled = false;
 
+        // Your two‐step loading tutorial
+        const steps = [
+            {
+                title: "Preparing test",
+                messages: ["Preparing document", "Preparing test..."],
+                duration: 3000
+            },
+            {
+                title: "Trying your prompt",
+                messages: ["Running your prompt…", "Searching for private information…", "Scanning for compliance…"],
+                duration: 4000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+        ];
 
-        // When the dropdown changes, load its data‐prompt into the textarea
-        $('#extractionSetDropdown').on('change', function () {
-            const selectedOption = $(this).find('option:selected');
-            const promptText = selectedOption.data('prompt') || '';
-            $('#promptInput').val(promptText);
-        });
+        //
+        // FADE IN / FADE OUT HELPERS
+        //
+        function fadeInContainer() {
+            outtercontainer.classList.remove("hidden");
+            container.classList.remove("fade-out");
+            container.classList.add("fade-in");
+        }
+        function fadeOutContainer(callback) {
+            container.classList.remove("fade-in");
+            container.classList.add("fade-out");
+            setTimeout(() => {
+                container.classList.remove("fade-out");
+                if (typeof callback === "function") callback();
+            }, 500);
+        }
 
-        // If the user types/edits the textarea, reset the dropdown to the “no selection” option
-        $('#promptInput').on('input', function () {
-            const dropdown = $('#extractionSetDropdown');
-            if (dropdown.val()) {
-                dropdown.val('');
+        //
+        // RUN STEPS: animate each step’s title, cycling messages, and progress bar
+        //
+        async function runSteps() {
+
+            fadeInContainer();
+
+            for (let { title, messages, duration } of steps) {
+                if (loadingCancelled) return;
+
+                // 1) Reset the progress bar completely: clear any existing transition,
+                //    set width to 0, force reflow, then allow the new transition to run.
+                progressEl.style.transition = "none";
+                progressEl.style.width = "0%";
+                // force reflow so the browser “sees” width=0 before we apply a new transition
+                progressEl.offsetWidth;
+
+                // 2) Update the title (as plain text—or if you want HTML here, swap to innerHTML)
+                titleEl.textContent = title;
+                messageEl.textContent = "";
+
+                // 3) Show the progress bar and begin animating it to 100%
+                $(progressEl).stop(true, true).show();
+                // Now give it a fresh CSS transition from 0→100%:
+                progressEl.style.transition = `width ${duration}ms linear`;
+                requestAnimationFrame(() => {
+                    progressEl.style.width = "100%";
+                });
+
+                // 4) Cycle through “messages” during the duration
+                let msgIdx = 0;
+                const msgInterval = setInterval(() => {
+                    if (loadingCancelled) {
+                        clearInterval(msgInterval);
+                        return;
+                    }
+                    messageEl.textContent = messages[msgIdx % messages.length];
+                    msgIdx++;
+                }, duration / messages.length);
+
+                // 5) Await the end of this step’s duration
+                await new Promise(res => {
+                    setTimeout(() => {
+                        clearInterval(msgInterval);
+                        res();
+                    }, duration);
+                });
+
+                if (loadingCancelled) return;
+
+                // 6) Fade out/in briefly before going to the next step
+                await new Promise(res => {
+                    fadeOutContainer(() => {
+                        fadeInContainer();
+                        res();
+                    });
+                });
             }
-        });
+        }
 
+        //
+        // “Run Prompt” button click: start the loading animation, then fire AJAX
+        //
         $('#testPromptButton').off("click").on("click", function (e) {
             e.preventDefault();
-            e.stopPropagation();   // ← prevent the parent “.edit‐workflow‐step‐task‐btn” from seeing this click
+            e.stopPropagation();
 
-            console.log("clicked");
+            // 1) Reset the “cancel” flag, spin the loader, and start runSteps()
+            loadingCancelled = false;
+            beginSpinningJoe();
+            runSteps();
+            contentEl.innerHTML = "";
+
+            // 2) Build task_data and JSON payload as before...
             let workflow_task_id = $(this).attr("data-task-id");
-
-            task_data = {
-                type: "prompt"
-
-            }
+            let task_data = { type: "prompt" };
             const dropdown = $('#extractionSetDropdown');
             if (dropdown.val()) {
-                task_data["prompt"] = dropdown.val()
+                task_data["prompt"] = dropdown.val();
             } else {
-                task_data["prompt"] = $('#promptInput').val()
+                task_data["prompt"] = $('#promptInput').val();
             }
-
-            console.log(workflow_task_id);  // Debugging line
             let data = JSON.stringify({
                 task_name: "Prompt",
                 document_uuids: document_uuids,
                 task_data: task_data
             });
 
-            console.log(data);
-
+            // 3) Fire off the AJAX call
             $.ajax({
                 url: `/workflows/workflow/step/test`,
                 type: 'POST',
@@ -125,91 +212,63 @@
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
                 async: true,
-                success: function (data) {
-                    console.log(data);
+                success: function (response) {
+                    // --- as soon as we get a response:
+
+                    // a) Stop the spinner and tell runSteps to quit immediately
+                    stopSpinningJoe();
+                    loadingCancelled = true;
+
+                    // b) Remove shimmer (if container/title has a shimmer class, take it off)
+                    //    Adjust the selector if you applied shimmer to a different element.
+                    container.classList.remove("shimmer");
+                    titleEl.classList.remove("shimmer");
+                    messageEl.classList.remove("shimmer");
+
+                    // c) Fade out the entire loading container, THEN inject final HTML & fade back in
+                    fadeOutContainer(() => {
+                        // Use innerHTML so any HTML tags in response.output actually render
+                        titleEl.innerHTML = "";
+                        messageEl.innerHTML = "";
+                        // Inject the final 
+                        contentEl.innerHTML = response.output || "";
+                        // (If you have a separate “details” field, otherwise just messageEl.innerHTML = "")
+
+                        // Hide the progress bar entirely
+                        $(progressEl).hide();
+                        // Finally, fade the container (with new content) back in
+                        fadeInContainer();
+                    });
                 },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
+                error: function (xhr, thrownError) {
+                    console.error("AJAX error:", thrownError);
                 }
             });
         });
 
-        const steps = [
-            {
-                title: "Processing document",
-                messages: ["Reading layout…", "Extracting text…", "Perfoming OCR…"],
-                duration: 5000
-            },
-            {
-                title: "Performing security check",
-                messages: ["Analyzing document content…", "Searching for private information…", "Scanning for compliance…"],
-                duration: 4000
-            },
-            {
-                title: "Preparing document for AI",
-                messages: ["Getting ready…", "Document passed check…"],
-                duration: 2500
-            },
-            {
-                title: "Done!",
-                messages: ["All set ✅"],
-                duration: 1500
+        //
+        // “Close” button (unchanged)
+        //
+        $('#closeAddPromptToWorkflowBtn').on("click", function (e) {
+            e.preventDefault();
+            $('#workflowAddPromptModal').remove();
+        });
+
+        //
+        // Dropdown ↔ Textarea (unchanged)
+        //
+        $('#extractionSetDropdown').on('change', function () {
+            const selectedOption = $(this).find('option:selected');
+            const promptText = selectedOption.data('prompt') || '';
+            $('#promptInput').val(promptText);
+        });
+        $('#promptInput').on('input', function () {
+            const dropdown = $('#extractionSetDropdown');
+            if (dropdown.val()) {
+                dropdown.val('');
             }
-        ];
-
-        const container = document.getElementById("loading-event-progress");
-        const titleEl = document.getElementById("loading-event-title");
-        const messageEl = document.getElementById("loading-event-message");
-        const progressEl = document.querySelector(".loading-progress-fill");
-
-        async function runSteps() {
-            // fade container in once at start
-            container.classList.add("fade-in");
-
-            for (let { title, messages, duration } of steps) {
-                titleEl.textContent = title;
-                messageEl.textContent = "";
-                progressEl.style.width = "0%";
-
-                // cycle through messages during progress
-                let msgIdx = 0;
-                const msgInterval = setInterval(() => {
-                    messageEl.textContent = messages[msgIdx % messages.length];
-                    msgIdx++;
-                }, duration / messages.length);
-
-                // animate fill
-                await new Promise(res => {
-                    progressEl.style.transition = `width ${duration}ms linear`;
-                    // trigger layout so transition takes effect
-                    requestAnimationFrame(() => {
-                        progressEl.style.width = "100%";
-                    });
-                    setTimeout(() => {
-                        clearInterval(msgInterval);
-                        res();
-                    }, duration);
-                });
-
-                // fade out before next
-                await new Promise(res => {
-                    container.classList.remove("fade-in");
-                    container.classList.add("fade-out");
-                    setTimeout(() => {
-                        container.classList.remove("fade-out");
-                        container.classList.add("fade-in");
-                        res();
-                    }, 500);
-                });
-            }
-
-            // optional: leave the last "Done!" visible a bit longer
-            setTimeout(() => container.classList.add("fade-out"), 1000);
-        }
-
-        // kick it off
-        runSteps();
-
+        });
     </script>
+
+
 </div>
