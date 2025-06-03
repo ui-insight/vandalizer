@@ -1115,3 +1115,7 @@ textarea {
 #rawTextContent {
     white-space: pre-wrap; /* CSS3 */
 }
+
+.edit-workflow-step-task-btn {
+    cursor: pointer;
+}

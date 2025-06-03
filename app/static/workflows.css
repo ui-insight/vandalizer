@@ -183,10 +183,6 @@
     font-weight: bold;
 }
 
-.workflow-tab-content {
-    display: none;
-}
-
 .workflow-label {
     display: block;
     margin-bottom: 8px;

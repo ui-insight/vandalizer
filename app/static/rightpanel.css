@@ -474,11 +474,27 @@ button.shadow-button:hover {
   
 }
 
+#workflow-panel {
+  display: flex;
+  align-items: center;
+}
+
+/* Make the Run button expand */
+#workflow-panel .run-workflow {
+  flex: 1;
+  margin-right: 0.5rem; /* small gap between button and icon */
+}
+
+/* Keep the laptop icon at its natural size on the right */
+#workflow-panel .fa-laptop-code {
+  font-size: 1.2rem;
+  cursor: pointer; /* if you want it to feel clickable */
+}
+
 .workflow-panel .action-buttons {
   border: 1px solid #d3d3d386;
   height: 40px;
- 
-  flex: 1; display: flex; 
+  flex: 1; display: flex;
 }
 
 .workflow-panel button {
