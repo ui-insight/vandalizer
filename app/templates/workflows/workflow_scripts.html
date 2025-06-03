@@ -422,6 +422,7 @@
             $('.workflow-output').fadeIn();
 
             workflow_interval_id = pollWorkflowStatus(session_id);
+            beginSpinningJoe();
 
             $.ajax({
                 url: '/workflows/workflow/run',
@@ -467,7 +468,7 @@
                     $('.workflow-output').find('.step-connector').addClass('active');
                     $('.workflow-loader').hide();
                     // performWorkflowStatus(session_id, workflow_elapsed_time);
-
+                    stopSpinningJoe();
                     if (download) {
                         downloadWorkflow(session_id)
                     }
@@ -476,6 +477,7 @@
                     console.log(xhr.status);
                     console.log(thrownError);
                     if (workflow_interval_id) {
+                        stopSpinningJoe();
                         clearInterval(workflow_interval_id);
                     }
                 }
@@ -542,6 +544,7 @@
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
+                        stopSpinningJoe();
                         clearInterval(workflow_interval_id);
                     }
                 }
@@ -568,6 +571,7 @@
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
+                    stopSpinningJoe();
                     clearInterval(intervalId); // Stop polling
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
@@ -588,6 +592,7 @@
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
+                stopSpinningJoe();
                 clearInterval(intervalId); // Stop polling on error
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -613,6 +618,7 @@
 
             // Stop polling after max attempts
             if (workflow_elapsed_time >= maxAttempts) {
+                stopSpinningJoe();
                 clearInterval(intervalId);
                 showToast("Workflow status polling timed out");
             }
