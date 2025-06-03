@@ -34,7 +34,7 @@ from app.models import (
     WorkflowStepTask,
 )
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.workflow import execute_workflow_task
+from app.utilities.workflow import execute_task_step_test, execute_workflow_task
 from app.utils import load_user
 
 from . import workflows
@@ -162,6 +162,41 @@ def run_workflow() -> ResponseReturnValue:
         }
 
     return {"output": output, "steps": data}
+
+
+@workflows.route("/workflow/step/test", methods=["POST"])
+def test_workflow_step() -> ResponseReturnValue:
+    """Run a workflow step."""
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+
+    workflow_data = request.get_json()
+    task_name = workflow_data["task_name"]
+    task_data = workflow_data["task_data"]
+    document_uuids = workflow_data["document_uuids"]
+
+    user_id = load_user().user_id
+    print(workflow_data)
+    docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
+    document_trigger_step = WorkflowStep(
+        name="Document",
+        data={"docs": docs, "user_id": user_id},
+    )
+    document_trigger_step.save()
+
+    async_result = execute_task_step_test.delay(
+        task_name=task_name,
+        task_data=task_data,
+        document_trigger_step_id=str(document_trigger_step.id),
+    )
+    workflow_output = async_result.get(timeout=600)
+    if workflow_output is None:
+        return jsonify({"error": "Workflow execution failed"})
+    # output = workflow_output.get("output")
+    print(workflow_output)
+
+    return {"output": workflow_output}
 
 
 # @MARK: ~~ Run integration

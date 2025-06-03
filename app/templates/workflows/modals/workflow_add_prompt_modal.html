@@ -43,7 +43,7 @@
 
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
                     {% if is_editing %}
-                    <button id="deletePromptToWorkflowTaskBtn" class="btn btn-secondary" style="flex-grow: 1;">Test
+                    <button id="testPromptButton" class="btn btn-secondary" style="flex-grow: 1;">Test
                         Step</button>
                     {% endif %}
                     <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;">
@@ -80,5 +80,50 @@
                 dropdown.val('');
             }
         });
+
+        $('#testPromptButton').off("click").on("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();   // ← prevent the parent “.edit‐workflow‐step‐task‐btn” from seeing this click
+
+            console.log("clicked");
+            let workflow_task_id = $(this).attr("data-task-id");
+
+            task_data = {
+                type: "prompt"
+
+            }
+            const dropdown = $('#extractionSetDropdown');
+            if (dropdown.val()) {
+                task_data["prompt"] = dropdown.val()
+            } else {
+                task_data["prompt"] = $('#promptInput').val()
+            }
+
+            console.log(workflow_task_id);  // Debugging line
+            let data = JSON.stringify({
+                task_name: "Prompt",
+                document_uuids: document_uuids,
+                task_data: task_data
+            });
+
+            console.log(data);
+
+            $.ajax({
+                url: `/workflows/workflow/step/test`,
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data);
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
     </script>
 </div>
