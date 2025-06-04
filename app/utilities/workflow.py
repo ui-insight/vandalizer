@@ -490,40 +490,41 @@ def build_workflow_engine(steps, workflow):
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
         node = None
-    debug(step)
-    if step.name == "Document":  # this the trigger step
-        node = DocumentNode(step.data)
-        nodes.append(node)
-    else:  # this a task step
-        tasks = []
-        for task in step.tasks:
-            if task.name == "Extraction":
-                if task.data.get("search_set_uuid"):
-                    search_set = SearchSet.objects(
-                        uuid=task.data.get("search_set_uuid"),
-                    ).first()
-                    search_items = search_set.items()
-                    task.data["keys"] = [item.searchphrase for item in search_items]
-                debug(task.data)
-                node = ExtractionNode(
-                    data=task.data,
-                )
-                tasks.append(node)
-                debug(tasks)
-            elif task.name == "Prompt":
-                node = PromptNode(
-                    data=task.data,
-                )
-                tasks.append(node)
-            elif task.name == "Formatter":
-                node = FormatNode(
-                    data=task.data,
-                )
-                tasks.append(node)
+        debug(step)
+        if step.name == "Document":  # this the trigger step
+            node = DocumentNode(step.data)
+            nodes.append(node)
+        else:  # this a task step
+            tasks = []
+            for task in step.tasks:
+                if task.name == "Extraction":
+                    if task.data.get("search_set_uuid"):
+                        search_set = SearchSet.objects(
+                            uuid=task.data.get("search_set_uuid"),
+                        ).first()
+                        search_items = search_set.items()
+                        task.data["keys"] = [item.searchphrase for item in search_items]
+                    debug(task.data)
+                    node = ExtractionNode(
+                        data=task.data,
+                    )
+                    tasks.append(node)
+                    debug(tasks)
+                elif task.name == "Prompt":
+                    node = PromptNode(
+                        data=task.data,
+                    )
+                    tasks.append(node)
+                elif task.name == "Formatter":
+                    node = FormatNode(
+                        data=task.data,
+                    )
+                    tasks.append(node)
 
-        node = MultiTaskNode(step.name)
-        node.add_tasks(tasks)
-        nodes.append(node)
+            node = MultiTaskNode(step.name)
+            node.add_tasks(tasks)
+            nodes.append(node)
+
         if node is not None:
             engine.add_node(node)
 
