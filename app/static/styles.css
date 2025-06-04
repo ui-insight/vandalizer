@@ -1126,7 +1126,7 @@ textarea {
     background-color: rgba(0, 0, 0, 0.05);
     padding:10px 22px;
       /* allow the content to expand vertically up to 80% of the viewport */
-  max-height: 80vh;    
+  max-height: 300px;;    
   /* let extra content scroll instead of clipping */
   overflow-y: auto;    
   /* if you want to prevent horizontal clipping as well: */

@@ -14,7 +14,18 @@
         <hr>
         <h3 class="workflow-modal-subtitle">Uses AI to perform your instructions on text</h3>
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
-
+        <div>
+            <div class=" loading-event-progress-container hidden" style="margin: 30px;">
+                <div id="loading-event-progress">
+                    <h2 id="loading-event-title"></h2>
+                    <div class="loading-progress-bar">
+                        <div class="loading-progress-fill"></div>
+                    </div>
+                    <p id="loading-event-message"></p>
+                    <p id="loading-event-content"></p>
+                </div>
+            </div>
+        </div>
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
             <div>
@@ -37,27 +48,15 @@
             </div>
         </div>
 
-        <div style="padding: 30px;">
-            <div class="loading-event-progress-container hidden">
-                <div id="loading-event-progress">
-                    <h2 id="loading-event-title"></h2>
-                    <div class="loading-progress-bar">
-                        <div class="loading-progress-fill"></div>
-                    </div>
-                    <p id="loading-event-message"></p>
-                    <p id="loading-event-content"></p>
-                </div>
-            </div>
-        </div>
+
         <div class="bottom-toolbar" style>
             <div>
                 <!-- Action buttons -->
 
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-                    {% if is_editing %}
                     <button id="testPromptButton" class="btn btn-secondary" style="flex-grow: 1;">Test
                         Step</button>
-                    {% endif %}
+
                     <button id="confirmPromptStepBtn" class="btn btn-primary" style="flex-grow: 1;">
                         {% if is_editing %}
                         Update
@@ -75,6 +74,7 @@
         const titleEl = document.getElementById("loading-event-title");
         const messageEl = document.getElementById("loading-event-message");
         const contentEl = document.getElementById("loading-event-content");
+        const contentBarEl = document.querySelector(".loading-progress-bar");
         const progressEl = document.querySelector(".loading-progress-fill");
         const outtercontainer = document.querySelector(".loading-event-progress-container");
         // Initially hide the container
@@ -91,6 +91,26 @@
                 title: "Trying your prompt",
                 messages: ["Running your prompt…", "Searching for private information…", "Scanning for compliance…"],
                 duration: 4000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
             },
             {
                 title: "Still working",
@@ -122,6 +142,7 @@
         async function runSteps() {
 
             fadeInContainer();
+            contentBarEl.style.display = 'block';
 
             for (let { title, messages, duration } of steps) {
                 if (loadingCancelled) return;
@@ -218,6 +239,7 @@
                     // a) Stop the spinner and tell runSteps to quit immediately
                     stopSpinningJoe();
                     loadingCancelled = true;
+                    contentBarEl.style.display = 'none';
 
                     // b) Remove shimmer (if container/title has a shimmer class, take it off)
                     //    Adjust the selector if you applied shimmer to a different element.

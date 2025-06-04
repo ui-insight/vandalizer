@@ -489,27 +489,11 @@ def build_workflow_engine(steps, workflow):
 
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
-        node = build_workflow_step(step)
-        nodes.append(node)
-        if node is not None:
-            engine.add_node(node)
-
-    debug(nodes)
-    # connect the steps
-    for idx in range(len(nodes)):
-        if idx == 0:
-            continue
-        engine.connect(nodes[idx - 1], nodes[idx])
-
-    return engine
-
-
-def build_workflow_step(self, step):
-    node = None
+        node = None
     debug(step)
     if step.name == "Document":  # this the trigger step
         node = DocumentNode(step.data)
-        return node
+        nodes.append(node)
     else:  # this a task step
         tasks = []
         for task in step.tasks:
@@ -539,7 +523,18 @@ def build_workflow_step(self, step):
 
         node = MultiTaskNode(step.name)
         node.add_tasks(tasks)
-        return node
+        nodes.append(node)
+        if node is not None:
+            engine.add_node(node)
+
+    debug(nodes)
+    # connect the steps
+    for idx in range(len(nodes)):
+        if idx == 0:
+            continue
+        engine.connect(nodes[idx - 1], nodes[idx])
+
+    return engine
 
 
 @celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
