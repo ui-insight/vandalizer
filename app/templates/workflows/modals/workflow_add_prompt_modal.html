@@ -14,18 +14,7 @@
         <hr>
         <h3 class="workflow-modal-subtitle">Uses AI to perform your instructions on text</h3>
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
-        <div>
-            <div class=" loading-event-progress-container hidden" style="margin: 30px;">
-                <div id="loading-event-progress">
-                    <h2 id="loading-event-title"></h2>
-                    <div class="loading-progress-bar">
-                        <div class="loading-progress-fill"></div>
-                    </div>
-                    <p id="loading-event-message"></p>
-                    <p id="loading-event-content" style="padding-top: 10px;"></p>
-                </div>
-            </div>
-        </div>
+        {% include 'workflows/modals/_event_progress_component.html' %}
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
             <div>
