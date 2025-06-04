@@ -2,8 +2,9 @@
     <div class="workflow-modal-content">
         <!-- Header -->
         <h2 class="workflow-modal-header">
-            {% if is_editing %} Edit Extractions {% else %} Add Extractions {% endif %}
-            <a class="closeAddExtractionToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
+            {% if is_editing %} Update Extractions {% else %} Add Extractions {% endif %}
+            <a class="closeAddExtractionToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i
+                    class="fa-solid fa-circle-xmark"></i></a>
         </h2>
 
         <!-- Description -->
@@ -11,41 +12,25 @@
         <h3 class="workflow-modal-subtitle">Extract specific information from text using AI</h3>
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
-        <!-- Tabbed navigation -->
-        <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
-        <div class="workflow-tab-container">
-            <button class="workflow-tab-btn {% if not is_editing or (is_editing and 'search_set_uuid' in workflow_task.data) %}active{% endif %}" 
-                    id="selectDropdownTab" 
-                    onclick="openAddExtractionTab('selectDropdown')">
-                Select from Tasks
-            </button>
-            <button class="workflow-tab-btn {% if (is_editing and 'search_set_uuid' not in workflow_task.data) %}active{% endif %}" 
-                    id="manualInputTab" 
-                    onclick="openAddExtractionTab('manualInput')">
-                Enter Manually
-            </button>
-        </div>
 
         <!-- Body -->
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
-            <div class="workflow-tab-content" id="selectDropdown" style="{% if not is_editing or (is_editing and 'search_set_uuid' in workflow_task.data) %}display: block;{% else %}display: none;{% endif %}">
-                <label for="extractionSetDropdown" class="workflow-label">Select an extraction set:</label>
+            <div class="workflow-tab-content" id="selectDropdown">
+                <label class="workflow-label" style="padding-top: 10px;">Enter extractions (comma-separated):</label>
+                <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field"
+                    value="{{ workflow_task.data['searchphrases'] if is_editing else '' }}">
+                <label class="workflow-label" style="padding-top: 10px;">From your saved
+                    tasks:</label>
                 <select id="extractionSetDropdown" class="workflow-input-field">
-                {% for extraction in extraction_sets %}
-                <option value="{{ extraction.uuid }}" {% if is_editing and 'search_set_uuid' in workflow_task.data and workflow_task.data['search_set_uuid'] == extraction.uuid %}selected{% endif %}>{{ extraction.title }}</option>
-                {% endfor %}
+                    <option value="">Select a saved task...</option>
+                    {% for prompt in extraction_sets %}
+                    <option value="{{ prompt.id }}" data-prompt="{{ prompt.search_phrases_csv()|e }}" {% if is_editing
+                        and 'search_set_item_id' in workflow_task.data and
+                        workflow_task.data['search_set_item_id']==prompt.id %} selected {% endif %}>{{ prompt.title }}
+                    </option>
+                    {% endfor %}
                 </select>
-            </div>
-
-            <!-- Tab content for manual input -->
-            <div class="workflow-tab-content" id="manualInput" 
-            style="{% if (is_editing and 'search_set_uuid' not in workflow_task.data) %}display: block;{% else %}display: none;{% endif %} margin: 0 auto;">
-                <label for="extractionInput" class="label">Enter extractions (comma-separated):</label>
-                <input type="text" id="extractionInput"
-                        placeholder="e.g., Name, Age, Location"
-                        class="input-field"
-                        value="{{ workflow_task.data['searchphrases'] if is_editing and 'searchphrases' in workflow_task.data else '' }}">
             </div>
         </div>
 
@@ -54,12 +39,13 @@
             <div>
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
                     {% if is_editing %}
-                    <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
+                    <button id="deleteExtractionToWorkflowBtn" class="btn btn-secondary" style="flex-grow: 1;">Test
+                        Step</button>
                     {% endif %}
-                    
+
                     <button id="confirmExtractionStepBtn" class="btn btn-primary" style="flex-grow: 1;">
                         {% if is_editing %}
-                        Edit Extractions
+                        Update
                         {% else %}
                         Add Extractions
                         {% endif %}
@@ -84,31 +70,19 @@
             $('.workflowAddExtractionsModal').remove();
         });
 
-        {% if is_editing %}
-        $('#deleteExtractionToWorkflowBtn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("clicked");
-            let data = JSON.stringify({
-                workflow_task_id: "{{ workflow_task_id }}"
-            });
-
-            $.ajax({
-                url: `/workflows/delete_step_task`,
-                type: 'POST',
-                data: data,
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                async: true,
-                success: function (data) {
-                    location.reload();
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                }
-            });
+        // When the dropdown changes, load its data‐prompt into the textarea
+        $('#extractionSetDropdown').on('change', function () {
+            const selectedOption = $(this).find('option:selected');
+            const promptText = selectedOption.data('prompt') || '';
+            $('#extractionInput').val(promptText);
         });
-        {% endif %}
+
+        // If the user types/edits the textarea, reset the dropdown to the “no selection” option
+        $('#extractionInput').on('input', function () {
+            const dropdown = $('#extractionSetDropdown');
+            if (dropdown.val()) {
+                dropdown.val('');
+            }
+        });
     </script>
 </div>
-

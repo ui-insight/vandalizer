@@ -7,7 +7,7 @@
                 <i class="fa-regular fa-pen-to-square"></i>
             </a>
         </h2>
-        
+
         <!-- Description -->
         <hr>
         <h3 class="workflow-modal-subtitle">Build this step of the workflow</h3>
@@ -20,7 +20,8 @@
             <div class="workflow-container" style="overflow: hidden; padding: 30px;">
                 <div class="workflow-step-add-tasks-panel">
                     {% for step in workflow_step.tasks %}
-                    <div class="workflow-step">
+                    <div class="workflow-step edit-workflow-step-task-btn" data-task-id="{{ step.id }}"
+                        data-step-id="{{ workflow_step.id }}" data-task-type="{{ step.name|lower }}">
                         <div class="step-content">
                             <div class="add-task-icon-container">
                                 {{ step.data.name }}
@@ -29,11 +30,11 @@
                                 {% elif step.name == "Prompt" %}
                                 <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
                                 {% elif step.name == "Format" %}
-                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                                <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
                                 {% elif step.name == "Document" %}
-                                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
+                                <i class="fa-regular fa-file-circle-plus" style="font-size: 24px; color: #191919;"></i>
                                 {% else %}
-                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
+                                <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
                                 {% endif %}
                             </div>
                             <div class="step-header">
@@ -47,11 +48,11 @@
                                 <span>Add Document(s)</span>
                                 {% endif %}
                                 {% if step.name == "Extraction" %}
-                                    
+
                                 <span class="item-info">
                                     {% if step.data.search_set_title %}
                                     {{ step.data.search_set_title }}
-                                    {% else %} 
+                                    {% else %}
                                     Custom Extraction
                                     {% endif %}
                                     <i>{{ step.extraction_items()|length }} items</i>
@@ -68,10 +69,14 @@
                                 <span class="item-info"></span>
                                 {% endif %}
                             </div>
-                        
+
                             <span class="workflow-loader" style="display: none;"></span>
-                            <div class="step-icon edit-workflow-step-task-btn" data-task-id="{{ step.id }}" data-step-id="{{ workflow_step.id }}" data-task-type="{{ step.name|lower }}">
-                                <i class="fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+
+                            <div class="step-icon">
+                                <a href="" class="delete-task-btn" data-task-id="{{ step.id }}">
+                                    <i class="fa-solid fa-trash"
+                                        style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -81,7 +86,7 @@
                     <div class="workflow-add-step" data-workflow-step-id="{{ workflow_step_id }}" style="padding: 0px;">
                         <div class="step-content" style="background-color: transparent;">
                             <div class="add-task-icon-container" style="background-color: rgba(181, 181, 181, 0.163);">
-                                <i class="fa-solid fa-plus"  style="font-size: 18px;"></i>
+                                <i class="fa-solid fa-plus" style="font-size: 18px;"></i>
                             </div>
                             <div class="step-header">
                                 {% if workflow_step.tasks|length > 0 %}
@@ -95,27 +100,57 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="bottom-toolbar" style>
             <div>
                 <!-- Action buttons -->
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-                    <button id="deletePromptToWorkflowBtn" class="btn btn-secondary" style="background-color: red; flex-grow: 1;">Delete Step</button>
-                    <button id="confirmWorkflowStepModalStepBtn" class="btn btn-primary" style="flex-grow: 1;">DONE</button>
+                    <button id="deletePromptToWorkflowBtn" class="btn btn-secondary"
+                        style="background-color: red; flex-grow: 1;">Delete Step</button>
+                    <button id="confirmWorkflowStepModalStepBtn" class="btn btn-primary"
+                        style="flex-grow: 1;">DONE</button>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <script>
-         $('.edit-workflow-step-task-btn').off("click").on("click", function (e) {
-                      e.preventDefault();  // Prevent default behavior, if needed
-                      let task_id = $(this).attr("data-task-id");
-                      let step_id = $(this).attr("data-step-id");
-                      let task_type = $(this).attr("data-task-type");
-                      console.log("Editing step task");
-                      workflowEditStepTaskType(step_id, task_id, task_type);
-                  });
+        $('.edit-workflow-step-task-btn').off("click").on("click", function (e) {
+            e.preventDefault();  // Prevent default behavior, if needed
+            let task_id = $(this).attr("data-task-id");
+            let step_id = $(this).attr("data-step-id");
+            let task_type = $(this).attr("data-task-type");
+            console.log("Editing step task");
+            workflowEditStepTaskType(step_id, task_id, task_type);
+        });
+
+        $('.delete-task-btn').off("click").on("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();   // ← prevent the parent “.edit‐workflow‐step‐task‐btn” from seeing this click
+
+            console.log("clicked");
+            let workflow_task_id = $(this).attr("data-task-id");
+            console.log(workflow_task_id);  // Debugging line
+            let data = JSON.stringify({
+                workflow_task_id: workflow_task_id
+            });
+
+            $.ajax({
+                url: `/workflows/delete_step_task`,
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
 
 
         $('#closeWorkflowStepBtn').on("click", function (e) {
@@ -124,8 +159,8 @@
             const url = new URL(window.location.href);
             url.searchParams.delete('workflow_step_id');
             window.history.replaceState(null, '', url.toString());
-           
-            
+
+
         });
 
         $('#confirmWorkflowStepModalStepBtn').on("click", function (e) {
@@ -173,13 +208,13 @@
             });
 
 
-            function workflowAddStepTask(workflow_step_id) { 
+        function workflowAddStepTask(workflow_step_id) {
             let data = JSON.stringify({
                 workflow_id: current_workflow_id,
                 space_id: current_space_id,
                 workflow_step_id: workflow_step_id
             });
-            
+
             $.ajax({
                 url: `/workflows/step/add_task`,
                 type: 'POST',
@@ -221,7 +256,7 @@
             if (newTitle) {
                 // Update title text
                 $('#workflowStepTitle').text(newTitle).show();
-                
+
                 // Send new title to the server
                 const data = JSON.stringify({ title: newTitle, workflow_step_id: "{{ workflow_step_id }}" });
                 $.ajax({

@@ -381,6 +381,7 @@ class PromptNode(Node):
     def process(self, inputs):
         data = self.data
         prompt = data.get("prompt", "Enter prompt")
+        print(f"INPUTS ARE {inputs}")
 
         prev_step_name = inputs.get("step_name", None)
         debug("Prompt", inputs, prompt)
@@ -421,13 +422,14 @@ class WorkflowEngine:
     def get_topological_order(self):
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self, workflow_result):
+    def execute(self, workflow_result=None):
         data = []
         nodes = self.get_topological_order()
         debug(nodes)
 
-        workflow_result.num_steps_completed = -1
-        workflow_result.num_steps_total = len(nodes) - 1
+        if workflow_result:
+            workflow_result.num_steps_completed = -1
+            workflow_result.num_steps_total = len(nodes) - 1
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
@@ -478,10 +480,10 @@ class WorkflowEngine:
                 }
                 # debug(latest_output)
 
-            workflow_result.steps_output[node.name] = output
-            workflow_result.num_steps_completed += 1
-
-            workflow_result.save()
+            if workflow_result:
+                workflow_result.steps_output[node.name] = output
+                workflow_result.num_steps_completed += 1
+                workflow_result.save()
 
             debug(latest_output)
             data.append(
@@ -492,14 +494,12 @@ class WorkflowEngine:
                 },
             )
 
-            workflow_result.save()
-
         if latest_output is None:
             return None, data
 
-        workflow_result.status = "completed"
-
-        workflow_result.save()
+        if workflow_result:
+            workflow_result.status = "completed"
+            workflow_result.save()
         return latest_output.get("output"), data
 
 
@@ -552,6 +552,9 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
             node.add_tasks(tasks)
             nodes.append(node)
 
+        node = MultiTaskNode(step.name)
+        node.add_tasks(tasks)
+        nodes.append(node)
         if node is not None:
             engine.add_node(node)
 
@@ -563,6 +566,62 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
         engine.connect(nodes[idx - 1], nodes[idx])
 
     return engine
+
+
+@celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
+def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
+    process_node = None
+    latest_output = None
+    workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
+    engine = WorkflowEngine()
+    nodes = []
+    node = DocumentNode(workflow_trigger_step.data)
+    nodes.append(node)
+    engine.add_node(node)
+
+    debug(nodes)
+    # connect the steps
+
+    if task_name == "Extraction":
+        process_node = ExtractionNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    elif task_name == "Prompt":
+        process_node = PromptNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    elif task_name == "Formatter":
+        process_node = FormatNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    else:
+        process_node = Node(task_name)
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+
+    for idx in range(len(nodes)):
+        if idx == 0:
+            continue
+        engine.connect(nodes[idx - 1], nodes[idx])
+
+    final_output, data = engine.execute()
+    print(final_output)
+
+    return final_output
 
 
 @celery_app.task(bind=True, name="workflow.execute_workflow")

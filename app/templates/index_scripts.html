@@ -55,7 +55,7 @@
         window.location.href = url.toString();
     }
 
- function updateModel(model) {
+    function updateModel(model) {
         console.log("Updating model to: " + model);
         $.ajax({
             url: '/tasks/model/update',
@@ -112,39 +112,39 @@
     }
 
     function filterAvailableModels(uuids) {
-    $.ajax({
-        url: '/tasks/model/filter',
-        type: 'POST',
-        contentType: 'application/json; charset=utf-8',
-        data: JSON.stringify({ uuids }),
-        dataType: 'json',
-        success: function (msg) {
-            const newModel = msg.current_model;
-            const models = msg.models;
-            // Update the modal's data-context so it's in sync
-            $('#model-modal').data('context', newModel);
+        $.ajax({
+            url: '/tasks/model/filter',
+            type: 'POST',
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify({ uuids }),
+            dataType: 'json',
+            success: function (msg) {
+                const newModel = msg.current_model;
+                const models = msg.models;
+                // Update the modal's data-context so it's in sync
+                $('#model-modal').data('context', newModel);
 
-            // Update the visible text in the UI
-            $('#current_selected_model').text(newModel);
+                // Update the visible text in the UI
+                $('#current_selected_model').text(newModel);
 
 
-            const $modelSelect = $('#model-select');
-            $modelSelect.empty(); // clear existing options
+                const $modelSelect = $('#model-select');
+                $modelSelect.empty(); // clear existing options
 
-            models.forEach(model => {
-                const option = $('<option>', {
-                    value: model.name,
-                    text: model.name,
-                    selected: model.name === newModel
+                models.forEach(model => {
+                    const option = $('<option>', {
+                        value: model.name,
+                        text: model.name,
+                        selected: model.name === newModel
+                    });
+                    $modelSelect.append(option);
                 });
-                $modelSelect.append(option);
-            });
 
-        },
-        error: function (xhr, status, err) {
-        console.error('Error filtering models:', status, err);
-        }
-    });
+            },
+            error: function (xhr, status, err) {
+                console.error('Error filtering models:', status, err);
+            }
+        });
     }
 
 
@@ -441,8 +441,16 @@
         });
     }
 
-    function showChatLoading() {
+    function beginSpinningJoe() {
         $('#navbar-img')[0].classList.add('spin');
+    }
+
+    function stopSpinningJoe() {
+        $('#navbar-img')[0].classList.remove('spin');
+    }
+
+    function showChatLoading() {
+        beginSpinningJoe();
         $('.chat-window').append(`
         <div id="loading-area" style="display: flex; height: 100px;">
             <div>
@@ -451,13 +459,13 @@
     }
 
     function showFillableDocLoading() {
-        $('#navbar-img')[0].classList.add('spin');
+        beginSpinningJoe()
         $('#search-results-panel')[0].classList.add('scanning');
         $('#search-results-panel')[0].append(`Processing fillable PDF...This will take a few minutes`);
     }
 
     function removeChatLoading() {
-        $('#navbar-img')[0].classList.remove('spin');
+        stopSpinningJoe()
         $('.chat-window #loading-area').remove();
     }
 

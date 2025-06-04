@@ -1116,12 +1116,21 @@ textarea {
     white-space: pre-wrap; /* CSS3 */
 }
 
-
-
+.edit-workflow-step-task-btn {
+    cursor: pointer;
+}
 
 .loading-event-progress-container {
     background-color: rgba(0, 0, 0, 0.05);
     padding:10px 22px;
+      /* allow the content to expand vertically up to 80% of the viewport */
+  max-height: 300px;;    
+  /* let extra content scroll instead of clipping */
+  overflow-y: auto;    
+  /* if you want to prevent horizontal clipping as well: */
+  overflow-x: auto;    
+  padding: 1rem;       /* optional, to give some breathing room */
+  box-sizing: border-box;
 }
 
  /* container */
@@ -1136,6 +1145,9 @@ textarea {
 #loading-event-title {
     font-size: 1.5rem;
     margin-bottom: 0.5rem;
+}
+
+#loading-event-title.shimmer {
     background: linear-gradient(
     90deg,
     #4b4b4b 25%,
@@ -1190,4 +1202,17 @@ textarea {
     min-height: 1.2em;
     font-size: 0.9rem;
     color: #b8b8b8;
+}
+
+#loading-event-content {
+    min-height: 1.2em;
+    font-size: 14px;
+    color: #2c2c2c;
+}
+
+#loading-event-title,
+#loading-event-message {
+  /* ensure long words or HTML strings wrap onto the next line */
+  white-space: normal;
+  word-wrap: break-word;
 }

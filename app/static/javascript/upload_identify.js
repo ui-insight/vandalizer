@@ -80,6 +80,7 @@ function showFile() {
       //dropArea.innerHTML = imgTag;
       $("#loading-area").show();
       $("#drag-area").hide();
+      beginSpinningJoe();
       var filetype = file.type;
       var filename = file.name;
       const extension = filename.split(".").pop();

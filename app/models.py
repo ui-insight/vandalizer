@@ -248,6 +248,11 @@ class SearchSet(me.Document):
         """Return the count of items associated with this search set."""
         return SearchSetItem.objects(searchset=self.uuid).count()
 
+    def search_phrases_csv(self) -> str:
+        """Return a list of search items associated with this search set."""
+        items = SearchSetItem.objects(searchset=self.uuid, searchtype="extraction")
+        return ",".join([item.searchphrase for item in items])
+
     def search_items(self) -> list[SearchSetItem]:
         """Return a list of search items associated with this search set."""
         return SearchSetItem.objects(searchset=self.uuid, searchtype="search")
