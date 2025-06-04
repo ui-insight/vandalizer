@@ -10,6 +10,7 @@
         <hr>
         <h3 class="workflow-modal-subtitle">Format the text using language</h3>
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
+        {% include 'workflows/modals/_event_progress_component.html' %}
 
         <!-- Setup formatter -->
         <div class="workflow-content-body">
@@ -37,14 +38,12 @@
         <div class="bottom-toolbar" style>
             <div>
                 <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-                    {% if is_editing %}
-                    <button id="deleteFormatToWorkflowStepBtn" class="btn btn-secondary" style="flex-grow: 1;">Test
+                    <button id="testPromptButton" class="btn btn-secondary" style="flex-grow: 1;">Test
                         Step</button>
-                    {% endif %}
 
                     <button id="confirmFormatterStepBtn" class="btn btn-primary" style="flex-grow: 1;">
                         {% if is_editing %}
-                        Update Formatter
+                        Update Task
                         {% else %}
                         Add Formatter
                         {% endif %}
@@ -55,6 +54,209 @@
     </div>
 
     <script>
+        const container = document.getElementById("loading-event-progress");
+        const titleEl = document.getElementById("loading-event-title");
+        const messageEl = document.getElementById("loading-event-message");
+        const contentEl = document.getElementById("loading-event-content");
+        const contentBarEl = document.querySelector(".loading-progress-bar");
+        const progressEl = document.querySelector(".loading-progress-fill");
+        const outtercontainer = document.querySelector(".loading-event-progress-container");
+        // Initially hide the container
+        let loadingCancelled = false;
+
+        // Your two‐step loading tutorial
+        const steps = [
+            {
+                title: "Preparing test",
+                messages: ["Preparing document", "Preparing test..."],
+                duration: 3000
+            },
+            {
+                title: "Trying your prompt",
+                messages: ["Running your prompt…", "Searching for private information…", "Scanning for compliance…"],
+                duration: 4000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+            {
+                title: "Still working",
+                messages: ["Talking with llm…", "Preparing information…", "Searching for information…"],
+                duration: 10000
+            },
+        ];
+
+        //
+        // FADE IN / FADE OUT HELPERS
+        //
+        function fadeInContainer() {
+            outtercontainer.classList.remove("hidden");
+            container.classList.remove("fade-out");
+            container.classList.add("fade-in");
+        }
+        function fadeOutContainer(callback) {
+            container.classList.remove("fade-in");
+            container.classList.add("fade-out");
+            setTimeout(() => {
+                container.classList.remove("fade-out");
+                if (typeof callback === "function") callback();
+            }, 500);
+        }
+
+        //
+        // RUN STEPS: animate each step’s title, cycling messages, and progress bar
+        //
+        async function runSteps() {
+
+            fadeInContainer();
+            contentBarEl.style.display = 'block';
+            messageEl.style.display = 'block';
+            titleEl.style.display = 'block';
+
+            for (let { title, messages, duration } of steps) {
+                if (loadingCancelled) return;
+
+                // 1) Reset the progress bar completely: clear any existing transition,
+                //    set width to 0, force reflow, then allow the new transition to run.
+                progressEl.style.transition = "none";
+                progressEl.style.width = "0%";
+                // force reflow so the browser “sees” width=0 before we apply a new transition
+                progressEl.offsetWidth;
+
+                // 2) Update the title (as plain text—or if you want HTML here, swap to innerHTML)
+                titleEl.textContent = title;
+                messageEl.textContent = "";
+
+                // 3) Show the progress bar and begin animating it to 100%
+                $(progressEl).stop(true, true).show();
+                // Now give it a fresh CSS transition from 0→100%:
+                progressEl.style.transition = `width ${duration}ms linear`;
+                requestAnimationFrame(() => {
+                    progressEl.style.width = "100%";
+                });
+
+                // 4) Cycle through “messages” during the duration
+                let msgIdx = 0;
+                const msgInterval = setInterval(() => {
+                    if (loadingCancelled) {
+                        clearInterval(msgInterval);
+                        return;
+                    }
+                    messageEl.textContent = messages[msgIdx % messages.length];
+                    msgIdx++;
+                }, duration / messages.length);
+
+                // 5) Await the end of this step’s duration
+                await new Promise(res => {
+                    setTimeout(() => {
+                        clearInterval(msgInterval);
+                        res();
+                    }, duration);
+                });
+
+                if (loadingCancelled) return;
+
+                // 6) Fade out/in briefly before going to the next step
+                await new Promise(res => {
+                    fadeOutContainer(() => {
+                        fadeInContainer();
+                        res();
+                    });
+                });
+            }
+        }
+
+        //
+        // “Run Prompt” button click: start the loading animation, then fire AJAX
+        //
+        $('#testPromptButton').off("click").on("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            // 1) Reset the “cancel” flag, spin the loader, and start runSteps()
+            loadingCancelled = false;
+            beginSpinningJoe();
+            runSteps();
+            contentEl.innerHTML = "";
+
+            // 2) Build task_data and JSON payload as before...
+            let workflow_task_id = $(this).attr("data-task-id");
+            let task_data = { type: "prompt" };
+            const dropdown = $('#extractionSetDropdown');
+            if (dropdown.val()) {
+                task_data["prompt"] = dropdown.val();
+            } else {
+                task_data["prompt"] = $('#promptInput').val();
+            }
+            let data = JSON.stringify({
+                task_name: "Formatter",
+                document_uuids: document_uuids,
+                task_data: task_data
+            });
+
+            // 3) Fire off the AJAX call
+            $.ajax({
+                url: `/workflows/workflow/step/test`,
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (response) {
+                    // --- as soon as we get a response:
+
+                    // a) Stop the spinner and tell runSteps to quit immediately
+                    stopSpinningJoe();
+                    loadingCancelled = true;
+                    contentBarEl.style.display = 'none';
+                    messageEl.style.display = 'none';
+                    titleEl.style.display = 'none';
+
+
+                    // b) Remove shimmer (if container/title has a shimmer class, take it off)
+                    //    Adjust the selector if you applied shimmer to a different element.
+                    container.classList.remove("shimmer");
+                    titleEl.classList.remove("shimmer");
+                    messageEl.classList.remove("shimmer");
+
+                    // c) Fade out the entire loading container, THEN inject final HTML & fade back in
+                    fadeOutContainer(() => {
+                        // Use innerHTML so any HTML tags in response.output actually render
+                        titleEl.innerHTML = "";
+                        messageEl.innerHTML = "";
+                        // Inject the final 
+                        contentEl.innerHTML = response.output || "";
+                        // (If you have a separate “details” field, otherwise just messageEl.innerHTML = "")
+
+                        // Hide the progress bar entirely
+                        $(progressEl).hide();
+                        // Finally, fade the container (with new content) back in
+                        fadeInContainer();
+                    });
+                },
+                error: function (xhr, thrownError) {
+                    console.error("AJAX error:", thrownError);
+                }
+            });
+        });
+
         $('#closeAddPromptToWorkflowBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowAddFormattingModal').remove();

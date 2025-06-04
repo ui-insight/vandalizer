@@ -407,6 +407,7 @@
             workflow_session_id = session_id;
 
             // Start the timer before making the API call
+            $('.workflow-output-buttons').addClass('hidden');
 
             console.log(current_space_id);
             let data = JSON.stringify({
@@ -418,6 +419,8 @@
             });
 
             $('.add-step').hide();
+            $('.workflow-output-section').hide();
+            $('.workflow-output').removeClass('hidden');
             $('.workflow-output').fadeIn();
 
             workflow_interval_id = pollWorkflowStatus(session_id);
@@ -458,8 +461,9 @@
                     // replace \",\" with <hr> in the html output
                     outputText = outputText.replace(/\",\"/g, '<hr>');
 
-
-                    $('.workflow-output-section').append(`${outputText}<br>`);
+                    $('.workflow-output-section').show();
+                    $('.workflow-output-buttons').removeClass('hidden');
+                    $('.workflow-output-section').append(`${outputText}`);
                     $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
                     $('.workflow-step').removeClass('active');
                     // Add 'active' class to the nth $('.workflow-step') element (0-based index)
@@ -486,7 +490,7 @@
         // If there is a workflow in the browser href
         let workflow_template = {{ workflow_template| length
     }}
-              if (workflow_template != "") {
+    if (workflow_template != "") {
         addWorkflowListeners();
     }
 

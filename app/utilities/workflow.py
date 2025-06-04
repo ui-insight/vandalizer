@@ -552,9 +552,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
             node.add_tasks(tasks)
             nodes.append(node)
 
-        node = MultiTaskNode(step.name)
-        node.add_tasks(tasks)
-        nodes.append(node)
         if node is not None:
             engine.add_node(node)
 

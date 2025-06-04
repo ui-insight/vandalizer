@@ -389,5 +389,20 @@ h4 {
 }
 
 .workflow-output-section {
-  padding: 15px 0px;
+  padding: 15px 15px;
+  width: 100%;
+  margin-top: 15px;
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.workflow-output-buttons {
+    padding: 0px;
+    margin: 15px 0px 0px 0px;
+    display: flex;
+    justify-content: right;
+    gap: 15px;
+}
+
+.workflow-output-button {
+  flex-grow: 1;
 }

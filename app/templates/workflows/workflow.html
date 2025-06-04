@@ -66,21 +66,30 @@
     </div>
 
 
-    <div class="workflow-step workflow-output" style="display: none;">
+    <div class="workflow-step workflow-output hidden">
         <div class="step-connector top"></div>
+
         <div class="step-content">
             <div class="add-task-icon-container">
                 <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
             </div>
             <div class="step-header">
+
                 <span>View output</span>
+
                 <span class="workflow-output-attachment-info"><span>Preparing</span> <span> <i> 1 second
                             elapsed</i></span></span>
+                <a id="closeWorkflowOutputBtn"
+                    style="position: absolute; right: 30px; color: #88888899; cursor: pointer;"><i
+                        class="fa-solid fa-circle-xmark"></i></a>
+
             </div>
 
         </div>
-        <div class="workflow-output-section">
-
+        <div class="workflow-output-section"></div>
+        <div class="workflow-output-buttons hidden">
+            <button id="shareWorkflowBtn" class="workflow-output-button btn btn-secondary">Share Workflow</button>
+            <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
         </div>
 
     </div>
