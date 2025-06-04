@@ -22,7 +22,7 @@
                         <div class="loading-progress-fill"></div>
                     </div>
                     <p id="loading-event-message"></p>
-                    <p id="loading-event-content"></p>
+                    <p id="loading-event-content" style="padding-top: 10px;"></p>
                 </div>
             </div>
         </div>
@@ -143,6 +143,8 @@
 
             fadeInContainer();
             contentBarEl.style.display = 'block';
+            messageEl.style.display = 'block';
+            titleEl.style.display = 'block';
 
             for (let { title, messages, duration } of steps) {
                 if (loadingCancelled) return;
@@ -240,6 +242,9 @@
                     stopSpinningJoe();
                     loadingCancelled = true;
                     contentBarEl.style.display = 'none';
+                    messageEl.style.display = 'none';
+                    titleEl.style.display = 'none';
+
 
                     // b) Remove shimmer (if container/title has a shimmer class, take it off)
                     //    Adjust the selector if you applied shimmer to a different element.
