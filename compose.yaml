@@ -14,7 +14,7 @@ services:
   celery:
     build:
       context: .
-      dockerfile: Celery.Containerfile
+      dockerfile: Dockerfile
     depends_on:
       - redis
       - mongo
@@ -26,6 +26,7 @@ services:
       - vandalizer
     volumes:
       - /tmp/vandalizer:/app/static/uploads
+    entrypoint: run-celery.sh
 
   web:
     build:
