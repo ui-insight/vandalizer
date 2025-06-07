@@ -56,6 +56,7 @@ dependencies = [
     "easyocr>=1.7.2",
     "pdf2image>=1.17.0",
     "pytesseract>=0.3.13",
+    "uillm",
 ]
 
 
@@ -88,6 +89,9 @@ commands = [["pytest"]]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
 TEST_BROWSER = "chrome"
+
+[tool.uv.sources]
+uillm = { git = "ssh://git@github.com/ui-insight/insight-helpers.git" }
 
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"

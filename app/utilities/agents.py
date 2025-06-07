@@ -4,6 +4,7 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any, Optional
+from datetime import datetime, timezone
 
 import asyncio
 
@@ -15,7 +16,9 @@ from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
-
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.profiles import ModelProfile
+from pydantic_ai.profiles.openai import OpenAIJsonSchemaTransformer, OpenAIModelProfile, openai_model_profile
 
 from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
@@ -24,6 +27,7 @@ from app.utilities.document_readers import extract_text_from_doc
 import asyncio
 from app.utilities.config import settings
 from app.utilities.llm import remove_code_markers
+
 
 load_dotenv()
 
@@ -41,6 +45,36 @@ if langfuse_enabled:
     langfuse = Langfuse()
 
 
+
+class InsightAIProvider(OpenRouterProvider):
+    """Custom OpenRouter provider for UIdaho Insight AI server."""
+    @property
+    def base_url(self) -> str:
+        return "https://mindrouter-api.nkn.uidaho.edu/v1"
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # Special handling for Ollama models, those that do not contain "/" in the name
+        if "/" not in model_name:
+            profile = openai_model_profile(model_name)
+            return OpenAIModelProfile(
+                json_schema_transformer=OpenAIJsonSchemaTransformer
+            ).update(profile)
+
+        # Fallback to parent logic
+        return super().model_profile(model_name)
+
+
+def get_agent_model(agent_model):
+    if "openai" in agent_model:
+        model_name = agent_model.split("/")[-1]
+        return OpenAIModel(
+            model_name=model_name,
+        )
+    return OpenAIModel(
+        model_name=agent_model,
+        provider=InsightAIProvider(api_key='no-api-key')
+    )
+
 @dataclass
 class RagDeps:
     doc_manager: DocumentManager
@@ -48,43 +82,6 @@ class RagDeps:
     documents: list[SmartDocument]
 
 
-chat_prompt = "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know."
-
-# @ model = OpenAIModel("gpt-4o")
-model = "openai:gpt-4o"
-
-
-def get_agent_model(agent_model):
-    model_config = []
-    if "/" in agent_model:
-        # use insight server model
-        model_config = agent_model.split("/")
-    elif ":" in agent_model:
-        model_config = agent_model.split(":")
-    else:
-        return OpenAIModel(
-            model_name=agent_model,
-            provider=OpenAIProvider(base_url=settings.insight_endpoint),
-        )
-
-    if len(model_config) == 1:
-        model_config = agent_model.split(":")
-    elif len(model_config) != 2:
-        raise ValueError(
-            f"Invalid model configuration: {agent_model}. Expected format: <model_type>/<model_name>"
-        )
-    model_type, model_name = model_config[0], model_config[1]
-    if model_type == "openai":
-        # use openai model
-        model = OpenAIModel(
-            model_name=model_name,
-        )
-    else:
-        model = OpenAIModel(
-            model_name=model_name,
-            provider=OpenAIProvider(base_url=settings.insight_endpoint),
-        )
-    return model
 
 
 def create_rag_agent(agent_model):
@@ -115,8 +112,13 @@ def create_rag_agent(agent_model):
     )
 
 
-def create_chat_agent(agent_model):
+def create_chat_agent(agent_model, system_prompt=None):
     model = get_agent_model(agent_model)
+    if system_prompt is not None:
+        return Agent(
+            model,
+            system_prompt=system_prompt,
+        )
     return Agent(
         model,
         system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
@@ -148,7 +150,7 @@ def create_chat_agent(agent_model):
 def create_prompt_agent(agent_model):
     model = get_agent_model(agent_model)
     return Agent(
-        "openai:gpt-4o",
+        model,
         system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
 
     When generating search prompts:
@@ -184,92 +186,13 @@ def create_upload_agent(agent_model):
         result_type=UploadResult,
     )
 
+upload_agent = create_upload_agent(settings.base_model)
 
-upload_agent = create_upload_agent("openai/gpt-4o")
+rag_agent = create_rag_agent(settings.base_model)
 
+prompt_agent = create_prompt_agent(settings.base_model)
 
-async def validate_document(document_path, document_text, chunk_size=8000):
-    """
-    Validate the document and return the result.
-    Args:
-        document_path (str): The path to the document.
-        document_text (str): The text content of the document.
-    Returns:
-        dict: The result of the validation.
-    """
-    text = document_text
-    if not text:
-        text = extract_text_from_doc(document_path)
-
-    debug("text: ", text)
-
-    compliance = settings.upload_compliance
-
-    chunked_text = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-    debug("number of chunks:", len(chunked_text))
-    tasks = []
-
-    for i, chunk in enumerate(chunked_text):
-        chunk_prompt = f"""Validate that the following document chunk ({i + 1}/{len(chunked_text)}) meets the compliance requirements:
-        Compliance Requirements: \n{compliance}
-        Document Path: {document_path}
-        Document Text Chunk: \n{chunk}
-        """
-        tasks.append(upload_agent.run(chunk_prompt))
-
-    chunk_results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    valid_results = []
-    feedbacks = []
-
-    results = []
-    for i, result in enumerate(chunk_results):
-        if isinstance(result, Exception):
-            debug(f"Error processing chunk {i + 1}: {result}")
-            feedbacks.append(f"Error processing chunk {i + 1}: {result}")
-            valid_results.append(False)
-        else:
-            result_output = result.output
-            results.append(result_output)
-            valid_results.append(result_output.valid)
-            feedbacks.append(f"Chunk {i + 1}: {result_output.feedback}")
-
-    is_valid = all(valid_results)
-
-    # combined_feedback = "\n\n".join(feedbacks)
-    combined_feedback = ""
-    if is_valid:
-        combined_feedback = (
-            "All document sections passed validation.\n\n" + combined_feedback
-        )
-    else:
-        # combined_feedback = (
-        #     "Document failed validation in one or more sections.\n\n"
-        #     + combined_feedback
-        # )
-        for item in results:
-            if not item.valid:
-                combined_feedback += item.feedback + "\n\n"
-
-    # summarize the feedback
-    chat_agent = create_chat_agent(settings.base_model)
-    feedback_summary = await chat_agent.run(
-        f"Check if there are any valiation failure and summaryize them in the following: {combined_feedback}"
-    )
-
-    result = UploadResult(
-        valid=is_valid,
-        feedback=feedback_summary.output,
-    )
-
-    debug("Final Validation Result:", result)
-    return result
-
-
-rag_agent = create_rag_agent(model)
-
-prompt_agent = create_prompt_agent(model)
-
+# TODO maybe add an indicator to the UI to show that the response was drawn from the vector store or not
 
 @rag_agent.tool
 def retrieve(
@@ -344,11 +267,14 @@ def retrieve(
     return content
 
 
+
 @dataclass
 class FieldInferenceDeps:
     extraction_context: Optional[str]
     keys: list[str]
 
+
+model = get_agent_model(settings.base_model)
 
 field_inference_agent = Agent(
     model,
@@ -499,7 +425,7 @@ def create_extraction_agent(agent_model):
     )
 
 
-extraction_agent = create_extraction_agent(model)
+extraction_agent = create_extraction_agent(settings.base_model)
 
 
 @extraction_agent.system_prompt
@@ -560,7 +486,7 @@ def filter_empty_entities(result: dict) -> list:
 
 
 # @observe()
-def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
+def extract_entities_with_agent(text: str, keys: list[str], context: str = "", model_name: str = settings.base_model) -> list:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
@@ -671,6 +597,7 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         entities=(list[DynamicModel], ...),
     )
 
+    model = get_agent_model(model_name)
     extractor_agent = Agent(
         model,
         deps_type=ExtractionDeps,

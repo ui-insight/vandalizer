@@ -469,7 +469,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
     em.root_path = current_app.root_path
 
     user = load_user()
-    model_config = UserModelConfig.objects(user_id=user.user_id)
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
     if model_config is not None:
         model = model_config.name

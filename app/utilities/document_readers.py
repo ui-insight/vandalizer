@@ -5,34 +5,13 @@ import os
 from devtools import debug
 from PyPDF2 import PdfReader
 
-from ..uillm.uillm import UIPDF
+from uillm import UIPDF
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
 MIN_PDF_TEXT_LENGTH = 100
 # doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), "static/uploads")
-
-
-class APIResponse:
-    def __init__(
-        self,
-        status=None,
-        message=None,
-        http_status=None,
-        text=None,
-        tables=None,
-        images=None,
-    ) -> None:
-        self.status = status
-        self.message = message
-        self.http_status = http_status
-        self.text = text
-        self.tables = tables
-        self.images = images
-
-    def __repr__(self) -> str:
-        return f"APIResponse(status={self.status}, message={self.message}, http_status={self.http_status}, text={self.text}, tables={self.tables}, images={self.images})"
 
 
 def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
