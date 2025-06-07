@@ -12,8 +12,13 @@ from app.utilities.agents import create_chat_agent, upload_agent
 from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
 
+from dotenv import load_dotenv
+load_dotenv()
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=5)
+
+chat_agent = create_chat_agent(settings.base_model)
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def validate_chunk(
     self, document_path: str, compliance: str, chunk_text: str, index: int, total: int
 ) -> dict:
@@ -42,8 +47,8 @@ def validate_chunk(
         raise self.retry(exc=e)
 
 
-@celery_app.task
-def summarize_results(results: list, document_uuid: str) -> dict:
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+def summarize_results(self, results: list, document_uuid: str) -> dict:
     """
     Summarize validation feedback from all chunks and update the SmartDocument.
     """
@@ -60,28 +65,34 @@ def summarize_results(results: list, document_uuid: str) -> dict:
         combined = "\n\n".join(feedback_list)
 
     # Summarize via chat_agent
-    chat_agent = create_chat_agent(settings.base_model)
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    summary = loop.run_until_complete(
-        chat_agent.run(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
+    try:
+        summary = loop.run_until_complete(
+            upload_agent.run(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
 
-Validation feedback:
-{combined}
-""")
-    )
+    Validation feedback:
+    {combined}
+    """)
+        )
+    except Exception as e:
+        debug(f"Error summarizing results: {e}")
+        self.retry(exc=e)
+
+    summary = summary.output.model_dump()
+    debug(summary)
 
     # Persist to DB
     doc = SmartDocument.objects(uuid=document_uuid).first()
     doc.valid = all_valid
-    doc.validation_feedback = summary.output
+    doc.validation_feedback = summary.get("feedback", "")
     doc.save()
     debug(f"Document {document_uuid} validation updated: valid={all_valid}")
-    return {"valid": all_valid, "feedback": summary.output}
+    return summary
 
 
-@celery_app.task
-def perform_document_validation(
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+def perform_document_validation(self,
     document_text: str,
     document_uuid: str,
     document_path: str,

@@ -108,15 +108,15 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
         debug("Document not validated, reason: ", document.validation_feedback)
         return
 
-    with DocumentManager() as document_manager:
-        document_path = document.absolute_path
-        document_manager.add_document(
-            user_id=user_id,
-            document_name=document.title,
-            document_id=document.uuid,
-            doc_path=document_path,
-            raw_text=raw_text,
-        )
+    document_manager = DocumentManager()
+    document_path = document.absolute_path
+    document_manager.add_document(
+        user_id=user_id,
+        document_name=document.title,
+        document_id=document.uuid,
+        doc_path=document_path,
+        raw_text=raw_text,
+    )
     document.save()
     return document.uuid
 
@@ -142,24 +142,8 @@ class DocumentManager:
             settings=Settings(anonymized_telemetry=False, is_persistent=True),
         )
 
-    def close(self):
-        """Explicitly close the ChromaDB client to prevent resource leaks."""
-        if hasattr(self, "client") and self.client:
-            try:
-                self.client.close()
-            except Exception as e:
-                print(f"Error closing ChromaDB client: {e}")
-
-    def __del__(self):
-        """Destructor to ensure client is closed if object is garbage collected."""
-        self.close()
-
     def __enter__(self):
         return self
-
-    def __exit__(self, exc_type, exc, tb):
-        # always close—even if an exception is raised
-        self.close()
 
     def get_user_collection(self, user_id: str) -> Chroma:
         """Get or create a collection for a specific user."""

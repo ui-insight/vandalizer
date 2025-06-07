@@ -5,6 +5,7 @@ import os
 import tempfile
 import uuid
 from itertools import chain
+from devtools import debug
 
 import pypandoc
 from bson import ObjectId
@@ -36,7 +37,7 @@ from app.models import (
 )
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.workflow import execute_task_step_test, execute_workflow_task
+from app.utilities.workflow import execute_workflow_task
 from app.utils import load_user
 
 from . import workflows
@@ -85,7 +86,7 @@ def edit_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
-@workflows.route("/delete", methods=["POST"])
+@workflows.route("/delete_workflow", methods=["POST"])
 def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
     user = load_user()
@@ -94,7 +95,10 @@ def delete_workflow() -> ResponseReturnValue:
     data = request.get_json()
     uuid = data["uuid"]
     print(uuid)
-    Workflow.objects(id=uuid).delete()
+    workflow = Workflow.objects(id=uuid).first()
+
+    WorkflowResult.objects(workflow=workflow).delete()
+    workflow.delete()
     return {"success": True}
 
 
@@ -206,7 +210,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    async_result = execute_task_step_test.delay(
+    async_result = execute_workflow_task.delay(
         task_name=task_name,
         task_data=task_data,
         document_trigger_step_id=str(document_trigger_step.id),
@@ -692,6 +696,7 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         # Handle POST request - create a new WorkflowStep
 
         data = request.get_json()
+        debug(data)
         workflow_id = data["workflow_uuid"]
         search_set_id = data.get("search_set_id", None)
         manual_input = data.get("manual_input", None)
@@ -703,6 +708,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
+            # if not searchset:
+            #     return jsonify({"error": "Search set not found"})
 
             workflow_step_task = None
             if task_id is not None and task_id != 0:

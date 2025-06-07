@@ -128,9 +128,17 @@ def llm_chat_model(model, prompt, data=None, docs=None):
     return output
 
 
-def data_extraction_model(model, keys, document_uuids=[], full_text=None):
+def data_extraction_model(model, keys, documents=[], full_text=None):
     output = None
     extraction_manager = ExtractionManager3()
+    document_uuids = []
+    for doc in documents:
+        if doc is None:
+            continue
+        if isinstance(doc, str):
+            document_uuids.append(doc)
+        else:
+            document_uuids.append(doc.uuid)
     output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
 
     debug(output)
@@ -157,10 +165,11 @@ CRITICAL:
 
     # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
-    chat_lm = ChatLM(model)
-    response = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
-    )
+    chat_agent = create_chat_agent(model)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    response = loop.run_until_complete(chat_agent.run(prompt))
+    response = response.output
 
     debug(response)
 
@@ -252,37 +261,16 @@ class DocumentNode(Node):
         for doc in self.attachments:
             if doc is None:
                 continue
-            doc_path = doc.absolute_path
             self.docs_uuids.append(doc.uuid)
-            user_id = doc.user_id
-            if not os.path.exists(str(doc_path)):
-                doc_path = os.path.join(
-                    app.root_path,
-                    "static",
-                    "uploads",
-                    user_id,
-                    str(doc.path),
-                )
-            self.pdf_paths.append(str(doc_path))
 
         for doc in self.docs:
             if doc is None:
                 continue
-            doc_path = doc.absolute_path
             self.docs_uuids.append(doc.uuid)
-            user_id = doc.user_id
-            if not os.path.exists(str(doc_path)):
-                doc_path = os.path.join(
-                    app.root_path,
-                    "static",
-                    "uploads",
-                    user_id,
-                    str(doc.path),
-                )
-            self.pdf_paths.append(str(doc_path))
 
         debug(self.docs[0])
         debug(self.pdf_paths)
+        debug(self.docs_uuids)
 
     def process(self, inputs=None):
         # data = inputs.get("data", None)
@@ -305,10 +293,10 @@ class FormatNode(Node):
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         if prev_step_name == "Document":
-            docs_uuids = inputs.get("output", None)
+            docs_uuids = inputs.get("output", [])
             text = ""
-            for doc_uuid in docs_uuids:
-                doc = SmartDocument.objects(uuid=doc_uuid).first()
+            for doc in docs_uuids:
+                doc = SmartDocument.objects(uuid=doc).first()
                 text += doc.raw_text
         else:
             text = data
@@ -323,6 +311,9 @@ class ExtractionNode(Node):
         self.data = data
         self.user_id = data.get("user_id", "0")
         self.model = data.get("model")
+        debug(self.data)
+        debug(self.model)
+        debug(self.user_id)
 
     def process(self, inputs):
         data = self.data
@@ -388,9 +379,11 @@ class PromptNode(Node):
         chat_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
-            docs = [
-                SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
-            ]
+            docs = []
+            for doc_uuid in docs_uuids:
+                doc = SmartDocument.objects(uuid=doc_uuid).first()
+                if doc is not None:
+                    docs.append(doc)
 
             chat_response = llm_chat_model(model=self.model, docs=docs, prompt=prompt)
         else:
@@ -510,13 +503,14 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
         node = None
-        debug(step)
+        debug(step.name, step.data)
         if step.name == "Document":  # this the trigger step
             node = DocumentNode(step.data)
             nodes.append(node)
         else:  # this a task step
             tasks = []
             for task in step.tasks:
+                debug(task)
                 if task.name == "Extraction":
                     if task.data.get("search_set_uuid"):
                         search_set = SearchSet.objects(
@@ -551,6 +545,7 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)
             nodes.append(node)
+            debug(step.tasks)
 
         if node is not None:
             engine.add_node(node)
@@ -564,61 +559,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
 
     return engine
 
-
-@celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
-def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
-    process_node = None
-    latest_output = None
-    workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
-    engine = WorkflowEngine()
-    nodes = []
-    node = DocumentNode(workflow_trigger_step.data)
-    nodes.append(node)
-    engine.add_node(node)
-
-    debug(nodes)
-    # connect the steps
-
-    if task_name == "Extraction":
-        process_node = ExtractionNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    elif task_name == "Prompt":
-        process_node = PromptNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    elif task_name == "Formatter":
-        process_node = FormatNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    else:
-        process_node = Node(task_name)
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-
-    for idx in range(len(nodes)):
-        if idx == 0:
-            continue
-        engine.connect(nodes[idx - 1], nodes[idx])
-
-    final_output, data = engine.execute()
-    print(final_output)
-
-    return final_output
 
 
 @celery_app.task(bind=True, name="workflow.execute_workflow")

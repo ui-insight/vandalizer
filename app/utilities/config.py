@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from ..uillm.uillm import UILLM
+from uillm import UILLM
 
 # Load environment variables from .env file
 load_dotenv()
@@ -49,7 +49,7 @@ if isinstance(list_of_models, str):
     ]
 
     for model in base_models:
-        name = model.split(":")[1].strip()
+        name = model.split("Model: ")[-1].strip()
         if name.startswith("EMBED"):
             continue
         # check if the model is an external provider
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     )
 
     base_model: str = Field(
-        default="openai/gpt-4o", description="The specific model to use for LLM tasks."
+        default="openai/gpt-4.1", description="The specific model to use for LLM tasks."
     )
     models: list[ModelType] = Field(
         default=models,
@@ -120,6 +120,7 @@ class Settings(BaseSettings):
     )
     # 128K is the max context length for the GPT-4o model
     # we use less than this to be safe
+    # TODO make this adaptable based on the model selected
     max_context_length: int = Field(
         default=max_length, description="Maximum context length for the model."
     )
