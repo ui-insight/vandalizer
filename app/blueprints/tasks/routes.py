@@ -88,6 +88,7 @@ def add_search_term() -> ResponseReturnValue:
         "toolpanel/search_set_item.html",
         search_set=searchset,
         item=searchsetitem,
+        item_index=searchset.items().count(),  # Assuming items is a
     )
     response = {
         "complete": True,
