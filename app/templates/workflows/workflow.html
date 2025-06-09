@@ -97,9 +97,21 @@
             <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
         </div>
 
+
+    </div>
+    <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
+        <ul>
+            <li id="download-pdf-option">PDF</li>
+            <li id="download-csv-option">CSV</li>
+            <li id="download-text-option">Text</li>
+        </ul>
     </div>
 
+
+
     <script>
+
+
         $('#editWorkflowTitleBtn').on("click", function (e) {
             e.preventDefault();
             $('#workflowTitle').hide();

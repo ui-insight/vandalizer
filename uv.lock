@@ -3371,6 +3371,19 @@ wheels = [
 ]
 
 [[package]]
+name = "reportlab"
+version = "4.4.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "chardet" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7b/d8/c3366bf10a5a5fcc3467eefa9504f6aa24fcda5817b5b147eabd37a385e1/reportlab-4.4.1.tar.gz", hash = "sha256:5f9b9fc0b7a48e8912c25ccf69d26b82980ab0da718e4f583fa720e8f8f5073f", size = 3509107, upload-time = "2025-05-15T08:07:02.539Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a1/2e/7994a139150abf11c8dd258feb091ad654823a83cfd9720bfdded27185c3/reportlab-4.4.1-py3-none-any.whl", hash = "sha256:9217a1c8c1917217f819718b24972a96ad0c485a1c494749562d097b58d974b7", size = 1953615, upload-time = "2025-05-15T08:06:59.248Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.3"
 source = { registry = "https://pypi.org/simple" }
@@ -4182,6 +4195,7 @@ dependencies = [
     { name = "pytesseract" },
     { name = "python-dotenv" },
     { name = "redis" },
+    { name = "reportlab" },
     { name = "requests" },
     { name = "rollbar" },
     { name = "tiktoken" },
@@ -4247,6 +4261,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'" },
     { name = "python-dotenv" },
     { name = "redis" },
+    { name = "reportlab" },
     { name = "requests" },
     { name = "rollbar" },
     { name = "ruff", marker = "extra == 'dev'" },

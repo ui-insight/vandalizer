@@ -140,6 +140,9 @@
             <div class="drag-area" id="drag-area" style="position: relative;">
                 <div class="icon"><i class="fas fa-cloud-upload-alt"></i></div>
                 <header style="padding: 0 15px; text-align: center;">Drag & Drop to Upload File</header>
+                <span
+                    style="padding: 0 15px; text-align: center; font-weight: 300; font-size: 12px; margin: 0; color: #5d5d5d78;"><i>pdf,
+                        xls, xlsx, docx</i></span>
                 <input type="file" hidden style="display:none;">
                 <div class="drop-area"
                     style="background-color: transparent; position: absolute; left: 0; right: 0; top: 0; bottom: 0;">
@@ -235,8 +238,9 @@
                                 <!-- Show date if there's room -->
                                 <span class="file-date">{{ doc.time_ago_in_words() }}</span>
 
-
-
+                                {% if doc.processing %}
+                                <span class="workflow-loader"></span>
+                                {% endif %}
                                 <button class="ellipsis-btn" data-doc-id="{{ doc.uuid }}">
                                     <span><i class="fa-solid fa-ellipsis-vertical"></i></span>
                                 </button>

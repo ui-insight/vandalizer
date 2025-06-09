@@ -1208,6 +1208,7 @@ textarea {
     min-height: 1.2em;
     font-size: 14px;
     color: #2c2c2c;
+    text-align: left;
 }
 
 #loading-event-title,

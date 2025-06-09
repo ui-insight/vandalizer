@@ -43,6 +43,7 @@ def perform_extraction_and_update(document_uuid, extension):
     raw_text = ""
     try:
         if extension == "docx":
+            debug("Extracting docx")
             # replace the extension with .docx
             docx_path = absolute_path.with_suffix(".docx")
             pdf_path = absolute_path.with_suffix(".pdf")
@@ -56,6 +57,7 @@ def perform_extraction_and_update(document_uuid, extension):
 
         elif extension in ["xlsx", "xls"]:
             # Convert to HTML
+            debug("Extracting excel")
             html_path = absolute_path.with_suffix(".html")
             excel_path = absolute_path.with_suffix(".xlsx")
             save_excel_to_html(excel_path, html_path)
@@ -64,6 +66,7 @@ def perform_extraction_and_update(document_uuid, extension):
             document.path = str(Path(document.path).with_suffix(".html"))
 
         else:
+            debug("Extracting pdf")
             # For other file types, use the generic text extraction
             raw_text = extract_text_from_doc(document.absolute_path, doc=document)
 
