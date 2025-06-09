@@ -358,6 +358,17 @@
         performSemanticSearch(searchTerm);
       });
 
+      $("#add-search-term-input").on("keyup", function (e) {
+        if (e.key === "Enter") {
+          if (search_set_add_uuid != "") {
+            addSearchSetItem();
+            return;
+          } else {
+            showToast("Please select an extraction group to add to");
+          }
+        }
+      });
+
       $("#rerun").on("click", function () {
         $("#semantic-panel").hide();
         let uuid = $(this).attr("data-uuid");
@@ -561,17 +572,6 @@
         },
       });
     }
-
-    $("#add-search-term-input").on("keyup", function (e) {
-      if (e.key === "Enter") {
-        if (search_set_add_uuid != "") {
-          addSearchSetItem();
-          return;
-        } else {
-          showToast("Please select an extraction group to add to");
-        }
-      }
-    });
 
     function addSearchSetItem() {
       $.ajax({
