@@ -1,77 +1,130 @@
 #!/usr/bin/env python3
 
 
-import nltk
-import PyPDF2
 from pathlib import Path
 
+import nltk
 import openpyxl
 import pandas as pd
+import PyPDF2
 
 
 def save_excel_to_html(excel_file_path, html_file_path) -> None:
     wb = openpyxl.load_workbook(excel_file_path, data_only=True)
     sheets = wb.sheetnames
     active_sheet = wb.active
-    active_sheet_index = sheets.index(active_sheet.title)
+    active_index = sheets.index(active_sheet.title)
 
     active_html_path = Path(html_file_path)
     output_dir_path = active_html_path.parent
     doc_name = active_html_path.stem
-
     output_dir_path.mkdir(parents=True, exist_ok=True)
+
+    # ——— Full-page & table styling ———
+    base_css = """
+    <style>
+      body {
+        background-color: #ffffff;
+        font-family: Arial, sans-serif;
+        margin: 1rem;
+        margin: 30px;
+      }
+      .nav-links {
+        margin: 1rem 0;
+      }
+      .nav-links a {
+        color: #007bff;
+        text-decoration: none;
+        margin: 0 .5rem;
+      }
+      .nav-links a:hover {
+        text-decoration: underline;
+      }
+      table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      td, th {
+        padding: .75rem 1rem;
+        border-bottom: 1px solid #e9ecef;
+      }
+      tbody tr:nth-of-type(odd) {
+        background-color: #f8f9fa;
+      }
+      th {
+        background-color: #343a40;
+        color: #ffffff;
+        text-align: left;
+      }
+    </style>
+    """
 
     for i, sheet_name in enumerate(sheets):
         sheet = wb[sheet_name]
         max_col = sheet.max_column
-        values = sheet.iter_rows(values_only=True)
-        values = [[cell if cell is not None else "" for cell in row] for row in values]
+
+        # read values and build DataFrame
+        values = [
+            [cell if cell is not None else "" for cell in row]
+            for row in sheet.iter_rows(values_only=True)
+        ]
         df = pd.DataFrame(values, columns=range(1, max_col + 1))
-        html_string = df.to_html(
+
+        # convert to HTML table
+        table_html = df.to_html(
             index=False,
             header=False,
             classes=["table", "table-striped"],
             border=0,
         )
 
-        # Add navigation links
-        nav_links = ""
+        # ——— navigation links ———
+        links = []
         if i > 0:
-            prev_sheet = sheets[i - 1]
+            prev = sheets[i - 1]
             prev_file = (
-                f"{doc_name}-{prev_sheet}.html"
-                if i - 1 != active_sheet_index
+                f"{doc_name}-{prev}.html"
+                if (i - 1) != active_index
                 else active_html_path.name
             )
-            nav_links += f'<a href="{prev_file}">Previous Sheet</a> | '
+            links.append(f'<a href="{prev_file}">← Previous</a>')
         if i < len(sheets) - 1:
-            next_sheet = sheets[i + 1]
+            nxt = sheets[i + 1]
             next_file = (
-                f"{doc_name}-{next_sheet}.html"
-                if i + 1 != active_sheet_index
+                f"{doc_name}-{nxt}.html"
+                if (i + 1) != active_index
                 else active_html_path.name
             )
-            nav_links += f'<a href="{next_file}">Next Sheet</a>'
+            links.append(f'<a href="{next_file}">Next →</a>')
+        nav_html = f'<div class="nav-links">{" | ".join(links)}</div>'
 
-        # HTML styles
-        style = """
-        <style>
-        table { border-width: 1px !important; }
-        </style>
-        """
+        # ——— wrap into full HTML ———
+        full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{doc_name} – {sheet_name}</title>
+  {base_css}
+</head>
+<body>
+  {nav_html}
+  {table_html}
+  {nav_html}
+</body>
+</html>
+"""
 
-        # Combine navigation links, style, and table in the final HTML
-        final_html = f"{nav_links}<br><br>{style}{html_string}"
-
-        # Determine the file path
-        if i == active_sheet_index:
-            final_html_file_path = active_html_path
+        # decide output path
+        if i == active_index:
+            out_path = active_html_path
         else:
-            final_html_file_path = output_dir_path / f"{doc_name}-{sheet_name}.html"
+            out_path = output_dir_path / f"{doc_name}-{sheet_name}.html"
 
-        with open(final_html_file_path, "w") as file:
-            file.write(final_html)
-
+        out_path.write_text(full_html, encoding="utf-8")
 
 
 def chunk_pdf(pdf_path):
