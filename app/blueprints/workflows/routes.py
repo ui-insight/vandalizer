@@ -388,6 +388,7 @@ def workflow_download() -> ResponseReturnValue:
         prompt = (
             "Convert the following HTML document into a well formatted CSV. "
             "Use commas as separators and include a header row.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
     elif fmt == "pdf":
@@ -395,11 +396,13 @@ def workflow_download() -> ResponseReturnValue:
         prompt = (
             "Lay out the following HTML document into a beautiful output I can export as PDF. "
             "You can output plain text; we'll convert it to PDF on the server.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
     else:  # txt
         prompt = (
-            "Pretty-print the following HTML document into a well-formatted text document. Just give me clean, indented text.\n\n"
+            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
 
@@ -407,6 +410,9 @@ def workflow_download() -> ResponseReturnValue:
     formatted = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
+
+    # Remove the tick marks before and after blocks
+    formatted = formatted.strip("`").strip()
 
     # 4) package it up
     buf = io.BytesIO()
