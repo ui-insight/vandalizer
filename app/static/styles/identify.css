@@ -18,7 +18,7 @@
     margin: 30px 45px;
   }
   .drag-area.active{
-    border: 2px solid #efefef;
+   border: 2px dashed #17181a9d;
   }
   .drag-area .icon{
     font-size: 24px;
