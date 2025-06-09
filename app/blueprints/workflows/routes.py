@@ -1,8 +1,8 @@
 """Handle workflow routes."""
 
+import io
 import json
 import os
-import tempfile
 import uuid
 from itertools import chain
 
@@ -33,7 +33,9 @@ from app.models import (
     WorkflowStep,
     WorkflowStepTask,
 )
+from app.utilities.config import model_type
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.llm import ChatLM
 from app.utilities.workflow import execute_task_step_test, execute_workflow_task
 from app.utils import load_user
 
@@ -365,29 +367,94 @@ def workflow_status() -> ResponseReturnValue:
 ## @MARK: Download
 @workflows.route("/download", methods=["GET"])
 def workflow_download() -> ResponseReturnValue:
-    """Download workflow results."""
     session_id = request.args.get("session_id")
+    fmt = request.args.get("format", "txt").lower()
 
     if not session_id:
-        return jsonify({"error": "workflow_id is required"}), 400
+        return jsonify({"error": "session_id is required"}), 400
 
-    # Get workflow status
+    # 1) fetch the result object
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
-
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
 
-    # Ensure the static folder exists
-    os.makedirs(os.path.join(current_app.root_path, "static"), exist_ok=True)
+    # 2) pull the final output payload
+    final_output = list(workflow_result.steps_output.values())[-1]["output"]
+    raw_json = json.dumps(final_output, indent=2)
+    print(raw_json)
+    # 3) ask the LLM to format
+    #    tailor the prompt to each format
+    if fmt == "csv":
+        prompt = (
+            "Convert the following HTML document into a well formatted CSV. "
+            "Use commas as separators and include a header row.\n\n"
+            f"{raw_json}"
+        )
+    elif fmt == "pdf":
+        # you might ask for a simple text layout or markdown-to-PDF
+        prompt = (
+            "Lay out the following HTML document into a beautiful output I can export as PDF. "
+            "You can output plain text; we'll convert it to PDF on the server.\n\n"
+            f"{raw_json}"
+        )
+    else:  # txt
+        prompt = (
+            "Pretty-print the following HTML document into a well-formatted text document. Just give me clean, indented text.\n\n"
+            f"{raw_json}"
+        )
 
-    final_output = list(workflow_result.steps_output.values())[-1]
+    chat_lm = ChatLM(model_type)
+    formatted = chat_lm.completion(
+        messages=[{"role": "user", "content": prompt}],
+    )
 
-    tmp_file = tempfile.TemporaryFile()
-    tmp_file.write(json.dumps(final_output["output"], indent=4).encode())
-    tmp_file.seek(0)
+    # 4) package it up
+    buf = io.BytesIO()
+    print(f"Format is {fmt}")
+    if fmt == "csv":
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name="workflow_output.csv",
+        )
 
-    # Return the path to the CSV file
-    return send_file(tmp_file, download_name="workflow_output.txt", as_attachment=True)
+    elif fmt == "pdf":
+        # simple PDF via reportlab (you can swap in your favorite)
+        from reportlab.lib.pagesizes import letter
+        from reportlab.pdfgen import canvas
+
+        pdf = canvas.Canvas(buf, pagesize=letter)
+        text = pdf.beginText(40, 750)
+        for line in formatted.splitlines():
+            text.textLine(line)
+            # add new page if you hit the bottom
+            if text.getY() < 40:
+                pdf.drawText(text)
+                pdf.showPage()
+                text = pdf.beginText(40, 750)
+        pdf.drawText(text)
+        pdf.save()
+
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="workflow_output.pdf",
+        )
+
+    else:  # txt
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/plain",
+            as_attachment=True,
+            download_name="workflow_output.txt",
+        )
 
 
 ## @MARK: ~~ Integrate

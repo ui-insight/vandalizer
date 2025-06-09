@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
+import os
 from datetime import datetime
 
 from devtools import debug
+from dotenv import load_dotenv
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.utilities.agents import chat_agent
-from app.utilities.redis_cache import RedisCache
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 

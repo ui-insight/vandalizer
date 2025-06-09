@@ -639,6 +639,57 @@
         return intervalId;
     }
 
+    $('#downloadWorkflowBtn').on('click', function () {
+        const $btn = $(this);
+        const $popup = $('#download-popup-menu');
+
+        // 1) move it so it's not clipped by any parent
+        $('body').append($popup);
+
+        // 2) show invisibly to get its dimensions
+        $popup.css({
+            position: 'absolute',
+            visibility: 'hidden',
+            display: 'block'
+        });
+        const popupW = $popup.outerWidth();
+        const popupH = $popup.outerHeight();
+
+        // 3) figure out where the button is on the page
+        const btnOff = $btn.offset();
+
+        // 4) calculate your top/left
+        let left = btnOff.left;               // align left edges
+        let top = btnOff.top - popupH - 10; // sit 10px above the button
+
+        // 5) keep it inside the viewport
+        const winW = $(window).width();
+        if (left + popupW > winW) left = winW - popupW - 5;
+
+        // 6) show it for real
+        $popup.css({
+            visibility: 'visible',
+            top: `${top}px`,
+            left: `${left}px`,
+            opacity: 0
+        }).animate({ opacity: 1 }, 200);
+    });
+
+    $('#download-pdf-option').on("click", function () {
+        downloadWorkflowOutput('pdf');
+    });
+    $('#download-csv-option').on("click", function () {
+        downloadWorkflowOutput('csv');
+    });
+    $('#download-text-option').on("click", function () {
+        downloadWorkflowOutput('txt');
+    });
+
+    function downloadWorkflowOutput(format) {
+        // Go to the server to download the file in the specified format
+        location.href = `/workflows/download?session_id=${workflow_session_id}&format=${format} `; // Redirect to the download URL
+    }
+
 
 
     // socket.on('workflow_status', function(data) {
