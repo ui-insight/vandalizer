@@ -65,9 +65,6 @@ models= [
      "tag": "insecure / most powerful model",
     "external": True
     },
-    {"name": "openai/gpt-4.1-mini",
-    "tag": "insecure / less powerful model",
-    "external": True},
     {"name": "openai/gpt-4.1-nano",
     "tag": "insecure / less powerful model",
     "external": False},
