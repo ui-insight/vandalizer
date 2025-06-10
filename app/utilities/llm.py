@@ -145,6 +145,26 @@ class InsightLM:
         return outputs
 
 
+def remove_xml_content(text: str, tag: str) -> str:
+    """Removes XML content from a string based on the specified tag.
+
+    Args:
+        text (str): The input text containing XML content.
+        tag (str): The XML tag to remove.
+
+    Returns:
+        str: The text with the specified XML content removed.
+    """
+    start_tag = f"<{tag}>"
+    end_tag = f"</{tag}>"
+    start_index = text.find(start_tag)
+    end_index = text.find(end_tag, start_index)
+
+    if start_index != -1 and end_index != -1:
+        return text[:start_index] + text[end_index + len(end_tag):]
+    return text.strip()
+
+
 def remove_code_markers(text: str) -> str:
     """Removes code block markers and language specifiers from LLM responses.
 

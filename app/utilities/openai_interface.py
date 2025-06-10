@@ -16,7 +16,7 @@ from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm import remove_code_markers
+from app.utilities.llm import remove_code_markers, remove_xml_content
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -215,8 +215,11 @@ class OpenAIInterface:
         else:
             answer = str(answer)
 
+        answer = remove_xml_content(answer, "think")
+        answer = remove_code_markers(answer)
+
         return {
             "question": question,
-            "answer": remove_code_markers(answer),
-            "formatted_answer": remove_code_markers(answer),
+            "answer": answer,
+            "formatted_answer": answer
         }
