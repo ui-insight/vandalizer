@@ -23,8 +23,8 @@ Wee!
 Before deploying to each environment, update the configuration by:
 
 1. Setting `FLASK_ENV` to `Development`, `Testing`, or `Production`.
-2. Restarting the Flask and Celery services. Restart Celery by running ./run_celery.sh
-3. Set environmental variables openai_api_key, redis_url (required)
+2. Setting the `OPENAI_API_KEY` environment variable appropriately for the deployment.
+3. Restarting the Flask and Celery services. Restart Celery by running ./run_celery.sh
 
 
 ## Installation
