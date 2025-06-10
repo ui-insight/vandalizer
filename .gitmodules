@@ -1,3 +1,0 @@
-[submodule "app/uillm"]
-	path = app/uillm
-	url = git+ssh://git@github.com/ui-insight/insight-helpers.git
