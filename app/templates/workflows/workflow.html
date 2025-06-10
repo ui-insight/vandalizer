@@ -88,7 +88,7 @@
         </div>
         <div class="workflow-output-section"></div>
         <div class="workflow-output-buttons hidden">
-            <button id="shareWorkflowBtn" class="workflow-output-button btn btn-secondary">Share Workflow</button>
+            <button id="share-workflow-btn" class="workflow-output-button btn btn-secondary">Share Workflow</button>
             <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
         </div>
 
@@ -106,6 +106,26 @@
 
     <script>
 
+        document
+            .getElementById("share-workflow-btn")
+            .addEventListener("click", () => {
+                const btn = event.currentTarget;
+                const workflowId = btn.dataset.workflowId;
+                // Build the “duplicate” URL
+                const url = `${window.location.origin}/workflows/duplicate/` + "{{ workflow.id }}";
+                // Copy to clipboard
+                navigator.clipboard.writeText(url)
+                    .then(() => {
+                        // optional: user feedback
+                        btn.textContent = "Link Copied!";
+                        showToast("Link Copied! Share it to others! 🚀");
+                        setTimeout(() => btn.textContent = "Share Workflow", 2000);
+                    })
+                    .catch(err => {
+                        console.error("Failed to copy link", err);
+                        alert("Couldn’t copy link to clipboard.");
+                    });
+            });
 
         $('#editWorkflowTitleBtn').on("click", function (e) {
             e.preventDefault();

@@ -33,7 +33,7 @@ if (dropArea) {
   //If user leave dragged File from DropArea
   dropArea.addEventListener("dragleave", () => {
     dropArea.classList.remove("active");
-    dragText.textContent = "Drag & Drop to Upload Files or Folders";
+    dragText.textContent = "Drag & Drop to Upload Files";
   });
 
   //If user drop File on DropArea
