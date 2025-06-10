@@ -2,13 +2,13 @@ services:
   redis:
     image: redis/redis-stack:latest
     ports:
-      - '6379:6379'
+      - "6379:6379"
     networks:
       - vandalizer
   mongo:
     image: mongo:latest
     ports:
-      - '27018:27017'
+      - "27018:27017"
     networks:
       - vandalizer
   celery:
@@ -26,14 +26,14 @@ services:
       - vandalizer
     volumes:
       - /tmp/vandalizer:/app/static/uploads
-    entrypoint: run-celery.sh
+    entrypoint: sh run_celery.sh
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - '8000:8000'
+      - "8000:8000"
     depends_on:
       - redis
       - mongo
@@ -49,7 +49,7 @@ services:
       - /tmp/vandalizer:/app/static/uploads
 
 networks:
-  vandalizer: 
+  vandalizer:
     external: false
     ipam:
       driver: default
