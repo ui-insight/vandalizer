@@ -24,40 +24,61 @@ Upload Compliance:
     Personally identifiable information is information contained in any record which makes a student's identity easily traceable. A student's ID number, for example, is personally identifiable information. Personally identifiable information cannot be released to third parties without the student's written consent, except under very narrow circumstances.
 """
 
-try:
-    list_of_models = UILLM.list_models()
-except Exception as e:
-    print(f"Error listing models: {e}")
-    list_of_models = ""
-models = []
-if isinstance(list_of_models, str):
-    base_models = list_of_models.split("\n")
-    # filter out to show only those that start with "Model:" or "EMBED"
-    base_models = [model for model in base_models if model.startswith("Model:")]
-    external_providers = [
-        "openai",
-        "google",
-        "x-ai",
-        "microsoft",
-        "amazon",
-        "meta-llama",
-        "anthropic",
-        "mistralai",
-        "nousresearch",
-        "deepseek",
-        "qwen",
-    ]
 
-    for model in base_models:
-        name = model.split("Model: ")[-1].strip()
-        if name.startswith("EMBED"):
-            continue
-        # check if the model is an external provider
-        external = any(
-            provider in name.split("/")[0] for provider in external_providers
-        )
-        models.append({"name": name, "external": external})
-debug(models)
+# try:
+#     list_of_models = UILLM.list_models()
+# except Exception as e:
+#     print(f"Error listing models: {e}")
+#     list_of_models = ""
+# models = []
+# if isinstance(list_of_models, str):
+#     base_models = list_of_models.split("\n")
+#     # filter out to show only those that start with "Model:" or "EMBED"
+#     base_models = [model for model in base_models if model.startswith("Model:")]
+#     external_providers = [
+#         "openai",
+#         "google",
+#         "x-ai",
+#         "microsoft",
+#         "amazon",
+#         "meta-llama",
+#         "anthropic",
+#         "mistralai",
+#         "nousresearch",
+#         "deepseek",
+#         "qwen",
+#     ]
+
+#     for model in base_models:
+#         name = model.split("Model: ")[-1].strip()
+#         if name.startswith("EMBED"):
+#             continue
+#         # check if the model is an external provider
+#         external = any(
+#             provider in name.split("/")[0] for provider in external_providers
+#         )
+#         models.append({"name": name, "external": external})
+#         # filter
+
+models= [
+    {"name": "openai/gpt-4.1",
+     "tag": "insecure / most powerful model",
+    "external": True
+    },
+    {"name": "openai/gpt-4.1-mini",
+    "tag": "insecure / less powerful model",
+    "external": True},
+    {"name": "openai/gpt-4.1-nano",
+    "tag": "insecure / less powerful model",
+    "external": False},
+    {"name": "qwen3:32k:32b",
+    "tag": "secure / powerful model",
+    "external": False},
+    {"name": "qwen2.5-32k:72b",
+    "tag": "secure / less powerful model",
+    "external": False}
+]
+# debug(models)
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
 
 
