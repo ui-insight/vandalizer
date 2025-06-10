@@ -25,4 +25,4 @@ COPY run_celery.sh ./
 
 EXPOSE 8000
 
-ENTRYPOINT ["gunicorn"]
+CMD ["gunicorn"]
