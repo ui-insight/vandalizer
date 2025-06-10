@@ -5,7 +5,7 @@ import os
 from devtools import debug
 from PyPDF2 import PdfReader
 
-from uillm import UIPDF
+from app.uillm.uipdf import UIPDF
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 

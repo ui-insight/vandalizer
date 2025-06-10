@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 import asyncio
+import time
 
 from celery import chord
 from devtools import debug
+from dotenv import load_dotenv
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app.celery_worker import celery_app
@@ -12,11 +14,11 @@ from app.utilities.agents import create_chat_agent, upload_agent
 from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
 
-from dotenv import load_dotenv
 load_dotenv()
 
 
 chat_agent = create_chat_agent(settings.base_model)
+
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def validate_chunk(
@@ -92,7 +94,8 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
-def perform_document_validation(self,
+def perform_document_validation(
+    self,
     document_text: str,
     document_uuid: str,
     document_path: str,
@@ -103,6 +106,7 @@ def perform_document_validation(self,
     Entry point: splits document, launches chunk validations, and the summarizer via a chord.
     """
 
+    start = time.perf_counter()
     # Extract text if needed
     text = document_text
     if text is None:
@@ -126,5 +130,8 @@ def perform_document_validation(self,
     # Use a chord to run summary after all chunks finish
     callback = summarize_results.s(document_uuid)
     chord(header)(callback)  # Executes validate_chunk tasks, then summarize_results
+
+    elapsed = time.perf_counter() - start
+    debug(f"perform_document_validation[{document_uuid}] took {elapsed:.2f}s")
 
     return text

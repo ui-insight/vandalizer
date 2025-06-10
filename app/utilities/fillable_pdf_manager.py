@@ -2,7 +2,7 @@ import os
 
 import openai
 
-from uillm import UILLM
+from app.uillm.uillm import UILLM
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 

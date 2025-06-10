@@ -28,7 +28,6 @@ from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
 )
-from app.utilities.excel_helper import save_excel_to_html
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"

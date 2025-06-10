@@ -120,7 +120,6 @@ def upload():
         uuid=uid,
         user_id=user.user_id,
         space=space,
-        raw_text=raw_text,
         folder=str(target_folder),  # attach it here
         task_id=None,
     )

@@ -53,7 +53,9 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "celery>=5.5.2",
     "pypandoc-binary>=1.15",
-    "reportlab"
+    "reportlab",
+    "pytesseract",
+    "pdf2image"
 ]
 
 
@@ -86,9 +88,6 @@ commands = [["pytest"]]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
 TEST_BROWSER = "chrome"
-
-[tool.uv.sources]
-uillm = { git = "ssh://git@github.com/ui-insight/insight-helpers.git" }
 
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"

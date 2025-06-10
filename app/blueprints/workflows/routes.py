@@ -36,7 +36,7 @@ from app.models import (
     WorkflowStep,
     WorkflowStepTask,
 )
-from app.utilities.config import model_type, settings
+from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.llm import ChatLM
 from app.utilities.workflow import execute_workflow_task
@@ -431,7 +431,7 @@ def workflow_download() -> ResponseReturnValue:
             f"{raw_json}"
         )
 
-    chat_lm = ChatLM(model_type)
+    chat_lm = ChatLM("gpt-4o")
     formatted = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
