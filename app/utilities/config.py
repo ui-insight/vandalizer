@@ -68,7 +68,7 @@ models= [
     {"name": "openai/gpt-4.1-nano",
     "tag": "insecure / less powerful model",
     "external": False},
-    {"name": "qwen3:32k:32b",
+    {"name": "qwen3:32b",
     "tag": "secure / powerful model",
     "external": False},
     {"name": "qwen2.5-32k:72b",
