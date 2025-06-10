@@ -206,11 +206,17 @@ class OpenAIInterface:
                 debug("Error in rag chat", e)
 
         debug(answer)
-        chat_history = json.loads(answer.new_messages_json())
-        cache.update(cache_key, llm_string, chat_history)
+        if hasattr(answer, "new_messages_json"):
+            chat_history = json.loads(answer.new_messages_json())
+            cache.update(cache_key, llm_string, chat_history)
+
+        if hasattr(answer, "output"):
+            answer = answer.output
+        else:
+            answer = str(answer)
 
         return {
             "question": question,
-            "answer": remove_code_markers(answer.output),
-            "formatted_answer": remove_code_markers(answer.output),
+            "answer": remove_code_markers(answer),
+            "formatted_answer": remove_code_markers(answer),
         }
