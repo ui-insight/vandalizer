@@ -705,5 +705,46 @@
         });
     });
 
+    $(function () {
+        // how often we poll (ms)
+        const POLL_INTERVAL = 3000;
+
+        // the timer ID so we can clear it
+        let pollTimer = setInterval(pollAllLoaders, POLL_INTERVAL);
+
+        function pollAllLoaders() {
+            // find each loader still on the page
+            $('.workflow-loader').each(function () {
+                let $loader = $(this);
+                let uuid = $loader.data('doc-uuid');
+
+                $.get("/files/poll_status", { docid: uuid })
+                    .done(function (resp) {
+                        if (resp.complete) {
+                            // remove the spinner
+                            $loader.remove();
+
+                            // if you want to show the raw-text icon in that row:
+                            // find the corresponding row and un-hide your icon:
+                            $loader
+                                .closest('tr')
+                                .find('.raw-text-icon')
+                                .show();
+
+                            // optionally: insert the text itself, etc.
+                        }
+                    })
+                    .fail(function () {
+                        console.error("poll for", uuid, "failed");
+                    });
+            });
+
+            // if there are no more loaders, stop polling entirely
+            if ($('.workflow-loader').length === 0) {
+                clearInterval(pollTimer);
+            }
+        }
+    });
+
 
 </script>

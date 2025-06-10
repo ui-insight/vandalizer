@@ -224,7 +224,7 @@
                                 <span class="file-date">{{ doc.time_ago_in_words() }}</span>
 
                                 {% if doc.processing %}
-                                <span class="workflow-loader"></span>
+                                <span class="workflow-loader" data-doc-uuid="{{ doc.uuid }}"></span>
                                 {% endif %}
                                 <button class="ellipsis-btn" data-doc-id="{{ doc.uuid }}">
                                     <span><i class="fa-solid fa-ellipsis-vertical"></i></span>
