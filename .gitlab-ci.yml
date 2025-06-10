@@ -1,0 +1,11 @@
+include:
+  - project: 'gitlab/workflows'
+    ref: main
+    file: 'workflows/container-build.gitlab-ci.yml'
+  - project: 'gitlab/workflows'
+    ref: main
+    file: 'workflows/container-dev-deploy.gitlab-ci.yml'
+
+stages:
+  - build
+  - deploy

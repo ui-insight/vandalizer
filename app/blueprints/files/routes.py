@@ -39,30 +39,45 @@ from . import files
 
 
 @files.route("/upload", methods=["POST"])
-def upload() -> ResponseReturnValue:
-    """Handle file upload."""
+def upload():
     user = load_user()
-    if user is None:
+    if not user:
         return redirect(url_for("auth.login"))
 
-    json_data = request.get_json()
-    blob = json_data["contentAsBase64String"]
-    filename = json_data["fileName"]
-    extension = json_data["extension"]
-    space = json_data["space"]
-    folder = json_data["folder"]
-    user_id = user.user_id
-    debug(user_id)
+    data = request.get_json()
+    space = data["space"]
+    parent_folder_id = data["folder"] or None
+    new_folder_name = data.get("rootFolderName")
 
-    if folder is None or folder == "":
-        folder = "0"
+    # 1) If a new folder was dropped, create it
+    print(new_folder_name)
+    if new_folder_name:
+        smart_folder = SmartFolder(
+            title=new_folder_name,
+            user_id=user.user_id,
+            space=space,
+            parent_id=parent_folder_id,
+        )
+        smart_folder.save()
+        target_folder = smart_folder.id
+    else:
+        target_folder = parent_folder_id
+
+    # 2) Now for each incoming file (you’re still doing per-file),
+    #    save SmartDocument(folder=target_folder)
+    blob = data["contentAsBase64String"]
+    filename = data["fileName"]
+    extension = data["extension"]
+
+    if target_folder is None or target_folder == "":
+        target_folder = "0"
 
     if (
         SmartDocument.objects(
             title=filename,
             space=space,
             user_id=user.user_id,
-            folder=folder,
+            folder=str(target_folder),
         ).count()
         > 0
     ):
@@ -72,8 +87,7 @@ def upload() -> ResponseReturnValue:
     uid = uuid.uuid4().hex.upper()
 
     # Update the stored path to include the user's id folder
-    relative_file_path = Path(user_id) / f"{uid}.{extension}"
-
+    relative_file_path = Path(user.user_id) / f"{uid}.{extension}"
     debug(relative_file_path)
 
     # Define base upload directory
@@ -82,7 +96,7 @@ def upload() -> ResponseReturnValue:
         os.makedirs(base_upload_dir)
 
     # Create a directory for the user based on their id
-    upload_dir = Path(base_upload_dir) / user_id
+    upload_dir = Path(base_upload_dir) / user.user_id
     if not Path.exists(upload_dir):
         os.makedirs(upload_dir)
 
@@ -106,7 +120,8 @@ def upload() -> ResponseReturnValue:
         uuid=uid,
         user_id=user.user_id,
         space=space,
-        folder=folder,
+        raw_text=raw_text,
+        folder=str(target_folder),  # attach it here
         task_id=None,
     )
     document.save()
@@ -138,7 +153,7 @@ def upload() -> ResponseReturnValue:
     )
     document.task_id = workflow_task_result.id
 
-    return jsonify({"complete": True, "uuid": uid, "folder_id": folder})
+    return jsonify({"complete": True, "uuid": uid})
 
 
 @files.route("/poll_status", methods=["GET"])

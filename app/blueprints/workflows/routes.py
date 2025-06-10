@@ -11,6 +11,7 @@ from bson import ObjectId
 from devtools import debug
 from flask import (
     current_app,
+    flash,
     jsonify,
     redirect,
     render_template,
@@ -412,6 +413,7 @@ def workflow_download() -> ResponseReturnValue:
         prompt = (
             "Convert the following HTML document into a well formatted CSV. "
             "Use commas as separators and include a header row.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
     elif fmt == "pdf":
@@ -419,11 +421,13 @@ def workflow_download() -> ResponseReturnValue:
         prompt = (
             "Lay out the following HTML document into a beautiful output I can export as PDF. "
             "You can output plain text; we'll convert it to PDF on the server.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
     else:  # txt
         prompt = (
-            "Pretty-print the following HTML document into a well-formatted text document. Just give me clean, indented text.\n\n"
+            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
             f"{raw_json}"
         )
 
@@ -431,6 +435,9 @@ def workflow_download() -> ResponseReturnValue:
     formatted = chat_lm.completion(
         messages=[{"role": "user", "content": prompt}],
     )
+
+    # Remove the tick marks before and after blocks
+    formatted = formatted.strip("`").strip()
 
     # 4) package it up
     buf = io.BytesIO()
@@ -1086,3 +1093,49 @@ def workflow_add_document_step() -> ResponseReturnValue:
 
         return jsonify({"response": "Placeholder"})
     return None
+
+
+@workflows.route("/duplicate/<workflow_id>")
+def duplicate_workflow(workflow_id):
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+    # 1) Load original
+    orig = Workflow.objects(id=workflow_id).first()
+    if not orig:
+        return
+        # abort(404, "Workflow not found")
+
+    # 2) Duplicate each step & task
+    new_steps = []
+    for step in orig.steps:
+        # duplicate tasks
+        new_tasks = []
+        for task in step.tasks:
+            dup_task = WorkflowStepTask(name=task.name, data=task.data.copy()).save()
+            new_tasks.append(dup_task)
+
+        dup_step = WorkflowStep(
+            name=step.name, tasks=new_tasks, data=(step.data or {}).copy()
+        ).save()
+        new_steps.append(dup_step)
+
+    # 3) Duplicate attachments
+    new_atts = []
+    for att in orig.attachments:
+        dup_att = WorkflowAttachment(attachment=att.attachment).save()
+        new_atts.append(dup_att)
+
+    # 4) Create the new Workflow
+    dup_wf = Workflow(
+        name=orig.name,
+        description=orig.description,
+        user_id=user.user_id,
+        space=Space.objects()[0].uuid,  # or however you track the user’s active space
+        steps=new_steps,
+        attachments=new_atts,
+        # created_at and updated_at default to now()
+    ).save()
+
+    flash("Workflow duplicated into your space!", "success")
+    return redirect(url_for("home.index", sesction="Workflows"))

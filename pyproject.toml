@@ -53,10 +53,6 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "celery>=5.5.2",
     "pypandoc-binary>=1.15",
-    "easyocr>=1.7.2",
-    "pdf2image>=1.17.0",
-    "pytesseract>=0.3.13",
-    "uillm",
     "reportlab"
 ]
 
