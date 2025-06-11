@@ -7,7 +7,7 @@ import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import fitz
 import pytesseract
@@ -38,6 +38,7 @@ valid_vlm_methods = [
     "openai/gpt-4o",
     "openai/gpt-4o-mini",
     "granite3.2-vision-16k:2b",
+    "qwen2.5-VL-8k:7b",
 ]
 
 valid_ocr_methods = [
@@ -442,7 +443,7 @@ class UIPDF:
             "return_document_as": return_as,
             "extract_tables": False,
             "extract_images": False,
-            "pages_to_extract": str(pages_to_extract),
+            "pages_to_extract": str(pages_to_extract) if pages_to_extract else None,
         }
 
         if method in valid_ocr_methods:

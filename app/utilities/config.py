@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 
 
-from devtools import debug
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from app.uillm.uillm import UILLM
 
 # Load environment variables from .env file
 load_dotenv()
@@ -60,20 +57,19 @@ Upload Compliance:
 #         models.append({"name": name, "external": external})
 #         # filter
 
-models= [
-    {"name": "openai/gpt-4.1",
-     "tag": "insecure / most powerful model",
-    "external": True
+models = [
+    {"name": "openai/gpt-4.1", "tag": "Cloud — Highest accuracy", "external": True},
+    {
+        "name": "openai/gpt-4.1-nano",
+        "tag": "Cloud — Fastest response",
+        "external": False,
     },
-    {"name": "openai/gpt-4.1-nano",
-    "tag": "insecure / less powerful model",
-    "external": False},
-    {"name": "qwen3:32b",
-    "tag": "secure / powerful model",
-    "external": False},
-    {"name": "qwen2.5-32k:72b",
-    "tag": "secure / less powerful model",
-    "external": False}
+    {"name": "qwen3:32b", "tag": "Secure — High accuracy", "external": False},
+    {
+        "name": "qwen2.5-32k:72b",
+        "tag": "Secure — Fast response",
+        "external": False,
+    },
 ]
 # debug(models)
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
