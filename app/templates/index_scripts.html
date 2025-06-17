@@ -121,11 +121,24 @@
             success: function (msg) {
                 const newModel = msg.current_model;
                 const models = msg.models;
+                console.log("Filtered models:", models);
+                console.log("current model:", newModel);
                 // Update the modal's data-context so it's in sync
                 $('#model-modal').data('context', newModel);
 
                 // Update the visible text in the UI
                 $('#current_selected_model').text(newModel);
+
+                // find the model tag in the models array based on the current model
+                const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
+
+                // add the model tag to the model-text-icon div
+                const tagElement = "<span class='model-tag' style='font-size: 0.8em; color: #5D6F81; margin-left: 5px;'>" + modelTag + "</span>";
+
+                // Clear any existing tags before appending the new one
+                $('#model-text-icon').find('.model-tag').remove();
+                $('#model-text-icon').append(tagElement);
+
 
 
                 const $modelSelect = $('#model-select');
