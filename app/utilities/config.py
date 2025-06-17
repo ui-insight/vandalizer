@@ -106,6 +106,7 @@ class ModelConfig(BaseModel):
 class ModelType(BaseModel):
     name: str
     external: bool
+    tag: str
 
 
 class Settings(BaseSettings):
