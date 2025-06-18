@@ -64,10 +64,10 @@ models = [
         "tag": "Cloud — Fastest response",
         "external": False,
     },
-    {"name": "qwen3:32b", "tag": "Secure — High accuracy", "external": False},
+    {"name": "qwen3:32b", "tag": "Secure — Highest accuracy", "external": False},
     {
         "name": "qwen2.5-32k:72b",
-        "tag": "Secure — Fast response",
+        "tag": "Secure — Fastest response",
         "external": False,
     },
 ]
