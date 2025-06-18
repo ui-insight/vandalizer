@@ -2,11 +2,8 @@
     <div>
         <p style="font-size: 24px; font-weight: 600;">
             <span id="workflowTitle">{{ workflow.name }}<i class="fa-regular fa-pen-to-square" id="editWorkflowTitleBtn"
-
                     style="margin-left: 7.5px; padding-bottom: 5px; font-size: 14px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
-            <span id="deleteWorkflowBtn"
-                style="font-size: 14px; color: red; cursor: pointer; font-weight: 200; margin-left: 24px;">
-                <i class="fa-solid fa-trash"></i> </span>
+
 
             <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
 
@@ -175,31 +172,6 @@
             $('#workflowTitleInput').hide();
         }
 
-    $("#deleteWorkflowBtn").on("click", function (e) {
-        console.log("Delete workflow");
-            e.preventDefault();
-            if (confirm("Are you sure you want to delete this workflow? This action cannot be undone.")) {
-                let data = JSON.stringify({
-                    uuid: "{{ workflow.id }}"
-                });
-
-                $.ajax({
-                    url: '/workflows/delete_workflow',
-                    type: 'POST',
-                    data: data,
-                    contentType: 'application/json; charset=utf-8',
-                    dataType: 'json',
-                    async: true,
-                    success: function (data) {
-                        location.reload();
-                    },
-                    error: function (xhr, ajaxOptions, thrownError) {
-                        console.log(xhr.status);
-                        console.log(thrownError);
-                    }
-                });
-            }
-        });
 
 
     </script>
