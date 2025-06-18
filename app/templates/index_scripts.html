@@ -55,8 +55,18 @@
         window.location.href = url.toString();
     }
 
+    $('#chat-model-popup-menu-options').on('click', 'li', function () {
+        const modelName = $(this).attr('value');
+        if (modelName) {
+            updateModel(modelName);
+        }
+        // close the menu
+        $('#chat-model-popup-menu').hide();
+    });
+
     function updateModel(model) {
         console.log("Updating model to: " + model);
+
         $.ajax({
             url: '/tasks/model/update',
             type: 'POST',
@@ -76,12 +86,16 @@
         });
     }
 
-    function showModelModal() {
+    $("#model-text-icon").on("click", function (e) {
+        e.stopPropagation();
         console.log("show model modal");
-        const modal = document.getElementById("model-modal");
-        $('#model-modal').show();
+        $('#chat-model-popup-menu').show();
+    });
 
-    }
+    $(document).on("click", function (e) {
+        $('#chat-model-popup-menu').fadeOut();
+    });
+
     $("#closeModelModalBtn").on('click', function () {
         $('#model-modal').hide();
     });
@@ -127,13 +141,14 @@
                 $('#model-modal').data('context', newModel);
 
                 // Update the visible text in the UI
-                $('#current_selected_model').text(newModel);
+                $('#current_selected_model').text('');
 
                 // find the model tag in the models array based on the current model
                 const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
 
                 // add the model tag to the model-text-icon div
-                const tagElement = "<span class='model-tag' style='font-size: 0.8em; color: #5D6F81; margin-left: 5px;'>" + modelTag + "</span>";
+                const tagElement = "<i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i>";
+
 
                 // Clear any existing tags before appending the new one
                 $('#model-text-icon').find('.model-tag').remove();
@@ -141,13 +156,13 @@
 
 
 
-                const $modelSelect = $('#model-select');
+                const $modelSelect = $('#chat-model-popup-menu-options');
                 $modelSelect.empty(); // clear existing options
 
                 models.forEach(model => {
-                    const option = $('<option>', {
+                    const option = $('<li>', {
                         value: model.name,
-                        text: model.name,
+                        text: model.tag,
                         selected: model.name === newModel
                     });
                     $modelSelect.append(option);
@@ -159,6 +174,8 @@
             }
         });
     }
+
+
 
 
 
