@@ -22,7 +22,7 @@
         },
         {
             title: "Preparing document for AI",
-            messages: ["Getting ready…", "Document passed check…"],
+            messages: ["Getting ready…", "Summarizing validation checks…"],
             duration: 2500
         },
         {
@@ -31,12 +31,12 @@
             duration: 1500
         }
     ];
- const root_container = document.querySelector(".loading-event-progress-container");
-        const container = document.getElementById("loading-event-progress");
+    const root_container = document.querySelector(".loading-event-progress-container");
+    const container = document.getElementById("loading-event-progress");
     const titleEl = document.getElementById("loading-event-title");
     const messageEl = document.getElementById("loading-event-message");
     const progressEl = document.querySelector(".loading-progress-fill");
-    // hide the root_container initially (display none)
+    // hide the root_container initially(display none)
     root_container.style.display = "none";
 
     async function advanceStep(statusMessages = []) {
@@ -248,11 +248,11 @@
                 const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
 
                 // add the model tag to the model-text-icon div
-                const tagElement = "<i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i>";
+                const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
 
 
                 // Clear any existing tags before appending the new one
-                $('#model-text-icon').find('.model-tag').remove();
+                $('#model-text-icon').find('#model-tag').remove();
                 $('#model-text-icon').append(tagElement);
 
 
@@ -320,6 +320,7 @@
         document_uuids = uuids;
 
         // filter user available models
+
         filterAvailableModels(uuids);
 
 

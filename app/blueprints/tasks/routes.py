@@ -45,9 +45,10 @@ def filter_models() -> ResponseReturnValue:
         return jsonify({"models": settings_models, "current_model": current_model})
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
-        if not doc.valid:
-            validation_failed = True
-            break
+        if doc is not None:
+            if not doc.valid:
+                validation_failed = True
+                break
     if validation_failed:
         config_models = [
             m for m in model_config.available_models if not m.get("external")

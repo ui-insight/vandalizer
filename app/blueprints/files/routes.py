@@ -72,16 +72,16 @@ def upload():
     if target_folder is None or target_folder == "":
         target_folder = "0"
 
-    if (
-        SmartDocument.objects(
+    # check if the file already exists (unique by title, user_id, space, and folder)
+    document_results = SmartDocument.objects(
             title=filename,
-            space=space,
             user_id=user.user_id,
+            space=space,
             folder=str(target_folder),
-        ).count()
-        > 0
-    ):
-        return jsonify({"complete": True})
+        )
+    debug(document_results)
+    if document_results.count() > 0:
+        return jsonify({"complete": True, "exists": True})
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
@@ -124,6 +124,9 @@ def upload():
         task_id=None,
         task_status="layout",
     )
+
+
+
     document.save()
 
     extraction_task = perform_extraction_and_update.s(
