@@ -138,18 +138,21 @@ def index() -> ResponseReturnValue:
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
-        documents.append(document)
-        verify_document(document, user_id)
-        current_space = Space.objects(uuid=document.space).first()
+        if document is not None:
+            documents.append(document)
+            verify_document(document, user_id)
+            current_space = Space.objects(uuid=document.space).first()
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
         for doc_id in doc_ids:
             document = SmartDocument.objects(uuid=doc_id).first()
-            documents.append(document)
-            verify_document(document, user_id)
+            if document is not None:
+                documents.append(document)
+                verify_document(document, user_id)
 
-        current_space = Space.objects(uuid=document.first.space).first()
+        if document is not None:
+            current_space = Space.objects(uuid=document.first.space).first()
 
     spaces.remove(current_space)
     spaces.insert(0, current_space)

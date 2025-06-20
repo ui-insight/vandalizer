@@ -173,6 +173,7 @@ function processFile(file) {
     $("#loading-area").show();
     $("#drag-area").hide();
 
+
     $.ajax({
       type: "POST",
       url: "/files/upload",
@@ -182,6 +183,12 @@ function processFile(file) {
       dataType: "json",
       success: result => {
         completedUploads++;
+        console.log(`Successfully uploaded ${filename}`, result);
+      // check if the document was uploaded previously
+        if (result.exists) {
+            alert(`Document "${filename}" already exists. Please rename it and try again.`);
+            return;
+        }
         if (result.uuid) {
             uploadedDocs.push({ name: filename, uuid: result.uuid });
         }
