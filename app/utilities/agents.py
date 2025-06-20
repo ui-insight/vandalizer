@@ -508,11 +508,6 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = "", m
         # Handle the case where the event loop is already running
         loop = asyncio.get_event_loop()
 
-    cache_result = cache.lookup(cache_key, llm_string)
-    if cache_result:
-        result = json.loads(cache_result[0])
-        return result.get("entities", [])
-
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
         keys = [k.strip() for k in keys.split(",")]
@@ -628,8 +623,6 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = "", m
             filtered_entities = filter_empty_entities(
                 result,
             )
-            if filtered_entities and len(filtered_entities) > 0:
-                cache.update(cache_key, llm_string, [json.dumps(result)])
         return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message
