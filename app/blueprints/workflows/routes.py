@@ -1,5 +1,7 @@
 """Handle workflow routes."""
 
+import asyncio
+from app.utilities.agents import create_chat_agent
 import io
 import json
 import os
@@ -22,6 +24,12 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from werkzeug.utils import secure_filename
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfgen import canvas
+
 
 from app.models import (
     SearchSet,
@@ -431,10 +439,23 @@ def workflow_download() -> ResponseReturnValue:
             f"{raw_json}"
         )
 
-    chat_lm = ChatLM("gpt-4o")
-    formatted = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    chat_agent = create_chat_agent(model)
+    # get current event loop
+    # if there is no current loop, create a new one
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    formatted = loop.run_until_complete(
+        chat_agent.run(prompt),
     )
+    formatted = formatted.output
 
     # Remove the tick marks before and after blocks
     formatted = formatted.strip("`").strip()
@@ -454,21 +475,12 @@ def workflow_download() -> ResponseReturnValue:
 
     elif fmt == "pdf":
         # simple PDF via reportlab (you can swap in your favorite)
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
+        buf.seek(0)
+        doc = SimpleDocTemplate(buf, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = [Paragraph(formatted, styles["Normal"])]
 
-        pdf = canvas.Canvas(buf, pagesize=letter)
-        text = pdf.beginText(40, 750)
-        for line in formatted.splitlines():
-            text.textLine(line)
-            # add new page if you hit the bottom
-            if text.getY() < 40:
-                pdf.drawText(text)
-                pdf.showPage()
-                text = pdf.beginText(40, 750)
-        pdf.drawText(text)
-        pdf.save()
-
+        doc.build(story)
         buf.seek(0)
         return send_file(
             buf,

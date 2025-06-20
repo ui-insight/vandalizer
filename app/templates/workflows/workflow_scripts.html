@@ -547,6 +547,7 @@
 
 
     function performWorkflowStatus(session_id, workflow_time) {
+
         $.ajax({
             url: `/workflows/workflow/status?session_id=${session_id}`,
             type: 'GET',
@@ -642,6 +643,16 @@
         return intervalId;
     }
 
+    // hide popup when popup menu loses focus and popup menu is visible
+    $(document).on("click", function (e) {
+        const $popupMenu = $('#download-popup-menu');
+        if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
+            hideDownloadPopupMenu();
+        }
+    });
+
+
+
     $('#downloadWorkflowBtn').on('click', function (e) {
         e.stopPropagation();
         const $btn = $(this);
@@ -695,9 +706,33 @@
         });
     });
 
+ // $('#download-popup-menu').on('click', function (e) {
+//            e.stopPropagation();
+//        });
 
+$(document).on('click', '#download-pdf-option', function(e) {
+    e.stopPropagation();
+    console.log("Download PDF option clicked");
+    hideDownloadPopupMenu();
+    downloadWorkflowOutput('pdf');
+});
+
+ $(document).on('click', '#download-csv-option', function(e) {
+        e.stopPropagation();
+        console.log("Download CSV option clicked");
+        hideDownloadPopupMenu();
+        downloadWorkflowOutput('csv');
+    });
+
+    $(document).on('click', '#download-text-option', function(e) {
+        e.stopPropagation();
+        console.log("Download Text option clicked");
+        hideDownloadPopupMenu();
+        downloadWorkflowOutput('txt');
+    });
 
     function downloadWorkflowOutput(format) {
+        console.log("Downloading workflow output in format:", format);
         // Go to the server to download the file in the specified format
         location.href = `/workflows/download?session_id=${workflow_session_id}&format=${format} `; // Redirect to the download URL
     }
@@ -716,11 +751,6 @@
             },
         );
     }
-
-    // Close the popup menu when clicking outside
-    $(document).on("click", function (e) {
-        hideDownloadPopupMenu();
-    });
 
 
 
