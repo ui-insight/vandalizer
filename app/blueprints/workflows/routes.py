@@ -1,10 +1,10 @@
 """Handle workflow routes."""
 
 import asyncio
-from app.utilities.agents import create_chat_agent
 import io
 import json
 import os
+import re
 import uuid
 from itertools import chain
 
@@ -23,13 +23,17 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
-from werkzeug.utils import secure_filename
-
-from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.pdfgen import canvas
-
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    ListFlowable,
+    ListItem,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+)
+from werkzeug.utils import secure_filename
 
 from app.models import (
     SearchSet,
@@ -44,9 +48,9 @@ from app.models import (
     WorkflowStep,
     WorkflowStepTask,
 )
+from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.llm import ChatLM
 from app.utilities.workflow import execute_workflow_task
 from app.utils import load_user
 
@@ -397,6 +401,112 @@ def workflow_status() -> ResponseReturnValue:
 #     emit("workflow_status", response)
 
 
+def convert_inline_markdown_to_tags(text):
+    """Converts inline Markdown to ReportLab's supported XML tags."""
+    text = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"__(.*?)__", r"<b>\1</b>", text)
+    text = re.sub(r"\*(.*?)\*", r"<i>\1</i>", text)
+    text = re.sub(r"_(.*?)_", r"<i>\1</i>", text)
+    text = re.sub(r"~~(.*?)~~", r"<strike>\1</strike>", text)
+    text = re.sub(r"`(.*?)`", r'<font face="Courier">\1</font>', text)
+    return text
+
+
+def generate_pdf_from_markdown(formatted_markdown: str):
+    """
+    Generates a PDF from a Markdown string using a robust parser.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=letter,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=18,
+    )
+
+    styles = getSampleStyleSheet()
+
+    # --- STYLE MODIFICATIONS (Corrected) ---
+    styles["h1"].fontSize = 18
+    styles["h1"].leading = 22
+    styles["h1"].spaceAfter = 12
+
+    styles["h2"].fontSize = 14
+    styles["h2"].leading = 18
+    styles["h2"].spaceAfter = 10
+
+    # Modify the existing 'h3' style instead of adding it
+    styles["h3"].fontSize = 12
+    styles["h3"].leading = 14
+    styles["h3"].spaceAfter = 8
+
+    # Modify the existing 'Bullet' style for all list items
+    styles["Bullet"].firstLineIndent = 0
+    styles["Bullet"].spaceBefore = 3
+
+    story = []
+
+    # Enhanced Parser
+    lines = formatted_markdown.strip().split("\n")
+    in_ul = False
+    in_ol = False
+    list_items = []
+
+    for line in lines:
+        line = line.strip()
+
+        is_ul_item = line.startswith(("* ", "- "))
+        is_ol_item = re.match(r"^\d+\.\s", line)
+
+        if (in_ul and not is_ul_item) or (in_ol and not is_ol_item):
+            story.append(
+                ListFlowable(list_items, bulletType="bullet" if in_ul else "1")
+            )
+            list_items = []
+            in_ul = in_ol = False
+            story.append(Spacer(1, 0.1 * inch))
+
+        if line.startswith("# "):
+            text = convert_inline_markdown_to_tags(line[2:])
+            story.append(Paragraph(text, styles["h1"]))
+        elif line.startswith("## "):
+            text = convert_inline_markdown_to_tags(line[3:])
+            story.append(Paragraph(text, styles["h2"]))
+        elif line.startswith("### "):
+            text = convert_inline_markdown_to_tags(line[4:])
+            story.append(Paragraph(text, styles["h3"]))
+        elif is_ul_item:
+            if not in_ul:
+                in_ul = True
+            text = convert_inline_markdown_to_tags(line[2:])
+            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
+        elif is_ol_item:
+            if not in_ol:
+                in_ol = True
+            text = convert_inline_markdown_to_tags(re.sub(r"^\d+\.\s", "", line))
+            # Reuse the 'Bullet' style for numbered list items to avoid errors
+            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
+        elif line:
+            text = convert_inline_markdown_to_tags(line)
+            story.append(Paragraph(text, styles["Normal"]))
+            story.append(Spacer(1, 0.1 * inch))
+
+    if in_ul or in_ol:
+        story.append(ListFlowable(list_items, bulletType="bullet" if in_ul else "1"))
+
+    doc.build(story)
+
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="workflow_output.pdf",
+    )
+
+
 ## @MARK: Download
 @workflows.route("/download", methods=["GET"])
 def workflow_download() -> ResponseReturnValue:
@@ -427,10 +537,11 @@ def workflow_download() -> ResponseReturnValue:
     elif fmt == "pdf":
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
-            "Lay out the following HTML document into a beautiful output I can export as PDF. "
-            "You can output plain text; we'll convert it to PDF on the server.\n\n"
-            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
-            f"{raw_json}"
+            "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
+            "Please format your entire response using Markdown.\n\n"
+            "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
+            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
+            f"Here is the HTML data:\n\n{raw_json}"
         )
     else:  # txt
         prompt = (
@@ -474,20 +585,7 @@ def workflow_download() -> ResponseReturnValue:
         )
 
     elif fmt == "pdf":
-        # simple PDF via reportlab (you can swap in your favorite)
-        buf.seek(0)
-        doc = SimpleDocTemplate(buf, pagesize=letter)
-        styles = getSampleStyleSheet()
-        story = [Paragraph(formatted, styles["Normal"])]
-
-        doc.build(story)
-        buf.seek(0)
-        return send_file(
-            buf,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name="workflow_output.pdf",
-        )
+        return generate_pdf_from_markdown(formatted)
 
     else:  # txt
         buf.write(formatted.encode("utf-8"))
