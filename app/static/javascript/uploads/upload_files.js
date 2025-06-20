@@ -6,7 +6,9 @@ var rootFolderName = null; // Variable to store the root folder name
 var file;
 let fileInput = document.querySelector("#file-input");
 let dropArea = document.querySelector(".drag-area");
-let dragText = dropArea.querySelector("header");
+let dragText = document.querySelector("header");
+
+
 
 if (dropArea) {  
     //button = dropArea.querySelector("button"),

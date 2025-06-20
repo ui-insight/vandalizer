@@ -122,6 +122,7 @@ def upload():
         space=space,
         folder=str(target_folder),  # attach it here
         task_id=None,
+        task_status="layout",
     )
     document.save()
 
@@ -160,9 +161,21 @@ def poll_status() -> ResponseReturnValue:
     """Poll the status of a document's processing."""
     document_uuid = request.args.get("docid")
     document = SmartDocument.objects(uuid=document_uuid).first()
+    status_messages = []
+    if document.task_status == "readying":
+        status_messages.append("Getting ready…")
+        if document.valid:
+            status_messages.append("Document passed validation checks...")
+        else:
+            status_messages.append("Document failed validation checks...")
+
+
+
     return jsonify(
         {
-            "complete": not document.processing and document.raw_text != "",
+            "status": document.task_status,
+            "status_messages": status_messages,
+            "complete": document.task_status == "complete" or document.task_status == "error",
             "raw_text": document.raw_text if not document.processing else "",
             "validation_feedback": document.validation_feedback,
             "valid": document.valid,

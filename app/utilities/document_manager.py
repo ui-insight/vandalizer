@@ -39,6 +39,8 @@ def perform_extraction_and_update(document_uuid, extension):
     absolute_path = document.absolute_path
     debug("Performing OCR on document", document.title, absolute_path)
     document.processing = True
+    document.task_status = "ocr"
+    document.save()
     raw_text = ""
     try:
         if extension == "docx":
@@ -99,6 +101,7 @@ def cleanup_document(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
 
     document.task_id = None
+    document.task_status = "error"
     document.processing = False
     document.save()
 
@@ -106,9 +109,11 @@ def cleanup_document(document_uuid: str):
 @celery_app.task
 def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    if not document.valid:
-        debug("Document not validated, reason: ", document.validation_feedback)
-        return
+    document.task_status = "readying"
+    document.save()
+    # if not document.valid:
+    #     debug("Document not validated, reason: ", document.validation_feedback)
+    #     return
 
     document_manager = DocumentManager()
     document_path = document.absolute_path
@@ -119,6 +124,7 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
         doc_path=document_path,
         raw_text=raw_text,
     )
+    document.task_status = "complete"
     document.save()
     return document.uuid
 

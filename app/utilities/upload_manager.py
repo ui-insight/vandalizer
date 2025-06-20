@@ -106,6 +106,11 @@ def perform_document_validation(
     Entry point: splits document, launches chunk validations, and the summarizer via a chord.
     """
 
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    if document is not None:
+        document.task_status = "security"
+        document.save()
+
     start = time.perf_counter()
     # Extract text if needed
     text = document_text
