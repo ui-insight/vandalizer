@@ -398,6 +398,17 @@ class PromptNode(Node):
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
 
+def sanitize_step_name(name: str) -> str:
+    name = name.replace('.', '_')
+    name = name.replace('$', '_')
+    name = name.strip()
+    name = name.strip('_')
+    name = re.sub(r'\s+', '_', name)
+    name = re.sub(r'__+', '_', name)
+    if not name:
+        name = 'step'
+    return name
+
 class WorkflowEngine:
     def __init__(self) -> None:
         self.nodes = []
@@ -474,7 +485,9 @@ class WorkflowEngine:
                 # debug(latest_output)
 
             if workflow_result:
-                workflow_result.steps_output[node.name] = output
+                step_name = sanitize_step_name(node.name)
+                debug(f"Step name: {step_name}")
+                workflow_result.steps_output[step_name] = output
                 workflow_result.num_steps_completed += 1
                 workflow_result.save()
 

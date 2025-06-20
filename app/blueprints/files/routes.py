@@ -163,7 +163,20 @@ def upload():
 def poll_status() -> ResponseReturnValue:
     """Poll the status of a document's processing."""
     document_uuid = request.args.get("docid")
+    if not document_uuid:
+        return jsonify(
+            {
+                "status": "error",
+                "status_messages": ["Missing document UUID"],
+                "complete": True,
+                "raw_text": "",
+                "validation_feedback": "",
+                "valid": True,
+            },
+        )
+    debug(f"Polling status for document UUID: {document_uuid}")
     document = SmartDocument.objects(uuid=document_uuid).first()
+    debug(document)
     status_messages = []
     if document.task_status == "readying":
         status_messages.append("Getting ready…")
