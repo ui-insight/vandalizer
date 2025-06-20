@@ -893,7 +893,7 @@
 
         function pollAllLoaders() {
             // find each loader still on the page
-            $('.workflow-loader').each(function () {
+            $('#workflow-loader-doc').each(function () {
                 let $loader = $(this);
                 let uuid = $loader.data('doc-uuid');
 
@@ -919,7 +919,7 @@
             });
 
             // if there are no more loaders, stop polling entirely
-            if ($('.workflow-loader').length === 0) {
+            if ($('#workflow-loader-doc').length === 0) {
                 clearInterval(pollTimer);
             }
         }
