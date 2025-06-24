@@ -22,7 +22,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     extracted_text = ""
     for _i in range(retries):
         try:
-            return UIPDF.process_pdf(pdf_path, return_as="merged_text")
+            return UIPDF.convert_to_text(pdf_path)
         except Exception as e:
             debug(f"Error extracting text from PDF: {e}")
             return ""
