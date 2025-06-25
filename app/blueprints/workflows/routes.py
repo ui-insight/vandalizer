@@ -1,13 +1,16 @@
 """Handle workflow routes."""
 
+import asyncio
 import io
 import json
 import os
+import re
 import uuid
 from itertools import chain
 
 import pypandoc
 from bson import ObjectId
+from devtools import debug
 from flask import (
     current_app,
     flash,
@@ -20,6 +23,16 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.units import inch
+from reportlab.platypus import (
+    ListFlowable,
+    ListItem,
+    Paragraph,
+    SimpleDocTemplate,
+    Spacer,
+)
 from werkzeug.utils import secure_filename
 
 from app.models import (
@@ -28,16 +41,17 @@ from app.models import (
     SmartDocument,
     Space,
     User,
+    UserModelConfig,
     Workflow,
     WorkflowAttachment,
     WorkflowResult,
     WorkflowStep,
     WorkflowStepTask,
 )
-from app.utilities.config import model_type
+from app.utilities.agents import create_chat_agent
+from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.llm import ChatLM
-from app.utilities.workflow import execute_task_step_test, execute_workflow_task
+from app.utilities.workflow import execute_workflow_task
 from app.utils import load_user
 
 from . import workflows
@@ -86,7 +100,7 @@ def edit_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
-@workflows.route("/delete", methods=["POST"])
+@workflows.route("/delete_workflow", methods=["POST"])
 def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
     user = load_user()
@@ -95,7 +109,10 @@ def delete_workflow() -> ResponseReturnValue:
     data = request.get_json()
     uuid = data["uuid"]
     print(uuid)
-    Workflow.objects(id=uuid).delete()
+    workflow = Workflow.objects(id=uuid).first()
+
+    WorkflowResult.objects(workflow=workflow).delete()
+    workflow.delete()
     return {"success": True}
 
 
@@ -135,11 +152,29 @@ def run_workflow() -> ResponseReturnValue:
         SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
+    for doc in docs:
+        if not doc.valid:
+            workflow_result.status = "failed"
+            workflow_result.save()
+            return jsonify(
+                {
+                    "output": [
+                        f"The document {doc.title} failed validation, please fix the validation errors and try again: \n\n{doc.validation_feedback}"
+                    ],
+                    "steps": [],
+                }
+            )
+
     document_trigger_step = WorkflowStep(
         name="Document",
         data={"docs": docs, "attachments": attachments, "user_id": user_id},
     )
     document_trigger_step.save()
+
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
 
     workflow_id = str(workflow.id)
     workflow_result_id = str(workflow_result.id)
@@ -149,6 +184,7 @@ def run_workflow() -> ResponseReturnValue:
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
+        model=model,
     )
     print("Async result", async_result)
     workflow_output = async_result.get(timeout=600)
@@ -188,7 +224,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    async_result = execute_task_step_test.delay(
+    async_result = execute_workflow_task.delay(
         task_name=task_name,
         task_data=task_data,
         document_trigger_step_id=str(document_trigger_step.id),
@@ -365,6 +401,112 @@ def workflow_status() -> ResponseReturnValue:
 #     emit("workflow_status", response)
 
 
+def convert_inline_markdown_to_tags(text):
+    """Converts inline Markdown to ReportLab's supported XML tags."""
+    text = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", text)
+    text = re.sub(r"__(.*?)__", r"<b>\1</b>", text)
+    text = re.sub(r"\*(.*?)\*", r"<i>\1</i>", text)
+    text = re.sub(r"_(.*?)_", r"<i>\1</i>", text)
+    text = re.sub(r"~~(.*?)~~", r"<strike>\1</strike>", text)
+    text = re.sub(r"`(.*?)`", r'<font face="Courier">\1</font>', text)
+    return text
+
+
+def generate_pdf_from_markdown(formatted_markdown: str):
+    """
+    Generates a PDF from a Markdown string using a robust parser.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=letter,
+        rightMargin=72,
+        leftMargin=72,
+        topMargin=72,
+        bottomMargin=18,
+    )
+
+    styles = getSampleStyleSheet()
+
+    # --- STYLE MODIFICATIONS (Corrected) ---
+    styles["h1"].fontSize = 18
+    styles["h1"].leading = 22
+    styles["h1"].spaceAfter = 12
+
+    styles["h2"].fontSize = 14
+    styles["h2"].leading = 18
+    styles["h2"].spaceAfter = 10
+
+    # Modify the existing 'h3' style instead of adding it
+    styles["h3"].fontSize = 12
+    styles["h3"].leading = 14
+    styles["h3"].spaceAfter = 8
+
+    # Modify the existing 'Bullet' style for all list items
+    styles["Bullet"].firstLineIndent = 0
+    styles["Bullet"].spaceBefore = 3
+
+    story = []
+
+    # Enhanced Parser
+    lines = formatted_markdown.strip().split("\n")
+    in_ul = False
+    in_ol = False
+    list_items = []
+
+    for line in lines:
+        line = line.strip()
+
+        is_ul_item = line.startswith(("* ", "- "))
+        is_ol_item = re.match(r"^\d+\.\s", line)
+
+        if (in_ul and not is_ul_item) or (in_ol and not is_ol_item):
+            story.append(
+                ListFlowable(list_items, bulletType="bullet" if in_ul else "1")
+            )
+            list_items = []
+            in_ul = in_ol = False
+            story.append(Spacer(1, 0.1 * inch))
+
+        if line.startswith("# "):
+            text = convert_inline_markdown_to_tags(line[2:])
+            story.append(Paragraph(text, styles["h1"]))
+        elif line.startswith("## "):
+            text = convert_inline_markdown_to_tags(line[3:])
+            story.append(Paragraph(text, styles["h2"]))
+        elif line.startswith("### "):
+            text = convert_inline_markdown_to_tags(line[4:])
+            story.append(Paragraph(text, styles["h3"]))
+        elif is_ul_item:
+            if not in_ul:
+                in_ul = True
+            text = convert_inline_markdown_to_tags(line[2:])
+            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
+        elif is_ol_item:
+            if not in_ol:
+                in_ol = True
+            text = convert_inline_markdown_to_tags(re.sub(r"^\d+\.\s", "", line))
+            # Reuse the 'Bullet' style for numbered list items to avoid errors
+            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
+        elif line:
+            text = convert_inline_markdown_to_tags(line)
+            story.append(Paragraph(text, styles["Normal"]))
+            story.append(Spacer(1, 0.1 * inch))
+
+    if in_ul or in_ol:
+        story.append(ListFlowable(list_items, bulletType="bullet" if in_ul else "1"))
+
+    doc.build(story)
+
+    buf.seek(0)
+    return send_file(
+        buf,
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name="workflow_output.pdf",
+    )
+
+
 ## @MARK: Download
 @workflows.route("/download", methods=["GET"])
 def workflow_download() -> ResponseReturnValue:
@@ -395,10 +537,11 @@ def workflow_download() -> ResponseReturnValue:
     elif fmt == "pdf":
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
-            "Lay out the following HTML document into a beautiful output I can export as PDF. "
-            "You can output plain text; we'll convert it to PDF on the server.\n\n"
-            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
-            f"{raw_json}"
+            "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
+            "Please format your entire response using Markdown.\n\n"
+            "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
+            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
+            f"Here is the HTML data:\n\n{raw_json}"
         )
     else:  # txt
         prompt = (
@@ -407,10 +550,23 @@ def workflow_download() -> ResponseReturnValue:
             f"{raw_json}"
         )
 
-    chat_lm = ChatLM(model_type)
-    formatted = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    chat_agent = create_chat_agent(model)
+    # get current event loop
+    # if there is no current loop, create a new one
+    loop = asyncio.get_event_loop()
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    formatted = loop.run_until_complete(
+        chat_agent.run(prompt),
     )
+    formatted = formatted.output
 
     # Remove the tick marks before and after blocks
     formatted = formatted.strip("`").strip()
@@ -429,29 +585,7 @@ def workflow_download() -> ResponseReturnValue:
         )
 
     elif fmt == "pdf":
-        # simple PDF via reportlab (you can swap in your favorite)
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
-
-        pdf = canvas.Canvas(buf, pagesize=letter)
-        text = pdf.beginText(40, 750)
-        for line in formatted.splitlines():
-            text.textLine(line)
-            # add new page if you hit the bottom
-            if text.getY() < 40:
-                pdf.drawText(text)
-                pdf.showPage()
-                text = pdf.beginText(40, 750)
-        pdf.drawText(text)
-        pdf.save()
-
-        buf.seek(0)
-        return send_file(
-            buf,
-            mimetype="application/pdf",
-            as_attachment=True,
-            download_name="workflow_output.pdf",
-        )
+        return generate_pdf_from_markdown(formatted)
 
     else:  # txt
         buf.write(formatted.encode("utf-8"))
@@ -745,6 +879,7 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         # Handle POST request - create a new WorkflowStep
 
         data = request.get_json()
+        debug(data)
         workflow_id = data["workflow_uuid"]
         search_set_id = data.get("search_set_id", None)
         manual_input = data.get("manual_input", None)
@@ -756,6 +891,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
         if search_set_id:
             searchset = SearchSet.objects(uuid=search_set_id).first()
+            # if not searchset:
+            #     return jsonify({"error": "Search set not found"})
 
             workflow_step_task = None
             if task_id is not None and task_id != 0:

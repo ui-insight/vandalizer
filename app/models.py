@@ -19,6 +19,16 @@ from pypdf import PdfReader
 from app import app
 
 
+class UserModelConfig(me.Document):
+    """User configuration model. Represents user-specific settings."""
+
+    user_id = me.StringField(required=True, max_length=200)
+    name = me.StringField(required=True, max_length=200)
+    temperature = me.FloatField(default=0.7)
+    top_p = me.FloatField(default=0.9)
+    available_models = me.ListField(me.DictField(), required=False, default=[])
+
+
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
 
@@ -108,12 +118,20 @@ class SmartDocument(me.Document):
 
     path = me.StringField(required=True, max_length=200)
     processing = me.BooleanField(default=False)
-    title = me.StringField(required=True, max_length=200)
-    raw_text = me.StringField(required=True, default="")
-    extension = me.StringField(default="pdf", max_length=10)
+    validating = me.BooleanField(default=False)
+    valid = me.BooleanField(default=True)
+    validation_feedback = me.StringField(required=False, max_length=5000)
     task_id = me.StringField(
         default=None, required=False, max_length=200
     )  # Celery task ID for processing
+    task_status = me.StringField(
+        default=None,
+        required=False,
+        max_length=200,
+    )  # Status of the Celery task (e.g., 'layout', 'ocr', 'security', 'done')
+    title = me.StringField(required=True, max_length=200)
+    raw_text = me.StringField(required=True, default="")
+    extension = me.StringField(default="pdf", max_length=10)
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)

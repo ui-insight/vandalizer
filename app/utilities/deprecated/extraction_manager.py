@@ -1,47 +1,47 @@
-import os
+# import os
 
-from langchain.callbacks import get_openai_callback
-from langchain.chains import create_extraction_chain
-from langchain.chat_models import ChatOpenAI
-from langchain.document_loaders import PyPDFLoader  # pdf loading
-from langchain.embeddings import OpenAIEmbeddings  # embeddings
+# from langchain.callbacks import get_openai_callback
+# from langchain.chains import create_extraction_chain
+# from langchain.chat_models import ChatOpenAI
+# from langchain.document_loaders import PyPDFLoader  # pdf loading
+# from langchain.embeddings import OpenAIEmbeddings  # embeddings
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+# OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
-class ExtractionManager:
-    llmManager = None
-    review_vector_db = None
-    embeddings = None
-    root_path = ""
+# class ExtractionManager:
+#     llmManager = None
+#     review_vector_db = None
+#     embeddings = None
+#     root_path = ""
 
-    def __init__(self) -> None:
-        self.embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+#     def __init__(self) -> None:
+#         self.embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
 
-    def extract(self, document, value_string):
-        loader = PyPDFLoader(
-            os.path.join(self.root_path, "static", "uploads", document),
-        )
-        docs = loader.load()
-        # text_splitter = CharacterTextSplitter(chunk_size=15000, chunk_overlap=0)
-        # docs = text_splitter.split_documents(loader.load())
-        input = ""
-        for doc in docs:
-            input += doc.page_content + " "
+#     def extract(self, document, value_string):
+#         loader = PyPDFLoader(
+#             os.path.join(self.root_path, "static", "uploads", document),
+#         )
+#         docs = loader.load()
+#         # text_splitter = CharacterTextSplitter(chunk_size=15000, chunk_overlap=0)
+#         # docs = text_splitter.split_documents(loader.load())
+#         input = ""
+#         for doc in docs:
+#             input += doc.page_content + " "
 
-        properties = {}
-        for value in value_string.split(","):
-            properties[value] = {"type": "string"}
+#         properties = {}
+#         for value in value_string.split(","):
+#             properties[value] = {"type": "string"}
 
-        schema = {
-            "properties": properties,
-        }
+#         schema = {
+#             "properties": properties,
+#         }
 
-        llm = ChatOpenAI(
-            model_name="gpt-3.5-turbo-16k", temperature=0, openai_api_key=OPENAI_API_KEY,
-        )
+#         llm = ChatOpenAI(
+#             model_name="gpt-3.5-turbo-16k", temperature=0, openai_api_key=OPENAI_API_KEY,
+#         )
 
-        with get_openai_callback():
-            chain = create_extraction_chain(schema, llm, verbose=True)
+#         with get_openai_callback():
+#             chain = create_extraction_chain(schema, llm, verbose=True)
 
-            return chain.run(input)
+#             return chain.run(input)

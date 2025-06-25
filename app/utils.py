@@ -34,13 +34,13 @@ def is_dev() -> bool:
 def ingest_semantics(document, user_id) -> None:
     # semantics = SemanticIngest()
     # semantics.ingest(document=document)
-    document_manager = DocumentManager()
+    with DocumentManager() as document_manager:
 
-    document_path = document.absolute_path
+        document_path = document.absolute_path
 
-    document_manager.add_document(
-        user_id=user_id,
-        document_name=document.title,
-        document_id=document.uuid,
-        doc_path=document_path,
-    )
+        document_manager.add_document(
+            user_id=user_id,
+            document_name=document.title,
+            document_id=document.uuid,
+            doc_path=document_path,
+        )

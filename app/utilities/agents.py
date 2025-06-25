@@ -4,20 +4,30 @@ import json
 import os
 from dataclasses import dataclass
 from typing import Any, Optional
+from datetime import datetime, timezone
 
 import asyncio
 
 from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
-from pydantic import create_model
+from pydantic import create_model, BaseModel
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.agent import Agent
+from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.providers.openai import OpenAIProvider
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+from pydantic_ai.profiles import ModelProfile
+from pydantic_ai.profiles.openai import OpenAIJsonSchemaTransformer, OpenAIModelProfile, openai_model_profile
 
 from app.models import SmartDocument
 from app.utilities.async_utilities import function_event_loop_decorator
 from app.utilities.document_manager import DocumentManager
+from app.utilities.document_readers import extract_text_from_doc
+import asyncio
+from app.utilities.config import settings
 from app.utilities.llm import remove_code_markers
+
 
 load_dotenv()
 
@@ -35,6 +45,36 @@ if langfuse_enabled:
     langfuse = Langfuse()
 
 
+
+class InsightAIProvider(OpenRouterProvider):
+    """Custom OpenRouter provider for UIdaho Insight AI server."""
+    @property
+    def base_url(self) -> str:
+        return "https://mindrouter-api.nkn.uidaho.edu/v1"
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # Special handling for Ollama models, those that do not contain "/" in the name
+        if "/" not in model_name:
+            profile = openai_model_profile(model_name)
+            return OpenAIModelProfile(
+                json_schema_transformer=OpenAIJsonSchemaTransformer
+            ).update(profile)
+
+        # Fallback to parent logic
+        return super().model_profile(model_name)
+
+
+def get_agent_model(agent_model):
+    if "openai" in agent_model:
+        model_name = agent_model.split("/")[-1]
+        return OpenAIModel(
+            model_name=model_name,
+        )
+    return OpenAIModel(
+        model_name=agent_model,
+        provider=InsightAIProvider(api_key='no-api-key')
+    )
+
 @dataclass
 class RagDeps:
     doc_manager: DocumentManager
@@ -42,91 +82,117 @@ class RagDeps:
     documents: list[SmartDocument]
 
 
-chat_prompt = "You are an assistant for question-answering tasks. Use the following pieces of retrieved context to answer the question. If you don't know the answer, just say that you don't know."
-
-# @ model = OpenAIModel("gpt-4o")
-model = "openai:gpt-4o"
-
-rag_agent = Agent(
-    model,
-    deps_type=RagDeps,
-    system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
-
-When responding to queries:
-1. Carefully analyze the retrieved context documents for relevance to the query
-2. Synthesize information across multiple context fragments when appropriate
-3. Quote or paraphrase the retrieved information with precise attribution (e.g., "According to Document 1...")
-4. Maintain the original meaning and nuance from source documents
-5. Identify and reconcile any contradictions between different sources
-6. Distinguish between factual statements from the context and your own reasoning
-
-Response guidelines:
-- Begin with a direct answer to the question when possible
-- Structure complex answers with clear headings or numbered points
-- Highlight key information using formatting when helpful
-- Include relevant examples or illustrations from the context
-- Acknowledge information gaps explicitly rather than extrapolating
-- If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
-
-Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
-)
-
-chat_agent = Agent(
-    "openai:gpt-4o",
-    system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
-
-Your communication style:
-- Warm and approachable while maintaining professionalism
-- Concise but thorough - prioritize clarity over length
-- Personalized to the user's tone and level of formality
-- Balances helpfulness with respect for user autonomy
-
-When responding:
-1. Address the user's specific question or need first
-2. Provide relevant context or background when helpful
-3. If uncertain, acknowledge limitations rather than guessing
-4. For complex topics, break information into digestible segments
-5. Use natural, conversational language (contractions, varied sentence structure)
-6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
-
-Content guidelines:
-- Cite sources for factual claims when possible
-- Present balanced perspectives on nuanced topics
-- Avoid unnecessary jargon unless the conversation indicates technical expertise
-- Respect privacy and security best practices
-
-Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
-)
-
-prompt_agent = Agent(
-    "openai:gpt-4o",
-    system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
-
-When generating search prompts:
-1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
-2. Include relevant synonyms and alternative phrasings to increase recall
-3. Remove conversational fillers and personal pronouns
-4. Prioritize domain-specific terminology when present
-5. Structure the prompt with the most important search terms first
-6. Include any contextual constraints (time periods, locations, etc.)
-7. Keep the prompt concise (under 100 words) but comprehensive
-8. Format technical terms precisely as they would appear in documentation
-
-Do not:
-- Include explanations or reasoning in your response
-- Ask clarifying questions
-- Provide answers to the user's question
-- Include special operators or syntax unless specified
-
-Your output should be the search prompt only, with no additional text.""",
-)
 
 
-chat_agent = Agent(
-    model,
-    system_prompt=chat_prompt,
-)
+def create_rag_agent(agent_model):
+    model = get_agent_model(agent_model)
 
+    return Agent(
+        model,
+        deps_type=RagDeps,
+        system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
+
+    When responding to queries:
+    1. Carefully analyze the retrieved context documents for relevance to the query
+    2. Synthesize information across multiple context fragments when appropriate
+    3. Quote or paraphrase the retrieved information with precise attribution (e.g., "According to Document 1...")
+    4. Maintain the original meaning and nuance from source documents
+    5. Identify and reconcile any contradictions between different sources
+    6. Distinguish between factual statements from the context and your own reasoning
+
+    Response guidelines:
+    - Begin with a direct answer to the question when possible
+    - Structure complex answers with clear headings or numbered points
+    - Highlight key information using formatting when helpful
+    - Include relevant examples or illustrations from the context
+    - Acknowledge information gaps explicitly rather than extrapolating
+    - If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
+
+    Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
+    )
+
+
+def create_chat_agent(agent_model, system_prompt=None):
+    model = get_agent_model(agent_model)
+    if system_prompt is not None:
+        return Agent(
+            model,
+            system_prompt=system_prompt,
+        )
+    return Agent(
+        model,
+        system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+
+    Your communication style:
+    - Warm and approachable while maintaining professionalism
+    - Concise but thorough - prioritize clarity over length
+    - Personalized to the user's tone and level of formality
+    - Balances helpfulness with respect for user autonomy
+
+    When responding:
+    1. Address the user's specific question or need first
+    2. Provide relevant context or background when helpful
+    3. If uncertain, acknowledge limitations rather than guessing
+    4. For complex topics, break information into digestible segments
+    5. Use natural, conversational language (contractions, varied sentence structure)
+    6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+
+    Content guidelines:
+    - Cite sources for factual claims when possible
+    - Present balanced perspectives on nuanced topics
+    - Avoid unnecessary jargon unless the conversation indicates technical expertise
+    - Respect privacy and security best practices
+
+    Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
+    )
+
+
+def create_prompt_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
+
+    When generating search prompts:
+    1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
+    2. Include relevant synonyms and alternative phrasings to increase recall
+    3. Remove conversational fillers and personal pronouns
+    4. Prioritize domain-specific terminology when present
+    5. Structure the prompt with the most important search terms first
+    6. Include any contextual constraints (time periods, locations, etc.)
+    7. Keep the prompt concise (under 100 words) but comprehensive
+    8. Format technical terms precisely as they would appear in documentation
+
+    Do not:
+    - Include explanations or reasoning in your response
+    - Ask clarifying questions
+    - Provide answers to the user's question
+    - Include special operators or syntax unless specified
+
+    Your output should be the search prompt only, with no additional text.""",
+    )
+
+
+class UploadResult(BaseModel):
+    feedback: str
+    valid: bool
+
+
+def create_upload_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+        result_type=UploadResult,
+    )
+
+upload_agent = create_upload_agent(settings.base_model)
+
+rag_agent = create_rag_agent(settings.base_model)
+
+prompt_agent = create_prompt_agent(settings.base_model)
+
+# TODO maybe add an indicator to the UI to show that the response was drawn from the vector store or not
 
 @rag_agent.tool
 def retrieve(
@@ -201,11 +267,14 @@ def retrieve(
     return content
 
 
+
 @dataclass
 class FieldInferenceDeps:
     extraction_context: Optional[str]
     keys: list[str]
 
+
+model = get_agent_model(settings.base_model)
 
 field_inference_agent = Agent(
     model,
@@ -346,11 +415,17 @@ class ExtractionDeps:
 #     base_url="https://mindrouter-api.nkn.uidaho.edu",
 # )
 
-extraction_agent = Agent(
-    model,
-    deps_type=ExtractionDeps,
-    retries=3,
-)
+
+def create_extraction_agent(agent_model):
+    model = get_agent_model(agent_model)
+    return Agent(
+        model,
+        deps_type=ExtractionDeps,
+        retries=3,
+    )
+
+
+extraction_agent = create_extraction_agent(settings.base_model)
 
 
 @extraction_agent.system_prompt
@@ -411,7 +486,7 @@ def filter_empty_entities(result: dict) -> list:
 
 
 # @observe()
-def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
+def extract_entities_with_agent(text: str, keys: list[str], context: str = "", model_name: str = settings.base_model) -> list:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
@@ -432,11 +507,6 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
     except RuntimeError:
         # Handle the case where the event loop is already running
         loop = asyncio.get_event_loop()
-
-    cache_result = cache.lookup(cache_key, llm_string)
-    if cache_result:
-        result = json.loads(cache_result[0])
-        return result.get("entities", [])
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -522,10 +592,11 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
         entities=(list[DynamicModel], ...),
     )
 
+    model = get_agent_model(model_name)
     extractor_agent = Agent(
         model,
         deps_type=ExtractionDeps,
-        result_type=ExtractionModel,
+        output_type=ExtractionModel,
         result_retries=3,
         retries=3,
     )
@@ -552,8 +623,6 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = ""):
             filtered_entities = filter_empty_entities(
                 result,
             )
-            if filtered_entities and len(filtered_entities) > 0:
-                cache.update(cache_key, llm_string, [json.dumps(result)])
         return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message

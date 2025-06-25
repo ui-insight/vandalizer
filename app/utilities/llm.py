@@ -4,28 +4,45 @@ from datetime import datetime
 
 import openai
 import requests
-from openai import OpenAI
 import tiktoken
+from devtools import debug
+from openai import OpenAI
+
+from app.models import UserModelConfig
 
 
 class ChatLM:
-    def __init__(self, model_type="insight") -> None:
+    def __init__(self, model=None, user_id=None) -> None:
+        model_type, model_name = "openai", "gpt-4o"
+        if model is not None:
+            self.model = model
+            model_type, model_name = model.split("/")
+        else:
+            if user_id is not None:
+                model_config = UserModelConfig.objects.first(user=user_id)
+                self.model = model_config.name
+                if model_config is not None:
+                    model_type, model_name = model_config.name.split("/")
+
         self.model_type = model_type
+        self.model_name = model_name
+        debug(f"Model type: {self.model_type}")
+        debug(f"Model name: {self.model_name}")
 
     def completion(self, structured_output=False, stream=False, **kwargs):
         if self.model_type == "openai":
-            model = kwargs.pop("model", "gpt-4o")
+            # model = kwargs.pop("model", "gpt-4o")
             messages = kwargs.pop("messages", [])
             if structured_output:
                 api_key = kwargs.pop("api_key", None)
                 client = OpenAI(api_key=api_key)
                 return client.beta.chat.completions.parse(
-                    model=model,
+                    model=self.model_name,
                     messages=messages,
                     **kwargs,
                 )
             completion = openai.chat.completions.create(
-                model=model,
+                model=self.model,
                 messages=messages,
                 **kwargs,
             )
@@ -127,6 +144,25 @@ class InsightLM:
 
         return outputs
 
+
+def remove_xml_content(text: str, tag: str) -> str:
+    """Removes XML content from a string based on the specified tag.
+
+    Args:
+        text (str): The input text containing XML content.
+        tag (str): The XML tag to remove.
+
+    Returns:
+        str: The text with the specified XML content removed.
+    """
+    start_tag = f"<{tag}>"
+    end_tag = f"</{tag}>"
+    start_index = text.find(start_tag)
+    end_index = text.find(end_tag, start_index)
+
+    if start_index != -1 and end_index != -1:
+        return text[:start_index] + text[end_index + len(end_tag):]
+    return text.strip()
 
 
 def remove_code_markers(text: str) -> str:

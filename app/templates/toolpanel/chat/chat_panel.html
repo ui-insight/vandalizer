@@ -1,15 +1,38 @@
-<div class="tab-content" id="chat-panel" style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
-    <p style="font-size: 12px; font-weight: 300; color: #00000077;"  class="doc-selected-counter"><i>{{ documents|length }} documents selected</i></i></p>
+<div class="tab-content" id="chat-panel"
+    style="{% if section != 'Chat' and section != 'Tasks' %}display: none;{% endif %}">
+    <!-- pinned model selector - populated from javascript -->
+    <a href="javascript:void(0);" id="model-text-icon">
+    </a>
+    <div id="chat-model-popup-menu" class="file-popup-menu" style="display: none;">
+        <ul id="chat-model-popup-menu-options">
+            <li id="download-pdf-option">PDF</li>
+            <li id="download-csv-option">CSV</li>
+            <li id="download-text-option">Text</li>
+        </ul>
+    </div>
+
+    <!-- rest of your content… -->
+    <p style="font-size:12px; font-weight:300; color:#00000077;" class="doc-selected-counter">
+        <i>{{ documents|length }} documents selected</i>
+    </p>
     <div class="chat-card-container" style="margin-top: 30px;">
+        <div class="loading-event-progress-container">
+            <div id="loading-event-progress">
+                <h2 id="loading-event-title"></h2>
+                <div class="loading-progress-bar">
+                    <div class="loading-progress-fill"></div>
+                </div>
+                <p id="loading-event-message"></p>
+            </div>
+        </div>
         <div class="chat-card-suggestion" id="chat-suggestion-3">
             <i class="fas fa-wrench" style="color: #F1B300;"></i>
             <p>Teach me how to use Vandalizer on this</p>
-            
+
         </div>
         <div class="chat-card-suggestion" id="chat-suggestion-1">
             <i class="fas fa-file-alt" style="color: #d22121bd;"></i>
             <p>Summarize the document(s)</p>
-            
         </div>
 
         <div class="chat-card-suggestion" id="chat-suggestion-2">
@@ -18,3 +41,6 @@
         </div>
     </div>
 </div>
+
+<script>
+</script>

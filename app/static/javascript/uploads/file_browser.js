@@ -21,10 +21,10 @@ $(document).ready(function () {
     const rect =
       e.type === "contextmenu"
         ? {
-            left: e.clientX,
-            top: e.clientY,
-            bottom: e.clientY,
-          }
+          left: e.clientX,
+          top: e.clientY,
+          bottom: e.clientY,
+        }
         : $displaytarget[0].getBoundingClientRect();
 
     const popupHeight = $popupMenu.outerHeight();

@@ -1,5 +1,6 @@
 """Handles primary routing for the home page and related functionalities."""
 
+import json
 import uuid
 from itertools import chain
 
@@ -18,27 +19,48 @@ from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
 from mongoengine.queryset.visitor import Q
 
-from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
 from app.models import (
     SearchSet,
     SearchSetItem,
     SmartDocument,
     SmartFolder,
     Space,
+    UserModelConfig,
     Workflow,
     WorkflowStep,
 )
-from app.utilities.config import max_context_length
+from app.utilities.config import settings
 from app.utilities.document_manager import (
-    cleanup_document,
     perform_extraction_and_update,
     perform_semantic_ingestion,
-    update_document_fields,
 )
 from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
 from app.utils import is_dev, load_user
 
 from . import home
+
+
+@app.context_processor
+def inject_current_model():
+    """
+    Runs on *every* template render.  Looks up the user's ModelConfig,
+    and makes `current_model` available in all templates.
+    """
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    models = [m.model_dump() for m in settings.models]
+    current_model = settings.base_model
+    if model_config:
+        current_model = model_config.name
+        if len(model_config.available_models) > 0:
+            models = json.loads(json.dumps(model_config.available_models))
+    debug(models)
+
+    return {"current_model": current_model, "models": models}
 
 
 def verify_document(document: SmartDocument, user_id: str) -> None:
@@ -49,24 +71,21 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     extension = document.extension
 
     if not document.raw_text or document.raw_text == "":
-        document.processing = True
-        document.save()
         # check if there is a task running
         if not document.task_id:
             extraction_task = perform_extraction_and_update.s(
-                document_uuid=document.uuid,
-                extension=extension,
+                document_uuid=document.uuid, extension=extension
+            )
+
+            validation_task = perform_document_validation.s(
+                document_uuid=document.uuid, document_path=document.absolute_path
             )
 
             ingestion_task = perform_semantic_ingestion.s(
                 document.uuid,
                 user_id,
             )
-            workflow = extraction_task | ingestion_task
-            workflow_task_result = workflow.apply_async(
-                link=update_document_fields.si(document.uuid),
-                link_error=cleanup_document.si(document.uuid),
-            )
+            workflow_task_result = extraction_task | validation_task | ingestion_task
             document.task_id = workflow_task_result.id
             document.save()
 
@@ -119,18 +138,21 @@ def index() -> ResponseReturnValue:
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
-        documents.append(document)
-        verify_document(document, user_id)
-        current_space = Space.objects(uuid=document.space).first()
+        if document is not None:
+            documents.append(document)
+            verify_document(document, user_id)
+            current_space = Space.objects(uuid=document.space).first()
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
         for doc_id in doc_ids:
             document = SmartDocument.objects(uuid=doc_id).first()
-            documents.append(document)
-            verify_document(document, user_id)
+            if document is not None:
+                documents.append(document)
+                verify_document(document, user_id)
 
-        current_space = Space.objects(uuid=document.first.space).first()
+        if document is not None:
+            current_space = Space.objects(uuid=document.first.space).first()
 
     spaces.remove(current_space)
     spaces.insert(0, current_space)
@@ -260,10 +282,32 @@ def index() -> ResponseReturnValue:
     release_seen = request.cookies.get("release_seen")
     show_release_panel = release_seen != CURRENT_RELEASE_VERSION
 
+    # user = load_user()
+    # models = []
+
+    # model_config = ModelConfig.objects(
+    #     user_id=user.user_id,
+    # ).first()
+    # model = settings.base_model
+    # settings_models = [m.model_dump() for m in settings.models]
+    # if model_config is None:
+    #     model_config = ModelConfig(user_id=user.user_id, name=model)
+    #     model_config.available_models = [m.model_dump() for m in settings.models]
+    #     model_config.save()
+    #     models = settings_models
+    # else:
+    #     if len(model_config.available_models) == 0:
+    #         models = settings_models
+
+    # debug(models)
+    # debug(settings.models)
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
         prompts=prompts,
+        # models=models,
+        # current_model=model,
         formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
@@ -273,7 +317,7 @@ def index() -> ResponseReturnValue:
         spaces=spaces,
         current_space_id=spaces[0].uuid,
         section=section,
-        max_context_length=max_context_length,
+        max_context_length=settings.max_context_length,
         workflows=workflows,
         workflow_template=workflow_template,
         workflow_step_template=workflow_step_template,
@@ -332,9 +376,17 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
+    user = load_user()
+
     debug(documents)
     debug(docs)
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
     response = OpenAIInterface().ask_question_to_documents(
+        model,
         current_app.root_path,
         documents,
         message,

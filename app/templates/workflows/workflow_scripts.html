@@ -35,7 +35,7 @@
                 dict['manual_input'] = manualInput;
             } else {
                 let dropdown_selection = $('#extractionSetDropdown')[0].value;
-                dict["search_id"] = dropdown_selection
+                dict["search_set_id"] = dropdown_selection
             }
         } else if (stepType == "prompt") {
             let dropdown = $('#extractionSetDropdown');
@@ -58,6 +58,7 @@
         }
 
         let data = JSON.stringify(dict);
+        console.log(data);
 
         $.ajax({
             url: `/workflows/add_${stepType.toLowerCase()}_step`,
@@ -75,6 +76,7 @@
             }
         });
     }
+
 
     function workflowAddStepTaskType(stepType, workflow_step_id, is_editing = false) {
         let data = JSON.stringify({
@@ -250,8 +252,9 @@
                 $('.workflow-output').fadeOut();
             });
 
-
-
+            $('#download-popup-menu').off('click').on('click', function (e) {
+                e.stopPropagation();
+            });
         }
 
         function fetchWorkflow(workflow_uuid) {
@@ -544,6 +547,7 @@
 
 
     function performWorkflowStatus(session_id, workflow_time) {
+
         $.ajax({
             url: `/workflows/workflow/status?session_id=${session_id}`,
             type: 'GET',
@@ -639,6 +643,16 @@
         return intervalId;
     }
 
+    // hide popup when popup menu loses focus and popup menu is visible
+    $(document).on("click", function (e) {
+        const $popupMenu = $('#download-popup-menu');
+        if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
+            hideDownloadPopupMenu();
+        }
+    });
+
+
+
     $('#downloadWorkflowBtn').on('click', function (e) {
         e.stopPropagation();
         const $btn = $(this);
@@ -674,27 +688,51 @@
             left: `${left}px`,
             opacity: 0
         }).animate({ opacity: 1 }, 200);
+
+
+        $('#download-pdf-option').off('click').on("click", function () {
+            console.log("here");
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('pdf');
+
+        });
+        $('#download-csv-option').off('click').on("click", function () {
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('csv');
+        });
+        $('#download-text-option').off('click').on("click", function () {
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('txt');
+        });
     });
 
-    $('#download-popup-menu').on('click', function (e) {
+ // $('#download-popup-menu').on('click', function (e) {
+//            e.stopPropagation();
+//        });
+
+$(document).on('click', '#download-pdf-option', function(e) {
+    e.stopPropagation();
+    console.log("Download PDF option clicked");
+    hideDownloadPopupMenu();
+    downloadWorkflowOutput('pdf');
+});
+
+ $(document).on('click', '#download-csv-option', function(e) {
         e.stopPropagation();
-    });
-
-    $('#download-pdf-option').on("click", function () {
-        hideDownloadPopupMenu();
-        downloadWorkflowOutput('pdf');
-
-    });
-    $('#download-csv-option').on("click", function () {
+        console.log("Download CSV option clicked");
         hideDownloadPopupMenu();
         downloadWorkflowOutput('csv');
     });
-    $('#download-text-option').on("click", function () {
+
+    $(document).on('click', '#download-text-option', function(e) {
+        e.stopPropagation();
+        console.log("Download Text option clicked");
         hideDownloadPopupMenu();
         downloadWorkflowOutput('txt');
     });
 
     function downloadWorkflowOutput(format) {
+        console.log("Downloading workflow output in format:", format);
         // Go to the server to download the file in the specified format
         location.href = `/workflows/download?session_id=${workflow_session_id}&format=${format} `; // Redirect to the download URL
     }
@@ -713,11 +751,6 @@
             },
         );
     }
-
-    // Close the popup menu when clicking outside
-    $(document).on("click", function (e) {
-        hideDownloadPopupMenu();
-    });
 
 
 

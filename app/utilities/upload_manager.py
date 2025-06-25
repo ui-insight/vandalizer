@@ -1,22 +1,26 @@
 #!/usr/bin/env python3
 
+import asyncio
+import time
+
+from celery import chord
+from devtools import debug
+from dotenv import load_dotenv
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 from app.celery_worker import celery_app
 from app.models import SmartDocument
-from devtools import debug
-from app.utilities.agents import validate_document
-import time
-from celery.result import AsyncResult
-from celery import chord, group
-import asyncio
-from app.utilities.agents import upload_agent, chat_agent
+from app.utilities.agents import create_chat_agent, upload_agent
+from app.utilities.config import settings
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities import config
+
+load_dotenv()
 
 
-import asyncio
+chat_agent = create_chat_agent(settings.base_model)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=5)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def validate_chunk(
     self, document_path: str, compliance: str, chunk_text: str, index: int, total: int
 ) -> dict:
@@ -24,6 +28,9 @@ def validate_chunk(
     Validate a single text chunk against compliance requirements.
     Returns a dict with keys: valid (bool), feedback (str), index (int).
     """
+    debug(
+        f"Validating chunk {index}/{total} of document {document_path}, model: {upload_agent.model}"
+    )
     try:
         prompt = f"""
         Validate chunk {index}/{total} of document {document_path}.
@@ -35,14 +42,15 @@ def validate_chunk(
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(upload_agent.run(prompt))
         output = result.output
+        debug(f"Chunk {index}/{total} validation result: {output}")
         return {"valid": output.valid, "feedback": output.feedback, "index": index}
-    except Exception as exc:
-        debug(f"Retrying chunk {index} due to error: {exc}")
-        raise self.retry(exc=exc)
+    except Exception as e:
+        debug(f"Retrying chunk {index} due to error: {e}")
+        raise self.retry(exc=e)
 
 
-@celery_app.task
-def summarize_results(results: list, document_uuid: str) -> dict:
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+def summarize_results(self, results: list, document_uuid: str) -> dict:
     """
     Summarize validation feedback from all chunks and update the SmartDocument.
     """
@@ -61,47 +69,74 @@ def summarize_results(results: list, document_uuid: str) -> dict:
     # Summarize via chat_agent
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    summary = loop.run_until_complete(
-        chat_agent.run(f"Summarize the following validation feedback:\n{combined}")
-    )
+    try:
+        summary = loop.run_until_complete(
+            upload_agent.run(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
+
+    Validation feedback:
+    {combined}
+    """)
+        )
+    except Exception as e:
+        debug(f"Error summarizing results: {e}")
+        self.retry(exc=e)
+
+    summary = summary.output.model_dump()
+    debug(summary)
 
     # Persist to DB
     doc = SmartDocument.objects(uuid=document_uuid).first()
     doc.valid = all_valid
-    doc.validation_feedback = summary.output
+    doc.validation_feedback = summary.get("feedback", "")
     doc.save()
     debug(f"Document {document_uuid} validation updated: valid={all_valid}")
-    return {"valid": all_valid, "feedback": summary.output}
+    return summary
 
 
-@celery_app.task
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def perform_document_validation(
+    self,
     document_text: str,
     document_uuid: str,
     document_path: str,
     chunk_size: int = 8000,
+    chunk_overlap: int = 200,
 ):
     """
     Entry point: splits document, launches chunk validations, and the summarizer via a chord.
     """
 
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    if document is not None:
+        document.task_status = "security"
+        document.save()
+
+    start = time.perf_counter()
     # Extract text if needed
-    text = document_text or extract_text_from_doc(document_path)
-    compliance = config.upload_compliance
+    text = document_text
+    if text is None:
+        text = extract_text_from_doc(document_path)
+    compliance = settings.upload_compliance
 
     # Split into chunks
-    chunked = [text[i : i + chunk_size] for i in range(0, len(text), chunk_size)]
-    total = len(chunked)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
+    chunks = text_splitter.split_text(text)
+    total = len(chunks)
     debug(f"Launching {total} chunk validation tasks")
 
     # Build list of validate_chunk subtasks
     header = [
         validate_chunk.s(document_path, compliance, chunk_text, idx + 1, total)
-        for idx, chunk_text in enumerate(chunked)
+        for idx, chunk_text in enumerate(chunks)
     ]
 
     # Use a chord to run summary after all chunks finish
     callback = summarize_results.s(document_uuid)
     chord(header)(callback)  # Executes validate_chunk tasks, then summarize_results
+
+    elapsed = time.perf_counter() - start
+    debug(f"perform_document_validation[{document_uuid}] took {elapsed:.2f}s")
 
     return text

@@ -1,4 +1,5 @@
 import csv
+import json
 import os
 import uuid
 from copy import deepcopy
@@ -18,12 +19,92 @@ from flask import (
 from flask.typing import ResponseReturnValue
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument
+from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
+from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import load_user
 
 from . import tasks
+
+
+@tasks.route("/model/filter", methods=["POST"])
+def filter_models() -> ResponseReturnValue:
+    data = request.get_json()
+    uuids = data.get("uuids", [])
+    debug(data)
+    validation_failed = False
+    user = load_user()
+
+    settings_models = [m.model_dump() for m in settings.models]
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    current_model = settings.base_model
+    if len(uuids) == 0:
+        if model_config:
+            current_model = model_config.name
+        return jsonify({"models": settings_models, "current_model": current_model})
+    for uuid in uuids:
+        doc = SmartDocument.objects(uuid=uuid).first()
+        if doc is not None:
+            if not doc.valid:
+                validation_failed = True
+                break
+    if validation_failed:
+        config_models = [
+            m for m in model_config.available_models if not m.get("external")
+        ]
+        current_model = "llama3.3"
+        # filter out the external models
+        if model_config:
+            model_config.available_models = config_models
+            model_config.save()
+        else:
+            model_config = UserModelConfig(user_id=user.user_id, name=current_model)
+            model_config.available_models = config_models
+            model_config.save()
+    else:
+        if not model_config:
+            model_config = UserModelConfig(
+                user_id=user.user_id, name=settings.base_model
+            )
+            model_config.available_models = settings_models
+            model_config.save()
+        else:
+            current_model = model_config.name
+
+            model_config.available_models = settings_models
+            model_config.save()
+
+    models = json.loads(json.dumps(model_config.available_models))
+    debug(current_model)
+
+    return jsonify({"models": models, "current_model": current_model})
+
+
+@tasks.route("/model/update", methods=["POST"])
+def update_model() -> ResponseReturnValue:
+    """Update the model for a search set."""
+    data = request.get_json()
+    debug(data)
+    name = data.get("name")
+    temperature = data.get("temperature", 0.7)
+    top_p = data.get("top_p", 0.9)
+
+    user = load_user()
+
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config is None:
+        model_config = UserModelConfig(
+            user_id=user.user_id, name=name, temperature=temperature, top_p=top_p
+        )
+    else:
+        model_config.name = name
+        model_config.temperature = temperature
+        model_config.top_p = top_p
+    model_config.save()
+
+    response = {"current_model": name}
+    return jsonify(response)
 
 
 # Add a extraction set
@@ -388,7 +469,13 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     em = ExtractionManager3()
     em.root_path = current_app.root_path
-    keys = em.build_from_documents(document_uuids)
+
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config is not None:
+        model = model_config.name
+    keys = em.build_from_documents(document_uuids, model)
 
     if "entities" in keys:
         bindings = keys["entities"]
@@ -482,7 +569,8 @@ def begin_prompt_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     items = search_set.items()
 
-    user_id = load_user().user_id
+    user = load_user()
+    user_id = user.user_id
 
     if len(items) > 0:
         llm = OpenAIInterface()

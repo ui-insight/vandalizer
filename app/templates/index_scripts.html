@@ -2,6 +2,109 @@
     var askingDocument = '';
     var document_uuids = [];
     var maxContextLength = parseInt("{{max_context_length}}");
+    var model = "{{model}}";
+
+
+    let animationStepIndex = 0;
+    let runStepResolve = null;
+    let animationInProgress = false;
+
+    const steps = [
+        {
+            title: "Processing document",
+            messages: ["Reading layout…", "Extracting text…", "Perfoming OCR…"],
+            duration: 5000
+        },
+        {
+            title: "Performing security check",
+            messages: ["Analyzing document content…", "Searching for private information…", "Scanning for compliance…"],
+            duration: 4000
+        },
+        {
+            title: "Preparing document for AI",
+            messages: ["Getting ready…", "Summarizing validation checks…"],
+            duration: 2500
+        },
+        {
+            title: "Done!",
+            messages: ["All set ✅"],
+            duration: 1500
+        }
+    ];
+    const root_container = document.querySelector(".loading-event-progress-container");
+    const container = document.getElementById("loading-event-progress");
+    const titleEl = document.getElementById("loading-event-title");
+    const messageEl = document.getElementById("loading-event-message");
+    const progressEl = document.querySelector(".loading-progress-fill");
+    // hide the root_container initially(display none)
+    root_container.style.display = "none";
+
+    async function advanceStep(statusMessages = []) {
+        if (animationStepIndex >= steps.length) return;
+
+        animationInProgress = true;
+        const { title, messages, duration } = steps[animationStepIndex];
+        titleEl.textContent = title;
+        messageEl.textContent = "";
+        progressEl.style.width = "0%";
+
+        let animationMessages = statusMessages.length > 0 ? statusMessages : messages;
+
+        // Cycle through messages
+        let msgIdx = 0;
+        const msgInterval = setInterval(() => {
+            messageEl.textContent = messages[msgIdx % animationMessages.length];
+            msgIdx++;
+        }, duration / animationMessages.length);
+
+        // Animate fill
+        await new Promise(res => {
+            progressEl.style.transition = `width ${duration}ms linear`;
+            requestAnimationFrame(() => {
+                progressEl.style.width = "100%";
+            });
+            setTimeout(() => {
+                clearInterval(msgInterval);
+                res();
+            }, duration);
+        });
+
+        // Fade out before next
+        await new Promise(res => {
+            container.classList.remove("fade-in");
+            container.classList.add("fade-out");
+            setTimeout(() => {
+                container.classList.remove("fade-out");
+                container.classList.add("fade-in");
+                res();
+            }, 500);
+        });
+
+        animationStepIndex++;
+
+        // If at the last stage, fade out after 1s
+        if (animationStepIndex === steps.length) {
+            setTimeout(() => container.classList.add("fade-out"), 1000);
+            animationInProgress = false;
+        }
+    }
+
+    // Call to start the animations from step 0
+    function startProcessingAnimation() {
+        animationStepIndex = 0;
+        // show the root_container
+        root_container.style.display = "block";
+        root_container.classList.remove("fade-out");
+        root_container.classList.add("fade-in");
+        container.classList.remove('fade-out');
+        container.classList.add("fade-in");
+
+        advanceStep(); // Start first step (will progress as you call more advanceStep)
+    }
+
+    // In pollStatus, keep a variable for backend stage (pseudo-stages shown here)
+    // You need to decide on how to map your backend status to these stages
+
 
     {% if (documents != None) and documents | length > 0 %}
     var documentData = {
@@ -53,8 +156,18 @@
         window.location.href = url.toString();
     }
 
+    $('#chat-model-popup-menu-options').on('click', 'li', function () {
+        const modelName = $(this).attr('value');
+        if (modelName) {
+            updateModel(modelName);
+        }
+        // close the menu
+        $('#chat-model-popup-menu').hide();
+    });
+
     function updateModel(model) {
         console.log("Updating model to: " + model);
+
         $.ajax({
             url: '/tasks/model/update',
             type: 'POST',
@@ -74,12 +187,16 @@
         });
     }
 
-    function showModelModal() {
+    $("#model-text-icon").on("click", function (e) {
+        e.stopPropagation();
         console.log("show model modal");
-        const modal = document.getElementById("model-modal");
-        $('#model-modal').show();
+        $('#chat-model-popup-menu').show();
+    });
 
-    }
+    $(document).on("click", function (e) {
+        $('#chat-model-popup-menu').fadeOut();
+    });
+
     $("#closeModelModalBtn").on('click', function () {
         $('#model-modal').hide();
     });
@@ -119,20 +236,34 @@
             success: function (msg) {
                 const newModel = msg.current_model;
                 const models = msg.models;
+                console.log("Filtered models:", models);
+                console.log("current model:", newModel);
                 // Update the modal's data-context so it's in sync
                 $('#model-modal').data('context', newModel);
 
                 // Update the visible text in the UI
-                $('#current_selected_model').text(newModel);
+                $('#current_selected_model').text('');
+
+                // find the model tag in the models array based on the current model
+                const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
+
+                // add the model tag to the model-text-icon div
+                const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
 
 
-                const $modelSelect = $('#model-select');
+                // Clear any existing tags before appending the new one
+                $('#model-text-icon').find('#model-tag').remove();
+                $('#model-text-icon').append(tagElement);
+
+
+
+                const $modelSelect = $('#chat-model-popup-menu-options');
                 $modelSelect.empty(); // clear existing options
 
                 models.forEach(model => {
-                    const option = $('<option>', {
+                    const option = $('<li>', {
                         value: model.name,
-                        text: model.name,
+                        text: model.tag,
                         selected: model.name === newModel
                     });
                     $modelSelect.append(option);
@@ -144,6 +275,8 @@
             }
         });
     }
+
+
 
 
 
@@ -185,6 +318,12 @@
 
         totalDocs += uuids.length;
         document_uuids = uuids;
+
+        // filter user available models
+
+        filterAvailableModels(uuids);
+
+
 
         var contextLengthWarning = `
                                     <span class="token-warning">&#9888; <span class="tooltiptext">Token count exceeds max context length, an advanced model will be used instead.</span></span>
@@ -492,10 +631,38 @@
 
     var pollTimeout = null;
     var pollingActive = true;
+
+    let lastKnownProcessingStage = null;
     function pollStatus(docUuid) {
         if (!pollingActive) return;
 
         $.get('/files/poll_status', { docid: docUuid }, function (data) {
+
+            console.log("Polling status for document: ", data.status);
+
+            let currentStage;
+            if (!data.complete) {
+                if (data.status === "layout" || data.status === "ocr") currentStage = 0; // Processing document
+                else if (data.status === "security") currentStage = 1;                   // Security check
+                else if (data.status === "readying") currentStage = 2;                   // Preparing AI
+                else currentStage = 0;                                                  // Default fallback
+            } else {
+                currentStage = 3; // Done!
+            }
+
+            if (data.status === "complete" || data.status === "error") {
+                currentStage = 3; // Force to done stage if complete or error
+            }
+
+            // Only advance the animation if we enter a new stage
+            if (currentStage !== lastKnownProcessingStage) {
+                if (animationStepIndex <= currentStage && animationStepIndex < steps.length) {
+                    const statusMessages = data.status_messages || [];
+                    advanceStep(statusMessages);
+                }
+                lastKnownProcessingStage = currentStage;
+            }
+
             if (data.complete) {
 
                 // Processing is complete, update UI
@@ -521,11 +688,21 @@
                 };
 
                 clearTimeout(pollTimeout);
-                window.location.reload();
+                // wait for the animation to finish
+                setTimeout(function () {
+                    // Reset animation step index
+                    animationStepIndex = 0;
+                    // Reset the container to its initial state
+                    container.classList.remove("fade-out");
+                    container.classList.add("fade-in");
+                    // Hide the loading event progress container
+                    root_container.style.display = "none";
+                }, 10000);
 
                 // No additional refresh needed per the requirement
+            }
 
-            } else {
+            else {
                 // Still processing, poll again after 5 seconds
                 pollTimeout = setTimeout(function () {
                     pollStatus(docUuid);
@@ -559,6 +736,8 @@
                 $('#processing-indicator').show();
                 // Hide regular content
                 $('#raw-text-icon').hide();
+
+                startProcessingAnimation();
                 // Start polling
                 pollStatus(docUuid);
             } else {
@@ -714,7 +893,7 @@
 
         function pollAllLoaders() {
             // find each loader still on the page
-            $('.workflow-loader').each(function () {
+            $('#workflow-loader-doc').each(function () {
                 let $loader = $(this);
                 let uuid = $loader.data('doc-uuid');
 
@@ -740,7 +919,7 @@
             });
 
             // if there are no more loaders, stop polling entirely
-            if ($('.workflow-loader').length === 0) {
+            if ($('#workflow-loader-doc').length === 0) {
                 clearInterval(pollTimer);
             }
         }

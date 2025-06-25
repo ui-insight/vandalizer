@@ -162,7 +162,9 @@
                     <!-- Styled file input -->
                     <label for="file-input" class="btn btn-primary" style="margin: 0;">
                         Upload Files
-                        <input type="file" id="file-input" style="display: none;" multiple webkitdirectory directory />
+                        <input type="file" id="file-input" style="display: none;"
+                            accept=.doc,.docx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            multiple />
                     </label>
                 </form>
                 <table class="styled-table" id="file-list" style="width: 100%;">
@@ -210,10 +212,22 @@
                                         doc.is_default %} checked disabled {% endif %}>
                                 </span>
 
-                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')">
+                                <a href="javascript:void(0);"
+                                    class="file-link{% if not doc.valid and not doc.processing %} invalid{% endif %}"
+                                    onclick="addDocId('{{ doc.uuid }}')" disabled={{not doc.valid}}>
                                     <span><i class="fa-solid fa-file"></i></span>
                                     <span class="file-name">{{ doc.title }}</span>
                                 </a>
+
+                                {% if not doc.valid and not doc.processing %}
+                                <span class="token-warning">
+                                    <i class="fa-solid fa-info-circle invalid-icon"></i>
+                                    <span class="tooltiptext">
+                                        {{ doc.validation_feedback }}
+                                    </span>
+                                </span>
+                                {% endif %}
+
 
                                 <!-- Show default tag if doc is default -->
                                 {% if doc.is_default %}
@@ -224,7 +238,8 @@
                                 <span class="file-date">{{ doc.time_ago_in_words() }}</span>
 
                                 {% if doc.processing %}
-                                <span class="workflow-loader" data-doc-uuid="{{ doc.uuid }}"></span>
+                                <span id="workflow-loader-doc" class="workflow-loader"
+                                    data-doc-uuid="{{ doc.uuid }}"></span>
                                 {% endif %}
                                 <button class="ellipsis-btn" data-doc-id="{{ doc.uuid }}">
                                     <span><i class="fa-solid fa-ellipsis-vertical"></i></span>
@@ -304,6 +319,7 @@
         <div class="modal-container">
             {% include "toolpanel/rename_modal.html" %}
             {% include "toolpanel/raw_text_modal.html" %}
+            {% include "toolpanel/model_modal.html" %}
             {% include "toolpanel/attachment_modal.html" %}
             {% include "workflows/new_workflow_modal.html" %}
             {% include "toolpanel/tasks/new_task_modal.html" %}
@@ -313,34 +329,61 @@
 
 
 <style>
+    /* style the invalid link */
+    .file-link.invalid .file-name {
+        color: red;
+        text-decoration: line-through;
+    }
+
+    /* style the info icon */
+    .invalid-icon {
+        color: red;
+        margin-left: 8px;
+        cursor: pointer;
+    }
+
     .token-warning {
-        color: #FFA500;
-        cursor: help;
-        margin-left: 5px;
         position: relative;
-        display: inline-block;
+        z-index: 1000;
     }
 
     .token-warning .tooltiptext {
         visibility: hidden;
-        width: 300px;
+        width: 250px;
         background-color: #555;
         color: #fff;
-        text-align: center;
+        text-align: left;
         border-radius: 6px;
-        padding: 5px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -100px;
+        padding: 8px 12px;
+        position: fixed;
+        /* Change from absolute to fixed */
+        z-index: 9999;
         opacity: 0;
-        transition: opacity 0.1s;
+        transition: opacity 0.2s;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        line-height: 1.4;
+        box-sizing: border-box;
+        max-height: 80vh;
+        overflow-y: auto;
     }
 
+    /* Position the tooltip dynamically with JavaScript instead of CSS */
     .token-warning:hover .tooltiptext {
         visibility: visible;
         opacity: 1;
+    }
+
+    /* Arrow styling */
+    .token-warning .tooltiptext::after {
+        content: "";
+        position: absolute;
+        top: 10px;
+        left: 100%;
+        border-width: 6px;
+        border-style: solid;
+        border-color: transparent transparent transparent #555;
     }
 </style>
 

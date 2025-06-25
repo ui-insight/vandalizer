@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import asyncio
 import graphlib
 import json
 import multiprocessing
@@ -14,8 +15,14 @@ from dotenv import load_dotenv
 
 from app import app
 from app.celery_worker import celery_app
-from app.models import SearchSet, SmartDocument, Workflow, WorkflowResult, WorkflowStep
-from app.utilities.config import model_type
+from app.models import (
+    SearchSet,
+    SmartDocument,
+    Workflow,
+    WorkflowResult,
+    WorkflowStep,
+)
+from app.utilities.agents import create_chat_agent
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.llm import ChatLM
 from app.utilities.openai_interface import (
@@ -92,27 +99,25 @@ def format_llm_output(text: str) -> str:
     return text.strip()
 
 
-def llm_chat_model(prompt, data=None, docs=None):
+def llm_chat_model(model, prompt, data=None, docs=None):
     if docs is None:
         docs = []
     open_ai_interface = OpenAIInterface()
     output = None
+    debug(model)
     if len(docs) == 0:
-        # convert the data to string
         full_text = json.dumps(data)
         output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
-
-        chat_lm = ChatLM(model_type)
-
-        output = chat_lm.completion(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": output_prompt}],
-            max_tokens=None,
-        )
+        chat_agent = create_chat_agent(model)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(chat_agent.run(output_prompt))
+        output = result.output
         output = format_llm_output(output).strip()
 
     else:
         output = open_ai_interface.ask_question_to_documents(
+            model=model,
             root_path=app.root_path,
             documents=docs,
             question=prompt,
@@ -123,24 +128,32 @@ def llm_chat_model(prompt, data=None, docs=None):
     return output
 
 
-def data_extraction_model(keys, document_uuids=[], full_text=None):
+def data_extraction_model(model, keys, documents=[], full_text=None):
     output = None
     extraction_manager = ExtractionManager3()
+    document_uuids = []
+    for doc in documents:
+        if doc is None:
+            continue
+        if isinstance(doc, str):
+            document_uuids.append(doc)
+        else:
+            document_uuids.append(doc.uuid)
     output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
 
     debug(output)
     prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
     prompt += "\n\n"
     prompt += json.dumps(output, indent=4)
-    chat_lm = ChatLM(model_type)
-    response = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
-    )
-    debug(response)
-    return response
+    loop = asyncio.new_event_loop()
+
+    chat_agent = create_chat_agent(model)
+    asyncio.set_event_loop(loop)
+    result = loop.run_until_complete(chat_agent.run(prompt))
+    return result.output
 
 
-def format_model(formatting_prompt, text):
+def format_model(model, formatting_prompt, text):
     system_prompt = """
 Follow the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. Always use html instead of markdown. Convert markdown to html. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.
 CRITICAL:
@@ -152,10 +165,11 @@ CRITICAL:
 
     # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
-    chat_lm = ChatLM(model_type)
-    response = chat_lm.completion(
-        messages=[{"role": "user", "content": prompt}],
-    )
+    chat_agent = create_chat_agent(model)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    response = loop.run_until_complete(chat_agent.run(prompt))
+    response = response.output
 
     debug(response)
 
@@ -247,35 +261,16 @@ class DocumentNode(Node):
         for doc in self.attachments:
             if doc is None:
                 continue
-            doc_path = doc.absolute_path
             self.docs_uuids.append(doc.uuid)
-            user_id = doc.user_id
-            if not os.path.exists(str(doc_path)):
-                doc_path = os.path.join(
-                    app.root_path,
-                    "static",
-                    "uploads",
-                    str(doc.path),
-                )
-            self.pdf_paths.append(str(doc_path))
 
         for doc in self.docs:
             if doc is None:
                 continue
-            doc_path = doc.absolute_path
             self.docs_uuids.append(doc.uuid)
-            user_id = doc.user_id
-            if not os.path.exists(str(doc_path)):
-                doc_path = os.path.join(
-                    app.root_path,
-                    "static",
-                    "uploads",
-                    str(doc.path),
-                )
-            self.pdf_paths.append(str(doc_path))
 
         debug(self.docs[0])
         debug(self.pdf_paths)
+        debug(self.docs_uuids)
 
     def process(self, inputs=None):
         # data = inputs.get("data", None)
@@ -287,6 +282,7 @@ class FormatNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Formatter")
         self.data = data
+        self.model = data.get("model")
 
     def process(self, inputs):
         formatting_prompt = self.data.get("prompt", "")
@@ -297,15 +293,15 @@ class FormatNode(Node):
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         if prev_step_name == "Document":
-            docs_uuids = inputs.get("output", None)
+            docs_uuids = inputs.get("output", [])
             text = ""
-            for doc_uuid in docs_uuids:
-                doc = SmartDocument.objects(uuid=doc_uuid).first()
+            for doc in docs_uuids:
+                doc = SmartDocument.objects(uuid=doc).first()
                 text += doc.raw_text
         else:
             text = data
 
-        prompt, output = format_model(formatting_prompt, text)
+        prompt, output = format_model(self.model, formatting_prompt, text)
         return {"output": output, "input": prompt, "step_name": self.name}
 
 
@@ -313,6 +309,11 @@ class ExtractionNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Extraction")
         self.data = data
+        self.user_id = data.get("user_id", "0")
+        self.model = data.get("model")
+        debug(self.data)
+        debug(self.model)
+        debug(self.user_id)
 
     def process(self, inputs):
         data = self.data
@@ -327,11 +328,12 @@ class ExtractionNode(Node):
 
         step_input = None
         docs_uuids = []
+        user_id = self.user_id
         extraction_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             step_input = docs_uuids
-            extraction_response = data_extraction_model(keys, docs_uuids)
+            extraction_response = data_extraction_model(self.model, keys, docs_uuids)
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
@@ -339,6 +341,7 @@ class ExtractionNode(Node):
             elif isinstance(step_input, list):
                 step_input = "\n".join(step_input)
             extraction_response = data_extraction_model(
+                self.model,
                 keys,
                 docs_uuids,
                 full_text=step_input,
@@ -346,6 +349,7 @@ class ExtractionNode(Node):
         elif prev_step_name in {"Extraction", "Formatter"}:
             step_input = inputs.get("output", None)
             extraction_response = data_extraction_model(
+                self.model,
                 keys,
                 docs_uuids,
                 full_text=step_input,
@@ -362,6 +366,8 @@ class PromptNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Prompt")
         self.data = data
+        self.user_id = data.get("user_id", "0")
+        self.model = data.get("model")
 
     def process(self, inputs):
         data = self.data
@@ -373,17 +379,35 @@ class PromptNode(Node):
         chat_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
-            docs = [
-                SmartDocument.objects(uuid=doc_uuid).first() for doc_uuid in docs_uuids
-            ]
+            docs = []
+            for doc_uuid in docs_uuids:
+                doc = SmartDocument.objects(uuid=doc_uuid).first()
+                if doc is not None:
+                    docs.append(doc)
 
-            chat_response = llm_chat_model(docs=docs, prompt=prompt)
+            chat_response = llm_chat_model(model=self.model, docs=docs, prompt=prompt)
         else:
             data = inputs.get("output", None)
 
-            chat_response = llm_chat_model(docs=[], prompt=prompt, data=data)
+            chat_response = llm_chat_model(
+                model=self.model,
+                docs=[],
+                prompt=prompt,
+                data=data,
+            )
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
+
+def sanitize_step_name(name: str) -> str:
+    name = name.replace('.', '_')
+    name = name.replace('$', '_')
+    name = name.strip()
+    name = name.strip('_')
+    name = re.sub(r'\s+', '_', name)
+    name = re.sub(r'__+', '_', name)
+    if not name:
+        name = 'step'
+    return name
 
 class WorkflowEngine:
     def __init__(self) -> None:
@@ -461,7 +485,9 @@ class WorkflowEngine:
                 # debug(latest_output)
 
             if workflow_result:
-                workflow_result.steps_output[node.name] = output
+                step_name = sanitize_step_name(node.name)
+                debug(f"Step name: {step_name}")
+                workflow_result.steps_output[step_name] = output
                 workflow_result.num_steps_completed += 1
                 workflow_result.save()
 
@@ -483,20 +509,21 @@ class WorkflowEngine:
         return latest_output.get("output"), data
 
 
-def build_workflow_engine(steps, workflow):
+def build_workflow_engine(steps, workflow, model, user_id=None):
     engine = WorkflowEngine()
     nodes = []
 
     for idx, step in enumerate(steps):
         # node_id = uuid4().hex
         node = None
-        debug(step)
+        debug(step.name, step.data)
         if step.name == "Document":  # this the trigger step
             node = DocumentNode(step.data)
             nodes.append(node)
         else:  # this a task step
             tasks = []
             for task in step.tasks:
+                debug(task)
                 if task.name == "Extraction":
                     if task.data.get("search_set_uuid"):
                         search_set = SearchSet.objects(
@@ -504,6 +531,9 @@ def build_workflow_engine(steps, workflow):
                         ).first()
                         search_items = search_set.items()
                         task.data["keys"] = [item.searchphrase for item in search_items]
+
+                    task.data["user_id"] = user_id
+                    task.data["model"] = model
                     debug(task.data)
                     node = ExtractionNode(
                         data=task.data,
@@ -511,11 +541,15 @@ def build_workflow_engine(steps, workflow):
                     tasks.append(node)
                     debug(tasks)
                 elif task.name == "Prompt":
+                    task.data["user_id"] = user_id
+                    task.data["model"] = model
                     node = PromptNode(
                         data=task.data,
                     )
                     tasks.append(node)
                 elif task.name == "Formatter":
+                    task.data["user_id"] = user_id
+                    task.data["model"] = model
                     node = FormatNode(
                         data=task.data,
                     )
@@ -524,6 +558,7 @@ def build_workflow_engine(steps, workflow):
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)
             nodes.append(node)
+            debug(step.tasks)
 
         if node is not None:
             engine.add_node(node)
@@ -538,65 +573,10 @@ def build_workflow_engine(steps, workflow):
     return engine
 
 
-@celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
-def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
-    process_node = None
-    latest_output = None
-    workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
-    engine = WorkflowEngine()
-    nodes = []
-    node = DocumentNode(workflow_trigger_step.data)
-    nodes.append(node)
-    engine.add_node(node)
-
-    debug(nodes)
-    # connect the steps
-
-    if task_name == "Extraction":
-        process_node = ExtractionNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    elif task_name == "Prompt":
-        process_node = PromptNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    elif task_name == "Formatter":
-        process_node = FormatNode(
-            data=task_data,
-        )
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-    else:
-        process_node = Node(task_name)
-        node = MultiTaskNode(task_name)
-        node.add_tasks([process_node])
-        nodes.append(node)
-        engine.add_node(node)
-
-    for idx in range(len(nodes)):
-        if idx == 0:
-            continue
-        engine.connect(nodes[idx - 1], nodes[idx])
-
-    final_output, data = engine.execute()
-    print(final_output)
-
-    return final_output
-
 
 @celery_app.task(bind=True, name="workflow.execute_workflow")
 def execute_workflow_task(
-    self, workflow_result_id, workflow_id, workflow_trigger_step_id
+    self, workflow_result_id, workflow_id, workflow_trigger_step_id, model
 ):
     workflow_result = WorkflowResult.objects(id=workflow_result_id).first()
     workflow = Workflow.objects(id=workflow_id).first()
@@ -630,7 +610,7 @@ def execute_workflow_task(
 
     debug(steps)
 
-    engine = build_workflow_engine(steps, workflow)
+    engine = build_workflow_engine(steps, workflow, model, user_id=workflow.user_id)
 
     final_output, data = engine.execute(workflow_result)
     print(

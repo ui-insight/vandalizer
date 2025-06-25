@@ -1,7 +1,6 @@
 import sys
 
 import pypandoc
-from flask import current_app
 
 from app.models import SmartDocument
 
@@ -40,6 +39,8 @@ def perform_extraction_and_update(document_uuid, extension):
     absolute_path = document.absolute_path
     debug("Performing OCR on document", document.title, absolute_path)
     document.processing = True
+    document.task_status = "ocr"
+    document.save()
     raw_text = ""
     try:
         if extension == "docx":
@@ -68,7 +69,7 @@ def perform_extraction_and_update(document_uuid, extension):
         else:
             debug("Extracting pdf")
             # For other file types, use the generic text extraction
-            raw_text = extract_text_from_doc(document.absolute_path)
+            raw_text = extract_text_from_doc(document.absolute_path, doc=document)
 
         document.raw_text = raw_text
         debug(
@@ -88,7 +89,6 @@ def perform_extraction_and_update(document_uuid, extension):
 @celery_app.task
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
-    document.processing = False
     document.task_id = None
     document.save()
 
@@ -100,29 +100,23 @@ def cleanup_document(document_uuid: str):
     """
     document = SmartDocument.objects(uuid=document_uuid).first()
 
-    document_file_path = (
-        Path(current_app.root_path) / "static" / "uploads" / document.path
-    )
     document.task_id = None
+    document.task_status = "error"
     document.processing = False
     document.save()
-    # if document:
-    #     try:
-    #         os.remove(document_file_path)
-    #     except Exception as e:
-    #         debug(f"Error removing file {document_file_path}: {e}")
-
-    #     document.delete()
 
 
 @celery_app.task
 def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    document.task_status = "readying"
+    document.save()
+    # if not document.valid:
+    #     debug("Document not validated, reason: ", document.validation_feedback)
+    #     return
 
     document_manager = DocumentManager()
-
     document_path = document.absolute_path
-
     document_manager.add_document(
         user_id=user_id,
         document_name=document.title,
@@ -130,6 +124,7 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
         doc_path=document_path,
         raw_text=raw_text,
     )
+    document.task_status = "complete"
     document.save()
     return document.uuid
 
@@ -154,6 +149,9 @@ class DocumentManager:
             path=persist_directory.as_posix(),
             settings=Settings(anonymized_telemetry=False, is_persistent=True),
         )
+
+    def __enter__(self):
+        return self
 
     def get_user_collection(self, user_id: str) -> Chroma:
         """Get or create a collection for a specific user."""
@@ -263,12 +261,21 @@ class DocumentManager:
 
     def delete_document(self, user_id: str, document_id: str) -> None:
         """Delete a specific document from a user's collection."""
-        self.get_user_collection(user_id)
+        # Check if the document exists before deleting
+        if not self.document_exists(user_id, document_id):
+            debug(f"Document {document_id} does not exist for user {user_id}.")
+            return
         # Get the raw collection to use ChromaDB's filtering
-        collection = self.client.get_or_create_collection(name=f"user_{user_id}_docs")
-        if collection:
+        try:
+            collection = self.client.get_or_create_collection(
+                name=f"user_{user_id}_docs"
+            )
             # Delete all chunks with matching document_id
             collection.delete(where={"document_id": document_id})
+        except Exception as e:
+            debug(f"Error deleting document {document_id} for user {user_id}: {e}")
+            raise
+            # close the client
 
     def list_user_documents(self, user_id: str) -> list[dict[str, Any]]:
         """List all documents in a user's collection with metadata."""

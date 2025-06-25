@@ -30,6 +30,9 @@ from app.utilities.document_manager import (
     update_document_fields,
 )
 from app.utilities.fillable_pdf_manager import FillablePDFManager
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
 from app.utils import load_user
 
 from . import files
@@ -69,16 +72,16 @@ def upload():
     if target_folder is None or target_folder == "":
         target_folder = "0"
 
-    if (
-        SmartDocument.objects(
+    # check if the file already exists (unique by title, user_id, space, and folder)
+    document_results = SmartDocument.objects(
             title=filename,
-            space=space,
             user_id=user.user_id,
+            space=space,
             folder=str(target_folder),
-        ).count()
-        > 0
-    ):
-        return jsonify({"complete": True})
+        )
+    debug(document_results)
+    if document_results.count() > 0:
+        return jsonify({"complete": True, "exists": True})
 
     imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
@@ -110,26 +113,43 @@ def upload():
     document = SmartDocument(
         title=filename,
         processing=True,
+        valid=True,
+        raw_text=raw_text,
         path=str(relative_file_path),
         extension=extension,
         uuid=uid,
         user_id=user.user_id,
         space=space,
-        raw_text=raw_text,
         folder=str(target_folder),  # attach it here
         task_id=None,
+        task_status="layout",
     )
+
+
+
     document.save()
+
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
         extension=extension,
     )
 
+    document.validating = True
+    document.save()
+
+    validation_task = perform_document_validation.s(
+        document_uuid=document.uuid,
+        document_path=str(file_path),
+    )
+
+    document.validating = False
+    document.save()
+
     ingestion_task = perform_semantic_ingestion.s(
         document.uuid,
         user_id,
     )
-    workflow = extraction_task | ingestion_task
+    workflow = extraction_task | validation_task | ingestion_task
     workflow_task_result = workflow.apply_async(
         link=update_document_fields.si(document.uuid),
         link_error=cleanup_document.si(document.uuid),
@@ -143,11 +163,38 @@ def upload():
 def poll_status() -> ResponseReturnValue:
     """Poll the status of a document's processing."""
     document_uuid = request.args.get("docid")
+    if not document_uuid:
+        return jsonify(
+            {
+                "status": "error",
+                "status_messages": ["Missing document UUID"],
+                "complete": True,
+                "raw_text": "",
+                "validation_feedback": "",
+                "valid": True,
+            },
+        )
+    debug(f"Polling status for document UUID: {document_uuid}")
     document = SmartDocument.objects(uuid=document_uuid).first()
+    debug(document)
+    status_messages = []
+    if document.task_status == "readying":
+        status_messages.append("Getting ready…")
+        if document.valid:
+            status_messages.append("Document passed validation checks...")
+        else:
+            status_messages.append("Document failed validation checks...")
+
+
+
     return jsonify(
         {
-            "complete": not document.processing and document.raw_text != "",
+            "status": document.task_status,
+            "status_messages": status_messages,
+            "complete": document.task_status == "complete" or document.task_status == "error",
             "raw_text": document.raw_text if not document.processing else "",
+            "validation_feedback": document.validation_feedback,
+            "valid": document.valid,
         },
     )
 
@@ -218,7 +265,6 @@ def delete_document() -> ResponseReturnValue:
     if not doc_id:
         flash("No document specified.", "warning")
         return _redirect_home()
-
     document = SmartDocument.objects(uuid=doc_id).first()
     if not document:
         flash("Document not found.", "warning")
@@ -227,15 +273,15 @@ def delete_document() -> ResponseReturnValue:
     # 1) Delete via manager (e.g. remove metadata/storage)
     try:
         DocumentManager().delete_document(
-            user_id=session.get("user_id"), document_id=doc_id
+            user_id=session.get("user_id"),
+            document_id=doc_id,  # noqa: COM812
         )
     except Exception as e:
         current_app.logger.error(f"[delete_document] manager error: {e}")
         flash("Could not remove document metadata.", "danger")
 
     # 2) Try removing the file (but don’t bail out if it’s missing)
-    upload_folder = Path(current_app.root_path) / "static" / "uploads"
-    file_path = upload_folder / document.path
+    file_path = document.absolute_path
     if file_path.exists():
         try:
             file_path.unlink()

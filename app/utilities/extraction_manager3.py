@@ -2,11 +2,13 @@ import os
 import time
 import openai
 import json
-from app.utilities.agents import extract_entities_with_agent
+from app.utilities.agents import create_chat_agent, extract_entities_with_agent
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.config import model_type
+from app.utilities.config import settings
 from app.utilities.llm import ChatLM
 from app.models import SmartDocument
+import asyncio
+from devtools import debug
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -14,7 +16,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 class ExtractionManager3:
     root_path = ""
 
-    def build_from_documents(self, document_uuids):
+    def build_from_documents(self, document_uuids, model):
         openai.api_key = OPENAI_API_KEY
         doc_text = ""
         time.time()
@@ -31,20 +33,17 @@ class ExtractionManager3:
             + doc_text
         )
 
-        model = "gpt-4o"
+        system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
-        chat_lm = ChatLM(model_type)
-        output = chat_lm.completion(
-            model=model,
-            response_format={"type": "json_object"},
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. ",
-                },
-                {"role": "user", "content": prompt},
-            ],
+        chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
+        loop = asyncio.new_event_loop()
+        result = loop.run_until_complete(
+            chat_agent.run(
+                prompt,
+            )
         )
+        output = result.output
+        debug(output)
         output = output.replace("\\n", "")
         output = output.replace("```json", "")
         output = output.replace("```", "")
@@ -70,7 +69,8 @@ class ExtractionManager3:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
                 doc_text = doc.raw_text
                 result = extract_entities_with_agent(
-                    text=doc_text, keys=fields_to_extract
+                    text=doc_text, keys=fields_to_extract,
+                    model_name=settings.base_model
                 )
                 extraction.extend(result)
         else:

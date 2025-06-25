@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "Vandalizer"
 authors = [{ name = "John Brunsfeld", email = "jbrunsfeld@uidaho.edu" }]
 readme = "README.md"
-requires-python = "<4.0,>=3.9"
+requires-python = "<4.0,>=3.12"
 dependencies = [
     "chardet",
     "chromadb",
@@ -37,7 +37,7 @@ dependencies = [
     "openpyxl",
     "pandas",
     "pydantic",
-    "pydantic_ai",
+    "pydantic-ai",
     "pymongo",
     "pymupdf",
     "pymupdf4llm",
@@ -50,9 +50,12 @@ dependencies = [
     "rollbar",
     "tiktoken",
     "wtforms",
+    "pydantic-settings>=2.8.1",
     "celery>=5.5.2",
     "pypandoc-binary>=1.15",
-    "reportlab"
+    "reportlab",
+    "pytesseract",
+    "pdf2image"
 ]
 
 

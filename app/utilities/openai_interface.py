@@ -9,13 +9,14 @@ from pydantic_ai.messages import ModelMessagesTypeAdapter
 
 from app.models import (
     MAX_CHAT_MESSAGES,
+    UserModelConfig,
 )
-from app.utilities.agents import RagDeps, chat_agent, rag_agent
+from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.async_utilities import class_method_event_loop_decorator
-from app.utilities.config import max_context_length, model_type
+from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm import ChatLM, remove_code_markers
+from app.utilities.llm import remove_code_markers, remove_xml_content
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -60,10 +61,20 @@ class OpenAIInterface:
                 + self.loaded_doc
             )
 
-        chat_lm = ChatLM(model_type)
-        return chat_lm.completion(
-            messages=[{"role": "user", "content": prompt}],
+        model = settings.base_model
+        model_config = UserModelConfig.objects(user_id=item.user_id).first()
+        if model_config is not None:
+            model = model_config.name
+        chat_agent = create_chat_agent(model)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            chat_agent.run(
+                messages=[{"role": "user", "content": prompt}],
+            )
         )
+
+        return result.output
 
     def get_cache_messages(user_id, docs_ids_string, session=None):
         cache_key = f"chat_history_{user_id}_{docs_ids_string}"
@@ -74,9 +85,7 @@ class OpenAIInterface:
         if session is not None:
             # latest_conversation_messages = session.get("chat_history", [])
             cache_result = cache.lookup(cache_key, llm_string)
-            debug(cache_result)
             if cache_result is not None:
-                debug(cache_result)
                 latest_conversation_messages = cache_result
 
                 # latest_conversation_messages =
@@ -125,6 +134,7 @@ class OpenAIInterface:
     @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
+        model,
         root_path,
         documents,
         question,
@@ -150,9 +160,12 @@ class OpenAIInterface:
             session=session,
         )
 
+        max_context_length = settings.max_context_length
+
         full_text = OpenAIInterface.get_full_text(documents, previous_messages)
         debug(max_context_length)
         debug(len(full_text))
+
         answer = None
 
         loop = asyncio.new_event_loop()
@@ -160,8 +173,8 @@ class OpenAIInterface:
 
         if len(full_text) < max_context_length:
             prompt += f"""Question: {question} Document: {full_text}"""
-            print(prompt)
             try:
+                chat_agent = create_chat_agent(model)
                 answer = loop.run_until_complete(
                     chat_agent.run(
                         prompt,
@@ -172,29 +185,41 @@ class OpenAIInterface:
                 debug("llmchat", answer)
             except Exception as e:
                 debug(f"Error during LLM chat: {e}")
-
         else:
             prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
             debug("Rag chat", prompt)
-            deps = RagDeps(
-                doc_manager=DocumentManager(),
-                user_id=user_id or "0",
-                documents=documents,
-            )
-            answer = loop.run_until_complete(
-                rag_agent.run_sync(
-                    prompt,
-                    deps=deps,
-                    message_history=previous_messages,
+            try:
+                rag_agent = create_rag_agent(model)
+                deps = RagDeps(
+                    doc_manager=DocumentManager(),
+                    user_id=user_id or "0",
+                    documents=documents,
                 )
-            )
+                answer = loop.run_until_complete(
+                    rag_agent.run_sync(
+                        prompt,
+                        deps=deps,
+                        message_history=previous_messages,
+                    )
+                )
+            except Exception as e:
+                debug("Error in rag chat", e)
 
-        chat_history = json.loads(answer.new_messages_json())
-        debug(chat_history)
-        cache.update(cache_key, llm_string, chat_history)
+        debug(answer)
+        if hasattr(answer, "new_messages_json"):
+            chat_history = json.loads(answer.new_messages_json())
+            cache.update(cache_key, llm_string, chat_history)
+
+        if hasattr(answer, "output"):
+            answer = answer.output
+        else:
+            answer = str(answer)
+
+        answer = remove_xml_content(answer, "think")
+        answer = remove_code_markers(answer)
 
         return {
             "question": question,
-            "answer": remove_code_markers(answer.data),
-            "formatted_answer": remove_code_markers(answer.data),
+            "answer": answer,
+            "formatted_answer": answer
         }

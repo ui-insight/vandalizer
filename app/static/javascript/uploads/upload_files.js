@@ -6,7 +6,9 @@ var rootFolderName = null; // Variable to store the root folder name
 var file;
 let fileInput = document.querySelector("#file-input");
 let dropArea = document.querySelector(".drag-area");
-let dragText = dropArea.querySelector("header");
+let dragText = document.querySelector("header");
+
+
 
 if (dropArea) {  
     //button = dropArea.querySelector("button"),
@@ -171,6 +173,7 @@ function processFile(file) {
     $("#loading-area").show();
     $("#drag-area").hide();
 
+
     $.ajax({
       type: "POST",
       url: "/files/upload",
@@ -180,6 +183,12 @@ function processFile(file) {
       dataType: "json",
       success: result => {
         completedUploads++;
+        console.log(`Successfully uploaded ${filename}`, result);
+      // check if the document was uploaded previously
+        if (result.exists) {
+            alert(`Document "${filename}" already exists. Please rename it and try again.`);
+            return;
+        }
         if (result.uuid) {
             uploadedDocs.push({ name: filename, uuid: result.uuid });
         }
