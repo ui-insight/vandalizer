@@ -5,13 +5,12 @@ RUN pip install uv
 WORKDIR /app
 
 COPY pyproject.toml ./
-RUN touch README.md
 
 RUN uv sync
 
-FROM python:3.13-slim AS runtime
+FROM python:3.13-alpine AS runtime
 
-WORKDIR app
+WORKDIR /app
 
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH"

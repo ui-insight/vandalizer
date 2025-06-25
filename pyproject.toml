@@ -65,10 +65,6 @@ dev = ["tox", "pytest", "pytest-cov", "ruff", "selenium"]
 [tool.setuptools.packages.find]
 exclude = ["certs", "tests", "vandalizer-dev"]
 
-[build-system]
-requires = ["setuptools", "cython"]
-build-backend = "setuptools.build_meta"
-
 [tool.tox]
 envlist = ["selenium_firefox", "selenium_chrome"]
 no_package = true
