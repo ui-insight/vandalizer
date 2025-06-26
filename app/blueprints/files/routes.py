@@ -37,6 +37,39 @@ from app.utils import load_user
 
 from . import files
 
+# Our allowed file extensions
+ALLOWED_EXTENSIONS = {"pdf", "docx", "xlsx", "xls"}
+
+# Mapping of extensions to their expected "magic numbers" (file signatures)
+# This helps verify the file content matches its extension.
+FILE_SIGNATURES = {
+    ".pdf": [b"%PDF-"],
+    ".docx": [b"PK\x03\x04"],  # Also the signature for .zip, .xlsx, etc.
+    ".xlsx": [b"PK\x03\x04"],
+    ".xls": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],  # Compound File Binary Format
+}
+
+
+def is_allowed_file(filename):
+    """Checks if the file has an allowed extension."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def is_valid_file_content(file_data, extension):
+    """Checks if the file's magic number matches its extension."""
+    if not extension.startswith("."):
+        extension = "." + extension
+    extension = extension.lower()
+
+    signatures = FILE_SIGNATURES.get(extension)
+    if not signatures:
+        return False  # Should not happen if is_allowed_file is checked first
+
+    for sig in signatures:
+        if file_data.startswith(sig):
+            return True
+    return False
+
 
 @files.route("/upload", methods=["POST"])
 def upload():
@@ -48,6 +81,14 @@ def upload():
     space = data["space"]
     parent_folder_id = data["folder"] or None
     new_folder_name = data.get("rootFolderName")
+
+    blob = data["contentAsBase64String"]
+    filename = data["fileName"]
+    extension = data["extension"]
+
+    # --- SECURITY CHECK 1: Validate file extension ---
+    if not is_allowed_file(filename):
+        return jsonify({"error": f"File type '{extension}' is not allowed."}), 400
 
     # 1) If a new folder was dropped, create it
     print(new_folder_name)
@@ -65,26 +106,31 @@ def upload():
 
     # 2) Now for each incoming file (you’re still doing per-file),
     #    save SmartDocument(folder=target_folder)
-    blob = data["contentAsBase64String"]
-    filename = data["fileName"]
-    extension = data["extension"]
 
     if target_folder is None or target_folder == "":
         target_folder = "0"
 
     # check if the file already exists (unique by title, user_id, space, and folder)
     document_results = SmartDocument.objects(
-            title=filename,
-            user_id=user.user_id,
-            space=space,
-            folder=str(target_folder),
-        )
+        title=filename,
+        user_id=user.user_id,
+        space=space,
+        folder=str(target_folder),
+    )
     debug(document_results)
     if document_results.count() > 0:
         return jsonify({"complete": True, "exists": True})
 
-    imgdata = base64.b64decode(blob)
     uid = uuid.uuid4().hex.upper()
+
+    try:
+        imgdata = base64.b64decode(blob)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid base64 string."}), 400
+
+    # --- SECURITY CHECK 2: Validate file content against its extension ---
+    if not is_valid_file_content(imgdata, extension):
+        return jsonify({"error": "File content does not match its extension."}), 400
 
     # Update the stored path to include the user's id folder
     relative_file_path = Path(user.user_id) / f"{uid}.{extension}"
@@ -124,8 +170,6 @@ def upload():
         task_id=None,
         task_status="layout",
     )
-
-
 
     document.save()
 
@@ -185,13 +229,12 @@ def poll_status() -> ResponseReturnValue:
         else:
             status_messages.append("Document failed validation checks...")
 
-
-
     return jsonify(
         {
             "status": document.task_status,
             "status_messages": status_messages,
-            "complete": document.task_status == "complete" or document.task_status == "error",
+            "complete": document.task_status == "complete"
+            or document.task_status == "error",
             "raw_text": document.raw_text if not document.processing else "",
             "validation_feedback": document.validation_feedback,
             "valid": document.valid,
@@ -205,6 +248,9 @@ def rename_document() -> ResponseReturnValue:
     data = request.get_json()
     document_uuid = data["uuid"]
     new_title = data["newName"]
+
+    if not is_allowed_file(new_title):
+        return jsonify({"error": f"File name '{new_title}' is not allowed."}), 400
 
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.title = new_title

@@ -116,8 +116,28 @@ $(document).ready(function () {
       success: function (result) {
         console.log("rename succeeded");
         console.log(result);
+        if (result.error) {
+          
+          return; // Exit the function
+        }
+
+
         location.reload();
       },
+      error: function(xhr, status, thrownError) {
+      // check for a 400 response
+      if (xhr.status === 400) {
+        // jQuery will auto-parse JSON into responseJSON if possible
+        var err = (xhr.responseJSON && xhr.responseJSON.error)
+                  || (function(){ try { return JSON.parse(xhr.responseText).error; } catch(e){} })()
+                  || "Unknown error";
+        alert(err);
+      } else {
+        // fallback for other HTTP errors
+        alert("Request failed: " + xhr.status + " " + thrownError);
+      }
+      console.error("rename failed:", status, thrownError, xhr.responseText);
+    }
     });
   }
 

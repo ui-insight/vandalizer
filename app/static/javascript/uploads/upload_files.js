@@ -148,6 +148,7 @@ function processFile(file) {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   ];
   if (!validTypes.includes(file.type)) {
+    alert(`${file.name} is not a supported document type.`);
     console.warn(`${file.name} is not a supported document type.`);
     return;
   }
@@ -189,6 +190,11 @@ function processFile(file) {
             alert(`Document "${filename}" already exists. Please rename it and try again.`);
             return;
         }
+        if(result.error) {
+          alert(`${result.error}`);
+          return
+        }
+
         if (result.uuid) {
             uploadedDocs.push({ name: filename, uuid: result.uuid });
         }
@@ -206,6 +212,7 @@ function processFile(file) {
         }
       },
       error: err => {
+        alert(`${err}`);
         console.error(`Error uploading ${filename}`, err);
       },
       complete: () => {
