@@ -8,7 +8,7 @@ COPY pyproject.toml ./
 
 RUN uv sync
 
-FROM python:3.13-alpine AS runtime
+FROM python:3.13-slim AS runtime
 
 WORKDIR /app
 
