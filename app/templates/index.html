@@ -212,10 +212,10 @@
                                         doc.is_default %} checked disabled {% endif %}>
                                 </span>
 
-                                <a href="javascript:void(0);"
-                                    class="file-link{% if not doc.valid and not doc.processing %} invalid{% endif %}"
-                                    onclick="addDocId('{{ doc.uuid }}')" disabled={{not doc.valid}}>
-                                    <span><i class="fa-solid fa-file"></i></span>
+                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')"
+                                    disabled={{not doc.valid}}>
+                                    <span><i
+                                            class="fa-solid fa-file {% if not doc.valid and not doc.processing %} invalid{% endif %}"></i></span>
                                     <span class="file-name">{{ doc.title }}</span>
                                 </a>
 
