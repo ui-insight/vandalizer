@@ -221,7 +221,7 @@
 
                                 {% if not doc.valid and not doc.processing %}
                                 <span class="token-warning">
-                                    <i class="fa-solid fa-info-circle invalid-icon"></i>
+                                    <i class="fa-solid fa-shield-halved invalid-icon"></i>
                                     <span class="tooltiptext">
                                         {{ doc.validation_feedback }}
                                     </span>
@@ -326,66 +326,6 @@
         </div>
     </div>
 </div>
-
-
-<style>
-    /* style the invalid link */
-    .file-link.invalid .file-name {
-        color: red;
-        text-decoration: line-through;
-    }
-
-    /* style the info icon */
-    .invalid-icon {
-        color: red;
-        margin-left: 8px;
-        cursor: pointer;
-    }
-
-    .token-warning {
-        position: relative;
-        z-index: 1000;
-    }
-
-    .token-warning .tooltiptext {
-        visibility: hidden;
-        width: 250px;
-        background-color: #555;
-        color: #fff;
-        text-align: left;
-        border-radius: 6px;
-        padding: 8px 12px;
-        position: fixed;
-        /* Change from absolute to fixed */
-        z-index: 9999;
-        opacity: 0;
-        transition: opacity 0.2s;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        white-space: normal;
-        line-height: 1.4;
-        box-sizing: border-box;
-        max-height: 80vh;
-        overflow-y: auto;
-    }
-
-    /* Position the tooltip dynamically with JavaScript instead of CSS */
-    .token-warning:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-
-    /* Arrow styling */
-    .token-warning .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 10px;
-        left: 100%;
-        border-width: 6px;
-        border-style: solid;
-        border-color: transparent transparent transparent #555;
-    }
-</style>
 
 
 {%endblock%} {% block scripts %}
