@@ -4,6 +4,8 @@ import pypandoc
 
 from app.models import SmartDocument
 
+import markdown
+
 try:
     import pysqlite3
 
@@ -48,14 +50,17 @@ def perform_extraction_and_update(document_uuid, extension):
             debug("Extracting docx")
             # replace the extension with .docx
             docx_path = absolute_path.with_suffix(".docx")
-            pdf_path = absolute_path.with_suffix(".pdf")
+            html_path = absolute_path.with_suffix(".html")
 
-            raw_text = pypandoc.convert_file(docx_path, "plain")
+            raw_text = convert_to_markdown(docx_path)
             debug("Extracted text from docx", raw_text[:100])
-            pypandoc.convert_file(docx_path, "pdf", outputfile=pdf_path)
+            # save as html
+            html_content = markdown.markdown(raw_text)
+            with open(html_path, "w", encoding="utf-8") as html_file:
+                html_file.write(html_content)
 
-            document.extension = "pdf"
-            document.path = str(Path(document.path).with_suffix(".pdf"))
+            document.extension = "html"
+            document.path = str(Path(document.path).with_suffix(".html"))
 
         elif extension in ["xlsx", "xls"]:
             # Convert to HTML

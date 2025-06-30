@@ -44,7 +44,9 @@ def convert_to_markdown(doc_path: str, doc=None) -> str:
         file_path = doc_path
 
     md = MarkItDown(enable_plugins=False)
-    result = md.convert(file_path)
+    result = md.convert(file_path, keep_data_uris=True)
+    debug(result)
+    debug("Converted to Markdown:", result.text_content)
 
     # Clean up NaN values
     cleaned_content = clean_markdown_nans(result.text_content)
