@@ -58,6 +58,7 @@ dependencies = [
     "pdf2image",
     "beautifulsoup4>=4.13.4",
     "markitdown[all]>=0.1.2",
+    "jsonschema"
 ]
 
 
