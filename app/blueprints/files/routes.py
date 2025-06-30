@@ -166,7 +166,7 @@ def upload():
         uuid=uid,
         user_id=user.user_id,
         space=space,
-        folder=str(target_folder),  # attach it here
+        folder=str(target_folder),
         task_id=None,
         task_status="layout",
     )
