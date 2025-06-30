@@ -18,9 +18,9 @@ from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
-CURRENT_RELEASE_VERSION = "2.1.8"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.1.9"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.1.8:
+Release 2.1.9:
 - Test workflow tasks while building
 - Download workflow results in various formats
 - Upload multiple files at once
