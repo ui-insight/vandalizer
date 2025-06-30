@@ -26,7 +26,7 @@ from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
 import asyncio
 from app.utilities.config import settings
-from app.utilities.llm import remove_code_markers
+from app.utilities.llm_helpers import remove_code_markers
 
 
 load_dotenv()

@@ -7,12 +7,49 @@ from PyPDF2 import PdfReader
 
 from app.uillm.uipdf import UIPDF
 
+from markitdown import MarkItDown
+
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
 MIN_PDF_TEXT_LENGTH = 100
 # doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), "static/uploads")
 
+def clean_markdown_nans(markdown_content: str) -> str:
+    """Remove NaN values from markdown content."""
+    # Replace NaN with empty cells
+    cleaned = markdown_content.replace('| NaN |', '| |')
+    cleaned = cleaned.replace('NaN', '')
+
+    # Remove completely empty rows
+    lines = cleaned.split('\n')
+    filtered_lines = []
+    for line in lines:
+        if '|' in line:
+            cells = [cell.strip() for cell in line.split('|')[1:-1]]
+            # Keep if has content or is header separator
+            if any(cell and cell != '---' for cell in cells) or all(cell in ['---', ''] for cell in cells):
+                filtered_lines.append(line)
+        else:
+            filtered_lines.append(line)
+
+    return '\n'.join(filtered_lines)
+
+# Modify your existing function:
+def convert_to_markdown(doc_path: str, doc=None) -> str:
+    """Convert a document to Markdown format."""
+    if doc:
+        file_path = doc.file_path
+    else:
+        file_path = doc_path
+
+    md = MarkItDown(enable_plugins=False)
+    result = md.convert(file_path)
+
+    # Clean up NaN values
+    cleaned_content = clean_markdown_nans(result.text_content)
+
+    return cleaned_content
 
 def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     """Extract text from a PDF file using PyMuPDF and OCR.
@@ -56,7 +93,8 @@ def extract_text_from_doc(doc_path, doc=None):
         if doc_path_str.endswith(".pdf"):
             return ocr_extract_text_from_pdf(doc_path_str)
         elif doc_path_str.endswith(".html"):
-            return extract_text_from_html(doc_path_str)
+            # return extract_text_from_html(doc_path_str)
+            return convert_to_markdown(doc_path_str)
         elif doc_path_str.endswith((".txt", ".md", ".csv")):
             with open(doc_path_str, encoding="utf-8") as file:
                 return file.read()

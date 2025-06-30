@@ -6,6 +6,8 @@ from itertools import chain
 
 from devtools import debug
 from flask import (
+    Response,
+    stream_with_context,
     current_app,
     jsonify,
     redirect,
@@ -343,34 +345,6 @@ def chat() -> ResponseReturnValue:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
         if document is not None:
             documents.append(document)
-            # find related html documents (excel converted to html)
-            # if document.extension == "html":
-            #     html_files = [
-            #         f
-            #         for f in os.listdir(
-            #             os.path.join(
-            #                 current_app.root_path,
-            #                 "static",
-            #                 "uploads",
-            #                 user_id,
-            #             ),
-            #         )
-            #         if f.startswith(document.uuid)
-            #         and f != document.path
-            #         and f.endswith(".html")
-            #     ]
-
-            #     for html_file in html_files:
-            #         html_doc = SmartDocument(
-            #             title=document.title,
-            #             path=html_file,
-            #             extension="html",
-            #             uuid=uuid.uuid4().hex,
-            #             user_id=user_id,
-            #             space=document.space,
-            #             folder=document.folder,
-            #         )
-            #         documents.append(html_doc)
 
     debug("Documents", [document.extension for document in documents])
     # default context docs
@@ -385,17 +359,14 @@ def chat() -> ResponseReturnValue:
     if model_config:
         model = model_config.name
 
-    response = OpenAIInterface().ask_question_to_documents(
-        model,
-        current_app.root_path,
-        documents,
-        message,
-        default_docs=docs,
-        user_id=user_id,
-        session=session,
-    )
-    response["question"] = message
-    return jsonify(response)
+    def generate():
+        for chunk in OpenAIInterface().ask_question_to_documents_stream(
+                model, current_app.root_path, documents, message, default_docs=docs, user_id=user_id, session=session):
+            # You can yield raw text, HTML, JSON, or Server-Sent Events.
+            yield chunk
+
+    # Use the appropriate MIME type. If you use Server-Sent Events, it's "text/event-stream".
+    return Response(stream_with_context(generate()), mimetype='text/html')
 
 
 @home.route("/static/fontawesome/webfonts/<path:filename>")

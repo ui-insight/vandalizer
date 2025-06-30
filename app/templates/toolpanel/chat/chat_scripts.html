@@ -1,313 +1,341 @@
 <script>
-  const placeholderText = "Chat with document...";
+    const placeholderText = "Chat with document...";
 
-  let chatReponse = null;
+    let chatReponse = null;
 
-  $("#chatinput").on("keydown", function (event) {
-    if ($("#chatplaceholder")[0].textContent == "") {
-      $("#chatplaceholder").attr("data-placeholder", placeholderText);
-      $("#chatplaceholder").css("color", "darkgray");
-    } else {
-      $("#chatplaceholder").attr("data-placeholder", "");
-      $("#chatplaceholder").css("color", "black");
+    $("#chatinput").on("keydown", function (event) {
+        if ($("#chatplaceholder")[0].textContent == "") {
+            $("#chatplaceholder").attr("data-placeholder", placeholderText);
+            $("#chatplaceholder").css("color", "darkgray");
+        } else {
+            $("#chatplaceholder").attr("data-placeholder", "");
+            $("#chatplaceholder").css("color", "black");
+        }
+    });
+    // Handle Enter and Shift+Enter keydown events
+    $("#chatinput").on("keyup", function (event) {
+        if ($("#chatplaceholder")[0].textContent == "") {
+            $("#chatplaceholder").attr("data-placeholder", placeholderText);
+            $("#chatplaceholder").css("color", "darkgray");
+        } else {
+            $("#chatplaceholder").attr("data-placeholder", "");
+            $("#chatplaceholder").css("color", "black");
+        }
+
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault(); // Prevent the default behavior of adding a newline
+            // Trigger your JavaScript event here
+            if (document_uuids != "") {
+                chat();
+                return;
+            } else {
+                showToast("Select a document to chat");
+            }
+        }
+    });
+
+    $("#chat-button").on("click", function (e) {
+        e.preventDefault();
+        console.log("chat button clicked");
+        if (document_uuids != "") {
+            chat();
+            return;
+        } else {
+            showToast("Select a document to chat");
+        }
+    });
+
+    $("#chat-suggestion-1").on("click", function (e) {
+        e.preventDefault();
+        console.log("chat button clicked");
+        if (document_uuids != "") {
+            performChat(
+                document_uuids,
+                "Summarize the provided document(s)",
+                folder_uuid,
+            );
+            return;
+        } else {
+            showToast("Select a document to chat");
+        }
+    });
+
+    $("#chat-suggestion-2").on("click", function (e) {
+        e.preventDefault();
+        setSection("Tasks");
+        $("#tasks-panel").show();
+    });
+
+    $("#chat-suggestion-3").on("click", function (e) {
+        e.preventDefault();
+        console.log("chat button clicked");
+        if (document_uuids != "") {
+            additional_context =
+                "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. The chat tab allows you to chat with your documents. You can use the tasks to create and run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can create prompt or formatting tasks, these are more complicated questions that you might frequently ask to chat. Save tasks you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document. The workflow tab allows for you to build out more complicated multi-step workflows. You can add extractions, prompts and other nodes to a series of interconnected steps and run them with the click of a button on one to many documents. Output the results, format them and download them if you like. When you are showing someone how to use this, show them examples in their document of what they might extract, prompt or how a workflow might be applied.";
+
+            performChat(
+                document_uuids,
+                "Teach me how to use vandalizer on this.",
+                folder_uuid,
+                additional_context,
+            );
+            return;
+        } else {
+            showToast("Select a document to chat");
+        }
+    });
+
+    function chat() {
+        // Add the message response bubble with the icon and loader
+        let question = $("#chatinput").find("p").text();
+        beginChat(question);
+
     }
-  });
-  // Handle Enter and Shift+Enter keydown events
-  $("#chatinput").on("keyup", function (event) {
-    if ($("#chatplaceholder")[0].textContent == "") {
-      $("#chatplaceholder").attr("data-placeholder", placeholderText);
-      $("#chatplaceholder").css("color", "darkgray");
-    } else {
-      $("#chatplaceholder").attr("data-placeholder", "");
-      $("#chatplaceholder").css("color", "black");
+
+    function beginChat(question) {
+        performChat(document_uuids, question, folder_uuid);
+
+        search_set_add_uuid = "";
+        is_adding_term = false;
     }
 
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault(); // Prevent the default behavior of adding a newline
-      // Trigger your JavaScript event here
-      if (document_uuids != "") {
-        chat();
-        return;
-      } else {
-        showToast("Select a document to chat");
-      }
-    }
-  });
-
-  $("#chat-button").on("click", function (e) {
-    e.preventDefault();
-    console.log("chat button clicked");
-    if (document_uuids != "") {
-      chat();
-      return;
-    } else {
-      showToast("Select a document to chat");
-    }
-  });
-
-  $("#chat-suggestion-1").on("click", function (e) {
-    e.preventDefault();
-    console.log("chat button clicked");
-    if (document_uuids != "") {
-      performChat(
+    function performChat(
         document_uuids,
-        "Summarize the provided document(s)",
+        question,
         folder_uuid,
-      );
-      return;
-    } else {
-      showToast("Select a document to chat");
-    }
-  });
+        additional_context = "",
+        display_question = "",
+    ) {
+        $(".chat-card-container").hide();
 
-  $("#chat-suggestion-2").on("click", function (e) {
-    e.preventDefault();
-    setSection("Tasks");
-    $("#tasks-panel").show();
-  });
+        console.log("Display question:" + display_question);
+        console.log("Question:" + question);
 
-  $("#chat-suggestion-3").on("click", function (e) {
-    e.preventDefault();
-    console.log("chat button clicked");
-    if (document_uuids != "") {
-      additional_context =
-        "Vandalizer is the tool you are in now. It is a tool that helps you understand and analyze documents. The chat tab allows you to chat with your documents. You can use the tasks to create and run extraction groups on a document. You can build a list of terms you would like to extract from a document, run them all. Tapping each one will copy the item to the clipboard and show it in the document. This is good for repetitive extraction tasks. Alternatively you can create prompt or formatting tasks, these are more complicated questions that you might frequently ask to chat. Save tasks you do regularly on documents. You can also select multiple documents, or attach fillable pdfs to extraction groups. Read the document provided and tell the user how they might use any of these features on this particular document. The workflow tab allows for you to build out more complicated multi-step workflows. You can add extractions, prompts and other nodes to a series of interconnected steps and run them with the click of a button on one to many documents. Output the results, format them and download them if you like. When you are showing someone how to use this, show them examples in their document of what they might extract, prompt or how a workflow might be applied.";
+        if (isProcessingFile) {
+            processingFileOriginalText = (display_question == "" ? question : display_question);
+            $("#chat-panel").append(
+                "<p><div class='message-you processing-file-text-question-holder'>" +
+                "Processing your document..." +
+                "</div></p>",
+            );
+        } else {
+            $("#chat-panel").append(
+                "<p><div class='message-you'>" +
+                (display_question == "" ? question : display_question) +
+                "</div></p>",
+            );
+        }
 
-      performChat(
-        document_uuids,
-        "Teach me how to use vandalizer on this.",
-        folder_uuid,
-        additional_context,
-      );
-      return;
-    } else {
-      showToast("Select a document to chat");
-    }
-  });
+        // Attach a delegated event listener to the parent container
+        $(document).on(
+            "click",
+            ".feedback-button-positive, .feedback-button-negative",
+            function () {
+                const feedbackType = this.dataset.feedbackType;
+                const question = $(this)
+                    .closest(".message-response")
+                    .attr("data-question");
+                const answer = $(this).closest(".message-response").attr("data-answer");
+                const context = $(this)
+                    .closest(".message-response")
+                    .attr("data-context");
+                const documentUuids = $(this)
+                    .closest(".message-response")
+                    .attr("data-document-uuids")
+                    .split(",");
 
-  function chat() {
-    // Add the message response bubble with the icon and loader
-    let question = $("#chatinput").find("p").text();
-    beginChat(question);
+            },
+        );
 
-  }
+        // reset the chat
+        $("#chatinput").find("p").text("");
 
-  function beginChat(question) {
-    performChat(document_uuids, question, folder_uuid);
-
-    search_set_add_uuid = "";
-    is_adding_term = false;
-  }
-
-  function performChat(
-    document_uuids,
-    question,
-    folder_uuid,
-    additional_context = "",
-    display_question = "",
-  ) {
-    $(".chat-card-container").hide();
-
-    console.log("Display question:" + display_question);
-    console.log("Question:" + question);
-
-    if (isProcessingFile) {
-      processingFileOriginalText = (display_question == "" ? question : display_question);
-      $("#chat-panel").append(
-        "<p><div class='message-you processing-file-text-question-holder'>" +
-        "Processing your document..." +
-        "</div></p>",
-      );
-    } else {
-      $("#chat-panel").append(
-        "<p><div class='message-you'>" +
-        (display_question == "" ? question : display_question) +
-        "</div></p>",
-      );
-    }
-
-    // Attach a delegated event listener to the parent container
-    $(document).on(
-      "click",
-      ".feedback-button-positive, .feedback-button-negative",
-      function () {
-        const feedbackType = this.dataset.feedbackType;
-        const question = $(this)
-          .closest(".message-response")
-          .attr("data-question");
-        const answer = $(this).closest(".message-response").attr("data-answer");
-        const context = $(this)
-          .closest(".message-response")
-          .attr("data-context");
-        const documentUuids = $(this)
-          .closest(".message-response")
-          .attr("data-document-uuids")
-          .split(",");
-
-      },
-    );
-
-    // reset the chat
-    $("#chatinput").find("p").text("");
-
-    let responseId = "response-" + new Date().getTime(); // unique ID for the response bubble
-    $("#chat-panel").append(
-      `<p>
+        let responseId = "response-" + new Date().getTime(); // unique ID for the response bubble
+        $("#chat-panel").append(
+            `<p>
         <div class='message-response' id='${responseId}'>
           <div class='chat-loader' style='display: inline-block;'></div>
         </div>
       </p>`,
-    );
-
-    $("#chat-panel").animate(
-      { scrollTop: $("#chat-panel")[0].scrollHeight },
-      "slow",
-    );
-
-    $.ajax({
-      url: "/home/chat",
-      type: "POST",
-      data: JSON.stringify({
-        document_uuids: document_uuids,
-        message: question + " " + additional_context,
-        folder_uuid: folder_uuid,
-      }),
-      contentType: "application/json; charset=utf-8",
-      dataType: "json",
-      async: true,
-      success: function (response) {
-        console.log(response);
-        let answer = response.answer;
-        let question = response.question;
-        let formatted_answer = response.formatted_answer;
-        let context = response.context;
-
-        let responseDiv = $("<div>")
-          .addClass("message-response-body")
-          .attr({
-            "data-question": question,
-            "data-answer": answer,
-            "data-context": context,
-            "data-document-uuids": document_uuids.join(","),
-          });
-
-        responseDiv.html(formatted_answer);
-        responseDiv.append(
-          createFeedbackButtons(),
         );
-
-        // reload page
-        $("#" + responseId).html(
-          `<div style='display: flex; flex-direction: column;'>
-            <div style='display: flex;'>
-              <div style='flex-grow: 1;'>
-                <div class="chat-response-body">
-                ${responseDiv.prop("outerHTML")}
-                </div>
-              </div>
-            </div>
-            
-          </div>`,
-        );
-
-        $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
-        $("#chatplaceholder").css("color", "darkgray");
 
         $("#chat-panel").animate(
-          { scrollTop: $("#chat-panel")[0].scrollHeight },
-          "slow",
+            { scrollTop: $("#chat-panel")[0].scrollHeight },
+            "slow",
         );
 
-        // copy to clipboard
-        $(".copy-btn").on("click", function () {
-          // let searchTerm = $(this).closest("div").text();
-          let responseHtml = $(this)
-            .closest('[id^="response"]')
-            .find(".chat-response-body")
-            .html()
-            .trim();
+        // Clear the response area
+        $("#" + responseId).html(
+            `<div style='display: flex; flex-direction: column;'>
+    <div style='display: flex;'>
+      <div style='flex-grow: 1;'>
+        <div class="chat-response-body" id="streamedResponse"></div>
+      </div>
+    </div>
+  </div>`
+        );
 
-          copyRichTextToClipboard(responseHtml);
 
-          // navigator.clipboard.writeText(responseHtml).then(function () {
-          //   showToast("Copied to clipboard");
-          // });
-        });
-      },
-      error: function (xhr, ajaxOptions, thrownError) {
-        console.log(xhr.status);
-        console.log(thrownError);
-      },
-    });
-  }
-
-  function copyRichTextToClipboard(html) {
-    // Create a temporary element
-    const container = document.createElement('div');
-    container.innerHTML = html;
-
-    // Try to use the modern clipboard API first
-    try {
-      // For plain text fallback
-      const textContent = container.textContent || container.innerText;
-
-      // Try to copy as HTML if supported
-      if (navigator.clipboard && navigator.clipboard.write) {
-        const blob = new Blob([html], { type: 'text/html' });
-        const clipboardItem = new ClipboardItem({ 'text/html': blob });
-        return navigator.clipboard.write([clipboardItem]).then(() => {
-          console.log('Rich text copied');
-          showToast("Copied to clipboard");
-        })
-          .catch(err => {
-            console.warn('Rich text copy failed, falling back to plain text', err);
-            return navigator.clipboard.writeText(textContent);
-          });
-      } else {
-        // Fall back to plain text
-        return navigator.clipboard.writeText(textContent);
-      }
-    } catch (err) {
-      console.warn('Modern clipboard API failed, using fallback', err);
-      // Fallback for Safari and older browsers
-      return new Promise((resolve, reject) => {
-        const textarea = document.createElement('textarea');
-        textarea.value = container.textContent || container.innerText;
-        textarea.style.position = 'fixed';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-
-        try {
-          const successful = document.execCommand('copy');
-          if (successful) {
-            resolve();
-          } else {
-            reject(new Error('execCommand failed'));
-          }
-        } catch (err) {
-          reject(err);
-        } finally {
-          document.body.removeChild(textarea);
+        // Initial scroll only if at (or near) the bottom
+        if (isScrolledToBottom($("#chat-panel")[0])) {
+            $("#chat-panel").animate(
+                { scrollTop: $("#chat-panel")[0].scrollHeight },
+                "fast"
+            );
         }
-      });
+
+        fetch("/home/chat", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json; charset=utf-8"
+            },
+            body: JSON.stringify({
+                document_uuids: document_uuids,
+                message: question + " " + additional_context,
+                folder_uuid: folder_uuid,
+            })
+        })
+            .then(response => {
+                if (!response.body) throw new Error("No response body");
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let markdownBuffer = "";
+                let questionText = question + " " + additional_context;
+
+                function pump() {
+                    return reader.read().then(({ done, value }) => {
+                        if (done) {
+                            let $responseDiv = $("<div>")
+                                .addClass("message-response-body")
+                                .attr({
+                                    "data-question": questionText,
+                                    "data-answer": markdownBuffer,
+                                    "data-context": "",
+                                    "data-document-uuids": document_uuids.join(","),
+                                })
+                                .html(marked.parse(markdownBuffer))
+                                .append(createFeedbackButtons());
+
+                            $("#" + responseId + " .chat-response-body").replaceWith($responseDiv);
+
+                            // Remove forced scroll after streaming!
+                            // Only scroll here if the user was at the bottom on stream end:
+                            if (isScrolledToBottom($("#chat-panel")[0])) {
+                                $("#chat-panel").animate(
+                                    { scrollTop: $("#chat-panel")[0].scrollHeight },
+                                    "fast"
+                                );
+                            }
+
+                            $("#chatplaceholder").attr("data-placeholder", "Chat with document...");
+                            $("#chatplaceholder").css("color", "darkgray");
+
+                            // Copy button
+                            $(".copy-btn").on("click", function () {
+                                let responseHtml = $(this)
+                                    .closest('[id^="response"]')
+                                    .find(".message-response-body")
+                                    .html()
+                                    .trim();
+                                copyRichTextToClipboard(responseHtml);
+                            });
+                            return;
+                        }
+                        let chunk = decoder.decode(value, { stream: true });
+                        markdownBuffer += chunk;
+
+                        $("#streamedResponse").html(marked.parse(markdownBuffer));
+
+                        // Scroll only if user is already at (or near) the bottom
+                        if (isScrolledToBottom($("#chat-panel")[0])) {
+                            $("#chat-panel").animate(
+                                { scrollTop: $("#chat-panel")[0].scrollHeight },
+                                "fast"
+                            );
+                        }
+
+                        return pump();
+                    });
+                }
+                return pump();
+            })
+            .catch(error => {
+                console.log("Stream error", error);
+            });
+
     }
-  }
 
-  // Fix the createFeedbackButtons function
-  function createFeedbackButtons() {
-    const feedbackDiv = document.createElement("div");
-    feedbackDiv.className = "feedback-buttons";
-    feedbackDiv.style.marginTop = "20px";
+    function isScrolledToBottom(el, threshold = 30) {
+        return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
+    }
 
-    const copyButton = document.createElement("button");
-    copyButton.innerHTML = '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
-    copyButton.className = "copy-btn";
-    copyButton.style.marginRight = "5px";
+    function copyRichTextToClipboard(html) {
+        // Create a temporary element
+        const container = document.createElement('div');
+        container.innerHTML = html;
 
-    feedbackDiv.appendChild(copyButton);
-    return feedbackDiv;
-  }
+        // Try to use the modern clipboard API first
+        try {
+            // For plain text fallback
+            const textContent = container.textContent || container.innerText;
+
+            // Try to copy as HTML if supported
+            if (navigator.clipboard && navigator.clipboard.write) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const clipboardItem = new ClipboardItem({ 'text/html': blob });
+                return navigator.clipboard.write([clipboardItem]).then(() => {
+                    console.log('Rich text copied');
+                    showToast("Copied to clipboard");
+                })
+                    .catch(err => {
+                        console.warn('Rich text copy failed, falling back to plain text', err);
+                        return navigator.clipboard.writeText(textContent);
+                    });
+            } else {
+                // Fall back to plain text
+                return navigator.clipboard.writeText(textContent);
+            }
+        } catch (err) {
+            console.warn('Modern clipboard API failed, using fallback', err);
+            // Fallback for Safari and older browsers
+            return new Promise((resolve, reject) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = container.textContent || container.innerText;
+                textarea.style.position = 'fixed';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error('execCommand failed'));
+                    }
+                } catch (err) {
+                    reject(err);
+                } finally {
+                    document.body.removeChild(textarea);
+                }
+            });
+        }
+    }
+
+    // Fix the createFeedbackButtons function
+    function createFeedbackButtons() {
+        const feedbackDiv = document.createElement("div");
+        feedbackDiv.className = "feedback-buttons";
+        feedbackDiv.style.marginTop = "20px";
+
+        const copyButton = document.createElement("button");
+        copyButton.innerHTML = '<i class="fa-regular fa-copy" style="cursor: pointer"></i>';
+        copyButton.className = "copy-btn";
+        copyButton.style.marginRight = "5px";
+
+        feedbackDiv.appendChild(copyButton);
+        return feedbackDiv;
+    }
 
 
 </script>
