@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import html
 
 import openai
 from devtools import debug
@@ -16,7 +17,7 @@ from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm import remove_code_markers, remove_xml_content
+from app.utilities.llm_helpers import remove_code_markers, remove_xml_content
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -131,9 +132,7 @@ class OpenAIInterface:
             )
         return full_text
 
-    @class_method_event_loop_decorator()
-    def ask_question_to_documents(
-        self,
+    def _prepare_chat(self,
         model,
         root_path,
         documents,
@@ -141,7 +140,8 @@ class OpenAIInterface:
         session=None,
         user_id=None,
         default_docs=None,
-    ):
+        ):
+
         if default_docs is None:
             default_docs = []
         default_docs = list(default_docs)
@@ -168,42 +168,86 @@ class OpenAIInterface:
 
         answer = None
 
+
+        agent = None
+        if len(full_text) < max_context_length:
+            prompt += f"""Question: {question} Document: {full_text}"""
+            agent = create_chat_agent(model)
+        else:
+            prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
+            agent = create_rag_agent(model)
+            debug("Rag chat", prompt)
+
+
+        return dict(
+            agent=agent,
+            prompt=prompt,
+            previous_messages=previous_messages,
+            cache_key=cache_key,
+            llm_string=llm_string,
+            user_id=user_id,
+            full_text=full_text,
+        )
+
+
+    @class_method_event_loop_decorator()
+    def ask_question_to_documents(
+        self,
+        model,
+        root_path,
+        documents,
+        question,
+        session=None,
+        user_id=None,
+        default_docs=None,
+    ):
+
+        prepared_data = self._prepare_chat(
+            model=model,
+            root_path=root_path,
+            documents=documents,
+            question=question,
+            session=session,
+            user_id=user_id,
+            default_docs=default_docs,
+        )
+        agent = prepared_data["agent"]
+        prompt = prepared_data["prompt"]
+        previous_messages = prepared_data["previous_messages"]
+        cache_key = prepared_data["cache_key"]
+        llm_string = prepared_data["llm_string"]
+        user_id = prepared_data["user_id"]
+        full_text = prepared_data["full_text"]
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        if len(full_text) < max_context_length:
-            prompt += f"""Question: {question} Document: {full_text}"""
-            try:
-                chat_agent = create_chat_agent(model)
-                answer = loop.run_until_complete(
-                    chat_agent.run(
-                        prompt,
-                        message_history=previous_messages,
-                    )
-                )
+        answer = None
 
-                debug("llmchat", answer)
-            except Exception as e:
-                debug(f"Error during LLM chat: {e}")
-        else:
-            prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
-            debug("Rag chat", prompt)
-            try:
-                rag_agent = create_rag_agent(model)
+        try:
+
+            if len(full_text) >= settings.max_context_length:
                 deps = RagDeps(
                     doc_manager=DocumentManager(),
                     user_id=user_id or "0",
                     documents=documents,
                 )
                 answer = loop.run_until_complete(
-                    rag_agent.run_sync(
+                    agent.run_sync(
                         prompt,
                         deps=deps,
                         message_history=previous_messages,
                     )
                 )
-            except Exception as e:
-                debug("Error in rag chat", e)
+            else:
+                answer = loop.run_until_complete(
+                    agent.run_sync(
+                        prompt,
+                        message_history=previous_messages,
+                    )
+                )
+        except Exception as e:
+            debug("Error in chat", e)
 
         debug(answer)
         if hasattr(answer, "new_messages_json"):
@@ -223,3 +267,48 @@ class OpenAIInterface:
             "answer": answer,
             "formatted_answer": answer
         }
+
+    def ask_question_to_documents_stream(
+        self,
+        model,
+        root_path,
+        documents,
+        question,
+        session=None,
+        user_id=None,
+        default_docs=None,
+    ):
+        prepared_data = self._prepare_chat(
+            model=model,
+            root_path=root_path,
+            documents=documents,
+            question=question,
+            session=session,
+            user_id=user_id,
+            default_docs=default_docs,
+        )
+        agent = prepared_data["agent"]
+        prompt = prepared_data["prompt"]
+
+        async def streamer():
+            async with agent.run_stream(prompt) as result:
+                async for token in result.stream_text(delta=True):
+                    yield token  # You may want to html.escape(token)
+
+        # Bridge the async generator to a sync iterator for Flask
+        def sync_streamer():
+            import asyncio
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            agen = streamer().__aiter__()
+
+            while True:
+                try:
+                    chunk = loop.run_until_complete(agen.__anext__())
+                    yield chunk
+                except StopAsyncIteration:
+                    break
+            loop.close()
+
+        return sync_streamer()

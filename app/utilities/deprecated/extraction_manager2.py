@@ -89,7 +89,7 @@ class ExtractionManager2:
 
         model = "gpt-4o"
 
-        chat_lm = ChatLM(Settings.model_type)
+        chat_lm = ChatLM(settings.model_type)
         output = chat_lm.completion(
             model=model,
             response_format={"type": "json_object"},

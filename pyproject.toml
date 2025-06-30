@@ -55,7 +55,9 @@ dependencies = [
     "pypandoc-binary>=1.15",
     "reportlab",
     "pytesseract",
-    "pdf2image"
+    "pdf2image",
+    "beautifulsoup4>=4.13.4",
+    "markitdown[all]>=0.1.2",
 ]
 
 

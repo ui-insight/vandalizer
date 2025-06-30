@@ -27,6 +27,7 @@ from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.document_readers import (
     extract_text_from_doc,
     extract_text_from_html,
+    convert_to_markdown,
 )
 
 MIN_PDF_TEXT_LENGTH = 100
@@ -62,7 +63,8 @@ def perform_extraction_and_update(document_uuid, extension):
             html_path = absolute_path.with_suffix(".html")
             excel_path = absolute_path.with_suffix(".xlsx")
             save_excel_to_html(excel_path, html_path)
-            raw_text = extract_text_from_html(html_path)
+            # raw_text = extract_text_from_html(html_path)
+            raw_text = convert_to_markdown(excel_path)
             document.extension = "html"
             document.path = str(Path(document.path).with_suffix(".html"))
 

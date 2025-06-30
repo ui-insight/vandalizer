@@ -5,7 +5,6 @@ import json
 from app.utilities.agents import create_chat_agent, extract_entities_with_agent
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.config import settings
-from app.utilities.llm import ChatLM
 from app.models import SmartDocument
 import asyncio
 from devtools import debug
