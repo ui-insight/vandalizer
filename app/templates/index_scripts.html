@@ -697,6 +697,8 @@
                     container.classList.add("fade-in");
                     // Hide the loading event progress container
                     root_container.style.display = "none";
+                    // Refresh the page to get the latest document
+                    window.location.reload();
                 }, 10000);
 
                 // No additional refresh needed per the requirement

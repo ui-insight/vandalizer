@@ -208,7 +208,6 @@ def retrieve(
 
     Returns:
         A list of documents that match the question
-
     """
     if docs_ids is None:
         docs_ids = []
