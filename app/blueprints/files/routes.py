@@ -26,7 +26,6 @@ from app.utilities.document_manager import (
     DocumentManager,
     cleanup_document,
     perform_extraction_and_update,
-    perform_semantic_ingestion,
     update_document_fields,
 )
 from app.utilities.fillable_pdf_manager import FillablePDFManager
@@ -178,22 +177,16 @@ def upload():
         extension=extension,
     )
 
-    document.validating = True
-    document.save()
-
     validation_task = perform_document_validation.s(
         document_uuid=document.uuid,
         document_path=str(file_path),
     )
 
-    document.validating = False
-    document.save()
-
-    ingestion_task = perform_semantic_ingestion.s(
-        document.uuid,
-        user_id,
-    )
-    workflow = extraction_task | validation_task | ingestion_task
+    # ingestion_task = perform_semantic_ingestion.s(
+    #     document.uuid,
+    #     user_id,
+    # )
+    workflow = extraction_task | validation_task  # | ingestion_task
     workflow_task_result = workflow.apply_async(
         link=update_document_fields.si(document.uuid),
         link_error=cleanup_document.si(document.uuid),

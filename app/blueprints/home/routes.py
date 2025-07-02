@@ -7,14 +7,13 @@ from itertools import chain
 from devtools import debug
 from flask import (
     Response,
-    stream_with_context,
     current_app,
-    jsonify,
     redirect,
     render_template,
     request,
     send_from_directory,
     session,
+    stream_with_context,
     url_for,
 )
 from flask.typing import ResponseReturnValue
@@ -33,14 +32,7 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.config import settings
-from app.utilities.document_manager import (
-    perform_extraction_and_update,
-    perform_semantic_ingestion,
-)
 from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.upload_manager import (
-    perform_document_validation,
-)
 from app.utils import is_dev, load_user
 
 from . import home
@@ -70,26 +62,26 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
 
-    extension = document.extension
+    # extension = document.extension
 
-    if not document.raw_text or document.raw_text == "":
-        # check if there is a task running
-        if not document.task_id:
-            extraction_task = perform_extraction_and_update.s(
-                document_uuid=document.uuid, extension=extension
-            )
+    # if not document.raw_text or document.raw_text == "":
+    #     # check if there is a task running
+    #     if not document.task_id:
+    #         extraction_task = perform_extraction_and_update.s(
+    #             document_uuid=document.uuid, extension=extension
+    #         )
 
-            validation_task = perform_document_validation.s(
-                document_uuid=document.uuid, document_path=document.absolute_path
-            )
+    #         validation_task = perform_document_validation.s(
+    #             document_uuid=document.uuid, document_path=document.absolute_path
+    #         )
 
-            ingestion_task = perform_semantic_ingestion.s(
-                document.uuid,
-                user_id,
-            )
-            workflow_task_result = extraction_task | validation_task | ingestion_task
-            document.task_id = workflow_task_result.id
-            document.save()
+    #         # ingestion_task = perform_semantic_ingestion.s(
+    #         #    document.uuid,
+    #         #    user_id,
+    #         # )
+    #         workflow_task_result = extraction_task | validation_task  # | ingestion_task
+    #         document.task_id = workflow_task_result.id
+    #         document.save()
 
 
 @home.route("/")
@@ -361,12 +353,19 @@ def chat() -> ResponseReturnValue:
 
     def generate():
         for chunk in OpenAIInterface().ask_question_to_documents_stream(
-                model, current_app.root_path, documents, message, default_docs=docs, user_id=user_id, session=session):
+            model,
+            current_app.root_path,
+            documents,
+            message,
+            default_docs=docs,
+            user_id=user_id,
+            session=session,
+        ):
             # You can yield raw text, HTML, JSON, or Server-Sent Events.
             yield chunk
 
     # Use the appropriate MIME type. If you use Server-Sent Events, it's "text/event-stream".
-    return Response(stream_with_context(generate()), mimetype='text/html')
+    return Response(stream_with_context(generate()), mimetype="text/html")
 
 
 @home.route("/static/fontawesome/webfonts/<path:filename>")

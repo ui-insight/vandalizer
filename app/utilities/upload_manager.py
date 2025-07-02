@@ -88,6 +88,8 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
     doc = SmartDocument.objects(uuid=document_uuid).first()
     doc.valid = all_valid
     doc.validation_feedback = summary.get("feedback", "")
+    doc.validating = False
+    doc.task_status = "complete"
     doc.save()
     debug(f"Document {document_uuid} validation updated: valid={all_valid}")
     return summary
@@ -109,6 +111,7 @@ def perform_document_validation(
     document = SmartDocument.objects(uuid=document_uuid).first()
     if document is not None:
         document.task_status = "security"
+        document.validating = True
         document.save()
 
     start = time.perf_counter()
