@@ -331,16 +331,15 @@
 
 {%endblock%} {% block scripts %}
 {{super()}}
+
+<script src="{{url_for('static', filename='javascript/pdf/pdf.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/helpers/progressloader.js')}}"></script>
 {% include "index_scripts.html" %}
 {% include "toolpanel/extractions/extraction_scripts.html" %}
 {% include "workflows/workflow_scripts.html" %}
 {% include "workflows/workflow_step_scripts.html" %}
 {% include "toolpanel/chat/chat_scripts.html" %}
 <!-- <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script> -->
-
-<script src="{{url_for('static', filename='javascript/pdf.js')}}"></script>
-
-
 <!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
 <script src="{{url_for('static', filename='javascript/uploads/upload_files.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/uploads/file_browser.js')}}"></script>

@@ -1,15 +1,16 @@
-from typing import Optional
+import warnings
+from typing import List, Optional
 
 import requests
 
 # for dev
-HOST_URL = "http://processpdf.nkn.uidaho.edu"
+# HOST_URL = 'http://processpdf.nkn.uidaho.edu'
 
 # for local
 # HOST_URL = 'http://localhost:5019'
 
 # for prod
-# HOST_URL = 'https://processpdf.insight.uidaho.edu'
+HOST_URL = "https://processpdf.insight.uidaho.edu"
 
 valid_vlm_methods = [
     "gemma3-64k:27b",
@@ -27,6 +28,16 @@ valid_vlm_methods = [
 ]
 
 valid_ocr_methods = ["ocr", "doctr", "easyocr", "olmocr", "tesseract", "smoldocling"]
+
+unsafe_methods = [
+    "mistralai/pixtral-large-2411",
+    "mistralai/pixtral-12b",
+    "google/gemini-pro-1.5",
+    "google/gemini-2.0-flash-lite-001",
+    "microsoft/phi-4-multimodal-instruct",
+    "openai/gpt-4o",
+    "openai/gpt-4o-mini",
+]
 
 
 # The UIPDF class for document extraction
@@ -89,7 +100,7 @@ class UIPDF:
         file_path: str = "./path/to/your/file.pdf",
         method: Optional[str] = None,
         webhook_url: Optional[str] = None,
-        only_these_pages: Optional[str] = None,
+        only_these_pages: Optional[List[int]] = None,
     ):
         """
         Converts a PDF file to text using an OCR or VLM method via an API endpoint.
@@ -104,16 +115,18 @@ class UIPDF:
                 The OCR or VLM method to use for text extraction. If not specified, defaults to 'qwen2.5-VL-8k:7b'.
                 Must be in the list of valid OCR or VLM methods.
             webhook_url (Optional[str]):
-                If provided, the API will send asynchronous job status and results to this URL. If not provided, the
-                function will fetch the result synchronously.
+                If provided, the API will send job status and results to this URL and return a job ID. If not provided, the
+                function will fetch the result via normal routes.
             only_these_pages (Optional[str]):
-                A comma-separated string of page numbers to process (e.g., "1,3,5"). If None, all pages are processed.
+                A list of page numbers to process (e.g., [1,3,5]). If None, all pages are processed. Note that pages are 0-N indexed.
 
         Returns:
-            str or None: The extracted text if successful, otherwise None. Returns an empty string if the file is not found.
+            str or dict: The extracted text or job ID if successful. Returns NoneType if the file is not found or an error occurs.
 
         Raises:
+            FileNotFoundError: If the file_path does not exist.
             ValueError: If the specified method is invalid.
+
 
         Example:
             >>> text = UIPDF.convert_to_text(
@@ -122,11 +135,18 @@ class UIPDF:
             ... )
             >>> print(text)
         """
+        # warn user that method is not safe for protected data
+        if method:
+            if method in unsafe_methods:
+                warnings.warn(
+                    f"Method: {method} is **NOT SAFE** for protected data!",
+                    DeprecationWarning,
+                )
 
         try:
             file = {"file": open(file_path, "rb")}
         except FileNotFoundError:
-            return ""
+            return None
 
         if not method:
             method = "qwen2.5-VL-8k:7b"
@@ -138,6 +158,8 @@ class UIPDF:
             "extract_images": "false",
             "extract_tables": "false",
         }
+        if only_these_pages:
+            params["pages_to_extract"] = str(only_these_pages)
 
         if method in valid_ocr_methods:
             _type = "ocr"
@@ -160,9 +182,17 @@ class UIPDF:
 
         try:
             response = requests.post(url=endpoint, params=params, files=file)
-            if response.status_code == 200:
+            if response.status_code in [200, 201, 202]:
                 response_dict = response.json()
-                return response_dict["text"]
+
+                if webhook_url:
+                    return response_dict
+                else:
+                    if "token_usage" in response_dict:
+                        print(
+                            f"Your query consumed ~{response_dict['token_usage']} tokens"
+                        )
+                    return response_dict["text"]
             else:
                 print("SERVER ERROR")
                 print(response.status_code)
@@ -177,7 +207,6 @@ class UIPDF:
         file_path: str = "./path/to/your/file.pdf",
         page_number: int = None,
         method: Optional[str] = None,
-        webhook_url: Optional[str] = None,
         table_format: Optional[str] = None,
     ):
         """
@@ -188,16 +217,15 @@ class UIPDF:
 
         Args:
             file_path (str):
-                The path to the PDF file to be processed. Defaults to './path/to/your/file.pdf'.
+                The path to the PDF file to be processed. Defaults to './path/to/your/file.pdf'. (Required)
             page_number (int):
                 The 1-based index of the page to extract the table from. (Required)
             method (Optional[str]):
                 The OCR or VLM method to use for table extraction. If not specified, defaults to 'qwen2.5-VL-8k:7b'.
                 Must be present in the list of valid OCR or VLM methods.
-            webhook_url (Optional[str]):
-                If provided, the API may send asynchronous job status and results to this URL. (Currently not used in this method.)
             table_format (Optional[str]):
-                Output format for the table. Must be one of 'markdown', 'html', or 'csv'. Defaults to 'markdown'.
+                Output format for the table. Must be one of 'markdown', 'html', or 'csv'. Defaults to 'markdown'. Note that
+                table_format is only supported for VLM methods.
 
         Returns:
             str or None: The extracted table as text if successful, otherwise None.
@@ -219,7 +247,7 @@ class UIPDF:
         try:
             file = {"file": open(file_path, "rb")}
         except FileNotFoundError:
-            return ""
+            return None
 
         if not method:
             method = "qwen2.5-VL-8k:7b"
@@ -259,7 +287,7 @@ class UIPDF:
         try:
             response = requests.post(url=endpoint, params=params, files=file)
 
-            if response.status_code == 200:
+            if response.status_code in [200, 201, 202]:
                 response_dict = response.json()
                 return response_dict["text"]
             else:
