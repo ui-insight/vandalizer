@@ -17,7 +17,7 @@ from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm_helpers import remove_code_markers, remove_xml_content
+from app.utilities.llm_helpers import remove_code_markers, remove_xml_content, remove_base64_images
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -82,7 +82,6 @@ class OpenAIInterface:
         llm_string = "pydantic_model:openai:gpt-4o"
         previous_messages = []
         latest_conversation_messages = []
-        debug(session)
         if session is not None:
             # latest_conversation_messages = session.get("chat_history", [])
             cache_result = cache.lookup(cache_key, llm_string)
@@ -163,8 +162,11 @@ class OpenAIInterface:
         max_context_length = settings.max_context_length
 
         full_text = OpenAIInterface.get_full_text(documents, previous_messages)
+        # remove base64 images from full_text
+        full_text = remove_base64_images(full_text)
         debug(max_context_length)
         debug(len(full_text))
+        debug(full_text[:5000])
 
         answer = None
 

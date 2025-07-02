@@ -2,6 +2,7 @@
 
 import json
 from typing import Any
+import re
 
 # from langfuse.decorators import observe
 import chardet
@@ -10,6 +11,28 @@ from pydantic import BaseModel, ValidationError
 
 from app.utilities.config import settings
 
+def remove_base64_images(text: str, replacement='') -> str:
+    """
+    Remove base64-encoded images from text and replace with placeholder.
+    This prevents sending large image data to the LLM.
+    """
+    # Pattern to match base64 image data (in various formats)
+    patterns = [
+        # HTML img tags with base64
+        r'<img[^>]*src=["\']\s*data:image/[^;]+;base64,[A-Za-z0-9+/=]+["\'"][^>]*>',
+        # Markdown images with base64
+        r'!\[[^\]]*\]\(data:image/[^;]+;base64,[A-Za-z0-9+/=]+\)',
+        # Raw base64 image data
+        r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
+        # Base64 strings that look like images (very long base64 sequences)
+        r'[A-Za-z0-9+/=]{1000,}'
+    ]
+
+    result = text
+    for pattern in patterns:
+        result = re.sub(pattern, replacement, result)
+
+    return result
 
 def remove_xml_content(text: str, tag: str) -> str:
     """Removes XML content from a string based on the specified tag.
