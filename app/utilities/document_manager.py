@@ -49,18 +49,27 @@ def perform_extraction_and_update(document_uuid, extension):
         if extension == "docx":
             debug("Extracting docx")
             # replace the extension with .docx
-            docx_path = absolute_path.with_suffix(".docx")
             html_path = absolute_path.with_suffix(".html")
+            docx_path = absolute_path.with_suffix(".docx")
 
-            raw_text = convert_to_markdown(docx_path)
+            doc_text = convert_to_markdown(docx_path, keep_data_uris=True)
+            raw_text = convert_to_markdown(docx_path, keep_data_uris=False)
             debug("Extracted text from docx", raw_text[:100])
             # save as html
-            html_content = markdown.markdown(raw_text)
-            with open(html_path, "w", encoding="utf-8") as html_file:
+            html_content = markdown.markdown(doc_text)
+            with open(html_path.as_posix(), "w", encoding="utf-8") as html_file:
                 html_file.write(html_content)
 
             document.extension = "html"
             document.path = str(Path(document.path).with_suffix(".html"))
+            debug(document.path)
+            document.raw_text = doc_text
+            document.processing = False
+            document.save()
+            debug("Saved docx as HTML", document.path)
+            debug(document.absolute_path)
+
+            return raw_text
 
         elif extension in ["xlsx", "xls"]:
             # Convert to HTML
@@ -72,25 +81,25 @@ def perform_extraction_and_update(document_uuid, extension):
             raw_text = convert_to_markdown(excel_path)
             document.extension = "html"
             document.path = str(Path(document.path).with_suffix(".html"))
+            document.raw_text = raw_text
+            document.processing = False
+            document.save()
+            return raw_text
 
         else:
             debug("Extracting pdf")
             # For other file types, use the generic text extraction
             raw_text = extract_text_from_doc(document.absolute_path, doc=document)
-
-        document.raw_text = raw_text
-        debug(
-            "Extraction completed, saving document",
-            document.title,
-            document.raw_text[:100],
-        )
-        document.processing = False
-        document.save()
-    except Exception:
+            document.raw_text = raw_text
+            document.processing = False
+            document.save()
+            return raw_text
+    except Exception as e:
+        debug(f"Error extracting text from document {document_uuid}: {e}")
         document.raw_text = ""
         document.processing = False
         document.save()
-    return raw_text
+        return raw_text
 
 
 @celery_app.task
@@ -118,6 +127,10 @@ def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_status = "readying"
     document.save()
+    debug(document.path)
+    debug(document.absolute_path)
+    debug(document.uuid)
+    debug(document.title)
     # if not document.valid:
     #     debug("Document not validated, reason: ", document.validation_feedback)
     #     return
