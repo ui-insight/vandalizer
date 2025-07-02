@@ -38,7 +38,28 @@ def filter_models() -> ResponseReturnValue:
 
     settings_models = [m.model_dump() for m in settings.models]
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if not model_config:
+        model_config = UserModelConfig(
+            user_id=user.user_id, name=settings.base_model
+        )
+        model_config.available_models = settings_models
+        model_config.save()
+    else:
+        # update the available models if they were incorrectly set
+        config_models = []
+        for m in model_config.available_models:
+            if "openai" in m["name"]:
+                m["external"] = True
+
+            config_models.append(m)
+        model_config.available_models = config_models
+        model_config.save()
+    # refresh the  model config
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    debug(model_config.available_models)
+
     current_model = settings.base_model
+    models = settings_models
     if len(uuids) == 0:
         if model_config:
             current_model = model_config.name
@@ -50,33 +71,15 @@ def filter_models() -> ResponseReturnValue:
                 validation_failed = True
                 break
     if validation_failed:
-        config_models = [
+        # filter out the external models
+        models = [
             m for m in model_config.available_models if not m.get("external")
         ]
-        current_model = "llama3.3"
-        # filter out the external models
-        if model_config:
-            model_config.available_models = config_models
-            model_config.save()
-        else:
-            model_config = UserModelConfig(user_id=user.user_id, name=current_model)
-            model_config.available_models = config_models
-            model_config.save()
-    else:
-        if not model_config:
-            model_config = UserModelConfig(
-                user_id=user.user_id, name=settings.base_model
-            )
-            model_config.available_models = settings_models
-            model_config.save()
-        else:
-            current_model = model_config.name
+        debug(models)
+        current_model = "qwen3:32b"
 
-            model_config.available_models = settings_models
-            model_config.save()
-
-    models = json.loads(json.dumps(model_config.available_models))
     debug(current_model)
+    debug(models)
 
     return jsonify({"models": models, "current_model": current_model})
 
