@@ -36,17 +36,10 @@ def clean_markdown_nans(markdown_content: str) -> str:
     return '\n'.join(filtered_lines)
 
 # Modify your existing function:
-def convert_to_markdown(doc_path: str, doc=None) -> str:
+def convert_to_markdown(doc_path: str, keep_data_uris=True) -> str:
     """Convert a document to Markdown format."""
-    if doc:
-        file_path = doc.file_path
-    else:
-        file_path = doc_path
-
     md = MarkItDown(enable_plugins=False)
-    result = md.convert(file_path, keep_data_uris=True)
-    debug(result)
-    debug("Converted to Markdown:", result.text_content)
+    result = md.convert(doc_path, keep_data_uris=keep_data_uris)
 
     # Clean up NaN values
     cleaned_content = clean_markdown_nans(result.text_content)
@@ -96,7 +89,7 @@ def extract_text_from_doc(doc_path, doc=None):
             return ocr_extract_text_from_pdf(doc_path_str)
         elif doc_path_str.endswith(".html"):
             # return extract_text_from_html(doc_path_str)
-            return convert_to_markdown(doc_path_str)
+            return convert_to_markdown(doc_path_str, keep_data_uris=False)
         elif doc_path_str.endswith((".txt", ".md", ".csv")):
             with open(doc_path_str, encoding="utf-8") as file:
                 return file.read()

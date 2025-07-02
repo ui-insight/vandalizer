@@ -121,6 +121,8 @@ def perform_document_validation(
         text = extract_text_from_doc(document_path)
     compliance = settings.upload_compliance
 
+    debug(text[:100])
+
     # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
