@@ -62,7 +62,7 @@ models = [
     {
         "name": "openai/gpt-4.1-nano",
         "tag": "Cloud — Fastest response",
-        "external": False,
+        "external": True,
     },
     {"name": "qwen3:32b", "tag": "Secure — Highest accuracy", "external": False},
     {
