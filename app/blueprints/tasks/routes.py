@@ -56,7 +56,6 @@ def filter_models() -> ResponseReturnValue:
         model_config.save()
     # refresh the  model config
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    debug(model_config.available_models)
 
     current_model = settings.base_model
     models = settings_models
@@ -78,8 +77,6 @@ def filter_models() -> ResponseReturnValue:
         debug(models)
         current_model = "qwen3:32b"
 
-    debug(current_model)
-    debug(models)
 
     return jsonify({"models": models, "current_model": current_model})
 

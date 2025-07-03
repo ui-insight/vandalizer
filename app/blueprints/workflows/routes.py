@@ -665,6 +665,7 @@ def add_workflow_step() -> ResponseReturnValue:
     step_title = workflow_step_data["title"]
 
     workflow_step = WorkflowStep(name=step_title)
+    debug(workflow_step_data)
     workflow_step.save()
     workflow.steps.append(workflow_step)
     workflow.save()
@@ -890,7 +891,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         workflow_step_task = None
 
         if search_set_id:
-            searchset = SearchSet.objects(uuid=search_set_id).first()
+            searchset = SearchSet.objects(id=ObjectId(search_set_id)).first()
+
             # if not searchset:
             #     return jsonify({"error": "Search set not found"})
 
@@ -1059,6 +1061,11 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+
+        debug(workflow_step_task)
+        debug(workflow_step.tasks)
+        debug(workflow_step)
+        debug(workflow)
 
         return jsonify({"response": "success"})
     return None

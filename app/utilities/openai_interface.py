@@ -13,7 +13,6 @@ from app.models import (
     UserModelConfig,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
-from app.utilities.async_utilities import class_method_event_loop_decorator
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
@@ -192,7 +191,6 @@ class OpenAIInterface:
         )
 
 
-    @class_method_event_loop_decorator()
     def ask_question_to_documents(
         self,
         model,
@@ -235,7 +233,7 @@ class OpenAIInterface:
                     documents=documents,
                 )
                 answer = loop.run_until_complete(
-                    agent.run_sync(
+                    agent.run(
                         prompt,
                         deps=deps,
                         message_history=previous_messages,
@@ -243,7 +241,7 @@ class OpenAIInterface:
                 )
             else:
                 answer = loop.run_until_complete(
-                    agent.run_sync(
+                    agent.run(
                         prompt,
                         message_history=previous_messages,
                     )

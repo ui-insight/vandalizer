@@ -52,7 +52,6 @@ def inject_current_model():
         current_model = model_config.name
         if len(model_config.available_models) > 0:
             models = json.loads(json.dumps(model_config.available_models))
-    debug(models)
 
     return {"current_model": current_model, "models": models}
 
