@@ -606,6 +606,7 @@ def execute_workflow_task(
     steps = [workflow_trigger_step]
     for step in workflow.steps:
         steps.append(step)
+        debug(step.name, step.data)
 
     debug(steps)
 
