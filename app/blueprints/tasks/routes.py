@@ -1,5 +1,5 @@
 import csv
-import json
+import io
 import os
 import uuid
 from copy import deepcopy
@@ -10,6 +10,7 @@ from flask import (
     abort,
     current_app,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -39,9 +40,7 @@ def filter_models() -> ResponseReturnValue:
     settings_models = [m.model_dump() for m in settings.models]
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if not model_config:
-        model_config = UserModelConfig(
-            user_id=user.user_id, name=settings.base_model
-        )
+        model_config = UserModelConfig(user_id=user.user_id, name=settings.base_model)
         model_config.available_models = settings_models
         model_config.save()
     else:
@@ -71,12 +70,9 @@ def filter_models() -> ResponseReturnValue:
                 break
     if validation_failed:
         # filter out the external models
-        models = [
-            m for m in model_config.available_models if not m.get("external")
-        ]
+        models = [m for m in model_config.available_models if not m.get("external")]
         debug(models)
         current_model = "qwen3:32b"
-
 
     return jsonify({"models": models, "current_model": current_model})
 
@@ -603,26 +599,30 @@ def begin_prompt_search() -> ResponseReturnValue:
     return jsonify(response)
 
 
-@tasks.route("/export_extraction", methods=["GET"])
-def export_extraction() -> ResponseReturnValue:
+@tasks.route("/export_extraction", methods=["POST"])
+def export_extraction():
     """Export the extraction results to a CSV file."""
-    result_json = request.args.to_dict()
+    # 1) Grab your data from form-POST or JSON
+    if request.is_json:
+        data = request.get_json(force=True)
+    else:
+        data = request.form.to_dict()
 
-    # Convert the dictionary to a list of rows
-    rows = []
-    for key, value in result_json.items():
-        rows.append([key, value])
+    # 2) Build CSV in memory
+    si = io.StringIO()
+    writer = csv.writer(si)
+    # Optional header row
+    writer.writerow(["Search Term", "Result"])
 
-    # Define the file path for the CSV file
-    csv_file_path = Path(current_app.root_path) / "static" / "export.csv"
+    for term, result in data.items():
+        writer.writerow([term, result])
 
-    # Write the rows to the CSV file
-    with Path.open(csv_file_path, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerows(rows)
+    # 3) Create a response with the CSV data
+    output = make_response(si.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=export.csv"
+    output.headers["Content-Type"] = "text/csv; charset=utf-8"
 
-    # Return the path to the CSV file
-    return send_file("static/export.csv", mimetype="text/csv", as_attachment=True)
+    return output
 
 
 @tasks.route("/download_fillable", methods=["GET"])

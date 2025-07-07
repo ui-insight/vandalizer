@@ -186,21 +186,13 @@ def run_workflow() -> ResponseReturnValue:
         workflow_trigger_step_id=workflow_trigger_step_id,
         model=model,
     )
-    print("Async result", async_result)
-    workflow_output = async_result.get(timeout=600)
-    if workflow_output is None:
-        return jsonify({"error": "Workflow execution failed"})
-    output = workflow_output.get("output")
-    data = workflow_output.get("history")
-    if not output:
-        return {
-            "output": [],
-            "steps": [],
-            "status": "error",
-            "error": "Workflow failed to execute",
-        }
-
-    return {"output": output, "steps": data}
+    return jsonify(
+        {
+            "status": "accepted",
+            "workflow_result_id": workflow_result_id,
+            "task_id": async_result.id,
+        },
+    ), 202
 
 
 @workflows.route("/workflow/step/test", methods=["POST"])

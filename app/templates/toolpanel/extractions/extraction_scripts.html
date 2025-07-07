@@ -446,28 +446,25 @@
 
       $("#export").on("click", function (e) {
         e.preventDefault();
-        searchDict = createSearchTermDictionary();
-        var form = $("<form>", {
+        const searchDict = createSearchTermDictionary();
+        console.log(searchDict);
+
+        // use POST instead of GET
+        const form = $("<form>", {
           action: "/tasks/export_extraction",
-          method: "GET",
+          method: "POST",
         });
 
-        $.each(searchDict, function (key, value) {
-          form.append(
-            $("<input>", {
-              type: "hidden",
-              name: key,
-              value: value,
-            }),
-          );
+        // add your inputs
+        $.each(searchDict, (key, value) => {
+          form.append($("<input>", { type: "hidden", name: key, value }));
         });
-
         form.append(
           $("<input>", {
             type: "hidden",
             name: "pdf_title",
-            value: $("#document-title")[0].innerText,
-          }),
+            value: $("#document-title").text().trim(),
+          })
         );
 
         $("body").append(form);
