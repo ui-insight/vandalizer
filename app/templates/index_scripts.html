@@ -836,9 +836,13 @@
 
                 $.get("/files/poll_status", { docid: uuid })
                     .done(function (resp) {
-
+                        console.log(resp);
                         updateStatusPanelForPolling(resp);
                         if (resp.complete) {
+                            if (resp.valid == false) {
+                                location.reload();
+                            }
+
                             // remove the spinner
                             $loader.remove();
 
