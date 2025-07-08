@@ -446,43 +446,9 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
+                    console.log("Workflow run response:", data);
 
 
-                    let chat_response = "";
-                    if (data.output.hasOwnProperty('answer')) {
-                        chat_response = data.output.answer;
-                    }
-                    else {
-                        chat_response = data.output;
-                    }
-                    console.log("chat response:", chat_response);
-
-                    if (typeof chat_response === 'object') {
-                        // Check if it's an array with a single HTML string
-                        if (Array.isArray(chat_response) && chat_response.length === 1 && typeof chat_response[0] === 'string') {
-                            // Just use the HTML string directly
-                            chat_response = chat_response[0];
-                        } else {
-                            // Otherwise stringify the object
-                            chat_response = JSON.stringify(chat_response, null, 2);
-                        }
-                    }
-                    let outputText = chat_response
-                        .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
-
-                    // replace \",\" with <hr> in the html output
-                    outputText = outputText.replace(/\",\"/g, '<hr>');
-
-                    $('.workflow-output-section').show();
-                    $('.workflow-output-buttons').removeClass('hidden');
-                    $('.workflow-output-section').append(`${outputText}`);
-                    $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
-                    $('.workflow-step').removeClass('active');
-                    // Add 'active' class to the nth $('.workflow-step') element (0-based index)
-                    $('.workflow-output').addClass('active');
-                    $('.workflow-output').find('.step-connector').addClass('active');
-                    $('.workflow-loader').hide();
-                    // performWorkflowStatus(session_id, workflow_elapsed_time);
                     stopSpinningJoe();
                     if (download) {
                         downloadWorkflow(session_id)
@@ -557,6 +523,7 @@
                 //const { steps_completed, total_steps, status } = data;
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
+                let status = data.status;
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
@@ -587,8 +554,7 @@
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
-                    stopSpinningJoe();
-                    clearInterval(intervalId); // Stop polling
+                    console.log("Workflow completed or failed");
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
                     }
@@ -599,6 +565,37 @@
                             clearInterval(workflow_interval_id);
                         }
                         showToast("Workflow completed");
+
+                        // show the results
+
+                    let workflow_response = data.output;
+                    console.log("workflow response:", data.output);
+
+                    if (Array.isArray(workflow_response) && workflow_response.length === 1 && typeof workflow_response[0] === 'string') {
+                        // Just use the HTML string directly
+                        workflow_response = workflow_response[0];
+                    } else {
+                        // Otherwise stringify the object
+                        workflow_response = JSON.stringify(workflow_response, null, 2);
+                    }
+                    let outputText = workflow_response
+                        .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+
+                    // replace \",\" with <hr> in the html output
+                    outputText = outputText.replace(/\",\"/g, '<hr>');
+
+                    $('.workflow-output-section').show();
+                    $('.workflow-output-buttons').removeClass('hidden');
+                    $('.workflow-output-section').append(`${outputText}`);
+                    $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
+                    $('.workflow-step').removeClass('active');
+                    // Add 'active' class to the nth $('.workflow-step') element (0-based index)
+                    $('.workflow-output').addClass('active');
+                    $('.workflow-output').find('.step-connector').addClass('active');
+                    $('.workflow-loader').hide();
+                    // performWorkflowStatus(session_id, workflow_elapsed_time);
+                    // stopSpinningJoe();
+
                     }
 
                     $('.workflow-step').eq(active_step).find('.step-connector').removeClass('active');
