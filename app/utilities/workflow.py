@@ -616,6 +616,10 @@ def execute_workflow_task(
     engine = build_workflow_engine(steps, workflow, model, user_id=workflow.user_id)
 
     final_output, data = engine.execute(workflow_result)
+    debug(final_output)
+    workflow_result.final_output = dict(output=final_output, data=data)
+    workflow_result.status = "completed"
+    workflow_result.save()
     print(
         f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
     )

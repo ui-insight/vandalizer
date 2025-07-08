@@ -31,7 +31,80 @@
             duration: 1500
         }
     ];
-    const docLoaderProgressHandler = new ProgressLoader('.loading-event-progress-container');
+    const root_container = document.querySelector(".loading-event-progress-container");
+    const container = document.getElementById("loading-event-progress");
+    const titleEl = document.getElementById("loading-event-title");
+    const messageEl = document.getElementById("loading-event-message");
+    const progressEl = document.querySelector(".loading-progress-fill");
+    // hide the root_container initially(display none)
+    root_container.style.display = "none";
+
+    async function advanceStep(statusMessages = []) {
+        if (animationStepIndex >= steps.length) return;
+
+        animationInProgress = true;
+        const { title, messages, duration } = steps[animationStepIndex];
+        titleEl.textContent = title;
+        messageEl.textContent = "";
+        progressEl.style.width = "0%";
+
+        let animationMessages = statusMessages.length > 0 ? statusMessages : messages;
+
+        // Cycle through messages
+        let msgIdx = 0;
+        const msgInterval = setInterval(() => {
+            messageEl.textContent = messages[msgIdx % animationMessages.length];
+            msgIdx++;
+        }, duration / animationMessages.length);
+
+        // Animate fill
+        await new Promise(res => {
+            progressEl.style.transition = `width ${duration}ms linear`;
+            requestAnimationFrame(() => {
+                progressEl.style.width = "100%";
+            });
+            setTimeout(() => {
+                clearInterval(msgInterval);
+                res();
+            }, duration);
+        });
+
+        // Fade out before next
+        await new Promise(res => {
+            container.classList.remove("fade-in");
+            container.classList.add("fade-out");
+            setTimeout(() => {
+                container.classList.remove("fade-out");
+                container.classList.add("fade-in");
+                res();
+            }, 500);
+        });
+
+        animationStepIndex++;
+
+        // If at the last stage, fade out after 1s
+        if (animationStepIndex === steps.length) {
+            setTimeout(() => container.classList.add("fade-out"), 1000);
+            animationInProgress = false;
+        }
+    }
+
+    // Call to start the animations from step 0
+    function startProcessingAnimation() {
+        animationStepIndex = 0;
+        // show the root_container
+        root_container.style.display = "block";
+        root_container.classList.remove("fade-out");
+        root_container.classList.add("fade-in");
+        container.classList.remove('fade-out');
+        container.classList.add("fade-in");
+
+        advanceStep(); // Start first step (will progress as you call more advanceStep)
+    }
+
+    // In pollStatus, keep a variable for backend stage (pseudo-stages shown here)
+    // You need to decide on how to map your backend status to these stages
+
 
     {% if (documents != None) and documents | length > 0 %}
     var documentData = {
