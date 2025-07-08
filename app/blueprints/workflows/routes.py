@@ -352,6 +352,10 @@ def workflow_status() -> ResponseReturnValue:
 
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
+    final_output = None
+    if workflow_result.final_output:
+        final_output = workflow_result.final_output.get("output", None)
+    debug("Workflow result", final_output)
 
     response = {
         "steps_completed": workflow_result.num_steps_completed,
