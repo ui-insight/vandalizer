@@ -5,7 +5,6 @@ from threading import Thread
 from devtools import debug
 from dotenv import load_dotenv
 
-
 load_dotenv()
 
 
@@ -66,7 +65,7 @@ def format_llm_output(text: str) -> str:
 
     """
 
-    debug(f"Formatting LLM output: {text})
+    debug(f"Formatting LLM output: {text}")
     # Replace explicit \n escapes with actual newlines
     text = text.replace("\n", "")
     text = text.strip('"')
