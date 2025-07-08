@@ -1,31 +1,10 @@
 #!/usr/bin/env python3
 
-import asyncio
-import graphlib
-import json
-import multiprocessing
-import re
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
-from typing import NoReturn
 
 from devtools import debug
 from dotenv import load_dotenv
 
-from app import app
-from app.celery_worker import celery_app
-from app.models import (
-    SearchSet,
-    SmartDocument,
-    Workflow,
-    WorkflowResult,
-    WorkflowStep,
-)
-from app.utilities.agents import create_chat_agent
-from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.openai_interface import (
-    OpenAIInterface,
-)
 
 load_dotenv()
 
@@ -86,6 +65,8 @@ def format_llm_output(text: str) -> str:
         str: Cleaned text string
 
     """
+
+    debug(f"Formatting LLM output: {text})
     # Replace explicit \n escapes with actual newlines
     text = text.replace("\n", "")
     text = text.strip('"')
@@ -111,6 +92,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         asyncio.set_event_loop(loop)
         result = loop.run_until_complete(chat_agent.run(output_prompt))
         output = result.output
+        debug(f"Output from chat agent: {output}")
         output = format_llm_output(output).strip()
 
     else:
@@ -121,6 +103,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
             question=prompt,
         )
         output = output.get("answer", "")
+        debug(f"Output from chat agent: {output}")
         output = format_llm_output(output)
         debug(output)
     return output
