@@ -51,7 +51,7 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.workflow import execute_task_step_test, execute_workflow_task
+from app.utilities.workflow import execute_task_step_test, execute_workflow_task, workflow_ingestion_task, WorkflowManager
 from app.utils import load_user
 
 from . import workflows
@@ -168,11 +168,18 @@ def run_workflow() -> ResponseReturnValue:
     workflow_result_id = str(workflow_result.id)
     workflow_trigger_step_id = str(document_trigger_step.id)
     print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
+
     async_result = execute_workflow_task.delay(
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
         model=model,
+    )
+    # Ingest workflow into vector database for future recommendations
+    workflow_ingestion_task.delay(
+        workflow_id=workflow_id,
+        workflow_trigger_step_id=workflow_trigger_step_id,
+        user_id=user_id
     )
     return jsonify(
         {
@@ -181,6 +188,54 @@ def run_workflow() -> ResponseReturnValue:
             "task_id": async_result.id,
         },
     ), 202
+
+
+@workflows.route("/workflow/recommendations", methods=["POST"])
+def get_workflow_recommendations_sync() -> ResponseReturnValue:
+    """Get workflow recommendations synchronously (for immediate results)."""
+    user = load_user()
+    if user is None:
+        return redirect(url_for("login"))
+
+    request_data = request.get_json()
+    document_uuids = request_data.get("uuids", [])
+    space = request_data.get("space")
+    limit = request_data.get("limit", 5)
+
+    if not document_uuids:
+        return jsonify({"recommendations": []}), 200
+
+    user_id = user.user_id
+
+    try:
+        # Load documents
+        documents = []
+        for uuid in document_uuids:
+            doc = SmartDocument.objects(uuid=uuid).first()
+            if doc:
+                documents.append(doc)
+
+        if not documents:
+            return jsonify({"recommendations": [], "message": "No valid documents found"}), 200
+
+        # Initialize workflow manager
+        from pathlib import Path
+        persist_directory = Path("data/workflows_vectordb")
+        workflow_manager = WorkflowManager(persist_directory=persist_directory)
+
+        # Get recommendations
+        recommendations = workflow_manager.search_workflow_recommendations(
+            selected_documents=documents,
+            user_id=user_id,
+            space=space,
+            limit=limit
+        )
+
+        return jsonify({"recommendations": recommendations}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e), "recommendations": []}), 500
+
 
 
 @workflows.route("/workflow/step/test", methods=["POST"])
@@ -352,11 +407,15 @@ def workflow_status() -> ResponseReturnValue:
 
     if not workflow_result:
         return jsonify({"error": "Workflow not found"}), 404
+    final_output = None
+    if workflow_result.final_output:
+        final_output = workflow_result.final_output.get("output", None)
+    print("Workflow result", final_output)
 
     response = {
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
-        # "time_elapsed": int(time_elapsed)
+        "output": final_output,
         "status": workflow_result.status,
     }
 

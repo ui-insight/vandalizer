@@ -102,9 +102,6 @@
         advanceStep(); // Start first step (will progress as you call more advanceStep)
     }
 
-    // In pollStatus, keep a variable for backend stage (pseudo-stages shown here)
-    // You need to decide on how to map your backend status to these stages
-
 
     {% if (documents != None) and documents | length > 0 %}
     var documentData = {
@@ -226,6 +223,32 @@
         window.history.pushState({}, "", newhref);
     }
 
+ function getWorkflowRecommendations(uuids) {
+        $.ajax({
+            url: '/workflows/workflow/recommendations',
+            type: 'POST',
+            contentType: 'application/json; charset=utf-8',
+            data: JSON.stringify({ uuids, space: $('#current-space-id')[0].innerHTML, limit: 5 }),
+            dataType: 'json',
+            success: function (msg) {
+                const recommendations = msg.recommendations;
+                console.log("Workflow recommendations:", recommendations);
+                // Update the UI with the recommendations
+                // $('#workflow-recommendations').empty();
+// if (recommendations.length > 0) {
+//     recommendations.forEach(rec => {
+//         $('#workflow-recommendations').append(`<li>${rec}</li>`);
+//     });
+// } else {
+//     $('#workflow-recommendations').append('<li>No recommendations available</li>');
+// }
+            },
+            error: function (xhr, status, err) {
+                console.error('Error fetching workflow recommendations:', status, err);
+            }
+        });
+    }
+
     function filterAvailableModels(uuids) {
         $.ajax({
             url: '/tasks/model/filter',
@@ -243,6 +266,7 @@
 
                 // Update the visible text in the UI
                 $('#current_selected_model').text('');
+
 
                 // find the model tag in the models array based on the current model
                 const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
@@ -322,6 +346,8 @@
         // filter user available models
 
         filterAvailableModels(uuids);
+
+        getWorkflowRecommendations(uuids);
 
 
 
@@ -631,13 +657,37 @@
 
     var pollTimeout = null;
     var pollingActive = true;
+
+    let lastKnownProcessingStage = null;
     function pollStatus(docUuid) {
         if (!pollingActive) return;
 
         $.get('/files/poll_status', { docid: docUuid }, function (data) {
 
             console.log("Polling status for document: ", data.status);
-            updateStatusPanelForPolling(data);
+
+            let currentStage;
+            if (!data.complete) {
+                if (data.status === "layout" || data.status === "ocr") currentStage = 0; // Processing document
+                else if (data.status === "security") currentStage = 1;                   // Security check
+                else if (data.status === "readying") currentStage = 2;                   // Preparing AI
+                else currentStage = 0;                                                  // Default fallback
+            } else {
+                currentStage = 3; // Done!
+            }
+
+            if (data.status === "complete" || data.status === "error") {
+                currentStage = 3; // Force to done stage if complete or error
+            }
+
+            // Only advance the animation if we enter a new stage
+            if (currentStage !== lastKnownProcessingStage) {
+                if (animationStepIndex <= currentStage && animationStepIndex < steps.length) {
+                    const statusMessages = data.status_messages || [];
+                    advanceStep(statusMessages);
+                }
+                lastKnownProcessingStage = currentStage;
+            }
 
             if (data.complete) {
 
@@ -669,7 +719,10 @@
                     // Reset animation step index
                     animationStepIndex = 0;
                     // Reset the container to its initial state
-                    docLoaderProgressHandler.hide();
+                    container.classList.remove("fade-out");
+                    container.classList.add("fade-in");
+                    // Hide the loading event progress container
+                    root_container.style.display = "none";
                     // Refresh the page to get the latest document
                     window.location.reload();
                 }, 10000);
@@ -686,39 +739,6 @@
                 isProcessingFile = true;
             }
         });
-    }
-
-    function updateStatusPanelForPolling(data) {
-        console.log("Polling data for panel update:", data); // Debugging line
-        docLoaderProgressHandler.show();
-        let currentStage;
-        if (!data.complete) {
-            if (data.status === "layout" || data.status === "ocr") {
-                currentStage = 0;
-                docLoaderProgressHandler.setMessage('Preparing Document', 'Reading layout...');
-            }
-            else if (data.status === "security") {
-                currentStage = 1;                   // Security check
-                docLoaderProgressHandler.setMessage('Security Check', 'Checking for any sensitive data...');
-            }
-            else if (data.status === "readying") {
-                currentStage = 2;                   // Preparing AI
-                docLoaderProgressHandler.markCompleted();
-            } else if (data.status === "completed") {
-                docLoaderProgressHandler.markCompleted();
-            }
-            else currentStage = 0;                                                  // Default fallback
-        } else {
-            currentStage = 3; // Done!
-            docLoaderProgressHandler.hide();
-        }
-
-        if (currentStage != docLoaderProgressHandler.itemidentifier) {
-            docLoaderProgressHandler.setProgress(5);
-            docLoaderProgressHandler.itemidentifier = currentStage;
-        } else {
-            docLoaderProgressHandler.incrementProgress(5);
-        }
     }
 
 
@@ -744,10 +764,8 @@
                 $('#processing-indicator').show();
                 // Hide regular content
                 $('#raw-text-icon').hide();
-                docLoaderProgressHandler.show();
-                docLoaderProgressHandler.setMessage('Preparing Document', 'Reading layout...');
-                docLoaderProgressHandler.setProgress(5);
 
+                startProcessingAnimation();
                 // Start polling
                 pollStatus(docUuid);
             } else {
@@ -765,7 +783,7 @@
 
         $('.tasks-close-button').off('click').on('click', function (e) {
             e.preventDefault();
-            setSection("Assistant");
+            setSection("Chat");
             $("#tasks-panel").hide();
         });
 
@@ -909,13 +927,7 @@
 
                 $.get("/files/poll_status", { docid: uuid })
                     .done(function (resp) {
-                        console.log(resp);
-                        updateStatusPanelForPolling(resp);
                         if (resp.complete) {
-                            if (resp.valid == false) {
-                                location.reload();
-                            }
-
                             // remove the spinner
                             $loader.remove();
 
