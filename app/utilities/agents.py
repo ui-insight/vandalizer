@@ -537,7 +537,10 @@ def extract_entities_with_agent(
                 deps=field_inference_deps,
             )
         )
-        if isinstance(result.output, str):
+
+        new_fields = result.output
+
+        if isinstance(new_fields, str):
             new_fields = remove_code_markers(result.output)
             debug(new_fields)
 
