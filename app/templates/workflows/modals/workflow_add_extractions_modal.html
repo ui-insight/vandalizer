@@ -54,13 +54,13 @@
         </div>
     </div>
     <script>
-        const container = document.getElementById("loading-event-progress");
-        const titleEl = document.getElementById("loading-event-title");
-        const messageEl = document.getElementById("loading-event-message");
-        const contentEl = document.getElementById("loading-event-content");
-        const contentBarEl = document.querySelector(".loading-progress-bar");
-        const progressEl = document.querySelector(".loading-progress-fill");
-        const outtercontainer = document.querySelector(".loading-event-progress-container");
+        const container = document.getElementById("test-event-progress");
+        const titleEl = document.getElementById("test-event-title");
+        const messageEl = document.getElementById("test-event-message");
+        const contentEl = document.getElementById("test-event-content");
+        const contentBarEl = document.querySelector(".test-progress-bar");
+        const progressEl = document.querySelector(".test-progress-fill");
+        const outtercontainer = document.querySelector(".test-event-progress-container");
         // Initially hide the container
         let loadingCancelled = false;
 
@@ -210,6 +210,9 @@
                 document_uuids: document_uuids,
                 task_data: task_data
             });
+
+            console.log("HERE");
+            console.log(data);
 
             // 3) Fire off the AJAX call
             $.ajax({

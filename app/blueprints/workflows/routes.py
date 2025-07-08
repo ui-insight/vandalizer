@@ -51,7 +51,7 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.workflow import execute_workflow_task
+from app.utilities.workflow import execute_task_step_test, execute_workflow_task
 from app.utils import load_user
 
 from . import workflows
@@ -216,7 +216,15 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    async_result = execute_workflow_task.delay(
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
+    task_data["user_id"] = user_id
+    task_data["model"] = model
+
+    async_result = execute_task_step_test.delay(
         task_name=task_name,
         task_data=task_data,
         document_trigger_step_id=str(document_trigger_step.id),

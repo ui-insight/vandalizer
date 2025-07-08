@@ -104,7 +104,7 @@ def index() -> ResponseReturnValue:
 
     user = load_user()
     user_id = user.user_id
-    section = request.args.get("section", default="Chat").strip()
+    section = request.args.get("section", default="Assistant").strip()
 
     document = None
     # Get the space

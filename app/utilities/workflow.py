@@ -4,7 +4,6 @@ import asyncio
 import graphlib
 import json
 import multiprocessing
-import os
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Thread
@@ -398,15 +397,16 @@ class PromptNode(Node):
 
 
 def sanitize_step_name(name: str) -> str:
-    name = name.replace('.', '_')
-    name = name.replace('$', '_')
+    name = name.replace(".", "_")
+    name = name.replace("$", "_")
     name = name.strip()
-    name = name.strip('_')
-    name = re.sub(r'\s+', '_', name)
-    name = re.sub(r'__+', '_', name)
+    name = name.strip("_")
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"__+", "_", name)
     if not name:
-        name = 'step'
+        name = "step"
     return name
+
 
 class WorkflowEngine:
     def __init__(self) -> None:
@@ -572,7 +572,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
     return engine
 
 
-
 @celery_app.task(bind=True, name="workflow.execute_workflow")
 def execute_workflow_task(
     self, workflow_result_id, workflow_id, workflow_trigger_step_id, model
@@ -624,3 +623,59 @@ def execute_workflow_task(
         "output": final_output,
         "history": data,
     }
+
+
+@celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
+def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
+    process_node = None
+    latest_output = None
+    workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
+    engine = WorkflowEngine()
+    nodes = []
+    node = DocumentNode(workflow_trigger_step.data)
+    nodes.append(node)
+    engine.add_node(node)
+
+    debug(nodes)
+    # connect the steps
+
+    if task_name == "Extraction":
+        process_node = ExtractionNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    elif task_name == "Prompt":
+        process_node = PromptNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    elif task_name == "Formatter":
+        process_node = FormatNode(
+            data=task_data,
+        )
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+    else:
+        process_node = Node(task_name)
+        node = MultiTaskNode(task_name)
+        node.add_tasks([process_node])
+        nodes.append(node)
+        engine.add_node(node)
+
+    for idx in range(len(nodes)):
+        if idx == 0:
+            continue
+        engine.connect(nodes[idx - 1], nodes[idx])
+
+    final_output, data = engine.execute()
+    print(final_output)
+
+    return final_output
