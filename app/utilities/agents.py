@@ -1,33 +1,30 @@
 """Utilities for agents."""
 
+import asyncio
 import json
 import os
 from dataclasses import dataclass
 from typing import Any, Optional
-from datetime import datetime, timezone
-
-import asyncio
 
 from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
-from pydantic import create_model, BaseModel
+from pydantic import BaseModel, create_model
 from pydantic_ai import ModelRetry, RunContext
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
-from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.profiles import ModelProfile
-from pydantic_ai.profiles.openai import OpenAIJsonSchemaTransformer, OpenAIModelProfile, openai_model_profile
+from pydantic_ai.profiles.openai import (
+    OpenAIJsonSchemaTransformer,
+    OpenAIModelProfile,
+    openai_model_profile,
+)
+from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.models import SmartDocument
-from app.utilities.async_utilities import function_event_loop_decorator
-from app.utilities.document_manager import DocumentManager
-from app.utilities.document_readers import extract_text_from_doc
-import asyncio
 from app.utilities.config import settings
+from app.utilities.document_manager import DocumentManager
 from app.utilities.llm_helpers import remove_code_markers
-
 
 load_dotenv()
 
@@ -45,9 +42,9 @@ if langfuse_enabled:
     langfuse = Langfuse()
 
 
-
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
+
     @property
     def base_url(self) -> str:
         return "https://mindrouter-api.nkn.uidaho.edu/v1"
@@ -71,17 +68,15 @@ def get_agent_model(agent_model):
             model_name=model_name,
         )
     return OpenAIModel(
-        model_name=agent_model,
-        provider=InsightAIProvider(api_key='no-api-key')
+        model_name=agent_model, provider=InsightAIProvider(api_key="no-api-key")
     )
+
 
 @dataclass
 class RagDeps:
     doc_manager: DocumentManager
     user_id: str
     documents: list[SmartDocument]
-
-
 
 
 def create_rag_agent(agent_model):
@@ -186,6 +181,7 @@ def create_upload_agent(agent_model):
         result_type=UploadResult,
     )
 
+
 upload_agent = create_upload_agent(settings.base_model)
 
 rag_agent = create_rag_agent(settings.base_model)
@@ -193,6 +189,7 @@ rag_agent = create_rag_agent(settings.base_model)
 prompt_agent = create_prompt_agent(settings.base_model)
 
 # TODO maybe add an indicator to the UI to show that the response was drawn from the vector store or not
+
 
 @rag_agent.tool
 def retrieve(
@@ -264,7 +261,6 @@ def retrieve(
             content += f"Document title: {result['metadata'].get('document_name')}\n"
         content += f"Document content: {result['content']}\n\n"
     return content
-
 
 
 @dataclass
@@ -485,7 +481,9 @@ def filter_empty_entities(result: dict) -> list:
 
 
 # @observe()
-def extract_entities_with_agent(text: str, keys: list[str], context: str = "", model_name: str = settings.base_model) -> list:
+def extract_entities_with_agent(
+    text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
+) -> list:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
@@ -539,7 +537,8 @@ def extract_entities_with_agent(text: str, keys: list[str], context: str = "", m
                 deps=field_inference_deps,
             )
         )
-        new_fields = remove_code_markers(result.output)
+        if isinstance(result.output, str):
+            new_fields = remove_code_markers(result.output)
 
         debug(new_fields)
 
