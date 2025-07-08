@@ -1,17 +1,13 @@
 #!/usr/bin/env python3
 
-import json
-from typing import Any
 import re
 
 # from langfuse.decorators import observe
-import chardet
 import tiktoken
-from pydantic import BaseModel, ValidationError
+from devtools import debug
 
-from app.utilities.config import settings
 
-def remove_base64_images(text: str, replacement='') -> str:
+def remove_base64_images(text: str, replacement="") -> str:
     """
     Remove base64-encoded images from text and replace with placeholder.
     This prevents sending large image data to the LLM.
@@ -21,11 +17,11 @@ def remove_base64_images(text: str, replacement='') -> str:
         # HTML img tags with base64
         r'<img[^>]*src=["\']\s*data:image/[^;]+;base64,[A-Za-z0-9+/=]+["\'"][^>]*>',
         # Markdown images with base64
-        r'!\[[^\]]*\]\(data:image/[^;]+;base64,[A-Za-z0-9+/=]+\)',
+        r"!\[[^\]]*\]\(data:image/[^;]+;base64,[A-Za-z0-9+/=]+\)",
         # Raw base64 image data
-        r'data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}',
+        r"data:image/[^;]+;base64,[A-Za-z0-9+/=]{100,}",
         # Base64 strings that look like images (very long base64 sequences)
-        r'[A-Za-z0-9+/=]{1000,}'
+        r"[A-Za-z0-9+/=]{1000,}",
     ]
 
     result = text
@@ -33,6 +29,7 @@ def remove_base64_images(text: str, replacement='') -> str:
         result = re.sub(pattern, replacement, result)
 
     return result
+
 
 def remove_xml_content(text: str, tag: str) -> str:
     """Removes XML content from a string based on the specified tag.
@@ -50,9 +47,8 @@ def remove_xml_content(text: str, tag: str) -> str:
     end_index = text.find(end_tag, start_index)
 
     if start_index != -1 and end_index != -1:
-        return text[:start_index] + text[end_index + len(end_tag):]
+        return text[:start_index] + text[end_index + len(end_tag) :]
     return text.strip()
-
 
 
 def remove_code_markers(text: str) -> str:
@@ -66,6 +62,7 @@ def remove_code_markers(text: str) -> str:
 
     """
     # Split the text into lines
+    debug(f"Removing code markers {text}")
     lines = text.split("\n")
     formatted_lines = []
 
