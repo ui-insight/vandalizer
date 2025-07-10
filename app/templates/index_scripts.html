@@ -9,98 +9,7 @@
     let runStepResolve = null;
     let animationInProgress = false;
 
-    const steps = [
-        {
-            title: "Processing document",
-            messages: ["Reading layout…", "Extracting text…", "Perfoming OCR…"],
-            duration: 5000
-        },
-        {
-            title: "Performing security check",
-            messages: ["Analyzing document content…", "Searching for private information…", "Scanning for compliance…"],
-            duration: 4000
-        },
-        {
-            title: "Preparing document for AI",
-            messages: ["Getting ready…", "Summarizing validation checks…"],
-            duration: 2500
-        },
-        {
-            title: "Done!",
-            messages: ["All set ✅"],
-            duration: 1500
-        }
-    ];
-    const root_container = document.querySelector(".loading-event-progress-container");
-    const container = document.getElementById("loading-event-progress");
-    const titleEl = document.getElementById("loading-event-title");
-    const messageEl = document.getElementById("loading-event-message");
-    const progressEl = document.querySelector(".loading-progress-fill");
-    // hide the root_container initially(display none)
-    root_container.style.display = "none";
-
-    async function advanceStep(statusMessages = []) {
-        if (animationStepIndex >= steps.length) return;
-
-        animationInProgress = true;
-        const { title, messages, duration } = steps[animationStepIndex];
-        titleEl.textContent = title;
-        messageEl.textContent = "";
-        progressEl.style.width = "0%";
-
-        let animationMessages = statusMessages.length > 0 ? statusMessages : messages;
-
-        // Cycle through messages
-        let msgIdx = 0;
-        const msgInterval = setInterval(() => {
-            messageEl.textContent = messages[msgIdx % animationMessages.length];
-            msgIdx++;
-        }, duration / animationMessages.length);
-
-        // Animate fill
-        await new Promise(res => {
-            progressEl.style.transition = `width ${duration}ms linear`;
-            requestAnimationFrame(() => {
-                progressEl.style.width = "100%";
-            });
-            setTimeout(() => {
-                clearInterval(msgInterval);
-                res();
-            }, duration);
-        });
-
-        // Fade out before next
-        await new Promise(res => {
-            container.classList.remove("fade-in");
-            container.classList.add("fade-out");
-            setTimeout(() => {
-                container.classList.remove("fade-out");
-                container.classList.add("fade-in");
-                res();
-            }, 500);
-        });
-
-        animationStepIndex++;
-
-        // If at the last stage, fade out after 1s
-        if (animationStepIndex === steps.length) {
-            setTimeout(() => container.classList.add("fade-out"), 1000);
-            animationInProgress = false;
-        }
-    }
-
-    // Call to start the animations from step 0
-    function startProcessingAnimation() {
-        animationStepIndex = 0;
-        // show the root_container
-        root_container.style.display = "block";
-        root_container.classList.remove("fade-out");
-        root_container.classList.add("fade-in");
-        container.classList.remove('fade-out');
-        container.classList.add("fade-in");
-
-        advanceStep(); // Start first step (will progress as you call more advanceStep)
-    }
+    const docLoaderProgressHandler = new ProgressLoader('.loading-event-progress-container');
 
 
     {% if (documents != None) and documents | length > 0 %}
@@ -658,36 +567,45 @@
     var pollTimeout = null;
     var pollingActive = true;
 
-    let lastKnownProcessingStage = null;
+    function updateStatusPanelForPolling(data) {
+        console.log("Polling data for panel update:", data); // Debugging line
+        docLoaderProgressHandler.show();
+        let currentStage;
+        if (!data.complete) {
+            if (data.status === "layout" || data.status === "ocr") {
+                currentStage = 0;
+                docLoaderProgressHandler.setMessage('Preparing Document', 'Reading layout...');
+            }
+            else if (data.status === "security") {
+                currentStage = 1;                   // Security check
+                docLoaderProgressHandler.setMessage('Security Check', 'Checking for any sensitive data...');
+            }
+            else if (data.status === "readying") {
+                currentStage = 2;                   // Preparing AI
+                docLoaderProgressHandler.markCompleted();
+            } else if (data.status === "completed") {
+                docLoaderProgressHandler.markCompleted();
+            }
+            else currentStage = 0;                                                  // Default fallback
+        } else {
+            currentStage = 3; // Done!
+            docLoaderProgressHandler.hide();
+        }
+
+        if (currentStage != docLoaderProgressHandler.itemidentifier) {
+            docLoaderProgressHandler.setProgress(5);
+            docLoaderProgressHandler.itemidentifier = currentStage;
+        } else {
+            docLoaderProgressHandler.incrementProgress(5);
+        }
+    }
+
     function pollStatus(docUuid) {
         if (!pollingActive) return;
 
         $.get('/files/poll_status', { docid: docUuid }, function (data) {
-
+            updateStatusPanelForPolling(data);
             console.log("Polling status for document: ", data.status);
-
-            let currentStage;
-            if (!data.complete) {
-                if (data.status === "layout" || data.status === "ocr") currentStage = 0; // Processing document
-                else if (data.status === "security") currentStage = 1;                   // Security check
-                else if (data.status === "readying") currentStage = 2;                   // Preparing AI
-                else currentStage = 0;                                                  // Default fallback
-            } else {
-                currentStage = 3; // Done!
-            }
-
-            if (data.status === "complete" || data.status === "error") {
-                currentStage = 3; // Force to done stage if complete or error
-            }
-
-            // Only advance the animation if we enter a new stage
-            if (currentStage !== lastKnownProcessingStage) {
-                if (animationStepIndex <= currentStage && animationStepIndex < steps.length) {
-                    const statusMessages = data.status_messages || [];
-                    advanceStep(statusMessages);
-                }
-                lastKnownProcessingStage = currentStage;
-            }
 
             if (data.complete) {
 
@@ -719,10 +637,7 @@
                     // Reset animation step index
                     animationStepIndex = 0;
                     // Reset the container to its initial state
-                    container.classList.remove("fade-out");
-                    container.classList.add("fade-in");
-                    // Hide the loading event progress container
-                    root_container.style.display = "none";
+                    docLoaderProgressHandler.hide();
                     // Refresh the page to get the latest document
                     window.location.reload();
                 }, 10000);
@@ -765,7 +680,6 @@
                 // Hide regular content
                 $('#raw-text-icon').hide();
 
-                startProcessingAnimation();
                 // Start polling
                 pollStatus(docUuid);
             } else {
@@ -783,7 +697,7 @@
 
         $('.tasks-close-button').off('click').on('click', function (e) {
             e.preventDefault();
-            setSection("Chat");
+            setSection("Assistant");
             $("#tasks-panel").hide();
         });
 
@@ -927,7 +841,13 @@
 
                 $.get("/files/poll_status", { docid: uuid })
                     .done(function (resp) {
+                        updateStatusPanelForPolling(resp);
+
                         if (resp.complete) {
+                            if (resp.valid == false) {
+                                location.reload();
+                            }
+
                             // remove the spinner
                             $loader.remove();
 
