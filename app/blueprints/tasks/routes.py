@@ -57,6 +57,7 @@ def filter_models() -> ResponseReturnValue:
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
 
     current_model = settings.base_model
+    print(current_model)
     models = settings_models
     if len(uuids) == 0:
         if model_config:
@@ -73,6 +74,8 @@ def filter_models() -> ResponseReturnValue:
         models = [m for m in model_config.available_models if not m.get("external")]
         debug(models)
         current_model = "qwen3:32b"
+    elif model_config:
+        current_model = model_config.name
 
     return jsonify({"models": models, "current_model": current_model})
 
