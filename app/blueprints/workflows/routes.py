@@ -182,6 +182,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     # Ingest workflow into vector database for future recommendations
     workflow_ingestion_task.delay(
+        docs,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
         user_id=user_id,
