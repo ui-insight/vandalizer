@@ -12,6 +12,7 @@ class ProgressLoader {
     // DOM element references
     this.messageEl = this.rootContainer.querySelector("#loading-event-title");
     this.subMessageEl = this.rootContainer.querySelector("#loading-event-message");
+    this.loadingIcon = this.rootContainer.querySelector("#loading-event-icon");
     this.progressFillEl = this.rootContainer.querySelector(".loading-progress-fill");
     this.progressBarEl = this.rootContainer.querySelector(".loading-progress-bar");
 
@@ -27,6 +28,40 @@ class ProgressLoader {
     this.rootContainer.style.display = "block";
     this.rootContainer.classList.remove("fade-out");
     this.rootContainer.classList.add("fade-in");
+  }
+
+  hideProgressBar() {
+    this.progressBarEl.style.display = "none";
+    this.progressFillEl.style.display = "none";
+  }
+
+  showDefaultMessage() {
+    this.loadingIcon.classList = "fa-solid fa-file-import";
+    this.messageEl.textContent = "Ready to roll with AI?";
+    this.subMessageEl.textContent = "Just add or select a document to begin."
+    this.hideProgressBar();
+  }
+
+  showOCRMessage() {
+    this.loadingIcon.classList = "fa-solid fa-cogs fa-spin";
+    this.messageEl.textContent = "Running OCR on Your Document…";
+    this.subMessageEl.textContent = "Please hold tight—we’re extracting text right now."
+    this.hideProgressBar();
+  }
+
+  showSecurityMessage() {
+    this.loadingIcon.classList = "fa-solid fa-shield-alt fa-spin";
+    this.messageEl.textContent = "Scanning Your Document for Security…";
+    this.subMessageEl.textContent = "Please hang tight—we’re checking for any sensitive information we need to keep safe."
+    this.hideProgressBar();
+  }
+
+  showRecommendationMessage() {
+    
+    this.loadingIcon.classList = "fa-solid fa-tasks fa-spin";
+    this.messageEl.textContent = "Finding Recommended Tasks & Workflows…";
+    this.subMessageEl.textContent = "Hang tight—we’re analyzing your document to surface the best next steps."
+    this.hideProgressBar();
   }
 
   /**

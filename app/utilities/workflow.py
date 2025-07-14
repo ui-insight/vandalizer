@@ -6,7 +6,6 @@ import json
 import multiprocessing
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
 from pathlib import Path
 from threading import Thread
 from typing import Any, Dict, List, NoReturn
@@ -625,24 +624,11 @@ class WorkflowManager:
                 }
                 doc_context.append(doc_info)
 
-        # Extract workflow steps context
-        steps_context = []
-        for step in workflow.steps:
-            step_info = {"name": step.name, "data": step.data or {}, "tasks": []}
-
-            # Extract task information
-            for task in step.tasks:
-                task_info = {"name": task.name, "data": task.data}
-                step_info["tasks"].append(task_info)
-
-            steps_context.append(step_info)
-
         return {
             "workflow_id": str(workflow.id),
             "workflow_name": workflow.name,
             "workflow_description": workflow.description or "",
             "trigger_documents": doc_context,
-            "workflow_steps": steps_context,
             "user_id": workflow.user_id,
             "space": workflow.space or "",
             "num_executions": workflow.num_executions,
@@ -693,65 +679,68 @@ class WorkflowManager:
 
         return "\n".join(text_parts)
 
-    def ingest_workflow(
-        self, workflow_id: str, workflow_trigger_step_id: str, user_id: str = None
-    ) -> Dict[str, Any]:
-        """Ingest a workflow into the vector store for search and retrieval."""
-        print("Ingesting workflow")
-
+    def ingest_workflow(self, workflow_id: str, ingestion_text: str) -> Dict[str, Any]:
+        """Ingest (or upsert) a workflow into the vector store, averaging embeddings on each run."""
         try:
             workflow = Workflow.objects(id=workflow_id).first()
             if not workflow:
                 return {"status": "error", "error": "Workflow not found"}
 
-            workflow_trigger_step = WorkflowStep.objects(
-                id=workflow_trigger_step_id
-            ).first()
-            if not workflow_trigger_step:
-                return {"status": "error", "error": "Workflow trigger step not found"}
+            new_embedding = self.embeddings.embed_query(ingestion_text)
+            doc_id = f"{workflow_id}"
 
-            # Extract workflow context
-            context = self._extract_workflow_context(workflow, workflow_trigger_step)
-
-            # Create searchable text
-            searchable_text = self._create_searchable_text(context)
-            debug(f"SEARCHABLE TEXT FOR INGESTION: {searchable_text}")
-
-            # Generate embedding
-            embedding = self.embeddings.embed_query(searchable_text)
-
-            # Create unique ID for this workflow execution
-            document_id = (
-                f"{workflow_id}_{workflow_trigger_step_id}_{datetime.now().isoformat()}"
+            # 1) Fetch any existing record
+            existing = self.collection.get(
+                ids=[doc_id], include=["embeddings", "metadatas"]
             )
 
-            # Store in vector database
-            self.collection.add(
-                embeddings=[embedding],
-                documents=[searchable_text],
-                metadatas=[
-                    {
-                        "workflow_id": workflow_id,
-                        "workflow_trigger_step_id": workflow_trigger_step_id,
-                        "workflow_name": workflow.name,
-                        "user_id": workflow.user_id,
-                        "space": workflow.space or "",
-                        "num_executions": workflow.num_executions,
-                        "created_at": context["created_at"],
-                        "ingested_at": datetime.now().isoformat(),
-                        "context": json.dumps(context),
-                    }
-                ],
-                ids=[document_id],
-            )
+            # 2) Decide: update vs. add
+            if existing.get("ids"):
+                # We have an old record → average embeddings
+                old_embed = existing["embeddings"][0]
+                meta = existing["metadatas"][0] or {}
+                old_count = meta.get("num_executions", 1)
 
-            print("INGESTED WORKFLOW")
+                new_count = old_count + 1
+                avg_embed = [
+                    (oe * old_count + ne) / new_count
+                    for oe, ne in zip(old_embed, new_embedding)
+                ]
+
+                updated_meta = {
+                    **meta,
+                    "num_executions": new_count,
+                }
+
+                self.collection.update(
+                    ids=[doc_id],
+                    embeddings=[avg_embed],
+                    documents=[ingestion_text],
+                    metadatas=[updated_meta],
+                )
+
+            else:
+                # No existing record → add fresh
+                new_count = 1
+                initial_meta = {
+                    "workflow_id": workflow_id,
+                    "workflow_name": workflow.name,
+                    "user_id": workflow.user_id,
+                    "space": workflow.space or "",
+                    "num_executions": new_count,
+                }
+                self.collection.add(
+                    embeddings=[new_embedding],
+                    documents=[ingestion_text],
+                    metadatas=[initial_meta],
+                    ids=[doc_id],
+                )
 
             return {
                 "status": "success",
-                "document_id": document_id,
+                "document_id": doc_id,
                 "workflow_id": workflow_id,
-                "message": f"Successfully ingested workflow '{workflow.name}'",
+                "message": f"Upserted workflow '{workflow.name}', run #{new_count}",
             }
 
         except Exception as e:
@@ -766,16 +755,18 @@ class WorkflowManager:
     ) -> List[Dict[str, Any]]:
         """Search for workflow recommendations based on selected documents."""
 
+        min_similarity = 0.9
+
         try:
             # Create search context from selected documents
-            search_parts = ""
-            search_parts.append("Documents selected:")
+            search_text = ""
+            search_text += "Documents selected:"
+
+            print("Number of items in chroma database: ")
+            print(self.collection.count())
 
             for doc in selected_documents:
-                search_parts += f"\n{doc.raw_text}"
-
-            search_text = "\n".join(search_parts)
-            debug(f"SEARCH TEXT FOR RECOMMENDATION {search_text}")
+                search_text += f"\n{doc.raw_text}"
 
             # Generate embedding for search
             search_embedding = self.embeddings.embed_query(search_text)
@@ -801,22 +792,20 @@ class WorkflowManager:
                     metadata = results["metadatas"][0][i]
                     distance = results["distances"][0][i]
                     similarity_score = 1 - distance  # Convert distance to similarity
-
+                    debug(f"Similarity score for document {doc_id}: {similarity_score}")
+                    if similarity_score < min_similarity:
+                        continue
                     # Parse context from metadata
                     context = json.loads(metadata.get("context", "{}"))
 
                     recommendation = {
                         "workflow_id": metadata["workflow_id"],
-                        "workflow_name": metadata["workflow_name"],
                         "similarity_score": similarity_score,
                         "user_id": metadata["user_id"],
                         "space": metadata.get("space", ""),
                         "num_executions": metadata.get("num_executions", 0),
                         "created_at": metadata.get("created_at"),
                         "context": context,
-                        "reason": self._generate_recommendation_reason(
-                            context, selected_documents
-                        ),
                     }
                     recommendations.append(recommendation)
 
@@ -827,44 +816,9 @@ class WorkflowManager:
             print(f"Error searching workflow recommendations: {str(e)}")
             return []
 
-    def _generate_recommendation_reason(
-        self, workflow_context: Dict, selected_docs: List[SmartDocument]
-    ) -> str:
-        """Generate a human-readable reason for the recommendation."""
-
-        reasons = []
-
-        # Check document type similarity
-        selected_types = set(
-            getattr(doc, "document_type", "unknown") for doc in selected_docs
-        )
-        workflow_doc_types = set()
-
-        for doc in workflow_context.get("trigger_documents", []):
-            workflow_doc_types.add(doc.get("document_type", "unknown"))
-
-        common_types = selected_types.intersection(workflow_doc_types)
-        if common_types:
-            reasons.append(f"Similar document types: {', '.join(common_types)}")
-
-        # Check for similar workflow steps
-        workflow_steps = workflow_context.get("workflow_steps", [])
-        if workflow_steps:
-            step_names = [step["name"] for step in workflow_steps[:3]]  # First 3 steps
-            reasons.append(f"Workflow includes: {', '.join(step_names)}")
-
-        # Check execution popularity
-        num_executions = workflow_context.get("num_executions", 0)
-        if num_executions > 0:
-            reasons.append(f"Successfully executed {num_executions} times")
-
-        return "; ".join(reasons) if reasons else "Similar workflow pattern detected"
-
 
 @celery_app.task(name="workflow.ingestion")
-def workflow_ingestion_task(
-    workflow_id: str, workflow_trigger_step_id: str, user_id: str = None
-) -> Dict[str, Any]:
+def workflow_ingestion_task(workflow_id: str, ingestion_text: str) -> Dict[str, Any]:
     """Celery task to ingest workflow into vector database."""
 
     try:
@@ -875,8 +829,7 @@ def workflow_ingestion_task(
         # Ingest workflow
         result = workflow_manager.ingest_workflow(
             workflow_id=workflow_id,
-            workflow_trigger_step_id=workflow_trigger_step_id,
-            user_id=user_id,
+            ingestion_text=ingestion_text,
         )
 
         print(f"Workflow ingestion task completed: {result}")

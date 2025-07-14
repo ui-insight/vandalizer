@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import time
 import uuid
 from itertools import chain
 
@@ -181,11 +182,15 @@ def run_workflow() -> ResponseReturnValue:
         model=model,
     )
     # Ingest workflow into vector database for future recommendations
+    ingestion_text = ""
+    ingestion_text += "Documents selected:"
+
+    for doc in docs:
+        ingestion_text += f"\n{doc.raw_text}"
+
     workflow_ingestion_task.delay(
-        docs,
         workflow_id=workflow_id,
-        workflow_trigger_step_id=workflow_trigger_step_id,
-        user_id=user_id,
+        ingestion_text=ingestion_text,
     )
     return jsonify(
         {
@@ -236,8 +241,26 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         recommendations = workflow_manager.search_workflow_recommendations(
             selected_documents=documents, user_id=user_id, space=space, limit=limit
         )
+        time.sleep(3)
 
-        return jsonify({"recommendations": recommendations}), 200
+        templates = []
+        recommended_workflows = []
+        for recommendation in recommendations:
+            workflow_id = recommendation["workflow_id"]
+            workflow = Workflow.objects(id=workflow_id).first()
+            if workflow and (workflow not in recommended_workflows):
+                recommended_workflows.append(workflow)
+
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-workflow.html",
+                    workflow=workflow,
+                    user=user,
+                )
+                templates.append(template)
+
+        print(recommendations)
+
+        return jsonify({"templates": templates}), 200
 
     except Exception as e:
         return jsonify({"error": str(e), "recommendations": []}), 500
