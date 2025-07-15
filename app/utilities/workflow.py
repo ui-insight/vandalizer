@@ -1,27 +1,21 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
-from datetime import datetime
-import json
-from typing import Dict, Any, List
 import asyncio
 import graphlib
 import json
 import multiprocessing
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from threading import Thread
-from typing import NoReturn
+from typing import Any, Dict, List, NoReturn
 
 import chromadb
 from chromadb.config import Settings
 from devtools import debug
-from langchain_chroma.vectorstores import Chroma
-from langchain_openai import OpenAIEmbeddings
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-
-from devtools import debug
 from dotenv import load_dotenv
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 
 from app import app
 from app.celery_worker import celery_app
@@ -587,7 +581,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
     return engine
 
 
-
 class WorkflowManager:
     def __init__(self, persist_directory=None) -> None:
         self.persist_directory = persist_directory
@@ -609,11 +602,12 @@ class WorkflowManager:
             self.collection = self.client.get_collection(self.collection_name)
         except:
             self.collection = self.client.create_collection(
-                name=self.collection_name,
-                metadata={"hnsw:space": "cosine"}
+                name=self.collection_name, metadata={"hnsw:space": "cosine"}
             )
 
-    def _extract_workflow_context(self, workflow: Workflow, workflow_trigger_step: WorkflowStep) -> Dict[str, Any]:
+    def _extract_workflow_context(
+        self, workflow: Workflow, workflow_trigger_step: WorkflowStep
+    ) -> Dict[str, Any]:
         """Extract comprehensive context from workflow and trigger step for embedding."""
 
         # Extract document context from trigger step
@@ -621,44 +615,26 @@ class WorkflowManager:
         doc_context = []
 
         for doc in trigger_docs:
-            if hasattr(doc, 'title') and hasattr(doc, 'content'):
+            if hasattr(doc, "title") and hasattr(doc, "content"):
                 doc_info = {
                     "title": doc.title,
                     "content_preview": doc.content[:500] if doc.content else "",
-                    "document_type": getattr(doc, 'document_type', 'unknown'),
-                    "tags": getattr(doc, 'tags', [])
+                    "document_type": getattr(doc, "document_type", "unknown"),
+                    "tags": getattr(doc, "tags", []),
                 }
                 doc_context.append(doc_info)
-
-        # Extract workflow steps context
-        steps_context = []
-        for step in workflow.steps:
-            step_info = {
-                "name": step.name,
-                "data": step.data or {},
-                "tasks": []
-            }
-
-            # Extract task information
-            for task in step.tasks:
-                task_info = {
-                    "name": task.name,
-                    "data": task.data
-                }
-                step_info["tasks"].append(task_info)
-
-            steps_context.append(step_info)
 
         return {
             "workflow_id": str(workflow.id),
             "workflow_name": workflow.name,
             "workflow_description": workflow.description or "",
             "trigger_documents": doc_context,
-            "workflow_steps": steps_context,
             "user_id": workflow.user_id,
             "space": workflow.space or "",
             "num_executions": workflow.num_executions,
-            "created_at": workflow.created_at.isoformat() if workflow.created_at else None
+            "created_at": workflow.created_at.isoformat()
+            if workflow.created_at
+            else None,
         }
 
     def _create_searchable_text(self, context: Dict[str, Any]) -> str:
@@ -668,88 +644,103 @@ class WorkflowManager:
 
         # Workflow metadata
         text_parts.append(f"Workflow: {context['workflow_name']}")
-        if context['workflow_description']:
+        if context["workflow_description"]:
             text_parts.append(f"Description: {context['workflow_description']}")
 
         # Document context
-        if context['trigger_documents']:
+        if context["trigger_documents"]:
             text_parts.append("Document Types:")
-            for doc in context['trigger_documents']:
+            for doc in context["trigger_documents"]:
                 text_parts.append(f"- {doc['title']} ({doc['document_type']})")
-                if doc['content_preview']:
+                if doc["content_preview"]:
                     text_parts.append(f"  Content: {doc['content_preview']}")
-                if doc['tags']:
+                if doc["tags"]:
                     text_parts.append(f"  Tags: {', '.join(doc['tags'])}")
 
         # Workflow steps
-        if context['workflow_steps']:
+        if context["workflow_steps"]:
             text_parts.append("Workflow Steps:")
-            for i, step in enumerate(context['workflow_steps'], 1):
+            for i, step in enumerate(context["workflow_steps"], 1):
                 text_parts.append(f"{i}. {step['name']}")
 
                 # Add step data context
-                if step['data']:
-                    for key, value in step['data'].items():
+                if step["data"]:
+                    for key, value in step["data"].items():
                         if isinstance(value, (str, int, float, bool)):
                             text_parts.append(f"   {key}: {value}")
 
                 # Add task context
-                for task in step['tasks']:
+                for task in step["tasks"]:
                     text_parts.append(f"   Task: {task['name']}")
-                    if task['data']:
-                        for key, value in task['data'].items():
+                    if task["data"]:
+                        for key, value in task["data"].items():
                             if isinstance(value, (str, int, float, bool)):
                                 text_parts.append(f"     {key}: {value}")
 
         return "\n".join(text_parts)
 
-    def ingest_workflow(self, workflow_id: str, workflow_trigger_step_id: str, user_id: str = None) -> Dict[str, Any]:
-        """Ingest a workflow into the vector store for search and retrieval."""
-
+    def ingest_workflow(self, workflow_id: str, ingestion_text: str) -> Dict[str, Any]:
+        """Ingest (or upsert) a workflow into the vector store, averaging embeddings on each run."""
         try:
             workflow = Workflow.objects(id=workflow_id).first()
             if not workflow:
                 return {"status": "error", "error": "Workflow not found"}
 
-            workflow_trigger_step = WorkflowStep.objects(id=workflow_trigger_step_id).first()
-            if not workflow_trigger_step:
-                return {"status": "error", "error": "Workflow trigger step not found"}
+            new_embedding = self.embeddings.embed_query(ingestion_text)
+            doc_id = f"{workflow_id}"
 
-            # Extract workflow context
-            context = self._extract_workflow_context(workflow, workflow_trigger_step)
+            # 1) Fetch any existing record
+            existing = self.collection.get(
+                ids=[doc_id], include=["embeddings", "metadatas"]
+            )
 
-            # Create searchable text
-            searchable_text = self._create_searchable_text(context)
+            # 2) Decide: update vs. add
+            if existing.get("ids"):
+                # We have an old record → average embeddings
+                old_embed = existing["embeddings"][0]
+                meta = existing["metadatas"][0] or {}
+                old_count = meta.get("num_executions", 1)
 
-            # Generate embedding
-            embedding = self.embeddings.embed_query(searchable_text)
+                new_count = old_count + 1
+                avg_embed = [
+                    (oe * old_count + ne) / new_count
+                    for oe, ne in zip(old_embed, new_embedding)
+                ]
 
-            # Create unique ID for this workflow execution
-            document_id = f"{workflow_id}_{workflow_trigger_step_id}_{datetime.now().isoformat()}"
+                updated_meta = {
+                    **meta,
+                    "num_executions": new_count,
+                }
 
-            # Store in vector database
-            self.collection.add(
-                embeddings=[embedding],
-                documents=[searchable_text],
-                metadatas=[{
+                self.collection.update(
+                    ids=[doc_id],
+                    embeddings=[avg_embed],
+                    documents=[ingestion_text],
+                    metadatas=[updated_meta],
+                )
+
+            else:
+                # No existing record → add fresh
+                new_count = 1
+                initial_meta = {
                     "workflow_id": workflow_id,
-                    "workflow_trigger_step_id": workflow_trigger_step_id,
                     "workflow_name": workflow.name,
                     "user_id": workflow.user_id,
                     "space": workflow.space or "",
-                    "num_executions": workflow.num_executions,
-                    "created_at": context["created_at"],
-                    "ingested_at": datetime.now().isoformat(),
-                    "context": json.dumps(context)
-                }],
-                ids=[document_id]
-            )
+                    "num_executions": new_count,
+                }
+                self.collection.add(
+                    embeddings=[new_embedding],
+                    documents=[ingestion_text],
+                    metadatas=[initial_meta],
+                    ids=[doc_id],
+                )
 
             return {
                 "status": "success",
-                "document_id": document_id,
+                "document_id": doc_id,
                 "workflow_id": workflow_id,
-                "message": f"Successfully ingested workflow '{workflow.name}'"
+                "message": f"Upserted workflow '{workflow.name}', run #{new_count}",
             }
 
         except Exception as e:
@@ -760,41 +751,39 @@ class WorkflowManager:
         selected_documents: List[SmartDocument],
         user_id: str = None,
         space: str = None,
-        limit: int = 5
+        limit: int = 5,
     ) -> List[Dict[str, Any]]:
         """Search for workflow recommendations based on selected documents."""
 
+        min_similarity = 0.9
+
         try:
             # Create search context from selected documents
-            search_parts = []
-            search_parts.append("Documents selected:")
+            search_text = ""
+            search_text += "Documents selected:"
+
+            print("Number of items in chroma database: ")
+            print(self.collection.count())
 
             for doc in selected_documents:
-                search_parts.append(f"- {doc.title}")
-                search_parts.append(f"  Type: {getattr(doc, 'document_type', 'unknown')}")
-                if hasattr(doc, 'content') and doc.content:
-                    search_parts.append(f"  Content preview: {doc.content[:300]}")
-                if hasattr(doc, 'tags') and doc.tags:
-                    search_parts.append(f"  Tags: {', '.join(doc.tags)}")
-
-            search_text = "\n".join(search_parts)
+                search_text += f"\n{doc.raw_text}"
 
             # Generate embedding for search
             search_embedding = self.embeddings.embed_query(search_text)
 
             # Build query filters
             where_filters = {}
-            if user_id:
-                where_filters["user_id"] = user_id
-            if space:
-                where_filters["space"] = space
+            # if user_id:
+            #     where_filters["user_id"] = user_id
+            # if space:
+            #     where_filters["space"] = space
 
             # Search vector database
             results = self.collection.query(
                 query_embeddings=[search_embedding],
                 n_results=limit,
                 where=where_filters if where_filters else None,
-                include=["metadatas", "documents", "distances"]
+                include=["metadatas", "documents", "distances"],
             )
 
             recommendations = []
@@ -803,63 +792,35 @@ class WorkflowManager:
                     metadata = results["metadatas"][0][i]
                     distance = results["distances"][0][i]
                     similarity_score = 1 - distance  # Convert distance to similarity
-
+                    debug(f"Similarity score for document {doc_id}: {similarity_score}")
+                    if similarity_score < min_similarity:
+                        continue
                     # Parse context from metadata
                     context = json.loads(metadata.get("context", "{}"))
 
                     recommendation = {
                         "workflow_id": metadata["workflow_id"],
-                        "workflow_name": metadata["workflow_name"],
                         "similarity_score": similarity_score,
                         "user_id": metadata["user_id"],
                         "space": metadata.get("space", ""),
                         "num_executions": metadata.get("num_executions", 0),
                         "created_at": metadata.get("created_at"),
                         "context": context,
-                        "reason": self._generate_recommendation_reason(context, selected_documents)
                     }
                     recommendations.append(recommendation)
 
+            print(recommendations)
             return recommendations
 
         except Exception as e:
             print(f"Error searching workflow recommendations: {str(e)}")
             return []
 
-    def _generate_recommendation_reason(self, workflow_context: Dict, selected_docs: List[SmartDocument]) -> str:
-        """Generate a human-readable reason for the recommendation."""
-
-        reasons = []
-
-        # Check document type similarity
-        selected_types = set(getattr(doc, 'document_type', 'unknown') for doc in selected_docs)
-        workflow_doc_types = set()
-
-        for doc in workflow_context.get("trigger_documents", []):
-            workflow_doc_types.add(doc.get("document_type", "unknown"))
-
-        common_types = selected_types.intersection(workflow_doc_types)
-        if common_types:
-            reasons.append(f"Similar document types: {', '.join(common_types)}")
-
-        # Check for similar workflow steps
-        workflow_steps = workflow_context.get("workflow_steps", [])
-        if workflow_steps:
-            step_names = [step["name"] for step in workflow_steps[:3]]  # First 3 steps
-            reasons.append(f"Workflow includes: {', '.join(step_names)}")
-
-        # Check execution popularity
-        num_executions = workflow_context.get("num_executions", 0)
-        if num_executions > 0:
-            reasons.append(f"Successfully executed {num_executions} times")
-
-        return "; ".join(reasons) if reasons else "Similar workflow pattern detected"
-
 
 @celery_app.task(name="workflow.ingestion")
-def workflow_ingestion_task(workflow_id: str, workflow_trigger_step_id: str, user_id: str = None) -> Dict[str, Any]:
+def workflow_ingestion_task(workflow_id: str, ingestion_text: str) -> Dict[str, Any]:
     """Celery task to ingest workflow into vector database."""
-    
+
     try:
         # Initialize workflow manager
         persist_directory = Path("data/workflows_vectordb")  # Configure as needed
@@ -868,8 +829,7 @@ def workflow_ingestion_task(workflow_id: str, workflow_trigger_step_id: str, use
         # Ingest workflow
         result = workflow_manager.ingest_workflow(
             workflow_id=workflow_id,
-            workflow_trigger_step_id=workflow_trigger_step_id,
-            user_id=user_id
+            ingestion_text=ingestion_text,
         )
 
         print(f"Workflow ingestion task completed: {result}")
@@ -879,7 +839,6 @@ def workflow_ingestion_task(workflow_id: str, workflow_trigger_step_id: str, use
         error_msg = f"Error in workflow ingestion task: {str(e)}"
         print(error_msg)
         return {"status": "error", "error": error_msg}
-
 
 
 @celery_app.task(bind=True, name="workflow.execute_workflow")

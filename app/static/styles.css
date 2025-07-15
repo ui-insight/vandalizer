@@ -1125,31 +1125,72 @@ textarea {
 }
 
 .loading-event-progress-container {
-    background-color: rgba(0, 0, 0, 0.05);
-    padding:10px 22px;
-      /* allow the content to expand vertically up to 80% of the viewport */
-  max-height: 300px;;    
-  /* let extra content scroll instead of clipping */
-  overflow-y: auto;    
-  /* if you want to prevent horizontal clipping as well: */
-  overflow-x: auto;    
-  padding: 1rem;       /* optional, to give some breathing room */
-  box-sizing: border-box;
-}
+    display: flex;
+    gap: 1rem;
+    align-items: stretch;
+  }
 
- /* container */
-#loading-event-progress {
+
+.loading-event-progress-content {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    padding: 2rem;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    color: #fff;
+    font-family: 'Montserrat', sans-serif;
     text-align: center;
-    font-family: sans-serif;
+    cursor: pointer;
+    transition: filter 0.3s ease;
+  }
+
+  .loading-event-progress-content::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%);
+    animation: rotateBG 32s linear infinite;
+  }
+
+  @keyframes rotateBG {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+
+  .loading-event-progress-content i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    animation: float 3s ease-in-out infinite;
+    z-index: 1;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50%     { transform: translateY(-10px); }
+  }
+
+  .loading-event-progress-content h2 {
+    font-size: 1.75rem;
+    margin: 0.5rem 0;
+    z-index: 1;
+  }
+
+  .loading-event-progress-content p {
+    font-size: 1rem;
+    opacity: 0.9;
+    z-index: 1;
+  }
+
+  .loading-event-progress-content:hover {
+    filter: brightness(1.05);
+  }
 
 
-}
 
-/* shimmer title */
-#loading-event-title {
-    font-size: 1.5rem;
-    margin-bottom: 0.5rem;
-}
 
 #loading-event-title.shimmer {
     background: linear-gradient(
@@ -1201,12 +1242,6 @@ textarea {
     transition: width 2s ease-in-out;
 }
 
-/* message text */
-#loading-event-message {
-    min-height: 1.2em;
-    font-size: 0.9rem;
-    color: #b8b8b8;
-}
 
 #loading-event-content {
     min-height: 1.2em;
@@ -1272,3 +1307,82 @@ textarea {
         border-style: solid;
         border-color: transparent transparent transparent #555;
     }
+
+
+    .gradient-border {
+    display: inline-block;
+    padding: 2px;                   /* thickness of the border */
+    border-radius: 12px;            /* rounds outer edge */
+    background: linear-gradient(
+      45deg,
+      #6a11cb,
+      #2575fc,
+      #ff00cc,
+      #00ffd1
+    );
+    background-size: 400% 400%;
+    animation:
+      gradientShift 6s ease infinite,
+      fadeInUp       0.6s ease forwards;
+    opacity: 0;
+    transform: translateY(10px);
+    margin: 1rem;
+  }
+
+  /* stagger if you want multiple cards */
+  .gradient-border.delay-1 { animation-delay: 0.1s; }
+  .gradient-border.delay-2 { animation-delay: 0.2s; }
+
+  @keyframes gradientShift {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0);     }
+  }
+
+  .recommendation-workflow-card {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border-radius: 10px;
+    padding: 15px 30px 15px 15px;
+    width: 100%;
+    box-sizing: border-box;
+    
+  }
+
+  .recommendation-workflow-card .icon {
+    font-size: 32px;
+    margin-right: 15px;
+    color: #6a11cb;
+  }
+
+  .recommendation-workflow-card .text {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+  }
+
+  .recommendation-workflow-card .type {
+    font-size: 10px;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+    color: #55555591;
+    text-transform: uppercase;
+  }
+
+  .recommendation-workflow-card .title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 0.25rem;
+  }
+  .recommendation-workflow-card .subtitle {
+    font-size: 14px;
+    color: #555;
+    margin: 0;
+  }
+
+  
