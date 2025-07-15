@@ -627,6 +627,8 @@
         } else {
             currentStage = 3; // Done!
             docLoaderProgressHandler.hide();
+            // refresh the page to get the latest document
+            window.location.reload();
         }
 
         if (currentStage != docLoaderProgressHandler.itemidentifier) {
