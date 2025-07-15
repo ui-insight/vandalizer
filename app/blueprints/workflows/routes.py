@@ -183,10 +183,21 @@ def run_workflow() -> ResponseReturnValue:
     )
     # Ingest workflow into vector database for future recommendations
     ingestion_text = ""
-    ingestion_text += "Documents selected:"
+    ingestion_text += "# Documents selected:"
 
     for doc in docs:
-        ingestion_text += f"\n{doc.raw_text}"
+        # takes a sample text from the document
+        if doc.raw_text:
+            sample_text = doc.raw_text
+            if len(sample_text) > 5000:
+                sample_text = sample_text[:5000]
+            ingestion_text += f"\nDocument: {doc.title} (UUID: {doc.uuid})\n{sample_text}"
+
+    ingestion_text += "\n# Workflow steps:"
+    for step in workflow.steps:
+        ingestion_text += f"\n- {step.name}"
+        for task in step.tasks:
+            ingestion_text += f"\n  - Task: {task.name} with data: {task.data}"
 
     workflow_ingestion_task.delay(
         workflow_id=workflow_id,
