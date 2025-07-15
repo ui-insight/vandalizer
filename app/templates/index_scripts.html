@@ -168,6 +168,19 @@
                     $('#recommendations-panel').append('<li>No recommendations available</li>');
                 }
 
+                $('#recommendation-task-card').on('click', function (e) {
+                    e.preventDefault();
+                    $("#tasks-panel").show();
+                    setSection("Tasks");
+                });
+
+                $('#recommendation-create-workflow-card').on('click', function (e) {
+                    e.preventDefault();
+                    setSection("Workflows");
+                    location.reload();
+
+                });
+
                 $('.workflow-recommendation-item').off("click").on("click", function () {
                     let uuid = $(this).attr("data-uuid");
 
@@ -292,9 +305,12 @@
             console.log("CHECKING TOTAL DOCS");
             if (totalDocs > 0) {
                 getWorkflowRecommendations(uuids);
+            } else {
+                $('#recommendations-panel').empty();
+                docLoaderProgressHandler.show();
+                docLoaderProgressHandler.showDefaultMessage();
             }
         }
-
 
 
         var contextLengthWarning = `

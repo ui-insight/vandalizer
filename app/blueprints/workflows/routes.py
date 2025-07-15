@@ -241,7 +241,7 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         recommendations = workflow_manager.search_workflow_recommendations(
             selected_documents=documents, user_id=user_id, space=space, limit=limit
         )
-        time.sleep(3)
+        time.sleep(1.5)
 
         templates = []
         recommended_workflows = []
@@ -259,6 +259,11 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                 templates.append(template)
 
         print(recommendations)
+        if len(recommendations) == 0:
+            template = render_template(
+                "toolpanel/recommendations/recommendations-none.html",
+            )
+            templates.append(template)
 
         return jsonify({"templates": templates}), 200
 
