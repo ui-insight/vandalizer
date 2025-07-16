@@ -37,7 +37,7 @@ class ProgressLoader {
 
   showDefaultMessage() {
     this.loadingIcon.classList = "fa-solid fa-file-import";
-    this.messageEl.textContent = "Ready to roll with AI?";
+    this.messageEl.textContent = "Ready to get started?";
     this.subMessageEl.textContent = "Just add or select a document to begin."
     this.hideProgressBar();
   }

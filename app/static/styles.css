@@ -1136,7 +1136,7 @@ textarea {
     position: relative;
     overflow: hidden;
     padding: 2rem;
-    border-radius: 12px;
+    /* border-radius: 12px; */
     background: linear-gradient(135deg, #6a11cb, #2575fc);
     color: #fff;
     font-family: 'Montserrat', sans-serif;
@@ -1312,7 +1312,7 @@ textarea {
     .gradient-border {
     display: inline-block;
     padding: 2px;                   /* thickness of the border */
-    border-radius: 12px;            /* rounds outer edge */
+    /* border-radius: 12px;            rounds outer edge */
     background: linear-gradient(
       45deg,
       #6a11cb,
@@ -1347,7 +1347,7 @@ textarea {
     display: flex;
     align-items: center;
     background: #fff;
-    border-radius: 10px;
+    /* border-radius: 10px; */
     padding: 15px 30px 15px 15px;
     width: 100%;
     box-sizing: border-box;

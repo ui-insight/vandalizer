@@ -5,6 +5,7 @@ import graphlib
 import json
 import multiprocessing
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Thread
@@ -602,7 +603,8 @@ class WorkflowManager:
             self.collection = self.client.get_collection(self.collection_name)
         except:
             self.collection = self.client.create_collection(
-                name=self.collection_name, metadata={"hnsw:space": "cosine"}
+                name=self.collection_name,
+                metadata={"hnsw:space": "cosine"},
             )
 
     def _extract_workflow_context(
@@ -687,7 +689,8 @@ class WorkflowManager:
                 return {"status": "error", "error": "Workflow not found"}
 
             new_embedding = self.embeddings.embed_query(ingestion_text)
-            doc_id = f"{workflow_id}"
+            uuid4 = uuid.uuid4().hex
+            doc_id = f"{workflow_id}_{uuid4}"
 
             # 1) Fetch any existing record
             existing = self.collection.get(
@@ -762,8 +765,8 @@ class WorkflowManager:
             search_text = ""
             search_text += "Documents selected:"
 
-            print("Number of items in chroma database: ")
-            print(self.collection.count())
+            debug("Number of items in chroma database: ")
+            debug(self.collection.count())
 
             for doc in selected_documents:
                 search_text += f"\n{doc.raw_text}"
@@ -817,7 +820,7 @@ class WorkflowManager:
             return []
 
 
-@celery_app.task(name="workflow.ingestion")
+# @celery_app.task(name="workflow.ingestion")
 def workflow_ingestion_task(workflow_id: str, ingestion_text: str) -> Dict[str, Any]:
     """Celery task to ingest workflow into vector database."""
 
