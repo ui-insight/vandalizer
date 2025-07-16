@@ -1,4 +1,4 @@
-data/workflows_vectordb
+data/recommendations_vectordb
 uv.lock
 app/static/fillable_form.pdf
 app/static/temp/*

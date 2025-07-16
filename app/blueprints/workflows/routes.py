@@ -8,6 +8,7 @@ import re
 import time
 import uuid
 from itertools import chain
+from pathlib import Path
 
 import pypandoc
 from bson import ObjectId
@@ -52,11 +53,12 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.semantic_recommender import (
+    SemanticRecommender,
+)
 from app.utilities.workflow import (
-    WorkflowManager,
     execute_task_step_test,
     execute_workflow_task,
-    workflow_ingestion_task,
 )
 from app.utils import load_user
 
@@ -188,9 +190,12 @@ def run_workflow() -> ResponseReturnValue:
     for doc in docs:
         ingestion_text += f"\n{doc.raw_text}"
 
-    workflow_ingestion_task(
-        workflow_id=workflow_id,
+    persist_directory = Path("data/recommendations_vectordb")
+    recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
+    recommendation_manager.ingest_recommendation_item(
+        identifier=workflow_id,
         ingestion_text=ingestion_text,
+        recommendation_type="Workflow",
     )
     return jsonify(
         {
@@ -231,32 +236,34 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                 {"recommendations": [], "message": "No valid documents found"}
             ), 200
 
-        # Initialize workflow manager
-        from pathlib import Path
-
-        persist_directory = Path("data/workflows_vectordb")
-        workflow_manager = WorkflowManager(persist_directory=persist_directory)
+        persist_directory = Path("data/recommendations_vectordb")
+        recommendation_manager = SemanticRecommender(
+            persist_directory=persist_directory,
+        )
 
         # Get recommendations
-        recommendations = workflow_manager.search_workflow_recommendations(
-            selected_documents=documents, user_id=user_id, space=space, limit=limit
+        recommendations = recommendation_manager.search_recommendations(
+            selected_documents=documents,
+            limit=limit,
         )
         time.sleep(1.5)
 
         templates = []
         recommended_workflows = []
         for recommendation in recommendations:
-            workflow_id = recommendation["workflow_id"]
-            workflow = Workflow.objects(id=workflow_id).first()
-            if workflow and (workflow not in recommended_workflows):
-                recommended_workflows.append(workflow)
+            identifier = recommendation["identifier"]
+            recommendation_type = recommendation["recommendation_type"]
+            if recommendation_type == "Workflow":
+                workflow = Workflow.objects(id=identifier).first()
+                if workflow and (workflow not in recommended_workflows):
+                    recommended_workflows.append(workflow)
 
-                template = render_template(
-                    "toolpanel/recommendations/recommendation-workflow.html",
-                    workflow=workflow,
-                    user=user,
-                )
-                templates.append(template)
+                    template = render_template(
+                        "toolpanel/recommendations/recommendation-workflow.html",
+                        workflow=workflow,
+                        user=user,
+                    )
+                    templates.append(template)
 
         print(recommendations)
         if len(recommendations) == 0:
