@@ -151,6 +151,8 @@ class SemanticRecommender:
                     ids=[doc_id],
                 )
 
+            debug("Successfully ingested item to recommendations")
+
             return {
                 "status": "success",
                 "document_id": doc_id,
@@ -159,4 +161,5 @@ class SemanticRecommender:
             }
 
         except Exception as e:
+            debug(e)
             return {"status": "error", "error": str(e)}

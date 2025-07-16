@@ -249,6 +249,11 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         time.sleep(1.5)
 
         templates = []
+        templates.append(
+            render_template(
+                "toolpanel/recommendations/recommendation-title.html",
+            )
+        )
         recommended_workflows = []
         for recommendation in recommendations:
             identifier = recommendation["identifier"]
@@ -264,6 +269,15 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                         user=user,
                     )
                     templates.append(template)
+            elif recommendation_type == "Extraction":
+                search_set = SearchSet.objects(id=identifier).first()
+                if search_set and (search_set not in recommended_workflows):
+                    recommended_workflows.append(search_set)
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-extraction.html",
+                    search_set=search_set,
+                )
+                templates.append(template)
 
         print(recommendations)
         if len(recommendations) == 0:
