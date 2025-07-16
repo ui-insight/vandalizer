@@ -24,6 +24,9 @@ from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.semantic_recommender import (
+    SemanticRecommender,
+)
 from app.utils import load_user
 
 from . import tasks
@@ -442,6 +445,27 @@ def begin_search() -> ResponseReturnValue:
         response = {
             "template": template,
         }
+
+        # Ingest workflow into vector database for future recommendations
+        ingestion_text = ""
+        ingestion_text += "# Documents selected:"
+
+        for doc in documents:
+            ingestion_text += f"\n{doc.raw_text}"
+
+        persist_directory = Path("data/recommendations_vectordb")
+        recommendation_manager = SemanticRecommender(
+            persist_directory=persist_directory
+        )
+
+        debug("BEGINNING EXTRACTION RECOMMENDATION")
+
+        recommendation_manager.ingest_recommendation_item(
+            identifier=str(search_set.id),
+            ingestion_text=ingestion_text,
+            recommendation_type="Extraction",
+        )
+
         return jsonify(response)
     template = render_template(
         "toolpanel/extractions/extraction_panel.html",
