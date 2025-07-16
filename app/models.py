@@ -31,6 +31,7 @@ class UserModelConfig(me.Document):
 
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
+
     name = me.StringField(required=True, max_length=50)
     data = me.DictField(required=True)
 
@@ -45,11 +46,13 @@ class WorkflowStepTask(me.Document):
             return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
         return 0
 
+
 class WorkflowStep(me.Document):
     """Workflow step model. Represents a step within a workflow."""
+
     name = me.StringField(required=True, max_length=50)
     tasks = me.ListField(
-        me.ReferenceField('WorkflowStepTask', reverse_delete_rule=CASCADE),
+        me.ReferenceField("WorkflowStepTask", reverse_delete_rule=PULL),
     )
     data = me.DictField(required=False)
 
@@ -63,22 +66,26 @@ class WorkflowStep(me.Document):
             return [phrase.strip() for phrase in self.data["searchphrases"].split(",")]
         return 0
 
+
 class WorkflowAttachment(me.Document):
     """Workflow attachment model. Represents an attachment within a workflow."""
+
     attachment = me.StringField(required=True, max_length=50)
+
 
 class Workflow(me.Document):
     """Workflow model. Represents a complete workflow."""
+
     name = me.StringField(required=True, max_length=500)
     description = me.StringField(required=False, max_length=2000)
     user_id = me.StringField(required=True, max_length=200)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     steps = me.ListField(
-        me.ReferenceField('WorkflowStep', reverse_delete_rule=CASCADE),
+        me.ReferenceField("WorkflowStep", reverse_delete_rule=PULL),
     )
     attachments = me.ListField(
-        me.ReferenceField('WorkflowAttachment', reverse_delete_rule=CASCADE),
+        me.ReferenceField("WorkflowAttachment", reverse_delete_rule=PULL),
     )
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
@@ -86,7 +93,8 @@ class Workflow(me.Document):
 
 class WorkflowResult(me.Document):
     """Workflow result model. Represents the result of a workflow execution."""
-    workflow = me.ReferenceField('Workflow', reverse_delete_rule=CASCADE)
+
+    workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE)
     num_steps_completed = me.IntField(default=0)
     num_steps_total = me.IntField(default=0)
     steps_output = me.DictField()
