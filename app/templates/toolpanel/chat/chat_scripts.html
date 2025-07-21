@@ -164,16 +164,7 @@
             "slow",
         );
 
-        // Clear the response area
-        $("#" + responseId).html(
-            `<div style='display: flex; flex-direction: column;'>
-    <div style='display: flex;'>
-      <div style='flex-grow: 1;'>
-        <div class="chat-response-body" id="streamedResponse"></div>
-      </div>
-    </div>
-  </div>`
-        );
+
 
 
         // Initial scroll only if at (or near) the bottom
@@ -183,6 +174,7 @@
                 "fast"
             );
         }
+
 
         fetch("/home/chat", {
             method: "POST",
@@ -201,7 +193,16 @@
                 const decoder = new TextDecoder();
                 let markdownBuffer = "";
                 let questionText = question + " " + additional_context;
-
+                // Clear the response area
+                $("#" + responseId).html(
+                    `<div style='display: flex; flex-direction: column;'>
+    <div style='display: flex;'>
+      <div style='flex-grow: 1;'>
+        <div class="chat-response-body" id="streamedResponse"></div>
+      </div>
+    </div>
+  </div>`
+                );
                 function pump() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
