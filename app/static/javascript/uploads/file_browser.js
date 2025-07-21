@@ -81,11 +81,8 @@ $(document).ready(function () {
     // Implement rename functionality
     console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
     let renameModal = $("#renameModal");
-
-    $("#renameBtn")
-      .off("click")
-      .on("click", function () {
-        let newName = $("#newName")[0].value;
+    function finishRename() {
+    let newName = $("#newName")[0].value;
         console.log(
           `Renaming ${currentItemType} with ID: ${currentItemId} to ${newName}`,
         );
@@ -96,6 +93,21 @@ $(document).ready(function () {
           console.log("renaming document");
           renameDocument(currentItemId, newName);
         }
+  }
+
+     $("#newName").on("keyup", function (event) {
+        if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault(); // Prevent the default behavior of adding a newline
+            finishRename();
+        }
+    });
+
+    $("#renameBtn")
+      .off("click")
+      .on("click", function () {
+
+        finishRename();
+        
       });
 
     $("#renameModal").show();
@@ -104,6 +116,8 @@ $(document).ready(function () {
 
     hidePopupMenu();
   });
+
+  
 
   function renameDocument(uuid, newName) {
     $.ajax({
