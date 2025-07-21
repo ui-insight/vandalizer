@@ -1,10 +1,8 @@
 import sys
 
-import pypandoc
+import markdown
 
 from app.models import SmartDocument
-
-import markdown
 
 try:
     import pysqlite3
@@ -27,9 +25,8 @@ from app import app
 from app.celery_worker import celery_app
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.document_readers import (
-    extract_text_from_doc,
-    extract_text_from_html,
     convert_to_markdown,
+    extract_text_from_doc,
 )
 
 MIN_PDF_TEXT_LENGTH = 100
@@ -60,7 +57,8 @@ def perform_extraction_and_update(document_uuid, extension):
             with open(html_path.as_posix(), "w", encoding="utf-8") as html_file:
                 html_file.write(html_content)
 
-            document.extension = "html"
+            document.extension = "docx"
+            document.downloadpath = str(Path(document.path))
             document.path = str(Path(document.path).with_suffix(".html"))
             debug(document.path)
             document.raw_text = doc_text
@@ -80,6 +78,7 @@ def perform_extraction_and_update(document_uuid, extension):
             # raw_text = extract_text_from_html(html_path)
             raw_text = convert_to_markdown(excel_path)
             document.extension = "html"
+            document.downloadpath = str(Path(document.path))
             document.path = str(Path(document.path).with_suffix(".html"))
             document.raw_text = raw_text
             document.processing = False
@@ -91,6 +90,7 @@ def perform_extraction_and_update(document_uuid, extension):
             # For other file types, use the generic text extraction
             raw_text = extract_text_from_doc(document.absolute_path, doc=document)
             document.raw_text = raw_text
+            document.downloadpath = str(Path(document.path))
             document.processing = False
             document.save()
             return raw_text

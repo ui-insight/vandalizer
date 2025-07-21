@@ -115,6 +115,7 @@ class SmartDocument(me.Document):
     """SmartDocument model. Represents a smart document in the system."""
 
     path = me.StringField(required=True, max_length=200)
+    downloadpath = me.StringField(required=True, max_length=200)
     processing = me.BooleanField(default=False)
     validating = me.BooleanField(default=False)
     valid = me.BooleanField(default=True)
