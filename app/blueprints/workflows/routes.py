@@ -410,6 +410,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
         # **Create SmartDocument Object**
         document = SmartDocument(
             title=filename,
+            downloadpath=f"{user.id}/{uid}.{extension}",
             path=f"{user.id}/{uid}.{extension}",
             extension=extension,
             uuid=uid,

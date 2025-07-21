@@ -160,6 +160,7 @@ def upload():
         processing=True,
         valid=True,
         raw_text=raw_text,
+        downloadpath=str(relative_file_path),
         path=str(relative_file_path),
         extension=extension,
         uuid=uid,
@@ -290,8 +291,10 @@ def download_document() -> ResponseReturnValue:
     if not document:
         abort(404, description="Document not found")
 
+    download_path = document.downloadpath if document.downloadpath else document.path
+
     document_file_path = (
-        Path(current_app.root_path) / "static" / "uploads" / document.path
+        Path(current_app.root_path) / "static" / "uploads" / download_path
     )
 
     return send_file(document_file_path, as_attachment=True)
