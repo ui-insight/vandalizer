@@ -1371,6 +1371,7 @@
 
         let session_id = generateSessionId();
         workflow_session_id = session_id;
+        active_step = 0;
 
         // Start the timer before making the API call
         $('.workflow-output-buttons').addClass('hidden');
@@ -1539,6 +1540,7 @@
                         // replace \",\" with <hr> in the html output
                         outputText = outputText.replace(/\",\"/g, '<hr>');
 
+                        $('.workflow-output-section').empty();
                         $('.workflow-output-section').show();
                         $('.workflow-output-buttons').removeClass('hidden');
                         $('.workflow-output-section').append(`${outputText}`);
