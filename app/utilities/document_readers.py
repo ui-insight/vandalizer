@@ -3,11 +3,10 @@
 import os
 
 from devtools import debug
+from markitdown import MarkItDown
 from PyPDF2 import PdfReader
 
 from app.uillm.uipdf import UIPDF
-
-from markitdown import MarkItDown
 
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
@@ -15,25 +14,29 @@ MIN_PDF_TEXT_LENGTH = 100
 # doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), "static/uploads")
 
+
 def clean_markdown_nans(markdown_content: str) -> str:
     """Remove NaN values from markdown content."""
     # Replace NaN with empty cells
-    cleaned = markdown_content.replace('| NaN |', '| |')
-    cleaned = cleaned.replace('NaN', '')
+    cleaned = markdown_content.replace("| NaN |", "| |")
+    cleaned = cleaned.replace("NaN", "")
 
     # Remove completely empty rows
-    lines = cleaned.split('\n')
+    lines = cleaned.split("\n")
     filtered_lines = []
     for line in lines:
-        if '|' in line:
-            cells = [cell.strip() for cell in line.split('|')[1:-1]]
+        if "|" in line:
+            cells = [cell.strip() for cell in line.split("|")[1:-1]]
             # Keep if has content or is header separator
-            if any(cell and cell != '---' for cell in cells) or all(cell in ['---', ''] for cell in cells):
+            if any(cell and cell != "---" for cell in cells) or all(
+                cell in ["---", ""] for cell in cells
+            ):
                 filtered_lines.append(line)
         else:
             filtered_lines.append(line)
 
-    return '\n'.join(filtered_lines)
+    return "\n".join(filtered_lines)
+
 
 # Modify your existing function:
 def convert_to_markdown(doc_path: str, keep_data_uris=True) -> str:
@@ -46,6 +49,7 @@ def convert_to_markdown(doc_path: str, keep_data_uris=True) -> str:
 
     return cleaned_content
 
+
 def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     """Extract text from a PDF file using PyMuPDF and OCR.
     If the native text extraction is insufficient, OCR is applied.
@@ -54,7 +58,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     extracted_text = ""
     for _i in range(retries):
         try:
-            return UIPDF.convert_to_text(pdf_path)
+            return UIPDF.convert_to_text_demo(pdf_path)
         except Exception as e:
             debug(f"Error extracting text from PDF: {e}")
             return ""

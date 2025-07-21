@@ -2,6 +2,9 @@ import warnings
 from typing import List, Optional
 
 import requests
+from PyPDF2 import PdfReader
+
+warnings.simplefilter("always", UserWarning)
 
 # for dev
 # HOST_URL = 'http://processpdf.nkn.uidaho.edu'
@@ -139,8 +142,7 @@ class UIPDF:
         if method:
             if method in unsafe_methods:
                 warnings.warn(
-                    f"Method: {method} is **NOT SAFE** for protected data!",
-                    DeprecationWarning,
+                    f"Method: {method} is **NOT SAFE** for protected data!", UserWarning
                 )
 
         try:
@@ -182,6 +184,77 @@ class UIPDF:
 
         try:
             response = requests.post(url=endpoint, params=params, files=file)
+            if response.status_code in [200, 201, 202]:
+                response_dict = response.json()
+
+                if webhook_url:
+                    return response_dict
+                else:
+                    if "token_usage" in response_dict:
+                        print(
+                            f"Your query consumed ~{response_dict['token_usage']} tokens"
+                        )
+                    return response_dict["text"]
+            else:
+                print("SERVER ERROR")
+                print(response.status_code)
+                print(response.text)
+                return None
+        except requests.RequestException as e:
+            print(f"Error occurred while converting PDF: {e}")
+            return None
+
+    @staticmethod
+    def convert_to_text_demo(
+        file_path: str = "./path/to/your/file.pdf", webhook_url: Optional[str] = None
+    ) -> str:
+        """
+        This function is a temporary static method the APLU Demo for plug into vandalizer. It bypasses usual tesseract logic
+        uses gemini-2.0-flash-lite-0 to improve speed and compute by offloading OCR to frontier AI (necessary for many concurrent
+        OCR tasks.)
+
+        Args:
+           file_path (str): The path to the PDF file.
+           webhook_url (Optional[str]): The webhook URL to use for the request.
+
+        Returns:
+           str: The extracted text from the PDF.
+
+        Example:
+           >>> text = UIPDF.convert_to_text_demo(file_path="./path/to/your/file.pdf")
+           >>> print(text)
+        """
+        # warn user that method is not safe for protected data
+        method = "google/gemini-2.0-flash-lite-001"
+
+        try:
+            with open(file_path, "rb") as pdf_file:
+                pdf = PdfReader(pdf_file)
+                num_pages = len(pdf.pages)
+                only_these_pages = list(range(num_pages))
+        except FileNotFoundError:
+            return None
+
+        params = {
+            "format": "markdown",
+            "return_document_as": "merged_text",
+            "extract_images": "false",
+            "extract_tables": "false",
+            "tool_type": "vlm",
+            "vlm_name": method,
+            "pages_to_extract": str(only_these_pages),
+        }
+        if webhook_url:
+            params["webhook_url"] = webhook_url
+            endpoint = f"{HOST_URL}/api/v1/start-job"
+        else:
+            endpoint = f"{HOST_URL}/api/v1/AIExtractPDF"
+
+        try:
+            with open(file_path, "rb") as pdf_file:
+                file = {"file": pdf_file}
+                response = requests.post(url=endpoint, params=params, files=file)
+
             if response.status_code in [200, 201, 202]:
                 response_dict = response.json()
 

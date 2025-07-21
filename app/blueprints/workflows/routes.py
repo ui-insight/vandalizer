@@ -249,42 +249,44 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         time.sleep(1.5)
 
         templates = []
-        templates.append(
-            render_template(
-                "toolpanel/recommendations/recommendation-title.html",
-            )
-        )
-        recommended_workflows = []
-        for recommendation in recommendations:
-            identifier = recommendation["identifier"]
-            recommendation_type = recommendation["recommendation_type"]
-            if recommendation_type == "Workflow":
-                workflow = Workflow.objects(id=identifier).first()
-                if workflow and (workflow not in recommended_workflows):
-                    recommended_workflows.append(workflow)
-
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-workflow.html",
-                        workflow=workflow,
-                        user=user,
-                    )
-                    templates.append(template)
-            elif recommendation_type == "Extraction":
-                search_set = SearchSet.objects(id=identifier).first()
-                if search_set and (search_set not in recommended_workflows):
-                    recommended_workflows.append(search_set)
-                template = render_template(
-                    "toolpanel/recommendations/recommendation-extraction.html",
-                    search_set=search_set,
-                )
-                templates.append(template)
 
         print(recommendations)
+        # No recommendations, show a standard experience
         if len(recommendations) == 0:
             template = render_template(
                 "toolpanel/recommendations/recommendations-none.html",
             )
             templates.append(template)
+        else:  # Render the recommendations
+            templates.append(
+                render_template(
+                    "toolpanel/recommendations/recommendation-title.html",
+                )
+            )
+            recommended_workflows = []
+            for recommendation in recommendations:
+                identifier = recommendation["identifier"]
+                recommendation_type = recommendation["recommendation_type"]
+                if recommendation_type == "Workflow":
+                    workflow = Workflow.objects(id=identifier).first()
+                    if workflow and (workflow not in recommended_workflows):
+                        recommended_workflows.append(workflow)
+
+                        template = render_template(
+                            "toolpanel/recommendations/recommendation-workflow.html",
+                            workflow=workflow,
+                            user=user,
+                        )
+                        templates.append(template)
+                elif recommendation_type == "Extraction":
+                    search_set = SearchSet.objects(id=identifier).first()
+                    if search_set and (search_set not in recommended_workflows):
+                        recommended_workflows.append(search_set)
+                    template = render_template(
+                        "toolpanel/recommendations/recommendation-extraction.html",
+                        search_set=search_set,
+                    )
+                    templates.append(template)
 
         return jsonify({"templates": templates}), 200
 

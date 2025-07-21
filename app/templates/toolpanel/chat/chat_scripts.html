@@ -246,13 +246,7 @@
 
                         $("#streamedResponse").html(marked.parse(markdownBuffer));
 
-                        // Scroll only if user is already at (or near) the bottom
-                        if (isScrolledToBottom($("#chat-panel")[0])) {
-                            $("#chat-panel").animate(
-                                { scrollTop: $("#chat-panel")[0].scrollHeight },
-                                "fast"
-                            );
-                        }
+
 
                         return pump();
                     });
