@@ -248,6 +248,8 @@ def rename_document() -> ResponseReturnValue:
 
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.title = new_title
+    if not document.downloadpath:
+        document.downloadpath = document.path
     document.save()
     return jsonify({"complete": True})
 
