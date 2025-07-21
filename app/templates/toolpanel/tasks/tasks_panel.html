@@ -1,14 +1,16 @@
-<div id="tasks-panel" class="tasks-panel" style="background-color: white; {% if section != 'Tasks' %}display: none;{% endif %} position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501; padding: 0px 0px;">
+<div id="tasks-panel" class="tasks-panel"
+    style="background-color: white; {% if section != 'Tasks' %}display: none;{% endif %} position: absolute; top: 70px; right: 0px; left: 0px; bottom: 0px; z-index: 501; padding: 0px 0px;">
     <div id="search-set-panel" style="margin: 0px 0px 30px 00px; text-align: left;">
         <p style="font-size: 24px; font-weight: 700; padding: 0px 30px;">Tasks
-            <span  style="float: right; font-size: 1em; color: #191919;">
+            <span style="float: right; font-size: 1em; color: #191919;">
                 <a class="tasks-close-button">
                     <i class="fa-solid fa-circle-xmark"></i>
                 </a>
             </span>
 
         </p>
-        <p style="font-size: 12px; font-weight: 300; color: #00000077; padding: 0px 30px;" class=""><i>Tasks perform extractions and prompts on your selected documents, and output to different formats.</i></p>
+        <p style="font-size: 12px; font-weight: 300; color: #00000077; padding: 0px 30px;" class=""><i>Tasks perform
+                extractions and prompts on your selected documents, and output to different formats.</i></p>
         <div class="search-set-container" style="padding: 15px 0px 30px 0px;">
             <div class="add-workflow-step-container" style="border-top: 1px #ddd solid;">
                 <div class="left-column" style="height: 100vh;">
@@ -19,31 +21,36 @@
                         <li class="section-item tasks-format-section">Format</li>
                     </ul>
                 </div>
-    
+
                 <div class="right-column">
                     <!-- All Section -->
                     <div class="tasks-container-all-section" style="padding-top: 20px;">
                         <p style="font-size: 18px; font-weight: 700;">Extract</p>
+                        {% if extraction_sets|length == 0 %}
+                        <a href="#" class="add-extraction-task-btn"><b>+ Add Extraction Task</b> — Set up rules to find
+                            and extract key information from your documents.</a>
+                        {% endif %}
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-filter"></i>
-                                    </span>                        
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {% if search_set.is_global %}
-                                    <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
-                                    {% endif %}
+                                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                                        {% endif %}
                                         {{
-                                        search_set.title }}</p>
+                                        search_set.title }}
+                                    </p>
 
                                     <p class="set-items" style="text-align: right; ">
                                         {% if search_set.item_count() == 0 %}
-                                            <span><i style="color: #00000077;">setup</i></span>
+                                        <span><i style="color: #00000077;">setup</i></span>
                                         {% else %}
                                         <span>{{ search_set.item_count() }}
                                             items</span>
@@ -55,25 +62,30 @@
                         {% endfor %}
 
                         <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Prompt</p>
+                        {% if prompts|length == 0 %}
+                        <a href="#" class="add-prompt-task-btn"><b>+ Add Prompt Task</b> — Create a custom prompt to
+                            generate or manipulate content.</a>
+                        {% endif %}
                         {% for prompt in prompts %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-regular fa-message"></i>
-                                    </span>                        
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {{
-                                            prompt.title }}</p>
-                                            <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="prompt">
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
-                                            
-                                            </p>
-                                            </p>
+                                        prompt.title }}</p>
+                                    <p class="set-items" style="text-align: right; ">
+                                        <a class="edit-prompt-button" style="color: #adadad99;"
+                                            data-uuid="{{ prompt.id }}" data-type="prompt">
+                                            <span><i class="fa-regular fa-pen-to-square"></i></span></a>
+
+                                    </p>
+                                    </p>
                                     </p>
                                 </div>
                             </div>
@@ -81,53 +93,57 @@
                         {% endfor %}
 
                         <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Format</p>
+                        <a href="#" class="add-formatter-task-btn"><b>+ Add Formatting Task</b> — Apply your preferred
+                            document styles and formatting templates.</a>
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-i-cursor"></i>
-                                    </span>  
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {{
-                                            prompt.title }}</p>
-                                            <p class="set-items" style="text-align: right; ">
-                                            <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="formatter">
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
-                                            
-                                            </p>
+                                        prompt.title }}</p>
+                                    <p class="set-items" style="text-align: right; ">
+                                        <a class="edit-prompt-button" style="color: #adadad99;"
+                                            data-uuid="{{ prompt.id }}" data-type="formatter">
+                                            <span><i class="fa-regular fa-pen-to-square"></i></span></a>
+
+                                    </p>
                                     </p>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
-                     <!-- Extract Section -->
-                     <div class="tasks-container-extract-section" style="display: none; padding-top: 20px;">
+                    <!-- Extract Section -->
+                    <div class="tasks-container-extract-section" style="display: none; padding-top: 20px;">
                         <p style="font-size: 18px; font-weight: 700;">Extract</p>
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
                             <div class="set-item" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-filter"></i>
-                                    </span>                        
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {% if search_set.is_global %}
-                                    <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
-                                    {% endif %}
+                                        <span style="padding-right: 5px;"><i class="fa-solid fa-globe"></i></span>
+                                        {% endif %}
                                         {{
-                                        search_set.title }}</p>
+                                        search_set.title }}
+                                    </p>
 
                                     <p class="set-items" style="text-align: right; ">
                                         {% if search_set.item_count() == 0 %}
-                                            <span><i style="color: #00000077;">setup</i></span>
+                                        <span><i style="color: #00000077;">setup</i></span>
                                         {% else %}
                                         <span>{{ search_set.item_count() }}
                                             items</span>
@@ -145,28 +161,29 @@
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-regular fa-message"></i>
-                                    </span>                        
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {{
-                                            prompt.title }}</p>
-                                            <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="prompt">
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
-                                            
-                                            </p>
-                                            </p>
+                                        prompt.title }}</p>
+                                    <p class="set-items" style="text-align: right; ">
+                                        <a class="edit-prompt-button" style="color: #adadad99;"
+                                            data-uuid="{{ prompt.id }}" data-type="prompt">
+                                            <span><i class="fa-regular fa-pen-to-square"></i></span></a>
+
+                                    </p>
+                                    </p>
                                     </p>
                                 </div>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
-    
+
                     <!-- Format Section -->
                     <div class="tasks-container-format-section" style="display: none; padding-top: 20px;">
                         <p style="font-size: 18px; font-weight: 700;">Format</p>
@@ -174,22 +191,23 @@
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
                                 <div class="set-content">
-                            
+
                                     <span style="float: left; font-size: 1em; color: #191919;">
                                         <i class="fa-solid fa-i-cursor"></i>
-                                    </span>  
+                                    </span>
 
                                     <p class="set-title"
                                         style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
                                         {{
-                                            prompt.title }}</p>
-                                            <p class="set-items" style="text-align: right; ">
-                                                <a class="edit-prompt-button" style="color: #adadad99;" data-uuid="{{ prompt.id }}" data-type="formatter">
-                                                    <span><i class="fa-regular fa-pen-to-square"></i></span></a>
-                                            
-                                            </p>
-                                            
-                                            </p>
+                                        prompt.title }}</p>
+                                    <p class="set-items" style="text-align: right; ">
+                                        <a class="edit-prompt-button" style="color: #adadad99;"
+                                            data-uuid="{{ prompt.id }}" data-type="formatter">
+                                            <span><i class="fa-regular fa-pen-to-square"></i></span></a>
+
+                                    </p>
+
+                                    </p>
                                     </p>
                                 </div>
                             </div>
@@ -197,12 +215,12 @@
                         {% endfor %}
                     </div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        $('.tasks-all-section').off('click').on('click', function(e) {
+        $('.tasks-all-section').off('click').on('click', function (e) {
             e.preventDefault();
             $(".tasks-container-all-section").show();
             $(".tasks-container-extract-section").hide();
@@ -212,7 +230,7 @@
             $(this).addClass('active');
         });
 
-        $('.tasks-extract-section').off('click').on('click', function(e) {
+        $('.tasks-extract-section').off('click').on('click', function (e) {
             e.preventDefault();
             $(".tasks-container-all-section").hide();
             $(".tasks-container-extract-section").show();
@@ -222,7 +240,7 @@
             $(this).addClass('active');
         });
 
-        $('.tasks-prompt-section').off('click').on('click', function(e) {
+        $('.tasks-prompt-section').off('click').on('click', function (e) {
             e.preventDefault();
             $(".tasks-container-all-section").hide();
             $(".tasks-container-extract-section").hide();
@@ -232,7 +250,7 @@
             $(this).addClass('active');
         });
 
-        $('.tasks-format-section').off('click').on('click', function(e) {
+        $('.tasks-format-section').off('click').on('click', function (e) {
             e.preventDefault();
             $(".tasks-container-all-section").hide();
             $(".tasks-container-extract-section").hide();
@@ -273,7 +291,7 @@
             });
         });
 
-        
+
 
 
     </script>

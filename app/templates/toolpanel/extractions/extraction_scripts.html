@@ -90,6 +90,44 @@
 
     var newTaskType = "";
 
+    $(".add-extraction-task-btn")
+      .off("click")
+      .on("click", function () {
+        console.log("here");
+        newTaskType = "extraction";
+        $("#newTaskModal").show();
+        $("#add-task-container").hide();
+        $("#name-add-task-container").show();
+        $("#newTaskBtn").show();
+      });
+
+    $(".add-prompt-task-btn")
+      .off("click")
+      .on("click", function () {
+        newTaskType = "prompt";
+        $("#newTaskModal").show();
+        $("#add-task-container").hide();
+        $("#name-add-task-prompt-container").show();
+        $("#newTaskBtn").show();
+      });
+
+    $(".add-formatter-task-btn")
+      .off("click")
+      .on("click", function () {
+        newTaskType = "formatter";
+        $("#newTaskModal").show();
+        $("#add-task-container").hide();
+        $("#name-add-task-prompt-container").show();
+        $("#newTaskBtn").show();
+      });
+
+    $("#newTaskBtn")
+      .off("click")
+      .on("click", function () {
+        createTask();
+        $("#newTaskModal").hide();
+      });
+
     $("#add-new-task-button").on("click", function () {
       $("#newTaskModal").show();
       $(".add-task-container").show();
@@ -100,39 +138,8 @@
       $("#newTaskPrompt")[0].value = "";
       newTaskType = "";
 
-      $("#add-extraction-task-btn")
-        .off("click")
-        .on("click", function () {
-          newTaskType = "extraction";
-          $("#add-task-container").hide();
-          $("#name-add-task-container").show();
-          $("#newTaskBtn").show();
-        });
 
-      $("#add-prompt-task-btn")
-        .off("click")
-        .on("click", function () {
-          newTaskType = "prompt";
-          $("#add-task-container").hide();
-          $("#name-add-task-prompt-container").show();
-          $("#newTaskBtn").show();
-        });
 
-      $("#add-formatter-task-btn")
-        .off("click")
-        .on("click", function () {
-          newTaskType = "formatter";
-          $("#add-task-container").hide();
-          $("#name-add-task-prompt-container").show();
-          $("#newTaskBtn").show();
-        });
-
-      $("#newTaskBtn")
-        .off("click")
-        .on("click", function () {
-          createTask();
-          $("#newTaskModal").hide();
-        });
     });
 
     function createTask() {

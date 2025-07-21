@@ -142,6 +142,22 @@
         const newQs = qs.toString();
         const newhref = `/home?${newQs}`;
         window.history.pushState({}, "", newhref);
+
+        const tabMenu = document.querySelector(".tab-menu");
+        const tabMenuItems = tabMenu.querySelectorAll("li");
+
+        tabMenuItems.forEach((item) => item.classList.remove("active"));
+        tabMenuItems.forEach((item) => {
+            if (item.innerText === "Assistant") {
+                if (sectionName == "Tasks" || sectionName == "Assistant") {
+                    item.classList.add("active");
+                }
+            } else {
+                if (sectionName == "Workflows") {
+                    item.classList.add("active");
+                }
+            }
+        });
     }
 
     function getWorkflowRecommendations(uuids) {
@@ -186,6 +202,7 @@
 
                     console.log("here1")
                     console.log(document_uuids);
+                    setSection("Workflows");
                     fetchWorkflow(uuid);
                 });
             },
