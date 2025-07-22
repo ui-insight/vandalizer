@@ -1394,6 +1394,7 @@
     function resetWorkflowButton() {
         $('.run-workflow')[0].textContent = "RUN";
         $('.run-workflow')[0].style = ""
+        $('.run-workflow').removeClass('shimmer');
         $('.workflow-step').removeClass('active');
         $('.step-connector').removeClass('active');
         $('.workflow-loader').hide();
@@ -1423,6 +1424,7 @@
 
         // Start the timer before making the API call
         $('.workflow-output-buttons').addClass('hidden');
+        $('.run-workflow').addClass('shimmer');
 
         console.log(current_space_id);
         let data = JSON.stringify({
@@ -1444,7 +1446,7 @@
         beginSpinningJoe();
 
         $('.run-workflow')[0].textContent = "WORKFLOW RUNNING";
-        $('.run-workflow')[0].style = "background-color: #cccccc; color: black;"
+        //$('.run-workflow')[0].style = "background-color: #cccccc; color: black;"
 
 
         $.ajax({
@@ -1464,6 +1466,7 @@
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                resetWorkflowButton();
                 if (workflow_interval_id) {
                     stopSpinningJoe();
                     clearInterval(workflow_interval_id);
@@ -1536,6 +1539,7 @@
                         console.log("hereeee");
                         stopSpinningJoe();
                         clearInterval(workflow_interval_id);
+                        resetWorkflowButton();
                     }
                 }
 
@@ -1572,7 +1576,7 @@
                             clearInterval(workflow_interval_id);
                         }
                         showToast("Workflow completed");
-
+                        resetWorkflowButton();
                         // show the results
 
                         let workflow_response = data.output;
@@ -1667,9 +1671,12 @@
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 stopSpinningJoe();
-                clearInterval(intervalId); // Stop polling on error
+                if (typeof intervalId !== 'undefined' && intervalId !== null) {
+                    clearInterval(intervalId); // Stop polling on error
+                }
                 console.log(xhr.status);
                 console.log(thrownError);
+                resetWorkflowButton();
                 showToast("Error polling workflow status");
             }
         });

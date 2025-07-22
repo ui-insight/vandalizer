@@ -1447,3 +1447,40 @@ think:hover > * {
   display: inline;              /* or block, depending on your markup */
 }
 
+//* 1) Positioning context */
+.btn.shimmer,
+.btn-primary.shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 2) The shimmer stripe */
+.btn.shimmer::before,
+.btn-primary.shimmer::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; 
+  height: 100%;
+  pointer-events: none;
+  
+  /* a nice white band */
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    rgba(255,255,255,0.8) 50%,
+    transparent 100%
+  );
+  
+  /* start fully off‑left */
+  transform: translateX(-100%) skewX(-20deg);
+  
+  /* animate it */
+  animation: button-shimmer 2s infinite;
+  -webkit-animation: button-shimmer 2s infinite;  /* Safari */
+}
+/* Keyframe for the button shimmer effect */
+@keyframes button-shimmer {
+  0%   { transform: translateX(-100%) skewX(-20deg); }
+  100% { transform: translateX(100%)  skewX(-20deg); }
+}
