@@ -59,7 +59,7 @@ class ProgressLoader {
   showSecurityFailureMessage() {
     this.loadingIcon.classList = "fa-solid fa-lock fa-spin";
     this.messageEl.textContent = "Document is locked by security check…";
-    this.subMessageEl.textContent = "We detected sensitive information in your document and are securing all ai calls for you."
+    this.subMessageEl.textContent = "We detected sensitive information in your document and are securing all AI calls for you."
     this.hideProgressBar();
   }
 
