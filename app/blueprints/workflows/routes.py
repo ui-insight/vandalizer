@@ -216,11 +216,6 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
 
         templates = []
 
-        templates.append(
-            render_template(
-                "toolpanel/recommendations/recommendation-title.html",
-            )
-        )
         recommended_workflows = []
         for recommendation in recommendations:
             identifier = recommendation["identifier"]
@@ -250,7 +245,15 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                 "toolpanel/recommendations/recommendations-none.html",
             )
             templates.append(template)
-            return jsonify({"templates": templates}), 200
+        else:
+            templates.insert(
+                0,
+                templates.append(
+                    render_template(
+                        "toolpanel/recommendations/recommendation-title.html",
+                    ),
+                ),
+            )
 
         print(recommendations)
         return jsonify({"templates": templates}), 200
