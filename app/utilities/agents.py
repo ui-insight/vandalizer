@@ -68,7 +68,8 @@ def get_agent_model(agent_model):
             model_name=model_name,
         )
     return OpenAIModel(
-        model_name=agent_model, provider=InsightAIProvider(api_key="no-api-key")
+        model_name=agent_model,
+        provider=InsightAIProvider(api_key="no-api-key"),
     )
 
 
