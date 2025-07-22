@@ -76,7 +76,7 @@ def filter_models() -> ResponseReturnValue:
         # filter out the external models
         models = [m for m in model_config.available_models if not m.get("external")]
         debug(models)
-        current_model = "qwen3:32b"
+        current_model = "qwen3-32k:32b"
     elif model_config:
         current_model = model_config.name
 
