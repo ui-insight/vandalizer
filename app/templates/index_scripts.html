@@ -1583,6 +1583,59 @@
                     $('.workflow-loader').hide();
                     $('.workflow-step').eq(active_step).removeClass('active');
                     $('.workflow-output').addClass('active');
+
+                    $('#downloadWorkflowBtn').on('click', function (e) {
+                        e.stopPropagation();
+                        const $btn = $(this);
+                        const $popup = $('#download-popup-menu');
+
+                        // 1) move it so it's not clipped by any parent
+                        $('body').append($popup);
+
+                        // 2) show invisibly to get its dimensions
+                        $popup.css({
+                            position: 'absolute',
+                            visibility: 'hidden',
+                            display: 'block'
+                        });
+                        const popupW = $popup.outerWidth();
+                        const popupH = $popup.outerHeight();
+
+                        // 3) figure out where the button is on the page
+                        const btnOff = $btn.offset();
+
+                        // 4) calculate your top/left
+                        let left = btnOff.left;               // align left edges
+                        let top = btnOff.top - popupH - 10; // sit 10px above the button
+
+                        // 5) keep it inside the viewport
+                        const winW = $(window).width();
+                        if (left + popupW > winW) left = winW - popupW - 5;
+
+                        // 6) show it for real
+                        $popup.css({
+                            visibility: 'visible',
+                            top: `${top}px`,
+                            left: `${left}px`,
+                            opacity: 0
+                        }).animate({ opacity: 1 }, 200);
+
+
+                        $('#download-pdf-option').off('click').on("click", function () {
+                            console.log("here");
+                            hideDownloadPopupMenu();
+                            downloadWorkflowOutput('pdf');
+
+                        });
+                        $('#download-csv-option').off('click').on("click", function () {
+                            hideDownloadPopupMenu();
+                            downloadWorkflowOutput('csv');
+                        });
+                        $('#download-text-option').off('click').on("click", function () {
+                            hideDownloadPopupMenu();
+                            downloadWorkflowOutput('txt');
+                        });
+                    });
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -1608,13 +1661,6 @@
             workflow_elapsed_time += 1;
 
             performWorkflowStatus(session_id, workflow_elapsed_time);
-
-            // Stop polling after max attempts
-            if (workflow_elapsed_time >= maxAttempts) {
-                stopSpinningJoe();
-                clearInterval(intervalId);
-                showToast("Workflow status polling timed out");
-            }
         }, pollInterval);
 
         return intervalId;
@@ -1630,58 +1676,7 @@
 
 
 
-    $('#downloadWorkflowBtn').on('click', function (e) {
-        e.stopPropagation();
-        const $btn = $(this);
-        const $popup = $('#download-popup-menu');
 
-        // 1) move it so it's not clipped by any parent
-        $('body').append($popup);
-
-        // 2) show invisibly to get its dimensions
-        $popup.css({
-            position: 'absolute',
-            visibility: 'hidden',
-            display: 'block'
-        });
-        const popupW = $popup.outerWidth();
-        const popupH = $popup.outerHeight();
-
-        // 3) figure out where the button is on the page
-        const btnOff = $btn.offset();
-
-        // 4) calculate your top/left
-        let left = btnOff.left;               // align left edges
-        let top = btnOff.top - popupH - 10; // sit 10px above the button
-
-        // 5) keep it inside the viewport
-        const winW = $(window).width();
-        if (left + popupW > winW) left = winW - popupW - 5;
-
-        // 6) show it for real
-        $popup.css({
-            visibility: 'visible',
-            top: `${top}px`,
-            left: `${left}px`,
-            opacity: 0
-        }).animate({ opacity: 1 }, 200);
-
-
-        $('#download-pdf-option').off('click').on("click", function () {
-            console.log("here");
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('pdf');
-
-        });
-        $('#download-csv-option').off('click').on("click", function () {
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('csv');
-        });
-        $('#download-text-option').off('click').on("click", function () {
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('txt');
-        });
-    });
 
     // $('#download-popup-menu').on('click', function (e) {
     //            e.stopPropagation();
