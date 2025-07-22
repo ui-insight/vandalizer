@@ -158,6 +158,12 @@
                 }
             }
         });
+
+        cleanup();
+    }
+
+    function cleanup() {
+        clearInterval(intervalId);
     }
 
     function getWorkflowRecommendations(uuids) {
@@ -1588,7 +1594,6 @@
     function pollWorkflowStatus(session_id) {
         let startTime = Date.now(); // Capture start time to calculate elapsed time
         const pollInterval = 1000; // Poll every second
-        const maxAttempts = 180; // Optional: Stop polling after 60 seconds to prevent infinite loop
         workflow_elapsed_time = 0;
 
         let intervalId = setInterval(() => {
