@@ -165,6 +165,12 @@
     function cleanup() {
         if (typeof intervalId !== 'undefined' && intervalId !== null) {
             clearInterval(intervalId);
+            intervalId = null;
+        }
+
+        if (typeof workflow_interval_id !== 'undefined' && workflow_interval_id !== null) {
+            clearInterval(workflow_interval_id);
+            workflow_interval_id = null;
         }
     }
 
@@ -1385,12 +1391,30 @@
     }
 
 
-
+    function resetWorkflowButton() {
+        $('.run-workflow')[0].textContent = "RUN";
+        $('.run-workflow')[0].style = ""
+        $('.workflow-step').removeClass('active');
+        $('.step-connector').removeClass('active');
+        $('.workflow-loader').hide();
+    }
 
     function runWorkflow(download = false) {
         if (document_uuids == "") {
             showToast("Select a document to run workflow");
             return;
+        }
+
+        console.log("Run");
+        if (typeof workflow_interval_id !== 'undefined' && workflow_interval_id !== null) {
+            $('.add-step').fadeIn();
+            $('.workflow-output').fadeOut();
+            clearInterval(workflow_interval_id);
+            workflow_interval_id = null;
+            stopSpinningJoe(); // Assuming this
+            console.log("Stop");
+            resetWorkflowButton();
+            return
         }
 
         let session_id = generateSessionId();
@@ -1419,6 +1443,10 @@
         workflow_interval_id = pollWorkflowStatus(session_id);
         beginSpinningJoe();
 
+        $('.run-workflow')[0].textContent = "WORKFLOW RUNNING";
+        $('.run-workflow')[0].style = "background-color: #cccccc; color: black;"
+
+
         $.ajax({
             url: '/workflows/workflow/run',
             type: 'POST',
@@ -1429,8 +1457,6 @@
             success: function (data) {
                 console.log("Workflow run response:", data);
 
-
-                stopSpinningJoe();
                 if (download) {
                     downloadWorkflow(session_id)
                 }
@@ -1507,6 +1533,7 @@
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
+                        console.log("hereeee");
                         stopSpinningJoe();
                         clearInterval(workflow_interval_id);
                     }
