@@ -1385,4 +1385,65 @@ textarea {
     margin: 0;
   }
 
-  
+/* 1. Base collapsed “think” pill: hides text nodes via font-size:0 */
+think {
+  display: inline-block;
+  padding: 0.1em 0.5em;
+  max-width: 6em;               /* keep it compact */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0;                 /* hide any raw text */
+  line-height: 0;               /* collapse line height */
+  vertical-align: middle;
+  cursor: pointer;
+  border-radius: 0.25em;
+  background: #f0f0f0;
+  transition: max-width 0.2s ease,
+              font-size 0.2s ease,
+              line-height 0.2s ease;
+}
+
+/* 2. Shimmering “Thinking…” placeholder */
+@keyframes shimmer {
+  0%   { background-position: -200% 0 }
+  100% { background-position: 200% 0 }
+}
+think::before {
+  content: 'Thinking…';
+  display: inline-block;
+  font-size: 0.85em;            /* restore size for placeholder */
+  line-height: initial;
+  font-style: italic;
+  background: linear-gradient(
+    to right,
+    #f0f0f0 20%,
+    #e0e0e0 40%,
+    #f0f0f0 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  color: transparent;
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+/* 3. Hide all child elements by default */
+think > * {
+  display: none;
+}
+
+/* 4. On hover: expand and reveal real content */
+think:hover {
+  max-width: none;              /* allow full width */
+  font-size: initial;           /* restore text size */
+  line-height: normal;          /* restore line height */
+}
+
+think:hover::before {
+  content: '';                  /* remove placeholder */
+}
+
+think:hover > * {
+  display: inline;              /* or block, depending on your markup */
+}
+

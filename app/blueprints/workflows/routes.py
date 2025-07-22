@@ -235,6 +235,11 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                 {"recommendations": [], "message": "No valid documents found"}
             ), 200
 
+        are_documents_valid = True
+        for document in documents:
+            if not document.valid:
+                are_documents_valid = False
+
         persist_directory = Path("data/recommendations_vectordb")
         recommendation_manager = SemanticRecommender(
             persist_directory=persist_directory,
@@ -285,7 +290,9 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
             ] + templates
 
         print(recommendations)
-        return jsonify({"templates": templates}), 200
+        return jsonify(
+            {"templates": templates, "are_documents_valid": are_documents_valid}
+        ), 200
 
     except Exception as e:
         print(e)

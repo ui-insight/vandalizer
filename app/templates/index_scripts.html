@@ -178,7 +178,13 @@
 
                 const recommendations = msg.templates;
 
-                docLoaderProgressHandler.hide();
+
+                const are_documents_valid = msg.are_documents_valid;
+                if (!are_documents_valid) {
+                    docLoaderProgressHandler.showSecurityFailureMessage();
+                } else {
+                    docLoaderProgressHandler.hide();
+                }
 
                 // Update the UI with the recommendations
                 $('#recommendations-panel').empty();
