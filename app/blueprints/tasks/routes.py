@@ -365,6 +365,8 @@ def begin_search() -> ResponseReturnValue:
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
 
+    print(data)
+
     documents = []
     document_paths = []
     load_user()
@@ -375,6 +377,8 @@ def begin_search() -> ResponseReturnValue:
         document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    print("Searching for search set")
+    print(searchset_uuid)
     keys = []
     items = []
     if search_set is not None:
@@ -461,7 +465,7 @@ def begin_search() -> ResponseReturnValue:
         debug("BEGINNING EXTRACTION RECOMMENDATION")
 
         recommendation_manager.ingest_recommendation_item(
-            identifier=str(search_set.id),
+            identifier=str(search_set.uuid),
             ingestion_text=ingestion_text,
             recommendation_type="Extraction",
         )

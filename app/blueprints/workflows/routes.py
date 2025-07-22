@@ -5,7 +5,6 @@ import io
 import json
 import os
 import re
-import time
 import uuid
 from itertools import chain
 from pathlib import Path
@@ -246,11 +245,9 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
             selected_documents=documents,
             limit=limit,
         )
-        time.sleep(1.5)
 
         templates = []
 
-        print(recommendations)
         # No recommendations, show a standard experience
         if len(recommendations) == 0:
             template = render_template(
@@ -282,12 +279,12 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                     search_set = SearchSet.objects(id=identifier).first()
                     if search_set and (search_set not in recommended_workflows):
                         recommended_workflows.append(search_set)
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-extraction.html",
-                        search_set=search_set,
-                    )
-                    templates.append(template)
-
+                        template = render_template(
+                            "toolpanel/recommendations/recommendation-extraction.html",
+                            search_set=search_set,
+                        )
+                        templates.append(template)
+        print(recommendations)
         return jsonify({"templates": templates}), 200
 
     except Exception as e:
