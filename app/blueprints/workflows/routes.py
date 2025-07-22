@@ -246,14 +246,11 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
             )
             templates.append(template)
         else:
-            templates.insert(
-                0,
-                templates.append(
-                    render_template(
-                        "toolpanel/recommendations/recommendation-title.html",
-                    ),
-                ),
-            )
+            templates = [
+                render_template(
+                    "toolpanel/recommendations/recommendation-title.html",
+                )
+            ] + templates
 
         print(recommendations)
         return jsonify({"templates": templates}), 200
