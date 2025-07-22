@@ -41,21 +41,16 @@ def filter_models() -> ResponseReturnValue:
     user = load_user()
 
     settings_models = [m.model_dump() for m in settings.models]
+    debug(settings_models)
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if not model_config:
         model_config = UserModelConfig(user_id=user.user_id, name=settings.base_model)
         model_config.available_models = settings_models
         model_config.save()
-    else:
-        # update the available models if they were incorrectly set
-        config_models = []
-        for m in model_config.available_models:
-            if "openai" in m["name"]:
-                m["external"] = True
 
-            config_models.append(m)
-        model_config.available_models = config_models
-        model_config.save()
+    model_config.available_models = settings_models
+    model_config.save()
+
     # refresh the  model config
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
 
@@ -76,7 +71,10 @@ def filter_models() -> ResponseReturnValue:
         # filter out the external models
         models = [m for m in model_config.available_models if not m.get("external")]
         debug(models)
-        current_model = "qwen3-32k:32b"
+        model_names = [m["name"] for m in models]
+        current_model = (
+            model_config.name if model_config.name in model_names else "qwen3-32k:32b"
+        )
     elif model_config:
         current_model = model_config.name
 

@@ -262,8 +262,8 @@
 
 
                 // find the model tag in the models array based on the current model
-                const modelTag = models.find(model => model.name === newModel)?.tag || 'default';
-
+                const modelTag = models.find(model => model.name === newModel)?.tag || 'Unknown';
+                console.log(models);
                 // add the model tag to the model-text-icon div
                 const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
 
