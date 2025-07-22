@@ -163,7 +163,9 @@
     }
 
     function cleanup() {
-        clearInterval(intervalId);
+        if (typeof intervalId !== 'undefined' && intervalId !== null) {
+            clearInterval(intervalId);
+        }
     }
 
     function getWorkflowRecommendations(uuids) {
