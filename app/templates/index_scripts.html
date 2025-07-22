@@ -1838,6 +1838,12 @@
             $("#newTaskBtn").show();
         });
 
+    $("#newTaskBtn")
+        .off("click")
+        .on("click", function () {
+            createTask();
+            $("#newTaskModal").hide();
+        });
 
 
     $("#add-new-task-button").on("click", function () {

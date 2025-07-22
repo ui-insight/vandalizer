@@ -27,8 +27,10 @@
                     <div class="tasks-container-all-section" style="padding-top: 20px;">
                         <p style="font-size: 18px; font-weight: 700;">Extract</p>
                         {% if extraction_sets|length == 0 %}
-                        <a href="#" class="add-extraction-task-btn"><b>+ Add Extraction Task</b> — Set up rules to find
-                            and extract key information from your documents.</a>
+                        <a href="#" class="add-extraction-task-btn"><b>+ Add Extraction Task</b><span
+                                style="color: #c4c4c4; font-weight: 300;"> — Set up rules to
+                                find
+                                and extract key information from your documents.</span></a>
                         {% endif %}
                         {% for search_set in extraction_sets %}
                         <div class="expandable-container">
@@ -63,8 +65,9 @@
 
                         <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Prompt</p>
                         {% if prompts|length == 0 %}
-                        <a href="#" class="add-prompt-task-btn"><b>+ Add Prompt Task</b> — Create a custom prompt to
-                            generate or manipulate content.</a>
+                        <a href="#" class="add-prompt-task-btn"><b>+ Add Prompt Task</b><span
+                                style="color: #c4c4c4; font-weight: 300;"> — Create a custom prompt to
+                                generate or manipulate content.</span></a>
                         {% endif %}
                         {% for prompt in prompts %}
                         <div class="expandable-container">
@@ -93,8 +96,9 @@
                         {% endfor %}
 
                         <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Format</p>
-                        <a href="#" class="add-formatter-task-btn"><b>+ Add Formatting Task</b> — Apply your preferred
-                            document styles and formatting templates.</a>
+                        <a href="#" class="add-formatter-task-btn"><b>+ Add Formatting Task</b><span
+                                style="color: #c4c4c4; font-weight: 300;"> — Apply your preferred
+                                document styles and formatting templates.</span></a>
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
