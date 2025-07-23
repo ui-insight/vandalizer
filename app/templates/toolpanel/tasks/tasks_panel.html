@@ -95,10 +95,13 @@
                         </div>
                         {% endfor %}
 
+                        {% if formatters|length == 0 %}
                         <p style="margin-top: 30px; font-size: 18px; font-weight: 700;">Format</p>
                         <a href="#" class="add-formatter-task-btn"><b>+ Add Formatting Task</b><span
                                 style="color: #c4c4c4; font-weight: 300;"> — Apply your preferred
                                 document styles and formatting templates.</span></a>
+                        {% endif %}
+
                         {% for prompt in formatters %}
                         <div class="expandable-container">
                             <div class="prompt-item" data-uuid="{{ prompt.id }}" data-title="{{ prompt.title }}">
