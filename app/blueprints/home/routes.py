@@ -350,6 +350,19 @@ def chat() -> ResponseReturnValue:
     if model_config:
         model = model_config.name
 
+
+    if model == "qwen3-32k:32b":
+        response = OpenAIInterface().ask_question_to_documents(
+            model,
+            current_app.root_path,
+            documents,
+            message,
+            default_docs=docs,
+            user_id=user_id,
+            session=session,
+        )
+        return response.get("formatted_answer", "")
+
     def generate():
         for chunk in OpenAIInterface().ask_question_to_documents_stream(
             model,
