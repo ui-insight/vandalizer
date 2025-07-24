@@ -166,9 +166,6 @@ class OpenAIInterface:
         full_text = OpenAIInterface.get_full_text(documents, previous_messages)
         # remove base64 images from full_text
         full_text = remove_base64_images(full_text)
-        debug(max_context_length)
-        debug(len(full_text))
-        debug(full_text[:5000])
 
         answer = None
 

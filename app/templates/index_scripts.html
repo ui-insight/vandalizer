@@ -1394,6 +1394,7 @@
         $('.workflow-step').removeClass('active');
         $('.step-connector').removeClass('active');
         $('.workflow-loader').hide();
+        stopScanning();
     }
 
     function runWorkflow(download = false) {
@@ -1440,6 +1441,7 @@
 
         workflow_interval_id = pollWorkflowStatus(session_id);
         beginSpinningJoe();
+        showScanning();
 
         $('.run-workflow')[0].textContent = "WORKFLOW RUNNING";
         //$('.run-workflow')[0].style = "background-color: #cccccc; color: black;"
