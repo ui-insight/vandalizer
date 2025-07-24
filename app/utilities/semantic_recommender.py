@@ -8,27 +8,27 @@ from chromadb.config import Settings
 from devtools import debug
 from langchain_openai import OpenAIEmbeddings
 
-from app.models import (
-    SmartDocument,
-)
+from app.models import SmartDocument
 
 
 class SemanticRecommender:
     def __init__(self, persist_directory=None) -> None:
-        self.persist_directory = persist_directory
+        self.persist_directory = persist_directory or "./chroma_db"
         self.embeddings = OpenAIEmbeddings()
 
         Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(
-            path=self.persist_directory.as_posix(),
+            path=self.persist_directory,
             settings=Settings(anonymized_telemetry=False, is_persistent=True),
         )
 
-        # Create or get collection for recommendations
+        # Ensure our collection exists (or create it)
+        existing = {col.name for col in self.client.list_collections()}
         self.collection_name = "semantic_recommendations"
-        try:
+
+        if self.collection_name in existing:
             self.collection = self.client.get_collection(self.collection_name)
-        except:
+        else:
             self.collection = self.client.create_collection(
                 name=self.collection_name,
                 metadata={"hnsw:space": "cosine"},
@@ -40,94 +40,90 @@ class SemanticRecommender:
         limit: int = 3,
     ) -> List[Dict[str, Any]]:
         """Search for recommendations based on selected documents."""
-
         min_similarity = 0.9
 
+        # Build the text prompt
+        search_text = "Documents selected:\n" + "\n".join(
+            doc.raw_text for doc in selected_documents
+        )
+
         try:
-            # Create search context from selected documents
-            search_text = ""
-            search_text += "Documents selected:"
-
-            for doc in selected_documents:
-                search_text += f"\n{doc.raw_text}"
-
-            # Generate embedding for search
+            # Generate embedding
             search_embedding = self.embeddings.embed_query(search_text)
 
-            # Build query filters
-            where_filters = {}
-            # if user_id:
-            #     where_filters["user_id"] = user_id
-            # if space:
-            #     where_filters["space"] = space
-
-            # Search vector database
+            # If the collection is empty, .query may still return empty lists rather than error,
+            # but wrap anyway in case Chromadb changes behavior.
             results = self.collection.query(
                 query_embeddings=[search_embedding],
                 n_results=limit,
-                where=where_filters if where_filters else None,
                 include=["metadatas", "documents", "distances"],
             )
 
             recommendations = []
-            if results and results["ids"]:
-                for i, doc_id in enumerate(results["ids"][0]):
-                    metadata = results["metadatas"][0][i]
-                    distance = results["distances"][0][i]
-                    similarity_score = 1 - distance  # Convert distance to similarity
-                    if similarity_score < min_similarity:
-                        continue
-                    # Parse context from metadata
+            ids = results.get("ids", [[]])[0]
+            metas = results.get("metadatas", [[]])[0]
+            dists = results.get("distances", [[]])[0]
+
+            for doc_id, metadata, distance in zip(ids, metas, dists):
+                similarity = 1 - distance
+                if similarity < min_similarity:
+                    continue
+
+                # Safely parse context
+                try:
                     context = json.loads(metadata.get("context", "{}"))
-                    debug(metadata)
-                    recommendation = {
-                        "identifier": metadata["identifier"],
-                        "recommendation_type": metadata["recommendation_type"],
-                        "similarity_score": similarity_score,
+                except json.JSONDecodeError:
+                    context = {}
+
+                recommendations.append(
+                    {
+                        "identifier": metadata.get("identifier"),
+                        "recommendation_type": metadata.get("recommendation_type"),
+                        "similarity_score": similarity,
                         "num_executions": metadata.get("num_executions", 0),
                         "created_at": metadata.get("created_at"),
                         "context": context,
                     }
-                    recommendations.append(recommendation)
+                )
 
-            print(recommendations)
+            debug(f"Found {len(recommendations)} valid recommendations")
             return recommendations
 
         except Exception as e:
-            print(f"Error searching semantic recommendations: {str(e)}")
+            debug(f"Error during search_recommendations: {e}")
             return []
 
     def ingest_recommendation_item(
         self, ingestion_text: str, identifier: str, recommendation_type: str
     ) -> Dict[str, Any]:
-        """Ingest (or upsert) a semantic into the vector store, averaging embeddings on each run."""
+        """Ingest (or upsert) an item into the vector store, averaging embeddings on each run."""
         try:
             new_embedding = self.embeddings.embed_query(ingestion_text)
-            uuid4 = uuid.uuid4().hex
-            doc_id = f"{ingestion_text}_{identifier}_{uuid4}"
+            doc_uuid = uuid.uuid4().hex
+            doc_id = f"{identifier}_{doc_uuid}"
 
-            # 1) Fetch any existing record
-            existing = self.collection.get(
-                ids=[doc_id], include=["embeddings", "metadatas"]
-            )
+            # Try to fetch existing; if it fails or is empty, we'll add fresh
+            try:
+                existing = self.collection.get(
+                    ids=[doc_id], include=["embeddings", "metadatas"]
+                )
+                has_existing = bool(existing.get("ids"))
+            except Exception:
+                debug("No existing record found or error fetching it, will create new")
+                has_existing = False
 
-            # 2) Decide: update vs. add
-            if existing.get("ids"):
-                # We have an old record → average embeddings
+            if has_existing:
                 old_embed = existing["embeddings"][0]
                 meta = existing["metadatas"][0] or {}
                 old_count = meta.get("num_executions", 1)
-
                 new_count = old_count + 1
+
+                # Average embeddings
                 avg_embed = [
                     (oe * old_count + ne) / new_count
                     for oe, ne in zip(old_embed, new_embedding)
                 ]
-
-                updated_meta = {
-                    **meta,
-                    "num_executions": new_count,
-                }
+                updated_meta = {**meta, "num_executions": new_count}
 
                 self.collection.update(
                     ids=[doc_id],
@@ -135,9 +131,7 @@ class SemanticRecommender:
                     documents=[ingestion_text],
                     metadatas=[updated_meta],
                 )
-
             else:
-                # No existing record → add fresh
                 new_count = 1
                 initial_meta = {
                     "identifier": identifier,
@@ -152,7 +146,6 @@ class SemanticRecommender:
                 )
 
             debug("Successfully ingested item to recommendations")
-
             return {
                 "status": "success",
                 "document_id": doc_id,
@@ -161,5 +154,5 @@ class SemanticRecommender:
             }
 
         except Exception as e:
-            debug(e)
+            debug(f"Error ingesting recommendation item: {e}")
             return {"status": "error", "error": str(e)}
