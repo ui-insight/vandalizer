@@ -1975,7 +1975,7 @@
         //performSearch(uuid, datatitle);
         search_set_add_uuid = uuid;
         updateSearchSetPanel(uuid);
-        performExtraction(uuid);
+        //performExtraction(uuid);
     });
 
     $(".prompt-item").on("click", function () {
@@ -2017,11 +2017,20 @@
         }
     });
 
+
+
+
+
+
     function performExtraction(search_set_uuid) {
 
         if (document_uuids == null || document_uuids == "") {
             showToast("Please select a document");
             return;
+        }
+
+        if ($('#run-term-button').length > 0 && $('#run-term-button')[0].textContent == "RUNNING") {
+            return
         }
 
         showScanning();
@@ -2032,6 +2041,11 @@
         });
 
         console.log(data);
+        if ($('#run-term-button').length > 0) {
+            $('#run-term-button')[0].textContent = "RUNNING";
+
+        }
+        $('#run-term-button').addClass('shimmer');
 
         $.ajax({
             url: "/tasks/begin_search",
@@ -2049,6 +2063,10 @@
                 $("#search-results-panel").empty();
                 $(data.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
+                if ($('#run-term-button').length > 0) {
+                    $('#run-term-button')[0].textContent = "RUN";
+                }
+                $('#run-term-button').removeClass('shimmer');
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2331,6 +2349,7 @@
                 $("#search-results-panel").empty();
                 $(data.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
+                performExtraction(set_uuid);
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);

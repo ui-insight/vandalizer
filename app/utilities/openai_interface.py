@@ -1,7 +1,6 @@
 import asyncio
 import json
 import os
-import html
 
 import openai
 from devtools import debug
@@ -16,7 +15,11 @@ from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.llm_helpers import remove_code_markers, remove_xml_content, remove_base64_images
+from app.utilities.llm_helpers import (
+    remove_base64_images,
+    remove_code_markers,
+    remove_xml_content,
+)
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -130,7 +133,8 @@ class OpenAIInterface:
             )
         return full_text
 
-    def _prepare_chat(self,
+    def _prepare_chat(
+        self,
         model,
         root_path,
         documents,
@@ -138,8 +142,7 @@ class OpenAIInterface:
         session=None,
         user_id=None,
         default_docs=None,
-        ):
-
+    ):
         if default_docs is None:
             default_docs = []
         default_docs = list(default_docs)
@@ -169,7 +172,6 @@ class OpenAIInterface:
 
         answer = None
 
-
         agent = None
         if len(full_text) < max_context_length:
             prompt += f"""Question: {question} Document: {full_text}"""
@@ -178,7 +180,6 @@ class OpenAIInterface:
             prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
             agent = create_rag_agent(model)
             debug("Rag chat", prompt)
-
 
         return dict(
             agent=agent,
@@ -190,7 +191,6 @@ class OpenAIInterface:
             full_text=full_text,
         )
 
-
     def ask_question_to_documents(
         self,
         model,
@@ -201,7 +201,6 @@ class OpenAIInterface:
         user_id=None,
         default_docs=None,
     ):
-
         prepared_data = self._prepare_chat(
             model=model,
             root_path=root_path,
@@ -225,7 +224,6 @@ class OpenAIInterface:
         answer = None
 
         try:
-
             if len(full_text) >= settings.max_context_length:
                 deps = RagDeps(
                     doc_manager=DocumentManager(),
@@ -262,11 +260,7 @@ class OpenAIInterface:
         answer = remove_xml_content(answer, "think")
         answer = remove_code_markers(answer)
 
-        return {
-            "question": question,
-            "answer": answer,
-            "formatted_answer": answer
-        }
+        return {"question": question, "answer": answer, "formatted_answer": answer}
 
     def ask_question_to_documents_stream(
         self,
