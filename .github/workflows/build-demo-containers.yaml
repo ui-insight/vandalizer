@@ -1,5 +1,9 @@
 name: Build and Push Docker Image
 on:
+  push:
+    branches:
+      - main
+      - feature/demo-containers*
   workflow_dispatch: ~
 
 jobs:
