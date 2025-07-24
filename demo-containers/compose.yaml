@@ -1,26 +1,23 @@
+name: "vandalizer-demo-${VANDALIZER_INSTANCE_NUMBER:-0}"
 services:
   vandalizer-preload:
-    image: ghcr.io/vandalizer:latest
+    image: ghcr.io/ui-iids/vandalizer-demo-preload:main
     networks:
       - vandalizer
     volumes:
-      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
-    entrypoint:
-      - sh preload_files.sh
+      - "vandalizer:/app/app/static/uploads"
   redis:
     image: redis/redis-stack:latest
-    ports:
-      - "6379:6379"
     networks:
       - vandalizer
+    restart: always
   mongo:
-    image: ghcr.io/vandalizer-demo-mongo:latest
-    ports:
-      - "27018:27017"
+    image: ghcr.io/ui-iids/vandalizer-demo-mongo:main
     networks:
       - vandalizer
+    restart: always
   celery:
-    image: ghcr.io/vandalizer:latest
+    image: ghcr.io/ui-iids/vandalizer:main
     depends_on:
       - redis
       - mongo
@@ -32,12 +29,13 @@ services:
     networks:
       - vandalizer
     volumes:
-      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
+      - "vandalizer:/app/app/static/uploads"
     entrypoint: sh run_celery.sh
+    restart: always
   web:
-    image: ghcr.io/vandalizer:latest
+    image: ghcr.io/ui-iids/vandalizer:main
     ports:
-      - "8000:8000"
+      - "${VANDALIZER_PORT_NUMBER:-8000}:8000"
     depends_on:
       - redis
       - mongo
@@ -51,7 +49,8 @@ services:
     networks:
       - vandalizer
     volumes:
-      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
+      - "vandalizer:/app/app/static/uploads"
+    restart: always
 
 networks:
   vandalizer:
@@ -61,3 +60,6 @@ networks:
       driver: default
       config:
         - subnet: "10.20.${VANDALIZER_INSTANCE_NUMBER:-0}.0/24"
+volumes:
+  vandalizer:
+    name: "vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}"

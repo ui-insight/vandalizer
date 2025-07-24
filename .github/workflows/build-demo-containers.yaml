@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - main
-      - feature/demo-containers*
+      - demo-containers*
   workflow_dispatch: ~
 
 jobs:
