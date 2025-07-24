@@ -580,6 +580,8 @@ def delete_search_set_item() -> ResponseReturnValue:
     data = request.get_json()
     search_set_item_uuid = data["uuid"]
     search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
+    if not search_set:
+        return jsonify({"error": "Search set item not found"}), 404
     search_set.delete()
     return jsonify({"complete": True})
 

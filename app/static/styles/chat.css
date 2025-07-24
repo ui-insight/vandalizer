@@ -15,3 +15,125 @@
       50%{background-size:calc(100%/3) 100%,calc(100%/3) 0%  ,calc(100%/3) 100%}
       66%{background-size:calc(100%/3) 100%,calc(100%/3) 100%,calc(100%/3) 0%  }
   }
+
+
+
+
+  .chat-card-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    gap: 10px;
+}
+
+.chat-card-suggestion {
+
+    background-color: rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: row;
+    justify-content: start;
+    align-items: center;
+    color: black;
+    text-align: center;
+    padding: 10px 22px;
+    flex: 1;
+}
+
+.chat-card-suggestion:hover {
+    background-color: rgba(0, 0, 0, 0.15);
+}
+
+.chat-card-suggestion p {
+    margin-left: 15px;
+    margin-top: 10px;
+}
+
+.chat-card-suggestion i {
+    font-size: 24px;
+}
+
+.chat-response-body > h1:first-of-type,
+.chat-response-body > h2:first-of-type {
+  margin-top: 0;
+}
+
+/* Animation for the send button */
+@keyframes pop-in {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Styles for the main chat input and controls container */
+.ask-question {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid hsl(var(--border)); /* Using CSS variables if you have them */
+    border-radius: 12px;
+    padding: 0.5rem;
+    background-color: hsl(var(--background)); /* Using CSS variables if you have them */
+}
+
+.chat-input-wrapper {
+    overflow-y: auto;
+    max-height: 25vh; /* max-h-96 is roughly 24rem or 384px */
+    padding: 10px 0px 20px 0px;
+    cursor: text;
+}
+
+#chatinput:focus {
+    outline: none;
+}
+
+.chat-controls-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-top: 5px;
+}
+
+/* Styling for the new "Tasks" link */
+.tasks-link-style {
+    color: #6c757d; /* Muted text color */
+    text-decoration: none;
+    font-size: 0.9em;
+    padding: 5px 7.5px;
+    transition: background-color 0.2s;
+    font-weight: 700; 
+    font-size: 16px; 
+    border: 1px solid #ced4da;
+}
+
+.tasks-link-style:hover {
+    background-color: #f0f0f0; /* Slight background on hover */
+    color: #343a40;
+}
+
+/* Basic styling for the model selector */
+.model-selector {
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-size: 0.9em;
+    background-color: #fff;
+}
+
+/* Send button styling */
+#send-chat-button {
+    padding: 6px;
+    display: flex; /* The button is now always visible */
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.2s ease-out; /* Smooth transition for dimming */
+}
+
+/* Style for when the button is inactive */
+#send-chat-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

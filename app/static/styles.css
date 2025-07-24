@@ -986,11 +986,6 @@ tr {
     border-left: 7px solid #f1b300;
 }
 
-.chat-response-body > h1:first-of-type,
-.chat-response-body > h2:first-of-type {
-  margin-top: 0;
-}
-
 .main-panel .header .row .col {
     /* bootstrap’s .col is already flex: 1 1 0%, but if yours isn’t: */
     flex: 1 1 0;
@@ -1013,40 +1008,6 @@ tr {
     margin: 0 30px; 
     padding-top: 0px;
   }
-
-
-  .chat-card-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-around;
-    gap: 10px;
-}
-
-.chat-card-suggestion {
-
-    background-color: rgba(0, 0, 0, 0.05);
-    display: flex;
-    flex-direction: row;
-    justify-content: start;
-    align-items: center;
-    color: black;
-    text-align: center;
-    padding: 10px 22px;
-    flex: 1;
-}
-
-.chat-card-suggestion:hover {
-    background-color: rgba(0, 0, 0, 0.15);
-}
-
-.chat-card-suggestion p {
-    margin-left: 15px;
-    margin-top: 10px;
-}
-
-.chat-card-suggestion i {
-    font-size: 24px;
-}
 
 .btn, .btn-primary {
     background-color: #f1b300;

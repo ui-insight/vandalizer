@@ -707,69 +707,65 @@
 
         console.log("Polling status for document ID:", docUuid); // Debugging line
 
-        $.get('/files/poll_status', { docid: docUuid }, function (data) {
-            updateStatusPanelForPolling(data);
-            console.log("Polling status for document: ", data.status);
+        $.ajax({
+            url: '/files/poll_status',
+            method: 'GET',
+            data: { docid: docUuid },
+            success: function (data) {
+                updateStatusPanelForPolling(data);
+                console.log("Polling status for document: ", data.status);
 
-            if (data.complete) {
+                if (data.complete) {
+                    // Processing is complete, update UI
+                    $('#loading-spinner, #processing-indicator').hide();
+                    $('#raw-text-icon').show();
+                    isProcessingFile = false;
 
-                // Processing is complete, update UI
-                $('#loading-spinner').hide();
-                $('#processing-indicator').hide();
-                $('#raw-text-icon').show();
-                isProcessingFile = false;
+                    if (processingFileOriginalText) {
+                        $('.processing-file-text-question-holder').text(processingFileOriginalText);
+                        $('.message-response, .message-you').remove();
+                        beginChat(processingFileOriginalText);
+                        processingFileOriginalText = "";
+                    }
 
+                    console.log("COMPLETED");
 
-                if (processingFileOriginalText != "") {
-                    $('.processing-file-text-question-holder').text(processingFileOriginalText);
-                    $('.message-response').remove();
-                    $('.message-you').remove();
-                    beginChat(processingFileOriginalText);
-                    processingFileOriginalText = "";
-                }
-
-                console.log("COMPLTED");
-
-                documentData = {
-                    id: docUuid,
-                    title: "",
-                    raw_text: data.raw_text
-                };
-
-                clearTimeout(pollTimeout);
-                // wait for the animation to finish
-                // setTimeout(function () {
-                //     // Reset animation step index
-                //     animationStepIndex = 0;
-                //     // Reset the container to its initial state
-                //     docLoaderProgressHandler.hide();
-                //     // Refresh the page to get the latest document
-                //     // window.location.reload();
-                // }, 10000);
-
-                var docContainer = $('.document-container');
-                if (docContainer.length > 0) {
-                    var docUuid = docContainer.data('doc-uuid');
-                    var isProcessing = docContainer.data('processing');
-                    // set processing to false
-                    docContainer.data('processing', false); // Set processing
-                }
-                updateDocumentSelections();
-
-                // No additional refresh needed per the requirement
-            }
-
-            else {
-                // Still processing, poll again after 5 seconds
-                pollTimeout = setTimeout(function () {
-                    var docContainer = $('.document-container');
-                    if (docContainer.length > 0) {
-                        let docUuid = docContainer.data('doc-uuid');
-                        pollStatus(docUuid);
+                    documentData = {
+                        id: docUuid,
+                        title: "",
+                        raw_text: data.raw_text
                     };
-                }, 5000);
 
-                isProcessingFile = true;
+                    clearTimeout(pollTimeout);
+
+                    const docContainer = $('.document-container');
+                    if (docContainer.length) {
+                        docContainer.data('processing', false);
+                    }
+                    updateDocumentSelections();
+                } else {
+                    // Still processing, poll again after 5 seconds
+                    isProcessingFile = true;
+                    pollTimeout = setTimeout(function () {
+                        const dc = $('.document-container');
+                        if (dc.length) {
+                            pollStatus(dc.data('doc-uuid'));
+                        }
+                    }, 5000);
+                }
+            },
+            error: function (xhr, status, error) {
+                if (xhr.status === 404) {
+                    // Document not found — stop polling and inform the user
+                    console.error("Document not found (404):", docUuid);
+                    clearTimeout(pollTimeout);
+                    isProcessingFile = false;
+                } else {
+                    // Some other error — you can choose to retry or stop
+                    console.error("Error polling status:", status, error);
+                    // Example: retry once after 10 seconds
+                    pollTimeout = setTimeout(() => pollStatus(docUuid), 10000);
+                }
             }
         });
     }
@@ -1243,7 +1239,7 @@
 
     function fetchWorkflow(workflow_uuid) {
         showScanning();
-        console.log("fetching workflow:" + workflow_uuid);
+        if (workflow_uuid == null || workflow_uuid == "") { return }
         current_workflow_id = workflow_uuid;
 
         let data = JSON.stringify({

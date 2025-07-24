@@ -214,6 +214,8 @@ def poll_status() -> ResponseReturnValue:
         )
     debug(f"Polling status for document UUID: {document_uuid}")
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        return jsonify({"error": "Document not found"}), 404
     debug(document)
     status_messages = []
     if document.task_status == "readying":

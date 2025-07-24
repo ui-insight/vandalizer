@@ -58,16 +58,16 @@ Upload Compliance:
 #         # filter
 
 models = [
-    {"name": "openai/gpt-4.1", "tag": "Cloud — Highest accuracy", "external": True},
+    {"name": "openai/gpt-4.1", "tag": "Cloud — Accurate", "external": True},
     {
         "name": "openai/gpt-4.1-nano",
-        "tag": "Cloud — Fastest response",
+        "tag": "Cloud — Fast",
         "external": True,
     },
-    {"name": "qwen3-32k:32b", "tag": "Secure — Highest accuracy", "external": False},
+    {"name": "qwen3-32k:32b", "tag": "Secure — Accurate", "external": False},
     {
         "name": "qwen2.5-32k:72b",
-        "tag": "Secure — Fastest response",
+        "tag": "Secure — Fast",
         "external": False,
     },
 ]

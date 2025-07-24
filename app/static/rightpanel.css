@@ -223,7 +223,7 @@ button.shadow-button:hover {
   width: 100%;
   /* height: 60px; */
   z-index: 100;
-  padding: 10px;
+  padding: 6px;
   background-color: #19191913;
 }
 
@@ -553,24 +553,20 @@ button.shadow-button:hover {
 
 /* pin the model selector absolutely */
   #model-text-icon {
-    position: absolute;
-    top: 65px;
-    right: 12px;
+
     /* z-index: 999; */
     display: inline-flex;
     align-items: center;
     cursor: pointer;
-    background: white;
-    padding: 4px 8px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    padding: 4px 6px;
     color: #5D6F81; 
     font-size: 12px;
   }
 
   #chat-model-popup-menu {
     position: absolute;
-    top: 100px;
-    right: 12px;
+    top: -90px;
+    right: 65px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: #5D6F81; 
     font-size: 12px;
