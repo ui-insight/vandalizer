@@ -10,6 +10,7 @@ from itertools import chain
 from pathlib import Path
 
 import pypandoc
+from bs4 import BeautifulSoup
 from bson import ObjectId
 from devtools import debug
 from flask import (
@@ -521,10 +522,27 @@ def convert_inline_markdown_to_tags(text):
     return text
 
 
+def sanitize_for_reportlab(html: str) -> str:
+    """
+    Convert <span style="color:…">…</span> into <font color="…">…</font>,
+    and drop any other <span> tags entirely.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    for span in soup.find_all("span"):
+        style = span.get("style", "")
+        # look for a color declaration
+        m = re.search(r"color\s*:\s*([^;]+)", style)
+        if m:
+            color = m.group(1).strip()
+            new_tag = soup.new_tag("font", color=color)
+            new_tag.string = span.get_text()
+            span.replace_with(new_tag)
+        else:
+            span.unwrap()
+    return str(soup)
+
+
 def generate_pdf_from_markdown(formatted_markdown: str):
-    """
-    Generates a PDF from a Markdown string using a robust parser.
-    """
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -534,79 +552,78 @@ def generate_pdf_from_markdown(formatted_markdown: str):
         topMargin=72,
         bottomMargin=18,
     )
-
     styles = getSampleStyleSheet()
-
-    # --- STYLE MODIFICATIONS (Corrected) ---
-    styles["h1"].fontSize = 18
-    styles["h1"].leading = 22
-    styles["h1"].spaceAfter = 12
-
-    styles["h2"].fontSize = 14
-    styles["h2"].leading = 18
-    styles["h2"].spaceAfter = 10
-
-    # Modify the existing 'h3' style instead of adding it
-    styles["h3"].fontSize = 12
-    styles["h3"].leading = 14
-    styles["h3"].spaceAfter = 8
-
-    # Modify the existing 'Bullet' style for all list items
-    styles["Bullet"].firstLineIndent = 0
-    styles["Bullet"].spaceBefore = 3
+    # … your style tweaks here …
 
     story = []
-
-    # Enhanced Parser
     lines = formatted_markdown.strip().split("\n")
-    in_ul = False
-    in_ol = False
+    in_ul = in_ol = False
     list_items = []
 
     for line in lines:
         line = line.strip()
-
+        # detect list items
         is_ul_item = line.startswith(("* ", "- "))
         is_ol_item = re.match(r"^\d+\.\s", line)
 
+        # close lists when they end
         if (in_ul and not is_ul_item) or (in_ol and not is_ol_item):
             story.append(
                 ListFlowable(list_items, bulletType="bullet" if in_ul else "1")
             )
+            story.append(Spacer(1, 0.1 * inch))
             list_items = []
             in_ul = in_ol = False
-            story.append(Spacer(1, 0.1 * inch))
 
+        # headings
         if line.startswith("# "):
-            text = convert_inline_markdown_to_tags(line[2:])
-            story.append(Paragraph(text, styles["h1"]))
+            raw = line[2:]
+            tag = "h1"
         elif line.startswith("## "):
-            text = convert_inline_markdown_to_tags(line[3:])
-            story.append(Paragraph(text, styles["h2"]))
+            raw = line[3:]
+            tag = "h2"
         elif line.startswith("### "):
-            text = convert_inline_markdown_to_tags(line[4:])
-            story.append(Paragraph(text, styles["h3"]))
-        elif is_ul_item:
-            if not in_ul:
-                in_ul = True
-            text = convert_inline_markdown_to_tags(line[2:])
-            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
-        elif is_ol_item:
-            if not in_ol:
-                in_ol = True
-            text = convert_inline_markdown_to_tags(re.sub(r"^\d+\.\s", "", line))
-            # Reuse the 'Bullet' style for numbered list items to avoid errors
-            list_items.append(ListItem(Paragraph(text, styles["Bullet"])))
-        elif line:
-            text = convert_inline_markdown_to_tags(line)
-            story.append(Paragraph(text, styles["Normal"]))
+            raw = line[4:]
+            tag = "h3"
+        else:
+            raw = line
+            tag = None
+
+        if tag:
+            html = convert_inline_markdown_to_tags(raw)
+            clean = sanitize_for_reportlab(html)
+            story.append(Paragraph(clean, styles[tag]))
+            continue
+
+        # unordered list
+        if is_ul_item:
+            in_ul = True
+            html = convert_inline_markdown_to_tags(line[2:])
+            clean = sanitize_for_reportlab(html)
+            list_items.append(ListItem(Paragraph(clean, styles["Bullet"])))
+            continue
+
+        # ordered list
+        if is_ol_item:
+            in_ol = True
+            text = re.sub(r"^\d+\.\s", "", line)
+            html = convert_inline_markdown_to_tags(text)
+            clean = sanitize_for_reportlab(html)
+            list_items.append(ListItem(Paragraph(clean, styles["Bullet"])))
+            continue
+
+        # normal paragraph
+        if line:
+            html = convert_inline_markdown_to_tags(line)
+            clean = sanitize_for_reportlab(html)
+            story.append(Paragraph(clean, styles["Normal"]))
             story.append(Spacer(1, 0.1 * inch))
 
+    # if the file ended with a list still open
     if in_ul or in_ol:
         story.append(ListFlowable(list_items, bulletType="bullet" if in_ul else "1"))
 
     doc.build(story)
-
     buf.seek(0)
     return send_file(
         buf,
