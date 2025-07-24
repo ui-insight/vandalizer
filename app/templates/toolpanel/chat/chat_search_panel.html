@@ -4,58 +4,39 @@
 
         <div class="ask-question-container">
             <div class="ask-question">
-                <div class="w-full sticky bottom-0  mx-auto">
-                    <div class="relative">
-                        <div>
-                            <div class="relative z-10">
-                                <div>
-                                    <fieldset style="padding-left: 15px;" data-has-accessory-warning="false"
-                                        class="flex items-start relative z-[5]">
-                                        <div
-                                            class="absolute bottom-full left-0 w-full text-center pb-1 px-2 sm:px-5 leading-tight [text-shadow:_0_0_0.25rem_hsl(var(--bg-200))]">
-                                        </div>
-                                        <div class="flex flex-col flex-1">
-                                            <div class="flex items-start gap-4">
-                                                <div class="flex-1">
-                                                    <div class="flex items-center flex-grow break-words min-w-0">
-                                                        <div class="flex flex-col w-full">
-                                                            <div
-                                                                class="overflow-y-auto w-full max-h-96 break-words py-4">
-                                                                <div style="padding-top: 5px;" id="chatinput"
-                                                                    contenteditable="true" translate="no"
-                                                                    enterkeyhint="enter" tabindex="0"
-                                                                    class="ProseMirror break-words max-w-[60ch]">
-                                                                    <p style="margin: 0px; color: darkgray;"
-                                                                        id="chatplaceholder"
-                                                                        data-placeholder="Chat with your document..."
-                                                                        class="is-empty is-editor-empty before:!text-text-500 before:whitespace-nowrap">
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                <div class="grid  grid-flow-col  items-center">
-                                                    <button class="btn btn-secondary tasks-btn"
-                                                        style="margin-right: 5px; padding: 15px;">
-                                                        <span><i class="fa-solid fa-diagram-project"
-                                                                style="padding-right: 5px;"></i>Tasks
-                                                            </li>
-                                                        </span>
-                                                    </button>
-                                                    <button class="btn btn-primary" id="chat-button">
-                                                        <span style="font-size: 2em;">
-                                                            <i class="fa-brands fa-searchengin"></i>
-                                                        </span>
-                                                    </button>
-
-                                                </div>
-                                            </div>
-                                    </fieldset>
-                                </div>
-                            </div>
-                        </div>
+                <div class="chat-input-wrapper" onclick="document.getElementById('chatinput').focus();">
+                    <div id="chatinput" contenteditable="true" translate="no" enterkeyhint="enter" tabindex="0"
+                        class="ProseMirror break-words max-w-[60ch]">
+                        <p style="margin: 0px; font-weight: 500; font-size: 14px; color: black;" id="chatplaceholder"
+                            data-placeholder="Chat with your document..."
+                            class="is-empty is-editor-empty before:!text-text-500 before:whitespace-nowrap">
+                        </p>
                     </div>
+                </div>
+
+                <div class="chat-controls-toolbar">
+                    <a href="#" id="tasks-link" class="tasks-link-style btn-secondary">
+                        <i class="fa-solid fa-diagram-project" style="padding-right: 5px; font-weight: 700;"></i>Tasks
+                    </a>
+
+                    <div style="flex-grow: 1;"></div>
+
+
+                    <!-- pinned model selector - populated from javascript -->
+                    <a href="javascript:void(0);" id="model-text-icon">
+                    </a>
+                    <div id="chat-model-popup-menu" class="file-popup-menu" style="display: none;">
+                        <ul id="chat-model-popup-menu-options">
+                            <li id="download-pdf-option">PDF</li>
+                            <li id="download-csv-option">CSV</li>
+                            <li id="download-text-option">Text</li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary" id="send-chat-button" disabled>
+                        <span style="font-size: 1.2em;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </span>
+                    </button>
                 </div>
             </div>
         </div>

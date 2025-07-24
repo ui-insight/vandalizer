@@ -1171,11 +1171,6 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
 
-        debug(workflow_step_task)
-        debug(workflow_step.tasks)
-        debug(workflow_step)
-        debug(workflow)
-
         return jsonify({"response": "success"})
     return None
 
