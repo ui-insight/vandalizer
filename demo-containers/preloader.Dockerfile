@@ -5,4 +5,4 @@ FROM alpine:latest
 COPY demo-data/files/ /srv/files
 
 # Default command (replace with your app’s start command if needed)
-CMD ["cp", "-r", "/srv/files/*", "/app/app/static/uploads/"]
+CMD ["/bin/sh", "-c", "cp -r /srv/files/* /app/app/static/uploads/"]
