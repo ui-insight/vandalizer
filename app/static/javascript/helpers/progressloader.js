@@ -81,6 +81,10 @@ class ProgressLoader {
     }, 500); // Match fade-out duration
   }
 
+  fastHide() {
+    this.rootContainer.style.display = "none";
+  }
+
   /**
    * Sets the main message and optional sub-message.
    * @param {string} message - The primary message.

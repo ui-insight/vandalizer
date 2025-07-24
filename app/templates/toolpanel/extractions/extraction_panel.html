@@ -97,6 +97,8 @@
                 style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
         <div class="extraction-tools-panel-content">
 
+
+            {% if search_set.extraction_items()|length == 0 %}
             <a class="content-btn" id="build-extraction-from-document-btn" data-uuid="{{ search_set.uuid }}">
                 <div class="add-task">
                     <div class="add-task-icon-container">
@@ -109,6 +111,7 @@
                     </div>
                 </div>
             </a>
+
 
             <div class="dimmed">
                 <a class="content-btn"> <!-- id="build-extraction-from-fillable-pdf-btn"> -->
@@ -125,6 +128,8 @@
                     </div>
                 </a>
             </div>
+            {% endif %}
+
             <input type="file" style="display: none;" id="fillable-pdf-input" name="fillable-pdf-input" accept=".pdf" />
             <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
                 <div class="add-task">
