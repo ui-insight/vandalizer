@@ -257,7 +257,7 @@ class DocumentNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Document")
         self.docs = data.get("docs", [])
-        self.attachments = data.get("attachments", [])
+        self.attachments = []  # data.get("attachments", [])
         self.pdf_paths = []
         user_id = data.get("user_id", "0")
 
@@ -265,10 +265,10 @@ class DocumentNode(Node):
         # self.content = ""
         self.docs_uuids = []
         self.content = ""
-        for doc in self.attachments:
-            if doc is None:
-                continue
-            self.docs_uuids.append(doc.uuid)
+        # for doc in self.attachments:
+        #     if doc is None:
+        #         continue
+        #     self.docs_uuids.append(doc.uuid)
 
         for doc in self.docs:
             if doc is None:
