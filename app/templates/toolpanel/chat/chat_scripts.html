@@ -1,5 +1,5 @@
 <script>
-    const placeholderText = "Chat with your document...";
+    const placeholderText = "Ask anything about this document…";
     let chatReponse = null;
 
     // This function runs once the page is fully loaded
@@ -32,14 +32,20 @@
 
     // Updated keydown listener for Enter and the new Backspace feature
     $("#chatinput").on("keydown", function (event) {
-        const isEmpty = $(this).text().trim().length === 0;
+        const text = $(this).text().trim();
 
-        // Fix: This condition now ONLY checks for "Backspace" and ignores "Delete".
-        if (event.key === "Backspace" && isEmpty) {
-            event.preventDefault(); // Prevent browser from navigating back
+
+        // Prevent a leading space in an empty editor
+        if (event.key === " " && text.length === 0) {
+            event.preventDefault();
+            return;
         }
 
-        // Submit on Enter, but only if the button is not disabled
+        // Prevent Backspace → browser‑back when empty
+        if (event.key === "Backspace" && text.trim().length === 0) {
+            event.preventDefault();
+        }
+
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             if (!$("#send-chat-button").is(":disabled")) {
@@ -47,6 +53,7 @@
             }
         }
     });
+
 
     // Click handler for the send button
     $("#send-chat-button").on("click", function (e) {
@@ -92,8 +99,9 @@
         let messageHtml = "<p><div class='message-you'>" + questionToDisplay + "</div></p>";
         $("#chat-panel").append(messageHtml);
 
-        $("#chatinput").text("");
-        $("#chatplaceholder").attr("data-placeholder", placeholderText);
+        $("#chatinput").text(""); // Clear the text
+        $("#chatinput").addClass("is-empty is-editor-empty"); // Re-apply classes
+        $("#chatinput").attr("data-placeholder", placeholderText); // Ensure data-attribute is set
 
         let responseId = "response-" + new Date().getTime();
         $("#chat-panel").append(
