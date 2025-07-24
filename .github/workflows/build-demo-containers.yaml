@@ -1,0 +1,36 @@
+name: Build and Push Docker Image
+on:
+  workflow_dispatch: ~
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set outputs
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Mongodb image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}-demo-mongo:${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-demo-mongo:${{ github.ref_name }}
+          file: ./demo-containers/preloaded-mongodb.Dockerfile
+      - name: Build and push Preloader image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}-demo-preload:${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-demo-preload:${{ github.ref_name }}
+          file: ./demo-containers/preloader.Dockerfile

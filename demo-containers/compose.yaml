@@ -1,0 +1,63 @@
+services:
+  vandalizer-preload:
+    image: ghcr.io/vandalizer:latest
+    networks:
+      - vandalizer
+    volumes:
+      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
+    entrypoint:
+      - sh preload_files.sh
+  redis:
+    image: redis/redis-stack:latest
+    ports:
+      - "6379:6379"
+    networks:
+      - vandalizer
+  mongo:
+    image: ghcr.io/vandalizer-demo-mongo:latest
+    ports:
+      - "27018:27017"
+    networks:
+      - vandalizer
+  celery:
+    image: ghcr.io/vandalizer:latest
+    depends_on:
+      - redis
+      - mongo
+      - vandalizer-preload
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_HOST=mongodb://mongo:27017
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - vandalizer
+    volumes:
+      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
+    entrypoint: sh run_celery.sh
+  web:
+    image: ghcr.io/vandalizer:latest
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
+      - mongo
+      - celery
+      - vandalizer-preload
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_HOST=mongodb://mongo:27017
+      - FLASK_ENV=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    networks:
+      - vandalizer
+    volumes:
+      - "/tmp/vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}:/app/app/static/uploads"
+
+networks:
+  vandalizer:
+    name: "vandalizer-${VANDALIZER_INSTANCE_NUMBER:-0}"
+    external: false
+    ipam:
+      driver: default
+      config:
+        - subnet: "10.20.${VANDALIZER_INSTANCE_NUMBER:-0}.0/24"
