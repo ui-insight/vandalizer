@@ -156,8 +156,23 @@ def run_workflow() -> ResponseReturnValue:
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     workflow_result.save()
+    workflow = Workflow.objects(id=workflow_id).first()
+    for attachment in workflow.attachments:
+        if attachment:
+            attachment.delete()
+
+    # Clear the attachments list from the workflow and save
+    workflow.attachments = []
+    workflow.save()
+
+    if not workflow:
+        return jsonify({"status": "error", "message": "Workflow not found"}), 404
+
+    workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
+    workflow_result.save()
+
     attachments = [
-        SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
+        # SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
     ]
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
 
