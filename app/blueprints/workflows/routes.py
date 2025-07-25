@@ -697,13 +697,7 @@ def workflow_download() -> ResponseReturnValue:
     chat_agent = create_chat_agent(model)
     # get current event loop
     # if there is no current loop, create a new one
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    formatted = loop.run_until_complete(
-        chat_agent.run(prompt),
-    )
+    formatted = asyncio.run(chat_agent.run(prompt))
     formatted = formatted.output
 
     # Remove the tick marks before and after blocks
