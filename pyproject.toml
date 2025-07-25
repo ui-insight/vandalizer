@@ -60,6 +60,7 @@ dependencies = [
     "markitdown[all]>=0.1.2",
     "jsonschema",
     "markdown>=3.8.2",
+    "flower>=2.0.1",
 ]
 
 

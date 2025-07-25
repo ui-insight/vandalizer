@@ -20,7 +20,9 @@ load_dotenv()
 chat_agent = create_chat_agent(settings.base_model)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+@celery_app.task(bind=True, name="tasks.upload.validation.chunk",
+                    autoretry_for=(Exception,),
+                 max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def validate_chunk(
     self, document_path: str, compliance: str, chunk_text: str, index: int, total: int
 ) -> dict:
@@ -49,7 +51,9 @@ def validate_chunk(
         raise self.retry(exc=e)
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+@celery_app.task(bind=True, name="tasks.upload.validation.summary",
+                 autoretry_for=(Exception,),
+                 max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def summarize_results(self, results: list, document_uuid: str) -> dict:
     """
     Summarize validation feedback from all chunks and update the SmartDocument.
@@ -95,7 +99,9 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
     return summary
 
 
-@celery_app.task(bind=True, max_retries=3, default_retry_delay=5, rate_limit="1/s")
+@celery_app.task(bind=True, name="tasks.upload.validation",
+                 autoretry_for=(Exception,),
+                 max_retries=3, default_retry_delay=5, rate_limit="1/s")
 def perform_document_validation(
     self,
     document_text: str,

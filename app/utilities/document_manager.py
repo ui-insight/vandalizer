@@ -33,7 +33,7 @@ MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
 
-@celery_app.task
+@celery_app.task(name="tasks.document.extraction", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def perform_extraction_and_update(document_uuid, extension):
     document = SmartDocument.objects(uuid=document_uuid).first()
     absolute_path = document.absolute_path
@@ -102,14 +102,14 @@ def perform_extraction_and_update(document_uuid, extension):
         return raw_text
 
 
-@celery_app.task
+@celery_app.task(name="tasks.document.update", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_id = None
     document.save()
 
 
-@celery_app.task
+@celery_app.task(name="tasks.document.cleanup", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def cleanup_document(document_uuid: str):
     """
     Delete the document record and its file when validation or ingestion fails.
@@ -122,7 +122,8 @@ def cleanup_document(document_uuid: str):
     document.save()
 
 
-@celery_app.task
+@celery_app.task(name="tasks.document.semantic_ingestion",
+    autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
 def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_status = "readying"

@@ -607,7 +607,11 @@ class WorkflowManager:
             )
 
 
-@celery_app.task(bind=True, name="workflow.execute_workflow")
+@celery_app.task(bind=True, name="tasks.workflow.execution",
+                 autoretry_for=(Exception,),
+                 rate_limit="1/s",
+                 max_retries=3, default_retry_delay=5
+                 )
 def execute_workflow_task(
     self, workflow_result_id, workflow_id, workflow_trigger_step_id, model
 ):
@@ -664,7 +668,7 @@ def execute_workflow_task(
     }
 
 
-@celery_app.task(bind=True, name="workflow.execute_workflow_step_test")
+@celery_app.task(bind=True, name="tasks.workflow.execution_step_test")
 def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
     process_node = None
     latest_output = None
