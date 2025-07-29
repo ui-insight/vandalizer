@@ -112,7 +112,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
     debug(model)
     if len(docs) == 0:
         full_text = json.dumps(data)
-        output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
+        output_prompt = f"""Following the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot.\n\nInstruction: {prompt}\n\n {full_text}"""
         chat_agent = create_chat_agent(model)
         result = chat_agent.run_sync(output_prompt)
         output = result.output
@@ -147,8 +147,7 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
     output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
 
     debug(output)
-    prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
-    prompt += "\n\n"
+    prompt = "Format the extracted data as a nicely formatted markdown with the extracted data as bullet points. Show only the extracted data in the output and no other text. Do not include any explanations or additional text.\n\n"
     prompt += json.dumps(output, indent=4)
     chat_agent = create_chat_agent(model)
     result = chat_agent.run_sync(prompt)
@@ -157,13 +156,11 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
 
 def format_model(model, formatting_prompt, text):
     system_prompt = """
-Follow the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. Always use html instead of markdown. Convert markdown to html. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.
+Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot.
 CRITICAL:
 - The formatted text should be a list of bullet points with the extracted data json data.
 - The bullet points should be in a list format.
-- Do not use markdown or json format by default, but use html format.
-- If the user requests some formatting that looks like markdown, convert it as html.
-    """
+"""
 
     # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
