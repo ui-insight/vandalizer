@@ -1526,7 +1526,6 @@
             type: 'GET',
             dataType: 'json',
             success: function (data) {
-                console.log(data);
                 //const { steps_completed, total_steps, status } = data;
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
@@ -1534,7 +1533,6 @@
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
-                        console.log("hereeee");
                         stopSpinningJoe();
                         clearInterval(workflow_interval_id);
                         resetWorkflowButton();
@@ -1590,8 +1588,11 @@
                         let outputText = workflow_response
                             .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
 
-                        // replace \",\" with <hr> in the html output
-                        outputText = outputText.replace(/\",\"/g, '<hr>');
+                        outputText = marked.parse(outputText, {
+                            gfm: true,
+                            breaks: true,
+                            sanitize: true
+                        });
 
                         $('.workflow-output-section').empty();
                         $('.workflow-output-section').show();
