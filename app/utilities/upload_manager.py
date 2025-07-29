@@ -39,10 +39,7 @@ def validate_chunk(
         Compliance Requirements:\n{compliance}
         Document Text Chunk:\n{chunk_text}
         """
-        # Run the agent synchronously in its own event loop
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(upload_agent.run(prompt))
+        result = upload_agent.run_sync(prompt)
         output = result.output
         debug(f"Chunk {index}/{total} validation result: {output}")
         return {"valid": output.valid, "feedback": output.feedback, "index": index}
@@ -71,16 +68,12 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
         combined = "\n\n".join(feedback_list)
 
     # Summarize via chat_agent
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     try:
-        summary = loop.run_until_complete(
-            upload_agent.run(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
+        summary = upload_agent.run_sync(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
 
     Validation feedback:
     {combined}
     """)
-        )
     except Exception as e:
         debug(f"Error summarizing results: {e}")
         self.retry(exc=e)

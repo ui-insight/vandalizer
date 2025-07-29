@@ -114,9 +114,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         full_text = json.dumps(data)
         output_prompt = f"""Following the instruction and output your answer as a nicely formatted html to display in a web interface chat bot. The html tags should fit nicely in a div on the page and not break formatting. Do not include newline break and quotes that break the formatting. Do not show ```html before the html.\n\nInstruction: {prompt}\n\n {full_text}"""
         chat_agent = create_chat_agent(model)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(chat_agent.run(output_prompt))
+        result = chat_agent.run_sync(output_prompt)
         output = result.output
         debug(f"Output from chat agent: {output}")
         output = format_llm_output(output).strip()
@@ -152,11 +150,8 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
     prompt = "Format the extracted data as a nicely formatted html with the extracted data as bullet points. Do not include newline break and quotes that break the formatting. Do not show ```html before the html."
     prompt += "\n\n"
     prompt += json.dumps(output, indent=4)
-    loop = asyncio.new_event_loop()
-
     chat_agent = create_chat_agent(model)
-    asyncio.set_event_loop(loop)
-    result = loop.run_until_complete(chat_agent.run(prompt))
+    result = chat_agent.run_sync(prompt)
     return result.output
 
 
@@ -173,9 +168,7 @@ CRITICAL:
     # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_agent = create_chat_agent(model)
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    response = loop.run_until_complete(chat_agent.run(prompt))
+    response = chat_agent.run_sync(prompt)
     response = response.output
 
     debug(response)

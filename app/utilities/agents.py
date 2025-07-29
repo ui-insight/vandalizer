@@ -209,13 +209,8 @@ def retrieve(
     """
     if docs_ids is None:
         docs_ids = []
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    prompt_response = loop.run_until_complete(
-        prompt_agent.run(
-            f"Generate a prompt for the following user question: {question}",
-        )
+    prompt_response = prompt_agent.run_sync(
+        f"Generate a prompt for the following user question: {question}",
     )
     prompt = prompt_response.output
     debug(prompt)
@@ -496,15 +491,6 @@ def extract_entities_with_agent(
 
     """
     # check if previous extraction exists in cache
-    cache_key = f"Keys:{keys}\n\nText:{text}"
-    llm_string = "pydantic_model:openai:gpt-4o"
-
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    except RuntimeError:
-        # Handle the case where the event loop is already running
-        loop = asyncio.get_event_loop()
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -532,11 +518,9 @@ def extract_entities_with_agent(
             keys=uncached_keys,
         )
 
-        result = loop.run_until_complete(
-            field_inference_agent.run(
-                "Infer the types of the keys",
-                deps=field_inference_deps,
-            )
+        result = field_inference_agent.run_sync(
+            "Infer the types of the keys",
+            deps=field_inference_deps,
         )
 
         new_fields = result.output
@@ -609,9 +593,7 @@ def extract_entities_with_agent(
     )
     try:
         # Run the agent synchronously
-        extraction = loop.run_until_complete(
-            extractor_agent.run(text, deps=extractor_deps)
-        )
+        extraction = extractor_agent.run_sync(text, deps=extractor_deps)
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)

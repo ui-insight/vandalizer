@@ -73,7 +73,7 @@ rm -f pids/celery_worker*.pid logs/celery_worker*.log
 
 # Start new workers with LOCAL log and pid directories
 echo "Starting new workers..."
-celery -A $CELERY_APP multi start $WORKER_COUNT \
+celery -A $CELERY_APP multi restart $WORKER_COUNT \
     --pidfile=pids/celery_%n.pid \
     --logfile=logs/celery_%n%I.log \
     --loglevel=$LOG_LEVEL \

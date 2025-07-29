@@ -90,6 +90,11 @@ BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
 TEST_BROWSER = "chrome"
 
+[dependency-groups]
+dev = [
+    "ipython>=9.4.0",
+]
+
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"
 skip_install = true
