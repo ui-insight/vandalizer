@@ -45,15 +45,18 @@ def inject_current_model():
     and makes `current_model` available in all templates.
     """
     user = load_user()
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    models = [m.model_dump() for m in settings.models]
-    current_model = settings.base_model
-    if model_config:
-        current_model = model_config.name
-        if len(model_config.available_models) > 0:
-            models = json.loads(json.dumps(model_config.available_models))
+    if user:
+        model_config = UserModelConfig.objects(user_id=user.user_id).first()
+        models = [m.model_dump() for m in settings.models]
+        current_model = settings.base_model
+        if model_config:
+            current_model = model_config.name
+            if len(model_config.available_models) > 0:
+                models = json.loads(json.dumps(model_config.available_models))
 
-    return {"current_model": current_model, "models": models}
+        return {"current_model": current_model, "models": models}
+
+    return {"current_model": "", "models": []}
 
 
 def verify_document(document: SmartDocument, user_id: str) -> None:
@@ -349,7 +352,6 @@ def chat() -> ResponseReturnValue:
     model = settings.base_model
     if model_config:
         model = model_config.name
-
 
     if model == "qwen3-32k:32b":
         response = OpenAIInterface().ask_question_to_documents(
