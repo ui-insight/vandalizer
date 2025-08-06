@@ -19,6 +19,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from flask_login import current_user, login_required
 from pypdf import PdfReader
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
@@ -70,9 +71,10 @@ def is_valid_file_content(file_data, extension):
     return False
 
 
+@login_required
 @files.route("/upload", methods=["POST"])
 def upload():
-    user = load_user()
+    user = current_user
     if not user:
         return redirect(url_for("auth.login"))
 

@@ -8,16 +8,14 @@ from devtools import debug
 from flask import (
     Response,
     current_app,
-    redirect,
     render_template,
     request,
     send_from_directory,
     session,
     stream_with_context,
-    url_for,
 )
 from flask.typing import ResponseReturnValue
-from flask_dance.contrib.azure import azure
+from flask_login import current_user, login_required
 from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
@@ -33,7 +31,7 @@ from app.models import (
 )
 from app.utilities.config import settings
 from app.utilities.openai_interface import OpenAIInterface
-from app.utils import is_dev, load_user
+from app.utils import load_user
 
 from . import home
 
@@ -83,26 +81,12 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     #         document.save()
 
 
+@login_required
 @home.route("/")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
     # production environment
-    if not is_dev():
-        if not azure.authorized:
-            return redirect(url_for("azure.login"))
-        if "user_id" not in session:
-            debug("No user session")
-            resp = azure.get("/v1.0/me")
-            user_info = resp.json()
-            if "id" not in user_info:
-                debug("Got nothing from azure")
-                session["user_id"] = "admin"
-            else:
-                debug("Got user info from azure")
-                user_id = user_info["id"]
-                session["user_id"] = user_id
-
-    user = load_user()
+    user = current_user
     user_id = user.user_id
     section = request.args.get("section", default="Assistant").strip()
 
@@ -349,7 +333,6 @@ def chat() -> ResponseReturnValue:
     model = settings.base_model
     if model_config:
         model = model_config.name
-
 
     if model == "qwen3-32k:32b":
         response = OpenAIInterface().ask_question_to_documents(

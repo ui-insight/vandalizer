@@ -18,6 +18,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from flask_login import current_user, login_required
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
@@ -32,13 +33,14 @@ from app.utils import load_user
 from . import tasks
 
 
+@login_required
 @tasks.route("/model/filter", methods=["POST"])
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])
     debug(data)
     validation_failed = False
-    user = load_user()
+    user = current_user
 
     settings_models = [m.model_dump() for m in settings.models]
     debug(settings_models)
@@ -81,6 +83,7 @@ def filter_models() -> ResponseReturnValue:
     return jsonify({"models": models, "current_model": current_model})
 
 
+@login_required
 @tasks.route("/model/update", methods=["POST"])
 def update_model() -> ResponseReturnValue:
     """Update the model for a search set."""
@@ -90,7 +93,7 @@ def update_model() -> ResponseReturnValue:
     temperature = data.get("temperature", 0.7)
     top_p = data.get("top_p", 0.9)
 
-    user = load_user()
+    user = current_user
 
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config is None:
@@ -108,10 +111,11 @@ def update_model() -> ResponseReturnValue:
 
 
 # Add a extraction set
+@login_required
 @tasks.route("/extraction/add_search_set", methods=["POST"])
 def add_search_set() -> ResponseReturnValue:
     """Add a new search set."""
-    user = load_user()
+    user = current_user
     if user is None:
         return redirect(url_for("login"))
 
@@ -134,6 +138,7 @@ def add_search_set() -> ResponseReturnValue:
 
 
 # Add a term to a search set
+@login_required
 @tasks.route("/extraction/add_search_term", methods=["POST"])
 def add_search_term() -> ResponseReturnValue:
     """Add a term to an existing search set."""
@@ -146,7 +151,7 @@ def add_search_term() -> ResponseReturnValue:
     attachments = data.get("attachments", None)
 
     if searchset.is_global:
-        user = load_user()
+        user = current_user
         if not user.is_admin:
             return jsonify(
                 {
@@ -178,6 +183,7 @@ def add_search_term() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/add_prompt", methods=["POST"])
 def add_prompt() -> ResponseReturnValue:
     """Add a new prompt to the database."""
@@ -191,7 +197,7 @@ def add_prompt() -> ResponseReturnValue:
             {"complete": False, "error": "Title and prompt cannot be empty."},
         )
 
-    user = load_user()
+    user = current_user
 
     searchsetitem = SearchSetItem(
         searchphrase=prompt,
@@ -308,10 +314,11 @@ def grab_template() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/extraction/update_title", methods=["POST"])
 def update_extraction_title() -> ResponseReturnValue:
     """Update the title of an extraction step."""
-    user = load_user()
+    user = current_user
     if user is None:
         return redirect(url_for("login"))
     extraction_data = request.get_json()
@@ -480,6 +487,7 @@ def begin_search() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/extract/build_from_document", methods=["POST"])
 def build_extraction_from_document() -> ResponseReturnValue:
     """Build extraction from document."""
@@ -495,7 +503,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
     em = ExtractionManager3()
     em.root_path = current_app.root_path
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
     if model_config is not None:
@@ -586,6 +594,7 @@ def delete_search_set_item() -> ResponseReturnValue:
     return jsonify({"complete": True})
 
 
+@login_required
 @tasks.route("/begin_prompt_search", methods=["POST"])
 def begin_prompt_search() -> ResponseReturnValue:
     """Begin a prompt search."""
@@ -596,7 +605,7 @@ def begin_prompt_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     items = search_set.items()
 
-    user = load_user()
+    user = current_user
     user_id = user.user_id
 
     if len(items) > 0:
