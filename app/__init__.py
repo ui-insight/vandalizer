@@ -142,7 +142,7 @@ app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
-AUTH_MODE = "AZURE" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
+AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
 app.logger.info(f"Authentication mode set to: {AUTH_MODE}")
 
 if AUTH_MODE == "AZURE":
