@@ -15,6 +15,7 @@ from pydantic_ai.messages import (
     ModelResponse,
 )
 from pypdf import PdfReader
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import app
 
@@ -109,6 +110,31 @@ class User(me.Document):
 
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
+    password_hash = me.StringField()
+
+    def set_password(self, password):
+        """Create a hashed password."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Check a hashed password."""
+        return check_password_hash(self.password_hash, password)
+
+    # You might need to add this if you use Flask-Login
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.user_id
 
 
 class SmartDocument(me.Document):
