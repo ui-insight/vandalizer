@@ -3,6 +3,7 @@
 import json
 import uuid
 from itertools import chain
+from markupsafe import escape
 
 from devtools import debug
 from flask import (
@@ -329,6 +330,11 @@ def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
     message = data["message"]
+    debug("Message received:", message)
+    message = escape(message)
+    debug("Sanitized message:", message)
+    # sanitize message
+
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
