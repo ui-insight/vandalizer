@@ -123,9 +123,13 @@
         // Get the current document
         if (documentData) {
             const modal = document.getElementById("rawTextModal");
-            const rawText = documentData.raw_text;
+            const rawText = marked.parse(documentData.raw_text, {
+                gfm: true,
+                breaks: false,
+            });
+
             const rawTextContent = document.getElementById("rawTextContent");
-            rawTextContent.textContent = rawText;
+            rawTextContent.innerHTML = rawText;
             $('#rawTextModal').show();
         }
     }
