@@ -4,6 +4,7 @@ import os
 import uuid
 from copy import deepcopy
 from pathlib import Path
+from markupsafe import escape
 
 from devtools import debug
 from flask import (
@@ -139,6 +140,7 @@ def add_search_term() -> ResponseReturnValue:
     """Add a term to an existing search set."""
     data = request.get_json()
     searchphrase = data["term"]
+    searchphrase = escape(searchphrase)
     searchset_uuid = data["search_set_uuid"]
     searchset = SearchSet.objects(uuid=searchset_uuid).first()
     searchtype = data["searchtype"]
@@ -184,6 +186,9 @@ def add_prompt() -> ResponseReturnValue:
     data = request.get_json()
     title = data["title"]
     prompt = data["prompt"]
+    # sanitize the input
+    title = escape(title)
+    prompt = escape(prompt)
     space_id = data["space_id"]
     prompt_type = data["prompt_type"]
     if title == "" or prompt == "":
