@@ -33,3 +33,7 @@ htmlcov/
 
 /app/static/db/
 /.python-version
+/data/
+*.log
+/logs/
+/pids/

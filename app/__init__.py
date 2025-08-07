@@ -55,6 +55,12 @@ def create_app() -> Flask:
         CELERY=dict(
             broker_url=f"redis://{REDIS_HOST}:6379/0",
             result_backend=f"redis://{REDIS_HOST}:6379/1",
+            task_default_queue="default",
+            task_routes={
+                "tasks.documents.*": {"queue": "documents"},
+                "tasks.workflow.*": {"queue": "workflows"},
+                "tasks.upload.*": {"queue": "uploads"},
+            },
         ),
     )
     app.config.from_prefixed_env()

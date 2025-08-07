@@ -60,6 +60,7 @@ dependencies = [
     "markitdown[all]>=0.1.2",
     "jsonschema",
     "markdown>=3.8.2",
+    "flower>=2.0.1",
 ]
 
 
@@ -88,6 +89,11 @@ commands = [["pytest"]]
 BASE_URL = "https://vandalizer-dev.nkn.uidaho.edu"
 TEST_BROWSER_HEADLESS = "true"
 TEST_BROWSER = "chrome"
+
+[dependency-groups]
+dev = [
+    "ipython>=9.4.0",
+]
 
 [tool.tox.env.selenium_chrome]
 description = "Run Selenium tests"
