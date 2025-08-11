@@ -179,7 +179,7 @@ def create_upload_agent(agent_model):
     return Agent(
         model,
         system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
-        result_type=UploadResult,
+        output_type=UploadResult,
     )
 
 
@@ -351,47 +351,6 @@ def get_cache_key(key: str, context: str) -> str:
     """Generate consistent cache key for a field."""
     return f"field_type:{key}:{context}"
 
-
-@field_inference_agent.result_validator
-def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str):
-    formatted_response = remove_code_markers(response)
-    if langfuse_enabled:
-        langfuse.trace(
-            name="validate_fields_types",
-            input=formatted_response,
-        )
-
-    try:
-        inferred_fields = json.loads(formatted_response)
-    except Exception as e:
-        msg = f"Failed to parse type inference response: {e!s}"
-        raise ModelRetry(msg)
-
-    # Modified validation logic
-    fields = {}
-    for key, type_str in inferred_fields.items():
-        try:
-            # Get type with fallback to Optional[str]
-            field_type = type_mapping.get(type_str.strip(), (Optional[str], None))
-
-            # Ensure Optional fields get None default
-            if "Optional" in type_str:
-                field_type = (field_type[0], None)
-
-            fields[key] = field_type
-        except Exception as e:
-            if langfuse_enabled:
-                langfuse.span(name="validation_error", input=e)
-            msg = f"Invalid type for field {key}: {e!s}"
-            raise ModelRetry(msg)
-
-    # Add fallback for missing keys (shouldn't happen but just in case)
-    requested_keys = context.deps.keys
-    for key in requested_keys:
-        if key not in fields:
-            fields[key] = (Optional[str], None)  # Default to optional string
-
-    return fields
 
 
 @dataclass
