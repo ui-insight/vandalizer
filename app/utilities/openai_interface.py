@@ -2,10 +2,21 @@ import asyncio
 import json
 import os
 
+import asyncio
+
 import openai
 from devtools import debug
 from dotenv import load_dotenv
-from pydantic_ai.messages import ModelMessagesTypeAdapter
+from pydantic_ai.messages import (
+    ModelMessagesTypeAdapter,
+    PartDeltaEvent,
+    TextPartDelta,
+    ThinkingPartDelta,
+    PartStartEvent,
+    TextPart,
+    ThinkingPart,
+)
+from pydantic_ai import Agent
 
 from app.models import (
     MAX_CHAT_MESSAGES,
@@ -21,6 +32,7 @@ from app.utilities.llm_helpers import (
     remove_xml_content,
 )
 from app.utilities.redis_cache import RedisCache
+import logging
 
 load_dotenv()
 
@@ -32,6 +44,9 @@ cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
 # TODO remove the formatting of the answer from the OpenAIInterface class
 # it is taking so much time to execute the call
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 # TODO we might need to rename the class
@@ -47,7 +62,7 @@ class OpenAIInterface:
         prompt = ""
         if len(item.text_blocks) > 0:
             prompt = (
-                """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted html div.\nQuestion:\n"""
+                """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted markdown.\nQuestion:\n"""
                 + item.searchphrase
             )
 
@@ -58,7 +73,7 @@ class OpenAIInterface:
             # print(prompt)
         else:
             prompt = (
-                """Given the following document, answer the following question. Return the result as nicely formatted html.:\nQuestion:\n"""
+                """Given the following document, answer the following question. Return the result as nicely formatted markdown.:\nQuestion:\n"""
                 + item.searchphrase
                 + "\n\nDocument:\n"
                 + self.loaded_doc
@@ -69,12 +84,8 @@ class OpenAIInterface:
         if model_config is not None:
             model = model_config.name
         chat_agent = create_chat_agent(model)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            chat_agent.run(
-                messages=[{"role": "user", "content": prompt}],
-            )
+        result = chat_agent.run_sync(
+            messages=[{"role": "user", "content": prompt}],
         )
 
         return result.output
@@ -153,7 +164,7 @@ class OpenAIInterface:
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted html div. Do not include the question in your response."""
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."""
 
         previous_messages, cache_key, llm_string = OpenAIInterface.get_cache_messages(
             user_id=user_id,
@@ -215,9 +226,6 @@ class OpenAIInterface:
         user_id = prepared_data["user_id"]
         full_text = prepared_data["full_text"]
 
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
         answer = None
 
         try:
@@ -227,19 +235,15 @@ class OpenAIInterface:
                     user_id=user_id or "0",
                     documents=documents,
                 )
-                answer = loop.run_until_complete(
-                    agent.run(
-                        prompt,
-                        deps=deps,
-                        message_history=previous_messages,
-                    )
+                answer = agent.run_sync(
+                    prompt,
+                    deps=deps,
+                    message_history=previous_messages,
                 )
             else:
-                answer = loop.run_until_complete(
-                    agent.run(
-                        prompt,
-                        message_history=previous_messages,
-                    )
+                answer = agent.run_sync(
+                    prompt,
+                    message_history=previous_messages,
                 )
         except Exception as e:
             debug("Error in chat", e)
@@ -282,13 +286,33 @@ class OpenAIInterface:
         prompt = prepared_data["prompt"]
 
         async def streamer():
-            async with agent.run_stream(prompt) as result:
-                async for token in result.stream_text(delta=True):
-                    yield token  # You may want to html.escape(token)
+            async with agent.iter(prompt) as agent_run:
+                async for node in agent_run:
+                    if Agent.is_model_request_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                if isinstance(event, PartStartEvent):
+                                    if isinstance(event.part, TextPart):
+                                        yield json.dumps(dict(
+                                            kind="text", content=event.part.content
+                                        )) + "\n"
+                                    elif isinstance(event.part, ThinkingPart):
+                                        yield json.dumps(dict(
+                                            kind="thinking", content=event.part.content
+                                        )) + "\n"
+                                if isinstance(event, PartDeltaEvent):
+                                    if isinstance(event.delta, TextPartDelta):
+                                        yield json.dumps(dict(kind="text", content=event.delta.content_delta)) + "\n"
+                                    elif isinstance(event.delta, ThinkingPartDelta):
+                                        yield json.dumps(dict(
+                                            kind="thinking", content=event.delta.content_delta
+                                        )) + "\n"
+                     # elif Agent.is_call_tools_node(node):
+
+
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():
-            import asyncio
 
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)

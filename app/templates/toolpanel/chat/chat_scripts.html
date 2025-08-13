@@ -128,11 +128,38 @@
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let markdownBuffer = "";
+                let thinkingBuffer = "";
                 let questionText = question + " " + additional_context;
+                let buffer = ""; // For handling partial JSON chunks
 
                 $("#" + responseId).html(
-                    `<div style='display: flex; flex-direction: column;'><div style='display: flex;'><div style='flex-grow: 1;'><div class="chat-response-body" id="streamedResponse"></div></div></div></div>`
+                    `<div style='display: flex; flex-direction: column;'>
+                        <div class='thinking-panel' style='display: none; background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
+                            <div class='thinking-header' style='cursor: pointer; font-weight: bold;'>
+                                <span class='thinking-toggle'>▶</span> Thinking...
+                            </div>
+                            <div class='thinking-content' style='display: none; margin-top: 10px; font-family: monospace; white-space: pre-wrap;'></div>
+                        </div>
+                        <div style='display: flex;'>
+                            <div style='flex-grow: 1;'>
+                                <div class="chat-response-body" id="streamedResponse"></div>
+                            </div>
+                        </div>
+                    </div>`
                 );
+
+                // Add click handler for thinking panel toggle
+                $("#" + responseId + " .thinking-header").on("click", function () {
+                    const $content = $(this).siblings(".thinking-content");
+                    const $toggle = $(this).find(".thinking-toggle");
+                    if ($content.is(":visible")) {
+                        $content.hide();
+                        $toggle.text("▶");
+                    } else {
+                        $content.show();
+                        $toggle.text("▼");
+                    }
+                });
 
                 function pump() {
                     return reader.read().then(({ done, value }) => {
@@ -142,6 +169,7 @@
                                 .attr({
                                     "data-question": questionText,
                                     "data-answer": markdownBuffer,
+                                    "data-thinking": thinkingBuffer,
                                     "data-context": "",
                                     "data-document-uuids": document_uuids.join(","),
                                 })
@@ -160,9 +188,34 @@
                             });
                             return;
                         }
+
                         let chunk = decoder.decode(value, { stream: true });
-                        markdownBuffer += chunk;
-                        $("#streamedResponse").html(marked.parse(markdownBuffer));
+                        buffer += chunk;
+
+                        // Process complete JSON lines
+                        let lines = buffer.split('\n');
+                        buffer = lines.pop(); // Keep incomplete line in buffer
+
+                        for (let line of lines) {
+                            if (line.trim()) {
+                                try {
+                                    let data = JSON.parse(line);
+
+                                    if (data.kind === "text") {
+                                        markdownBuffer += data.content;
+                                        $("#streamedResponse").html(marked.parse(markdownBuffer));
+                                    } else if (data.kind === "thinking") {
+                                        thinkingBuffer += data.content;
+                                        const $thinkingPanel = $("#" + responseId + " .thinking-panel");
+                                        $thinkingPanel.show();
+                                        $thinkingPanel.find(".thinking-content").text(thinkingBuffer);
+                                    }
+                                } catch (e) {
+                                    console.error("Error parsing JSON:", e, "Line:", line);
+                                }
+                            }
+                        }
+
                         return pump();
                     });
                 }
@@ -170,8 +223,6 @@
             })
             .catch(error => {
                 console.log("Stream error", error);
-                // Re-enable button on error if desired, though leaving it disabled
-                // until user types is also a valid UX choice.
             });
     }
 

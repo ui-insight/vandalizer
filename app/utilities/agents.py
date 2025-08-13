@@ -179,7 +179,7 @@ def create_upload_agent(agent_model):
     return Agent(
         model,
         system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
-        result_type=UploadResult,
+        output_type=UploadResult,
     )
 
 
@@ -209,13 +209,8 @@ def retrieve(
     """
     if docs_ids is None:
         docs_ids = []
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    prompt_response = loop.run_until_complete(
-        prompt_agent.run(
-            f"Generate a prompt for the following user question: {question}",
-        )
+    prompt_response = prompt_agent.run_sync(
+        f"Generate a prompt for the following user question: {question}",
     )
     prompt = prompt_response.output
     debug(prompt)
@@ -357,47 +352,6 @@ def get_cache_key(key: str, context: str) -> str:
     return f"field_type:{key}:{context}"
 
 
-@field_inference_agent.result_validator
-def validate_fields_types(context: RunContext[FieldInferenceDeps], response: str):
-    formatted_response = remove_code_markers(response)
-    if langfuse_enabled:
-        langfuse.trace(
-            name="validate_fields_types",
-            input=formatted_response,
-        )
-
-    try:
-        inferred_fields = json.loads(formatted_response)
-    except Exception as e:
-        msg = f"Failed to parse type inference response: {e!s}"
-        raise ModelRetry(msg)
-
-    # Modified validation logic
-    fields = {}
-    for key, type_str in inferred_fields.items():
-        try:
-            # Get type with fallback to Optional[str]
-            field_type = type_mapping.get(type_str.strip(), (Optional[str], None))
-
-            # Ensure Optional fields get None default
-            if "Optional" in type_str:
-                field_type = (field_type[0], None)
-
-            fields[key] = field_type
-        except Exception as e:
-            if langfuse_enabled:
-                langfuse.span(name="validation_error", input=e)
-            msg = f"Invalid type for field {key}: {e!s}"
-            raise ModelRetry(msg)
-
-    # Add fallback for missing keys (shouldn't happen but just in case)
-    requested_keys = context.deps.keys
-    for key in requested_keys:
-        if key not in fields:
-            fields[key] = (Optional[str], None)  # Default to optional string
-
-    return fields
-
 
 @dataclass
 class ExtractionDeps:
@@ -496,15 +450,6 @@ def extract_entities_with_agent(
 
     """
     # check if previous extraction exists in cache
-    cache_key = f"Keys:{keys}\n\nText:{text}"
-    llm_string = "pydantic_model:openai:gpt-4o"
-
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    except RuntimeError:
-        # Handle the case where the event loop is already running
-        loop = asyncio.get_event_loop()
 
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -532,11 +477,9 @@ def extract_entities_with_agent(
             keys=uncached_keys,
         )
 
-        result = loop.run_until_complete(
-            field_inference_agent.run(
-                "Infer the types of the keys",
-                deps=field_inference_deps,
-            )
+        result = field_inference_agent.run_sync(
+            "Infer the types of the keys",
+            deps=field_inference_deps,
         )
 
         new_fields = result.output
@@ -609,9 +552,7 @@ def extract_entities_with_agent(
     )
     try:
         # Run the agent synchronously
-        extraction = loop.run_until_complete(
-            extractor_agent.run(text, deps=extractor_deps)
-        )
+        extraction = extractor_agent.run_sync(text, deps=extractor_deps)
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)
