@@ -84,9 +84,6 @@ def extract_text_from_doc(doc_path, doc=None):
         return doc.raw_text
 
     doc_path_str = str(doc_path)
-    debug(doc)
-    debug(doc.raw_text)
-    debug(doc_path_str)
 
     if doc is None:
         if doc_path_str.endswith(".pdf"):
@@ -100,6 +97,9 @@ def extract_text_from_doc(doc_path, doc=None):
 
         return None
     else:
+        debug(doc)
+        debug(doc.raw_text)
+        debug(doc_path_str)
         debug(doc.extension)
         if doc.extension in {"pdf"}:
             # return extract_text_from_pdf(doc_path_str)
