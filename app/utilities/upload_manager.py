@@ -83,6 +83,9 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
 
     # Persist to DB
     doc = SmartDocument.objects(uuid=document_uuid).first()
+    if doc is None:
+        debug(f"Document {document_uuid} not found for validation update")
+        return {"valid": False, "feedback": "Document not found"}
     doc.valid = all_valid
     doc.validation_feedback = summary.get("feedback", "")
     doc.validating = False
