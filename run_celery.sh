@@ -45,12 +45,25 @@ fi
 # Find PIDs by regex pattern, works even if pgrep/procps isn't installed
 find_pids() {
   local pattern=$1
-  for pid in /proc/[0-9]*; do
-    if [ -r "$pid/cmdline" ]; then
-      tr '\0' ' ' < "$pid/cmdline" | grep -qE "$pattern" && basename "$pid"
-    fi
-  done
-} 
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f -- "$pattern" || true
+    return
+  fi
+
+  # Fallback: try ps -eo (procps); else ps aux (busybox)
+  if ps -eo pid,command >/dev/null 2>&1; then
+    ps -eo pid,command | awk -v pat="$pattern" '
+      BEGIN{ IGNORECASE=1 }
+      $0 ~ pat { print $1 }
+    ' || true
+  else
+    ps aux | awk -v pat="$pattern" '
+      BEGIN{ IGNORECASE=1 }
+      NR>1 && $0 ~ pat { print $2 }
+    ' || true
+  fi
+}
 
 # Create directories
 mkdir -p "$LOG_DIR" "$PID_DIR"
