@@ -23,7 +23,6 @@ QUEUE_CONFIG=(
     "default:1:4:threads"      # 1 worker for default, 4 threads
 )
 
-
 # Use absolute paths
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 LOG_DIR="$SCRIPT_DIR/logs"
