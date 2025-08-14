@@ -1,5 +1,7 @@
 FROM python:3.13 AS builder
 
+RUN apt-get update && apt-get install -y procps
+
 RUN pip install uv
 
 WORKDIR /app
