@@ -50,7 +50,7 @@ find_pids() {
       tr '\0' ' ' < "$pid/cmdline" | grep -qE "$pattern" && basename "$pid"
     fi
   done
-}
+} 
 
 # Create directories
 mkdir -p "$LOG_DIR" "$PID_DIR"
