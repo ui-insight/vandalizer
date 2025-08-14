@@ -42,6 +42,29 @@ else
   NC=''
 fi
 
+# Find PIDs by regex pattern, works even if pgrep/procps isn't installed
+find_pids() {
+  local pattern=$1
+
+  if command -v pgrep >/dev/null 2>&1; then
+    pgrep -f -- "$pattern" || true
+    return
+  fi
+
+  # Fallback: try ps -eo (procps); else ps aux (busybox)
+  if ps -eo pid,command >/dev/null 2>&1; then
+    ps -eo pid,command | awk -v pat="$pattern" '
+      BEGIN{ IGNORECASE=1 }
+      $0 ~ pat { print $1 }
+    ' || true
+  else
+    ps aux | awk -v pat="$pattern" '
+      BEGIN{ IGNORECASE=1 }
+      NR>1 && $0 ~ pat { print $2 }
+    ' || true
+  fi
+}
+
 # Create directories
 mkdir -p "$LOG_DIR" "$PID_DIR"
 
@@ -180,13 +203,13 @@ stop_all_workers() {
 
   # Clean up any remaining celery processes
   local remaining
-  remaining=$(pgrep -f "celery.*worker" || true)
+  remaining=$(find_pids "celery.*worker")
   if [[ -n "${remaining}" ]]; then
     echo "Stopping remaining celery processes: $remaining"
     # shellcheck disable=SC2086
     echo $remaining | xargs kill -TERM 2>/dev/null || true
     sleep 2
-    remaining=$(pgrep -f "celery.*worker" || true)
+    remaining=$(find_pids "celery.*worker")
     if [[ -n "${remaining}" ]]; then
       # shellcheck disable=SC2086
       echo $remaining | xargs kill -KILL 2>/dev/null || true
@@ -214,12 +237,12 @@ stop_flower() {
 
   # Clean up any remaining flower processes
   local flower_pids
-  flower_pids=$(pgrep -f "celery.*flower" || true)
+  flower_pids=$(find_pids "celery.*flower")
   if [[ -n "${flower_pids}" ]]; then
     # shellcheck disable=SC2086
     echo $flower_pids | xargs kill -TERM 2>/dev/null || true
     sleep 1
-    flower_pids=$(pgrep -f "celery.*flower" || true)
+    flower_pids=$(find_pids "celery.*flower")
     if [[ -n "${flower_pids}" ]]; then
       # shellcheck disable=SC2086
       echo $flower_pids | xargs kill -KILL 2>/dev/null || true
