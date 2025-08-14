@@ -10,6 +10,8 @@ RUN uv sync
 
 FROM python:3.13-slim AS runtime
 
+RUN apt-get update && apt-get install -y procps
+
 WORKDIR /app
 
 ENV VIRTUAL_ENV=/app/.venv \
