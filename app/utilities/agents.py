@@ -541,7 +541,7 @@ def extract_entities_with_agent(
         model,
         deps_type=ExtractionDeps,
         output_type=ExtractionModel,
-        result_retries=3,
+        output_retries=3,
         retries=3,
     )
 
