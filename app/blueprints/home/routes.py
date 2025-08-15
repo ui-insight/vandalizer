@@ -36,6 +36,16 @@ from app.utilities.config import settings
 from app.utilities.openai_interface import OpenAIInterface
 from app.utils import is_dev, load_user
 
+from app.utilities.document_manager import (
+    cleanup_document,
+    perform_extraction_and_update,
+    update_document_fields,
+)
+
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
+
 from . import home
 
 
@@ -65,26 +75,29 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
 
-    # extension = document.extension
+    extension = document.extension
 
-    # if not document.raw_text or document.raw_text == "":
-    #     # check if there is a task running
-    #     if not document.task_id:
-    #         extraction_task = perform_extraction_and_update.s(
-    #             document_uuid=document.uuid, extension=extension
-    #         )
+    if not document.raw_text or document.raw_text == "":
 
-    #         validation_task = perform_document_validation.s(
-    #             document_uuid=document.uuid, document_path=document.absolute_path
-    #         )
+        extraction_task = perform_extraction_and_update.s(
+            document_uuid=document.uuid,
+            extension=extension,
+        )
 
-    #         # ingestion_task = perform_semantic_ingestion.s(
-    #         #    document.uuid,
-    #         #    user_id,
-    #         # )
-    #         workflow_task_result = extraction_task | validation_task  # | ingestion_task
-    #         document.task_id = workflow_task_result.id
-    #         document.save()
+        validation_task = perform_document_validation.s(
+            document_uuid=document.uuid,
+            document_path=str(document.absolute_path),
+        )
+
+        workflow = extraction_task | validation_task  # | ingestion_task
+        workflow_task_result = workflow.apply_async(
+            link=update_document_fields.si(document.uuid),
+            link_error=cleanup_document.si(document.uuid),
+        )
+        document.task_id = workflow_task_result.id
+        document.processing = True
+        document.save()
+
 
 
 @home.route("/")
