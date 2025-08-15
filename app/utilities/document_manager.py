@@ -74,6 +74,18 @@ def perform_extraction_and_update(document_uuid, extension):
         return ""
 
     absolute_path = document.absolute_path
+    path_extension = absolute_path.suffix.lower()
+    if path_extension == ".pdf" and (
+        not document.raw_text or document.raw_text.strip() == ""
+    ):
+        # If raw_text is empty, we will perform OCR
+        raw_text = extract_text_from_doc(absolute_path, doc=document)
+        document.raw_text = raw_text
+        document.processing = False
+        document.downloadpath = str(Path(document.path))
+        document.save()
+        return raw_text
+
     debug("Performing OCR on document", document.title, absolute_path)
     document.processing = True
     document.task_status = "ocr"

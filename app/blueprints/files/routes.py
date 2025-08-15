@@ -193,6 +193,7 @@ def upload():
         link_error=cleanup_document.si(document.uuid),
     )
     document.task_id = workflow_task_result.id
+    document.save()
 
     return jsonify({"complete": True, "uuid": uid})
 
