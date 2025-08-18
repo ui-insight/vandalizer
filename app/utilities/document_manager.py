@@ -74,6 +74,18 @@ def perform_extraction_and_update(document_uuid, extension):
         return ""
 
     absolute_path = document.absolute_path
+    path_extension = absolute_path.suffix.lower()
+    if path_extension == ".pdf" and (
+        not document.raw_text or document.raw_text.strip() == ""
+    ):
+        # If raw_text is empty, we will perform OCR
+        raw_text = extract_text_from_doc(absolute_path, doc=document)
+        document.raw_text = raw_text
+        document.processing = False
+        document.downloadpath = str(Path(document.path))
+        document.save()
+        return raw_text
+
     debug("Performing OCR on document", document.title, absolute_path)
     document.processing = True
     document.task_status = "ocr"
@@ -95,10 +107,13 @@ def perform_extraction_and_update(document_uuid, extension):
             document.extension = "html"
             document.path = str(Path(document.path).with_suffix(".html"))
             document.raw_text = raw_text
-        else:
+        elif extension in ["docx", "doc"]:
             pypandoc.convert_file(absolute_path, "pdf", outputfile=pdf_path, extra_args=extra_args)
             raw_text = pypandoc.convert_file(absolute_path, "markdown")
             raw_text = remove_images_from_markdown(raw_text)
+            document.raw_text = raw_text
+        else: # pdf and others
+            raw_text = extract_text_from_doc(document.absolute_path, doc=document)
             document.raw_text = raw_text
 
         document.processing = False

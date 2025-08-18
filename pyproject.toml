@@ -4,7 +4,7 @@ version = "2.0.0"
 description = "Vandalizer"
 authors = [{ name = "John Brunsfeld", email = "jbrunsfeld@uidaho.edu" }]
 readme = "README.md"
-requires-python = "<4.0,>=3.12"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "chardet",
     "chromadb",
@@ -28,6 +28,7 @@ dependencies = [
     "langchain_redis",
     "langchain_text_splitters",
     "langfuse",
+    "pysqlite3-binary",
     "markdownify",
     "mongoengine",
     "nest-asyncio",
