@@ -1,0 +1,162 @@
+<form action="/files/create_folder" method="post" id="add-form" class="add-form">
+    <input type="hidden" name="space_id" value="{{ current_space_id }}">
+    <input type="hidden" name="parent_id" value="{{ current_folder_id }}">
+
+    <!-- Hidden folder name input (we’ll fill it then submit) -->
+    <input type="text" class="add-folder-input-field" id="add-folder-field" name="name" placeholder="New folder name"
+        style="display:none;">
+
+    <!-- Hidden file input (we’ll trigger it from the menu) -->
+    <input type="file" id="file-input" style="display:none;"
+        accept=".doc,.docx,.xls,.xlsx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        multiple>
+
+    <!-- Single "+ Add" button -->
+    <button type="button" id="add-button" class="btn btn-primary" aria-haspopup="true" aria-expanded="false">
+        + Add
+    </button>
+
+    <!-- Popup menu -->
+    <div id="add-menu" class="add-menu" role="menu" aria-labelledby="add-button" hidden>
+        <button type="button" class="add-menu-item" id="menu-new-folder" role="menuitem">
+            <!-- folder icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 4l2 2h8a2 2 0 012 2v9a3 3 0 01-3 3H5a3 3 0 01-3-3V7a3 3 0 013-3h5z" fill="currentColor"
+                    opacity=".2" />
+                <path d="M4 7a1 1 0 011-1h5l2 2h7a1 1 0 011 1v8a2 2 0 01-2 2H6a2 2 0 01-2-2V7z" fill="currentColor" />
+            </svg>
+            New Folder
+        </button>
+
+        <button type="button" class="add-menu-item" id="menu-upload-files" role="menuitem">
+            <!-- upload icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 16V8m0 0l-3 3m3-3l3 3" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M20 17v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2" stroke="currentColor" stroke-width="2" fill="none"
+                    stroke-linecap="round" />
+            </svg>
+            Upload Files
+        </button>
+    </div>
+</form>
+
+<style>
+    .add-form {
+        position: relative;
+        display: inline-block;
+    }
+
+    .add-menu {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        margin-top: .5rem;
+        min-width: 200px;
+        padding: .25rem;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, .15);
+        border-radius: .5rem;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+        z-index: 1000;
+    }
+
+    .add-menu-item {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        padding: .5rem .75rem;
+        border: 0;
+        background: transparent;
+        border-radius: .375rem;
+        cursor: pointer;
+        font: inherit;
+        text-align: left;
+    }
+
+    .add-menu-item:hover,
+    .add-menu-item:focus {
+        background: rgba(0, 0, 0, .04);
+        outline: none;
+    }
+
+    .add-menu-item svg {
+        flex: 0 0 auto;
+    }
+</style>
+
+<script>
+    (function () {
+        const addBtn = document.getElementById('add-button');
+        const menu = document.getElementById('add-menu');
+        const newFolderBtn = document.getElementById('menu-new-folder');
+        const uploadFilesBtn = document.getElementById('menu-upload-files');
+        const folderField = document.getElementById('add-folder-field');
+        const fileInput = document.getElementById('file-input');
+        const form = document.getElementById('add-form');
+
+        function openMenu() {
+            menu.hidden = false;
+            addBtn.setAttribute('aria-expanded', 'true');
+            // simple focus management: focus first item
+            newFolderBtn.focus();
+            // click-away to close
+            document.addEventListener('click', onDocClick);
+            document.addEventListener('keydown', onKeyDown);
+        }
+
+        function closeMenu() {
+            if (menu.hidden) return;
+            menu.hidden = true;
+            addBtn.setAttribute('aria-expanded', 'false');
+            document.removeEventListener('click', onDocClick);
+            document.removeEventListener('keydown', onKeyDown);
+        }
+
+        function onDocClick(e) {
+            if (!menu.contains(e.target) && e.target !== addBtn) {
+                closeMenu();
+            }
+        }
+
+        function onKeyDown(e) {
+            if (e.key === 'Escape') closeMenu();
+            // basic up/down navigation
+            const items = [newFolderBtn, uploadFilesBtn];
+            const idx = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                items[(idx + 1) % items.length].focus();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                items[(idx - 1 + items.length) % items.length].focus();
+            }
+        }
+
+        addBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            menu.hidden ? openMenu() : closeMenu();
+        });
+
+        // New Folder flow: prompt for name, set hidden field, submit form (POST to /files/create_folder)
+        newFolderBtn.addEventListener('click', () => {
+            closeMenu();
+            const name = window.prompt('New folder name'); // replace with your modal if you have one
+            if (!name) return;
+            folderField.value = name.trim();
+            // If you have any existing listeners tied to "Add Folder" submit, they will still fire here.
+            form.submit();
+        });
+
+        // Upload Files flow: trigger hidden file input (existing listeners still apply)
+        uploadFilesBtn.addEventListener('click', () => {
+            closeMenu();
+            fileInput.click();
+        });
+
+        // Optional: close menu if window resizes or scrolls
+        window.addEventListener('resize', closeMenu);
+        window.addEventListener('scroll', closeMenu, true);
+    })();
+</script>

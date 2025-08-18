@@ -155,34 +155,11 @@
 
             <div style="padding: 0px 45px 45px 45px;">
 
-                <form action="/files/create_folder" method="post" id="add-folder-form">
-                    <input type="hidden" name="space_id" value="{{ current_space_id }}">
-                    <input type="hidden" name="parent_id" value="{{ current_folder_id }}">
-                    <input type="text" style="display: none;" class="add-folder-input-field" id="add-folder-field"
-                        name="name" placeholder="New folder name">
-                    <button type="submit" id="add-folder-button" class="btn btn-primary">Add Folder</button>
-
-                    <!-- Styled file input -->
-                    <label for="file-input" class="btn btn-primary" style="margin: 0;">
-                        Upload Files
-                        <input type="file" id="file-input" style="display: none;"
-                            accept=.doc,.docx,.xls,.xlsx,.pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            multiple />
-                    </label>
-                </form>
+                {% include "_add_button.html" %}
+                {% include "_breadcrumbs.html" %}
                 <table class="styled-table" id="file-list" style="width: 100%;">
                     <tbody id="doc-body">
-                        {% if current_folder_id != "0" %}
-                        <tr>
-                            <td>
-                                <span style="margin-right: 10px;"><input type="checkbox" class="document-selector"
-                                        data-doc-type="all_folder"></span>
-                                <a href="?folder_id={{ current_folder_parent_id }}">
-                                    <i class="fa-solid fa-arrow-up"></i> ..
-                                </a>
-                            </td>
-                        </tr>
-                        {% endif %}
+
                         {% for folder in folders %}
                         <tr class="folder">
                             <td>

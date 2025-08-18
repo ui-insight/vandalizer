@@ -8,6 +8,7 @@ from pathlib import Path
 
 from devtools import debug
 from flask import (
+    Blueprint,
     abort,
     current_app,
     flash,
@@ -34,7 +35,7 @@ from app.utilities.upload_manager import (
 )
 from app.utils import load_user
 
-from . import files
+files = Blueprint("files", __name__)
 
 # Our allowed file extensions
 ALLOWED_EXTENSIONS = {"pdf", "docx", "xlsx", "xls"}

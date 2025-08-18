@@ -4,10 +4,10 @@ import os
 import uuid
 from copy import deepcopy
 from pathlib import Path
-from markupsafe import escape
 
 from devtools import debug
 from flask import (
+    Blueprint,
     abort,
     current_app,
     jsonify,
@@ -19,6 +19,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
@@ -30,7 +31,7 @@ from app.utilities.semantic_recommender import (
 )
 from app.utils import load_user
 
-from . import tasks
+tasks = Blueprint("tasks", __name__)
 
 
 @tasks.route("/model/filter", methods=["POST"])
