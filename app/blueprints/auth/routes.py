@@ -1,13 +1,13 @@
 """Handles authorization routing."""
 
-from flask import redirect, render_template, session, url_for
+from flask import Blueprint, redirect, render_template, session, url_for
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
 
 from app.models import User
 from app.utils import is_dev, load_user
 
-from . import auth
+auth = Blueprint("auth", __name__)
 
 
 @auth.route("/")

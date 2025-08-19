@@ -3,10 +3,11 @@
 import json
 import uuid
 from itertools import chain
-from markupsafe import escape
+from typing import Dict, List, Optional
 
 from devtools import debug
 from flask import (
+    Blueprint,
     Response,
     current_app,
     redirect,
@@ -19,6 +20,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
+from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
@@ -33,20 +35,18 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.config import settings
-from app.utilities.openai_interface import OpenAIInterface
-from app.utils import is_dev, load_user
-
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
     update_document_fields,
 )
-
+from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
+from app.utils import is_dev, load_user
 
-from . import home
+home = Blueprint("home", __name__)
 
 
 @app.context_processor
@@ -78,7 +78,6 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     extension = document.extension
 
     if not document.raw_text or document.raw_text == "":
-
         extraction_task = perform_extraction_and_update.s(
             document_uuid=document.uuid,
             extension=extension,
@@ -98,6 +97,45 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
         document.processing = True
         document.save()
 
+
+MAX_BREADCRUMB_DEPTH = 10  # safety to avoid accidental loops
+
+
+def build_breadcrumbs(
+    current_folder_id: str, current_space: str
+) -> List[Dict[str, str]]:
+    """
+    Returns a list of dicts: [{'label': 'Space', 'href': '/?folder_id=0'}, ...]
+    - Starts with the space
+    - Then each ancestor folder, ending with the current folder
+    """
+
+    # Start with Space as the root crumb
+    crumbs: List[Dict[str, str]] = [
+        {"label": current_space.title, "href": url_for("home.index", folder_id="0")}
+    ]
+
+    # If we’re at root, we’re done.
+    if not current_folder_id or current_folder_id == "0":
+        return crumbs
+
+    # Walk up the tree using parent_id
+    path: List[Dict[str, str]] = []
+    node: Optional[SmartFolder] = SmartFolder.objects(uuid=current_folder_id).first()
+    depth = 0
+
+    while node and depth < MAX_BREADCRUMB_DEPTH:
+        path.append(
+            {"label": node.title, "href": url_for("home.index", folder_id=node.uuid)}
+        )
+        if not node.parent_id or node.parent_id == "0":
+            break
+        node = SmartFolder.objects(uuid=node.parent_id).first()
+        depth += 1
+
+    # Reverse to go root → … → current
+    crumbs.extend(reversed(path))
+    return crumbs
 
 
 @home.route("/")
@@ -312,6 +350,8 @@ def index() -> ResponseReturnValue:
     # debug(models)
     # debug(settings.models)
 
+    breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -335,6 +375,7 @@ def index() -> ResponseReturnValue:
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
         current_release=CURRENT_RELEASE_VERSION,
+        breadcrumbs=breadcrumbs,
     )
 
 
