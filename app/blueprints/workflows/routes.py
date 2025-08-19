@@ -14,6 +14,7 @@ from bs4 import BeautifulSoup
 from bson import ObjectId
 from devtools import debug
 from flask import (
+    Blueprint,
     current_app,
     flash,
     jsonify,
@@ -62,7 +63,7 @@ from app.utilities.workflow import (
 )
 from app.utils import load_user
 
-from . import workflows
+workflows = Blueprint("workflows", __name__)
 
 
 @workflows.route("/create_workflow", methods=["POST"])

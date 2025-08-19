@@ -2,12 +2,12 @@
 
 import uuid
 
-from flask import redirect, render_template, request
+from flask import Blueprint, redirect, render_template, request
 from flask.typing import ResponseReturnValue
 
 from app.models import Space
 
-from . import spaces
+spaces = Blueprint("spaces", __name__)
 
 
 @spaces.route("/new", methods=["GET", "POST"])

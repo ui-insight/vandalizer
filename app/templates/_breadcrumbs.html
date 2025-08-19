@@ -1,0 +1,61 @@
+<!-- Breadcrumbs -->
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+    <ol class="breadcrumbs-list">
+        {% for c in breadcrumbs %}
+        <li class="breadcrumbs-item">
+            {% if not loop.last %}
+            <a class="breadcrumbs-link" href="{{ c.href }}">{{ c.label }}</a>
+            <span class="breadcrumbs-sep" aria-hidden="true">›</span>
+            {% else %}
+            <span class="breadcrumbs-current" aria-current="page">{{ c.label }}</span>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</nav>
+
+<style>
+    .breadcrumbs {
+        padding: 20px 30px 0px 0px;
+        max-width: 100%;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    .breadcrumbs-list {
+        list-style: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .25rem;
+        margin: 0;
+        padding: 0;
+    }
+
+    .breadcrumbs-item {
+        display: inline-flex;
+        align-items: center;
+        font-size: 18px;
+        font-weight: 400;
+    }
+
+    .breadcrumbs-link {
+        text-decoration: none;
+        color: #000000a5;
+
+        /* match your .btn-primary hue if you like */
+    }
+
+    .breadcrumbs-link:hover {
+        text-decoration: underline;
+    }
+
+    .breadcrumbs-sep {
+        margin: 0 10px;
+        opacity: .6;
+    }
+
+    .breadcrumbs-current {
+        font-weight: 500;
+        color: rgba(0, 0, 0, 0.784)5;
+    }
+</style>
