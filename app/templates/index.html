@@ -16,7 +16,7 @@
 <link rel="stylesheet" href="{{url_for('static', filename='workflows.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles/test_event_widget.css')}}" />
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+<script src="{{url_for('static', filename='javascript/marked.umd.js')}}"></script>
 {% endblock %}
 
 {% block navbar %}

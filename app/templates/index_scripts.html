@@ -123,7 +123,10 @@
         // Get the current document
         if (documentData) {
             const modal = document.getElementById("rawTextModal");
-            const rawText = marked.parse(documentData.raw_text, {
+            // remove code markers from the raw text
+
+            const outputText = documentData.raw_text.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+            const rawText = window.marked.parse(outputText, {
                 gfm: true,
                 breaks: false,
             });
@@ -1589,13 +1592,17 @@
                             // Otherwise stringify the object
                             workflow_response = JSON.stringify(workflow_response, null, 2);
                         }
+                        // Clean up the text
                         let outputText = workflow_response
-                            .replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+                            .replace(/^```(html|json|markdown)?\\s*|\\s*```$/g, '')
+                            .trim();
 
-                        outputText = marked.parse(outputText, {
+                        // Ensure proper spacing before headers
+                        outputText = outputText.replace(/([.!?:])#/g, '$1\\n\\n#');
+
+                        outputText = window.marked.parse(outputText, {
                             gfm: true,
                             breaks: true,
-                            sanitize: true
                         });
 
                         $('.workflow-output-section').empty();
