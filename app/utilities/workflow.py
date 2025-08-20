@@ -112,12 +112,12 @@ def llm_chat_model(model, prompt, data=None, docs=None):
     debug(model)
     if len(docs) == 0:
         full_text = json.dumps(data)
-        output_prompt = f"""Following the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot.\n\nInstruction: {prompt}\n\n {full_text}"""
+        output_prompt = f"""Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot. Only show the markdown output and add no text before it.\n\nInstruction: {prompt}\n\n {full_text}"""
         chat_agent = create_chat_agent(model)
         result = chat_agent.run_sync(output_prompt)
         output = result.output
         debug(f"Output from chat agent: {output}")
-        output = format_llm_output(output).strip()
+        # output = format_llm_output(output).strip()
 
     else:
         output = open_ai_interface.ask_question_to_documents(
@@ -128,7 +128,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         )
         output = output.get("answer", "")
         debug(f"Output from chat agent: {output}")
-        output = format_llm_output(output)
+        # output = format_llm_output(output)
         debug(output)
     return output
 

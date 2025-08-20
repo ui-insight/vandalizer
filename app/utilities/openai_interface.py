@@ -178,8 +178,6 @@ class OpenAIInterface:
         # remove base64 images from full_text
         full_text = remove_base64_images(full_text)
 
-        answer = None
-
         agent = None
         if len(full_text) < max_context_length:
             prompt += f"""Question: {question} Document: {full_text}"""
@@ -293,8 +291,11 @@ class OpenAIInterface:
                             async for event in stream:
                                 if isinstance(event, PartStartEvent):
                                     if isinstance(event.part, TextPart):
+                                        # remove code markers
+                                        # content = remove_code_markers(event.part.content)
+                                        content = event.part.content
                                         yield json.dumps(dict(
-                                            kind="text", content=event.part.content
+                                            kind="text", content=content
                                         )) + "\n"
                                     elif isinstance(event.part, ThinkingPart):
                                         yield json.dumps(dict(
@@ -302,7 +303,10 @@ class OpenAIInterface:
                                         )) + "\n"
                                 if isinstance(event, PartDeltaEvent):
                                     if isinstance(event.delta, TextPartDelta):
-                                        yield json.dumps(dict(kind="text", content=event.delta.content_delta)) + "\n"
+                                        # remove code markers
+                                        # content = remove_code_markers(event.delta.content_delta)  # noqa: E501
+                                        content = event.delta.content_delta
+                                        yield json.dumps(dict(kind="text", content=content)) + "\n"
                                     elif isinstance(event.delta, ThinkingPartDelta):
                                         yield json.dumps(dict(
                                             kind="thinking", content=event.delta.content_delta
