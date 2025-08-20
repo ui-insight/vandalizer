@@ -37,15 +37,15 @@ class ProgressLoader {
 
   showDefaultMessage() {
     this.loadingIcon.classList = "fa-solid fa-file-import";
-    this.messageEl.textContent = "Ready to get started?";
-    this.subMessageEl.textContent = "Just add or select a document to begin."
+    this.messageEl.textContent = "Let’s get started!";
+    this.subMessageEl.textContent = "Upload or select one or more documents, or simply ask me a question."
     this.hideProgressBar();
   }
 
   showOCRMessage() {
     this.loadingIcon.classList = "fa-solid fa-cogs fa-spin";
-    this.messageEl.textContent = "Running OCR on Your Document…";
-    this.subMessageEl.textContent = "Please hold tight—we’re extracting text right now."
+    this.messageEl.textContent = "Converting And Preparing Your Document…";
+    this.subMessageEl.textContent = "We’re converting it can be read and analyzed accurately.";
     this.hideProgressBar();
   }
 
