@@ -357,7 +357,7 @@ def test_workflow_step() -> ResponseReturnValue:
 
 
 # @MARK: ~~ Run integration
-@workflows.route("/workflow/run", methods=["GET", "POST"])
+@workflows.route("/run_integrated", methods=["GET", "POST"])
 def run_workflow_integrated() -> ResponseReturnValue:
     """Run the integrated workflow and return the result."""
     # **1. Authenticate User via API Key**
@@ -441,7 +441,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     # **5. Prepare Workflow Execution**
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
-
+    workflow_result.save()
     # Since we can't look up attachments, we'll assume there are none or handle them accordingly
     attachments = []
     # If your workflow has predefined attachments, you might need to handle them differently
@@ -456,11 +456,17 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow_trigger_step_id = str(document_trigger_step.id)
 
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
     # **6. Execute the Workflow**
     workflow_output = execute_workflow_task.delay(
         workflow_result_id=str(workflow_result.id),
         workflow_id=str(workflow.id),
         workflow_trigger_step_id=workflow_trigger_step_id,
+        model=model,
     )
     workflow_output = workflow_output.get()
     output = workflow_output["output"]
