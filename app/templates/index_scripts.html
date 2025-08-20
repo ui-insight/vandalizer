@@ -1557,10 +1557,13 @@
                     active_step = steps_completed + 1;
                 }
 
+                const minutes = Math.floor(workflow_time / 60);
+                const seconds = workflow_time % 60;
+
                 // Update steps completed and time elapsed
                 $('.workflow-output-attachment-info').html(`
                       <span>${steps_completed} / ${total_steps} steps completed</span>
-                      <span><i> ${workflow_time} seconds elapsed</i></span>
+                      <span><i>${minutes}m ${seconds}s elapsed</i></span>
                   `);
 
                 // Check if the workflow is completed or has failed
@@ -1840,7 +1843,7 @@
             });
     });
 
-    $("#add-new_workflow-button").on("click", function () {
+    $(".add-new_workflow-button").on("click", function () {
         $("#newWorkflowModal").show();
 
         $("#newWorkflowBtn")
