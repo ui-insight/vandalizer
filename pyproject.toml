@@ -28,7 +28,7 @@ dependencies = [
     "langchain_redis",
     "langchain_text_splitters",
     "langfuse",
-    "pysqlite3-binary",
+    "pysqlite3-binary; sys_platform == 'linux'",
     "markdownify",
     "mongoengine",
     "nest-asyncio",

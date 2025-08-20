@@ -164,6 +164,7 @@
                 function pump() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
+                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
                             let $responseDiv = $("<div>")
                                 .addClass("message-response-body")
                                 .attr({
@@ -173,7 +174,7 @@
                                     "data-context": "",
                                     "data-document-uuids": document_uuids.join(","),
                                 })
-                                .html(marked.parse(markdownBuffer))
+                                .html(window.marked.parse(outputText))
                                 .append(createFeedbackButtons());
 
                             $("#" + responseId + " .chat-response-body").replaceWith($responseDiv);
@@ -203,7 +204,11 @@
 
                                     if (data.kind === "text") {
                                         markdownBuffer += data.content;
-                                        $("#streamedResponse").html(marked.parse(markdownBuffer));
+                                        // remove code markers from markdownBuffer
+                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+
+                                        markdownContent = window.marked.parse(outputText);
+                                        $("#streamedResponse").html(markdownContent);
                                     } else if (data.kind === "thinking") {
                                         thinkingBuffer += data.content;
                                         const $thinkingPanel = $("#" + responseId + " .thinking-panel");
