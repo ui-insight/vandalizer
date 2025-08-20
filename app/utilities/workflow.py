@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import asyncio
 import graphlib
 import json
 import multiprocessing
@@ -444,7 +443,7 @@ class WorkflowEngine:
             else:
                 debug(node)
                 debug(latest_output)
-                output = node.process(latest_output)
+                # output = node.process(latest_output)
                 for task in node.tasks:
                     process_node = None
 
@@ -597,11 +596,14 @@ class WorkflowManager:
             )
 
 
-@celery_app.task(bind=True, name="tasks.workflow.execution",
-                 autoretry_for=(Exception,),
-                 rate_limit="1/s",
-                 max_retries=3, default_retry_delay=5
-                 )
+@celery_app.task(
+    bind=True,
+    name="tasks.workflow.execution",
+    autoretry_for=(Exception,),
+    rate_limit="1/s",
+    max_retries=3,
+    default_retry_delay=5,
+)
 def execute_workflow_task(
     self, workflow_result_id, workflow_id, workflow_trigger_step_id, model
 ):
