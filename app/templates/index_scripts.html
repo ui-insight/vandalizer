@@ -179,6 +179,9 @@
             clearInterval(workflow_interval_id);
             workflow_interval_id = null;
         }
+
+        stopScanning();
+        stopSpinningJoe();
     }
 
     function getWorkflowRecommendations(uuids) {
