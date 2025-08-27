@@ -19,6 +19,15 @@
     let runStepResolve = null;
     let animationInProgress = false;
 
+    {% if (documents != None) and documents | length > 0 %}
+    var documentPath = '/static/uploads/{{ selected_document.path }}';
+    {% else %}
+    var documentPath = null;
+    {% endif %}
+
+
+    window.document_displayed = false;
+
     const docLoaderProgressHandler = new ProgressLoader('.loading-event-progress-container');
     docLoaderProgressHandler.show();
     docLoaderProgressHandler.showDefaultMessage()
@@ -674,12 +683,97 @@
         }
     }
 
+function showDocumentContainer() {
+    // Hide the file selection area
+    $('.file-selection').hide();
+
+    // Show the document container
+    $('.document-container').show();
+
+    // Show the document viewer area
+    $('#document').show();
+
+    // Enable raw text icon if raw text is available
+    if (documentData && documentData.raw_text) {
+        $('#raw-text-icon').show();
+    }
+
+    console.log("Document container is now visible");
+}
+
+
+function displayDocument() {
+    // First check if we have a document container indicating processing status
+    var docContainer = $('.document-container');
+    console.log("displayDocument called");
+    if (docContainer.length > 0) {
+        var docUuid = docContainer.data('doc-uuid');
+        var isProcessing = docContainer.data('processing');
+
+        if (isProcessing) {
+            console.log("Document is still processing, waiting for completion...");
+            // Don't attempt to load PDF yet - polling will handle this
+            return;
+        }
+    }
+
+    // Proceed with document loading
+    attemptDocumentLoad();
+}
+
+
+function attemptDocumentLoad(path = null) {
+     if(path) {
+        documentPath = path;
+     }
+     if(!documentPath) {
+        console.log("No document path available to load.");
+        return;
+     }
+
+    // append /static/uploads/ to the document path if not already present
+    if (!documentPath.startsWith('/static/uploads/')) {
+        documentPath = '/static/uploads/' + documentPath;
+    }
+
+    const extension = documentPath.split('.').pop().toLowerCase();
+    console.log("Attempting to load document:", documentPath, "with extension:", extension);
+
+    $.ajax({
+        url: documentPath,
+        type: 'HEAD',
+        success: function () {
+            console.log("document file exists, loading: " + documentPath);
+            renderDocument();
+        },
+        error: function (xhr, status, error) {
+            console.error("Document file not ready yet:", status, error);
+            // For DOCX files, the conversion might still be in progress
+            // Check if we should retry
+            var docContainer = $('.document-container');
+            if (docContainer.length > 0) {
+                var docUuid = docContainer.data('doc-uuid');
+                console.log("Checking document processing status...");
+                // Start polling if not already active
+                if (!pollingActive) {
+                    pollingActive = true;
+                    pollStatus(docUuid);
+                }
+            }
+        }
+    });
+}
+
+
     var pollTimeout = null;
     var pollingActive = true;
 
     function updateStatusPanelForPolling(data) {
         console.log("Polling data for panel update:", data); // Debugging line
         docLoaderProgressHandler.show();
+        if (!window.document_displayed && documentPath) {
+            attemptDocumentLoad(data.path);
+        }
         let currentStage;
         if (!data.complete) {
             if (data.status === "layout" || data.status === "ocr") {
@@ -701,7 +795,7 @@
             currentStage = 3; // Done!
             docLoaderProgressHandler.hide();
             // refresh the page to get the latest document
-            window.location.reload();
+            // window.location.reload();
         }
 
         if (currentStage != docLoaderProgressHandler.itemidentifier) {
@@ -809,6 +903,7 @@
             } else {
                 // Show regular content
                 $('#raw-text-icon').show();
+                displayDocument();
                 // refresh the page to get the latest document
             }
         }
@@ -1603,9 +1698,6 @@
                             .replace(/^```(html|json|markdown)?\\s*|\\s*```$/g, '')
                             .trim();
 
-                        // Ensure proper spacing before headers
-                        outputText = outputText.replace(/([.!?:])#/g, '$1\\n\\n#');
-
                         outputText = window.marked.parse(outputText, {
                             gfm: true,
                             breaks: true,
@@ -1977,7 +2069,7 @@
                 documents = msg.results.documents[0];
                 highlightTerms = documents;
 
-                renderPDF();
+                renderDocument();
                 setTimeout(function () {
                     nextHighlight();
                 }, 500);
@@ -2342,7 +2434,7 @@
             showToast("Copied to clipboard");
             navigator.clipboard.writeText(searchTerm);
 
-            renderPDF();
+            renderDocument();
             setTimeout(function () {
                 nextHighlight();
             }, 500);

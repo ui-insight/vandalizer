@@ -182,6 +182,8 @@ def index() -> ResponseReturnValue:
 
     documents = []
 
+    selected_document = None
+
     # Check for documents
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
@@ -190,6 +192,7 @@ def index() -> ResponseReturnValue:
             documents.append(document)
             verify_document(document, user_id)
             current_space = Space.objects(uuid=document.space).first()
+            selected_document = document
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
@@ -363,6 +366,7 @@ def index() -> ResponseReturnValue:
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
+        selected_document=selected_document,
         folder_docs=folder_docs,
         spaces=spaces,
         current_space_id=spaces[0].uuid,

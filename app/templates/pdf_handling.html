@@ -5,9 +5,18 @@
     var current_search_item = 0;
     needsScroll = true;
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/javascript/pdf/pdf.worker.js';
+    window.document_displayed = false;
 
-    var pdfDoc = null,
-        pageNum = 1,
+    {% if (documents != None) and documents | length > 0 %}
+    var documentPath = '/static/uploads/{{ selected_document.path }}';
+    {% else %}
+    var documentPath = null;
+    {% endif %}
+
+
+    var pdfDoc = null;
+
+    var pageNum = 1,
         pageRendering = false,
         pdfContainer = document.getElementById('document');
 
@@ -102,33 +111,67 @@
         });
     }
 
+
+    function documentExists(url, callback) {
+        $.ajax({
+            url: url,
+            type: 'HEAD',
+            success: function () {
+                callback(true);
+            },
+            error: function () {
+                callback(false);
+            }
+        });
+    }
+
     {% if documents | length > 0 %}
 
-    console.log("rendering pdf")
+    console.log("rendering document")
     console.log("{{ documents[0].path }}");
     // check if the document is a pdf
-    const document_path = "{{ documents[0].path }}";
-    const extension = document_path.split('.').pop();
+    console.log("document path: " + documentPath);
+    const extension = documentPath.split('.').pop();
     console.log("extension: " + extension);
 
 
-    if (extension == "pdf") {
-        const pdfPath = '/static/uploads/{{ documents[0].path }}';
-        console.log("pdf path: " + pdfPath);
-        pdfjsLib.getDocument(pdfPath).promise.then(function (pdfDoc_) {
-            pdfDoc = pdfDoc_;
 
-            renderPDF();
-        });
-    } else if (extension == "html") {
-        console.log("rendering html")
-        var iframe = document.createElement('iframe');
-        iframe.src = '/static/uploads/{{ documents[0].path }}';
-        iframe.width = "100%";
-        iframe.height = "100%";
-        pdfContainer.appendChild(iframe);
-    }
     {% endif %}
+
+    function renderDocument() {
+        console.log("document path: " + documentPath);
+        const extension = documentPath.split('.').pop();
+        console.log("extension: " + extension);
+
+        if (extension == "pdf") {
+            // check if the pdfPath is valid path on the server
+            console.log("pdf file exists");
+
+            console.log("pdf path: " + documentPath);
+            pdfjsLib.getDocument(documentPath).promise.then(function (pdfDoc_) {
+                pdfDoc = pdfDoc_;
+
+                renderPDF();
+                window.document_displayed = true;
+            });
+        } else if (extension == "html") {
+            var iframe = document.createElement('iframe');
+            iframe.src = documentPath;
+            iframe.width = "100%";
+            iframe.height = "100%";
+            pdfContainer.appendChild(iframe);
+            window.document_displayed = true;
+        }
+    }
+
+     function renderHTML() {
+            pdfContainer.innerHTML = '';
+            var iframe = document.createElement('iframe');
+            iframe.src = documentPath;
+            iframe.width = "100%";
+            iframe.height = "100%";
+            pdfContainer.appendChild(iframe);
+        }
 
     function renderPDF() {
         pdfContainer.innerHTML = '';
@@ -143,4 +186,5 @@
             renderPage(pageNumber);
         }
     }
+
 </script>

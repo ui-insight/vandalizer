@@ -153,8 +153,6 @@ def upload():
 
     debug(file_path)
 
-    user_id = user.user_id
-
     raw_text = ""
     document = SmartDocument(
         title=filename,
@@ -227,15 +225,19 @@ def poll_status() -> ResponseReturnValue:
         else:
             status_messages.append("Document failed validation checks...")
 
+    complete = (
+        document.task_status == "complete"
+ or document.task_status == "error"
+    )
     return jsonify(
         {
             "status": document.task_status,
             "status_messages": status_messages,
-            "complete": document.task_status == "complete"
-            or document.task_status == "error",
+            "complete": complete,
             "raw_text": document.raw_text if not document.processing else "",
             "validation_feedback": document.validation_feedback,
             "valid": document.valid,
+            "path": document.path,
         },
     )
 
