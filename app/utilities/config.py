@@ -58,18 +58,8 @@ Upload Compliance:
 #         # filter
 
 models = [
-    {"name": "openai/gpt-4.1", "tag": "Cloud — Accurate", "external": True},
-    {
-        "name": "openai/gpt-4.1-nano",
-        "tag": "Cloud — Fast",
-        "external": True,
-    },
-    {"name": "qwen3-32k:32b", "tag": "Secure — Accurate", "external": False},
-    {
-        "name": "qwen2.5-32k:72b",
-        "tag": "Secure — Fast",
-        "external": False,
-    },
+    {"name": "openai/gpt-4.1", "tag": "Cloud", "external": True},
+    {"name": "qwen3-32k:32b", "tag": "Private", "external": False},
 ]
 # debug(models)
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average

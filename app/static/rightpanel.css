@@ -565,12 +565,22 @@ button.shadow-button:hover {
 
   #chat-model-popup-menu {
     position: absolute;
-    top: -90px;
+    top: -20px;
     right: 65px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: #5D6F81; 
     font-size: 12px;
     border: 0px;
+  }
+
+  #chat-model-popup-menu-options li.model-option {
+    display: flex; align-items: center; padding: 8px 10px; cursor: pointer;
+  }
+  #chat-model-popup-menu-options li.model-option.selected {
+    background: rgba(0,0,0,0.05);
+  }
+  #chat-model-popup-menu-options li.model-option .label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
   /* tighten up the label */
