@@ -1,0 +1,77 @@
+/* ========== Right rail that pushes layout, with rail-aware header ========== */
+:root{
+  --rail-w: 64px;        /* collapsed */
+  --rail-w-open: 220px;  /* expanded */
+}
+
+/* Rail (right, fixed) */
+.app-rail{
+  position: fixed;
+  top: 0; right: 0; bottom: 0; left: auto;
+  width: var(--rail-w);
+  background:#111; color:#ddd; border-left:1px solid #2a2a2a;
+  display:flex; flex-direction:column;
+  z-index: 650;
+  transition: width .2s ease;
+}
+.app-rail.expanded{ width: var(--rail-w-open); }
+
+/* --- Panels: use floats + margin to RESERVE rail space (no overlay) --- */
+.main-panel{ position: relative; width:100%; }
+
+/* Right panel keeps 40% width, but is pushed left by the rail width */
+.right-panel{
+  float: right;
+  width: 40%;
+  margin-right: var(--rail-w);      /* ← rail reserve */
+  /* remove any previous absolute/float-left from older CSS */
+  position: relative;
+}
+
+/* Left panel shrinks by the rail width */
+.left-panel{
+  float: left;
+  width: calc(60% - var(--rail-w));
+  /* keep your overflow behavior; no overlay now so no clipping */
+}
+
+/* When rail expands, both rules above react automatically via --rail-w */
+
+/* --- Header & semantic bar: anchor to the left panel’s RIGHT EDGE --- */
+/* Original stylesheet gives header a fixed width (60%); override it. */
+body .main-panel .header{
+  position: fixed;               /* keep it fixed as before */
+  left: 0;
+  right: calc(40% + var(--rail-w));  /* stop before right panel + rail */
+  width: auto !important;        /* defeat old width:60% */
+  z-index: 400;                  /* below rail, above doc */
+}
+
+/* Semantic panel floating over the doc: same idea */
+body .left-panel .semantic-panel{
+  left: 30px;
+  right: calc(40% + var(--rail-w) + 30px);
+  width: auto;                   /* content dictates size */
+}
+
+/* Bottom toolbars in right panel should avoid the rail */
+.right-panel .bottom-toolbar,
+.floating-bottom-toolbar{
+  right: var(--rail-w);
+  width: 40%;
+}
+
+/* Tiny tooltips when collapsed: pop to the LEFT of the rail */
+.app-rail.collapsed .rail-nav a[data-tip]:hover::after{
+  content: attr(data-tip);
+  position: absolute;
+  right: calc(var(--rail-w) + 8px);
+  background:#222; color:#fff; padding:4px 8px; border-radius:6px; font-size:12px;
+  white-space: nowrap; pointer-events: none;
+}
+
+/* Safety on narrower screens: keep the doc usable */
+@media (max-width: 1200px){
+  .left-panel{ min-width: 520px; }
+  .right-panel{ width: calc(100% - var(--rail-w) - 520px); }
+}

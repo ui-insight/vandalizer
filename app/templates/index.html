@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="{{url_for('static', filename='rawstyles.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='workflows.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles/test_event_widget.css')}}" />
+<!-- <link rel="stylesheet" href="{{url_for('static', filename='styles/app_rail.css')}}" /> -->
 <script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/marked.umd.js')}}"></script>
 {% endblock %}
@@ -56,6 +57,8 @@
 <script>
     // call this to refresh the list of selected documents
 </script>
+
+
 
 <div class="main-panel">
     <div class="left-panel">
@@ -260,14 +263,15 @@
                 <ul class="tab-menu">
                     <li class="{% if section == 'Assistant' or section == 'Tasks' %}active{% endif %}"><i
                             class="fas fa-comments" style="padding-right: 5px;"></i>Assistant</li>
-                    <li class="{% if section == 'Workflows' %}active{% endif %}"><i class="fas fa-file-alt"
-                            style="padding-right: 5px;"></i>Workflows</li>
+                    <li class="{% if section == 'Library' %}active{% endif %}"><i class="fas fa-book-open"
+                            style="padding-right: 5px;"></i>Library</li>
 
 
                 </ul>
                 {% include "toolpanel/chat/chat_panel.html" %}
 
-                {% include "workflows/workflows_panel.html" %}
+                <!-- {% include "workflows/workflows_panel.html" %} -->
+                {% include "library/library_panel.html" %}
             </div>
 
             {% include "toolpanel/tasks/tasks_panel.html" %}

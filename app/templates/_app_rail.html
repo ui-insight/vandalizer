@@ -1,0 +1,31 @@
+<!-- Slim left nav rail -->
+<div id="app-rail" class="app-rail collapsed" aria-label="App rail">
+    <div class="rail-top">
+        <button id="rail-toggle" class="rail-toggle" title="Expand/Collapse">
+            <i class="fa-solid fa-bars"></i>
+            <span class="rail-label">Menu</span>
+        </button>
+    </div>
+
+    <ul class="rail-nav">
+        <li>
+            <a href="#assistant" data-tip="Assistant">
+                <i class="fas fa-comments"></i><span>Assistant</span>
+            </a>
+        </li>
+        <li>
+            <a href="#library" data-tip="Library">
+                <i class="fas fa-book-open"></i><span>Library</span>
+            </a>
+        </li>
+
+        <li class="rail-spacer"></li>
+
+        <!-- This button hides/shows your big document left-panel -->
+        <li>
+            <a href="javascript:void(0);" id="dock-left-toggle" data-tip="Hide Document Panel">
+                <i class="fa-solid fa-columns"></i><span>Hide Doc</span>
+            </a>
+        </li>
+    </ul>
+</div>

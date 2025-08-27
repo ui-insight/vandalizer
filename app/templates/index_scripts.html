@@ -160,7 +160,7 @@
                     item.classList.add("active");
                 }
             } else {
-                if (sectionName == "Workflows") {
+                if (sectionName == "Library") {
                     item.classList.add("active");
                 }
             }
@@ -272,28 +272,55 @@
 
 
                 // find the model tag in the models array based on the current model
-                const modelTag = models.find(model => model.name === newModel)?.tag || 'Unknown';
-                console.log(models);
+                const modelTag = models.find(model => model.name === newModel);
+                modelName = modelTag?.tag || 'Cloud';
+                modelSecurity = modelTag?.external || false;
+                console.log(modelTag);
                 // add the model tag to the model-text-icon div
-                const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelTag + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
-
-
-                // Clear any existing tags before appending the new one
-                $('#model-text-icon').find('#model-tag').remove();
-                $('#model-text-icon').append(tagElement);
-
+                if (modelSecurity) {
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-unlock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
+                    // Clear any existing tags before appending the new one
+                    $('#model-text-icon').find('#model-tag').remove();
+                    $('#model-text-icon').append(tagElement);
+                } else {
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 8px;'></i></div>";
+                    $('#model-text-icon').find('#model-tag').remove();
+                    $('#model-text-icon').append(tagElement);
+                }
 
 
                 const $modelSelect = $('#chat-model-popup-menu-options');
                 $modelSelect.empty(); // clear existing options
 
-                models.forEach(model => {
-                    const option = $('<li>', {
-                        value: model.name,
-                        text: model.tag,
-                        selected: model.name === newModel
-                    });
-                    $modelSelect.append(option);
+                models.forEach(m => {
+                    const isExternal = !!m.external;            // external → unlocked icon
+                    const iconClass = isExternal ? 'fa-unlock' : 'fa-lock';
+                    const isSelected = m.name === newModel;
+
+                    const $li = $('<li>', {
+                        'class': `model-option${isSelected ? ' selected' : ''}`,
+                        'data-value': m.name,
+                        'role': 'menuitemradio',
+                        'aria-checked': isSelected ? 'true' : 'false',
+                        'tabindex': 0
+                    }).html(`
+    <i class="fa-solid ${iconClass}" aria-hidden="true" style="margin-right:8px;"></i>
+    <span class="label">${m.tag || m.name}</span>
+  `);
+
+                    $modelSelect.append($li);
+                });
+
+                // optional: selection handler
+                $modelSelect.on('click keydown', 'li.model-option', function (e) {
+                    if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
+                        const name = $(this).data('value');
+                        // update UI selection state
+                        $(this).attr('aria-checked', 'true').addClass('selected')
+                            .siblings().attr('aria-checked', 'false').removeClass('selected');
+                        // your function to switch models:
+                        // setModel(name);
+                    }
                 });
 
             },
@@ -2592,4 +2619,44 @@
 
         return searchTermDictionary;
     }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const rail = document.getElementById('app-rail');
+        const railToggle = document.getElementById('rail-toggle');
+        const dockLeftToggle = document.getElementById('dock-left-toggle');
+
+        // helper to apply CSS variable for left offsets
+        const setRailVar = (px) => document.documentElement.style.setProperty('--rail-w', px);
+
+        // restore rail pinned state
+        const pinned = localStorage.getItem('railPinned') === '1';
+        if (pinned) {
+            rail.classList.remove('collapsed');
+            rail.classList.add('expanded');
+            setRailVar(getComputedStyle(document.documentElement).getPropertyValue('--rail-w-open').trim() || '220px');
+        } else {
+            rail.classList.add('collapsed');
+            rail.classList.remove('expanded');
+            setRailVar('64px');
+        }
+
+        railToggle.addEventListener('click', () => {
+            const isExpanding = !rail.classList.contains('expanded');
+            rail.classList.toggle('expanded', isExpanding);
+            rail.classList.toggle('collapsed', !isExpanding);
+            setRailVar(isExpanding ? '220px' : '64px');
+            localStorage.setItem('railPinned', isExpanding ? '1' : '0');
+        });
+
+        dockLeftToggle.addEventListener('click', () => {
+            document.body.classList.toggle('left-collapsed');
+            // optional: remember this too
+            localStorage.setItem('leftCollapsed', document.body.classList.contains('left-collapsed') ? '1' : '0');
+        });
+
+        // restore left-panel collapsed state
+        if (localStorage.getItem('leftCollapsed') === '1') {
+            document.body.classList.add('left-collapsed');
+        }
+    });
 </script>

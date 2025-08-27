@@ -1,0 +1,112 @@
+{# expects:
+- scope: 'verified' | 'team' | 'mine' (for badges/labels if you want)
+- filters: { type: 'all'|'workflows'|'tasks', kinds: [...] }
+- workflows, extraction_sets, prompts, formatters
+#}
+
+{% set _type = filters.type if filters and filters.type else 'workflows' %}
+{% set _kinds = filters.kinds if filters and filters.kinds else ['extract','prompt','format'] %}
+
+{% if _type in ['all','workflows'] %}
+<div style="margin: 6px 0 12px 0; font-size:14px; font-weight:700;">Workflows</div>
+{% if workflows|length == 0 %}
+<div class="library-card">
+    <div class="meta">No workflows found.</div>
+</div>
+{% endif %}
+{% for workflow in workflows %}
+<div class="library-card workflow-item" data-uuid="{{ workflow.id }}" data-title="{{ workflow.title }}">
+    <div style="display:flex; align-items:flex-start;">
+        <span style="margin-right:10px; font-size:14px;"><i class="fa-solid fa-diagram-project"></i></span>
+        <div style="flex:1;">
+            <div class="title"><b>{{ workflow.name }}</b></div>
+            {% if workflow.description %}
+            <div class="meta">{{ workflow.description }}</div>
+            {% endif %}
+            <div style="margin-top:8px;">
+                {% if workflow.verified %}<span class="library-badge">Verified</span>{% endif %}
+                {% if scope=='team' %}<span class="library-badge">Team</span>{% endif %}
+                {% if scope=='mine' %}<span class="library-badge">Mine</span>{% endif %}
+            </div>
+        </div>
+        <div>
+            <a class="edit-workflow-button" style="color:#adadad99;" data-uuid="{{ workflow.id }}">
+                <i class="fa-regular fa-pen-to-square"></i>
+            </a>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if _type in ['all','tasks'] %}
+{% if 'extract' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Extract</div>
+{% if extraction_sets|length == 0 %}
+<div class="library-card">
+    <div class="meta">No extract tasks found.</div>
+</div>
+{% endif %}
+{% for s in extraction_sets %}
+<div class="library-card set-item" data-uuid="{{ s.uuid }}" data-title="{{ s.title }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-solid fa-filter"></i></span>
+        <div style="flex:1;">
+            <div class="title">
+                {% if s.is_global %}<i class="fa-solid fa-globe" style="margin-right:4px;"></i>{% endif %}
+                {{ s.title }}
+            </div>
+            <div class="meta">
+                {% if s.item_count() == 0 %}<i style="color:#00000077;">setup</i>{% else %}{{ s.item_count() }} items{%
+                endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if 'prompt' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Prompt</div>
+{% if prompts|length == 0 %}
+<div class="library-card">
+    <div class="meta">No prompt tasks found.</div>
+</div>
+{% endif %}
+{% for p in prompts %}
+<div class="library-card prompt-item" data-uuid="{{ p.id }}" data-title="{{ p.title }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-regular fa-message"></i></span>
+        <div style="flex:1;">
+            <div class="title">{{ p.title }}</div>
+        </div>
+        <a class="edit-prompt-button" style="color:#adadad99;" data-uuid="{{ p.id }}" data-type="prompt">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </a>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if 'format' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Format</div>
+{% if formatters|length == 0 %}
+<div class="library-card">
+    <div class="meta">No format tasks found.</div>
+</div>
+{% endif %}
+{% for f in formatters %}
+<div class="library-card prompt-item" data-uuid="{{ f.id }}" data-title="{{ f.title }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-solid fa-i-cursor"></i></span>
+        <div style="flex:1;">
+            <div class="title">{{ f.title }}</div>
+        </div>
+        <a class="edit-prompt-button" style="color:#adadad99;" data-uuid="{{ f.id }}" data-type="formatter">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </a>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endif %}
