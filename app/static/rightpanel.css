@@ -574,14 +574,14 @@ button.shadow-button:hover {
   }
 
   #chat-model-popup-menu-options li.model-option {
-  display: flex; align-items: center; padding: 8px 10px; cursor: pointer;
-}
-#chat-model-popup-menu-options li.model-option.selected {
-  background: rgba(0,0,0,0.05);
-}
-#chat-model-popup-menu-options li.model-option .label {
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+    display: flex; align-items: center; padding: 8px 10px; cursor: pointer;
+  }
+  #chat-model-popup-menu-options li.model-option.selected {
+    background: rgba(0,0,0,0.05);
+  }
+  #chat-model-popup-menu-options li.model-option .label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
 
   /* tighten up the label */
   #model-text-icon #current_selected_model {

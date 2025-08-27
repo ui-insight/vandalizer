@@ -1,39 +1,28 @@
 <script>
-    const placeholderText = "Ask anything about this document…";
-    let chatReponse = null;
+    const PLACEHOLDER = "Ask anything about this document…";
 
-    // This function runs once the page is fully loaded
+    // Utility: keep editor empty-state + button in sync
+    function updateEditorState() {
+        const $input = $("#chatinput");
+        const hasText = $input.text().trim().length > 0;
+        $input.toggleClass("is-editor-empty", !hasText);
+        $("#send-chat-button").prop("disabled", !hasText);
+    }
+
+    // On load
     $(document).ready(function () {
-        // Fix: Ensures the placeholder and button are set correctly on initial load.
-        const hasText = $("#chatinput").text().trim().length > 0;
-        $("#send-chat-button").prop('disabled', !hasText);
-
-        if (!hasText) {
-            $("#chatplaceholder").attr("data-placeholder", placeholderText);
-        } else {
-            $("#chatplaceholder").attr("data-placeholder", "");
-        }
+        $("#chatinput").attr("data-placeholder", PLACEHOLDER);
+        updateEditorState();
     });
 
-    // This listener now toggles the disabled property of the send button
+    // Input changes (typing, paste, IME, etc.)
     $("#chatinput").on("input", function () {
-        const hasText = $(this).text().trim().length > 0;
-        const placeholder = $("#chatplaceholder");
-        const sendButton = $("#send-chat-button");
-
-        sendButton.prop('disabled', !hasText);
-
-        if (hasText) {
-            placeholder.attr("data-placeholder", "");
-        } else {
-            placeholder.attr("data-placeholder", placeholderText);
-        }
+        updateEditorState();
     });
 
-    // Updated keydown listener for Enter and the new Backspace feature
+    // Keydown guards + Enter-to-send
     $("#chatinput").on("keydown", function (event) {
         const text = $(this).text().trim();
-
 
         // Prevent a leading space in an empty editor
         if (event.key === " " && text.length === 0) {
@@ -41,9 +30,10 @@
             return;
         }
 
-        // Prevent Backspace → browser‑back when empty
-        if (event.key === "Backspace" && text.trim().length === 0) {
+        // Prevent Backspace → browser-back when empty
+        if (event.key === "Backspace" && text.length === 0) {
             event.preventDefault();
+            return;
         }
 
         if (event.key === "Enter" && !event.shiftKey) {
@@ -53,7 +43,6 @@
             }
         }
     });
-
 
     // Click handler for the send button
     $("#send-chat-button").on("click", function (e) {
@@ -72,7 +61,6 @@
         $("#tasks-panel").show();
     });
 
-
     function chat() {
         let question = $("#chatinput").text();
         beginChat(question);
@@ -84,32 +72,33 @@
         is_adding_term = false;
     }
 
+    // --- Only the clearing/placeholder part changes inside performChat ---
     function performChat(
         document_uuids,
         question,
         folder_uuid,
         additional_context = "",
-        display_question = "",
+        display_question = ""
     ) {
-        $("#send-chat-button").prop('disabled', true);
+        $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
-        let questionToDisplay = display_question === "" ? question : display_question;
+        const questionToDisplay = display_question === "" ? question : display_question;
 
-        let messageHtml = "<p><div class='message-you'>" + questionToDisplay + "</div></p>";
-        $("#chat-panel").append(messageHtml);
+        $("#chat-panel").append("<p><div class='message-you'>" + questionToDisplay + "</div></p>");
 
-        $("#chatinput").text(""); // Clear the text
-        $("#chatinput").addClass("is-empty is-editor-empty"); // Re-apply classes
-        $("#chatinput").attr("data-placeholder", placeholderText); // Ensure data-attribute is set
+        // Clear editor correctly and restore placeholder state
+        $("#chatinput").empty().addClass("is-editor-empty");
+        // keep placeholder text synced (optional if static)
+        $("#chatinput").attr("data-placeholder", PLACEHOLDER);
 
-        let responseId = "response-" + new Date().getTime();
+        const responseId = "response-" + new Date().getTime();
         $("#chat-panel").append(
             `<p>
-                <div class='message-response' id='${responseId}'>
-                    <div class='chat-loader' style='display: inline-block;'></div>
-                </div>
-            </p>`
+        <div class='message-response' id='${responseId}'>
+          <div class='chat-loader' style='display: inline-block;'></div>
+        </div>
+      </p>`
         );
 
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "slow");
@@ -121,9 +110,9 @@
                 document_uuids: document_uuids,
                 message: question + " " + additional_context,
                 folder_uuid: folder_uuid,
-            })
+            }),
         })
-            .then(response => {
+            .then((response) => {
                 if (!response.body) throw new Error("No response body");
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -134,21 +123,21 @@
 
                 $("#" + responseId).html(
                     `<div style='display: flex; flex-direction: column;'>
-                        <div class='thinking-panel' style='display: none; background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
-                            <div class='thinking-header' style='cursor: pointer; font-weight: bold;'>
-                                <span class='thinking-toggle'>▶</span> Thinking...
-                            </div>
-                            <div class='thinking-content' style='display: none; margin-top: 10px; font-family: monospace; white-space: pre-wrap;'></div>
-                        </div>
-                        <div style='display: flex;'>
-                            <div style='flex-grow: 1;'>
-                                <div class="chat-response-body" id="streamedResponse"></div>
-                            </div>
-                        </div>
-                    </div>`
+            <div class='thinking-panel' style='display: none; background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
+              <div class='thinking-header' style='cursor: pointer; font-weight: bold;'>
+                <span class='thinking-toggle'>▶</span> Thinking...
+              </div>
+              <div class='thinking-content' style='display: none; margin-top: 10px; font-family: monospace; white-space: pre-wrap;'></div>
+            </div>
+            <div style='display: flex;'>
+              <div style='flex-grow: 1;'>
+                <div class="chat-response-body" id="streamedResponse"></div>
+              </div>
+            </div>
+          </div>`
                 );
 
-                // Add click handler for thinking panel toggle
+                // Thinking panel toggle
                 $("#" + responseId + " .thinking-header").on("click", function () {
                     const $content = $(this).siblings(".thinking-content");
                     const $toggle = $(this).find(".thinking-toggle");
@@ -164,7 +153,7 @@
                 function pump() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
-                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
                             let $responseDiv = $("<div>")
                                 .addClass("message-response-body")
                                 .attr({
@@ -194,7 +183,7 @@
                         buffer += chunk;
 
                         // Process complete JSON lines
-                        let lines = buffer.split('\n');
+                        let lines = buffer.split("\n");
                         buffer = lines.pop(); // Keep incomplete line in buffer
 
                         for (let line of lines) {
@@ -204,10 +193,8 @@
 
                                     if (data.kind === "text") {
                                         markdownBuffer += data.content;
-                                        // remove code markers from markdownBuffer
-                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
-
-                                        markdownContent = window.marked.parse(outputText);
+                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
+                                        const markdownContent = window.marked.parse(outputText);
                                         $("#streamedResponse").html(markdownContent);
                                     } else if (data.kind === "thinking") {
                                         thinkingBuffer += data.content;
@@ -226,7 +213,7 @@
                 }
                 return pump();
             })
-            .catch(error => {
+            .catch((error) => {
                 console.log("Stream error", error);
             });
     }
