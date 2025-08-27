@@ -62,7 +62,6 @@ def remove_code_markers(text: str) -> str:
 
     """
     # Split the text into lines
-    debug(f"Removing code markers {text}")
     lines = text.split("\n")
     formatted_lines = []
 
@@ -72,7 +71,7 @@ def remove_code_markers(text: str) -> str:
             # If line only contains the code block marker with optional language
             if line.strip().startswith("```") and len(line.strip().split()) <= 2:
                 continue
-            # If code block marker is part of a content line, remove just the markers
+            # If code block marker is part of a content line, remove the markers and the language specifier
             line = line.replace("```", "")
 
         formatted_lines.append(line)
