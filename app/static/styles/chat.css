@@ -90,6 +90,15 @@
     outline: none;
 }
 
+#chatinput.is-editor-empty::before {
+  content: attr(data-placeholder);
+  color: #8a8f98;           /* tweak to your muted text color */
+  pointer-events: none;
+  white-space: nowrap;
+  font-weight: 500;
+  font-size: 14px;
+}
+
 .chat-controls-toolbar {
     display: flex;
     align-items: center;
