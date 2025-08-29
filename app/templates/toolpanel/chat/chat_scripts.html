@@ -1,5 +1,5 @@
 <script>
-    const PLACEHOLDER = "Ask anything about this document…";
+    const PLACEHOLDER = "Ask anything, select documents or run tasks.";
 
     // Utility: keep editor empty-state + button in sync
     function updateEditorState() {
@@ -47,11 +47,7 @@
     // Click handler for the send button
     $("#send-chat-button").on("click", function (e) {
         e.preventDefault();
-        if (document_uuids != "") {
-            chat();
-        } else {
-            showToast("Select a document to chat");
-        }
+        chat();
     });
 
     // Click handler for the tasks link

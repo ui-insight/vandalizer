@@ -96,7 +96,11 @@
   pointer-events: none;
   white-space: nowrap;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 16px;
+}
+
+#chatinput {
+    font-size: 16px;
 }
 
 .chat-controls-toolbar {
