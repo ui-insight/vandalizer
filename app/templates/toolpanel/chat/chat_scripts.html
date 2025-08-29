@@ -1,5 +1,5 @@
 <script>
-    const PLACEHOLDER = "Ask anything about this document…";
+    const PLACEHOLDER = "Ask anything, select documents or run tasks.";
 
     // Utility: keep editor empty-state + button in sync
     function updateEditorState() {
@@ -47,11 +47,7 @@
     // Click handler for the send button
     $("#send-chat-button").on("click", function (e) {
         e.preventDefault();
-        // if (document_uuids != "") {
         chat();
-        // } else {
-        //     showToast("Select a document to chat");
-        // }
     });
 
     // Click handler for the tasks link
@@ -176,6 +172,14 @@
                                 let responseHtml = $(this).closest('[id^="response"]').find(".message-response-body").html().trim();
                                 copyRichTextToClipboard(responseHtml);
                             });
+                            $(".download-btn").on("click", function () {
+                                let responseHtml = $(this)
+                                    .closest('[id^="response"]')
+                                    .find(".message-response-body")
+                                    .html()
+                                    .trim();
+                                downloadResponsePlaceholder(responseHtml);
+                            });
                             return;
                         }
 
@@ -222,6 +226,96 @@
         return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
     }
 
-    function copyRichTextToClipboard(html) { /* ... */ }
-    function createFeedbackButtons() { /* ... */ }
+    function copyRichTextToClipboard(html) {
+        // Create a temporary element
+        const container = document.createElement('div');
+        container.innerHTML = html;
+
+        // Try to use the modern clipboard API first
+        try {
+            // For plain text fallback
+            const textContent = container.textContent || container.innerText;
+
+            // Try to copy as HTML if supported
+            if (navigator.clipboard && navigator.clipboard.write) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const clipboardItem = new ClipboardItem({ 'text/html': blob });
+                return navigator.clipboard.write([clipboardItem]).then(() => {
+                    console.log('Rich text copied');
+                    showToast("Copied to clipboard");
+                })
+                    .catch(err => {
+                        console.warn('Rich text copy failed, falling back to plain text', err);
+                        return navigator.clipboard.writeText(textContent);
+                    });
+            } else {
+                // Fall back to plain text
+                return navigator.clipboard.writeText(textContent);
+            }
+        } catch (err) {
+            console.warn('Modern clipboard API failed, using fallback', err);
+            // Fallback for Safari and older browsers
+            return new Promise((resolve, reject) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = container.textContent || container.innerText;
+                textarea.style.position = 'fixed';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error('execCommand failed'));
+                    }
+                } catch (err) {
+                    reject(err);
+                } finally {
+                    document.body.removeChild(textarea);
+                }
+            });
+        }
+    }
+
+    function createFeedbackButtons() {
+        const feedbackDiv = document.createElement("div");
+        feedbackDiv.className = "feedback-buttons";
+        // align to bottom-right without needing extra CSS files
+        feedbackDiv.style.display = "flex";
+        feedbackDiv.style.justifyContent = "flex-end";
+        feedbackDiv.style.gap = "12px";
+        feedbackDiv.style.marginTop = "30px";
+
+        // "Link-like" button style
+        const makeLinkBtn = (text, className) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = className + " btn btn-secondary"; // e.g., "copy-btn" or "download-btn"
+            btn.textContent = text;
+            // btn.style.background = "none";
+            // btn.style.border = "none";
+            // btn.style.color = "#000000aa";
+            // btn.style.padding = "0";
+            btn.style.fontSize = "10px";
+            return btn;
+        };
+
+        const copyBtn = makeLinkBtn("Copy", "copy-btn");
+        const downloadBtn = makeLinkBtn("Download", "download-btn");
+
+        feedbackDiv.appendChild(copyBtn);
+        feedbackDiv.appendChild(downloadBtn);
+        return feedbackDiv;
+    }
+
+    function downloadResponsePlaceholder(html) {
+        // Stub for now — wire this up to your real download later
+        if (typeof showToast === "function") {
+            showToast("Download coming soon");
+        } else {
+            console.log("Download placeholder triggered.", { html });
+        }
+    }
 </script>

@@ -1,22 +1,21 @@
 import asyncio
 import json
+import logging
 import os
-
-import asyncio
 
 import openai
 from devtools import debug
 from dotenv import load_dotenv
+from pydantic_ai import Agent
 from pydantic_ai.messages import (
     ModelMessagesTypeAdapter,
     PartDeltaEvent,
-    TextPartDelta,
-    ThinkingPartDelta,
     PartStartEvent,
     TextPart,
+    TextPartDelta,
     ThinkingPart,
+    ThinkingPartDelta,
 )
-from pydantic_ai import Agent
 
 from app.models import (
     MAX_CHAT_MESSAGES,
@@ -32,7 +31,6 @@ from app.utilities.llm_helpers import (
     remove_xml_content,
 )
 from app.utilities.redis_cache import RedisCache
-import logging
 
 load_dotenv()
 
@@ -164,7 +162,10 @@ class OpenAIInterface:
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."""
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response. At the end include a very short suggestion of next questions to ask or next steps the user might do with the documents."""
+
+        if len(docs) == 0:
+            prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
 
         previous_messages, cache_key, llm_string = OpenAIInterface.get_cache_messages(
             user_id=user_id,
@@ -294,30 +295,47 @@ class OpenAIInterface:
                                         # remove code markers
                                         # content = remove_code_markers(event.part.content)
                                         content = event.part.content
-                                        yield json.dumps(dict(
-                                            kind="text", content=content
-                                        )) + "\n"
+                                        yield (
+                                            json.dumps(
+                                                dict(kind="text", content=content)
+                                            )
+                                            + "\n"
+                                        )
                                     elif isinstance(event.part, ThinkingPart):
-                                        yield json.dumps(dict(
-                                            kind="thinking", content=event.part.content
-                                        )) + "\n"
+                                        yield (
+                                            json.dumps(
+                                                dict(
+                                                    kind="thinking",
+                                                    content=event.part.content,
+                                                )
+                                            )
+                                            + "\n"
+                                        )
                                 if isinstance(event, PartDeltaEvent):
                                     if isinstance(event.delta, TextPartDelta):
                                         # remove code markers
                                         # content = remove_code_markers(event.delta.content_delta)  # noqa: E501
                                         content = event.delta.content_delta
-                                        yield json.dumps(dict(kind="text", content=content)) + "\n"
+                                        yield (
+                                            json.dumps(
+                                                dict(kind="text", content=content)
+                                            )
+                                            + "\n"
+                                        )
                                     elif isinstance(event.delta, ThinkingPartDelta):
-                                        yield json.dumps(dict(
-                                            kind="thinking", content=event.delta.content_delta
-                                        )) + "\n"
-                     # elif Agent.is_call_tools_node(node):
-
-
+                                        yield (
+                                            json.dumps(
+                                                dict(
+                                                    kind="thinking",
+                                                    content=event.delta.content_delta,
+                                                )
+                                            )
+                                            + "\n"
+                                        )
+                    # elif Agent.is_call_tools_node(node):
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():
-
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
             agen = streamer().__aiter__()
