@@ -78,6 +78,7 @@
     ) {
         $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
+        $("#recommendations-panel").hide();
 
         const questionToDisplay = display_question === "" ? question : display_question;
 
@@ -116,6 +117,7 @@
                 let thinkingBuffer = "";
                 let questionText = question + " " + additional_context;
                 let buffer = ""; // For handling partial JSON chunks
+
 
                 $("#" + responseId).html(
                     `<div style='display: flex; flex-direction: column;'>

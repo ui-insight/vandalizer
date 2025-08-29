@@ -287,12 +287,12 @@
                 console.log(modelTag);
                 // add the model tag to the model-text-icon div
                 if (modelSecurity) {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-unlock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-cloud-arrow-up' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     // Clear any existing tags before appending the new one
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 } else {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 }
@@ -303,7 +303,7 @@
 
                 models.forEach(m => {
                     const isExternal = !!m.external;            // external → unlocked icon
-                    const iconClass = isExternal ? 'fa-unlock' : 'fa-lock';
+                    const iconClass = isExternal ? 'fa-cloud-arrow-up' : 'fa-lock';
                     const isSelected = m.name === newModel;
 
                     const $li = $('<li>', {

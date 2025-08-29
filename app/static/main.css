@@ -213,3 +213,7 @@ position: absolute;
 left: 0; top: 0;
 pointer-events: none;  /* highlights won’t block selection/scroll */
 }
+
+.document-container {
+    padding: 0px 30px;
+}

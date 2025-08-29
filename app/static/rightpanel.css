@@ -523,6 +523,28 @@ button.shadow-button:hover {
   outline-offset: 3px;
 }
 
+.btn-secondary-reverse {
+    background-color: #191919;
+    color: #ffffff;
+    border: 2px solid #d3d3d386;
+}
+
+.btn-secondary-reverse {
+  border-radius: 0px;
+  text-decoration: none;
+  text-align: center;
+  -webkit-transition: all 0.3s ease 0s;
+  -moz-transition: all 0.3s ease 0s;
+  -o-transition: all 0.3s ease 0s;
+  transition: all 0.3s ease 0s;
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.65em;
+  outline-offset: 3px;
+}
+
 
 .btn-important:hover {
   background-color: black;
@@ -565,8 +587,8 @@ button.shadow-button:hover {
 
   #chat-model-popup-menu {
     position: absolute;
-    top: -20px;
-    right: 65px;
+    top: 0px;
+    right: 50px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: #5D6F81; 
     font-size: 12px;
