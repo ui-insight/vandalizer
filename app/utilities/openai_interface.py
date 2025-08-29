@@ -162,7 +162,7 @@ class OpenAIInterface:
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."""
+        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response. At the end include a very short suggestion of next questions to ask or next steps the user might do with the documents."""
 
         if len(docs) == 0:
             prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
