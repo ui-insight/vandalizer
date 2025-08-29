@@ -228,13 +228,10 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
 
     request_data = request.get_json()
     document_uuids = request_data.get("uuids", [])
-    space = request_data.get("space")
     limit = request_data.get("limit", 5)
 
     if not document_uuids:
         return jsonify({"recommendations": []}), 200
-
-    user_id = user.user_id
 
     try:
         # Load documents
@@ -350,8 +347,8 @@ def test_workflow_step() -> ResponseReturnValue:
     workflow_output = async_result.get(timeout=600)
     if workflow_output is None:
         return jsonify({"error": "Workflow execution failed"})
-    # output = workflow_output.get("output")
-    print(workflow_output)
+
+    debug(workflow_output)
 
     return {"output": workflow_output}
 
@@ -419,12 +416,10 @@ def run_workflow_integrated() -> ResponseReturnValue:
             pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
             pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
             extension = "pdf"
-            file_path = pdf_path
         elif extension in ["xlsx", "xls"]:
             html_path = os.path.join(upload_dir, f"{uid}.html")
             save_excel_to_html(file_path, html_path)
             extension = "html"
-            file_path = html_path
 
         # **Create SmartDocument Object**
         document = SmartDocument(
@@ -1025,15 +1020,11 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         manual_input = data.get("manual_input", None)
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
 
         if search_set_id:
             searchset = SearchSet.objects(id=ObjectId(search_set_id)).first()
-
-            # if not searchset:
-            #     return jsonify({"error": "Search set not found"})
 
             workflow_step_task = None
             if task_id is not None and task_id != 0:
@@ -1125,7 +1116,6 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
-        workflow_step_id = data.get("workflow_step_id")
         space_id = data.get("space_id")
 
         is_editing = data.get("is_editing") or False
@@ -1159,12 +1149,10 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
     if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
-        workflow_id = data["workflow_uuid"]
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         if search_set_item_id:
@@ -1250,10 +1238,8 @@ def workflow_add_format_step() -> ResponseReturnValue:
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
 
-        workflow_id = data["workflow_uuid"]
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         workflow_step_task = None
@@ -1338,9 +1324,6 @@ def workflow_add_document_step() -> ResponseReturnValue:
 
     if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
-        data = request.get_json()
-        workflow_id = data["workflow_uuid"]
-        workflow = Workflow.objects(id=workflow_id).first()
 
         return jsonify({"response": "Placeholder"})
     return None
