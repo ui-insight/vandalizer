@@ -65,10 +65,9 @@ def filter_models() -> ResponseReturnValue:
         return jsonify({"models": settings_models, "current_model": current_model})
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
-        if doc is not None:
-            if not doc.valid:
-                validation_failed = True
-                break
+        if doc is not None and not doc.valid:
+            validation_failed = True
+            break
     if validation_failed:
         # filter out the external models
         models = [m for m in model_config.available_models if not m.get("external")]
@@ -493,8 +492,6 @@ def build_extraction_from_document() -> ResponseReturnValue:
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
     load_user()
-
-    documents = []
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 

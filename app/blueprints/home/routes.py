@@ -321,37 +321,9 @@ def index() -> ResponseReturnValue:
             parent_id=current_folder_id,
         ).all()
 
-    total_token_counts = 0
-    for doc in folder_docs:
-        total_token_counts += doc.token_count
-
     # Release Notes
     release_seen = request.cookies.get("release_seen")
     show_release_panel = release_seen != CURRENT_RELEASE_VERSION
-
-    # Release Notes
-    release_seen = request.cookies.get("release_seen")
-    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
-
-    # user = load_user()
-    # models = []
-
-    # model_config = ModelConfig.objects(
-    #     user_id=user.user_id,
-    # ).first()
-    # model = settings.base_model
-    # settings_models = [m.model_dump() for m in settings.models]
-    # if model_config is None:
-    #     model_config = ModelConfig(user_id=user.user_id, name=model)
-    #     model_config.available_models = [m.model_dump() for m in settings.models]
-    #     model_config.save()
-    #     models = settings_models
-    # else:
-    #     if len(model_config.available_models) == 0:
-    #         models = settings_models
-
-    # debug(models)
-    # debug(settings.models)
 
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
@@ -359,8 +331,6 @@ def index() -> ResponseReturnValue:
         "index.html",
         extraction_sets=extraction_sets,
         prompts=prompts,
-        # models=models,
-        # current_model=model,
         formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
@@ -412,7 +382,6 @@ def chat() -> ResponseReturnValue:
 
     debug(documents)
     debug(docs)
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
 
     def generate():
