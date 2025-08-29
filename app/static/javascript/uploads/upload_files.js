@@ -12,8 +12,7 @@ let dragText = document.querySelector("header");
 
 if (dropArea) {  
     //button = dropArea.querySelector("button"),
-    input = dropArea.querySelector("input"),
-    dragArea = document.querySelector(".drop-area");
+    const input = dropArea.querySelector("input");
   //this is a global variable and we'll use it inside multiple functions
   //button.onclick = ()=>{
   //  input.click(); //if user click on the button then the input also clicked
