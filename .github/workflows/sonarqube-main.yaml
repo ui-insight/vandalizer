@@ -9,7 +9,7 @@ on:
 
 jobs:
   build:
-    if: ${{ github.repository_owner == 'ui-iids' }}
+    if: ${{ github.repository_owner == 'ui-insight' }}
     name: Build and analyze
     runs-on: ubuntu-latest
     

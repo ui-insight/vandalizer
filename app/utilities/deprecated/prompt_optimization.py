@@ -48,9 +48,6 @@
 # from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 # dotenv.load_dotenv()
-# os.environ["OPENAI_API_KEY"] = (
-#     "***REMOVED***"
-# )
 
 # # embedding_model = "text-embedding-3-large"
 # # embedding = OpenAIEmbeddings(model=embedding_model)
