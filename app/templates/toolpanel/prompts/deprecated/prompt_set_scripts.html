@@ -1,13 +1,13 @@
 <script>
     var is_adding_prompt_term = false;
     var prompt_set_add_uuid = "";
-    
+
     $(document).ready(function () {
 
         function createSearchTermDictionary() {
             const searchTermDictionary = {};
             let searchItems = $('.set-result-items').children();
-            searchItems.each(function() {
+            searchItems.each(function () {
                 const searchPhrase = $(this).find('.set-title').text().trim();
                 const result = $(this).find('.extraction-result').text().trim();
                 searchTermDictionary[searchPhrase] = result;
@@ -17,7 +17,7 @@
 
             return searchTermDictionary;
         }
-        
+
         $('.prompt-set-item').on("click", function () {
             console.log("Prompt item tapped");
             performPromptSearch($(this).attr("data-uuid"), $(this).attr("data-title"));
@@ -61,7 +61,7 @@
             }
         }
 
-        $('#promptinput').on('keydown', function(event) {
+        $('#promptinput').on('keydown', function (event) {
             $('#promptplaceholder').attr("data-placeholder", "");
             $('#promptplaceholder').css("color", "black");
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -86,7 +86,7 @@
             }
         });
 
-        function addPromptSetItem () {
+        function addPromptSetItem() {
 
             console.log("Adding prompt term");
             let question = $("#promptinput").find('p').text();
@@ -106,9 +106,7 @@
                 dataType: 'json',
                 async: true,
                 success: function (msg) {
-                    attachments = []
-                    
-                    if (msg.complete == false) {
+                    if (!msg.complete) {
                         showToast(msg.error);
                         return;
                     }
@@ -126,7 +124,7 @@
             });
         }
 
-        $('#add-prompt-set-input').on('keyup', function(e) {
+        $('#add-prompt-set-input').on('keyup', function (e) {
             if (e.key === 'Enter') {
                 console.log("triggering click");
                 $('#add-prompt-set-button').click();
@@ -156,6 +154,6 @@
             });
         });
 
-        
+
     });
 </script>
