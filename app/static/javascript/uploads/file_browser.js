@@ -6,10 +6,31 @@ $(document).ready(function () {
   let currentItemType = null;
   let isPopupJustOpened = false;
 
-  $("#file-list tr").on("contextmenu", function (e) {
+  $("#file-list").on("contextmenu", "tr", function (e) {
+    // If the target is inside an anchor or button, suppress their default behavior
+    if ($(e.target).closest("a, button").length) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
     e.preventDefault();
+    e.stopPropagation();
     showPopupMenu(e, $(this), $(this));
   });
+
+    $("#file-list")
+    .on("contextmenu", "a, button", function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return false;
+    })
+    .on("mousedown", "a, button", function (e) {
+      // Right mouse button = 2 (or e.which === 3 in jQuery)
+      if (e.button === 2 || e.which === 3) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    });
 
   $(".ellipsis-btn").on("click", function (e) {
     e.preventDefault();
