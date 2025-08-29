@@ -207,7 +207,7 @@
                                         // remove code markers from markdownBuffer
                                         const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
 
-                                        markdownContent = window.marked.parse(outputText);
+                                        const markdownContent = window.marked.parse(outputText);
                                         $("#streamedResponse").html(markdownContent);
                                     } else if (data.kind === "thinking") {
                                         thinkingBuffer += data.content;

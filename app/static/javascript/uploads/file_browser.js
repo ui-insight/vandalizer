@@ -142,7 +142,7 @@ $(document).ready(function () {
       // check for a 400 response
       if (xhr.status === 400) {
         // jQuery will auto-parse JSON into responseJSON if possible
-        var err = (xhr.responseJSON && xhr.responseJSON.error)
+        let err = (xhr.responseJSON && xhr.responseJSON.error)
                   || (function(){ try { return JSON.parse(xhr.responseText).error; } catch(e){} })()
                   || "Unknown error";
         alert(err);
@@ -179,8 +179,8 @@ $(document).ready(function () {
       }
     } else {
       var folderId = null;
-      var href = window.location.href;
-      var folderIdIndex = href.indexOf("folder_id=");
+      let href = window.location.href;
+      let folderIdIndex = href.indexOf("folder_id=");
       if (folderIdIndex !== -1) {
         folderId = href.substring(folderIdIndex + 10);
       }
@@ -202,12 +202,12 @@ $(document).ready(function () {
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
       var folderId = null;
-      var href = window.location.href;
-      var folderIdIndex = href.indexOf("folder_id=");
+      let href = window.location.href;
+      let folderIdIndex = href.indexOf("folder_id=");
       if (folderIdIndex !== -1) {
         folderId = href.substring(folderIdIndex + 10);
       }
-      var redirectUrl = window.location.href.split("?")[1];
+      let redirectUrl = window.location.href.split("?")[1];
       console.log("redirectUrl: ", redirectUrl);
       window.location.href = `/files/toggle_default_doc?doc_id=${currentItemId}&redirect_url=${redirectUrl}`;
     } else {
