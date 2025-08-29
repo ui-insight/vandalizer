@@ -61,7 +61,7 @@ models = [
     {"name": "openai/gpt-4.1", "tag": "Cloud", "external": True},
     {"name": "qwen3-32k:32b", "tag": "Private", "external": False},
 ]
-# debug(models)
+
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
 
 

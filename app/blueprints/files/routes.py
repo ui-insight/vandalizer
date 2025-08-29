@@ -182,10 +182,6 @@ def upload():
         document_path=str(file_path),
     )
 
-    # ingestion_task = perform_semantic_ingestion.s(
-    #     document.uuid,
-    #     user_id,
-    # )
     workflow = extraction_task | validation_task  # | ingestion_task
     workflow_task_result = workflow.apply_async(
         link=update_document_fields.si(document.uuid),
@@ -225,10 +221,7 @@ def poll_status() -> ResponseReturnValue:
         else:
             status_messages.append("Document failed validation checks...")
 
-    complete = (
-        document.task_status == "complete"
- or document.task_status == "error"
-    )
+    complete = document.task_status == "complete" or document.task_status == "error"
     return jsonify(
         {
             "status": document.task_status,
