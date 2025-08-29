@@ -65,7 +65,6 @@ def usage_dashboard():
         wf_q = wf_q.filter(user_id=user_id)
         fb_q = fb_q.filter(user_id=user_id)
         ss_q = ss_q.filter(user_id=user_id)
-        wfr_q = wfr_q  # WorkflowResult has session_id, not user_id; skip narrowing unless you store it in steps_output
 
     if space_id:
         doc_q = doc_q.filter(space=space_id)
