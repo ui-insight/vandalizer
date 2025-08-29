@@ -18,15 +18,12 @@ from flask_cors import CORS
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_mail import Mail
 
-CURRENT_RELEASE_VERSION = "2.2.01"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.2.01:
-- Test workflow tasks while building
-- Download workflow results in various formats
-- Upload multiple files at once
-- Delete and edit workflows
-- Share workflows
-- Many bug fixes and performance improvements.
+Release 2.3.01:
+- Over 20 bug fixes and tweaks
+- Restored elegant formatting
+- Improved workflow speed and performance
 """
 
 # Load environment variables from .env file

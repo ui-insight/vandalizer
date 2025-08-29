@@ -2711,4 +2711,44 @@
 
         return searchTermDictionary;
     }
+
+    // document.addEventListener('DOMContentLoaded', () => {
+    //     const rail = document.getElementById('app-rail');
+    //     const railToggle = document.getElementById('rail-toggle');
+    //     const dockLeftToggle = document.getElementById('dock-left-toggle');
+
+    //     // helper to apply CSS variable for left offsets
+    //     const setRailVar = (px) => document.documentElement.style.setProperty('--rail-w', px);
+
+    //     // restore rail pinned state
+    //     const pinned = localStorage.getItem('railPinned') === '1';
+    //     if (pinned) {
+    //         rail.classList.remove('collapsed');
+    //         rail.classList.add('expanded');
+    //         setRailVar(getComputedStyle(document.documentElement).getPropertyValue('--rail-w-open').trim() || '220px');
+    //     } else {
+    //         rail.classList.add('collapsed');
+    //         rail.classList.remove('expanded');
+    //         setRailVar('64px');
+    //     }
+
+    //     railToggle.addEventListener('click', () => {
+    //         const isExpanding = !rail.classList.contains('expanded');
+    //         rail.classList.toggle('expanded', isExpanding);
+    //         rail.classList.toggle('collapsed', !isExpanding);
+    //         setRailVar(isExpanding ? '220px' : '64px');
+    //         localStorage.setItem('railPinned', isExpanding ? '1' : '0');
+    //     });
+
+    //     dockLeftToggle.addEventListener('click', () => {
+    //         document.body.classList.toggle('left-collapsed');
+    //         // optional: remember this too
+    //         localStorage.setItem('leftCollapsed', document.body.classList.contains('left-collapsed') ? '1' : '0');
+    //     });
+
+    //     // restore left-panel collapsed state
+    //     if (localStorage.getItem('leftCollapsed') === '1') {
+    //         document.body.classList.add('left-collapsed');
+    //     }
+    // });
 </script>

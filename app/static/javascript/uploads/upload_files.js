@@ -141,14 +141,24 @@ function traverseFileTree(entry, path = "") {
 }
 
 function processFile(file) {
-  const validTypes = [
+  const okMimes = new Set([
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  ];
-  if (!validTypes.includes(file.type)) {
-    alert(`${file.name} is not a supported document type.`);
-    console.warn(`${file.name} is not a supported document type.`);
+    // Some browsers fall back to octet-stream for downloaded files
+    "application/octet-stream"
+  ]);
+
+  // Allow by extension if MIME is unreliable
+  const name = file.webkitRelativePath || file.relativePath || file.name;
+  const ext = name.split(".").pop().toLowerCase();
+
+  const extOK = ["pdf","docx","xlsx"].includes(ext);
+  const mimeOK = okMimes.has(file.type);
+
+  if (!extOK && !mimeOK) {
+    alert(`${name} is not a supported document type.`);
+    console.warn(`${name} rejected (ext=${ext}, type=${file.type}).`);
     return;
   }
 
@@ -156,23 +166,18 @@ function processFile(file) {
   reader.onload = () => {
     const arrayBuffer = reader.result;
     const base64String = arrayBufferToBase64(arrayBuffer);
-    const filename = file.relativePath || file.name;
-    const extension = filename.split(".").pop();
-
     const payload = {
-        contentType: file.type,
-        contentAsBase64String: base64String,
-        fileName: filename,
-        extension,
-        space: document.querySelector("#current-space-id").innerText,
-        folder: document.querySelector("#current-folder-id").innerText,
-        rootFolderName  // <-- new
-        };
+      contentType: file.type || "",
+      contentAsBase64String: base64String,
+      fileName: name,
+      extension: ext, // normalized
+      space: document.querySelector("#current-space-id")?.innerText || "",
+      folder: document.querySelector("#current-folder-id")?.innerText || "",
+      rootFolderName // your var
+    };
 
-    // Show loader for each file if you like
     $("#loading-area").show();
     $("#drag-area").hide();
-
 
     $.ajax({
       type: "POST",
@@ -183,36 +188,39 @@ function processFile(file) {
       dataType: "json",
       success: result => {
         completedUploads++;
-        console.log(`Successfully uploaded ${filename}`, result);
-      // check if the document was uploaded previously
+        console.log(`Successfully uploaded ${name}`, result);
+
         if (result.exists) {
-            alert(`Document "${filename}" already exists. Please rename it and try again.`);
-            return;
+          alert(`Document "${name}" already exists. Please rename it and try again.`);
+          return;
         }
-        if(result.error) {
-          alert(`${result.error}`);
-          return
+        if (result.error) {
+          // FIX: don’t call stringify on a string
+          alert(`${result.error}${result.code ? " ("+result.code+")" : ""}`);
+          return;
         }
 
         if (result.uuid) {
-            uploadedDocs.push({ name: filename, uuid: result.uuid });
+          uploadedDocs.push({ name, uuid: result.uuid });
         }
 
         console.log(`Uploaded ${completedUploads} of ${pendingUploads}`);
-        // All done?
         if (completedUploads === pendingUploads) {
-            if (pendingUploads === 1) {
-            // Single-file: go straight to that doc
+          if (pendingUploads === 1 && result.uuid) {
             window.location.href = `/home?docid=${result.uuid}`;
-            } else {
-            // Multi-file: reload the list
-            window.location.href = '/home';
-            }
+          } else {
+            window.location.href = "/home";
+          }
         }
       },
-      error: err => {
-        alert(`${err}`);
-        console.error(`Error uploading ${filename}`, err);
+      error: xhr => {
+        let msg = "Upload failed.";
+        try {
+          const resp = xhr.responseJSON || JSON.parse(xhr.responseText || "{}");
+          if (resp.error) msg = resp.error + (resp.code ? ` (${resp.code})` : "");
+        } catch(_) {}
+        alert(`${name}: ${msg}`);
+        console.error(`Error uploading ${name}`, xhr);
       },
       complete: () => {
         $("#loading-area").hide();
@@ -223,9 +231,14 @@ function processFile(file) {
   reader.readAsArrayBuffer(file);
 }
 
+
 function arrayBufferToBase64(buffer) {
-  let binary = "";
   const bytes = new Uint8Array(buffer);
-  bytes.forEach(b => binary += String.fromCharCode(b));
-  return window.btoa(binary);
+  const chunkSize = 0x8000; // 32 KB
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
 }

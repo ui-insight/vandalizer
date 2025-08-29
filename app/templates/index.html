@@ -244,8 +244,9 @@
 
             {% if show_release_panel %}
             <div id="release-panel">
-                <button onclick="dismissReleasePanel()">X</button>
-                <h3>New Release</h3>
+                <button onclick="dismissReleasePanel()"
+                    style="color: #f1b300; font-size: 16px; font-weight: 400;">continue</button>
+                <h3>This is a new release!</h3>
                 <pre>{{ release_notes }}</pre>
             </div>
             {% endif %}

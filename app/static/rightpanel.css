@@ -523,6 +523,12 @@ button.shadow-button:hover {
   outline-offset: 3px;
 }
 
+.btn-secondary:hover {
+    background-color: #191919;
+    color: #ffffff;
+    border: 2px solid #191919;
+}
+
 
 .btn-important:hover {
   background-color: black;
