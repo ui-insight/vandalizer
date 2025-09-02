@@ -48,9 +48,6 @@ $(document).ready(function () {
         }
         : $displaytarget[0].getBoundingClientRect();
 
-    const popupHeight = $popupMenu.outerHeight();
-    const windowHeight = $(window).height();
-
     let top, left;
 
     top = rect.top - 45;
@@ -101,7 +98,6 @@ $(document).ready(function () {
   $("#rename-option").on("click", function () {
     // Implement rename functionality
     console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
-    let renameModal = $("#renameModal");
     function finishRename() {
     let newName = $("#newName")[0].value;
         console.log(

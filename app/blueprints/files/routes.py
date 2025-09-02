@@ -47,6 +47,7 @@ FILE_SIGNATURES = {
 
 
 ALLOWED_EXTS = {"pdf", "docx", "xlsx", "xls"}
+HOME_ROUTE = "home.index"
 
 
 def is_allowed_file(filename: str) -> bool:
@@ -375,8 +376,8 @@ def delete_document() -> ResponseReturnValue:
 def _redirect_home():
     folder_id = request.args.get("folder_id")
     if folder_id:
-        return redirect(url_for("home.index", folder_id=folder_id))
-    return redirect(url_for("home.index"))
+        return redirect(url_for(HOME_ROUTE, folder_id=folder_id))
+    return redirect(url_for(HOME_ROUTE))
 
 
 @files.route("/delete_folder")
@@ -389,7 +390,7 @@ def delete_folder() -> ResponseReturnValue:
     SmartFolder.objects.filter(parent_id=folder_id).delete()
     SmartDocument.objects.filter(folder=folder_id).delete()
 
-    return redirect(url_for("home.index"))
+    return redirect(url_for(HOME_ROUTE))
 
 
 @files.route("/move_item", methods=["POST"])
@@ -436,7 +437,7 @@ def create_folder() -> ResponseReturnValue:
         user_id=session["user_id"],
         uuid=uuid.uuid4().hex,
     )
-    return redirect(url_for("home.index", folder_id=folder.uuid))
+    return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
 
 
 @files.route("/upload_fillable_pdf", methods=["POST"])
