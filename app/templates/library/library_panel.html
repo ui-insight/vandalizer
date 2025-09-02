@@ -10,8 +10,9 @@
         </div>
     </div>
 
-    <div style="display: flex; border-top: 1px #ddd solid; height: calc(100% - 70px);">
-        <div style="width: 260px; flex-shrink: 0; border-right: 1px #ddd solid; padding: 20px 0 20px 30px;">
+    <div style="display: flex; border-top: 1px #ddd solid;    height: calc(100% - 70px);">
+        <div
+            style="width: 160px; flex-shrink: 0; background-color: #f4f4f4; border-right: 1px #ddd solid; padding: 20px 0 20px 30px;">
             <p style="font-size: 12px; font-weight: 400; color: #00000099; padding-right: 20px; margin-bottom: 20px;">
                 Shared automations your team can reuse.</p>
 
@@ -46,9 +47,6 @@
                         endif %}>
                     <span>Format</span>
                 </label>
-                <p id="task-kind-hint" style="font-size:11px; color:#888; margin-top:8px;">
-                    Task kinds apply when viewing Tasks or All.
-                </p>
             </div>
         </div>
 
@@ -75,62 +73,6 @@
 
     {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
 </div>
-
-<style>
-    /* Left nav list styles */
-    .section-list {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 20px 0;
-    }
-
-    .section-item {
-        padding: 10px 20px 10px 0;
-        /* Adjusted padding */
-        cursor: pointer;
-        font-weight: 500;
-        border-left: 3px solid transparent;
-    }
-
-    .section-item:hover {
-        background-color: #f5f5f5;
-    }
-
-    .section-item.active {
-        font-weight: 700;
-        color: #000;
-        /* No border or background for this style */
-    }
-
-    /* Scope tab and card styles */
-    .scope-tab.active {
-        background: #ffe08a;
-    }
-
-    .library-card {
-        border: 1px solid #eee;
-        border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-    }
-
-    .library-card .meta {
-        color: #00000090;
-        font-size: 12px;
-    }
-
-    .library-card .title {
-        font-weight: 600;
-    }
-
-    .library-badge {
-        font-size: 11px;
-        padding: 3px 6px;
-        border-radius: 999px;
-        background: #f2f2f2;
-        margin-right: 6px;
-    }
-</style>
 
 <script>
     // --- State Management ---

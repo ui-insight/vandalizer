@@ -571,8 +571,8 @@ button.shadow-button:hover {
 
   #chat-model-popup-menu {
     position: absolute;
-    top: 0px;
-    right: 50px;
+    top: 32px;
+    left: 70px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: #5D6F81; 
     font-size: 12px;
