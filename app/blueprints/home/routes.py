@@ -1,5 +1,7 @@
 """Handles primary routing for the home page and related functionalities."""
 
+import asyncio
+import io
 import json
 import uuid
 from itertools import chain
@@ -13,6 +15,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     stream_with_context,
@@ -34,12 +37,14 @@ from app.models import (
     Workflow,
     WorkflowStep,
 )
+from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
     update_document_fields,
 )
+from app.utilities.markdown_helpers import generate_pdf_from_markdown
 from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
@@ -47,6 +52,8 @@ from app.utilities.upload_manager import (
 from app.utils import is_dev, load_user
 
 home = Blueprint("home", __name__)
+
+WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 
 @app.context_processor
@@ -70,7 +77,7 @@ def inject_current_model():
     return {"current_model": "", "models": []}
 
 
-def verify_document(document: SmartDocument, user_id: str) -> None:
+def verify_document(document: SmartDocument) -> None:
     """Verify and update the document if necessary."""
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
@@ -158,7 +165,6 @@ def index() -> ResponseReturnValue:
                 session["user_id"] = user_id
 
     user = load_user()
-    user_id = user.user_id
     section = request.args.get("section", default="Assistant").strip()
 
     document = None
@@ -190,7 +196,7 @@ def index() -> ResponseReturnValue:
         document = SmartDocument.objects(uuid=doc_id).first()
         if document is not None:
             documents.append(document)
-            verify_document(document, user_id)
+            verify_document(document)
             current_space = Space.objects(uuid=document.space).first()
             selected_document = document
 
@@ -200,7 +206,7 @@ def index() -> ResponseReturnValue:
             document = SmartDocument.objects(uuid=doc_id).first()
             if document is not None:
                 documents.append(document)
-                verify_document(document, user_id)
+                verify_document(document)
 
         if document is not None:
             current_space = Space.objects(uuid=document.first.space).first()
@@ -378,8 +384,6 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    user = load_user()
-
     debug(documents)
     debug(docs)
     model = settings.base_model
@@ -401,18 +405,96 @@ def chat() -> ResponseReturnValue:
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
+## @MARK: Download
+@home.route("/chat/download", methods=["POST"])
+def chat_download() -> ResponseReturnValue:
+    fmt = request.args.get("format", "txt").lower()
+    final_output = request.args.get("content", "txt").lower()
+
+    #    tailor the prompt to each format
+    if fmt == "csv":
+        prompt = (
+            "Convert the following HTML document into a well formatted CSV. "
+            "Use commas as separators and include a header row.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            f"{final_output}"
+        )
+    elif fmt == "pdf":
+        # you might ask for a simple text layout or markdown-to-PDF
+        prompt = (
+            "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
+            "Please format your entire response using Markdown.\n\n"
+            "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
+            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
+            f"Here is the HTML data:\n\n{final_output}"
+        )
+    else:  # txt
+        prompt = (
+            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            f"{final_output}"
+        )
+
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    chat_agent = create_chat_agent(model)
+    # get current event loop
+    # if there is no current loop, create a new one
+    formatted = asyncio.run(chat_agent.run(prompt))
+    formatted = formatted.output
+
+    # Remove the tick marks before and after blocks
+    formatted = formatted.strip("`").strip()
+
+    # 4) package it up
+    buf = io.BytesIO()
+    debug(f"Format is {fmt}")
+    if fmt == "csv":
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name="chat_output.csv",
+        )
+
+    elif fmt == "pdf":
+        buf = generate_pdf_from_markdown(formatted)
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="chat_output.pdf",
+        )
+
+    else:  # txt
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/plain",
+            as_attachment=True,
+            download_name="chat_output.txt",
+        )
+
+
 @home.route("/static/fontawesome/webfonts/<path:filename>")
 def serve_fonts(filename):
     if filename.endswith(".woff2"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/woff2",
         )
     if filename.endswith(".ttf"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/ttf",
         )
-    return send_from_directory("static/fontawesome/webfonts", filename)
+    return send_from_directory(WEBFONTS_DIR, filename)

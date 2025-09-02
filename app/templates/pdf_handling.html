@@ -23,89 +23,122 @@
     function renderPage(num) {
         pageRendering = true;
         pdfDoc.getPage(num).then(function (page) {
-            const container = document.createElement('div');
-            container.style.position = "relative";
+            // 1) figure out the scale to fit container width
+            const cssWidth = pdfContainer.clientWidth; // available width
+            const unscaled = page.getViewport({ scale: 1 });
+            // Keep a small horizontal padding if desired (set to 0 if not)
+            const horizontalPadding = 0;
+            const targetWidth = Math.max(0, cssWidth - horizontalPadding * 2);
+            const scale = targetWidth / unscaled.width;
+
+            // 2) build the centered page wrapper
+            const wrapper = document.createElement('div');
+            wrapper.className = 'pdf-page';
+            wrapper.style.width = Math.floor(unscaled.width * scale) + 'px'; // centers via #document flex
+            wrapper.style.position = 'relative';
+
+            // 3) canvas + overlay sized to the viewport
             const canvas = document.createElement('canvas');
-            container.appendChild(canvas);
-            container.appendChild(document.createElement('div'));
-            pdfContainer.appendChild(container);
-            pdfDoc.getPage(num).then(function (page) {
-                var scale = 1.2;
-                var viewport = page.getViewport({ scale: scale, });
-                var context = canvas.getContext('2d');
-                var aspect = viewport.width / viewport.height;
+            canvas.className = 'pdf-canvas';
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay-layer';
 
-                canvas.width = Math.floor(pdfContainer.clientWidth);
-                canvas.height = Math.floor((pdfContainer.clientWidth - 100.0) / aspect);
-                //canvas.style.width = Math.floor(container.clientWidth - 100.0)  + "px";
-                //canvas.style.height = Math.floor((container.clientWidth - 100.0) * aspect) + "px";
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(overlay);
+            pdfContainer.appendChild(wrapper);
 
+            // 4) crisp rendering on HiDPI
+            const dpr = window.devicePixelRatio || 1;
+            const viewport = page.getViewport({ scale: scale });
+            canvas.width = Math.floor(viewport.width * dpr);
+            canvas.height = Math.floor(viewport.height * dpr);
+            canvas.style.width = Math.floor(viewport.width) + 'px';
+            canvas.style.height = Math.floor(viewport.height) + 'px';
 
-                var renderContext = {
-                    canvasContext: context,
+            overlay.style.width = canvas.style.width;
+            overlay.style.height = canvas.style.height;
 
-                    viewport: viewport
-                };
-                var renderTask = page.render(renderContext);
+            const ctx = canvas.getContext('2d');
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport,
+                transform: [dpr, 0, 0, dpr, 0, 0] // scale up internally for crispness
+            };
 
-
-
-                renderTask.promise.then(function () {
-                    pageRendering = false;
-                    highlightText(page, highlightTerms, viewport, container);
-                });
-            })
+            const renderTask = page.render(renderContext);
+            renderTask.promise.then(function () {
+                pageRendering = false;
+                // pass overlay instead of the wrapper/canvas for highlight placement
+                highlightText(page, highlightTerms, viewport, overlay);
+            });
         });
     }
 
-    function highlightText(page, highlightTerms, viewport, canvas) {
-        if (highlightTerms == []) {
-            return;
+    function renderPDF() {
+        pdfContainer.innerHTML = '';
+        current_search_item = 0;
+        needsScroll = false;
+        if (!pdfDoc) return;
+
+        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+            renderPage(pageNumber);
         }
+    }
+
+    // rerender on resize so pages reflow & gaps don’t appear on some screens
+    let resizeTimer;
+    window.addEventListener('resize', function () {
+        if (!window.document_displayed) return;
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(function () {
+            renderPDF();
+        }, 150);
+    });
+
+    // Fix: highlightTerms empty check, and place highlights inside the overlay
+    function highlightText(page, highlightTerms, viewport, overlayEl) {
+        if (!highlightTerms || highlightTerms.length === 0) return;
 
         page.getTextContent().then(function (textContent) {
             textContent.items.forEach(function (textItem) {
-                textString = textItem.str;
-                // Check if textString includes anything in highlightTerms array
-                var phrase = highlightTerms.find(function (phrase) {
-                    return textString.includes(phrase);
+                const textString = textItem.str;
+                const phrase = highlightTerms.find(p => textString && textString.includes(p));
+                if (phrase === undefined) return;
+
+                // coords
+                const scale = viewport.scale;
+                const [, , , , tx, ty] = textItem.transform; // a,b,c,d,tx,ty
+                const x = tx * scale;
+                const y = viewport.height - (ty * scale) - (textItem.height * scale);
+
+                const highlight = document.createElement('div');
+                highlight.className = 'highlight';
+                Object.assign(highlight.style, {
+                    position: 'absolute',
+                    left: x + 'px',
+                    top: y + 'px',
+                    width: (textItem.width * scale) + 'px',
+                    height: (textItem.height * scale) + 'px',
+                    backgroundColor: 'yellow',
+                    opacity: 0.5
                 });
-
-                if (phrase != undefined) {
-                    console.log(phrase);
-                    // Create highlight div
-                    var highlight = document.createElement('div');
-                    highlight.style.position = 'absolute';
-
-                    // Adjust the position and size according to the scale of the viewport
-                    var adjustedX = textItem.transform[4] * viewport.scale;
-                    var adjustedY = viewport.height - (textItem.transform[5] * viewport.scale) - (textItem.height * viewport.scale);
-
-                    highlight.style.left = adjustedX + 'px';
-                    highlight.style.top = adjustedY + 'px';
-                    highlight.style.width = (textItem.width * viewport.scale) + 'px';
-                    highlight.style.height = (textItem.height * viewport.scale) + 'px';
-                    highlight.style.backgroundColor = 'yellow';
-                    highlight.style.opacity = 0.5; // Making it semi-transparent
-                    highlight.className = 'highlight';
-                    // Append to the container
-                    canvas.appendChild(highlight);
-                }
+                overlayEl.appendChild(highlight);
             });
 
-            highlights = $('.highlight');
-            if (highlights.length == 0) {
+            const highlights = $('.highlight');
+            if (highlights.length === 0) {
                 $('#semantic-panel').hide();
             } else {
                 $('#semantic-panel').show();
                 $('#semantic-panel-term').text(searchTerm);
-                $('#semantic-panel-count').text(current_search_item + 1 + " of " + highlights.length);
+                $('#semantic-panel-count').text((current_search_item + 1) + " of " + highlights.length);
 
                 if (needsScroll) {
                     needsScroll = false;
-                    $('.left-panel').animate({
-                        scrollTop: highlights[current_search_item].style.top
-                    }, 1000);
+                    const $scrollHost = $('.left-panel');
+                    const $target = $(highlights[current_search_item]);
+                    const delta = $target.offset().top - $scrollHost.offset().top + $scrollHost.scrollTop() - 40;
+                    $scrollHost.animate({ scrollTop: delta }, 600);
                 }
             }
         });
@@ -164,14 +197,14 @@
         }
     }
 
-     function renderHTML() {
-            pdfContainer.innerHTML = '';
-            var iframe = document.createElement('iframe');
-            iframe.src = documentPath;
-            iframe.width = "100%";
-            iframe.height = "100%";
-            pdfContainer.appendChild(iframe);
-        }
+    function renderHTML() {
+        pdfContainer.innerHTML = '';
+        var iframe = document.createElement('iframe');
+        iframe.src = documentPath;
+        iframe.width = "100%";
+        iframe.height = "100%";
+        pdfContainer.appendChild(iframe);
+    }
 
     function renderPDF() {
         pdfContainer.innerHTML = '';

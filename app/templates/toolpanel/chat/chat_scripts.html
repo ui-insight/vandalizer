@@ -1,39 +1,28 @@
 <script>
-    const placeholderText = "Ask anything about this document…";
-    let chatReponse = null;
+    const PLACEHOLDER = "Ask vandalizer anything...";
 
-    // This function runs once the page is fully loaded
+    // Utility: keep editor empty-state + button in sync
+    function updateEditorState() {
+        const $input = $("#chatinput");
+        const hasText = $input.text().trim().length > 0;
+        $input.toggleClass("is-editor-empty", !hasText);
+        $("#send-chat-button").prop("disabled", !hasText);
+    }
+
+    // On load
     $(document).ready(function () {
-        // Fix: Ensures the placeholder and button are set correctly on initial load.
-        const hasText = $("#chatinput").text().trim().length > 0;
-        $("#send-chat-button").prop('disabled', !hasText);
-
-        if (!hasText) {
-            $("#chatplaceholder").attr("data-placeholder", placeholderText);
-        } else {
-            $("#chatplaceholder").attr("data-placeholder", "");
-        }
+        $("#chatinput").attr("data-placeholder", PLACEHOLDER);
+        updateEditorState();
     });
 
-    // This listener now toggles the disabled property of the send button
+    // Input changes (typing, paste, IME, etc.)
     $("#chatinput").on("input", function () {
-        const hasText = $(this).text().trim().length > 0;
-        const placeholder = $("#chatplaceholder");
-        const sendButton = $("#send-chat-button");
-
-        sendButton.prop('disabled', !hasText);
-
-        if (hasText) {
-            placeholder.attr("data-placeholder", "");
-        } else {
-            placeholder.attr("data-placeholder", placeholderText);
-        }
+        updateEditorState();
     });
 
-    // Updated keydown listener for Enter and the new Backspace feature
+    // Keydown guards + Enter-to-send
     $("#chatinput").on("keydown", function (event) {
         const text = $(this).text().trim();
-
 
         // Prevent a leading space in an empty editor
         if (event.key === " " && text.length === 0) {
@@ -41,9 +30,10 @@
             return;
         }
 
-        // Prevent Backspace → browser‑back when empty
-        if (event.key === "Backspace" && text.trim().length === 0) {
+        // Prevent Backspace → browser-back when empty
+        if (event.key === "Backspace" && text.length === 0) {
             event.preventDefault();
+            return;
         }
 
         if (event.key === "Enter" && !event.shiftKey) {
@@ -54,15 +44,10 @@
         }
     });
 
-
     // Click handler for the send button
     $("#send-chat-button").on("click", function (e) {
         e.preventDefault();
-        if (document_uuids != "") {
-            chat();
-        } else {
-            showToast("Select a document to chat");
-        }
+        chat();
     });
 
     // Click handler for the tasks link
@@ -71,7 +56,6 @@
         setSection("Tasks");
         $("#tasks-panel").show();
     });
-
 
     function chat() {
         let question = $("#chatinput").text();
@@ -84,32 +68,33 @@
         is_adding_term = false;
     }
 
+    // --- Only the clearing/placeholder part changes inside performChat ---
     function performChat(
         document_uuids,
         question,
         folder_uuid,
         additional_context = "",
-        display_question = "",
+        display_question = ""
     ) {
-        $("#send-chat-button").prop('disabled', true);
+        $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
-        let questionToDisplay = display_question === "" ? question : display_question;
+        const questionToDisplay = display_question === "" ? question : display_question;
 
-        let messageHtml = "<p><div class='message-you'>" + questionToDisplay + "</div></p>";
-        $("#chat-panel").append(messageHtml);
+        $("#chat-panel").append("<p><div class='message-you'>" + questionToDisplay + "</div></p>");
 
-        $("#chatinput").text(""); // Clear the text
-        $("#chatinput").addClass("is-empty is-editor-empty"); // Re-apply classes
-        $("#chatinput").attr("data-placeholder", placeholderText); // Ensure data-attribute is set
+        // Clear editor correctly and restore placeholder state
+        $("#chatinput").empty().addClass("is-editor-empty");
+        // keep placeholder text synced (optional if static)
+        $("#chatinput").attr("data-placeholder", PLACEHOLDER);
 
-        let responseId = "response-" + new Date().getTime();
+        const responseId = "response-" + new Date().getTime();
         $("#chat-panel").append(
             `<p>
-                <div class='message-response' id='${responseId}'>
-                    <div class='chat-loader' style='display: inline-block;'></div>
-                </div>
-            </p>`
+        <div class='message-response' id='${responseId}'>
+          <div class='chat-loader' style='display: inline-block;'></div>
+        </div>
+      </p>`
         );
 
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "slow");
@@ -121,9 +106,9 @@
                 document_uuids: document_uuids,
                 message: question + " " + additional_context,
                 folder_uuid: folder_uuid,
-            })
+            }),
         })
-            .then(response => {
+            .then((response) => {
                 if (!response.body) throw new Error("No response body");
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -134,21 +119,21 @@
 
                 $("#" + responseId).html(
                     `<div style='display: flex; flex-direction: column;'>
-                        <div class='thinking-panel' style='display: none; background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
-                            <div class='thinking-header' style='cursor: pointer; font-weight: bold;'>
-                                <span class='thinking-toggle'>▶</span> Thinking...
-                            </div>
-                            <div class='thinking-content' style='display: none; margin-top: 10px; font-family: monospace; white-space: pre-wrap;'></div>
-                        </div>
-                        <div style='display: flex;'>
-                            <div style='flex-grow: 1;'>
-                                <div class="chat-response-body" id="streamedResponse"></div>
-                            </div>
-                        </div>
-                    </div>`
+            <div class='thinking-panel' style='display: none; background: #f5f5f5; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>
+              <div class='thinking-header' style='cursor: pointer; font-weight: bold;'>
+                <span class='thinking-toggle'>▶</span> Thinking...
+              </div>
+              <div class='thinking-content' style='display: none; margin-top: 10px; font-family: monospace; white-space: pre-wrap;'></div>
+            </div>
+            <div style='display: flex;'>
+              <div style='flex-grow: 1;'>
+                <div class="chat-response-body" id="streamedResponse"></div>
+              </div>
+            </div>
+          </div>`
                 );
 
-                // Add click handler for thinking panel toggle
+                // Thinking panel toggle
                 $("#" + responseId + " .thinking-header").on("click", function () {
                     const $content = $(this).siblings(".thinking-content");
                     const $toggle = $(this).find(".thinking-toggle");
@@ -164,7 +149,7 @@
                 function pump() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
-                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
                             let $responseDiv = $("<div>")
                                 .addClass("message-response-body")
                                 .attr({
@@ -187,6 +172,21 @@
                                 let responseHtml = $(this).closest('[id^="response"]').find(".message-response-body").html().trim();
                                 copyRichTextToClipboard(responseHtml);
                             });
+                            $(".download-btn").on("click", function () {
+                                const $body = $(this)
+                                    .closest('[id^="response"]')
+                                    .find(".message-response-body")
+                                    .first()
+                                    .clone();
+
+                                // Remove the feedback row(s) just for the download payload
+                                $body.find(".feedback-buttons").remove();
+
+                                // (Optional) If your popup menu ever gets injected inside the body, strip it too
+                                $body.find("#chat-model-popup-menu").remove();
+                                const responseHtml = $body.html().trim();
+                                attachChatDownloadUI(this, responseHtml);
+                            });
                             return;
                         }
 
@@ -194,7 +194,7 @@
                         buffer += chunk;
 
                         // Process complete JSON lines
-                        let lines = buffer.split('\n');
+                        let lines = buffer.split("\n");
                         buffer = lines.pop(); // Keep incomplete line in buffer
 
                         for (let line of lines) {
@@ -204,9 +204,7 @@
 
                                     if (data.kind === "text") {
                                         markdownBuffer += data.content;
-                                        // remove code markers from markdownBuffer
-                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
-
+                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
                                         const markdownContent = window.marked.parse(outputText);
                                         $("#streamedResponse").html(markdownContent);
                                     } else if (data.kind === "thinking") {
@@ -226,7 +224,7 @@
                 }
                 return pump();
             })
-            .catch(error => {
+            .catch((error) => {
                 console.log("Stream error", error);
             });
     }
@@ -235,6 +233,198 @@
         return el.scrollHeight - el.scrollTop - el.clientHeight < threshold;
     }
 
-    function copyRichTextToClipboard(html) { /* ... */ }
-    function createFeedbackButtons() { /* ... */ }
+    function copyRichTextToClipboard(html) {
+        // Create a temporary element
+        const container = document.createElement('div');
+        container.innerHTML = html;
+
+        // Try to use the modern clipboard API first
+        try {
+            // For plain text fallback
+            const textContent = container.textContent || container.innerText;
+
+            // Try to copy as HTML if supported
+            if (navigator.clipboard && navigator.clipboard.write) {
+                const blob = new Blob([html], { type: 'text/html' });
+                const clipboardItem = new ClipboardItem({ 'text/html': blob });
+                return navigator.clipboard.write([clipboardItem]).then(() => {
+                    console.log('Rich text copied');
+                    showToast("Copied to clipboard");
+                })
+                    .catch(err => {
+                        console.warn('Rich text copy failed, falling back to plain text', err);
+                        return navigator.clipboard.writeText(textContent);
+                    });
+            } else {
+                // Fall back to plain text
+                return navigator.clipboard.writeText(textContent);
+            }
+        } catch (err) {
+            console.warn('Modern clipboard API failed, using fallback', err);
+            // Fallback for Safari and older browsers
+            return new Promise((resolve, reject) => {
+                const textarea = document.createElement('textarea');
+                textarea.value = container.textContent || container.innerText;
+                textarea.style.position = 'fixed';
+                document.body.appendChild(textarea);
+                textarea.focus();
+                textarea.select();
+
+                try {
+                    const successful = document.execCommand('copy');
+                    if (successful) {
+                        resolve();
+                    } else {
+                        reject(new Error('execCommand failed'));
+                    }
+                } catch (err) {
+                    reject(err);
+                } finally {
+                    document.body.removeChild(textarea);
+                }
+            });
+        }
+    }
+
+    function createFeedbackButtons() {
+        const feedbackDiv = document.createElement("div");
+        feedbackDiv.className = "feedback-buttons";
+        // align to bottom-right without needing extra CSS files
+        feedbackDiv.style.display = "flex";
+        feedbackDiv.style.justifyContent = "flex-end";
+        feedbackDiv.style.gap = "12px";
+        feedbackDiv.style.marginTop = "30px";
+
+        // "Link-like" button style
+        const makeLinkBtn = (text, className) => {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = className + " btn btn-secondary"; // e.g., "copy-btn" or "download-btn"
+            btn.textContent = text;
+            // btn.style.background = "none";
+            // btn.style.border = "none";
+            // btn.style.color = "#000000aa";
+            // btn.style.padding = "0";
+            btn.style.fontSize = "10px";
+            return btn;
+        };
+
+        const copyBtn = makeLinkBtn("Copy", "copy-btn");
+        const downloadBtn = makeLinkBtn("Download", "download-btn");
+
+        feedbackDiv.appendChild(copyBtn);
+        feedbackDiv.appendChild(downloadBtn);
+        return feedbackDiv;
+    }
+
+
+    function attachChatDownloadUI(downloadBtnEl, htmlMarkup) {
+        // Ensure the chat popup exists (create if missing)
+        let $menu = $('#chat-download-popup-menu');
+        if ($menu.length === 0) {
+            $menu = $(`
+      <div id="chat-model-popup-menu" class="file-popup-menu" style="display:none; position:absolute; z-index:10000;">
+        <ul id="chat-model-popup-menu-options">
+          <li id="download-pdf-option-chat">Download as PDF</li>
+          <li id="download-csv-option-chat">Download as CSV</li>
+          <li id="download-text-option-chat">Download as Text</li>
+        </ul>
+      </div>
+    `).appendTo(document.body);
+        }
+
+        let isOpen = false;
+
+        function positionAndShowMenu(anchorEl) {
+            const rect = anchorEl.getBoundingClientRect();
+            // position near the button, tweak offsets to taste
+            const top = rect.bottom + window.scrollY + 6;
+            const left = rect.left + window.scrollX;
+            $menu.css({ top: `${top}px`, left: `${left}px` }).show();
+            isOpen = true;
+
+            // Close on outside click (namespaced & added only while open)
+            setTimeout(() => {
+                $(document).on('click.chatDl', (e) => {
+                    if (!$(e.target).closest('#chat-model-popup-menu').length) hide();
+                });
+            }, 0);
+        }
+
+        function hide() {
+            $menu.hide();
+            $(document).off('click.chatDl');
+            isOpen = false;
+        }
+
+        if (isOpen) { hide(); return; }
+        positionAndShowMenu(downloadBtnEl);
+
+        // Scoped handlers: bind to the menu element (not document)
+        $menu.off('click.chatDl');
+        $menu.on('click.chatDl', '#download-pdf-option-chat', async (e) => {
+            e.stopPropagation(); hide();
+            await downloadChatOutput('pdf', htmlMarkup);
+        });
+        $menu.on('click.chatDl', '#download-csv-option-chat', async (e) => {
+            e.stopPropagation(); hide();
+            await downloadChatOutput('csv', htmlMarkup);
+        });
+        $menu.on('click.chatDl', '#download-text-option-chat', async (e) => {
+            e.stopPropagation(); hide();
+            await downloadChatOutput('txt', htmlMarkup);
+        });
+
+        // Expose hide if you need to close from elsewhere
+        return { hide };
+    }
+
+    /** Chat-specific downloader that calls your /chat/download route */
+    async function downloadChatOutput(fmt, html) {
+        try {
+            if (typeof showToast === 'function') showToast('Preparing download…');
+
+            // Server expects query args even for POST
+            const params = new URLSearchParams({ format: fmt, content: html });
+            const url = `/home/chat/download?${params.toString()}`;
+
+            const resp = await fetch(url, { method: 'POST' });
+            if (!resp.ok) {
+                const text = await resp.text().catch(() => '');
+                throw new Error(`Download failed (${resp.status}): ${text.slice(0, 200)}`);
+            }
+
+            // Parse filename from headers or fallback by fmt
+            let filename = `chat_output.${fmt === 'pdf' ? 'pdf' : fmt === 'csv' ? 'csv' : 'txt'}`;
+            const cd = resp.headers.get('Content-Disposition') || resp.headers.get('content-disposition');
+            if (cd) {
+                const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                if (m && m[1]) {
+                    try { filename = decodeURIComponent(m[1].replace(/^"+|"+$/g, '')); } catch (_) { }
+                }
+            }
+
+            const blob = await resp.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+
+            if (typeof showToast === 'function') showToast(`Downloading ${filename}`);
+        } catch (err) {
+            console.error('Download error:', err);
+            if (typeof showToast === 'function') showToast('Download failed. Copying to clipboard instead…');
+            try {
+                await copyRichTextToClipboard(html);
+                if (typeof showToast === 'function') showToast('Copied to clipboard.');
+            } catch (copyErr) {
+                console.error('Clipboard fallback failed:', copyErr);
+                if (typeof showToast === 'function') showToast('Could not copy to clipboard.');
+            }
+        }
+    }
 </script>

@@ -2,7 +2,6 @@
 
 import base64
 import io
-import os
 import uuid
 from pathlib import Path
 
@@ -37,9 +36,6 @@ from app.utils import load_user
 
 files = Blueprint("files", __name__)
 
-# Our allowed file extensions
-ALLOWED_EXTENSIONS = {"pdf", "docx", "xlsx", "xls"}
-
 # Mapping of extensions to their expected "magic numbers" (file signatures)
 # This helps verify the file content matches its extension.
 FILE_SIGNATURES = {
@@ -50,24 +46,44 @@ FILE_SIGNATURES = {
 }
 
 
-def is_allowed_file(filename):
-    """Checks if the file has an allowed extension."""
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+ALLOWED_EXTS = {"pdf", "docx", "xlsx", "xls"}
+HOME_ROUTE = "home.index"
 
 
-def is_valid_file_content(file_data, extension):
-    """Checks if the file's magic number matches its extension."""
-    if not extension.startswith("."):
-        extension = "." + extension
-    extension = extension.lower()
+def is_allowed_file(filename: str) -> bool:
+    if "." not in filename:
+        return False
+    return filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTS
 
-    signatures = FILE_SIGNATURES.get(extension)
-    if not signatures:
-        return False  # Should not happen if is_allowed_file is checked first
 
-    for sig in signatures:
-        if file_data.startswith(sig):
-            return True
+def is_valid_file_content(data: bytes, extension: str) -> bool:
+    ext = extension.lower().lstrip(".")
+    header = data[:8192]  # sniff a bit more for safety
+
+    if ext == "pdf":
+        # Some PDFs may have leading whitespace/newlines before %PDF-
+        # Search within the first 1KB for the magic string
+        return b"%PDF-" in header[:1024]
+
+    if ext in ("docx", "xlsx"):
+        # OOXML containers are ZIPs with specific [Content_Types].xml pieces
+        # Quick zip signature:
+        if not header.startswith(b"PK\x03\x04"):
+            return False
+        try:
+            import io
+            import zipfile
+
+            with zipfile.ZipFile(io.BytesIO(data)) as zf:
+                if ext == "docx":
+                    return any(name.startswith("word/") for name in zf.namelist())
+                if ext == "xlsx":
+                    return any(name.startswith("xl/") for name in zf.namelist())
+        except Exception:
+            return False
+        return True
+
+    # Fallback: unknown extension not supported
     return False
 
 
@@ -77,21 +93,40 @@ def upload():
     if not user:
         return redirect(url_for("auth.login"))
 
-    data = request.get_json()
-    space = data["space"]
-    parent_folder_id = data["folder"] or None
-    new_folder_name = data.get("rootFolderName")
+    # Safer JSON parsing (won't 400 before your own code runs)
+    data = request.get_json(silent=True) or {}
+    if not data:
+        return jsonify({"error": "Invalid JSON payload."}), 400
 
-    blob = data["contentAsBase64String"]
-    filename = data["fileName"]
-    extension = data["extension"]
+    space = data.get("space")
+    parent_folder_id = data.get("folder") or None
+    new_folder_name = (data.get("rootFolderName") or "").strip() or None
 
-    # --- SECURITY CHECK 1: Validate file extension ---
-    if not is_allowed_file(filename):
-        return jsonify({"error": f"File type '{extension}' is not allowed."}), 400
+    blob = data.get("contentAsBase64String")
+    filename = (data.get("fileName") or "").strip()
+    raw_extension = (data.get("extension") or "").strip()
 
-    # 1) If a new folder was dropped, create it
-    print(new_folder_name)
+    if not blob or not filename or not space:
+        return jsonify(
+            {"error": "Missing required fields: file content, file name, or space."}
+        ), 400
+
+    # Normalize filename/extension early
+    from werkzeug.utils import secure_filename
+
+    safe_filename = secure_filename(filename)
+    extension = raw_extension.lower().lstrip(".")
+
+    # --- SECURITY CHECK 1: Validate file extension (case-insensitive) ---
+    if not is_allowed_file(safe_filename):
+        return jsonify(
+            {
+                "error": f"File type '{extension}' is not allowed.",
+                "code": "EXTENSION_NOT_ALLOWED",
+            }
+        ), 400
+
+    # Create folder if requested
     if new_folder_name:
         smart_folder = SmartFolder(
             title=new_folder_name,
@@ -104,61 +139,54 @@ def upload():
     else:
         target_folder = parent_folder_id
 
-    # 2) Now for each incoming file (you’re still doing per-file),
-    #    save SmartDocument(folder=target_folder)
-
-    if target_folder is None or target_folder == "":
+    if not target_folder:
         target_folder = "0"
 
-    # check if the file already exists (unique by title, user_id, space, and folder)
-    document_results = SmartDocument.objects(
-        title=filename,
+    # De-duplicate on (title, user, space, folder)
+    existing = SmartDocument.objects(
+        title=safe_filename,
         user_id=user.user_id,
         space=space,
         folder=str(target_folder),
     )
-    debug(document_results)
-    if document_results.count() > 0:
-        return jsonify({"complete": True, "exists": True})
+    if existing.count() > 0:
+        return jsonify({"complete": True, "exists": True}), 200
 
     uid = uuid.uuid4().hex.upper()
 
+    # Base64 decode with clearer errors and a size sanity check (optional)
     try:
-        imgdata = base64.b64decode(blob)
-    except (ValueError, TypeError):
-        return jsonify({"error": "Invalid base64 string."}), 400
+        imgdata = base64.b64decode(blob, validate=True)
+    except (ValueError, TypeError) as e:
+        current_app.logger.warning("Base64 decode failed for %s: %s", safe_filename, e)
+        return jsonify({"error": "Invalid base64 string.", "code": "BAD_BASE64"}), 400
 
-    # --- SECURITY CHECK 2: Validate file content against its extension ---
+    # --- SECURITY CHECK 2: Validate content signature more leniently for PDFs ---
     if not is_valid_file_content(imgdata, extension):
-        return jsonify({"error": "File content does not match its extension."}), 400
+        return jsonify(
+            {
+                "error": "File content does not match its extension.",
+                "code": "MAGIC_MISMATCH",
+            }
+        ), 400
 
-    # Update the stored path to include the user's id folder
+    # Save to per-user directory
     relative_file_path = Path(user.user_id) / f"{uid}.{extension}"
-    debug(relative_file_path)
-
-    # Define base upload directory
     base_upload_dir = Path(current_app.root_path) / "static" / "uploads"
-    if not Path.exists(base_upload_dir):
-        os.makedirs(base_upload_dir)
+    base_upload_dir.mkdir(parents=True, exist_ok=True)
+    upload_dir = base_upload_dir / user.user_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create a directory for the user based on their id
-    upload_dir = Path(base_upload_dir) / user.user_id
-    if not Path.exists(upload_dir):
-        os.makedirs(upload_dir)
-
-    # Save the file to the user's directory
-    file_path = Path(upload_dir) / f"{uid}.{extension}"
-    with Path.open(file_path, "wb") as f:
+    file_path = upload_dir / f"{uid}.{extension}"
+    with file_path.open("wb") as f:
         f.write(imgdata)
 
-    debug(file_path)
-
-    raw_text = ""
+    # Persist doc
     document = SmartDocument(
-        title=filename,
+        title=safe_filename,
         processing=True,
         valid=True,
-        raw_text=raw_text,
+        raw_text="",
         downloadpath=str(relative_file_path),
         path=str(relative_file_path),
         extension=extension,
@@ -169,20 +197,18 @@ def upload():
         task_id=None,
         task_status="layout",
     )
-
     document.save()
 
+    # Kick off tasks
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
         extension=extension,
     )
-
     validation_task = perform_document_validation.s(
         document_uuid=document.uuid,
         document_path=str(file_path),
     )
-
-    workflow = extraction_task | validation_task  # | ingestion_task
+    workflow = extraction_task | validation_task
     workflow_task_result = workflow.apply_async(
         link=update_document_fields.si(document.uuid),
         link_error=cleanup_document.si(document.uuid),
@@ -190,7 +216,7 @@ def upload():
     document.task_id = workflow_task_result.id
     document.save()
 
-    return jsonify({"complete": True, "uuid": uid})
+    return jsonify({"complete": True, "uuid": uid}), 200
 
 
 @files.route("/poll_status", methods=["GET"])
@@ -350,8 +376,8 @@ def delete_document() -> ResponseReturnValue:
 def _redirect_home():
     folder_id = request.args.get("folder_id")
     if folder_id:
-        return redirect(url_for("home.index", folder_id=folder_id))
-    return redirect(url_for("home.index"))
+        return redirect(url_for(HOME_ROUTE, folder_id=folder_id))
+    return redirect(url_for(HOME_ROUTE))
 
 
 @files.route("/delete_folder")
@@ -364,7 +390,7 @@ def delete_folder() -> ResponseReturnValue:
     SmartFolder.objects.filter(parent_id=folder_id).delete()
     SmartDocument.objects.filter(folder=folder_id).delete()
 
-    return redirect(url_for("home.index"))
+    return redirect(url_for(HOME_ROUTE))
 
 
 @files.route("/move_item", methods=["POST"])
@@ -411,7 +437,7 @@ def create_folder() -> ResponseReturnValue:
         user_id=session["user_id"],
         uuid=uuid.uuid4().hex,
     )
-    return redirect(url_for("home.index", folder_id=folder.uuid))
+    return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
 
 
 @files.route("/upload_fillable_pdf", methods=["POST"])

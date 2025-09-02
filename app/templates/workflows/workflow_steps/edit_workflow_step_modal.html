@@ -14,7 +14,7 @@
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
         <!-- Tabbed navigation -->
-        <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
+        <p class="workflow-label" style="padding: 15px 30px;">Basic Setup</p>
 
         <div class="workflow-content-body">
             <div class="workflow-container" style="overflow: hidden; padding: 30px;">
@@ -166,7 +166,6 @@
         $('#confirmWorkflowStepModalStepBtn').on("click", function (e) {
             e.preventDefault();  // Prevent default behavior, if needed
             $('#workflowEditStepModal').remove();
-            // window.location.href = `/home?workflow_id={{ workflow.id }}&section=Workflows`;
             const url = new URL(window.location.href);
             url.searchParams.delete('workflow_step_id');
             window.history.replaceState(null, '', url.toString());

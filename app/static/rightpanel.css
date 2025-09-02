@@ -80,7 +80,6 @@
   padding: 15px;
   right: 0;
   width: 40%;
-  /* height: 135px; */
   background-color: white;
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   z-index: 500;
@@ -92,7 +91,6 @@
     padding: 15px;
     right: 0;
     width: 40%;
-    /* height: 135px; */
     background-color: white;
     box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
     z-index: 500;
@@ -221,7 +219,6 @@ button.shadow-button:hover {
 .ask-question-container {
   position: relative;
   width: 100%;
-  /* height: 60px; */
   z-index: 100;
   padding: 6px;
   background-color: #19191913;
@@ -260,7 +257,6 @@ button.shadow-button:hover {
   border-width: 0px;
   background-color: transparent;
   border-radius: 6px;
-  border-width: 0px;
   box-shadow: 1 1px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
   font-weight: 600;
@@ -274,7 +270,6 @@ button.shadow-button:hover {
   height: 40px;
   width: 40px;
   border-width: 0px;
-  border-width: 0px;
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
   font-weight: 600;
@@ -283,10 +278,6 @@ button.shadow-button:hover {
 .ask-question .add-button {
   height: 40px;
   width: 40px;
-}
-
-.tab-container {
-
 }
 
 .tab-menu {
@@ -470,10 +461,6 @@ button.shadow-button:hover {
   cursor: pointer;
 }
 
-.workflow-panel {
-  
-}
-
 #workflow-panel {
   display: flex;
   align-items: center;
@@ -505,9 +492,6 @@ button.shadow-button:hover {
     background-color: #ffffff;
     color: #191919;
     border: 2px solid #d3d3d386;
-}
-
-.btn-secondary {
   border-radius: 0px;
   text-decoration: none;
   text-align: center;
@@ -523,6 +507,12 @@ button.shadow-button:hover {
   outline-offset: 3px;
 }
 
+.btn-secondary:hover {
+    background-color: #191919;
+    color: #ffffff;
+    border: 2px solid #191919;
+}
+
 
 .btn-important:hover {
   background-color: black;
@@ -533,9 +523,6 @@ button.shadow-button:hover {
     background-color: red;
     color: white;
     border: 2px solid #d3d3d386;
-}
-
-.btn-important {
   border-radius: 0px;
   text-decoration: none;
   text-align: center;
@@ -553,8 +540,6 @@ button.shadow-button:hover {
 
 /* pin the model selector absolutely */
   #model-text-icon {
-
-    /* z-index: 999; */
     display: inline-flex;
     align-items: center;
     cursor: pointer;
@@ -565,12 +550,22 @@ button.shadow-button:hover {
 
   #chat-model-popup-menu {
     position: absolute;
-    top: -90px;
+    top: -20px;
     right: 65px;
         box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     color: #5D6F81; 
     font-size: 12px;
     border: 0px;
+  }
+
+  #chat-model-popup-menu-options li.model-option {
+    display: flex; align-items: center; padding: 8px 10px; cursor: pointer;
+  }
+  #chat-model-popup-menu-options li.model-option.selected {
+    background: rgba(0,0,0,0.05);
+  }
+  #chat-model-popup-menu-options li.model-option .label {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
 
   /* tighten up the label */
