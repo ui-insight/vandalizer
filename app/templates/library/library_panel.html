@@ -1,94 +1,108 @@
-<div id="library-panel" class="tab-content" style="{% if section != 'Library' %}display:none;{% endif %}">
-    <div style="margin: 0 0 12px 0; padding: 12px 24px 0 24px;">
-        <p style="font-size:24px; font-weight:700; margin-bottom:6px;">Library</p>
-        <p style="font-size:12px; font-weight:300; color:#00000077; margin:0;">
-            <i>Find and reuse workflows and tasks. Workflows are made of tasks.</i>
-        </p>
-    </div>
+<div id="library-panel" class="tab-content"
+    style="background-color: white; {% if section != 'Library' %}display:none;{% endif %} padding: 24px 0px;">
 
-    <!-- Scope tabs -->
-    <div id="library-scope-tabs"
-        style="display:flex; gap:16px; padding: 8px 24px 12px 24px; border-bottom:1px solid #eee;">
-        {% set _scope = scope or 'team' %}
-        <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
-            style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;">
-            Verified
-        </a>
-        <a href="#" class="scope-tab {% if _scope=='team' %}active{% endif %}" data-scope="team"
-            style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;">
-            My Team
-        </a>
-        <a href="#" class="scope-tab {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
-            style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;">
-            My Library
-        </a>
-
-        <!-- search -->
-        <div style="flex:1;"></div>
-        <div style="width:380px;">
+    <div style="display: flex; align-items: center; padding: 0 30px; margin-bottom: 20px;">
+        <p style="font-size: 28px; font-weight: 700; margin: 0;">Library</p>
+        <div style="flex: 1;"></div>
+        <div style="width: 380px;">
             <input id="library-search" type="text" placeholder="Search workflows and tasks…" value="{{ query or '' }}"
                 style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; outline:none;">
         </div>
     </div>
 
-    <!-- 2-column layout -->
-    <div style="position:absolute; top:150px; left:0; right:0; bottom:0;">
-        <div style="display:grid; grid-template-columns: 260px 1fr; height:100%;">
-            <!-- Left rail: ONLY Type + Task Kind -->
-            <aside id="library-filters"
-                style="border-right:1px solid #eee; padding:16px 16px 24px 24px; overflow:auto;">
-                <div style="margin-bottom:18px;">
-                    <div style="font-size:12px; font-weight:700; color:#666; margin-bottom:8px;">Type</div>
-                    {% set t = (filters.type if filters and filters.type else 'workflows') %}
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input type="radio" name="type" value="all" {% if t=='all' %}checked{% endif %}>
-                        <span>All</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input type="radio" name="type" value="workflows" {% if t=='workflows' %}checked{% endif %}>
-                        <span>Workflows</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input type="radio" name="type" value="tasks" {% if t=='tasks' %}checked{% endif %}>
-                        <span>Tasks</span>
-                    </label>
-                </div>
+    <div style="display: flex; border-top: 1px #ddd solid; height: calc(100% - 70px);">
+        <div style="width: 260px; flex-shrink: 0; border-right: 1px #ddd solid; padding: 20px 0 20px 30px;">
+            <p style="font-size: 12px; font-weight: 400; color: #00000099; padding-right: 20px; margin-bottom: 20px;">
+                Shared automations your team can reuse.</p>
 
-                <div id="task-kind-filter">
-                    <div style="font-size:12px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
-                    {% set kinds = (filters.kinds if filters and filters.kinds else ['extract','prompt','format']) %}
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input class="kind-checkbox" type="checkbox" value="extract" {% if 'extract' in kinds
-                            %}checked{% endif %}>
-                        <span>Extract</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input class="kind-checkbox" type="checkbox" value="prompt" {% if 'prompt' in kinds %}checked{%
-                            endif %}>
-                        <span>Prompt</span>
-                    </label>
-                    <label style="display:flex; align-items:center; gap:8px; margin:6px 0;">
-                        <input class="kind-checkbox" type="checkbox" value="format" {% if 'format' in kinds %}checked{%
-                            endif %}>
-                        <span>Format</span>
-                    </label>
-                    <p id="task-kind-hint" style="font-size:11px; color:#888; margin-top:8px;">
-                        Task kinds apply when viewing Tasks or All.
-                    </p>
-                </div>
-            </aside>
+            <ul class="section-list">
+                {% set t = (filters.type if filters and filters.type else 'workflows') %}
+                <li class="section-item library-type-section {% if t=='all' %}active{% endif %}" data-type="all">All
+                </li>
+                <li class="section-item library-type-section {% if t=='workflows' %}active{% endif %}"
+                    data-type="workflows">Workflows</li>
+                <li class="section-item library-type-section {% if t=='tasks' %}active{% endif %}" data-type="tasks">
+                    Tasks</li>
+            </ul>
 
-            <!-- Results column -->
-            <section id="library-results" style="overflow:auto; padding:20px 24px;">
-                {# initial payload so page has content before first AJAX #}
+            <div id="task-kind-filter" style="padding-right: 20px;">
+                <div style="font-size:12px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
+                {% set kinds = (filters.kinds if filters and filters.kinds else ['extract','prompt','format']) %}
+                <label
+                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox" type="checkbox" value="extract" {% if 'extract' in kinds %}checked{%
+                        endif %}>
+                    <span>Extract</span>
+                </label>
+                <label
+                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox" type="checkbox" value="prompt" {% if 'prompt' in kinds %}checked{%
+                        endif %}>
+                    <span>Prompt</span>
+                </label>
+                <label
+                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox" type="checkbox" value="format" {% if 'format' in kinds %}checked{%
+                        endif %}>
+                    <span>Format</span>
+                </label>
+                <p id="task-kind-hint" style="font-size:11px; color:#888; margin-top:8px;">
+                    Task kinds apply when viewing Tasks or All.
+                </p>
+            </div>
+        </div>
+
+        <div style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px 30px;">
+            <div id="library-scope-tabs" style="display:flex; gap:16px; margin-bottom: 20px;">
+                {% set _scope = scope or 'team' %}
+                <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
+                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;">
+                    Verified </a>
+                <a href="#" class="scope-tab {% if _scope=='team' %}active{% endif %}" data-scope="team"
+                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;"> My
+                    Team </a>
+                <a href="#" class="scope-tab {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
+                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;"> My
+                    Library </a>
+                <div style="flex:1;"></div>
+            </div>
+
+            <section id="library-results" style="flex-grow: 1; overflow-y: auto;">
                 {% include "library/_results.html" %}
             </section>
         </div>
     </div>
+
+    {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
 </div>
 
 <style>
-    /* tiny bit of sugar for the active scope tab */
+    /* Left nav list styles */
+    .section-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 20px 0;
+    }
+
+    .section-item {
+        padding: 10px 20px 10px 0;
+        /* Adjusted padding */
+        cursor: pointer;
+        font-weight: 500;
+        border-left: 3px solid transparent;
+    }
+
+    .section-item:hover {
+        background-color: #f5f5f5;
+    }
+
+    .section-item.active {
+        font-weight: 700;
+        color: #000;
+        /* No border or background for this style */
+    }
+
+    /* Scope tab and card styles */
     .scope-tab.active {
         background: #ffe08a;
     }
@@ -119,18 +133,43 @@
 </style>
 
 <script>
-    // ------- State
+    // --- State Management ---
     const LibraryState = {
-        scope: "{{ _scope }}",
-        type: "{{ t }}",
-        kinds: {{ kinds| tojson if kinds is defined else '["extract","prompt","format"]' }},
-    q: "{{ query or '' }}"
-  };
+        scope: "{{ scope }}",
+        type: "{{ item_type }}",
+        kinds: {{ kinds | tojson }},
+    q: "{{ query }}"
+    };
 
-    // ------- Helpers
-    function debounce(fn, ms) { let t; return function () { clearTimeout(t); t = setTimeout(() => fn.apply(this, arguments), ms); }; }
+    // --- Helpers ---
+    function debounce(fn, ms) {
+        let t;
+        return function () {
+            clearTimeout(t);
+            t = setTimeout(() => fn.apply(this, arguments), ms);
+        };
+    }
+
+    function updateURL() {
+        const params = new URLSearchParams();
+        params.set('scope', LibraryState.scope);
+        params.set('type', LibraryState.type);
+        if (LibraryState.kinds.length > 0) {
+            params.set('kinds', LibraryState.kinds.join(','));
+        }
+        if (LibraryState.q) {
+            params.set('q', LibraryState.q);
+        }
+        // Update URL without reloading the page
+        history.pushState(null, '', `?${params.toString()}`);
+    }
 
     function refreshResults() {
+        updateURL(); // Update the URL every time filters change
+
+        // Show loading indicator (optional)
+        $("#library-results").html("<p>Loading...</p>");
+
         const payload = JSON.stringify(LibraryState);
         $.ajax({
             url: '/library/filter',
@@ -144,76 +183,58 @@
                 }
             },
             error: function (xhr) {
+                $("#library-results").html("<p>Error loading results.</p>");
                 console.log('Library filter error', xhr.status, xhr.responseText);
             }
         });
     }
 
-    // ------- Scope tabs
-    $(document).on('click', '.scope-tab', function (e) {
-        e.preventDefault();
-        $('.scope-tab').removeClass('active');
-        $(this).addClass('active');
-        LibraryState.scope = $(this).data('scope'); // verified | team | mine
-        refreshResults();
-    });
+    // --- Event Handlers ---
+    $(document).ready(function () {
+        // --- Scope tabs ---
+        $('.scope-tab').on('click', function (e) {
+            e.preventDefault();
+            $('.scope-tab').removeClass('active');
+            $(this).addClass('active');
+            LibraryState.scope = $(this).data('scope');
+            refreshResults();
+        });
 
-    // ------- Type radios
-    $("#library-filters input[name='type']").on('change', function () {
-        LibraryState.type = $(this).val(); // all | workflows | tasks
-        // Show/hide task kind filter hint based on type
+        // --- Type list items ---
+        $('.library-type-section').on('click', function (e) {
+            e.preventDefault();
+            $('.library-type-section').removeClass('active');
+            $(this).addClass('active');
+            LibraryState.type = $(this).data('type');
+
+            if (LibraryState.type === 'workflows') {
+                $("#task-kind-filter").css('opacity', .45);
+            } else {
+                $("#task-kind-filter").css('opacity', 1);
+            }
+            refreshResults();
+        });
+
+        // --- Kind checkboxes ---
+        $("#task-kind-filter .kind-checkbox").on('change', function () {
+            const kinds = [];
+            $("#task-kind-filter .kind-checkbox:checked").each(function () {
+                kinds.push($(this).val());
+            });
+            LibraryState.kinds = kinds;
+            refreshResults();
+        });
+
+        // --- Search ---
+        $("#library-search").on('input', debounce(function () {
+            LibraryState.q = $(this).val();
+            refreshResults();
+        }, 300));
+
+        // --- Initial State Check ---
+        // On page load, correctly set the opacity of the task kind filter
         if (LibraryState.type === 'workflows') {
             $("#task-kind-filter").css('opacity', .45);
-        } else {
-            $("#task-kind-filter").css('opacity', 1);
         }
-        refreshResults();
-    });
-
-    // ------- Kind checkboxes
-    $("#library-filters .kind-checkbox").on('change', function () {
-        const kinds = [];
-        $("#library-filters .kind-checkbox:checked").each(function () { kinds.push($(this).val()); });
-        LibraryState.kinds = kinds.length ? kinds : [];
-        refreshResults();
-    });
-
-    // ------- Search
-    $("#library-search").on('input', debounce(function () {
-        LibraryState.q = $(this).val();
-        refreshResults();
-    }, 250));
-
-    // ------- Edit handlers (delegate; results are fully replaced)
-    $(document).on("click", ".edit-workflow-button", function (e) {
-        e.preventDefault(); e.stopPropagation();
-        const uuid = $(this).attr("data-uuid");
-        $.ajax({
-            url: '/workflows/edit',
-            type: 'POST',
-            data: JSON.stringify({ uuid }),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            success: function (data) {
-                $("#search-results-panel").show().empty();
-                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-            }
-        });
-    });
-
-    $(document).on("click", ".edit-prompt-button", function (e) {
-        e.preventDefault(); e.stopPropagation();
-        const uuid = $(this).attr("data-uuid");
-        $.ajax({
-            url: '/tasks/edit_prompt',
-            type: 'POST',
-            data: JSON.stringify({ uuid }),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            success: function (data) {
-                $("#search-results-panel").show().empty();
-                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-            }
-        });
     });
 </script>

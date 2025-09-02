@@ -175,6 +175,26 @@
             }
         });
 
+        if (sectionName == "Extract") {
+            $("#extraction-panel").show();
+            $("#bottom-toolbar-extraction").show();
+        } else if (sectionName == "Prompt") {
+            $("#prompt-panel").show();
+            $("#bottom-toolbar-prompt").show();
+        } else if (sectionName == "Assistant") {
+            $("#chat-panel").show();
+            $("#bottom-toolbar-chat").show();
+        } else if (sectionName == "Workflows") {
+            $("#workflows-panel").show();
+            $("#bottom-toolbar-add-workflows").show();
+        } else if (sectionName == "Tasks") {
+            $("#chat-panel").show();
+            $("#tasks-panel").show();
+            $("#bottom-toolbar-tasks").show();
+        } else if (sectionName == "Library") {
+            $("#library-panel").show();
+        }
+
         cleanup();
     }
 
@@ -1935,23 +1955,7 @@
             setSection(tabTitle);
             $("#tasks-panel").hide();
 
-            if (tabTitle == "Extract") {
-                $("#extraction-panel").show();
-                $("#bottom-toolbar-extraction").show();
-            } else if (tabTitle == "Prompt") {
-                $("#prompt-panel").show();
-                $("#bottom-toolbar-prompt").show();
-            } else if (tabTitle == "Assistant") {
-                $("#chat-panel").show();
-                $("#bottom-toolbar-chat").show();
-            } else if (tabTitle == "Workflows") {
-                $("#workflows-panel").show();
-                $("#bottom-toolbar-add-workflows").show();
-            } else if (tabTitle == "Tasks") {
-                $("#chat-panel").show();
-                $("#tasks-panel").show();
-                $("#bottom-toolbar-tasks").show();
-            }
+
         });
     });
 
