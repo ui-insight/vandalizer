@@ -116,6 +116,7 @@ from .blueprints.auth.routes import auth  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
 from .blueprints.files.routes import files  # noqa: E402
 from .blueprints.home.routes import home  # noqa: E402
+from .blueprints.library.routes import library  # noqa: E402
 from .blueprints.office.routes import office  # noqa: E402
 from .blueprints.spaces.routes import spaces  # noqa: E402
 from .blueprints.tasks.routes import tasks  # noqa: E402
@@ -130,6 +131,7 @@ app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
 app.register_blueprint(admin, url_prefix="/admin")
+app.register_blueprint(library, url_prefix="/library")
 
 # OAuth
 blueprint = make_azure_blueprint(
