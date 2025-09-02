@@ -53,6 +53,8 @@ from app.utils import is_dev, load_user
 
 home = Blueprint("home", __name__)
 
+WEBFONTS_DIR = "static/fontawesome/webfonts"
+
 
 @app.context_processor
 def inject_current_model():
@@ -75,7 +77,7 @@ def inject_current_model():
     return {"current_model": "", "models": []}
 
 
-def verify_document(document: SmartDocument, user_id: str) -> None:
+def verify_document(document: SmartDocument) -> None:
     """Verify and update the document if necessary."""
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
@@ -163,7 +165,6 @@ def index() -> ResponseReturnValue:
                 session["user_id"] = user_id
 
     user = load_user()
-    user_id = user.user_id
     section = request.args.get("section", default="Assistant").strip()
 
     document = None
@@ -195,7 +196,7 @@ def index() -> ResponseReturnValue:
         document = SmartDocument.objects(uuid=doc_id).first()
         if document is not None:
             documents.append(document)
-            verify_document(document, user_id)
+            verify_document(document)
             current_space = Space.objects(uuid=document.space).first()
             selected_document = document
 
@@ -205,7 +206,7 @@ def index() -> ResponseReturnValue:
             document = SmartDocument.objects(uuid=doc_id).first()
             if document is not None:
                 documents.append(document)
-                verify_document(document, user_id)
+                verify_document(document)
 
         if document is not None:
             current_space = Space.objects(uuid=document.first.space).first()
@@ -383,8 +384,6 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    user = load_user()
-
     debug(documents)
     debug(docs)
     model = settings.base_model
@@ -488,14 +487,14 @@ def chat_download() -> ResponseReturnValue:
 def serve_fonts(filename):
     if filename.endswith(".woff2"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/woff2",
         )
     if filename.endswith(".ttf"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/ttf",
         )
-    return send_from_directory("static/fontawesome/webfonts", filename)
+    return send_from_directory(WEBFONTS_DIR, filename)

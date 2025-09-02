@@ -18,7 +18,6 @@
             }} documents selected</i></p>
     <hr style="padding-bottom: 0px; margin-bottom: 0px;">
     <div class="search-results-content-body">
-        <!-- <p><b>Searches</b></p> -->
         {% for item in search_set.search_items() %}
         <div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}"
             data-search-type="{{ search_set.searchtype }}">
@@ -80,7 +79,6 @@
 
                         <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{
                             results[item.searchphrase|trim] }}</p>
-                        <!-- <span style="float:right;"><i class="fa-regular fa-flag"></i></i></span> -->
                     </div>
                 </div>
                 {% endif %}
@@ -114,7 +112,7 @@
 
 
             <div class="dimmed">
-                <a class="content-btn"> <!-- id="build-extraction-from-fillable-pdf-btn"> -->
+                <a class="content-btn">
                     <div class="add-task">
                         <div class="add-task-icon-container">
                             <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #54bbb6;"></i>
