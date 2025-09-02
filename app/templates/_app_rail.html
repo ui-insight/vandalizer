@@ -1,31 +1,57 @@
-<!-- Slim left nav rail -->
-<div id="app-rail" class="app-rail collapsed" aria-label="App rail">
-    <div class="rail-top">
-        <button id="rail-toggle" class="rail-toggle" title="Expand/Collapse">
-            <i class="fa-solid fa-bars"></i>
-            <span class="rail-label">Menu</span>
-        </button>
+<div class="app-rail" id="app-rail" aria-expanded="true">
+    <div class="rail-header">
+        <div class="rail-header-center">
+            <i class="fa-solid fa-bolt"></i>
+            <span>Activity</span>
+        </div>
     </div>
 
-    <ul class="rail-nav">
-        <li>
-            <a href="#assistant" data-tip="Assistant">
-                <i class="fas fa-comments"></i><span>Assistant</span>
-            </a>
-        </li>
-        <li>
-            <a href="#library" data-tip="Library">
-                <i class="fas fa-book-open"></i><span>Library</span>
-            </a>
-        </li>
+    <div class="rail-section">
+        <ul class="run-list" id="run-list">
 
-        <li class="rail-spacer"></li>
+            <!-- Running -->
+            <li class="run-item is-running" data-run-id="run_987651" onclick="openRun('run_987651')">
+                <span class="run-left">
+                    <i class="fa-solid fa-diagram-project run-type-icon" title="Workflow"></i>
+                    <span class="run-title truncate" title="Quarterly FERPA Audit">
+                        Quarterly FERPA Audit
+                    </span>
+                </span>
+                <span class="run-right">
+                    <i class="fa-solid fa-gear fa-spin run-state-icon" aria-label="Running"></i>
+                </span>
+            </li>
 
-        <!-- This button hides/shows your big document left-panel -->
-        <li>
-            <a href="javascript:void(0);" id="dock-left-toggle" data-tip="Hide Document Panel">
-                <i class="fa-solid fa-columns"></i><span>Hide Doc</span>
-            </a>
-        </li>
-    </ul>
+            <!-- Completed chat -->
+            <li class="run-item" data-run-id="run_987650" onclick="openRun('run_987650')">
+                <span class="run-left">
+                    <i class="fa-solid fa-comments run-type-icon" title="Chat"></i>
+                    <span class="run-title truncate" title="Chat: Compare RAG vs. Full-text on Policy PDFs">
+                        Compare RAG vs. Full-text on Policy PDFs
+                    </span>
+                </span>
+            </li>
+
+            <!-- Completed task -->
+            <li class="run-item" data-run-id="run_987649" onclick="openRun('run_987649')">
+                <span class="run-left">
+                    <i class="fa-solid fa-list-check run-type-icon" title="Task"></i>
+                    <span class="run-title truncate" title="Task: Extract PII fields from New Hire Packets">
+                        Extract PII fields from New Hire Packets
+                    </span>
+                </span>
+            </li>
+
+            <!-- Failed workflow -->
+            <li class="run-item" data-run-id="run_987648" onclick="openRun('run_987648')">
+                <span class="run-left">
+                    <i class="fa-solid fa-diagram-project run-type-icon" title="Workflow"></i>
+                    <span class="run-title truncate" title="Workflow: Vendor Contract Redlines">
+                        Vendor Contract Redlines
+                    </span>
+                </span>
+            </li>
+
+        </ul>
+    </div>
 </div>
