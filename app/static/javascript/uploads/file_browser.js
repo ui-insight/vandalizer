@@ -218,7 +218,7 @@ $(document).ready(function () {
 
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
-      var folderId = null;
+      let folderId = null;
       let href = window.location.href;
       let folderIdIndex = href.indexOf("folder_id=");
       if (folderIdIndex !== -1) {
