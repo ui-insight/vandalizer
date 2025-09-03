@@ -98,23 +98,26 @@ def usage_dashboard():
     }
 
     # === Top users by uploads (in range) ===
+    match_rule = "$match"
+    group_rule = "$group"
+    sort_rule = "$sort"
     pipeline_users = [
-        {"$match": {"created_at": {"$gte": start, "$lte": end}}},
-        *([{"$match": {"user_id": user_id}}] if user_id else []),
-        *([{"$match": {"space": space_id}}] if space_id else []),
-        {"$group": {"_id": "$user_id", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
+        {match_rule: {"created_at": {"$gte": start, "$lte": end}}},
+        *([{match_rule: {"user_id": user_id}}] if user_id else []),
+        *([{match_rule: {"space": space_id}}] if space_id else []),
+        {group_rule: {"_id": "$user_id", "count": {"$sum": 1}}},
+        {sort_rule: {"count": -1}},
         {"$limit": 10},
     ]
     top_users = list(SmartDocument.objects.aggregate(*pipeline_users))
 
     # === Top spaces by uploads (in range) ===
     pipeline_spaces = [
-        {"$match": {"created_at": {"$gte": start, "$lte": end}}},
-        *([{"$match": {"user_id": user_id}}] if user_id else []),
-        *([{"$match": {"space": space_id}}] if space_id else []),
-        {"$group": {"_id": "$space", "count": {"$sum": 1}}},
-        {"$sort": {"count": -1}},
+        {match_rule: {"created_at": {"$gte": start, "$lte": end}}},
+        *([{match_rule: {"user_id": user_id}}] if user_id else []),
+        *([{match_rule: {"space": space_id}}] if space_id else []),
+        {group_rule: {"_id": "$space", "count": {"$sum": 1}}},
+        {sort_rule: {"count": -1}},
         {"$limit": 10},
     ]
     top_spaces = list(SmartDocument.objects.aggregate(*pipeline_spaces))

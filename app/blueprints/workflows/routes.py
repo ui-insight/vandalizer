@@ -54,6 +54,8 @@ from app.utils import load_user
 
 workflows = Blueprint("workflows", __name__)
 
+WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
+
 
 @workflows.route("/create_workflow", methods=["POST"])
 def add_workflow() -> ResponseReturnValue:
@@ -156,7 +158,7 @@ def run_workflow() -> ResponseReturnValue:
     workflow.save()
 
     if not workflow:
-        return jsonify({"status": "error", "message": "Workflow not found"}), 404
+        return jsonify({"status": "error", "message": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     attachments = [
         # SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
@@ -365,7 +367,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow = Workflow.objects(id=workflow_id).first()
     if not workflow:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     # **4. Handle File Uploads**
     uploaded_files = request.files.getlist("file")
@@ -472,7 +474,7 @@ def workflow_status() -> ResponseReturnValue:
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
 
     if not workflow_result:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
     final_output = None
     if workflow_result.final_output:
         final_output = workflow_result.final_output.get("output", None)
@@ -526,7 +528,7 @@ def workflow_download() -> ResponseReturnValue:
     # 1) fetch the result object
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
     if not workflow_result:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     # 2) pull the final output payload
     final_output = list(workflow_result.steps_output.values())[-1]["output"]
@@ -887,7 +889,6 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
         data = request.get_json()
         debug(data)
-        workflow_id = data["workflow_uuid"]
         search_set_id = data.get("search_set_id", None)
         manual_input = data.get("manual_input", None)
         workflow_step_id = data.get("workflow_step_id", None)
