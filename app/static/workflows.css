@@ -130,9 +130,6 @@
   }
   
   .add-step button {
-    border: none;
-    /* width: 30px;
-    height: 30px; */
     cursor: pointer;
     background-color: #f1b300;
     border: 2px solid #f1b300;

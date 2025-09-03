@@ -557,8 +557,7 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
             nodes.append(node)
             debug(step.tasks)
 
-        if node is not None:
-            engine.add_node(node)
+        engine.add_node(node)
 
     debug(nodes)
     # connect the steps

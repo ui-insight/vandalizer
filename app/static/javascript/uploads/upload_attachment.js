@@ -1,5 +1,5 @@
 //selecting all required elements
-var file;
+let file;
 let attachArea = document.querySelector(".attach-area");
 if (attachArea) {
   let dragText = attachArea.querySelector("header"),
@@ -45,11 +45,11 @@ function attachFile(){
     let fileReader = new FileReader(); //creating new FileReader object
     fileReader.onload = ()=>{
       let fileURL = fileReader.result; //passing user file source in fileURL variable
-       var filetype = file.type;
-          var filename = file.name;
-      var base64String = getB64Str(fileURL);
+      let filetype = file.type;
+      let filename = file.name;
+      let base64String = getB64Str(fileURL);
 
-      var model = {
+      let model = {
           contentType: filetype,
           contentAsBase64String: base64String,
           fileName: filename,
@@ -80,11 +80,6 @@ function attachFile(){
 }
 
 function getB64Str(buffer) {
-          var binary = '';
-          var bytes = new Uint8Array(buffer);
-          var len = bytes.byteLength;
-          for (var i = 0; i < len; i++) {
-              binary += String.fromCharCode(bytes[i]);
-          }
-          return window.btoa(binary);
+    const binary = new TextDecoder("latin1").decode(new Uint8Array(buffer));
+    return window.btoa(binary);
 }
