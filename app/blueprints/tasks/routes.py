@@ -33,6 +33,8 @@ from app.utils import load_user
 
 tasks = Blueprint("tasks", __name__)
 
+EXTRACTION_PANEL_TEMPLATE = "toolpanel/extractions/extraction_panel.html"
+
 
 @tasks.route("/model/filter", methods=["POST"])
 def filter_models() -> ResponseReturnValue:
@@ -283,7 +285,7 @@ def grab_template() -> ResponseReturnValue:
 
     if search_set.set_type == "extraction":
         template = render_template(
-            "toolpanel/extractions/extraction_panel.html",
+            EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
             documents=documents,
         )
@@ -444,7 +446,7 @@ def begin_search() -> ResponseReturnValue:
         normalized_results = normalize_results(results)
         print(normalize_results)
         template = render_template(
-            "toolpanel/extractions/extraction_panel.html",
+            EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
             results=normalized_results,
             documents=documents,
@@ -475,7 +477,7 @@ def begin_search() -> ResponseReturnValue:
 
         return jsonify(response)
     template = render_template(
-        "toolpanel/extractions/extraction_panel.html",
+        EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
         documents=documents,
     )
@@ -521,7 +523,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
         return jsonify(response)
 
     template = render_template(
-        "toolpanel/extractions/extraction_panel.html",
+        EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
     )
     response = {
@@ -599,16 +601,8 @@ def begin_prompt_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     items = search_set.items()
 
-    user = load_user()
-    user_id = user.user_id
-
     if len(items) > 0:
         llm = OpenAIInterface()
-        document_file_path = Path("static") / "uploads" / user_id / document_path
-        if not Path.exists(str(document_file_path)):
-            document_file_path = (
-                Path(current_app.root_path) / "static" / "uploads" / document_path
-            )
 
         llm.load_document(document_path)
         results = {}

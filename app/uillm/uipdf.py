@@ -233,7 +233,7 @@ class UIPDF:
                 num_pages = len(pdf.pages)
                 only_these_pages = list(range(num_pages))
         except FileNotFoundError:
-            return None
+            return ""
 
         params = {
             "format": "markdown",
@@ -270,10 +270,10 @@ class UIPDF:
                 print("SERVER ERROR")
                 print(response.status_code)
                 print(response.text)
-                return None
+                return ""
         except requests.RequestException as e:
             print(f"Error occurred while converting PDF: {e}")
-            return None
+            return ""
 
     @staticmethod
     def convert_table(

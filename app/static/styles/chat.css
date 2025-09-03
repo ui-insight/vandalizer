@@ -114,7 +114,6 @@
 .tasks-link-style {
     color: #6c757d; /* Muted text color */
     text-decoration: none;
-    font-size: 0.9em;
     padding: 5px 7.5px;
     transition: background-color 0.2s;
     font-weight: 700; 
