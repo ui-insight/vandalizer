@@ -107,7 +107,6 @@
             .getElementById("share-workflow-btn")
             .addEventListener("click", () => {
                 const btn = event.currentTarget;
-                const workflowId = btn.dataset.workflowId;
                 // Build the “duplicate” URL
                 const url = `${window.location.origin}/workflows/duplicate/` + "{{ workflow.id }}";
                 // Copy to clipboard

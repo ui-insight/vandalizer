@@ -15,11 +15,6 @@
     margin-right: auto;
   }
   
-  .px-2 {
-    padding-left: 0.5rem;
-    padding-right: 0.5rem;
-  }
-  
   .md\:px-1 {
     padding-left: 0.25rem;
     padding-right: 0.25rem;
