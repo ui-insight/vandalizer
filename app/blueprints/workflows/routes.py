@@ -343,7 +343,7 @@ def test_workflow_step() -> ResponseReturnValue:
 
 
 # @MARK: ~~ Run integration
-@workflows.route("/run_integrated", methods=["GET", "POST"])
+@workflows.route("/run_integrated", methods=["POST"])
 def run_workflow_integrated() -> ResponseReturnValue:
     """Run the integrated workflow and return the result."""
     # **1. Authenticate User via API Key**
@@ -1241,7 +1241,8 @@ def duplicate_workflow(workflow_id):
         steps=new_steps,
         attachments=new_atts,
         # created_at and updated_at default to now()
-    ).save()
+    )
+    dup_wf.save()
 
     flash("Workflow duplicated into your space!", "success")
     return redirect(url_for("home.index", sesction="Workflows"))

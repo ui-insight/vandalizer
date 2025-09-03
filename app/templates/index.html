@@ -28,7 +28,7 @@
     <div class="navbar-header">
         <a href="/home">
             <img id="navbar-img" style="float: left; width: 25px; height: 40px; margin-top: 20px; "
-                src="/static/images/joevandal.png">
+                src="/static/images/joevandal.png" alt="Joe Vandal Logo">
             <img id="navbar-img" style="float: left; width: 200px; height: 50px; margin-top: 15px; "
                 src="/static/images/Vandalizer_Wordmark_RGB.png" alt="Vandalizer LOGO">
         </a>
@@ -69,11 +69,10 @@
             <div class="row" style="height:100%; background-color: #191919; display: flex; align-items: center;">
                 <div class="col-auto" style="padding-left: 30px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <a href="javascript:void(0);" onclick="removeDocIdAndGo()">
-                        <span style="font-size: 2em; color: white;">
-                            <i class="fa-solid fa-arrow-left"></i>
-                        </span>
-                    </a>
+                    <button type="button" onclick="removeDocIdAndGo()" aria-label="Go back"
+                        style="background:none;border:none;padding:0;cursor:pointer;">
+                        <i class="fa-solid fa-arrow-left" style="font-size:2em; color:white;"></i>
+                    </button>
                     {% endif %}
                 </div>
 
@@ -92,12 +91,10 @@
                         style="display: {% if documents[0].processing %}block{% else %}none{% endif %};">
                         <i class="fa-solid fa-spinner fa-spin"></i>
                     </span>
-                    <a href="javascript:void(0);" id="raw-text-icon" onclick="showRawText()"
-                        style="display: {% if not documents[0].processing %}block{% else %}none{% endif %};">
-                        <span style="font-size: 1em; color: rgba(255, 255, 255, 0.637);">
-                            <i class="fa-solid fa-code"></i>
-                        </span>
-                    </a>
+                    <button type="button" id="raw-text-icon" onclick="showRawText()" aria-label="Show raw text" style="display: {% if not documents[0].processing %}block{% else %}none{% endif %};
+               background:none; border:none; padding:0; cursor:pointer;">
+                        <i class="fa-solid fa-code" style="font-size:1em; color:rgba(255,255,255,0.637);"></i>
+                    </button>
                     {% endif %}
                 </div>
             </div>
@@ -164,6 +161,7 @@
                 {% include "_add_button.html" %}
                 {% include "_breadcrumbs.html" %}
                 <table class="styled-table" id="file-list" style="width: 100%; margin-top: 10px;">
+                    <th></th>
                     <tbody id="doc-body">
 
                         {% for folder in folders %}
@@ -240,7 +238,6 @@
 
             <div id="file-popup-menu" class="file-popup-menu" style="display: none;">
                 <ul>
-                    <!-- <li id="toggle-target-doc-option">Toggle Target</li> -->
                     <li id="rename-option">Rename</li>
                     <li id="delete-option">Delete</li>
                     <li id="download-option">Download</li>
@@ -323,11 +320,8 @@
 <script src="{{url_for('static', filename='javascript/helpers/progressloader.js')}}"></script>
 {% include "index_scripts.html" %}
 {% include "toolpanel/extractions/extraction_scripts.html" %}
-{% include "workflows/workflow_scripts.html" %}
 {% include "workflows/workflow_step_scripts.html" %}
 {% include "toolpanel/chat/chat_scripts.html" %}
-<!-- <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script> -->
-<!-- <script src="{{url_for('static', filename='javascript/pdf/pspdfkit.js')}}"></script> -->
 <script src="{{url_for('static', filename='javascript/uploads/upload_files.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/uploads/file_browser.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/uploads/upload_attachment.js')}}"></script>
