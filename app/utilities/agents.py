@@ -1,6 +1,5 @@
 """Utilities for agents."""
 
-import asyncio
 import json
 import os
 from dataclasses import dataclass
@@ -10,7 +9,7 @@ from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
 from pydantic import BaseModel, create_model
-from pydantic_ai import ModelRetry, RunContext
+from pydantic_ai import RunContext
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.profiles import ModelProfile
@@ -271,7 +270,6 @@ field_inference_agent = Agent(
     model,
     retries=3,
     deps_type=FieldInferenceDeps,
-    # output_type=dict[str, str],
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
 )
 
@@ -352,18 +350,11 @@ def get_cache_key(key: str, context: str) -> str:
     return f"field_type:{key}:{context}"
 
 
-
 @dataclass
 class ExtractionDeps:
     extraction_context: Optional[str]
     fields: dict[str, tuple]
     text: str
-
-
-# model = OpenAIModel(
-#     model_name="deepseek-r1:70b",
-#     base_url="https://mindrouter-api.nkn.uidaho.edu",
-# )
 
 
 def create_extraction_agent(agent_model):
