@@ -372,7 +372,8 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user_id = load_user().user_id
+    user = load_user()
+    user_id = user.user_id
     debug(document_uuids)
     # migrate to new document user's location
     for doc_uuid in document_uuids:
@@ -386,7 +387,12 @@ def chat() -> ResponseReturnValue:
 
     debug(documents)
     debug(docs)
-    model = settings.base_model
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    print(f"The model is {model}")
 
     def generate():
         for chunk in OpenAIInterface().ask_question_to_documents_stream(

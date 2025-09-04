@@ -3,7 +3,7 @@ let completedUploads = 0;
 const uploadedDocs = [];
 let rootFolderName = null; // Variable to store the root folder name
 
-let file;
+let uploadFile;
 let fileInput = document.querySelector("#file-input");
 let dropArea = document.querySelector(".drag-area");
 let dragText = document.querySelector("header");
@@ -19,7 +19,7 @@ if (dropArea) {
   //}
   input.addEventListener("change", function () {
     //getting user select file and [0] this means if user select multiple files then we'll select only the first one
-    file = this.files[0];
+    uploadFile = this.files[0];
     dropArea.classList.add("active");
     showFile(); //calling function
   });
