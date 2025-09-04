@@ -1,7 +1,16 @@
 # admin_routes.py (or wherever your Flask routes live)
+import secrets
 from datetime import datetime, timedelta
 
-from flask import Blueprint, abort, render_template, request
+from flask import (
+    Blueprint,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user
 
 from app.models import (
@@ -10,10 +19,14 @@ from app.models import (
     SearchSetItem,
     SmartDocument,
     Space,
+    Team,
+    TeamInvite,
+    TeamMembership,
     User,
     Workflow,
     WorkflowResult,
 )
+from app.utils import load_user
 
 admin = Blueprint("admin", __name__)
 
@@ -161,3 +174,54 @@ def usage_dashboard():
         all_users=all_users,
         all_spaces=all_spaces,
     )
+
+
+@admin.route("/teams", methods=["GET"])
+def admin_teams():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    teams = Team.objects.order_by("name")
+    data = []
+    for t in teams:
+        members = TeamMembership.objects(team=t)
+        invites = TeamInvite.objects(team=t, accepted=False)
+        data.append({"team": t, "members": members, "invites": invites})
+    return render_template(
+        "admin/teams.html", teams=data, is_admin=True, current_user_name=user.name
+    )
+
+
+@admin.route("/teams/create", methods=["POST"])
+def admin_teams_create():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    name = request.form.get("name", "").strip()
+    owner_user_id = request.form.get("owner_user_id", "").strip()
+    if not name or not owner_user_id:
+        return jsonify({"error": "name and owner_user_id required"}), 400
+    t = Team(
+        uuid=secrets.token_urlsafe(12), name=name, owner_user_id=owner_user_id
+    ).save()
+    TeamMembership(team=t, user_id=owner_user_id, role="owner").save()
+    return redirect(url_for("admin.admin_teams"))
+
+
+@admin.route("/teams/invite", methods=["POST"])
+def admin_teams_invite():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    team_id = request.form.get("team_id")
+    email = request.form.get("email", "").strip().lower()
+    role = request.form.get("role", "member")
+    team = Team.objects(id=team_id).first()
+    if not team:
+        return jsonify({"error": "Team not found"}), 404
+    token = secrets.token_urlsafe(24)
+    TeamInvite(
+        team=team, email=email, role=role, invited_by_user_id=user.user_id, token=token
+    ).save()
+    # TODO: send mail
+    return redirect(url_for("admin.admin_teams"))

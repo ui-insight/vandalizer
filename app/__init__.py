@@ -120,6 +120,7 @@ from .blueprints.library.routes import library  # noqa: E402
 from .blueprints.office.routes import office  # noqa: E402
 from .blueprints.spaces.routes import spaces  # noqa: E402
 from .blueprints.tasks.routes import tasks  # noqa: E402
+from .blueprints.team.routes import teams  # noqa: E402
 from .blueprints.workflows.routes import workflows  # noqa: E402
 
 app.register_blueprint(auth)
@@ -132,6 +133,7 @@ app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
 app.register_blueprint(admin, url_prefix="/admin")
 app.register_blueprint(library, url_prefix="/library")
+app.register_blueprint(teams, url_prefix="/teams")
 
 # OAuth
 blueprint = make_azure_blueprint(

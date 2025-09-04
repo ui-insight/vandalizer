@@ -5,94 +5,12 @@ from flask import Blueprint, jsonify, render_template, request
 library = Blueprint("library", __name__)
 
 
-MOCK_DATA = [
-    {
-        "id": 1,
-        "type": "workflow",
-        "scope": "verified",
-        "title": "Verified Financial Report Workflow",
-        "meta": "Official workflow for quarterly reports.",
-    },
-    {
-        "id": 2,
-        "type": "task",
-        "kind": "extract",
-        "scope": "verified",
-        "title": "Extract Invoices",
-        "meta": "A verified task to pull invoice data.",
-    },
-    {
-        "id": 3,
-        "type": "task",
-        "kind": "prompt",
-        "scope": "team",
-        "title": "Summarize Meeting Notes",
-        "meta": "Team prompt for meeting summaries.",
-    },
-    {
-        "id": 4,
-        "type": "workflow",
-        "scope": "team",
-        "title": "Team Onboarding Workflow",
-        "meta": "Standard procedure for new hires.",
-    },
-    {
-        "id": 5,
-        "type": "task",
-        "kind": "format",
-        "scope": "team",
-        "title": "Format as Memo",
-        "meta": "Formats text into the official team memo style.",
-    },
-    {
-        "id": 6,
-        "type": "workflow",
-        "scope": "mine",
-        "title": "My Daily Review",
-        "meta": "A personal workflow I created.",
-    },
-    {
-        "id": 7,
-        "type": "task",
-        "kind": "extract",
-        "scope": "mine",
-        "title": "Scan for Action Items",
-        "meta": "My custom extraction task.",
-    },
-    {
-        "id": 8,
-        "type": "task",
-        "kind": "prompt",
-        "scope": "mine",
-        "title": "Draft an Email Reply",
-        "meta": "A personal prompt for quick email drafting.",
-    },
-    {
-        "id": 9,
-        "type": "task",
-        "kind": "format",
-        "scope": "verified",
-        "title": "APA Citation Formatter",
-        "meta": "Formats text to APA 7th edition.",
-    },
-    {
-        "id": 10,
-        "type": "workflow",
-        "scope": "team",
-        "title": "Marketing Campaign Approval",
-        "meta": "Multi-step approval workflow for the marketing team.",
-    },
-]
-
-
 def filter_data(filters):
     """Applies filters to the mock data."""
     scope = filters.get("scope")
     item_type = filters.get("type")
     kinds = filters.get("kinds", [])
     query = filters.get("q", "").lower()
-
-    results = MOCK_DATA
 
     if scope:
         results = [item for item in results if item.get("scope") == scope]
