@@ -195,7 +195,7 @@ $(document).ready(function () {
         window.location.href = `/files/delete_folder?folder_id=${currentItemId}`;
       }
     } else {
-      var folderId = null;
+      let folderId = null;
       let href = window.location.href;
       let folderIdIndex = href.indexOf("folder_id=");
       if (folderIdIndex !== -1) {
