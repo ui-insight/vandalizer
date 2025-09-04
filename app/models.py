@@ -88,6 +88,8 @@ class Workflow(me.Document):
     )
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
+    verified = me.BooleanField(default=False)
+    created_by_user_id = me.StringField(required=False, max_length=200)
 
 
 class WorkflowResult(me.Document):
@@ -108,6 +110,7 @@ class User(me.Document):
 
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
+    name = me.StringField()
 
 
 class SmartDocument(me.Document):
@@ -243,6 +246,8 @@ class SearchSet(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user = me.StringField(required=False, max_length=200)
     fillable_pdf_url = me.StringField(required=False, max_length=200)
+    verified = me.BooleanField(default=False)
+    created_by_user_id = me.StringField(required=False, max_length=200)
 
     def item_count(self) -> int:
         """Return the count of items associated with this search set."""
@@ -397,3 +402,117 @@ class AgentHistory(me.Document):
         """Save new messages to the history."""
         messages_data = json.loads(messages_json)
         return AgentHistory(user_id=user_id, messages=messages_data).save()
+
+
+# Teams
+class Team(me.Document):
+    """A collaborative group of users."""
+
+    uuid = me.StringField(required=True, max_length=200, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    owner_user_id = me.StringField(required=True, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+
+class TeamMembership(me.Document):
+    """Users belonging to teams with a role."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "user_id"], "unique": True},
+        ],
+    }
+
+
+class TeamInvite(me.Document):
+    """Pending invite to a team by email."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    email = me.StringField(required=True, max_length=320)  # RFC-ish
+    invited_by_user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    token = me.StringField(required=True, max_length=200, unique=True)  # secure random
+    accepted = me.BooleanField(default=False)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "email"], "unique": True},
+            {"fields": ["token"], "unique": True},
+        ]
+    }
+
+
+class LibraryScope(Enum):
+    PERSONAL = "personal"  # one per user
+    TEAM = "team"  # one per team
+    VERIFIED = "verified"  # global verified catalog
+
+
+class LibraryItem(me.Document):
+    """
+    A pointer to either a Workflow or a SearchSet, with provenance and optional verification stamp.
+    """
+
+    # Polymorphic reference to Workflow or SearchSet
+    obj = me.GenericReferenceField(required=True)  # Workflow OR SearchSet
+
+    # For quick filtering without dereferencing
+    kind = me.StringField(required=True, choices=["workflow", "searchset"])
+
+    added_by_user_id = me.StringField(required=True, max_length=200)
+    added_at = me.DateTimeField(default=datetime.datetime.now)
+
+    # Whether the referenced object is currently marked verified (mirrors source)
+    verified = me.BooleanField(default=False)
+    verified_at = me.DateTimeField(required=False)
+    verified_by_user_id = me.StringField(required=False, max_length=200)
+
+    # Optional tags/notes to help curate libraries
+    tags = me.ListField(me.StringField(max_length=100), default=[])
+    note = me.StringField(required=False, max_length=2000)
+
+    meta = {
+        "indexes": [
+            # Prevent duplicate entries for the same object inside the same library
+            {"fields": ["obj", "kind"]},
+        ]
+    }
+
+
+# Library
+class Library(me.Document):
+    """
+    A collection of library items under a given scope.
+    - PERSONAL:   one per user (owner_user_id populated)
+    - TEAM:       one per team (team ref populated)
+    - VERIFIED:   global catalog (neither owner_user_id nor team populated)
+    """
+
+    scope = me.EnumField(LibraryScope, required=True)
+    title = me.StringField(required=True, max_length=200)
+    description = me.StringField(required=False, max_length=2000)
+
+    # Only one of these is set depending on scope
+    owner_user_id = me.StringField(required=False, max_length=200)  # PERSONAL
+    team = me.ReferenceField(
+        Team, required=False, reverse_delete_rule=me.CASCADE
+    )  # TEAM
+
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+    items = me.ListField(me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL))
+
+    meta = {
+        "indexes": [
+            # enforce uniqueness of library by scope & owner/team
+            {"fields": ["scope", "owner_user_id"], "unique": True, "sparse": True},
+            {"fields": ["scope", "team"], "unique": True, "sparse": True},
+        ]
+    }

@@ -356,6 +356,7 @@ def index() -> ResponseReturnValue:
         show_release_panel=show_release_panel,
         current_release=CURRENT_RELEASE_VERSION,
         breadcrumbs=breadcrumbs,
+        is_admin=user.is_admin,
     )
 
 
