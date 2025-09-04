@@ -149,7 +149,11 @@
                 function pump() {
                     return reader.read().then(({ done, value }) => {
                         if (done) {
-                            const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
+                            const outputText = markdownBuffer
+                                // remove an opening fence at the very start
+                                .replace(/^\s*```(?:[a-z0-9_-]+)?[^\n]*\n?/, '')
+                                // remove a closing fence at the very end
+                                .replace(/```[ \t]*$/, '');
                             let $responseDiv = $("<div>")
                                 .addClass("message-response-body")
                                 .attr({
@@ -204,7 +208,11 @@
 
                                     if (data.kind === "text") {
                                         markdownBuffer += data.content;
-                                        const outputText = markdownBuffer.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "");
+                                        const outputText = markdownBuffer
+                                            // remove an opening fence at the very start
+                                            .replace(/^\s*```(?:[a-z0-9_-]+)?[^\n]*\n?/, '')
+                                            // remove a closing fence at the very end
+                                            .replace(/```[ \t]*$/, '');
                                         const markdownContent = window.marked.parse(outputText);
                                         $("#streamedResponse").html(markdownContent);
                                     } else if (data.kind === "thinking") {
@@ -396,7 +404,11 @@
             if (cd) {
                 const m = cd.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
                 if (m && m[1]) {
-                    try { filename = decodeURIComponent(m[1].replace(/^"+|"+$/g, '')); } catch (_) { }
+                    try {
+                        const raw = decodeURIComponent(m[1]);
+                        // trim only edge double quotes (any run of them)
+                        filename = raw.replace(/^"+/, '').replace(/"+$/, '');
+                    } catch (_) { }
                 }
             }
 

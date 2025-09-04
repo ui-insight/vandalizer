@@ -305,7 +305,7 @@ def grab_template() -> ResponseReturnValue:
         }
         return jsonify(response)
     template = render_template(
-        "toolpanel/prompts/prompt_results.html",
+        PROMPT_RESULTS_TEMPLATE,
         search_set=search_set,
         documents=documents,
     )
@@ -329,6 +329,9 @@ def update_extraction_title() -> ResponseReturnValue:
 
     response = {"complete": True}
     return jsonify(response)
+
+
+PROMPT_RESULTS_TEMPLATE = "toolpanel/prompts/prompt_results.html"
 
 
 @tasks.route("/semantic_search", methods=["POST"])
@@ -609,7 +612,7 @@ def begin_prompt_search() -> ResponseReturnValue:
         for item in items:
             results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
         template = render_template(
-            "toolpanel/prompts/prompt_results.html",
+            PROMPT_RESULTS_TEMPLATE,
             search_set=search_set,
             results=results,
         )
@@ -618,7 +621,7 @@ def begin_prompt_search() -> ResponseReturnValue:
         }
         return jsonify(response)
     template = render_template(
-        "toolpanel/prompts/prompt_results.html",
+        PROMPT_RESULTS_TEMPLATE,
         search_set=search_set,
     )
     response = {
