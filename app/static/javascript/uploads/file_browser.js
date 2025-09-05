@@ -159,9 +159,17 @@ $(document).ready(function () {
       // check for a 400 response
       if (xhr.status === 400) {
         // jQuery will auto-parse JSON into responseJSON if possible
-        let err = (xhr.responseJSON && xhr.responseJSON.error)
-                  || (function(){ try { return JSON.parse(xhr.responseText).error; } catch(e){} })()
-                  || "Unknown error";
+        let err =
+          xhr.responseJSON?.error ||
+          (() => {
+            try {
+              return JSON.parse(xhr.responseText)?.error;
+            } catch (e) {
+              console.log(e);
+            }
+          })() ||
+          "Unknown error";
+
         alert(err);
       } else {
         // fallback for other HTTP errors
@@ -218,12 +226,6 @@ $(document).ready(function () {
 
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
-      let folderId = null;
-      let href = window.location.href;
-      let folderIdIndex = href.indexOf("folder_id=");
-      if (folderIdIndex !== -1) {
-        folderId = href.substring(folderIdIndex + 10);
-      }
       let redirectUrl = window.location.href.split("?")[1];
       console.log("redirectUrl: ", redirectUrl);
       window.location.href = `/files/toggle_default_doc?doc_id=${currentItemId}&redirect_url=${redirectUrl}`;
