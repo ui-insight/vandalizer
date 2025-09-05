@@ -42,7 +42,9 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.markdown_helpers import generate_pdf_from_markdown
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -587,7 +589,7 @@ def workflow_download() -> ResponseReturnValue:
             download_name="workflow_output.csv",
         )
     elif fmt == "pdf":
-        buf = generate_pdf_from_markdown(formatted)
+        buf = generate_pdf_from_html(formatted)
         return send_file(
             buf,
             mimetype="application/pdf",
