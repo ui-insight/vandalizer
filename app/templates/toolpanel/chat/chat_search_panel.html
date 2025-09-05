@@ -12,9 +12,24 @@
                 </div>
 
                 <div class="chat-controls-toolbar">
-                    <a href="#" id="tasks-link" class="tasks-link-style btn-secondary">
-                        <i class="fa-solid fa-plus" style="padding-right: 5px; font-weight: 700;"></i>Add
-                    </a>
+                    <div class="menu-anchor">
+                        <a href="#" id="chat-add-link" class="btn btn-secondary" aria-haspopup="true"
+                            aria-expanded="false" data-menu="#chat-add-menu">
+                            <i class="fa-solid fa-plus" style="padding-right:5px; font-weight:700;"></i>Add
+                        </a>
+
+                        <div id="chat-add-menu" class="menu menu-up" role="menu" hidden>
+                            <a class="menu-item" role="menuitem" href="/tasks/new/extraction">
+                                <i class="fa-solid fa-file-circle-plus" style="width:18px;"></i>
+                                Add Document
+                            </a>
+                            <a class="menu-item" role="menuitem" href="/tasks/new/prompt">
+                                <i class="fa-solid fa-globe" style="width:18px;"></i>
+                                Add Website
+                            </a>
+                        </div>
+                    </div>
+
 
 
 
