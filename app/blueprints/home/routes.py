@@ -44,7 +44,9 @@ from app.utilities.document_manager import (
     perform_extraction_and_update,
     update_document_fields,
 )
-from app.utilities.markdown_helpers import generate_pdf_from_markdown
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
 from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
@@ -415,7 +417,11 @@ def chat() -> ResponseReturnValue:
 @home.route("/chat/download", methods=["POST"])
 def chat_download() -> ResponseReturnValue:
     fmt = request.args.get("format", "txt").lower()
-    final_output = request.args.get("content", "txt").lower()
+
+    if request.is_json:
+        final_output = request.json.get("content", "")
+    else:
+        final_output = request.form.get("content", "")
 
     #    tailor the prompt to each format
     if fmt == "csv":
@@ -429,7 +435,7 @@ def chat_download() -> ResponseReturnValue:
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
             "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
-            "Please format your entire response using Markdown.\n\n"
+            "Please format your entire response using gorgeous modern designed html.\n\n"
             "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
             "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
             f"Here is the HTML data:\n\n{final_output}"
@@ -470,7 +476,7 @@ def chat_download() -> ResponseReturnValue:
         )
 
     elif fmt == "pdf":
-        buf = generate_pdf_from_markdown(formatted)
+        buf = generate_pdf_from_html(formatted)
         return send_file(
             buf,
             mimetype="application/pdf",
