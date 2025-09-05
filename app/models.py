@@ -2,6 +2,7 @@
 """Models for the application. Defines data structures and relationships."""
 
 import datetime
+import datetime as dt
 import json
 import os
 from enum import Enum
@@ -514,5 +515,146 @@ class Library(me.Document):
             # enforce uniqueness of library by scope & owner/team
             {"fields": ["scope", "owner_user_id"], "unique": True, "sparse": True},
             {"fields": ["scope", "team"], "unique": True, "sparse": True},
+        ]
+    }
+
+
+# Activity / Data Analytics
+
+
+# ---- Activity Types & Status ----
+
+
+class ActivityType(str, Enum):
+    CONVERSATION = "conversation"  # chat/agent session messages
+    SEARCH_SET_RUN = "search_set_run"  # SearchSet execution
+    WORKFLOW_RUN = "workflow_run"  # WorkflowResult / workflow execution
+
+
+class ActivityStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+# ---- Activity Event ----
+
+
+class ActivityEvent(me.Document):
+    """
+    Immutable-ish append-only activity events for the live feed (and audits).
+    One document per top-level run (conversation session, search_set run, workflow run).
+    """
+
+    # What happened
+    type = me.StringField(required=True, choices=[t.value for t in ActivityType])
+    status = me.StringField(
+        required=True,
+        choices=[s.value for s in ActivityStatus],
+        default=ActivityStatus.RUNNING.value,
+    )
+
+    # Who/where
+    user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(
+        required=False, max_length=200
+    )  # optional: derive via TeamMembership
+    space = me.StringField(required=False, max_length=200)
+
+    # When
+    started_at = me.DateTimeField(default=dt.datetime.utcnow)
+    finished_at = me.DateTimeField(required=False)
+
+    # Linkage to domain objects (use whichever applies)
+    # NOTE: keep light to avoid deref unless needed in UI
+    conversation_id = me.StringField(
+        required=False, max_length=200
+    )  # ChatHistory.id or custom session id
+    search_set_uuid = me.StringField(required=False, max_length=200)
+    workflow_result = me.ReferenceField(
+        "WorkflowResult", reverse_delete_rule=me.CASCADE, required=False
+    )
+    workflow = me.ReferenceField(
+        "Workflow", reverse_delete_rule=me.NULLIFY, required=False
+    )
+
+    # Metrics (optional but handy for analytics + UI badges)
+    # keep primitives: ints/floats/short strings
+    message_count = me.IntField(default=0)  # conversation
+    tokens_input = me.IntField(default=0)  # LLM tokens in
+    tokens_output = me.IntField(default=0)  # LLM tokens out
+    documents_touched = me.IntField(default=0)  # # of docs referenced
+    steps_total = me.IntField(default=0)  # workflow
+    steps_completed = me.IntField(default=0)  # workflow
+    error = me.StringField(required=False, max_length=2000)
+
+    # Free-form details to inspect/debug without dereferencing
+    meta_summary = me.DictField(
+        default={}
+    )  # e.g., {"model":"gpt-4o", "search_set_title":"Acme NDA"}
+    tags = me.ListField(me.StringField(max_length=50), default=[])
+
+    meta = {
+        "indexes": [
+            {"fields": ["-started_at"]},
+            {"fields": ["user_id", "-started_at"]},
+            {"fields": ["team_id", "-started_at"]},
+            {"fields": ["type", "-started_at"]},
+            {"fields": ["status", "-started_at"]},
+        ]
+    }
+
+    @property
+    def is_running(self) -> bool:
+        return self.status in {
+            ActivityStatus.QUEUED.value,
+            ActivityStatus.RUNNING.value,
+        }
+
+    @property
+    def duration_ms(self) -> int | None:
+        if not self.finished_at:
+            return None
+        return int((self.finished_at - self.started_at).total_seconds() * 1000)
+
+
+class DailyUsageAggregate(me.Document):
+    """
+    Per-day rollups for analytics.
+    Separate docs per (scope, principal) so we can query by user, team, and global.
+    """
+
+    # Partition key
+    date = me.DateField(required=True)  # UTC day boundary
+    scope = me.StringField(required=True, choices=["user", "team", "global"])
+    user_id = me.StringField(required=False, max_length=200)  # when scope == 'user'
+    team_id = me.StringField(required=False, max_length=200)  # when scope == 'team'
+
+    # Generic counts by type
+    conversations = me.IntField(default=0)
+    searches = me.IntField(default=0)
+    workflows_started = me.IntField(default=0)
+    workflows_completed = me.IntField(default=0)
+    workflows_failed = me.IntField(default=0)
+
+    # Resource metrics
+    tokens_input = me.IntField(default=0)
+    tokens_output = me.IntField(default=0)
+    documents_touched = me.IntField(default=0)
+
+    # Time & size metrics (ms for precision; convert in UI)
+    workflow_duration_ms = me.IntField(default=0)  # sum of durations for completed
+    conversation_messages = me.IntField(default=0)
+
+    created_at = me.DateTimeField(default=dt.datetime.utcnow)
+    updated_at = me.DateTimeField(default=dt.datetime.utcnow)
+
+    meta = {
+        "indexes": [
+            {"fields": ["date", "scope", "user_id"], "unique": True, "sparse": True},
+            {"fields": ["date", "scope", "team_id"], "unique": True, "sparse": True},
+            {"fields": ["-date", "scope"]},
         ]
     }
