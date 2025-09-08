@@ -187,15 +187,15 @@ class ChatManager:
             agent = create_rag_agent(model)
             debug("Rag chat", prompt)
 
-        return dict(
-            agent=agent,
-            prompt=prompt,
-            previous_messages=previous_messages,
-            cache_key=cache_key,
-            llm_string=llm_string,
-            user_id=user_id,
-            full_text=full_text,
-        )
+        return {
+            "agent": agent,
+            "prompt": prompt,
+            "previous_messages": previous_messages,
+            "cache_key": cache_key,
+            "llm_string": llm_string,
+            "user_id": user_id,
+            "full_text": full_text,
+        }
 
     def ask_question_to_documents(
         self,
@@ -296,7 +296,7 @@ class ChatManager:
                                         content = event.part.content
                                         yield (
                                             json.dumps(
-                                                dict(kind="text", content=content)
+                                                {"kind": "text", "content": content}
                                             )
                                             + "\n"
                                         )
@@ -324,10 +324,10 @@ class ChatManager:
                                     elif isinstance(event.delta, ThinkingPartDelta):
                                         yield (
                                             json.dumps(
-                                                dict(
-                                                    kind="thinking",
-                                                    content=event.delta.content_delta,
-                                                )
+                                                {
+                                                    "kind": "thinking",
+                                                    "content": event.delta.content_delta,
+                                                }
                                             )
                                             + "\n"
                                         )

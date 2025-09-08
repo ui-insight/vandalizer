@@ -627,7 +627,7 @@ def execute_workflow_task(
 
     final_output, data = engine.execute(workflow_result)
     debug(final_output)
-    workflow_result.final_output = dict(output=final_output, data=data)
+    workflow_result.final_output = {"output": final_output, "data": data}
     workflow_result.status = "completed"
     workflow_result.save()
     print(

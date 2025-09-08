@@ -5,7 +5,7 @@ import io
 import json
 import uuid
 from itertools import chain
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from devtools import debug
 from flask import (
@@ -150,189 +150,41 @@ def build_breadcrumbs(
 @home.route("/")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
-    # production environment
-    if not is_dev():
-        if not azure.authorized:
-            return redirect(url_for("azure.login"))
-        if "user_id" not in session:
-            debug("No user session")
-            resp = azure.get("/v1.0/me")
-            user_info = resp.json()
-            if "id" not in user_info:
-                debug("Got nothing from azure")
-                session["user_id"] = "admin"
-            else:
-                debug("Got user info from azure")
-                user_id = user_info["id"]
-                session["user_id"] = user_id
+    # Auth/session (early exits keep the main flow flat)
+    resp = _ensure_user_session()
+    if resp is not None:
+        return resp
 
     user = load_user()
-    section = request.args.get("section", default="Assistant").strip()
+    section = (request.args.get("section") or "Assistant").strip()
 
-    document = None
-    # Get the space
-    spaces = list(Space.objects())
-    if len(spaces) == 0:
-        space = Space(title="Default Space", uuid=uuid.uuid4().hex)
-        space.save()
-        spaces = list(Space.objects())
+    # Spaces
+    spaces_all = _ensure_default_space_and_get_all()
+    current_space = _resolve_current_space(spaces_all)
+    spaces = _order_spaces_with_current_first(spaces_all, current_space)
 
-    if request.args.get("space_id"):
-        session["space_id"] = request.args.get("space_id")
-        current_space = Space.objects(uuid=request.args.get("space_id")).first()
-    elif "space_id" in session and session["space_id"] != "":
-        current_space = Space.objects(uuid=session["space_id"]).first()
-    else:
-        current_space = spaces[0]
+    # Documents (may update current_space if a doc lives elsewhere)
+    documents, selected_document, maybe_space = _gather_documents()
+    if maybe_space is not None:
+        current_space = maybe_space
+        spaces = _order_spaces_with_current_first(spaces_all, current_space)
 
-    if current_space not in spaces:
-        current_space = spaces[0]
-
-    documents = []
-
-    selected_document = None
-
-    # Check for documents
-    if request.args.get("docid"):
-        doc_id = request.args.get("docid")
-        document = SmartDocument.objects(uuid=doc_id).first()
-        if document is not None:
-            documents.append(document)
-            verify_document(document)
-            current_space = Space.objects(uuid=document.space).first()
-            selected_document = document
-
-    if request.args.get("docids"):
-        doc_ids = request.args.get("docids").split(",")
-        for doc_id in doc_ids:
-            document = SmartDocument.objects(uuid=doc_id).first()
-            if document is not None:
-                documents.append(document)
-                verify_document(document)
-
-        if document is not None:
-            current_space = Space.objects(uuid=document.first.space).first()
-
-    spaces.remove(current_space)
-    spaces.insert(0, current_space)
-
-    # Get workflow if it exists
-    workflow_template = ""
-    workflow_step_template = ""
+    # Workflow templates (string fragments for the page)
     workflow_id = request.args.get("workflow_id", default=0)
-    if workflow_id != 0:
-        workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
+    workflow_tpl, workflow_step_tpl = _render_workflow_bits(workflow_id)
 
-        workflow_template = render_template(
-            "workflows/workflow.html",
-            workflow=workflow,
-        )
-
-        workflow_step_id = request.args.get("workflow_step_id", default=0)
-        if workflow_step_id != 0:
-            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-            workflow_step_template = render_template(
-                "workflows/workflow_steps/edit_workflow_step_modal.html",
-                workflow=workflow,
-                workflow_step_id=workflow_step.id,
-                workflow_step=workflow_step,
-            )
-
-        # Get workflow if it exists
-
-        workflow_step_id = request.args.get("workflow_step_id", default=0)
-        if workflow_step_id != 0:
-            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-            workflow_step_template = render_template(
-                "workflows/workflow_steps/edit_workflow_step_modal.html",
-                workflow=workflow,
-                workflow_step_id=workflow_step.id,
-                workflow_step=workflow_step,
-            )
-
-    # Get workflow if it exists
-
-    # Get the extraction and prompt sets
-    global_extraction_sets = SearchSet.objects(
-        space=current_space.uuid,
-        is_global=True,
-        set_type="extraction",
-    ).all()
-    user_extraction_sets = SearchSet.objects(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        is_global=False,
-        set_type="extraction",
-    ).all()
-    extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
-
-    # Get the prompt sets
-
-    prompts = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="prompt",
-    ).all()
-
-    formatters = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="formatter",
-    ).all()
-
-    # Workflows
-    workflows = Workflow.objects(
-        user_id=user.user_id,
-    ).all()
-
-    # Get the folders
-    current_folder_id = "0"
-    current_folder_parent_id = "0"
-    if request.args.get("folder_id"):
-        current_folder_id = request.args.get("folder_id")
-
-    base_query = Q(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        folder=current_folder_id,
+    # Query sets & workflows
+    extraction_sets, prompts, formatters, workflows = _load_sets_and_workflows(
+        user, current_space
     )
 
-    default_doc_query = Q(user_id=user.user_id, is_default=True)
-
-    folder_docs = (
-        SmartDocument.objects(base_query | default_doc_query)
-        .order_by("-created_at")
-        .all()
+    # Folder context
+    current_folder_id, current_folder_parent_id, folder_docs, folders = _folder_context(
+        user, current_space
     )
-    # Check for OCR and semantic ingestion for documents in the folder
-    # This should resolve the issue with old documents not being processed
 
-    if current_folder_id not in {0, "0"}:
-        folder_docs = (
-            SmartDocument.objects(base_query | default_doc_query)
-            .order_by("-created_at")
-            .all()
-        )
-
-        folder = SmartFolder.objects(uuid=current_folder_id).first()
-        if folder:
-            current_folder_parent_id = folder.parent_id
-    folders = SmartFolder.objects(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        parent_id="0",
-    ).all()
-    if current_folder_id != 0:
-        folders = SmartFolder.objects(
-            user_id=user.user_id,
-            space=current_space.uuid,
-            parent_id=current_folder_id,
-        ).all()
-
-    # Release Notes
-    release_seen = request.cookies.get("release_seen")
-    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
-
+    # Release panel & breadcrumbs
+    show_release_panel = request.cookies.get("release_seen") != CURRENT_RELEASE_VERSION
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
     return render_template(
@@ -351,8 +203,8 @@ def index() -> ResponseReturnValue:
         section=section,
         max_context_length=settings.max_context_length,
         workflows=workflows,
-        workflow_template=workflow_template,
-        workflow_step_template=workflow_step_template,
+        workflow_template=workflow_tpl,
+        workflow_step_template=workflow_step_tpl,
         workflow_id=workflow_id,
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
@@ -360,6 +212,179 @@ def index() -> ResponseReturnValue:
         breadcrumbs=breadcrumbs,
         is_admin=user.is_admin,
     )
+
+
+# ---------------------------- helpers ----------------------------
+
+
+def _ensure_user_session() -> Optional[ResponseReturnValue]:
+    """Handle prod auth; return a Response to short-circuit, else None."""
+    if is_dev():
+        return None
+
+    if not azure.authorized:
+        return redirect(url_for("azure.login"))
+
+    if "user_id" in session:
+        return None
+
+    debug("No user session")
+    resp = azure.get("/v1.0/me")
+    user_info = resp.json()
+    session["user_id"] = user_info.get("id", "admin")
+    debug("Got user info from azure" if "id" in user_info else "Got nothing from azure")
+    return None
+
+
+def _ensure_default_space_and_get_all() -> list[Space]:
+    """Guarantee at least one Space exists; return all spaces."""
+    spaces = list(Space.objects())
+    if not spaces:
+        Space(title="Default Space", uuid=uuid.uuid4().hex).save()
+        spaces = list(Space.objects())
+    return spaces
+
+
+def _resolve_current_space(spaces: list[Space]) -> Space:
+    """Pick current space from query, session, or first available."""
+    q_space_id = request.args.get("space_id")
+    if q_space_id:
+        session["space_id"] = q_space_id
+        found = Space.objects(uuid=q_space_id).first()
+        if found:
+            return found
+
+    sess_id = session.get("space_id")
+    if sess_id:
+        found = Space.objects(uuid=sess_id).first()
+        if found:
+            return found
+
+    return spaces[0]
+
+
+def _order_spaces_with_current_first(
+    spaces_all: list[Space], current: Space
+) -> list[Space]:
+    """Return spaces with current first (no duplicates)."""
+    ordered = [current] + [s for s in spaces_all if s.uuid != current.uuid]
+    return ordered
+
+
+def _gather_documents() -> tuple[
+    list[SmartDocument], Optional[SmartDocument], Optional[Space]
+]:
+    """
+    Collect selected docs based on 'docid'/'docids'.
+    Returns (documents, selected_document, current_space_override_if_any).
+    """
+    documents: list[SmartDocument] = []
+    selected_document: Optional[SmartDocument] = None
+    space_override: Optional[Space] = None
+
+    doc_id = request.args.get("docid")
+    if doc_id:
+        d = SmartDocument.objects(uuid=doc_id).first()
+        if d:
+            documents.append(d)
+            verify_document(d)
+            selected_document = d
+            space_override = Space.objects(uuid=d.space).first()
+
+    doc_ids = request.args.get("docids")
+    if doc_ids:
+        for did in doc_ids.split(","):
+            d = SmartDocument.objects(uuid=did).first()
+            if d:
+                documents.append(d)
+                verify_document(d)
+                # keep last space encountered (prior behavior used the last doc)
+                space_override = Space.objects(uuid=d.space).first()
+
+    return documents, selected_document, space_override
+
+
+def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
+    """Render workflow and (optional) workflow-step templates."""
+    if not workflow_id or workflow_id == 0:
+        return "", ""
+
+    workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
+    if not workflow:
+        return "", ""
+
+    workflow_tpl = render_template("workflows/workflow.html", workflow=workflow)
+
+    step_tpl = ""
+    step_id = request.args.get("workflow_step_id", default=0)
+    if step_id and step_id != 0:
+        workflow_step = WorkflowStep.objects(id=step_id).first()
+        if workflow_step:
+            step_tpl = render_template(
+                "workflows/workflow_steps/edit_workflow_step_modal.html",
+                workflow=workflow,
+                workflow_step_id=workflow_step.id,
+                workflow_step=workflow_step,
+            )
+    return workflow_tpl, step_tpl
+
+
+def _load_sets_and_workflows(user, current_space: Space):
+    """Load extraction sets, prompt/formatter items, and user workflows."""
+    global_extraction_sets = SearchSet.objects(
+        space=current_space.uuid, is_global=True, set_type="extraction"
+    ).all()
+    user_extraction_sets = SearchSet.objects(
+        user_id=user.user_id,
+        space=current_space.uuid,
+        is_global=False,
+        set_type="extraction",
+    ).all()
+    extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
+
+    prompts = SearchSetItem.objects(
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="prompt"
+    ).all()
+
+    formatters = SearchSetItem.objects(
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="formatter"
+    ).all()
+
+    workflows = Workflow.objects(user_id=user.user_id).all()
+
+    return extraction_sets, prompts, formatters, workflows
+
+
+def _folder_context(user, current_space: Space):
+    """
+    Resolve folder id/parent, gather docs & subfolders.
+    Returns (current_folder_id, current_folder_parent_id, folder_docs, folders).
+    """
+    current_folder_id = request.args.get("folder_id", default="0")
+    current_folder_parent_id = "0"
+
+    base_query = Q(
+        user_id=user.user_id, space=current_space.uuid, folder=current_folder_id
+    )
+    default_doc_query = Q(user_id=user.user_id, is_default=True)
+    folder_docs = (
+        SmartDocument.objects(base_query | default_doc_query)
+        .order_by("-created_at")
+        .all()
+    )
+
+    if current_folder_id not in {"0", 0}:
+        folder = SmartFolder.objects(uuid=current_folder_id).first()
+        if folder:
+            current_folder_parent_id = folder.parent_id
+
+    folders = SmartFolder.objects(
+        user_id=user.user_id,
+        space=current_space.uuid,
+        parent_id=current_folder_id if current_folder_id != 0 else "0",
+    ).all()
+
+    return current_folder_id, current_folder_parent_id, folder_docs, folders
 
 
 @home.route("/chat", methods=["POST"])
