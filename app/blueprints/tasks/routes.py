@@ -2,8 +2,10 @@ import csv
 import io
 import os
 import uuid
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+from typing import Any, Dict, List
 
 from devtools import debug
 from flask import (
@@ -23,9 +25,9 @@ from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
+from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -341,29 +343,30 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
-def normalize_results(results):
-    from collections import defaultdict
-
-    if isinstance(results, list):
-        collected = defaultdict(list)
-
-        for d in results:
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    if v not in collected[k]:
-                        collected[k].append(v)
-
-        # Convert to string or comma-separated string
-        flattened = {
-            k: v[0] if len(v) == 1 else ", ".join(str(val) for val in v)
-            for k, v in collected.items()
-        }
-        return flattened
-
-    elif isinstance(results, dict):
+def normalize_results(results) -> Dict[str, Any]:
+    """Normalize a list of dicts into a single dict of unique values (comma-joined),
+    or return the dict as-is. Non-list/dict inputs yield {}."""
+    if isinstance(results, dict):
         return results
+    if not isinstance(results, list):
+        return {}
 
-    return {}
+    collected: Dict[str, List[Any]] = defaultdict(list)
+    seen: Dict[str, set] = defaultdict(set)
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        for k, v in item.items():
+            if v in seen[k]:
+                continue
+            seen[k].add(v)
+            collected[k].append(v)
+
+    return {
+        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
+        for k, vals in collected.items()
+    }
 
 
 @tasks.route("/begin_search", methods=["POST"])
@@ -605,7 +608,7 @@ def begin_prompt_search() -> ResponseReturnValue:
     items = search_set.items()
 
     if len(items) > 0:
-        llm = OpenAIInterface()
+        llm = ChatManager()
 
         llm.load_document(document_path)
         results = {}

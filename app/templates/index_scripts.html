@@ -35,10 +35,11 @@
 
     {% if (documents != None) and documents | length > 0 %}
     var documentData = {
-        id: "{{ documents[0].id|safe }}",
-        title: "{{ documents[0].title|safe }}",
-        raw_text: {{ documents[0].raw_text| tojson | safe }}
+        id: {{ documents[0].id| tojson }},
+    title: { { documents[0].title | tojson } },
+    raw_text: { { documents[0].raw_text | tojson } }
     };
+
     {% else %}
     const documentData = null;
     {% endif %}

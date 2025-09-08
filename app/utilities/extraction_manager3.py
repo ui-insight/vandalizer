@@ -1,13 +1,13 @@
+import json
 import os
 import time
+
 import openai
-import json
-from app.utilities.agents import create_chat_agent, extract_entities_with_agent
-from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.config import settings
-from app.models import SmartDocument
-import asyncio
 from devtools import debug
+
+from app.models import SmartDocument
+from app.utilities.agents import create_chat_agent, extract_entities_with_agent
+from app.utilities.config import settings
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -34,7 +34,7 @@ class ExtractionManager3:
 
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
-        chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
+        chat_agent = create_chat_agent(model, system_prompt=system_prompt)
         result = chat_agent.run_sync(prompt)
         output = result.output
         debug(output)
@@ -63,8 +63,9 @@ class ExtractionManager3:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
                 doc_text = doc.raw_text
                 result = extract_entities_with_agent(
-                    text=doc_text, keys=fields_to_extract,
-                    model_name=settings.base_model
+                    text=doc_text,
+                    keys=fields_to_extract,
+                    model_name=settings.base_model,
                 )
                 extraction.extend(result)
         else:

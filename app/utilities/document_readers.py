@@ -11,7 +11,6 @@ from app.uillm.uipdf import UIPDF
 OCR_ENDPOINT = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
 
 MIN_PDF_TEXT_LENGTH = 100
-# doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 OUTPUT_FOLDER = os.path.join(os.path.dirname(__file__), "static/uploads")
 
 
@@ -55,7 +54,6 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
     If the native text extraction is insufficient, OCR is applied.
     """
     debug("Extracting text with ocr for ", pdf_path)
-    extracted_text = ""
     for _i in range(retries):
         try:
             return UIPDF.convert_to_text_demo(pdf_path)
@@ -63,7 +61,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries=3) -> str:
             debug(f"Error extracting text from PDF: {e}")
             return ""
         return ""
-    return None
+    return ""
 
 
 def extract_text_from_pdf(pdf_path):
@@ -89,7 +87,6 @@ def extract_text_from_doc(doc_path, doc=None):
         if doc_path_str.endswith(".pdf"):
             return ocr_extract_text_from_pdf(doc_path_str)
         elif doc_path_str.endswith(".html"):
-            # return extract_text_from_html(doc_path_str)
             return convert_to_markdown(doc_path_str, keep_data_uris=False)
         elif doc_path_str.endswith((".txt", ".md", ".csv")):
             with open(doc_path_str, encoding="utf-8") as file:
@@ -102,7 +99,6 @@ def extract_text_from_doc(doc_path, doc=None):
         debug(doc_path_str)
         debug(doc.extension)
         if doc.extension in {"pdf"}:
-            # return extract_text_from_pdf(doc_path_str)
             return ocr_extract_text_from_pdf(doc_path_str)
         elif doc.extension in {"docx", "doc"}:
             return extract_text_from_pdf(doc_path_str)

@@ -38,6 +38,7 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
+from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.document_manager import (
     cleanup_document,
@@ -47,7 +48,6 @@ from app.utilities.document_manager import (
 from app.utilities.markdown_helpers import (
     generate_pdf_from_html,
 )
-from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -398,7 +398,7 @@ def chat() -> ResponseReturnValue:
     print(f"The model is {model}")
 
     def generate():
-        for chunk in OpenAIInterface().ask_question_to_documents_stream(
+        for chunk in ChatManager().ask_question_to_documents_stream(
             model,
             current_app.root_path,
             documents,

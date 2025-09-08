@@ -40,8 +40,6 @@ def get_or_create_verified_library() -> Library:
 
 
 def _mk_library_item(obj, added_by_user_id: str) -> LibraryItem:
-    from inspect import isclass
-
     # Detect type
     kind = None
     from_path = f"{obj.__class__.__module__}.{obj.__class__.__name__}"
@@ -262,7 +260,7 @@ def _text_match(obj, q: Optional[str]) -> bool:
     if not q:
         return True
     ql = q.lower()
-    # Workflows: name + description; SearchSets: title
+
     if isinstance(obj, Workflow):
         name = (obj.name or "").lower()
         desc = (obj.description or "").lower()

@@ -1,4 +1,4 @@
-import datetime as dt
+from datetime import datetime, timezone
 
 from app.models import (
     ActivityEvent,
@@ -85,7 +85,7 @@ def activity_finish(
     error: str | None = None,
 ):
     ev.status = status.value
-    ev.finished_at = dt.datetime.utcnow()
+    ev.finished_at = datetime.now(timezone.utc)
     if error:
         ev.error = error[:2000]
     ev.save()
@@ -94,7 +94,7 @@ def activity_finish(
 
 
 def _agg_key(ev: ActivityEvent):
-    day = ev.finished_at.date() if ev.finished_at else dt.datetime.utcnow().date()
+    day = ev.finished_at.date() if ev.finished_at else datetime.now(timezone.utc).date()
     # emit 3 scopes to support user, team, and global dashboards
     keys = [{"date": day, "scope": "global"}]
     if ev.user_id:
@@ -131,7 +131,7 @@ def rollup_event_to_daily_aggregates(ev: ActivityEvent):
         doc = DailyUsageAggregate.objects(**key).modify(
             upsert=True,
             new=True,
-            set__updated_at=dt.datetime.utcnow(),
+            set__updated_at=datetime.now(timezone.utc),
             inc__tokens_input=_incs_for(ev).get("tokens_input", 0),
             inc__tokens_output=_incs_for(ev).get("tokens_output", 0),
             inc__documents_touched=_incs_for(ev).get("documents_touched", 0),
@@ -145,4 +145,4 @@ def rollup_event_to_daily_aggregates(ev: ActivityEvent):
         )
         # ensure created_at on first upsert
         if not doc.created_at:
-            doc.update(set__created_at=dt.datetime.utcnow())
+            doc.update(set__created_at=datetime.now(timezone.utc))

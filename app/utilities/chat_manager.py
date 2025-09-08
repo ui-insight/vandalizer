@@ -40,15 +40,14 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 ttl = 60 * 60 * 1
 cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
-# TODO remove the formatting of the answer from the OpenAIInterface class
+# TODO remove the formatting of the answer from the ChatManager class
 # it is taking so much time to execute the call
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# TODO we might need to rename the class
-class OpenAIInterface:
+class ChatManager:
     loaded_doc = ""
 
     def load_document(self, document_path) -> None:
@@ -167,7 +166,7 @@ class OpenAIInterface:
         if len(docs) == 0:
             prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
 
-        previous_messages, cache_key, llm_string = OpenAIInterface.get_cache_messages(
+        previous_messages, cache_key, llm_string = ChatManager.get_cache_messages(
             user_id=user_id,
             docs_ids_string=docs_ids_string,
             session=session,
@@ -175,7 +174,7 @@ class OpenAIInterface:
 
         max_context_length = settings.max_context_length
 
-        full_text = OpenAIInterface.get_full_text(documents, previous_messages)
+        full_text = ChatManager.get_full_text(documents, previous_messages)
         # remove base64 images from full_text
         full_text = remove_base64_images(full_text)
 

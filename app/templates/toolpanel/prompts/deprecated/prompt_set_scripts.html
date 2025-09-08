@@ -3,21 +3,6 @@
     var prompt_set_add_uuid = "";
 
     $(document).ready(function () {
-
-        function createSearchTermDictionary() {
-            const searchTermDictionary = {};
-            let searchItems = $('.set-result-items').children();
-            searchItems.each(function () {
-                const searchPhrase = $(this).find('.set-title').text().trim();
-                const result = $(this).find('.extraction-result').text().trim();
-                searchTermDictionary[searchPhrase] = result;
-            });
-
-            return searchTermDictionary;
-
-            return searchTermDictionary;
-        }
-
         $('.prompt-set-item').on("click", function () {
             console.log("Prompt item tapped");
             performPromptSearch($(this).attr("data-uuid"), $(this).attr("data-title"));
@@ -80,7 +65,6 @@
         $('#add-prompt-term-button').on("click", function () {
             if (prompt_set_add_uuid != "") {
                 addPromptSetItem();
-                return;
             } else {
                 showToast("Please select an prompt group to add to");
             }

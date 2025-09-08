@@ -258,5 +258,6 @@ def admin_teams_invite():
     TeamInvite(
         team=team, email=email, role=role, invited_by_user_id=user.user_id, token=token
     ).save()
+
     # TODO: send mail
     return redirect(url_for("admin.admin_teams"))

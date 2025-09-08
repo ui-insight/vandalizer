@@ -1,10 +1,10 @@
 import hashlib
+import os
 from typing import Any, Optional
 
+from dotenv import load_dotenv
 from redis import Redis
 from redis.commands.json.path import Path
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
@@ -25,10 +25,12 @@ class RedisCache:
         self.ttl = ttl
         self.prefix = prefix
 
+    import hashlib
+
     def _key(self, prompt: str, llm_string: str) -> str:
         """Create a key for the cache."""
-        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()
-        llm_string_hash = hashlib.md5(llm_string.encode()).hexdigest()
+        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        llm_string_hash = hashlib.sha256(llm_string.encode("utf-8")).hexdigest()
         return f"{self.prefix}:{prompt_hash}:{llm_string_hash}"
 
     def lookup(self, prompt: str, llm_string: str) -> Optional[Any]:
@@ -71,7 +73,7 @@ class RedisCache:
         if self.ttl is not None:
             self.redis.expire(key, self.ttl)
 
-    def clear(self, **kwargs: Any) -> None:
+    def clear(self) -> None:
         """Clear all entries in the Redis cache that match the cache prefix.
 
         This method removes all cache entries that start with the specified prefix.
