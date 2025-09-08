@@ -34,10 +34,11 @@
 
 
     {% if (documents != None) and documents | length > 0 %}
+    // prettier-ignore
     var documentData = {
-        id: {{ documents[0].id| tojson }},
-    title: { { documents[0].title | tojson } },
-    raw_text: { { documents[0].raw_text | tojson } }
+        id: "{{ documents[0].pk }}",
+        title: {{ documents[0].title | tojson }},
+    raw_text: {{ documents[0].raw_text | tojson }},
     };
 
     {% else %}

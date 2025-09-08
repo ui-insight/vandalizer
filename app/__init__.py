@@ -49,16 +49,16 @@ def celery_init_app(app: Flask) -> Celery:
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
-        CELERY=dict(
-            broker_url=f"redis://{REDIS_HOST}:6379/0",
-            result_backend=f"redis://{REDIS_HOST}:6379/1",
-            task_default_queue="default",
-            task_routes={
+        CELERY={
+            "broker_url": f"redis://{REDIS_HOST}:6379/0",
+            "result_backend": f"redis://{REDIS_HOST}:6379/1",
+            "task_default_queue": "default",
+            "task_routes": {
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
             },
-        ),
+        }
     )
     app.config.from_prefixed_env()
     celery_init_app(app)
