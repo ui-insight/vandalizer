@@ -50,7 +50,9 @@ from app.utilities.document_manager import (
     perform_extraction_and_update,
     update_document_fields,
 )
-from app.utilities.library_helpers import ensure_everyone_has_libraries_and_backfill
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+)
 from app.utilities.markdown_helpers import (
     generate_pdf_from_html,
 )
@@ -198,8 +200,9 @@ def index() -> ResponseReturnValue:
 
     # Activity
     activities = _build_activities(user=user, team=current_team)
+    my_library = _get_or_create_personal_library(user_id=user.user_id)
 
-    ensure_everyone_has_libraries_and_backfill()
+    # ensure_everyone_has_libraries_and_backfill()
 
     return render_template(
         "index.html",
@@ -229,6 +232,7 @@ def index() -> ResponseReturnValue:
         current_team=current_team,
         my_teams=my_teams,
         activities=activities,
+        my_library=my_library,
     )
 
 
