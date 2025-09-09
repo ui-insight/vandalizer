@@ -28,16 +28,21 @@ from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
 from app.models import (
+    ActivityEvent,
     SearchSet,
     SearchSetItem,
     SmartDocument,
     SmartFolder,
     Space,
+    Team,
+    TeamMembership,
+    User,
     UserModelConfig,
     Workflow,
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import recent_activity_for_feed
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.document_manager import (
@@ -45,6 +50,7 @@ from app.utilities.document_manager import (
     perform_extraction_and_update,
     update_document_fields,
 )
+from app.utilities.library_helpers import ensure_everyone_has_libraries_and_backfill
 from app.utilities.markdown_helpers import (
     generate_pdf_from_html,
 )
@@ -121,7 +127,7 @@ def build_breadcrumbs(
 
     # Start with Space as the root crumb
     crumbs: List[Dict[str, str]] = [
-        {"label": current_space.title, "href": url_for("home.index", folder_id="0")}
+        {"label": "My Files", "href": url_for("home.index", folder_id="0")}
     ]
 
     # If we’re at root, we’re done.
@@ -187,6 +193,14 @@ def index() -> ResponseReturnValue:
     show_release_panel = request.cookies.get("release_seen") != CURRENT_RELEASE_VERSION
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
+    # Teams
+    current_team, my_teams = _get_teams(user)
+
+    # Activity
+    activities = _build_activities(user=user, team=current_team)
+
+    ensure_everyone_has_libraries_and_backfill()
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -211,10 +225,20 @@ def index() -> ResponseReturnValue:
         current_release=CURRENT_RELEASE_VERSION,
         breadcrumbs=breadcrumbs,
         is_admin=user.is_admin,
+        activites=activities,
+        current_team=current_team,
+        my_teams=my_teams,
+        activities=activities,
     )
 
 
 # ---------------------------- helpers ----------------------------
+
+
+def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
+    current_team = user.ensure_current_team()
+    my_teams = TeamMembership.objects(user_id=user.user_id)
+    return (current_team, my_teams)
 
 
 def _ensure_user_session() -> Optional[ResponseReturnValue]:
@@ -385,6 +409,11 @@ def _folder_context(user, current_space: Space):
     ).all()
 
     return current_folder_id, current_folder_parent_id, folder_docs, folders
+
+
+def _build_activities(user: User, team: Team) -> list[ActivityEvent]:
+    activities = recent_activity_for_feed(user_id=user.id, team_id=team.id)
+    return activities
 
 
 @home.route("/chat", methods=["POST"])

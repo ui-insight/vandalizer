@@ -10,7 +10,7 @@
 
 /* Header centered with icon + label */
 .rail-header{
-  padding: 10px 12px; border-bottom: 1px solid #ddd;
+  padding: 17px 12px; border-bottom: 1px solid #ddd;
 }
 .rail-header-center{
   display:flex; align-items:center; justify-content:center; gap:8px;

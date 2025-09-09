@@ -1,5 +1,4 @@
-<div id="library-panel" class="tab-content"
-    style="background-color: white; {% if section != 'Library' %}display:none;{% endif %} padding: 24px 0px;">
+<div id="library-panel" class="tab-content" style="background-color: white; padding: 24px 0px;">
 
     <div style="display: flex; align-items: center; padding: 0 30px; margin-bottom: 20px;">
         <p style="font-size: 28px; font-weight: 700; margin: 0;">Library</p>
@@ -11,13 +10,13 @@
     </div>
 
     <div style="display: flex; border-top: 1px #ddd solid;    height: calc(100% - 70px);">
-        <div
-            style="width: 160px; flex-shrink: 0; background-color: #f4f4f4; border-right: 1px #ddd solid; padding: 20px 0 20px 30px;">
-            <p style="font-size: 12px; font-weight: 400; color: #00000099; padding-right: 20px; margin-bottom: 20px;">
+        <div style="width: 160px; flex-shrink: 0; background-color: #f4f4f4; border-right: 1px #ddd solid; ">
+            <p
+                style="font-size: 12px; font-weight: 400; color: #00000099; padding: 20px 20px 20px 20px; margin-bottom: 20px; border-bottom: 1px #ddd solid;">
                 Shared automations your team can reuse.</p>
 
             <ul class="section-list">
-                {% set t = (filters.type if filters and filters.type else 'workflows') %}
+                {% set t = (filters.type if filters and filters.type else 'all') %}
                 <li class="section-item library-type-section {% if t=='all' %}active{% endif %}" data-type="all">All
                 </li>
                 <li class="section-item library-type-section {% if t=='workflows' %}active{% endif %}"
@@ -26,8 +25,9 @@
                     Tasks</li>
             </ul>
 
-            <div id="task-kind-filter" style="padding-right: 20px;">
-                <div style="font-size:12px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
+            <div id="task-kind-filter"
+                style="padding: 10px 15px 10px 15px; margin: 15px 15px 15px 15px; background-color: #dadada;">
+                <div style="font-size:15px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
                 {% set kinds = (filters.kinds if filters and filters.kinds else ['extract','prompt','format']) %}
                 <label
                     style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
@@ -52,16 +52,18 @@
 
         <div style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px 30px;">
             <div id="library-scope-tabs" style="display:flex; gap:16px; margin-bottom: 20px;">
-                {% set _scope = scope or 'team' %}
-                <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
-                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;">
-                    Verified </a>
-                <a href="#" class="scope-tab {% if _scope=='team' %}active{% endif %}" data-scope="team"
-                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;"> My
-                    Team </a>
+                {% set _scope = scope or 'mine' %}
                 <a href="#" class="scope-tab {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
-                    style="font-weight:600; padding:6px 10px; border-radius:8px; text-decoration:none; color:#111;"> My
+                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;"> My
                     Library </a>
+                <a href="#" class="scope-tab {% if _scope=='team' %}active{% endif %}" data-scope="team"
+                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;"> My
+                    Team </a>
+                <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
+                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;">
+                    Verified </a>
+
+
                 <div style="flex:1;"></div>
             </div>
 

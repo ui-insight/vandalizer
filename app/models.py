@@ -9,7 +9,7 @@ from enum import Enum
 from pathlib import Path
 
 import mongoengine as me
-from mongoengine import CASCADE, PULL
+from mongoengine import CASCADE, PULL, signals
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -106,12 +106,99 @@ class WorkflowResult(me.Document):
     session_id = me.StringField(required=True, max_length=50)
 
 
+# Teams
+class Team(me.Document):
+    """A collaborative group of users."""
+
+    uuid = me.StringField(required=True, max_length=200, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    owner_user_id = me.StringField(required=True, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+
+class TeamMembership(me.Document):
+    """Users belonging to teams with a role."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "user_id"], "unique": True},
+        ],
+    }
+
+
+class TeamInvite(me.Document):
+    """Pending invite to a team by email."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    email = me.StringField(required=True, max_length=320)  # RFC-ish
+    invited_by_user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    token = me.StringField(required=True, max_length=200, unique=True)  # secure random
+    accepted = me.BooleanField(default=False)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "email"], "unique": True},
+            {"fields": ["token"], "unique": True},
+        ]
+    }
+
+
 class User(me.Document):
     """User model. Represents a user in the system."""
 
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
     name = me.StringField()
+
+    current_team = me.ReferenceField(
+        "Team", required=False, reverse_delete_rule=me.NULLIFY
+    )
+
+    @property
+    def current_team_uuid(self) -> str | None:
+        return getattr(self.current_team, "uuid", None)
+
+    def ensure_current_team(self) -> "Team | None":
+        if self.current_team:
+            return self.current_team
+        team = _pick_default_team_for_user(self.user_id)
+        if team:
+            self.current_team = team
+            self.save()  # triggers pre_save but already set, safe/idempotent
+        return team
+
+
+def _role_rank(role: str) -> int:
+    # lower is higher priority
+    return {"owner": 0, "admin": 1, "member": 2}.get(role, 3)
+
+
+def _pick_default_team_for_user(user_id: str) -> "Team | None":
+    memberships = list(
+        TeamMembership.objects(user_id=user_id)  # uses your existing index
+    )
+    if not memberships:
+        return None
+    memberships.sort(key=lambda m: (_role_rank(m.role), m.created_at))
+    return memberships[0].team
+
+
+def _user_pre_save(sender, document: "User", **kwargs):
+    # Only fill if empty; don't override an explicit selection
+    if getattr(document, "current_team", None) is None:
+        team = _pick_default_team_for_user(document.user_id)
+        if team:
+            document.current_team = team
+
+
+signals.pre_save.connect(_user_pre_save, sender=User)
 
 
 class SmartDocument(me.Document):
@@ -403,50 +490,6 @@ class AgentHistory(me.Document):
         """Save new messages to the history."""
         messages_data = json.loads(messages_json)
         return AgentHistory(user_id=user_id, messages=messages_data).save()
-
-
-# Teams
-class Team(me.Document):
-    """A collaborative group of users."""
-
-    uuid = me.StringField(required=True, max_length=200, unique=True)
-    name = me.StringField(required=True, max_length=200)
-    owner_user_id = me.StringField(required=True, max_length=200)
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-
-
-class TeamMembership(me.Document):
-    """Users belonging to teams with a role."""
-
-    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
-    user_id = me.StringField(required=True, max_length=200)
-    role = me.StringField(default="member", choices=["owner", "admin", "member"])
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-
-    meta = {
-        "indexes": [
-            {"fields": ["team", "user_id"], "unique": True},
-        ],
-    }
-
-
-class TeamInvite(me.Document):
-    """Pending invite to a team by email."""
-
-    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
-    email = me.StringField(required=True, max_length=320)  # RFC-ish
-    invited_by_user_id = me.StringField(required=True, max_length=200)
-    role = me.StringField(default="member", choices=["owner", "admin", "member"])
-    token = me.StringField(required=True, max_length=200, unique=True)  # secure random
-    accepted = me.BooleanField(default=False)
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-
-    meta = {
-        "indexes": [
-            {"fields": ["team", "email"], "unique": True},
-            {"fields": ["token"], "unique": True},
-        ]
-    }
 
 
 class LibraryScope(Enum):

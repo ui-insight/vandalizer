@@ -2,12 +2,24 @@
     <div class="rail-header">
         <div class="rail-header-center">
             <i class="fa-solid fa-bolt"></i>
-            <span>Activity</span>
+            <span style="font-size: 14px; font-weight: 700;">Activity</span>
         </div>
     </div>
 
     <div class="rail-section">
         <ul class="run-list" id="run-list">
+            <!-- Completed chat -->
+            <li class="run-item">
+                <a href="/home?docid={{ selected_document.uuid }}&section=Assistant">
+                    <span class="run-left">
+                        <i class="fa-solid fa-pen-to-square" title="Chat" style="color: black;"></i>
+                        <span class="run-title truncate" title="New chat">
+                            New chat
+                        </span>
+                    </span>
+                </a>
+            </li>
+            <li style="height: 5px;"></li>
 
             <!-- Running -->
             <li class="run-item is-running" data-run-id="run_987651" onclick="openRun('run_987651')">

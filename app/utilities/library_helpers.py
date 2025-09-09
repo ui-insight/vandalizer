@@ -1,7 +1,18 @@
-import datetime
+from datetime import datetime, timezone
 from typing import Literal, Optional, Sequence, Tuple
 
-from app.models import Library, LibraryItem, LibraryScope, SearchSet, Team, Workflow
+from mongoengine import Q
+
+from app.models import (
+    Library,
+    LibraryItem,
+    LibraryScope,
+    SearchSet,
+    Team,
+    TeamMembership,
+    User,
+    Workflow,
+)
 
 
 def get_or_create_personal_library(user_id: str) -> Library:
@@ -331,3 +342,130 @@ def search_libraries(
         paged = objs[offset : offset + limit]
 
     return (paged, total)
+
+
+def _get_or_create_personal_library(user_id: str) -> Library:
+    lib = Library.objects(scope=LibraryScope.PERSONAL, owner_user_id=user_id).first()
+    if lib:
+        return lib
+    return Library(
+        scope=LibraryScope.PERSONAL,
+        title="My Library",
+        description="Personal library",
+        owner_user_id=user_id,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    ).save()
+
+
+def _get_or_create_team_library(team: Team) -> Library:
+    lib = Library.objects(scope=LibraryScope.TEAM, team=team).first()
+    if lib:
+        return lib
+    return Library(
+        scope=LibraryScope.TEAM,
+        title=f"{team.name} Library",
+        description=f"Shared library for team: {team.name}",
+        team=team,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    ).save()
+
+
+def _owner_id_for(obj) -> str | None:
+    """
+    Decide which field reflects 'ownership' for backfill.
+    Prefer created_by_user_id when present; otherwise user_id.
+    """
+    uid = getattr(obj, "created_by_user_id", None) or getattr(obj, "user_id", None)
+    return uid or None
+
+
+def _ensure_library_item(lib: Library, obj, kind: str) -> LibraryItem:
+    """
+    Create-or-get a LibraryItem pointing to obj (Workflow or SearchSet) and
+    attach to lib.items if missing. Idempotent.
+    """
+    # Look for any LibraryItem that already points at this obj/kind.
+    # We keep a single item globally (not per library) to avoid duplication.
+    li = LibraryItem.objects(obj=obj, kind=kind).first()
+    if not li:
+        # mirror verified if source has it
+        verified_flag = bool(getattr(obj, "verified", False))
+        li = LibraryItem(
+            obj=obj,
+            kind=kind,
+            added_by_user_id=_owner_id_for(obj) or "",
+            added_at=datetime.now(timezone.utc),
+            verified=verified_flag,
+            verified_at=datetime.now(timezone.utc) if verified_flag else None,
+        ).save()
+
+    # Attach to the target library if not already attached
+    if li.id not in [x.id for x in lib.items]:
+        lib.items.append(li)
+        lib.updated_at = datetime.now(timezone.utc)
+        lib.save()
+
+    return li
+
+
+def ensure_user_team_libraries(user: User) -> list[Library]:
+    """
+    Ensure a team library exists for every team the user belongs to.
+    Returns the list of libraries (created or found).
+    """
+    libs = []
+    memberships = TeamMembership.objects(user_id=user.user_id)
+    for m in memberships:
+        libs.append(_get_or_create_team_library(m.team))
+    return libs
+
+
+def backfill_personal_library(user: User) -> Library:
+    """
+    Ensure user’s personal library exists and backfill it with all of their
+    Workflows and SearchSets.
+    """
+    lib = _get_or_create_personal_library(user.user_id)
+
+    # Find objects "owned" by the user
+    # Ownership rule: created_by_user_id == user.user_id OR user_id == user.user_id
+    user_q = Q(created_by_user_id=user.user_id) | Q(user_id=user.user_id)
+
+    # SearchSets
+    for ss in SearchSet.objects(user_q):
+        _ensure_library_item(lib, ss, "searchset")
+
+    # Workflows
+    for wf in Workflow.objects(user_q):
+        _ensure_library_item(lib, wf, "workflow")
+
+    return lib
+
+
+# ---------- batch utilities ----------
+
+
+def ensure_everyone_has_libraries_and_backfill(personal_only: bool = False) -> None:
+    """
+    Run once or on a schedule. Safe to re-run.
+    - Ensures each user has a personal library and backfills it.
+    - If personal_only=False, also ensures a team library for every team they belong to.
+    """
+    for user in User.objects():
+        backfill_personal_library(user)
+        if not personal_only:
+            ensure_user_team_libraries(user)
+
+
+# ---------- optional signal hooks (auto-create on demand) ----------
+
+
+def _user_post_save(sender, document: User, **kwargs):
+    # Ensure the personal library exists for new/updated users
+    _get_or_create_personal_library(document.user_id)
+
+
+# If you want this behavior automatically:
+# signals.post_save.connect(_user_post_save, sender=User)

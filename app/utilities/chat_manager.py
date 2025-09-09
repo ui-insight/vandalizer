@@ -161,10 +161,15 @@ class ChatManager:
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response. At the end include a very short suggestion of next questions to ask or next steps the user might do with the documents."""
+        prompt = """You are given the following document(s). 
+Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
+Do not restate or include the original question in your answer. 
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
 
         if len(docs) == 0:
-            prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
+            prompt = """Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
+Do not restate or include the original question in your answer. 
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
 
         previous_messages, cache_key, llm_string = ChatManager.get_cache_messages(
             user_id=user_id,

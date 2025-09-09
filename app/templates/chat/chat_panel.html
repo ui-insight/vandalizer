@@ -1,5 +1,5 @@
-<div class="tab-content" id="chat-panel"
-    style="{% if section != 'Assistant' and section != 'Tasks' %}display: none;{% endif %}">
+<div class="tab-content" id="chat-panel">
+
 
     <div class="chat-card-container">
         <div class="loading-event-progress-container" style="display: none;">
@@ -19,6 +19,8 @@
     <div id="recommendations-panel">
 
     </div>
+
+    {% include "chat/chat_search_panel.html" %}
 </div>
 
 <script>

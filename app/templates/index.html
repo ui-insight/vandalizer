@@ -49,13 +49,8 @@
 
 {% endblock %} {%block content %}
 
-<script>
-    // call this to refresh the list of selected documents
-</script>
-
 
 {% include "_app_rail.html" %}
-
 
 <div class="main-panel">
     <div class="left-panel">
@@ -81,8 +76,8 @@
 
                 <div class="col-auto" style="padding-right: 30px;">
                     {% if (documents != None) and documents|length > 0 %}
-                    <span id="loading-spinner" class="loading-spinner"
-                        style="display: {% if documents[0].processing %}block{% else %}none{% endif %};">
+                    <span id="loading-spinner"
+                        class="loading-spinner {{ 'is-visible' if documents[0].processing else 'hidden' }}">
                         <i class="fa-solid fa-spinner fa-spin"></i>
                     </span>
                     <button type="button" id="raw-text-icon" onclick="showRawText()" aria-label="Show raw text" style="display: {% if not documents[0].processing %}block{% else %}none{% endif %};
@@ -154,10 +149,30 @@
 
                 {% include "_add_button.html" %}
                 {% include "_breadcrumbs.html" %}
+
+                <!-- Files -->
                 <table class="styled-table" id="file-list" style="width: 100%; margin-top: 10px;">
                     <th style="display: none;"></th>
                     <tbody id="doc-body">
 
+                        <!-- Shared Folder -->
+                        <tr class="folder">
+                            <td>
+                                <span style="margin-right: 10px;"><input type="checkbox" class="document-selector"
+                                        data-doc-type="folder" data-doc-uuid="" data-doc-uuids=""
+                                        data-num-documents=" "></span>
+
+                                <a href="javascript:void(0);" onclick="">
+                                    <span><i class="fa-solid fa-folder" style="color:  rgb(0 128 128);"></i></span>
+                                    <span
+                                        style="padding-right: 10px; padding-left: 5px; font-weight: 450; overflow: ellipsis; color:#17181abb;">
+                                        {{ current_team.name }} shared folder</span>
+                                </a>
+
+                            </td>
+                        </tr>
+
+                        <!-- Folders -->
                         {% for folder in folders %}
                         <tr class="folder">
                             <td>
@@ -167,9 +182,9 @@
                                         data-num-documents="{{ folder.number_of_documents() }} "></span>
 
                                 <a href="javascript:void(0);" onclick="addFolderId('{{ folder.uuid }}')">
-                                    <span><i class="fa-solid fa-folder" style="color: #5E48FF;"></i></span>
+                                    <span><i class="fa-solid fa-folder" style="color: rgb(162, 162, 162);"></i></span>
                                     <span
-                                        style="padding-right: 10px; padding-left: 10px; overflow: ellipsis; color:#17181abb;">
+                                        style="padding-right: 10px; padding-left: 5px; font-weight: 450; overflow: ellipsis; color:#17181abb;">
                                         {{ folder.title }}</span>
                                 </a>
 
@@ -181,6 +196,8 @@
                             </td>
                         </tr>
                         {% endfor %}
+
+                        <!-- Files -->
                         {% for doc in folder_docs %}
                         <tr id="file-item" class="file">
                             <td style="white-space: nowrap;">
@@ -190,12 +207,14 @@
                                         doc.is_default %} checked disabled {% endif %}>
                                 </span>
 
-                                <a href="javascript:void(0);" class="file-link" onclick="addDocId('{{ doc.uuid }}')"
-                                    disabled={{not doc.valid}}>
-                                    <span><i
-                                            class="fa-solid fa-file {% if not doc.valid and not doc.processing %} invalid{% endif %}"></i></span>
+                                <button type="button" class="file-link bootstrapless-button"
+                                    onclick="addDocId('{{ doc.uuid }}')" {% if not doc.valid %}disabled{% endif %}>
+                                    <span>
+                                        <i
+                                            class="fa-solid fa-file{% if not doc.valid and not doc.processing %} invalid{% endif %}"></i>
+                                    </span>
                                     <span class="file-name">{{ doc.title }}</span>
-                                </a>
+                                </button>
 
                                 {% if not doc.valid and not doc.processing %}
                                 <span class="token-warning">
@@ -263,7 +282,7 @@
 
 
                 </ul>
-                {% include "toolpanel/chat/chat_panel.html" %}
+                {% include "chat/chat_panel.html" %}
 
                 <!-- {% include "workflows/workflows_panel.html" %} -->
                 {% include "library/library_panel.html" %}
@@ -291,9 +310,6 @@
             {% include "workflows/workflow_steps/new_workflow_step_modal.html" %}
         </div>
 
-        {% include "toolpanel/chat/chat_search_panel.html" %}
-
-
         <div id="snackbar">Copied</div>
         <div class="modal-container">
             {% include "toolpanel/rename_modal.html" %}
@@ -316,7 +332,7 @@
 {% include "index_scripts.html" %}
 {% include "toolpanel/extractions/extraction_scripts.html" %}
 {% include "workflows/workflow_step_scripts.html" %}
-{% include "toolpanel/chat/chat_scripts.html" %}
+{% include "chat/chat_scripts.html" %}
 <script src="{{url_for('static', filename='javascript/uploads/upload_files.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/uploads/file_browser.js')}}"></script>
 <script src="{{url_for('static', filename='javascript/uploads/upload_attachment.js')}}"></script>

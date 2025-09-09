@@ -31,6 +31,12 @@
     box-shadow: var(--menu-shadow);
     z-index: 1000;
   }
+
+.menu.menu-right {
+  right: 0;
+  left: auto;
+}
+
 /* menu that opens above instead of below */
 .menu.menu-up {
   bottom: calc(100% + 8px);

@@ -1,31 +1,34 @@
 <div class="menu-anchor" style="float:right; margin-top: 25px;">
     <button class="btn btn-secondary" id="userDropdown" aria-haspopup="true" aria-expanded="false"
         data-menu="#user-menu">
-        <i class="fa-solid fa-user" style="margin-right:6px"></i>{{ current_user_name or "Account" }}
+        <i class="fa-solid fa-user" style="margin-right:6px"></i>{{ current_team.name or "Account" }}
     </button>
 
     <div id="user-menu" class="menu menu-right" role="menu" hidden>
-        <a class="menu-item center" role="menuitem" href="/teams">
-            <i class="fa-solid fa-users" style="width:18px;"></i> View Team
+
+        {% for team_membership in my_teams %}
+        <a class="menu-item" role="menuitem" href="/teams">
+            <i class="fa-solid fa-users" style="width:18px;"></i> {{ team_membership.team.name }}
         </a>
+        {% endfor %}
 
         {% if is_admin %}
         <hr class="menu-divider">
 
-        <a class="menu-item center" role="menuitem" href="/admin/teams">
+        <a class="menu-item" role="menuitem" href="/admin/teams">
             <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Admin: Teams
         </a>
 
         <hr class="menu-divider">
 
-        <a class="menu-item center" role="menuitem" href="/admin/usage">
+        <a class="menu-item" role="menuitem" href="/admin/usage">
             <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Admin: Reports
         </a>
         {% endif %}
 
         <hr class="menu-divider">
 
-        <a class="menu-item center" role="menuitem" href="/logout">
+        <a class="menu-item" role="menuitem" href="/logout">
             <i class="fa-solid fa-right-from-bracket" style="width:18px;"></i> Logout
         </a>
     </div>

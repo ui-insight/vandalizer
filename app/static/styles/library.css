@@ -6,10 +6,10 @@
     }
 
     .section-item {
-        padding: 10px 20px 10px 0;
-        /* Adjusted padding */
+        padding: 7.5px 20px 7.5px 15px;
         cursor: pointer;
         font-weight: 500;
+        font-size: 16px;
         border-left: 3px solid transparent;
     }
 
@@ -20,12 +20,13 @@
     .section-item.active {
         font-weight: 700;
         color: #000;
+         background-color: #dadada;
         /* No border or background for this style */
     }
 
     /* Scope tab and card styles */
     .scope-tab.active {
-        background: #ffe08a;
+        border-bottom: 4px solid #f1b300;
     }
 
     .library-card {

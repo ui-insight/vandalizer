@@ -924,8 +924,12 @@ tr {
     flex-grow: 1;
 }
 
+.file-link i {
+    color: rgb(206, 206, 206);
+}
+
 .fa-file.invalid {
-    color: red;
+    color: rgba(255, 0, 0, 0.351);
 }
 
 .file-name {
@@ -1444,4 +1448,9 @@ think:hover > * {
 @keyframes button-shimmer {
   0%   { transform: translateX(-100%) skewX(-20deg); }
   100% { transform: translateX(100%)  skewX(-20deg); }
+}
+
+.bootstrapless-button {
+  background: none;
+  border: none;
 }

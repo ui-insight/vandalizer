@@ -38,7 +38,7 @@
     var documentData = {
         id: "{{ documents[0].pk }}",
         title: {{ documents[0].title | tojson }},
-    raw_text: {{ documents[0].raw_text | tojson }},
+    raw_text: '{{ documents[0].raw_text | tojson }}',
     };
 
     {% else %}
@@ -152,6 +152,11 @@
     });
 
     function setSection(sectionName) {
+        $(".search-results-panel").hide();
+        $(".bottom-toolbar").hide();
+        $(".tab-content").hide();
+        $("#tasks-panel").hide();
+
         // Use the tabTitle variable as needed
         let href = window.location.href;
         const qs = new URLSearchParams(href.split("?")[1]);
@@ -177,23 +182,14 @@
             }
         });
 
-        if (sectionName == "Extract") {
-            $("#extraction-panel").show();
-            $("#bottom-toolbar-extraction").show();
-        } else if (sectionName == "Prompt") {
-            $("#prompt-panel").show();
-            $("#bottom-toolbar-prompt").show();
-        } else if (sectionName == "Assistant") {
+        if (sectionName == "Assistant") {
             $("#chat-panel").show();
             $("#bottom-toolbar-chat").show();
         } else if (sectionName == "Workflows") {
             $("#workflows-panel").show();
             $("#bottom-toolbar-add-workflows").show();
-        } else if (sectionName == "Tasks") {
-            $("#chat-panel").show();
-            $("#tasks-panel").show();
-            $("#bottom-toolbar-tasks").show();
-        } else if (sectionName == "Library") {
+        }
+        else if (sectionName == "Library") {
             $("#library-panel").show();
         }
 
@@ -1950,13 +1946,9 @@
         item.addEventListener("click", function () {
             tabMenuItems.forEach((item) => item.classList.remove("active"));
             this.classList.add("active");
-            $(".search-results-panel").hide();
-            $(".tab-content").hide();
-            $(".bottom-toolbar").hide();
             var tabTitle = $(this).text();
-            setSection(tabTitle);
-            $("#tasks-panel").hide();
 
+            setSection(tabTitle);
 
         });
     });
@@ -2830,6 +2822,7 @@
         additional_context = "",
         display_question = ""
     ) {
+        $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
@@ -3070,6 +3063,7 @@
         const copyBtn = makeLinkBtn("Copy", "copy-btn");
         const downloadBtn = makeLinkBtn("Download", "download-btn");
 
+
         feedbackDiv.appendChild(copyBtn);
         feedbackDiv.appendChild(downloadBtn);
         return feedbackDiv;
@@ -3215,4 +3209,9 @@
             }
         }
     }
+
+
+    section = "{{ section }}"
+    console.log("Section is: " + section)
+    setSection(section);
 </script>
