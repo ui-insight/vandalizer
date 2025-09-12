@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 
 import openai
 from devtools import debug
@@ -20,6 +21,7 @@ from pydantic_ai.messages import (
 from app.models import (
     MAX_CHAT_MESSAGES,
     UserModelConfig,
+    ChatConversation,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.config import settings
@@ -30,6 +32,7 @@ from app.utilities.llm_helpers import (
     remove_code_markers,
     remove_xml_content,
 )
+from app.utilities.web_utils import URLContentFetcher
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -148,6 +151,7 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
+        conversation_id=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -167,11 +171,16 @@ class OpenAIInterface:
         if len(docs) == 0:
             prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
 
-        previous_messages, cache_key, llm_string = OpenAIInterface.get_cache_messages(
+        chat_conversation = ChatConversation.objects(
+            uuid=conversation_id,
             user_id=user_id,
-            docs_ids_string=docs_ids_string,
-            session=session,
-        )
+        ).first()
+        if chat_conversation is None:
+            chat_conversation = ChatConversation(
+                uuid=str(uuid.uuid4()), user_id=user_id
+            )
+
+        previous_messages = chat_conversation.messages or []
 
         max_context_length = settings.max_context_length
 
@@ -191,9 +200,7 @@ class OpenAIInterface:
         return dict(
             agent=agent,
             prompt=prompt,
-            previous_messages=previous_messages,
-            cache_key=cache_key,
-            llm_string=llm_string,
+            conversation=chat_conversation,
             user_id=user_id,
             full_text=full_text,
         )
@@ -204,6 +211,7 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
+        conversation_id=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -213,15 +221,15 @@ class OpenAIInterface:
             root_path=root_path,
             documents=documents,
             question=question,
+            conversation_id=conversation_id,
             session=session,
             user_id=user_id,
             default_docs=default_docs,
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
-        previous_messages = prepared_data["previous_messages"]
-        cache_key = prepared_data["cache_key"]
-        llm_string = prepared_data["llm_string"]
+        conversation = prepared_data["conversation"]
+        previous_messages = conversation.messages or []
         user_id = prepared_data["user_id"]
         full_text = prepared_data["full_text"]
 
@@ -248,10 +256,6 @@ class OpenAIInterface:
             debug("Error in chat", e)
 
         debug(answer)
-        if hasattr(answer, "new_messages_json"):
-            chat_history = json.loads(answer.new_messages_json())
-            cache.update(cache_key, llm_string, chat_history)
-
         if hasattr(answer, "output"):
             answer = answer.output
         else:
@@ -268,6 +272,7 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
+        conversation_id=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -283,9 +288,19 @@ class OpenAIInterface:
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
+        conversation = prepared_data["conversation"]
+        previous_messages = conversation.messages or []
+
+        fetcher = URLContentFetcher(max_content_length=30000)
+        result = fetcher.process_chat_input(question)
+        print(result)
+        prompt += "\n\nAdditional context:\n"
+        prompt += "\n".join(result)
+        print("Final prompt to the model:")
+        print(prompt)
 
         async def streamer():
-            async with agent.iter(prompt) as agent_run:
+            async with agent.iter(prompt, message_history=previous_messages) as agent_run:
                 async for node in agent_run:
                     if Agent.is_model_request_node(node):
                         async with node.stream(agent_run.ctx) as stream:

@@ -128,6 +128,61 @@
         $('#model-modal').hide();
     });
 
+function showChatInputModal() {
+    $('#chat-input-modal').show();
+    $('#chatinput').focus();
+  }
+
+  $('#close-chat-input-modal').on('click', function () {
+    $('#chat-input-modal').hide();
+  });
+
+ // click or keydown on submit button
+    $('#submitChatInputBtn').on('click keydown', function (e) {
+
+    const link = $('#chat-input-link').val().trim();
+      console.log("Submitting link: " + link);
+
+    $.ajax({
+        url: '/home/fetch_link_content',
+        type: 'POST',
+        data: JSON.stringify({
+            link: link,
+            space: $('#current-space-id')[0].innerHTML
+        }),
+        contentType: 'application/json; charset=utf-8',
+        dataType: 'json',
+        async: true,
+        success: function (msg) {
+            const documentName = msg.document_name;
+            $('#chatinput').val('');
+            $('#chat-input-modal').hide();
+            if (documentName) {
+            // Start asking questions about the new document
+            askDocument(documentName);
+            openChatWindow();
+            $('.chat-window').append(`
+                <div class="answer-card" style="padding: 30px; ">
+                <p style="font-size: 30; color: #5D6F81;">
+                    You added a link: <i>${link}</i>
+                </p>
+                <p style="font-size: 30; color: #5D6F81;">
+                    The document <i>${documentName}</i> has been added. You can now ask questions about it.
+                </p>
+                </div>
+            `);
+            } else {
+            alert("Failed to add the link. Please try again.");
+            }
+        },
+        error: function (xhr, ajaxOptions, thrownError) {
+            console.log(xhr.status);
+            console.log(thrownError);
+            alert("An error occurred while adding the link. Please try again.");
+        }
+    })
+  });
+
     function showRawText() {
         // Get the current document
         if (documentData) {
@@ -215,7 +270,7 @@
 
                 // Update the UI with the recommendations
                 $('#recommendations-panel').empty();
-                if (recommendations.length > 0) {
+                if (recommendations && recommendations.length > 0) {
                     recommendations.forEach(rec => {
                         $('#recommendations-panel').append(`${rec}`);
                     });

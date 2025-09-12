@@ -338,62 +338,12 @@ class ChatMessage(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
 
 
-class ChatHistory(me.Document):
+class ChatConversation(me.Document):
     """Represents a chat history for a user."""
 
+    uuid = me.StringField(required=True, max_length=200)
+    title = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
     messages = me.ListField(me.ReferenceField(ChatMessage))
-    last_conversation_id = me.StringField(required=False, max_length=200)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
-
-    @staticmethod
-    def get_latest_conversation_messages(user_id):
-        # latest conversation MAX_CHAT_MESSAGES from the user
-        history = ChatHistory.objects(user_id=user_id).order_by("-created_at").first()
-        if history is None:
-            return None
-        # take the last 2h of conversation
-        return [m for m in history.messages if convert_to_hours(m) < 2]
-
-
-def convert_to_hours(message):
-    time_slot = datetime.datetime.now() - message.created_at
-    return time_slot.total_seconds() / 3600
-
-
-class AgentHistory(me.Document):
-    """Simple agent history model for storing conversation messages as JSON."""
-
-    user_id = me.StringField(required=True)
-    messages = me.ListField(me.DictField())  # Store messages as plain JSON
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-
-    meta = {"collection": "agent_history"}
-
-    @classmethod
-    def get_latest_conversation_messages(cls, user_id):
-        """Retrieve the latest conversation messages for a user."""
-        # Get today's conversation and filter by the latest conversation
-        # history = cls.objects(user_id=user_id).order_by("-created_at").first()
-        today_history = cls.objects(user_id=user_id).filter(
-            created_at__gte=datetime.datetime.now().replace(hour=0, minute=0, second=0),
-        )
-        if today_history:
-            latest_conversation = today_history.order_by("-created_at").first()
-
-            messages: list[ModelMessage] = []
-            for message in latest_conversation.messages:
-                # convert message to ModelMessage
-                if message["kind"] == "request":
-                    messages.append(ModelRequest(**message))
-                elif message["kind"] == "response":
-                    messages.append(ModelResponse(**message))
-            return messages
-        return []
-
-    @classmethod
-    def save_messages(cls, user_id, messages_json):
-        """Save new messages to the history."""
-        messages_data = json.loads(messages_json)
-        return AgentHistory(user_id=user_id, messages=messages_data).save()
