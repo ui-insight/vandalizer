@@ -1141,7 +1141,7 @@ textarea {
   }
 
   .loading-event-progress-content p {
-    font-size: 1rem;
+    font-size: 1.3rem;
     opacity: 0.9;
     z-index: 1;
   }

@@ -6,10 +6,31 @@ $(document).ready(function () {
   let currentItemType = null;
   let isPopupJustOpened = false;
 
-  $("#file-list tr").on("contextmenu", function (e) {
+  $("#file-list").on("contextmenu", "tr", function (e) {
+    // If the target is inside an anchor or button, suppress their default behavior
+    if ($(e.target).closest("a, button").length) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
     e.preventDefault();
+    e.stopPropagation();
     showPopupMenu(e, $(this), $(this));
   });
+
+    $("#file-list")
+    .on("contextmenu", "a, button", function (e) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      return false;
+    })
+    .on("mousedown", "a, button", function (e) {
+      // Right mouse button = 2 (or e.which === 3 in jQuery)
+      if (e.button === 2 || e.which === 3) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    });
 
   $(".ellipsis-btn").on("click", function (e) {
     e.preventDefault();
@@ -26,9 +47,6 @@ $(document).ready(function () {
           bottom: e.clientY,
         }
         : $displaytarget[0].getBoundingClientRect();
-
-    const popupHeight = $popupMenu.outerHeight();
-    const windowHeight = $(window).height();
 
     let top, left;
 
@@ -80,7 +98,6 @@ $(document).ready(function () {
   $("#rename-option").on("click", function () {
     // Implement rename functionality
     console.log(`Rename ${currentItemType} with ID: ${currentItemId}`);
-    let renameModal = $("#renameModal");
     function finishRename() {
     let newName = $("#newName")[0].value;
         console.log(
@@ -142,9 +159,17 @@ $(document).ready(function () {
       // check for a 400 response
       if (xhr.status === 400) {
         // jQuery will auto-parse JSON into responseJSON if possible
-        var err = (xhr.responseJSON && xhr.responseJSON.error)
-                  || (function(){ try { return JSON.parse(xhr.responseText).error; } catch(e){} })()
-                  || "Unknown error";
+        let err =
+          xhr.responseJSON?.error ||
+          (() => {
+            try {
+              return JSON.parse(xhr.responseText)?.error;
+            } catch (e) {
+              console.log(e);
+            }
+          })() ||
+          "Unknown error";
+
         alert(err);
       } else {
         // fallback for other HTTP errors
@@ -178,9 +203,9 @@ $(document).ready(function () {
         window.location.href = `/files/delete_folder?folder_id=${currentItemId}`;
       }
     } else {
-      var folderId = null;
-      var href = window.location.href;
-      var folderIdIndex = href.indexOf("folder_id=");
+      let folderId = null;
+      let href = window.location.href;
+      let folderIdIndex = href.indexOf("folder_id=");
       if (folderIdIndex !== -1) {
         folderId = href.substring(folderIdIndex + 10);
       }
@@ -201,13 +226,7 @@ $(document).ready(function () {
 
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
-      var folderId = null;
-      var href = window.location.href;
-      var folderIdIndex = href.indexOf("folder_id=");
-      if (folderIdIndex !== -1) {
-        folderId = href.substring(folderIdIndex + 10);
-      }
-      var redirectUrl = window.location.href.split("?")[1];
+      let redirectUrl = window.location.href.split("?")[1];
       console.log("redirectUrl: ", redirectUrl);
       window.location.href = `/files/toggle_default_doc?doc_id=${currentItemId}&redirect_url=${redirectUrl}`;
     } else {

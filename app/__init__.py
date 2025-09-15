@@ -20,15 +20,12 @@ from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import LoginManager, login_user
 from flask_mail import Mail
 
-CURRENT_RELEASE_VERSION = "2.2.01"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.2.01:
-- Test workflow tasks while building
-- Download workflow results in various formats
-- Upload multiple files at once
-- Delete and edit workflows
-- Share workflows
-- Many bug fixes and performance improvements.
+Release 2.3.01:
+- Over 20 bug fixes and tweaks
+- Restored elegant formatting
+- Improved workflow speed and performance
 """
 
 # Load environment variables from .env file
@@ -129,14 +126,15 @@ def load_user(user_id: str):
 
 
 # Setup blueprints
-from .blueprints.auth import auth  # noqa: E402
-from .blueprints.feedback import feedback  # noqa: E402
-from .blueprints.files import files  # noqa: E402
-from .blueprints.home import home  # noqa: E402
-from .blueprints.office import office  # noqa: E402
-from .blueprints.spaces import spaces  # noqa: E402
-from .blueprints.tasks import tasks  # noqa: E402
-from .blueprints.workflows import workflows  # noqa: E402
+from .blueprints.admin.routes import admin  # noqa: E402
+from .blueprints.auth.routes import auth  # noqa: E402
+from .blueprints.feedback.routes import feedback  # noqa: E402
+from .blueprints.files.routes import files  # noqa: E402
+from .blueprints.home.routes import home  # noqa: E402
+from .blueprints.office.routes import office  # noqa: E402
+from .blueprints.spaces.routes import spaces  # noqa: E402
+from .blueprints.tasks.routes import tasks  # noqa: E402
+from .blueprints.workflows.routes import workflows  # noqa: E402
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")
@@ -146,6 +144,7 @@ app.register_blueprint(spaces, url_prefix="/spaces")
 app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
+app.register_blueprint(admin, url_prefix="/admin")
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()

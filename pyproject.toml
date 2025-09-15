@@ -28,7 +28,7 @@ dependencies = [
     "langchain_redis",
     "langchain_text_splitters",
     "langfuse",
-    "pysqlite3-binary",
+    "pysqlite3-binary; sys_platform == 'linux'",
     "markdownify",
     "mongoengine",
     "nest-asyncio",
@@ -62,6 +62,7 @@ dependencies = [
     "jsonschema",
     "markdown>=3.8.2",
     "flower>=2.0.1",
+    "xhtml2pdf>=0.2.15",
 ]
 
 

@@ -1,6 +1,7 @@
 """Handles authorization routing."""
 
 from flask import (
+    Blueprint,
     current_app,
     flash,
     redirect,
@@ -15,7 +16,7 @@ from flask_login import login_user
 
 from app.models import User
 
-from . import auth
+auth = Blueprint("auth", __name__)
 
 
 @auth.route("/")

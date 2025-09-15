@@ -57,7 +57,6 @@ class WorkflowStep(me.Document):
     )
     data = me.DictField(required=False)
 
-    # TODO: This is deprecated need to refactor out
     def extraction_items(self):
         if "search_set_uuid" in self.data:
             search_set = SearchSet.objects(uuid=self.data["search_set_uuid"]).first()
@@ -408,7 +407,7 @@ class AgentHistory(me.Document):
         )
         if today_history:
             latest_conversation = today_history.order_by("-created_at").first()
-            # return latest_conversation.messages
+
             messages: list[ModelMessage] = []
             for message in latest_conversation.messages:
                 # convert message to ModelMessage

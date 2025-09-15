@@ -5,6 +5,12 @@
                 on your selected documents, and output to different formats.</i></p>
 
         <div class="search-set-container" style="padding: 15px 0px;">
+            {% if workflows|length == 0 %}
+
+            <a href="#" class="add-new_workflow-button"><b>+ Build Your First Workflow</b><span
+                    style="color: #c4c4c4; font-weight: 300;"> — Combine multiple tasks, prompts and/or extractions to
+                    create reproducible workflows.</span></a>
+            {% endif %}
             {% for workflow in workflows %}
             <div class="expandable-container">
                 <div class="workflow-item" data-uuid="{{ workflow.id }}" data-title="{{ workflow.title }}">

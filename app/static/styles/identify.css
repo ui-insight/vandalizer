@@ -1,6 +1,5 @@
 #loading-area {
     height: 200px;
-    display: flex;
     align-items: center;
     justify-content: center;
     flex-direction: column;
@@ -69,7 +68,7 @@
     border: 2px solid #efefef;
   }
   .attach-area .icon{
-    font-size: 22x;
+    font-size: 22px;
     font-weight: 400;
     color: #17181abb;
   }

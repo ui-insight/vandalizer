@@ -18,13 +18,13 @@
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
             <div>
-                <label class="workflow-label" style="padding-top: 10px;">Enter a
-                    prompt:</label>
+                <p class="workflow-label" style="padding-top: 10px;">Enter a
+                    prompt:</p>
                 <textarea id="promptInput" class="input-field"
                     placeholder="e.g., Summarize this for me into a todo list" rows="10"
                     value="{{ workflow_task.data['prompt'] if is_editing else '' }}">{{ workflow_task.data['prompt'] if is_editing else '' }}</textarea>
-                <label class="workflow-label" style="padding-top: 10px;">From your saved
-                    tasks:</label>
+                <p class="workflow-label" style="padding-top: 10px;">From your saved
+                    tasks:</p>
                 <select id="extractionSetDropdown" class="workflow-input-field">
                     <option value="">Select a saved task...</option>
                     {% for prompt in prompts %}
@@ -143,8 +143,6 @@
                 //    set width to 0, force reflow, then allow the new transition to run.
                 progressEl.style.transition = "none";
                 progressEl.style.width = "0%";
-                // force reflow so the browser “sees” width=0 before we apply a new transition
-                progressEl.offsetWidth;
 
                 // 2) Update the title (as plain text—or if you want HTML here, swap to innerHTML)
                 titleEl.textContent = title;
@@ -203,7 +201,6 @@
             contentEl.innerHTML = "";
 
             // 2) Build task_data and JSON payload as before...
-            let workflow_task_id = $(this).attr("data-task-id");
             let task_data = { type: "prompt" };
             const dropdown = $('#extractionSetDropdown');
             if (dropdown.val()) {

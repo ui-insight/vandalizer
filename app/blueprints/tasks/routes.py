@@ -4,10 +4,10 @@ import os
 import uuid
 from copy import deepcopy
 from pathlib import Path
-from markupsafe import escape
 
 from devtools import debug
 from flask import (
+    Blueprint,
     abort,
     current_app,
     jsonify,
@@ -20,6 +20,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
+from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
@@ -31,7 +32,9 @@ from app.utilities.semantic_recommender import (
 )
 from app.utils import load_user
 
-from . import tasks
+tasks = Blueprint("tasks", __name__)
+
+EXTRACTION_PANEL_TEMPLATE = "toolpanel/extractions/extraction_panel.html"
 
 
 @login_required
@@ -66,10 +69,9 @@ def filter_models() -> ResponseReturnValue:
         return jsonify({"models": settings_models, "current_model": current_model})
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
-        if doc is not None:
-            if not doc.valid:
-                validation_failed = True
-                break
+        if doc is not None and not doc.valid:
+            validation_failed = True
+            break
     if validation_failed:
         # filter out the external models
         models = [m for m in model_config.available_models if not m.get("external")]
@@ -289,7 +291,7 @@ def grab_template() -> ResponseReturnValue:
 
     if search_set.set_type == "extraction":
         template = render_template(
-            "toolpanel/extractions/extraction_panel.html",
+            EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
             documents=documents,
         )
@@ -309,7 +311,7 @@ def grab_template() -> ResponseReturnValue:
         }
         return jsonify(response)
     template = render_template(
-        "toolpanel/prompts/prompt_results.html",
+        PROMPT_RESULTS_TEMPLATE,
         search_set=search_set,
         documents=documents,
     )
@@ -334,6 +336,9 @@ def update_extraction_title() -> ResponseReturnValue:
 
     response = {"complete": True}
     return jsonify(response)
+
+
+PROMPT_RESULTS_TEMPLATE = "toolpanel/prompts/prompt_results.html"
 
 
 @tasks.route("/semantic_search", methods=["POST"])
@@ -451,7 +456,7 @@ def begin_search() -> ResponseReturnValue:
         normalized_results = normalize_results(results)
         print(normalize_results)
         template = render_template(
-            "toolpanel/extractions/extraction_panel.html",
+            EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
             results=normalized_results,
             documents=documents,
@@ -482,7 +487,7 @@ def begin_search() -> ResponseReturnValue:
 
         return jsonify(response)
     template = render_template(
-        "toolpanel/extractions/extraction_panel.html",
+        EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
         documents=documents,
     )
@@ -500,8 +505,6 @@ def build_extraction_from_document() -> ResponseReturnValue:
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
     load_user()
-
-    documents = []
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
@@ -531,7 +534,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
         return jsonify(response)
 
     template = render_template(
-        "toolpanel/extractions/extraction_panel.html",
+        EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
     )
     response = {
@@ -615,18 +618,13 @@ def begin_prompt_search() -> ResponseReturnValue:
 
     if len(items) > 0:
         llm = OpenAIInterface()
-        document_file_path = Path("static") / "uploads" / user_id / document_path
-        if not Path.exists(str(document_file_path)):
-            document_file_path = (
-                Path(current_app.root_path) / "static" / "uploads" / document_path
-            )
 
         llm.load_document(document_path)
         results = {}
         for item in items:
             results[item.searchphrase] = llm.ask_question_to_loaded_document(item)
         template = render_template(
-            "toolpanel/prompts/prompt_results.html",
+            PROMPT_RESULTS_TEMPLATE,
             search_set=search_set,
             results=results,
         )
@@ -635,7 +633,7 @@ def begin_prompt_search() -> ResponseReturnValue:
         }
         return jsonify(response)
     template = render_template(
-        "toolpanel/prompts/prompt_results.html",
+        PROMPT_RESULTS_TEMPLATE,
         search_set=search_set,
     )
     response = {

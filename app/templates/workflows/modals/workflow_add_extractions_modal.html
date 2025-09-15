@@ -18,11 +18,11 @@
         <div class="workflow-content-body">
             <!-- Tab content for dropdown selection -->
             <div class="workflow-tab-content" id="selectDropdown">
-                <label class="workflow-label" style="padding-top: 10px;">Enter extractions (comma-separated):</label>
+                <p class="workflow-label" style="padding-top: 10px;">Enter extractions (comma-separated):</p>
                 <input type="text" id="extractionInput" placeholder="e.g., Name, Age, Location" class="input-field"
                     value="{{ workflow_task.data['searchphrases'] if is_editing else '' }}">
-                <label class="workflow-label" style="padding-top: 10px;">From your saved
-                    tasks:</label>
+                <p class="workflow-label" style="padding-top: 10px;">From your saved
+                    tasks:</p>
                 <select id="extractionSetDropdown" class="workflow-input-field">
                     <option value="">Select a saved task...</option>
                     {% for prompt in extraction_sets %}
@@ -137,8 +137,6 @@
                 //    set width to 0, force reflow, then allow the new transition to run.
                 progressEl.style.transition = "none";
                 progressEl.style.width = "0%";
-                // force reflow so the browser “sees” width=0 before we apply a new transition
-                progressEl.offsetWidth;
 
                 // 2) Update the title (as plain text—or if you want HTML here, swap to innerHTML)
                 titleEl.textContent = title;
@@ -197,7 +195,6 @@
             contentEl.innerHTML = "";
 
             // 2) Build task_data and JSON payload as before...
-            let workflow_task_id = $(this).attr("data-task-id");
             let task_data = { type: "extraction" };
             const dropdown = $('#extractionSetDropdown');
             if (dropdown.val()) {
