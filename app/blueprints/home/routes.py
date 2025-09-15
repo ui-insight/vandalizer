@@ -12,7 +12,6 @@ from flask import (
     Blueprint,
     Response,
     current_app,
-    redirect,
     render_template,
     request,
     send_file,
@@ -22,7 +21,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
-from flask_dance.contrib.azure import azure
+from flask_login import current_user, login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
@@ -60,30 +59,30 @@ from app.utilities.markdown_helpers import (
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
-from app.utils import is_dev, load_user
 
 home = Blueprint("home", __name__)
 
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 
+@login_required
 @app.context_processor
 def inject_current_model():
     """
     Runs on *every* template render.  Looks up the user's ModelConfig,
     and makes `current_model` available in all templates.
     """
-    user = load_user()
-    if user:
-        model_config = UserModelConfig.objects(user_id=user.user_id).first()
-        models = [m.model_dump() for m in settings.models]
-        current_model = settings.base_model
-        if model_config:
-            current_model = model_config.name
-            if len(model_config.available_models) > 0:
-                models = json.loads(json.dumps(model_config.available_models))
+    # user = current_user
+    # if user:
+    #     model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    #     models = [m.model_dump() for m in settings.models]
+    #     current_model = settings.base_model
+    #     if model_config:
+    #         current_model = model_config.name
+    #         if len(model_config.available_models) > 0:
+    #             models = json.loads(json.dumps(model_config.available_models))
 
-        return {"current_model": current_model, "models": models}
+    #     return {"current_model": current_model, "models": models}
 
     return {"current_model": "", "models": []}
 
@@ -156,15 +155,13 @@ def build_breadcrumbs(
     return crumbs
 
 
+@login_required
 @home.route("/")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
-    # Auth/session (early exits keep the main flow flat)
-    resp = _ensure_user_session()
-    if resp is not None:
-        return resp
-
-    user = load_user()
+    user = current_user
+    if user is None:
+        return
     section = (request.args.get("section") or "Assistant").strip()
 
     # Spaces
@@ -202,8 +199,6 @@ def index() -> ResponseReturnValue:
     # Activity
     activities_qs = _build_activities(user=user)
     activities = [event_to_dict(a) for a in activities_qs]
-
-    import json
 
     json.dumps(activities)
     print(activities)
@@ -290,25 +285,6 @@ def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
     current_team = user.ensure_current_team()
     my_teams = TeamMembership.objects(user_id=user.user_id)
     return (current_team, my_teams)
-
-
-def _ensure_user_session() -> Optional[ResponseReturnValue]:
-    """Handle prod auth; return a Response to short-circuit, else None."""
-    if is_dev():
-        return None
-
-    if not azure.authorized:
-        return redirect(url_for("azure.login"))
-
-    if "user_id" in session:
-        return None
-
-    debug("No user session")
-    resp = azure.get("/v1.0/me")
-    user_info = resp.json()
-    session["user_id"] = user_info.get("id", "admin")
-    debug("Got user info from azure" if "id" in user_info else "Got nothing from azure")
-    return None
 
 
 def _ensure_default_space_and_get_all() -> list[Space]:
@@ -480,7 +456,7 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user = load_user()
+    user = current_user
     user_id = user.user_id
     debug(document_uuids)
     # migrate to new document user's location
@@ -553,7 +529,7 @@ def chat_download() -> ResponseReturnValue:
             f"{final_output}"
         )
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config:
         model = model_config.name

@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
     ModelResponse,
 )
 from pypdf import PdfReader
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import app
 
@@ -173,6 +174,32 @@ class User(me.Document):
             self.current_team = team
             self.save()  # triggers pre_save but already set, safe/idempotent
         return team
+
+    password_hash = me.StringField()
+
+    def set_password(self, password):
+        """Create a hashed password."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Check a hashed password."""
+        return check_password_hash(self.password_hash, password)
+
+    # You might need to add this if you use Flask-Login
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.user_id
 
 
 def _role_rank(role: str) -> int:

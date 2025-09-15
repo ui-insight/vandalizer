@@ -15,7 +15,9 @@ from dotenv import load_dotenv
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
+from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
+from flask_login import LoginManager, login_user
 from flask_mail import Mail
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
@@ -110,6 +112,19 @@ Mail(app)
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
 
+from app.models import User
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "auth.login"  # Redirect here if @login_required fails
+
+
+@login_manager.user_loader
+def load_user(user_id: str):
+    """Loads user from DB for session management."""
+    return User.objects(user_id=user_id).first()
+
+
 # Setup blueprints
 from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
@@ -135,14 +150,55 @@ app.register_blueprint(admin, url_prefix="/admin")
 app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
 
-# OAuth
-blueprint = make_azure_blueprint(
-    client_id=app.config["CLIENT_ID"],
-    client_secret=app.config["CLIENT_SECRET"],
-    tenant=app.config["TENANT_NAME"],
-)
+# --- 4. CONDITIONAL AUTHENTICATION SETUP ---
+AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
+app.logger.info(f"Authentication mode set to: {AUTH_MODE}")
 
-app.register_blueprint(blueprint, url_prefix="/login")
+if AUTH_MODE == "AZURE":
+    # --- Azure AD / Flask-Dance Mode ---
+    blueprint = make_azure_blueprint(
+        client_id=app.config["CLIENT_ID"],
+        client_secret=app.config["CLIENT_SECRET"],
+        tenant=app.config["TENANT_NAME"],
+    )
+
+    app.register_blueprint(blueprint, url_prefix="/login")
+
+    @oauth_authorized.connect_via(blueprint)
+    def azure_logged_in(blueprint, token):
+        """Creates or loads a user after successful Azure login."""
+        if not token:
+            app.logger.warning("Failed to fetch token from Azure.")
+            return
+
+        resp = blueprint.session.get("/v1.0/me")
+        if not resp.ok:
+            app.logger.warning(
+                f"Failed to fetch user info from Azure Graph: {resp.text}"
+            )
+            return
+
+        info = resp.json()
+        user_id = info["id"]
+        user = User.objects(id=user_id).first()
+
+        if not user:
+            # Create a new user if they don't exist
+            user = User(
+                user_id=info["userPrincipalName"], name=info["displayName"]
+            ).save()
+
+        login_user(user)  # This is the critical step to create the user session
+
+elif AUTH_MODE == "LOCAL":
+    # Point the login view to the local blueprint's login function
+    login_manager.login_view = "auth.login"
+
+else:
+    raise ValueError(f"Invalid AUTH_MODE: '{AUTH_MODE}'. Must be 'AZURE' or 'LOCAL'.")
+
+
+app.config["AUTH_MODE"] = AUTH_MODE
 
 
 with app.app_context():

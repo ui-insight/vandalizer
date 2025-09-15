@@ -19,6 +19,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from flask_login import current_user, login_required
 from pypdf import PdfReader
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
@@ -32,7 +33,6 @@ from app.utilities.fillable_pdf_manager import FillablePDFManager
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
-from app.utils import load_user
 
 files = Blueprint("files", __name__)
 
@@ -87,9 +87,10 @@ def is_valid_file_content(data: bytes, extension: str) -> bool:
     return False
 
 
+@login_required
 @files.route("/upload", methods=["POST"])
 def upload():
-    user = load_user()
+    user = current_user
     if not user:
         return redirect(url_for("auth.login"))
 
@@ -411,7 +412,6 @@ def move_item() -> ResponseReturnValue:
 @files.route("/toggle_default_doc")
 def toggle_default_doc() -> ResponseReturnValue:
     """Toggle the default document status."""
-    load_user()
     doc_id = request.args.get("doc_id")
     request.args.get("folder_id")
     redirect_url = request.args.get("redirect_url")

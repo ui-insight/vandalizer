@@ -203,7 +203,7 @@ footer .footer-poweredby {
     box-shadow: -0.7rem 0 0 #f1b300;
 }
 
-.hero-content a:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
+.hero-content a.action-button:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
     -webkit-box-shadow: none;
     box-shadow: none;
     background: none;
@@ -212,7 +212,7 @@ footer .footer-poweredby {
     border-bottom: 0.1em solid #f1b300;
 }
 
-.hero-content a, .hero-content  button {
+.hero-content a.action-button, .hero-content  button {
     display: inline-block;
     width: 100%;
     color: #191919;
@@ -1412,7 +1412,7 @@ think:hover > * {
   display: inline;              /* or block, depending on your markup */
 }
 
-//* 1) Positioning context */
+/* 1) Positioning context */
 .btn.shimmer,
 .btn-primary.shimmer {
   position: relative;
@@ -1483,3 +1483,25 @@ think:hover > * {
   font-size: 12px;
   line-height: 12px;
 }
+.local-login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 45px;
+      width: 100%;
+    }
+    .local-login-form input,
+    .local-login-form button {
+      padding: 12px 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    .local-login-form button {
+      background-color: #f1b300; /* Vandal Gold */
+      color: #000;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
