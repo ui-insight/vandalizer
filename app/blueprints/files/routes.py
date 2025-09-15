@@ -33,7 +33,6 @@ from app.utilities.fillable_pdf_manager import FillablePDFManager
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
-from app.utils import load_user
 
 files = Blueprint("files", __name__)
 
@@ -413,7 +412,6 @@ def move_item() -> ResponseReturnValue:
 @files.route("/toggle_default_doc")
 def toggle_default_doc() -> ResponseReturnValue:
     """Toggle the default document status."""
-    load_user()
     doc_id = request.args.get("doc_id")
     request.args.get("folder_id")
     redirect_url = request.args.get("redirect_url")
