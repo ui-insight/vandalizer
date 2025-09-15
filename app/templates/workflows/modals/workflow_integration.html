@@ -13,16 +13,19 @@
         <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
         <!-- Tabbed navigation -->
-        <label class="workflow-label" style="padding: 15px 30px;">Basic Setup</label>
+        <p class="workflow-label" style="padding: 15px 30px;">Basic Setup</p>
 
         <!-- Added design section -->
         <div class="workflow-content-body" style="background-color: white; padding: 0px 30px 60px 30px;">
             <div class="quickstart-code">
                 <h4>Start Workflow</h4>
                 <div style="position: relative;">
-                    <a id="copyCodeButton" class="btn btn-secondary" style="position: absolute; top: 10px; right: 10px; cursor: pointer;"><i class="fa-regular fa-copy"></i></a>
+                    <a id="copyCodeButton" class="btn btn-secondary"
+                        style="position: absolute; top: 10px; right: 10px; cursor: pointer;"><i
+                            class="fa-regular fa-copy"></i></a>
                     <div style="position: absolute; bottom: 10px; right: 10px;">
-                        <select id="languageDropdown" style="cursor: pointer;" style="border-radius: 0; box-shadow: none;">
+                        <select id="languageDropdown" style="cursor: pointer;"
+                            style="border-radius: 0; box-shadow: none;">
                             <option value="python">Python</option>
                             <option value="bash">Bash</option>
                         </select>
@@ -84,11 +87,11 @@ print(response.json())`;
         });
 
         $('#languageDropdown').on("change", function () {
-    const language = $(this).val();
-    let codeSnippet = '';
+            const language = $(this).val();
+            let codeSnippet = '';
 
-    if (language === 'python') {
-        codeSnippet = `import requests
+            if (language === 'python') {
+                codeSnippet = `import requests
 
 files = {
     'file': open('path/to/your/file1.txt', 'rb'),
@@ -111,17 +114,17 @@ response = requests.post(
 )
 
 print(response.json())`;
-    } else if (language === 'bash') {
-        codeSnippet = `curl -X POST https://vandalizer.nkn.uidaho.edu/workflow/run \\
+            } else if (language === 'bash') {
+                codeSnippet = `curl -X POST https://vandalizer.nkn.uidaho.edu/workflow/run \\
     -H "x-api-key: {{ user.id }}" \\
     -H "Accept: application/json" \\
     -F "workflowID={{ workflow.id }}" \\
     -F "file=@path/to/your/file1.txt" \\
     -F "file=@path/to/your/file2.txt"
     # Add more files using additional -F flags`;
-    }
+            }
 
-    $('#codeSnippet').text(codeSnippet);
-});
+            $('#codeSnippet').text(codeSnippet);
+        });
     </script>
 </div>

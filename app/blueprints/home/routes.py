@@ -1,15 +1,20 @@
 """Handles primary routing for the home page and related functionalities."""
 
+import asyncio
+import io
 import json
 import uuid
 from itertools import chain
+from typing import Dict, List, Optional
 
 from devtools import debug
 from flask import (
+    Blueprint,
     Response,
     current_app,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     stream_with_context,
@@ -30,21 +35,25 @@ from app.models import (
     Workflow,
     WorkflowStep,
 )
+from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
-from app.utilities.openai_interface import OpenAIInterface
-from app.utils import load_user
-
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
     update_document_fields,
 )
-
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
+from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
+from app.utils import load_user
 
-from . import home
+home = Blueprint("home", __name__)
+
+WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 
 @app.context_processor
@@ -68,7 +77,7 @@ def inject_current_model():
     return {"current_model": "", "models": []}
 
 
-def verify_document(document: SmartDocument, user_id: str) -> None:
+def verify_document(document: SmartDocument) -> None:
     """Verify and update the document if necessary."""
     debug("Updating old document", document.title)
     debug("Document processing", document.processing)
@@ -76,7 +85,6 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
     extension = document.extension
 
     if not document.raw_text or document.raw_text == "":
-
         extraction_task = perform_extraction_and_update.s(
             document_uuid=document.uuid,
             extension=extension,
@@ -96,6 +104,45 @@ def verify_document(document: SmartDocument, user_id: str) -> None:
         document.processing = True
         document.save()
 
+
+MAX_BREADCRUMB_DEPTH = 10  # safety to avoid accidental loops
+
+
+def build_breadcrumbs(
+    current_folder_id: str, current_space: str
+) -> List[Dict[str, str]]:
+    """
+    Returns a list of dicts: [{'label': 'Space', 'href': '/?folder_id=0'}, ...]
+    - Starts with the space
+    - Then each ancestor folder, ending with the current folder
+    """
+
+    # Start with Space as the root crumb
+    crumbs: List[Dict[str, str]] = [
+        {"label": current_space.title, "href": url_for("home.index", folder_id="0")}
+    ]
+
+    # If we’re at root, we’re done.
+    if not current_folder_id or current_folder_id == "0":
+        return crumbs
+
+    # Walk up the tree using parent_id
+    path: List[Dict[str, str]] = []
+    node: Optional[SmartFolder] = SmartFolder.objects(uuid=current_folder_id).first()
+    depth = 0
+
+    while node and depth < MAX_BREADCRUMB_DEPTH:
+        path.append(
+            {"label": node.title, "href": url_for("home.index", folder_id=node.uuid)}
+        )
+        if not node.parent_id or node.parent_id == "0":
+            break
+        node = SmartFolder.objects(uuid=node.parent_id).first()
+        depth += 1
+
+    # Reverse to go root → … → current
+    crumbs.extend(reversed(path))
+    return crumbs
 
 
 @login_required
@@ -128,14 +175,17 @@ def index() -> ResponseReturnValue:
 
     documents = []
 
+    selected_document = None
+
     # Check for documents
     if request.args.get("docid"):
         doc_id = request.args.get("docid")
         document = SmartDocument.objects(uuid=doc_id).first()
         if document is not None:
             documents.append(document)
-            verify_document(document, user_id)
+            verify_document(document)
             current_space = Space.objects(uuid=document.space).first()
+            selected_document = document
 
     if request.args.get("docids"):
         doc_ids = request.args.get("docids").split(",")
@@ -143,7 +193,7 @@ def index() -> ResponseReturnValue:
             document = SmartDocument.objects(uuid=doc_id).first()
             if document is not None:
                 documents.append(document)
-                verify_document(document, user_id)
+                verify_document(document)
 
         if document is not None:
             current_space = Space.objects(uuid=document.first.space).first()
@@ -264,49 +314,22 @@ def index() -> ResponseReturnValue:
             parent_id=current_folder_id,
         ).all()
 
-    total_token_counts = 0
-    for doc in folder_docs:
-        total_token_counts += doc.token_count
-
     # Release Notes
     release_seen = request.cookies.get("release_seen")
     show_release_panel = release_seen != CURRENT_RELEASE_VERSION
 
-    # Release Notes
-    release_seen = request.cookies.get("release_seen")
-    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
-
-    # user = load_user()
-    # models = []
-
-    # model_config = ModelConfig.objects(
-    #     user_id=user.user_id,
-    # ).first()
-    # model = settings.base_model
-    # settings_models = [m.model_dump() for m in settings.models]
-    # if model_config is None:
-    #     model_config = ModelConfig(user_id=user.user_id, name=model)
-    #     model_config.available_models = [m.model_dump() for m in settings.models]
-    #     model_config.save()
-    #     models = settings_models
-    # else:
-    #     if len(model_config.available_models) == 0:
-    #         models = settings_models
-
-    # debug(models)
-    # debug(settings.models)
+    breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
         prompts=prompts,
-        # models=models,
-        # current_model=model,
         formatters=formatters,
         folders=folders,
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
+        selected_document=selected_document,
         folder_docs=folder_docs,
         spaces=spaces,
         current_space_id=spaces[0].uuid,
@@ -319,6 +342,7 @@ def index() -> ResponseReturnValue:
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
         current_release=CURRENT_RELEASE_VERSION,
+        breadcrumbs=breadcrumbs,
     )
 
 
@@ -335,7 +359,8 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user_id = load_user().user_id
+    user = load_user()
+    user_id = user.user_id
     debug(document_uuids)
     # migrate to new document user's location
     for doc_uuid in document_uuids:
@@ -347,12 +372,14 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    user = load_user()
-
     debug(documents)
     debug(docs)
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = settings.base_model
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    print(f"The model is {model}")
 
     def generate():
         for chunk in OpenAIInterface().ask_question_to_documents_stream(
@@ -371,18 +398,100 @@ def chat() -> ResponseReturnValue:
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
+## @MARK: Download
+@home.route("/chat/download", methods=["POST"])
+def chat_download() -> ResponseReturnValue:
+    fmt = request.args.get("format", "txt").lower()
+
+    if request.is_json:
+        final_output = request.json.get("content", "")
+    else:
+        final_output = request.form.get("content", "")
+
+    #    tailor the prompt to each format
+    if fmt == "csv":
+        prompt = (
+            "Convert the following HTML document into a well formatted CSV. "
+            "Use commas as separators and include a header row.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            f"{final_output}"
+        )
+    elif fmt == "pdf":
+        # you might ask for a simple text layout or markdown-to-PDF
+        prompt = (
+            "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
+            "Please format your entire response using gorgeous modern designed html.\n\n"
+            "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
+            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
+            f"Here is the HTML data:\n\n{final_output}"
+        )
+    else:  # txt
+        prompt = (
+            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
+            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            f"{final_output}"
+        )
+
+    user = load_user()
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    if model_config:
+        model = model_config.name
+    else:
+        model = settings.base_model
+    chat_agent = create_chat_agent(model)
+    # get current event loop
+    # if there is no current loop, create a new one
+    formatted = asyncio.run(chat_agent.run(prompt))
+    formatted = formatted.output
+
+    # Remove the tick marks before and after blocks
+    formatted = formatted.strip("`").strip()
+
+    # 4) package it up
+    buf = io.BytesIO()
+    debug(f"Format is {fmt}")
+    if fmt == "csv":
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/csv",
+            as_attachment=True,
+            download_name="chat_output.csv",
+        )
+
+    elif fmt == "pdf":
+        buf = generate_pdf_from_html(formatted)
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="chat_output.pdf",
+        )
+
+    else:  # txt
+        buf.write(formatted.encode("utf-8"))
+        buf.seek(0)
+        return send_file(
+            buf,
+            mimetype="text/plain",
+            as_attachment=True,
+            download_name="chat_output.txt",
+        )
+
+
 @home.route("/static/fontawesome/webfonts/<path:filename>")
 def serve_fonts(filename):
     if filename.endswith(".woff2"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/woff2",
         )
     if filename.endswith(".ttf"):
         return send_from_directory(
-            "static/fontawesome/webfonts",
+            WEBFONTS_DIR,
             filename,
             mimetype="font/ttf",
         )
-    return send_from_directory("static/fontawesome/webfonts", filename)
+    return send_from_directory(WEBFONTS_DIR, filename)

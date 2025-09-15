@@ -6,11 +6,8 @@
             <div class="ask-question">
                 <div class="chat-input-wrapper" onclick="document.getElementById('chatinput').focus();">
                     <div id="chatinput" contenteditable="true" translate="no" enterkeyhint="enter" tabindex="0"
-                        class="ProseMirror break-words max-w-[60ch]">
-                        <p style="margin: 0px; font-weight: 500; font-size: 14px; color: black;" id="chatplaceholder"
-                            data-placeholder="Chat with your document..."
-                            class="is-empty is-editor-empty before:!text-text-500 before:whitespace-nowrap">
-                        </p>
+                        class="ProseMirror break-words is-editor-empty"
+                        data-placeholder="Ask anything about this document…">
                     </div>
                 </div>
 
@@ -27,9 +24,9 @@
                     </a>
                     <div id="chat-model-popup-menu" class="file-popup-menu" style="display: none;">
                         <ul id="chat-model-popup-menu-options">
-                            <li id="download-pdf-option">PDF</li>
-                            <li id="download-csv-option">CSV</li>
-                            <li id="download-text-option">Text</li>
+                            <li id="download-pdf-option-chat">PDF</li>
+                            <li id="download-csv-option-chat">CSV</li>
+                            <li id="download-text-option-chat">Text</li>
                         </ul>
                     </div>
                     <button class="btn btn-primary" id="send-chat-button" disabled>

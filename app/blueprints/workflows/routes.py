@@ -4,16 +4,15 @@ import asyncio
 import io
 import json
 import os
-import re
 import uuid
 from itertools import chain
 from pathlib import Path
 
 import pypandoc
-from bs4 import BeautifulSoup
 from bson import ObjectId
 from devtools import debug
 from flask import (
+    Blueprint,
     current_app,
     flash,
     jsonify,
@@ -26,16 +25,6 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
-from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    ListFlowable,
-    ListItem,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-)
 from werkzeug.utils import secure_filename
 
 from app.models import (
@@ -54,6 +43,9 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -62,7 +54,9 @@ from app.utilities.workflow import (
     execute_workflow_task,
 )
 
-from . import workflows
+workflows = Blueprint("workflows", __name__)
+
+WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
 
 
 @login_required
@@ -95,7 +89,6 @@ def edit_workflow() -> ResponseReturnValue:
     """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
-    load_user()
     workflow = Workflow.objects(id=uuid).first()
 
     template = render_template(
@@ -147,6 +140,7 @@ def update_workflow() -> ResponseReturnValue:
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
     user = current_user
+    user_id = user.user_id
     if user is None:
         return redirect(url_for("login"))
 
@@ -168,7 +162,7 @@ def run_workflow() -> ResponseReturnValue:
     workflow.save()
 
     if not workflow:
-        return jsonify({"status": "error", "message": "Workflow not found"}), 404
+        return jsonify({"status": "error", "message": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     attachments = [
         # SmartDocument.objects(uuid=x.attachment).first() for x in workflow.attachments
@@ -230,13 +224,10 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
 
     request_data = request.get_json()
     document_uuids = request_data.get("uuids", [])
-    space = request_data.get("space")
     limit = request_data.get("limit", 5)
 
     if not document_uuids:
         return jsonify({"recommendations": []}), 200
-
-    user_id = user.user_id
 
     try:
         # Load documents
@@ -353,14 +344,14 @@ def test_workflow_step() -> ResponseReturnValue:
     workflow_output = async_result.get(timeout=600)
     if workflow_output is None:
         return jsonify({"error": "Workflow execution failed"})
-    # output = workflow_output.get("output")
-    print(workflow_output)
+
+    debug(workflow_output)
 
     return {"output": workflow_output}
 
 
 # @MARK: ~~ Run integration
-@workflows.route("/workflow/run", methods=["GET", "POST"])
+@workflows.route("/run_integrated", methods=["POST"])
 def run_workflow_integrated() -> ResponseReturnValue:
     """Run the integrated workflow and return the result."""
     # **1. Authenticate User via API Key**
@@ -382,7 +373,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow = Workflow.objects(id=workflow_id).first()
     if not workflow:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     # **4. Handle File Uploads**
     uploaded_files = request.files.getlist("file")
@@ -422,12 +413,10 @@ def run_workflow_integrated() -> ResponseReturnValue:
             pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
             pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
             extension = "pdf"
-            file_path = pdf_path
         elif extension in ["xlsx", "xls"]:
             html_path = os.path.join(upload_dir, f"{uid}.html")
             save_excel_to_html(file_path, html_path)
             extension = "html"
-            file_path = html_path
 
         # **Create SmartDocument Object**
         document = SmartDocument(
@@ -444,7 +433,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     # **5. Prepare Workflow Execution**
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
-
+    workflow_result.save()
     # Since we can't look up attachments, we'll assume there are none or handle them accordingly
     attachments = []
     # If your workflow has predefined attachments, you might need to handle them differently
@@ -459,11 +448,17 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow_trigger_step_id = str(document_trigger_step.id)
 
+    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model = settings.base_model
+    if model_config:
+        model = model_config.name
+
     # **6. Execute the Workflow**
     workflow_output = execute_workflow_task.delay(
         workflow_result_id=str(workflow_result.id),
         workflow_id=str(workflow.id),
         workflow_trigger_step_id=workflow_trigger_step_id,
+        model=model,
     )
     workflow_output = workflow_output.get()
     output = workflow_output["output"]
@@ -485,7 +480,7 @@ def workflow_status() -> ResponseReturnValue:
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
 
     if not workflow_result:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
     final_output = None
     if workflow_result.final_output:
         final_output = workflow_result.final_output.get("output", None)
@@ -527,128 +522,6 @@ def workflow_status() -> ResponseReturnValue:
 #     emit("workflow_status", response)
 
 
-def convert_inline_markdown_to_tags(text):
-    """Converts inline Markdown to ReportLab's supported XML tags."""
-    text = re.sub(r"\*\*(.*?)\*\*", r"<b>\1</b>", text)
-    text = re.sub(r"__(.*?)__", r"<b>\1</b>", text)
-    text = re.sub(r"\*(.*?)\*", r"<i>\1</i>", text)
-    text = re.sub(r"_(.*?)_", r"<i>\1</i>", text)
-    text = re.sub(r"~~(.*?)~~", r"<strike>\1</strike>", text)
-    text = re.sub(r"`(.*?)`", r'<font face="Courier">\1</font>', text)
-    return text
-
-
-def sanitize_for_reportlab(html: str) -> str:
-    """
-    Convert <span style="color:…">…</span> into <font color="…">…</font>,
-    and drop any other <span> tags entirely.
-    """
-    soup = BeautifulSoup(html, "html.parser")
-    for span in soup.find_all("span"):
-        style = span.get("style", "")
-        # look for a color declaration
-        m = re.search(r"color\s*:\s*([^;]+)", style)
-        if m:
-            color = m.group(1).strip()
-            new_tag = soup.new_tag("font", color=color)
-            new_tag.string = span.get_text()
-            span.replace_with(new_tag)
-        else:
-            span.unwrap()
-    return str(soup)
-
-
-def generate_pdf_from_markdown(formatted_markdown: str):
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=letter,
-        rightMargin=72,
-        leftMargin=72,
-        topMargin=72,
-        bottomMargin=18,
-    )
-    styles = getSampleStyleSheet()
-    # … your style tweaks here …
-
-    story = []
-    lines = formatted_markdown.strip().split("\n")
-    in_ul = in_ol = False
-    list_items = []
-
-    for line in lines:
-        line = line.strip()
-        # detect list items
-        is_ul_item = line.startswith(("* ", "- "))
-        is_ol_item = re.match(r"^\d+\.\s", line)
-
-        # close lists when they end
-        if (in_ul and not is_ul_item) or (in_ol and not is_ol_item):
-            story.append(
-                ListFlowable(list_items, bulletType="bullet" if in_ul else "1")
-            )
-            story.append(Spacer(1, 0.1 * inch))
-            list_items = []
-            in_ul = in_ol = False
-
-        # headings
-        if line.startswith("# "):
-            raw = line[2:]
-            tag = "h1"
-        elif line.startswith("## "):
-            raw = line[3:]
-            tag = "h2"
-        elif line.startswith("### "):
-            raw = line[4:]
-            tag = "h3"
-        else:
-            raw = line
-            tag = None
-
-        if tag:
-            html = convert_inline_markdown_to_tags(raw)
-            clean = sanitize_for_reportlab(html)
-            story.append(Paragraph(clean, styles[tag]))
-            continue
-
-        # unordered list
-        if is_ul_item:
-            in_ul = True
-            html = convert_inline_markdown_to_tags(line[2:])
-            clean = sanitize_for_reportlab(html)
-            list_items.append(ListItem(Paragraph(clean, styles["Bullet"])))
-            continue
-
-        # ordered list
-        if is_ol_item:
-            in_ol = True
-            text = re.sub(r"^\d+\.\s", "", line)
-            html = convert_inline_markdown_to_tags(text)
-            clean = sanitize_for_reportlab(html)
-            list_items.append(ListItem(Paragraph(clean, styles["Bullet"])))
-            continue
-
-        # normal paragraph
-        if line:
-            html = convert_inline_markdown_to_tags(line)
-            clean = sanitize_for_reportlab(html)
-            story.append(Paragraph(clean, styles["Normal"]))
-            story.append(Spacer(1, 0.1 * inch))
-
-    # if the file ended with a list still open
-    if in_ul or in_ol:
-        story.append(ListFlowable(list_items, bulletType="bullet" if in_ul else "1"))
-
-    doc.build(story)
-    buf.seek(0)
-    return send_file(
-        buf,
-        mimetype="application/pdf",
-        as_attachment=True,
-        download_name="workflow_output.pdf",
-    )
-
-
 ## @MARK: Download
 @login_required
 @workflows.route("/download", methods=["GET"])
@@ -662,7 +535,7 @@ def workflow_download() -> ResponseReturnValue:
     # 1) fetch the result object
     workflow_result = WorkflowResult.objects(session_id=session_id).first()
     if not workflow_result:
-        return jsonify({"error": "Workflow not found"}), 404
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
     # 2) pull the final output payload
     final_output = list(workflow_result.steps_output.values())[-1]["output"]
@@ -710,7 +583,7 @@ def workflow_download() -> ResponseReturnValue:
 
     # 4) package it up
     buf = io.BytesIO()
-    print(f"Format is {fmt}")
+    debug(f"Format is {fmt}")
     if fmt == "csv":
         buf.write(formatted.encode("utf-8"))
         buf.seek(0)
@@ -720,9 +593,14 @@ def workflow_download() -> ResponseReturnValue:
             as_attachment=True,
             download_name="workflow_output.csv",
         )
-
     elif fmt == "pdf":
-        return generate_pdf_from_markdown(formatted)
+        buf = generate_pdf_from_html(formatted)
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name="workflow_output.pdf",
+        )
 
     else:  # txt
         buf.write(formatted.encode("utf-8"))
@@ -1028,20 +906,15 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
         data = request.get_json()
         debug(data)
-        workflow_id = data["workflow_uuid"]
         search_set_id = data.get("search_set_id", None)
         manual_input = data.get("manual_input", None)
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
 
         if search_set_id:
             searchset = SearchSet.objects(id=ObjectId(search_set_id)).first()
-
-            # if not searchset:
-            #     return jsonify({"error": "Search set not found"})
 
             workflow_step_task = None
             if task_id is not None and task_id != 0:
@@ -1134,7 +1007,6 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
-        workflow_step_id = data.get("workflow_step_id")
         space_id = data.get("space_id")
 
         is_editing = data.get("is_editing") or False
@@ -1149,7 +1021,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
             workflow_task = WorkflowStepTask.objects(id=workflow_task_id).first()
 
         prompts = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=current_user.user_id,
             space_id=current_space.uuid,
             searchtype="prompt",
         ).all()
@@ -1168,12 +1040,10 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
     if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
         data = request.get_json()
-        workflow_id = data["workflow_uuid"]
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         if search_set_item_id:
@@ -1237,7 +1107,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         current_space = Space.objects(uuid=space_id).first()
         formatters = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=current_user.user_id,
             space_id=current_space.uuid,
             searchtype="formatter",
         ).all()
@@ -1259,10 +1129,8 @@ def workflow_add_format_step() -> ResponseReturnValue:
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
 
-        workflow_id = data["workflow_uuid"]
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
-        workflow = Workflow.objects(id=workflow_id).first()
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
 
         workflow_step_task = None
@@ -1347,9 +1215,6 @@ def workflow_add_document_step() -> ResponseReturnValue:
 
     if request.method == "POST":
         # Handle POST request - create a new WorkflowStep
-        data = request.get_json()
-        workflow_id = data["workflow_uuid"]
-        workflow = Workflow.objects(id=workflow_id).first()
 
         return jsonify({"response": "Placeholder"})
     return None
@@ -1396,7 +1261,8 @@ def duplicate_workflow(workflow_id):
         steps=new_steps,
         attachments=new_atts,
         # created_at and updated_at default to now()
-    ).save()
+    )
+    dup_wf.save()
 
     flash("Workflow duplicated into your space!", "success")
     return redirect(url_for("home.index", sesction="Workflows"))

@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import asyncio
 import graphlib
 import json
 import multiprocessing
@@ -112,12 +111,12 @@ def llm_chat_model(model, prompt, data=None, docs=None):
     debug(model)
     if len(docs) == 0:
         full_text = json.dumps(data)
-        output_prompt = f"""Following the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot.\n\nInstruction: {prompt}\n\n {full_text}"""
+        output_prompt = f"""Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot. Only show the markdown output and add no text before it.\n\nInstruction: {prompt}\n\n {full_text}"""
         chat_agent = create_chat_agent(model)
         result = chat_agent.run_sync(output_prompt)
         output = result.output
         debug(f"Output from chat agent: {output}")
-        output = format_llm_output(output).strip()
+        # output = format_llm_output(output).strip()
 
     else:
         output = open_ai_interface.ask_question_to_documents(
@@ -128,7 +127,7 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         )
         output = output.get("answer", "")
         debug(f"Output from chat agent: {output}")
-        output = format_llm_output(output)
+        # output = format_llm_output(output)
         debug(output)
     return output
 
@@ -444,7 +443,7 @@ class WorkflowEngine:
             else:
                 debug(node)
                 debug(latest_output)
-                output = node.process(latest_output)
+                # output = node.process(latest_output)
                 for task in node.tasks:
                     process_node = None
 
@@ -558,8 +557,7 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
             nodes.append(node)
             debug(step.tasks)
 
-        if node is not None:
-            engine.add_node(node)
+        engine.add_node(node)
 
     debug(nodes)
     # connect the steps
@@ -597,11 +595,14 @@ class WorkflowManager:
             )
 
 
-@celery_app.task(bind=True, name="tasks.workflow.execution",
-                 autoretry_for=(Exception,),
-                 rate_limit="1/s",
-                 max_retries=3, default_retry_delay=5
-                 )
+@celery_app.task(
+    bind=True,
+    name="tasks.workflow.execution",
+    autoretry_for=(Exception,),
+    rate_limit="1/s",
+    max_retries=3,
+    default_retry_delay=5,
+)
 def execute_workflow_task(
     self, workflow_result_id, workflow_id, workflow_trigger_step_id, model
 ):

@@ -1,6 +1,5 @@
 """Utilities for agents."""
 
-import asyncio
 import json
 import os
 from dataclasses import dataclass
@@ -10,7 +9,7 @@ from devtools import debug
 from dotenv import load_dotenv
 from langchain_redis import RedisCache
 from pydantic import BaseModel, create_model
-from pydantic_ai import ModelRetry, RunContext
+from pydantic_ai import RunContext
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.profiles import ModelProfile
@@ -115,6 +114,7 @@ def create_chat_agent(agent_model, system_prompt=None):
             model,
             system_prompt=system_prompt,
         )
+    print(model)
     return Agent(
         model,
         system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
@@ -188,8 +188,6 @@ upload_agent = create_upload_agent(settings.base_model)
 rag_agent = create_rag_agent(settings.base_model)
 
 prompt_agent = create_prompt_agent(settings.base_model)
-
-# TODO maybe add an indicator to the UI to show that the response was drawn from the vector store or not
 
 
 @rag_agent.tool
@@ -271,7 +269,6 @@ field_inference_agent = Agent(
     model,
     retries=3,
     deps_type=FieldInferenceDeps,
-    # output_type=dict[str, str],
     system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
 )
 
@@ -352,18 +349,11 @@ def get_cache_key(key: str, context: str) -> str:
     return f"field_type:{key}:{context}"
 
 
-
 @dataclass
 class ExtractionDeps:
     extraction_context: Optional[str]
     fields: dict[str, tuple]
     text: str
-
-
-# model = OpenAIModel(
-#     model_name="deepseek-r1:70b",
-#     base_url="https://mindrouter-api.nkn.uidaho.edu",
-# )
 
 
 def create_extraction_agent(agent_model):
@@ -521,26 +511,19 @@ def extract_entities_with_agent(
                     inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
 
     debug(inferred_fields)
-    # DynamicModel = create_model(
-    #     "DynamicEntity",
-    #     **{field_name: field_spec for field_name, field_spec in fields.items()},
-    # )
-    # ExtractionModel = create_model(
-    #     "ExtractionModel", entities=(List[DynamicModel], ...)
-    # )
-    #
+
     # Proceed with entity extraction
-    DynamicModel = create_model("DynamicEntity", **inferred_fields)
-    ExtractionModel = create_model(
+    dynamic_model = create_model("DynamicEntity", **inferred_fields)
+    extraction_model = create_model(
         "ExtractionModel",
-        entities=(list[DynamicModel], ...),
+        entities=(list[dynamic_model], ...),
     )
 
     model = get_agent_model(model_name)
     extractor_agent = Agent(
         model,
         deps_type=ExtractionDeps,
-        output_type=ExtractionModel,
+        output_type=extraction_model,
         output_retries=3,
         retries=3,
     )

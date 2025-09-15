@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+{% block title %}Admin | Usage Dashboard{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin: 15px 15px 0;
+    }
+
+    .kpi-card {
+        background: #111;
+        color: #fff;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .2);
+    }
+
+    .kpi-label {
+        font-size: 12px;
+        opacity: .7;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+
+    .kpi-value {
+        font-size: 24px;
+        font-weight: 800;
+    }
+
+    .panel {
+        background: #191919;
+        color: #e9e9e9;
+        border-radius: 12px;
+        margin: 15px;
+        padding: 16px;
+    }
+
+    .panel h3 {
+        margin: 0 0 10px 0;
+        font-size: 18px;
+    }
+
+    .twocol {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .styled-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .styled-table th,
+    .styled-table td {
+        padding: 10px;
+        border-bottom: 1px solid #2a2a2a;
+    }
+
+    .styled-table th {
+        text-align: left;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        opacity: .8;
+    }
+
+    .filters {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 15px;
+    }
+
+    .filters input,
+    .filters select {
+        background: #111;
+        color: #fff;
+        border: 1px solid #2a2a2a;
+        border-radius: 8px;
+        padding: 8px 10px;
+    }
+
+    .filters button {
+        border-radius: 8px;
+        padding: 8px 12px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 11px;
+        background: #2a2a2a;
+    }
+
+    .badge.ok {
+        background: #204b2a;
+    }
+
+    .badge.warn {
+        background: #4b3a20;
+    }
+
+    .badge.err {
+        background: #4b2020;
+    }
+
+    @media (max-width:1200px) {
+        .kpi-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .twocol {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="filters">
+    <form method="get" action="{{ url_for('admin.usage_dashboard') }}">
+        <label>Start:
+            <input type="date" name="start" value="{{ start.strftime('%Y-%m-%d') }}">
+        </label>
+        <label>End:
+            <input type="date" name="end" value="{{ end.strftime('%Y-%m-%d') }}">
+        </label>
+        <label>User:
+            <select name="user_id">
+                <option value="">All</option>
+                {% for u in all_users %}
+                <option value="{{ u.user_id }}" {% if user_id==u.user_id %}selected{% endif %}>{{ u.user_id }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>Space:
+            <select name="space_id">
+                <option value="">All</option>
+                {% for s in all_spaces %}
+                <option value="{{ s.uuid }}" {% if space_id==s.uuid %}selected{% endif %}>{{ s.title }} ({{ s.uuid }})
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Apply</button>
+    </form>
+</div>
+
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-label">Total Users</div>
+        <div class="kpi-value">{{ kpi.total_users }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Spaces</div>
+        <div class="kpi-value">{{ kpi.total_spaces }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Documents</div>
+        <div class="kpi-value">{{ kpi.total_documents }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Workflows</div>
+        <div class="kpi-value">{{ kpi.total_workflows }}</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-label">Total Results</div>
+        <div class="kpi-value">{{ kpi.total_results }}</div>
+    </div>
+</div>
+
+<div class="panel">
+    <h3>In-Range Summary ({{ start.strftime('%Y-%m-%d') }} → {{ end.strftime('%Y-%m-%d') }})</h3>
+    <div class="twocol">
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Documents</td>
+                    <td>{{ in_range.docs_count }}</td>
+                </tr>
+                <tr>
+                    <td>Processing</td>
+                    <td><span class="badge warn">{{ in_range.docs_processing }}</span></td>
+                </tr>
+                <tr>
+                    <td>Validating</td>
+                    <td><span class="badge warn">{{ in_range.docs_validating }}</span></td>
+                </tr>
+                <tr>
+                    <td>Invalid</td>
+                    <td><span class="badge err">{{ in_range.docs_invalid }}</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <table class="styled-table">
+            <thead>
+                <tr>
+                    <th>Metric</th>
+                    <th>Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Workflows Created</td>
+                    <td>{{ in_range.workflows_count }}</td>
+                </tr>
+                <tr>
+                    <td>Workflow Results</td>
+                    <td>{{ in_range.workflow_results_count }}</td>
+                </tr>
+                <tr>
+                    <td>Feedback</td>
+                    <td>{{ in_range.feedback_count }}</td>
+                </tr>
+                <tr>
+                    <td>Feedback (+)</td>
+                    <td><span class="badge ok">{{ in_range.feedback_positive }}</span></td>
+                </tr>
+                <tr>
+                    <td>Feedback (-)</td>
+                    <td><span class="badge err">{{ in_range.feedback_negative }}</span></td>
+                </tr>
+                <tr>
+                    <td>Search Sets</td>
+                    <td>{{ in_range.search_sets_count }}</td>
+                </tr>
+                <tr>
+                    <td>Search Items</td>
+                    <td>{{ in_range.search_items_count }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="panel">
+    <h3>Workflow Result Status</h3>
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Status</th>
+                <th>Count</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in results_by_status %}
+            <tr>
+                <td>{{ row._id if row._id else 'unknown' }}</td>
+                <td>{{ row.count }}</td>
+            </tr>
+            {% endfor %}
+            {% if results_by_status|length == 0 %}
+            <tr>
+                <td colspan="2"><i>No results in range.</i></td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="panel">
+    <h3>Top Uploaders (Users) — In Range</h3>
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>Documents</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in top_users %}
+            <tr>
+                <td>{{ u._id }}</td>
+                <td>{{ u.count }}</td>
+            </tr>
+            {% endfor %}
+            {% if top_users|length == 0 %}
+            <tr>
+                <td colspan="2"><i>No uploads in range.</i></td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="panel">
+    <h3>Top Spaces — In Range</h3>
+    <table class="styled-table">
+        <thead>
+            <tr>
+                <th>Space</th>
+                <th>Documents</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in top_spaces %}
+            <tr>
+                <td>{{ s._id }}</td>
+                <td>{{ s.count }}</td>
+            </tr>
+            {% endfor %}
+            {% if top_spaces|length == 0 %}
+            <tr>
+                <td colspan="2"><i>No uploads in range.</i></td>
+            </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<div class="panel">
+    <h3>Recent Activity</h3>
+    <div class="twocol">
+        <div>
+            <h4 style="margin-top:0;">Documents (latest 25)</h4>
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Title</th>
+                        <th>User</th>
+                        <th>Space</th>
+                        <th>Valid</th>
+                        <th>Processing</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in recent_docs %}
+                    <tr>
+                        <td>{{ d.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ d.title }}</td>
+                        <td>{{ d.user_id }}</td>
+                        <td>{{ d.space }}</td>
+                        <td>{{ '✓' if d.valid else '✗' }}</td>
+                        <td>{{ '⏳' if d.processing else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if recent_docs|length == 0 %}
+                    <tr>
+                        <td colspan="6"><i>No documents in range.</i></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+
+        <div>
+            <h4 style="margin-top:0;">Workflow Results (latest 25)</h4>
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>Workflow</th>
+                        <th>Status</th>
+                        <th>Steps</th>
+                        <th>Session</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in recent_results %}
+                    <tr>
+                        <td>{{ r.start_time.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ r.workflow.name if r.workflow else '(deleted)' }}</td>
+                        <td>{{ r.status }}</td>
+                        <td>{{ r.num_steps_completed }}/{{ r.num_steps_total }}</td>
+                        <td>{{ r.session_id }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if recent_results|length == 0 %}
+                    <tr>
+                        <td colspan="5"><i>No results in range.</i></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <h4>Feedback (latest 25)</h4>
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>When</th>
+                        <th>User</th>
+                        <th>Type</th>
+                        <th>Excerpt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for f in recent_feedback %}
+                    <tr>
+                        <td>{{ f.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ f.user_id }}</td>
+                        <td>
+                            {% if f.feedback == 'positive' %}
+                            <span class="badge ok">positive</span>
+                            {% elif f.feedback == 'negative' %}
+                            <span class="badge err">negative</span>
+                            {% else %}
+                            <span class="badge">{{ f.feedback }}</span>
+                            {% endif %}
+                        </td>
+                        <td title="{{ f.comment or '' }}">{{ (f.comment or '')[:80] }}{% if (f.comment or '')|length >
+                            80 %}…{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if recent_feedback|length == 0 %}
+                    <tr>
+                        <td colspan="4"><i>No feedback in range.</i></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

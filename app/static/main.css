@@ -25,9 +25,6 @@
     width: 40%;
     height: 100%;
     float: left;
-}
-
-.main-panel .header .header-right {
     list-style: none;
     padding: 30px;
     padding-top: 0px;
@@ -193,4 +190,23 @@
 /* remove default arrow in IE */
 select::-ms-expand {
     display:none;
+}
+
+
+#document {
+display: flex;
+flex-direction: column;
+align-items: center;   /* center all pages horizontally */
+}
+.pdf-page {
+position: relative;
+margin: 16px 0;        /* consistent gap between pages */
+}
+.pdf-canvas {
+display: block;
+}
+.overlay-layer {
+position: absolute;
+left: 0; top: 0;
+pointer-events: none;  /* highlights won’t block selection/scroll */
 }
