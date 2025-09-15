@@ -30,7 +30,6 @@ from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
-from app.utils import load_user
 
 tasks = Blueprint("tasks", __name__)
 
@@ -224,7 +223,6 @@ def edit_prompt() -> ResponseReturnValue:
     """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
-    load_user()
     prompt = SearchSetItem.objects(id=uuid).first()
 
     template = render_template(
@@ -245,7 +243,6 @@ def update_prompt() -> ResponseReturnValue:
     uuid = data["uuid"]
     title = data["title"]
     prompt = data["prompt"]
-    load_user()
     prompt_item = SearchSetItem.objects(id=uuid).first()
 
     prompt_item.title = title
@@ -384,7 +381,6 @@ def begin_search() -> ResponseReturnValue:
 
     documents = []
     document_paths = []
-    load_user()
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
@@ -504,7 +500,6 @@ def build_extraction_from_document() -> ResponseReturnValue:
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
-    load_user()
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 

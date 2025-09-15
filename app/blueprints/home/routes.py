@@ -2,7 +2,6 @@
 
 import asyncio
 import io
-import json
 import uuid
 from itertools import chain
 from typing import Dict, List, Optional
@@ -18,6 +17,7 @@ from flask import (
     send_from_directory,
     session,
     stream_with_context,
+    url_for,
 )
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
@@ -49,30 +49,30 @@ from app.utilities.openai_interface import OpenAIInterface
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
-from app.utils import load_user
 
 home = Blueprint("home", __name__)
 
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 
+@login_required
 @app.context_processor
 def inject_current_model():
     """
     Runs on *every* template render.  Looks up the user's ModelConfig,
     and makes `current_model` available in all templates.
     """
-    user = load_user()
-    if user:
-        model_config = UserModelConfig.objects(user_id=user.user_id).first()
-        models = [m.model_dump() for m in settings.models]
-        current_model = settings.base_model
-        if model_config:
-            current_model = model_config.name
-            if len(model_config.available_models) > 0:
-                models = json.loads(json.dumps(model_config.available_models))
+    # user = current_user
+    # if user:
+    #     model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    #     models = [m.model_dump() for m in settings.models]
+    #     current_model = settings.base_model
+    #     if model_config:
+    #         current_model = model_config.name
+    #         if len(model_config.available_models) > 0:
+    #             models = json.loads(json.dumps(model_config.available_models))
 
-        return {"current_model": current_model, "models": models}
+    #     return {"current_model": current_model, "models": models}
 
     return {"current_model": "", "models": []}
 
@@ -359,7 +359,7 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user = load_user()
+    user = current_user
     user_id = user.user_id
     debug(document_uuids)
     # migrate to new document user's location
@@ -432,7 +432,7 @@ def chat_download() -> ResponseReturnValue:
             f"{final_output}"
         )
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config:
         model = model_config.name
