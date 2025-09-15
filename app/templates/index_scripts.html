@@ -244,30 +244,22 @@
                 $('#recommendation-task-card').on('click', function (e) {
                     e.preventDefault();
                     $("#tasks-panel").show();
-                    setSection("Tasks");
                 });
 
                 $('#recommendation-create-workflow-card').on('click', function (e) {
                     e.preventDefault();
-                    setSection("Workflows");
                     location.reload();
 
                 });
 
                 $('.workflow-recommendation-item').off("click").on("click", function () {
                     let uuid = $(this).attr("data-uuid");
-
-                    console.log("here1")
-                    console.log(document_uuids);
-                    setSection("Workflows");
                     fetchWorkflow(uuid);
                 });
 
                 $('.extraction-recommendation-item').off("click").on("click", function () {
                     let uuid = $(this).attr("data-uuid");
                     console.log(uuid);
-                    // $("#tasks-panel").show();
-                    // setSection("Tasks");
                     search_set_add_uuid = uuid;
                     updateSearchSetPanel(uuid);
                     performExtraction(uuid);
@@ -959,7 +951,6 @@
         $('.tasks-btn').on('click', function (e) {
             e.preventDefault();
             $("#tasks-panel").show();
-            setSection("Tasks");
         });
 
         $('.tasks-close-button').off('click').on('click', function (e) {
@@ -1972,6 +1963,8 @@
 
     $(".add-new_workflow-button").on("click", function () {
         $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
 
         $("#newWorkflowBtn")
             .off("click")
@@ -2007,6 +2000,7 @@
     $(".add-formatter-task-btn")
         .off("click")
         .on("click", function () {
+            console.log("here");
             newTaskType = "formatter";
             $("#newTaskModal").show();
             $("#add-task-container").hide();
@@ -2118,6 +2112,7 @@
     $(".prompt-item").on("click", function () {
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
+        setSection("Assistant");
 
         if (document_uuids != "") {
             $("#tasks-panel").hide();
@@ -2799,7 +2794,6 @@
     // Click handler for the tasks link
     $("#tasks-link").on("click", function (e) {
         e.preventDefault();
-        setSection("Tasks");
         $("#tasks-panel").show();
     });
 

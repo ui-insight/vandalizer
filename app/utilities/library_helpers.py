@@ -60,6 +60,12 @@ def _mk_library_item(obj, added_by_user_id: str) -> LibraryItem:
     elif obj.__class__.__name__ == "SearchSet":
         kind = "searchset"
         verified = bool(getattr(obj, "verified", False))
+    elif obj.__class__.__name__ == "SearchSetItem" and obj.searchtype == "prompt":
+        kind = "prompt"
+        verified = False
+    elif obj.__class__.__name__ == "SearchSetItem" and obj.searchtype == "formatter":
+        kind = "formatter"
+        verified = False
     else:
         raise ValueError(f"Unsupported library object type: {from_path}")
 
@@ -68,7 +74,7 @@ def _mk_library_item(obj, added_by_user_id: str) -> LibraryItem:
         kind=kind,
         added_by_user_id=added_by_user_id,
         verified=verified,
-        verified_at=datetime.datetime.now() if verified else None,
+        verified_at=datetime.now() if verified else None,
         verified_by_user_id=None,
     ).save()
     return li
@@ -82,7 +88,7 @@ def add_object_to_library(obj, library: Library, added_by_user_id: str) -> Libra
 
     li = _mk_library_item(obj, added_by_user_id)
     library.items.append(li)
-    library.updated_at = datetime.datetime.now()
+    library.updated_at = datetime.now()
     library.save()
     return li
 
@@ -113,7 +119,7 @@ def promote_personal_item_to_team(user_id: str, team: Team, obj):
 
 
 def sync_verification_flags_for_object(obj, verified_by_user_id: str | None = None):
-    now = datetime.datetime.now()
+    now = datetime.now()
     is_verified = bool(getattr(obj, "verified", False))
     for li in LibraryItem.objects(obj=obj):
         li.verified = is_verified

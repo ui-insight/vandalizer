@@ -7,6 +7,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List
 
+from bson import ObjectId
 from devtools import debug
 from flask import (
     Blueprint,
@@ -28,6 +29,10 @@ from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+    add_object_to_library,
+)
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -118,7 +123,7 @@ def add_search_set() -> ResponseReturnValue:
     """Add a new search set."""
     user = load_user()
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     data = request.get_json()
     debug(data)
@@ -211,6 +216,10 @@ def add_prompt() -> ResponseReturnValue:
     )
 
     searchsetitem.save()
+
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(searchsetitem, library=library, added_by_user_id=user.user_id)
+
     response = {"complete": True}
     return jsonify(response)
 
@@ -221,7 +230,7 @@ def edit_prompt() -> ResponseReturnValue:
     data = request.get_json()
     uuid = data["uuid"]
     load_user()
-    prompt = SearchSetItem.objects(id=uuid).first()
+    prompt = SearchSetItem.objects(id=ObjectId(uuid)).first()
 
     template = render_template(
         "toolpanel/prompts/edit_prompt.html",
@@ -322,7 +331,7 @@ def update_extraction_title() -> ResponseReturnValue:
     """Update the title of an extraction step."""
     user = load_user()
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     extraction_data = request.get_json()
     extraction_uuid = extraction_data["extraction_uuid"]
     extraction_step = SearchSet.objects(uuid=extraction_uuid).first()

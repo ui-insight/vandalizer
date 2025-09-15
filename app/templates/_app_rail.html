@@ -67,3 +67,94 @@
         </ul>
     </div>
 </div>
+
+<!-- Your existing rail markup goes here (as in your question) -->
+
+<script>
+    // Injected from server
+    const activity_items = {{ activities | tojson | safe }};
+
+    // Icon map by type
+    const TYPE_ICON = {
+        conversation: { cls: "fa-comments", title: "Chat" },
+        search_set_run: { cls: "fa-list-check", title: "Task" },
+        workflow_run: { cls: "fa-diagram-project", title: "Workflow" },
+    };
+
+    // Right-side status icon (only show on interesting states)
+    const STATUS_ICON = {
+        queued: { cls: "fa-clock", label: "Queued" },
+        running: { cls: "fa-gear fa-spin", label: "Running" },
+        failed: { cls: "fa-triangle-exclamation", label: "Failed" },
+        canceled: { cls: "fa-circle-minus", label: "Canceled" },
+        completed: { cls: "fa-circle-check", label: "Completed" },
+    };
+
+    function safeTitle(a) {
+        return a.title && a.title.trim().length ? a.title : (TYPE_ICON[a.type]?.title ?? "Activity");
+    }
+
+    function liForActivity(a) {
+        const isRunning = a.status === "running" || a.status === "queued";
+        const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
+        const status = STATUS_ICON[a.status];
+
+        // Title tooltip can include error on failure
+        const tooltip = a.status === "failed" && a.error
+            ? `${safeTitle(a)} — Error: ${a.error}`
+            : safeTitle(a);
+
+        // Build left and (optional) right content
+        const right = status && (a.status === "running" || a.status === "failed")
+            ? `<span class="run-right"><i class="fa-solid ${status.cls} run-state-icon" aria-label="${status.label}"></i></span>`
+            : "";
+
+        const li = document.createElement("li");
+        li.className = `run-item${isRunning ? " is-running" : ""}`;
+        li.dataset.runId = a.id;
+        li.onclick = () => openRun(a.id, a);
+
+        li.innerHTML = `
+      <span class="run-left">
+        <i class="fa-solid ${typeIcon} run-type-icon" title="${TYPE_ICON[a.type]?.title || "Activity"}"></i>
+        <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
+      </span>
+      ${right}
+    `;
+        return li;
+    }
+
+    function renderActivities(list) {
+        const ul = document.getElementById("run-list");
+        if (!ul) return;
+
+        // Keep first two items (your "New chat" and spacer) and clear the rest
+        const keep = 2;
+        while (ul.children.length > keep) ul.removeChild(ul.lastElementChild);
+
+        list.forEach(a => ul.appendChild(liForActivity(a)));
+    }
+
+    // Simple handler you can expand to route appropriately
+    function openRun(id, a) {
+        if (!a) return;
+        // Route by type — adjust to your app’s real URLs
+        if (a.type === "conversation" && a.conversation_id) {
+            window.location.href = `/conversations/${encodeURIComponent(a.conversation_id)}`;
+        } else if (a.type === "workflow_run" && a.workflow_id) {
+            window.location.href = `/workflows/${encodeURIComponent(a.workflow_id)}/runs/${encodeURIComponent(id)}`;
+        } else if (a.type === "search_set_run" && a.search_set_uuid) {
+            window.location.href = `/search-sets/${encodeURIComponent(a.search_set_uuid)}/runs/${encodeURIComponent(id)}`;
+        } else {
+            // Fallback: open a generic run inspector
+            window.location.href = `/runs/${encodeURIComponent(id)}`;
+        }
+    }
+
+    console.log("rendering activities");
+    console.log(activity_items);
+    // Initial render
+    renderActivities(activity_items);
+
+    // (Optional) If you add SSE/WebSocket updates later, call renderActivities() again with new data.
+</script>

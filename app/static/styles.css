@@ -1454,3 +1454,32 @@ think:hover > * {
   background: none;
   border: none;
 }
+
+
+.vandalizer-checkbox {
+  appearance: none; /* Remove default OS checkbox */
+  -webkit-appearance: none; /* For Safari */
+  -moz-appearance: none;
+
+  width: 15px;
+  height: 15px;
+  border: 2px solid #888;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.vandalizer-checkbox:checked {
+  background-color: #ffffff; /* green when checked */
+  border-color: #c6c6c6;
+  color: black;
+}
+
+.vandalizer-checkbox:checked::after {
+  content: "✓";
+  color: rgb(0, 0, 0);
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 12px;
+}

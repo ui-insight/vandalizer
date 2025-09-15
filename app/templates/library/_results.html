@@ -19,6 +19,14 @@
     <div style="display:flex; align-items:flex-start;">
         <span style="margin-right:10px; font-size:14px;"><i class="fa-solid fa-diagram-project"></i></span>
         <div style="flex:1;">
+            <div style="float:right;">
+
+                <button type="submit" class="btn btn-secondary edit-workflow-button" data-uuid="{{ workflow.id }}"
+                    style="margin-left:10px"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+                <button type="submit" class="btn btn-secondary edit-workflow-button" data-uuid="{{ workflow.id }}"
+                    style="margin-left:10px"><i class="fa-regular fa-pen-to-square"></i></button>
+
+            </div>
             <div class="title"><b>{{ workflow.name }}</b></div>
             {% if workflow.description %}
             <div class="meta">{{ workflow.description }}</div>
@@ -28,11 +36,6 @@
                 {% if scope=='team' %}<span class="library-badge">Team</span>{% endif %}
                 {% if scope=='mine' %}<span class="library-badge">Mine</span>{% endif %}
             </div>
-        </div>
-        <div>
-            <a class="edit-workflow-button" style="color:#adadad99;" data-uuid="{{ workflow.id }}">
-                <i class="fa-regular fa-pen-to-square"></i>
-            </a>
         </div>
     </div>
 </div>
@@ -52,13 +55,31 @@
     <div style="display:flex; align-items:center;">
         <span style="margin-right:10px;"><i class="fa-solid fa-filter"></i></span>
         <div style="flex:1;">
+            <div style="float:right;">
+
+                <button type="submit" class="btn btn-secondary edit-extraction-button" data-uuid=""
+                    style="margin-left:10px"><i class="fa-solid fa-arrow-up-from-bracket"></i></button>
+                <button type="submit" class="btn btn-secondary edit-extraction-button" data-uuid=""
+                    style="margin-left:10px"><i class="fa-regular fa-pen-to-square"></i></button>
+            </div>
             <div class="title">
                 {% if s.is_global %}<i class="fa-solid fa-globe" style="margin-right:4px;"></i>{% endif %}
                 {{ s.title }}
             </div>
             <div class="meta">
-                {% if s.item_count() == 0 %}<i style="color:#00000077;">setup</i>{% else %}{{ s.item_count() }} items{%
-                endif %}
+                <span style="padding-top: 5px;">{% if s.item_count() == 0 %}
+                    <i style="color:#00000077; ">setup</i>{%
+                    else %}{{
+                    s.item_count() }} items{%
+                    endif %}
+                </span>
+                <div style="margin-top:8px;">
+                    {% if true %}<span class="library-badge">Verified</span>{% endif %}
+                    {% if scope=='team' %}<span class="library-badge">Team</span>{% endif %}
+                    {% if scope=='mine' %}<span class="library-badge">Mine</span>{% endif %}
+
+
+                </div>
             </div>
         </div>
     </div>
@@ -80,9 +101,8 @@
         <div style="flex:1;">
             <div class="title">{{ p.title }}</div>
         </div>
-        <a class="edit-prompt-button" style="color:#adadad99;" data-uuid="{{ p.id }}" data-type="prompt">
-            <i class="fa-regular fa-pen-to-square"></i>
-        </a>
+        <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ p.id }}" data-type="prompt"
+            style="margin-left:10px"> <i class="fa-regular fa-pen-to-square"></i></button>
     </div>
 </div>
 {% endfor %}
@@ -102,11 +122,86 @@
         <div style="flex:1;">
             <div class="title">{{ f.title }}</div>
         </div>
-        <a class="edit-prompt-button" style="color:#adadad99;" data-uuid="{{ f.id }}" data-type="formatter">
-            <i class="fa-regular fa-pen-to-square"></i>
-        </a>
+        <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ f.id }}" data-type="formatter"
+            style="margin-left:10px"> <i class="fa-regular fa-pen-to-square"></i></button>
     </div>
 </div>
 {% endfor %}
 {% endif %}
 {% endif %}
+
+
+<script>
+    $(".edit-workflow-button").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("here");
+        $("#add-task-container").hide();
+        let uuid = $(this).attr("data-uuid");
+        const data = JSON.stringify({
+            uuid: uuid,
+        });
+
+        $.ajax({
+            url: '/workflows/edit',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                console.log(data.template);
+                $("#search-results-panel").show();
+                $("#search-results-panel").empty();
+                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    });
+
+
+    $(".edit-prompt-button").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log("here");
+        $("#add-task-container").hide();
+        let uuid = $(this).attr("data-uuid");
+        const data = JSON.stringify({
+            uuid: uuid,
+        });
+
+        $.ajax({
+            url: '/tasks/edit_prompt',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                console.log(data.template);
+                $("#search-results-panel").show();
+                $("#search-results-panel").empty();
+                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    });
+
+    $(".edit-extraction-button").on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        let datatitle = $(this).attr("data-title");
+        search_set_add_uuid = uuid;
+        updateSearchSetPanel(uuid);
+    });
+
+
+
+</script>

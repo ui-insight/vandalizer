@@ -9,6 +9,7 @@ from app.models import (  # adjust import path if needed
     LibraryItem,
     LibraryScope,
     SearchSet,
+    SearchSetItem,
     Team,
     User,
     Workflow,
@@ -101,6 +102,7 @@ def _build_results_for_template(filters: dict) -> dict:
     # --- Separate polymorphic objects
     workflow_objs: list[Workflow] = []
     searchset_objs: list[SearchSet] = []
+    searchset_items_objs: list[SearchSetItem] = []
 
     for li in lib_items:
         # li.kind is "workflow" or "searchset"
@@ -108,6 +110,10 @@ def _build_results_for_template(filters: dict) -> dict:
             workflow_objs.append(li.obj)
         elif li.kind == "searchset" and li.obj and isinstance(li.obj, SearchSet):
             searchset_objs.append(li.obj)
+        elif li.kind == "prompt" and li.obj and isinstance(li.obj, SearchSetItem):
+            searchset_items_objs.append(li.obj)
+        elif li.kind == "formatter" and li.obj and isinstance(li.obj, SearchSetItem):
+            searchset_items_objs.append(li.obj)
 
     # --- Apply 'type' and 'kinds'
     # type: 'workflows' | 'tasks' | 'all'
@@ -132,6 +138,14 @@ def _build_results_for_template(filters: dict) -> dict:
             extraction_sets = [
                 s for s in searchset_objs if (s.set_type or "").lower() == "extraction"
             ]
+        prompts = [
+            s for s in searchset_items_objs if (s.searchtype or "").lower() == "prompt"
+        ]
+        formatters = [
+            s
+            for s in searchset_items_objs
+            if (s.searchtype or "").lower() == "formatter"
+        ]
 
     # --- Text search
     if query:
@@ -146,7 +160,10 @@ def _build_results_for_template(filters: dict) -> dict:
             extraction_sets = [
                 s for s in extraction_sets if query in (s.title or "").lower()
             ]
-        # prompts/formatters would be filtered similarly once implemented
+        if prompts:
+            prompts = [s for s in prompts if query in (s.title or "").lower()]
+        if formatters:
+            formatters = [s for s in formatters if query in (s.title or "").lower()]
 
     # --- Sort (optional niceties)
     workflows.sort(

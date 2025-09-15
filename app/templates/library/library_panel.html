@@ -15,7 +15,7 @@
                 style="font-size: 12px; font-weight: 400; color: #00000099; padding: 20px 20px 20px 20px; margin-bottom: 20px; border-bottom: 1px #ddd solid;">
                 Shared automations your team can reuse.</p>
 
-            <ul class="section-list">
+            <ul class="section-list" style="border-bottom: 1px #ddd solid; padding-bottom: 15px;">
                 {% set t = (filters.type if filters and filters.type else 'all') %}
                 <li class="section-item library-type-section {% if t=='all' %}active{% endif %}" data-type="all">All
                 </li>
@@ -25,32 +25,32 @@
                     Tasks</li>
             </ul>
 
-            <div id="task-kind-filter"
-                style="padding: 10px 15px 10px 15px; margin: 15px 15px 15px 15px; background-color: #dadada;">
+            <div id="task-kind-filter" style="padding: 10px 15px 10px 0px; margin: 15px 15px 15px 15px;">
                 <div style="font-size:15px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
                 {% set kinds = (filters.kinds if filters and filters.kinds else ['extract','prompt','format']) %}
                 <label
-                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox" type="checkbox" value="extract" {% if 'extract' in kinds %}checked{%
-                        endif %}>
+                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="extract" {% if 'extract' in
+                        kinds %}checked{% endif %}>
                     <span>Extract</span>
                 </label>
                 <label
-                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox" type="checkbox" value="prompt" {% if 'prompt' in kinds %}checked{%
-                        endif %}>
+                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="prompt" {% if 'prompt' in
+                        kinds %}checked{% endif %}>
                     <span>Prompt</span>
                 </label>
                 <label
-                    style="display:flex; align-items:center; gap:8px; margin:6px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox" type="checkbox" value="format" {% if 'format' in kinds %}checked{%
-                        endif %}>
+                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
+                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="format" {% if 'format' in
+                        kinds %}checked{% endif %}>
                     <span>Format</span>
                 </label>
             </div>
         </div>
 
-        <div style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px 30px;">
+        <div
+            style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px 0px 20px 30px;">
             <div id="library-scope-tabs" style="display:flex; gap:16px; margin-bottom: 20px;">
                 {% set _scope = scope or 'mine' %}
                 <a href="#" class="scope-tab {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
@@ -67,8 +67,8 @@
                 <div style="flex:1;"></div>
             </div>
 
-            <section id="library-results" style="flex-grow: 1; overflow-y: auto;">
-                {% include "library/_results.html" %}
+            <section id="library-results" style="flex-grow: 1; overflow-y: auto; padding-right: 30px;">
+                {{ initial_library_results | safe }}
             </section>
         </div>
     </div>
@@ -94,19 +94,78 @@
         };
     }
 
-    function updateURL() {
-        const params = new URLSearchParams();
-        params.set('scope', LibraryState.scope);
-        params.set('type', LibraryState.type);
-        if (LibraryState.kinds.length > 0) {
-            params.set('kinds', LibraryState.kinds.join(','));
-        }
-        if (LibraryState.q) {
-            params.set('q', LibraryState.q);
-        }
-        // Update URL without reloading the page
-        history.pushState(null, '', `?${params.toString()}`);
+    // Helper: set or delete a param (treat "", null, undefined as "delete")
+    function setParam(params, key, value, { treatAllAsEmpty = false } = {}) {
+        const empty =
+            value === undefined || value === null || String(value).trim() === "" ||
+            (treatAllAsEmpty && value === "all");
+        if (empty) params.delete(key);
+        else params.set(key, value);
     }
+
+    // Replace your existing updateURL() with this:
+    function updateURL({ mode = "replace" } = {}) {
+        const url = new URL(window.location.href);
+        const params = url.searchParams;
+
+        // Only touch the filters you own; everything else remains intact.
+        setParam(params, "scope", LibraryState.scope);
+        setParam(params, "type", LibraryState.type, { treatAllAsEmpty: true }); // drop ?type=all
+        setParam(
+            params,
+            "kinds",
+            (Array.isArray(LibraryState.kinds) && LibraryState.kinds.length)
+                ? LibraryState.kinds.join(",")
+                : ""
+        );
+        setParam(params, "q", LibraryState.q);
+
+        // Write back without disturbing path or hash.
+        const newPath = url.pathname + (params.toString() ? `?${params}` : "") + url.hash;
+
+        if (mode === "push") {
+            history.pushState(null, "", newPath);
+        } else {
+            history.replaceState(null, "", newPath);
+        }
+    }
+
+    // Optional (nice UX): use push on coarse changes, replace for typing
+    $(document).ready(function () {
+        $('.scope-tab').on('click', function (e) {
+            e.preventDefault();
+            $('.scope-tab').removeClass('active');
+            $(this).addClass('active');
+            LibraryState.scope = $(this).data('scope');
+            updateURL({ mode: "push" });
+            refreshResults();
+        });
+
+        $('.library-type-section').on('click', function (e) {
+            e.preventDefault();
+            $('.library-type-section').removeClass('active');
+            $(this).addClass('active');
+            LibraryState.type = $(this).data('type');
+            $("#task-kind-filter").css('opacity', LibraryState.type === 'workflows' ? .45 : 1);
+            updateURL({ mode: "push" });
+            refreshResults();
+        });
+
+        $("#task-kind-filter .kind-checkbox").on('change', function () {
+            const kinds = [];
+            $("#task-kind-filter .kind-checkbox:checked").each(function () { kinds.push($(this).val()); });
+            LibraryState.kinds = kinds;
+            updateURL({ mode: "push" });
+            refreshResults();
+        });
+
+        $("#library-search").on('input', debounce(function () {
+            LibraryState.q = $(this).val();
+            updateURL({ mode: "replace" }); // avoid flooding history while typing
+            refreshResults();
+        }, 300));
+    });
+
 
     function refreshResults() {
         updateURL(); // Update the URL every time filters change

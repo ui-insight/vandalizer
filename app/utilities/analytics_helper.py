@@ -14,10 +14,9 @@ def recent_activity_for_feed(
     user_id: str | None = None, team_id: str | None = None, limit: int = 100
 ):
     q = ActivityEvent.objects
+    print(f"Activites for {user_id} {team_id}")
     if user_id:
         q = q(user_id=user_id)
-    if team_id:
-        q = q(team_id=team_id)
     return q.order_by("-started_at").limit(limit)
 
 

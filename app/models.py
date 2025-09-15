@@ -507,7 +507,9 @@ class LibraryItem(me.Document):
     obj = me.GenericReferenceField(required=True)  # Workflow OR SearchSet
 
     # For quick filtering without dereferencing
-    kind = me.StringField(required=True, choices=["workflow", "searchset"])
+    kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
 
     added_by_user_id = me.StringField(required=True, max_length=200)
     added_at = me.DateTimeField(default=datetime.datetime.now)

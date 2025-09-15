@@ -27,6 +27,7 @@ from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
+from app.blueprints.library.routes import _build_results_for_template
 from app.models import (
     ActivityEvent,
     SearchSet,
@@ -199,10 +200,26 @@ def index() -> ResponseReturnValue:
     current_team, my_teams = _get_teams(user)
 
     # Activity
-    activities = _build_activities(user=user, team=current_team)
-    my_library = _get_or_create_personal_library(user_id=user.user_id)
+    activities_qs = _build_activities(user=user)
+    activities = [event_to_dict(a) for a in activities_qs]
+
+    import json
+
+    json.dumps(activities)
+    print(activities)
 
     # ensure_everyone_has_libraries_and_backfill()
+
+    # Library
+    my_library = _get_or_create_personal_library(user_id=user.user_id)
+    scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
+    item_type = request.args.get("type", "workflows")  # 'workflows' | 'tasks' | 'all'
+    kinds_str = request.args.get("kinds", "extract,prompt,format")
+    kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
+    query = request.args.get("q", "")
+
+    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
+    initial_library_results = _initial_library_results(request)
 
     return render_template(
         "index.html",
@@ -228,15 +245,45 @@ def index() -> ResponseReturnValue:
         current_release=CURRENT_RELEASE_VERSION,
         breadcrumbs=breadcrumbs,
         is_admin=user.is_admin,
-        activites=activities,
+        activities=activities,
         current_team=current_team,
         my_teams=my_teams,
-        activities=activities,
         my_library=my_library,
+        initial_library_results=initial_library_results,
+        filters=initial_filters,
     )
 
 
 # ---------------------------- helpers ----------------------------
+
+
+def event_to_dict(a: ActivityEvent) -> dict:
+    return {
+        "id": str(a.id),
+        "type": str(a.type),
+        "status": str(a.status),
+        "title": str(a.meta_summary.get("title") or "Activity"),
+        "conversation_id": str(a.conversation_id) if a.conversation_id else None,
+        "search_set_uuid": str(a.search_set_uuid) if a.search_set_uuid else None,
+        "workflow_id": str(a.workflow.id) if a.workflow else None,
+        "started_at": a.started_at.isoformat() if a.started_at else None,
+        "finished_at": a.finished_at.isoformat() if a.finished_at else None,
+        "error": str(a.error) if a.error else "",
+    }
+
+
+def _initial_library_results(request: Any) -> str:
+    scope = request.args.get("scope", "mine")  # 'team' | 'mine' | 'verified'
+    item_type = request.args.get("type", "all")  # 'workflows' | 'tasks' | 'all'
+    kinds_str = request.args.get("kinds", "extract,prompt,format")
+    kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
+    query = request.args.get("q", "")
+
+    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
+    ctx = _build_results_for_template(initial_filters)
+
+    # Render the partial once for first load so the panel is filled immediately
+    return render_template("library/_results.html", **ctx)
 
 
 def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
@@ -415,8 +462,8 @@ def _folder_context(user, current_space: Space):
     return current_folder_id, current_folder_parent_id, folder_docs, folders
 
 
-def _build_activities(user: User, team: Team) -> list[ActivityEvent]:
-    activities = recent_activity_for_feed(user_id=user.id, team_id=team.id)
+def _build_activities(user: User) -> list[ActivityEvent]:
+    activities = recent_activity_for_feed(user_id=user.user_id)
     return activities
 
 
