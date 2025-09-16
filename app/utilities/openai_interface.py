@@ -246,6 +246,21 @@ class OpenAIInterface:
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
 
+        conversation = ChatConversation.objects(
+            uuid=conversation_uuid,
+            user_id=user_id,
+        ).first()
+        if conversation:
+            # Include URL attachments in the context
+            url_context = ""
+            for url_attachment in conversation.url_attachments:
+                if url_attachment.content:
+                    url_context += f"\n\nWeb Content from {url_attachment.url}:\n{url_attachment.content[:10000]}\n"
+
+        # Add URL context to the prompt if it exists
+        if url_context:
+            prompt += f"\n\nAdditional context from web links:{url_context}"
+
         # fetcher = URLContentFetcher(max_content_length=30000)
         # result = fetcher.process_chat_input(question)
         # print(result)
@@ -317,10 +332,6 @@ class OpenAIInterface:
 
             if full_response:
                 assistant_message = ''.join(full_response)
-                conversation = ChatConversation.objects(
-                    uuid=conversation_uuid,
-                    user_id=user_id,
-                ).first()
                 conversation.add_message(ChatRole.ASSISTANT, assistant_message)
 
 

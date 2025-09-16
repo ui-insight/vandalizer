@@ -343,6 +343,7 @@ class UrlAttachment(me.Document):
     """Represents a URL attachment in a chat."""
     url = me.StringField(required=True, max_length=500)
     title = me.StringField(required=False, max_length=200)
+    content = me.StringField(required=False, max_length=50000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
 

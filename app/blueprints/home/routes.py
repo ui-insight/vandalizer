@@ -5,6 +5,7 @@ import io
 import json
 import uuid
 import logging
+from datetime import datetime
 
 from itertools import chain
 from typing import Dict, List, Optional
@@ -41,6 +42,7 @@ from app.models import (
     WorkflowStep,
     ChatConversation,
     ChatRole,
+    UrlAttachment,
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
@@ -57,6 +59,9 @@ from app.utilities.upload_manager import (
     perform_document_validation,
 )
 from app.utils import is_dev, load_user
+from app.utilities.web_utils import URLContentFetcher  # You already have this
+import requests
+from urllib.parse import urlparse
 
 home = Blueprint("home", __name__)
 
@@ -393,10 +398,12 @@ def chat() -> ResponseReturnValue:
 
     conversation = ChatConversation.objects(uuid=conversation_uuid, user_id=user_id).first()
     if conversation is None:
-        conversation = ChatConversation(user_id=user.user_id, uuid=uuid.uuid4().hex)
-        conversation.add_message(ChatRole.USER, message)
+        title = message.strip()
+        conversation = ChatConversation(user_id=user.user_id, title=title, uuid=str(uuid.uuid4()))
         conversation.generate_title()
         conversation.save()
+
+        conversation.add_message(ChatRole.USER, message)
     else:
         conversation.add_message(ChatRole.USER, message)
 
@@ -438,13 +445,110 @@ def chat() -> ResponseReturnValue:
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
 
-@app.route("/chat_history/<conversation_uuid>")
-def chat_history(conversation_uuid):
-    conversation = ChatConversation.objects(uuid=conversation_uuid).first()
-    if not conversation:
-        return jsonify({"messages": []}), 404
-    # Use the get_messages() method you defined!
-    return jsonify({"messages": conversation.get_messages()})
+@app.route("/chat/add_link", methods=["POST"])
+def add_link_to_chat():
+    """Add a URL attachment to a chat conversation."""
+    try:
+        data = request.get_json()
+        link = data.get("link")
+        conversation_uuid = data.get("conversation_uuid")
+
+        user = load_user()
+        user_id = user.user_id
+
+        # Validate URL
+        # if not link or not link.startswith(('http://', 'https://')):
+        #     return jsonify({"error": "Invalid URL"}), 400
+
+        # Get or create conversation
+        if conversation_uuid:
+            conversation = ChatConversation.objects(
+                uuid=conversation_uuid,
+                user_id=user_id
+            ).first()
+        else:
+            # Create new conversation if none exists
+            conversation = ChatConversation(
+                uuid=str(uuid.uuid4()),
+                user_id=user_id,
+                title="New Conversation"
+            )
+            conversation.save()
+
+        if not conversation:
+            return jsonify({"error": "Conversation not found"}), 404
+
+        debug(link)
+        debug(conversation)
+
+        # Fetch URL content
+        fetcher = URLContentFetcher(max_content_length=50000)
+        result = fetcher.fetch_url_content(link)
+
+        # Extract title from URL or content
+        title = urlparse(link).netloc
+        title = result.get("title", title)
+        content = result.get("content", "")
+
+        debug(content)
+        debug(title)
+
+        # Create URL attachment
+        url_attachment = UrlAttachment(
+            url=link,
+            title=title,
+            content=content,
+            user_id=user_id
+        )
+        url_attachment.save()
+
+        # Add to conversation
+        conversation.url_attachments.append(url_attachment)
+        conversation.updated_at = datetime.now()
+        conversation.save()
+
+        return jsonify({
+            "success": True,
+            "conversation_uuid": conversation.uuid,
+            "attachment_id": str(url_attachment.id),
+            "title": title,
+            "content_preview": content[:500] if content else ""
+        }), 200
+
+    except Exception as e:
+        logger.error(f"Error adding URL attachment: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/chat_history/<conversation_uuid>", methods=["GET"])
+def get_chat_history(conversation_uuid):
+    """Get chat conversation history."""
+    try:
+        user = load_user()
+        conversation = ChatConversation.objects(
+            uuid=conversation_uuid,
+            user_id=user.user_id
+        ).first()
+
+        if not conversation:
+            return jsonify({"messages": [], "url_attachments": []}), 404
+
+        # Include URL attachments if they exist
+        url_attachments = []
+        for attachment in conversation.url_attachments:
+            url_attachments.append({
+                "url": attachment.url,
+                "title": attachment.title,
+                "created_at": attachment.created_at.isoformat()
+            })
+
+        return jsonify({
+            "messages": conversation.get_messages(),
+            "url_attachments": url_attachments
+        })
+    except Exception as e:
+        logger.error(f"Error fetching chat history: {e}")
+        return jsonify({"error": "Failed to fetch conversation"}), 500
+
 
 @app.route("/chat_history/<conversation_uuid>", methods=["DELETE"])
 def delete_chat_history(conversation_uuid):
@@ -463,14 +567,31 @@ def delete_chat_history(conversation_uuid):
         if not conversation:
             return jsonify({"error": "Conversation not found"}), 404
 
-        # Delete all associated messages (they should cascade delete due to your model setup)
+        # Delete associated attachments first (if not cascade deleting)
+        # This depends on your model setup - if CASCADE is set, this happens automatically
+        for attachment in conversation.file_attachments:
+            attachment.delete()
+
+        for attachment in conversation.url_attachments:
+            attachment.delete()
+
+        # Delete all messages (they should cascade delete due to your model setup)
+        # But explicitly delete them to be safe
+        for message in conversation.messages:
+            message.delete()
+
+        # Delete the conversation itself
         conversation.delete()
 
-        return jsonify({"success": True, "message": "Conversation deleted"}), 200
+        return jsonify({
+            "success": True,
+            "message": "Conversation deleted successfully"
+        }), 200
 
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
-        return jsonify({"error": "Failed to delete conversation"}), 500
+        return jsonify({"error": f"Failed to delete conversation: {str(e)}"}), 500
+
 
 ## @MARK: Download
 @home.route("/chat/download", methods=["POST"])

@@ -137,51 +137,68 @@ function showChatInputModal() {
     $('#chat-input-modal').hide();
   });
 
- // click or keydown on submit button
-    $('#submitChatInputBtn').on('click keydown', function (e) {
+    // click or keydown on submit button
+    $('#submitChatInputBtn').on('click', function (e) {
+        const link = $('#chat-input-link').val().trim();
+        console.log("Submitting link: " + link);
 
-    const link = $('#chat-input-link').val().trim();
-      console.log("Submitting link: " + link);
+        // Get current conversation UUID
+        let conversation_uuid = $("#chat-history-select").val();
 
-    $.ajax({
-        url: '/home/fetch_link_content',
-        type: 'POST',
-        data: JSON.stringify({
-            link: link,
-            space: $('#current-space-id')[0].innerHTML
-        }),
-        contentType: 'application/json; charset=utf-8',
-        dataType: 'json',
-        async: true,
-        success: function (msg) {
-            const documentName = msg.document_name;
-            $('#chatinput').val('');
-            $('#chat-input-modal').hide();
-            if (documentName) {
-            // Start asking questions about the new document
-            askDocument(documentName);
-            openChatWindow();
-            $('.chat-window').append(`
-                <div class="answer-card" style="padding: 30px; ">
-                <p style="font-size: 30; color: #5D6F81;">
-                    You added a link: <i>${link}</i>
-                </p>
-                <p style="font-size: 30; color: #5D6F81;">
-                    The document <i>${documentName}</i> has been added. You can now ask questions about it.
-                </p>
-                </div>
-            `);
-            } else {
-            alert("Failed to add the link. Please try again.");
+        // Disable button during submission
+        $(this).prop('disabled', true);
+
+        $.ajax({
+            url: '/chat/add_link',
+            type: 'POST',
+            data: JSON.stringify({
+                link: link,
+                conversation_uuid: conversation_uuid || null
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (response) {
+                // Clear input and close modal
+                $('#chat-input-link').val('');
+                $('#chat-input-modal').hide();
+
+                // Update conversation UUID if new
+                if (response.conversation_uuid && !conversation_uuid) {
+                    // Add to dropdown if not exists
+                    if ($(`#chat-history-select option[value="${response.conversation_uuid}"]`).length === 0) {
+                        $("#chat-history-select").append(
+                            $("<option>").val(response.conversation_uuid).text("New Conversation")
+                        );
+                    }
+                    $("#chat-history-select").val(response.conversation_uuid);
+                }
+
+                // Show confirmation in chat
+                $("#chat-panel").append(`
+                    <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
+                        <i class="fa fa-link"></i> Added link: <a href="${link}" target="_blank">${response.title || link}</a>
+                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            Content loaded (${response.content_preview ? response.content_preview.length + ' chars' : '0 chars'})
+                        </div>
+                    </div>
+                `);
+
+                // Scroll to bottom
+                $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+
+                // Optionally, you can now ask a question about the link
+                // askAboutLink(link);
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.error("Error adding link:", thrownError);
+                alert("Failed to add the link. Please try again.");
+            },
+            complete: function() {
+                // Re-enable button
+                $('#submitChatInputBtn').prop('disabled', false);
             }
-        },
-        error: function (xhr, ajaxOptions, thrownError) {
-            console.log(xhr.status);
-            console.log(thrownError);
-            alert("An error occurred while adding the link. Please try again.");
-        }
-    })
-  });
+        });
+    });
 
     function showRawText() {
         // Get the current document
