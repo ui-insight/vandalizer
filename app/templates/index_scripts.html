@@ -2883,6 +2883,9 @@ function showChatInputModal() {
         additional_context = "",
         display_question = ""
     ) {
+        const conversation_uuid = $("#chat-history-select").val();
+        console.log("conversation_uuid:", conversation_uuid);
+
         $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
@@ -2911,7 +2914,8 @@ function showChatInputModal() {
             headers: { "Content-Type": "application/json; charset=utf-8" },
             body: JSON.stringify({
                 document_uuids: document_uuids,
-                message: question + " " + additional_context,
+                message: question + "\n" + additional_context,
+                conversation_uuid: conversation_uuid,
                 folder_uuid: folder_uuid,
             }),
         })

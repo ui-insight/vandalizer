@@ -13,7 +13,11 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    UserPromptPart,
+    TextPart,
+    SystemPromptPart,
 )
+
 from pypdf import PdfReader
 
 from app import app
@@ -322,28 +326,105 @@ class FeedbackCounter(me.Document):
 
 class ChatRole(Enum):
     """Represents a role in a chat."""
-
     SYSTEM = "system"
     USER = "user"
-
+    ASSISTANT = "assistant"  # Added assistant role
 
 MAX_CHAT_MESSAGES = 20
 
+class FileAttachment(me.Document):
+    """Represents a file attachment in a chat."""
+    filename = me.StringField(required=True, max_length=200)
+    filepath = me.StringField(required=True, max_length=500)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    user_id = me.StringField(required=True, max_length=200)
+
+class UrlAttachment(me.Document):
+    """Represents a URL attachment in a chat."""
+    url = me.StringField(required=True, max_length=500)
+    title = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    user_id = me.StringField(required=True, max_length=200)
 
 class ChatMessage(me.Document):
     """Represents a message in a chat."""
-
     role = me.EnumField(ChatRole, required=True)
     message = me.StringField(required=True, max_length=500000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
 
+    def to_dict(self):
+        """Convert to dictionary format"""
+        return {
+            "role": self.role.value,
+            "content": self.message
+        }
+
+    def to_model_message(self) -> ModelMessage:
+        """Convert to ModelMessage format for pydantic-ai"""
+        if self.role == ChatRole.USER:
+            # User messages become ModelRequest with UserPromptPart
+            return ModelRequest(
+                parts=[UserPromptPart(content=self.message)]
+            )
+        elif self.role == ChatRole.ASSISTANT:
+            # Assistant messages become ModelResponse with TextPart
+            return ModelResponse(
+                parts=[TextPart(content=self.message)]
+            )
+        elif self.role == ChatRole.SYSTEM:
+            # System messages become ModelRequest with SystemPromptPart
+            return ModelRequest(
+                parts=[SystemPromptPart(content=self.message)]
+            )
+        else:
+            # Fallback to user message if role is unknown
+            return ModelRequest(
+                parts=[UserPromptPart(content=self.message)]
+            )
+
 
 class ChatConversation(me.Document):
     """Represents a chat history for a user."""
-
-    uuid = me.StringField(required=True, max_length=200)
+    uuid = me.StringField(required=True, max_length=200, unique=True)
     title = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
-    messages = me.ListField(me.ReferenceField(ChatMessage))
+    messages = me.ListField(me.ReferenceField(ChatMessage, reverse_delete_rule=CASCADE))
+    # attachments can be files or urls
+    file_attachments = me.ListField(me.ReferenceField(FileAttachment, reverse_delete_rule=CASCADE))
+    url_attachments = me.ListField(me.ReferenceField(UrlAttachment, reverse_delete_rule=CASCADE))
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+    def add_message(self, role, content):
+        """Add a message to the conversation and save it"""
+        message = ChatMessage(role=role, message=content)
+        message.save()
+        self.messages.append(message)
+        self.updated_at = datetime.datetime.now()
+
+        # # Keep only the last MAX_CHAT_MESSAGES
+        # if len(self.messages) > MAX_CHAT_MESSAGES:
+        #     # Delete old messages from database
+        #     old_messages = self.messages[:-MAX_CHAT_MESSAGES]
+        #     for msg in old_messages:
+        #         msg.delete()
+        #     self.messages = self.messages[-MAX_CHAT_MESSAGES:]
+
+        self.save()
+        return message
+
+    def get_messages(self):
+        """Get messages in format expected by pydantic_ai agent"""
+        return [msg.to_dict() for msg in self.messages]
+    def to_model_messages(self) -> list[ModelMessage]:
+        """Get messages in ModelMessage format"""
+        return [msg.to_model_message() for msg in self.messages]
+
+    def generate_title(self):
+        """Generate a title from the first user message"""
+        if self.messages and self.title == "New Conversation":
+            first_user_msg = next((msg for msg in self.messages if msg.role == ChatRole.USER), None)
+            if first_user_msg:
+                # Take first 50 characters of the message as title
+                self.title = first_user_msg.message[:50] + ("..." if len(first_user_msg.message) > 50 else "")
+                self.save()
