@@ -22,6 +22,7 @@ from app.models import (
     MAX_CHAT_MESSAGES,
     UserModelConfig,
     ChatConversation,
+    ChatRole,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.config import settings
@@ -91,40 +92,6 @@ class OpenAIInterface:
 
         return result.output
 
-    def get_cache_messages(user_id, docs_ids_string, session=None):
-        cache_key = f"chat_history_{user_id}_{docs_ids_string}"
-        llm_string = "pydantic_model:openai:gpt-4o"
-        previous_messages = []
-        latest_conversation_messages = []
-        if session is not None:
-            # latest_conversation_messages = session.get("chat_history", [])
-            cache_result = cache.lookup(cache_key, llm_string)
-            if cache_result is not None:
-                latest_conversation_messages = cache_result
-
-                # latest_conversation_messages =
-                ModelMessagesTypeAdapter.validate_python(latest_conversation_messages)
-            previous_messages = latest_conversation_messages[-MAX_CHAT_MESSAGES:]
-            parsed_messages = []
-            for message in previous_messages:
-                new_parts = []
-                for part in message["parts"]:
-                    # remove tool_call
-                    if "tool-call" in part["part_kind"]:
-                        continue
-                    new_parts.append(part)
-                message["parts"] = new_parts
-
-                if message["parts"] == []:
-                    continue
-                # remove timestamp if exists in message
-                if "timestamp" in message:
-                    del message["timestamp"]
-
-            previous_messages = parsed_messages
-
-        return previous_messages, cache_key, llm_string
-
     def get_full_text(documents, previous_messages):
         full_text = ""
         for document in documents:
@@ -151,7 +118,8 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
-        conversation_id=None,
+        previous_messages=[],
+        conversation_uuid=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -171,16 +139,7 @@ class OpenAIInterface:
         if len(docs) == 0:
             prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
 
-        chat_conversation = ChatConversation.objects(
-            uuid=conversation_id,
-            user_id=user_id,
-        ).first()
-        if chat_conversation is None:
-            chat_conversation = ChatConversation(
-                uuid=str(uuid.uuid4()), user_id=user_id
-            )
-
-        previous_messages = chat_conversation.messages or []
+        debug(user_id)
 
         max_context_length = settings.max_context_length
 
@@ -190,7 +149,7 @@ class OpenAIInterface:
 
         agent = None
         if len(full_text) < max_context_length:
-            prompt += f"""Question: {question} Document: {full_text}"""
+            prompt += f"""\nQuestion: {question}\n{full_text}"""
             agent = create_chat_agent(model)
         else:
             prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
@@ -200,7 +159,6 @@ class OpenAIInterface:
         return dict(
             agent=agent,
             prompt=prompt,
-            conversation=chat_conversation,
             user_id=user_id,
             full_text=full_text,
         )
@@ -211,7 +169,8 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
-        conversation_id=None,
+        previous_messages=[],
+        conversation_uuid=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -221,15 +180,13 @@ class OpenAIInterface:
             root_path=root_path,
             documents=documents,
             question=question,
-            conversation_id=conversation_id,
+            previous_messages=previous_messages,
             session=session,
             user_id=user_id,
             default_docs=default_docs,
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
-        conversation = prepared_data["conversation"]
-        previous_messages = conversation.messages or []
         user_id = prepared_data["user_id"]
         full_text = prepared_data["full_text"]
 
@@ -255,7 +212,6 @@ class OpenAIInterface:
         except Exception as e:
             debug("Error in chat", e)
 
-        debug(answer)
         if hasattr(answer, "output"):
             answer = answer.output
         else:
@@ -272,7 +228,8 @@ class OpenAIInterface:
         root_path,
         documents,
         question,
-        conversation_id=None,
+        previous_messages=[],
+        conversation_uuid=None,
         session=None,
         user_id=None,
         default_docs=None,
@@ -288,16 +245,23 @@ class OpenAIInterface:
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
-        conversation = prepared_data["conversation"]
-        previous_messages = conversation.messages or []
 
-        fetcher = URLContentFetcher(max_content_length=30000)
-        result = fetcher.process_chat_input(question)
-        print(result)
-        prompt += "\n\nAdditional context:\n"
-        prompt += "\n".join(result)
+        # fetcher = URLContentFetcher(max_content_length=30000)
+        # result = fetcher.process_chat_input(question)
+        # print(result)
+        # if isinstance(result, str):
+        #     # If result is a string, add it directly
+        #     prompt += result
+        # elif isinstance(result, (list, tuple)):
+        #     # If result is a list/tuple, join with newlines
+        #     prompt += "\n".join(str(item) for item in result)
+        # else:
+        #     # Fallback: convert to string
+        #     prompt += str(result)
         print("Final prompt to the model:")
         print(prompt)
+
+        full_response = []
 
         async def streamer():
             async with agent.iter(prompt, message_history=previous_messages) as agent_run:
@@ -310,6 +274,7 @@ class OpenAIInterface:
                                         # remove code markers
                                         # content = remove_code_markers(event.part.content)
                                         content = event.part.content
+                                        full_response.append(content)
                                         yield (
                                             json.dumps(
                                                 dict(kind="text", content=content)
@@ -331,6 +296,7 @@ class OpenAIInterface:
                                         # remove code markers
                                         # content = remove_code_markers(event.delta.content_delta)  # noqa: E501
                                         content = event.delta.content_delta
+                                        full_response.append(content)
                                         yield (
                                             json.dumps(
                                                 dict(kind="text", content=content)
@@ -348,6 +314,15 @@ class OpenAIInterface:
                                             + "\n"
                                         )
                     # elif Agent.is_call_tools_node(node):
+
+            if full_response:
+                assistant_message = ''.join(full_response)
+                conversation = ChatConversation.objects(
+                    uuid=conversation_uuid,
+                    user_id=user_id,
+                ).first()
+                conversation.add_message(ChatRole.ASSISTANT, assistant_message)
+
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():

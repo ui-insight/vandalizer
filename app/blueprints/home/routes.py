@@ -4,6 +4,8 @@ import asyncio
 import io
 import json
 import uuid
+import logging
+
 from itertools import chain
 from typing import Dict, List, Optional
 
@@ -20,6 +22,7 @@ from flask import (
     session,
     stream_with_context,
     url_for,
+    jsonify,
 )
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
@@ -36,6 +39,8 @@ from app.models import (
     UserModelConfig,
     Workflow,
     WorkflowStep,
+    ChatConversation,
+    ChatRole,
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
@@ -57,6 +62,7 @@ home = Blueprint("home", __name__)
 
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
+logger = logging.getLogger(__name__)
 
 @app.context_processor
 def inject_current_model():
@@ -335,6 +341,11 @@ def index() -> ResponseReturnValue:
 
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
+    conversations = ChatConversation.objects(
+        user_id=user.user_id
+    ).order_by("-created_at").all()
+
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
@@ -344,6 +355,7 @@ def index() -> ResponseReturnValue:
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
+        conversations=conversations,
         selected_document=selected_document,
         folder_docs=folder_docs,
         spaces=spaces,
@@ -366,7 +378,9 @@ def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
     message = data["message"]
+    conversation_uuid = data.get("conversation_uuid", None)
     debug("Message received:", message)
+    debug("Conversation UUID:", conversation_uuid)
     message = escape(message)
     debug("Sanitized message:", message)
     # sanitize message
@@ -376,7 +390,16 @@ def chat() -> ResponseReturnValue:
     documents = []
     user = load_user()
     user_id = user.user_id
-    debug(document_uuids)
+
+    conversation = ChatConversation.objects(uuid=conversation_uuid, user_id=user_id).first()
+    if conversation is None:
+        conversation = ChatConversation(user_id=user.user_id, uuid=uuid.uuid4().hex)
+        conversation.add_message(ChatRole.USER, message)
+        conversation.generate_title()
+        conversation.save()
+    else:
+        conversation.add_message(ChatRole.USER, message)
+
     # migrate to new document user's location
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid, is_default=False).first()
@@ -402,6 +425,8 @@ def chat() -> ResponseReturnValue:
             current_app.root_path,
             documents,
             message,
+            previous_messages=conversation.to_model_messages(),
+            conversation_uuid=conversation.uuid,
             default_docs=docs,
             user_id=user_id,
             session=session,
@@ -412,6 +437,40 @@ def chat() -> ResponseReturnValue:
     # Use the appropriate MIME type. If you use Server-Sent Events, it's "text/event-stream".
     return Response(stream_with_context(generate()), mimetype="text/event-stream")
 
+
+@app.route("/chat_history/<conversation_uuid>")
+def chat_history(conversation_uuid):
+    conversation = ChatConversation.objects(uuid=conversation_uuid).first()
+    if not conversation:
+        return jsonify({"messages": []}), 404
+    # Use the get_messages() method you defined!
+    return jsonify({"messages": conversation.get_messages()})
+
+@app.route("/chat_history/<conversation_uuid>", methods=["DELETE"])
+def delete_chat_history(conversation_uuid):
+    """Delete a chat conversation."""
+    try:
+        # Get the current user
+        user = load_user()
+        user_id = user.user_id
+
+        # Find the conversation and verify it belongs to the user
+        conversation = ChatConversation.objects(
+            uuid=conversation_uuid,
+            user_id=user_id
+        ).first()
+
+        if not conversation:
+            return jsonify({"error": "Conversation not found"}), 404
+
+        # Delete all associated messages (they should cascade delete due to your model setup)
+        conversation.delete()
+
+        return jsonify({"success": True, "message": "Conversation deleted"}), 200
+
+    except Exception as e:
+        logger.error(f"Error deleting conversation: {e}")
+        return jsonify({"error": "Failed to delete conversation"}), 500
 
 ## @MARK: Download
 @home.route("/chat/download", methods=["POST"])
