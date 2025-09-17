@@ -307,6 +307,11 @@ Return a json object where keys are field names and values are the recommended t
 Consider making fields Optional if they might not always be present."""
 
 
+MAP_OPTIONAL_STR = "Optional[str]"
+MAP_OPTIONAL_INT = "Optional[int]"
+MAP_OPTIONAL_FLOAT = "Optional[float]"
+
+
 type_mapping = {
     "str": (str, ...),
     "int": (int, ...),
@@ -316,9 +321,9 @@ type_mapping = {
     "List[int]": (list[int], ...),
     "List[float]": (list[float], ...),
     "Dict[str, str]": (dict[str, str], ...),
-    "Optional[str]": (str, None),
-    "Optional[int]": (int, None),
-    "Optional[float]": (float, None),
+    MAP_OPTIONAL_STR: (str, None),
+    MAP_OPTIONAL_INT: (int, None),
+    MAP_OPTIONAL_FLOAT: (float, None),
     "Optional[bool]": (bool, None),
     "Optional[List[str]]": (list[str], None),
     "Optional[List[int]]": (list[int], None),
@@ -333,13 +338,13 @@ reverse_type_mapping = {
     (list[str], ...): "List[str]",
     (list[int], ...): "List[int]",
     (list[float], ...): "List[float]",
-    (Optional[str], None): "Optional[str]",
-    (Optional[int], None): "Optional[int]",
-    (Optional[float], None): "Optional[float]",
+    (Optional[str], None): MAP_OPTIONAL_STR,
+    (Optional[int], None): MAP_OPTIONAL_INT,
+    (Optional[float], None): MAP_OPTIONAL_FLOAT,
     (dict[str, str], ...): "Dict[str, str]",
-    (str, None): "Optional[str]",
-    (int, None): "Optional[int]",
-    (float, None): "Optional[float]",
+    (str, None): MAP_OPTIONAL_STR,
+    (int, None): MAP_OPTIONAL_INT,
+    (float, None): MAP_OPTIONAL_FLOAT,
     (bool, None): "Optional[bool]",
 }
 
@@ -565,7 +570,7 @@ def extract_entities_with_agent(
                 entity = json.loads(entity_str)
                 debug(entity)
                 return [entity]
-            except:
+            except json.JSONDecodeError:
                 pass
         # If we can't recover, return empty results
         return []

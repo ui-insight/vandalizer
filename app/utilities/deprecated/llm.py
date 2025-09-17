@@ -4,7 +4,6 @@ from datetime import datetime
 
 import openai
 import requests
-import tiktoken
 from devtools import debug
 from openai import OpenAI
 
@@ -31,7 +30,6 @@ class ChatLM:
 
     def completion(self, structured_output=False, stream=False, **kwargs):
         if self.model_type == "openai":
-            # model = kwargs.pop("model", "gpt-4o")
             messages = kwargs.pop("messages", [])
             if structured_output:
                 api_key = kwargs.pop("api_key", None)
@@ -143,5 +141,3 @@ class InsightLM:
         self.history.append(entry)
 
         return outputs
-
-

@@ -1,5 +1,4 @@
-<div class="bottom-toolbar" id="bottom-toolbar-chat"
-    style="{% if section != 'Assistant' and section != 'Tasks' %}display: none;{% endif %}">
+<div class="bottom-toolbar" id="bottom-toolbar-chat">
     <div id="add-item-panel">
 
         <div class="ask-question-container">
@@ -12,17 +11,26 @@
                 </div>
 
                 <div class="chat-controls-toolbar">
+                    <div class="menu-anchor">
+                        <a href="#" id="chat-add-link" class="btn btn-secondary" aria-haspopup="true"
+                            aria-expanded="false" data-menu="#chat-add-menu">
+                            <i class="fa-solid fa-plus" style="padding-right:5px; font-weight:700;"></i>Add
+                        </a>
 
-                    <button type="button" onclick="showChatInputModal()" aria-label="Show raw text" style="display: block;
-               background:none; border:none; padding:0; cursor:pointer;">
-                        <i class="fa-solid fa-paperclip" style="padding-right: 5px; font-weight: 700;"></i>Add
-                    </button>
+                        <div id="chat-add-menu" class="menu menu-up" role="menu" hidden>
+                            <a class="menu-item" role="menuitem" href="/tasks/new/extraction">
+                                <i class="fa-solid fa-file-circle-plus" style="width:18px;"></i>
+                                Add Document
+                            </a>
+                            <a class="menu-item" role="menuitem" href="/tasks/new/prompt">
+                                <i class="fa-solid fa-globe" style="width:18px;"></i>
+                                Add Website
+                            </a>
+                        </div>
+                    </div>
 
-                    <a href="#" id="tasks-link" class="tasks-link-style btn-secondary">
-                        <i class="fa-solid fa-diagram-project" style="padding-right: 5px; font-weight: 700;"></i>Tasks
-                    </a>
 
-                    <div style="flex-grow: 1;"></div>
+
 
 
                     <!-- pinned model selector - populated from javascript -->
@@ -35,6 +43,8 @@
                             <li id="download-text-option-chat">Text</li>
                         </ul>
                     </div>
+
+                    <div style="flex-grow: 1;"></div>
                     <button class="btn btn-primary" id="send-chat-button" disabled>
                         <span style="font-size: 1.2em;">
                             <i class="fa-solid fa-paper-plane"></i>

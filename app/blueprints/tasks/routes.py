@@ -2,8 +2,10 @@ import csv
 import io
 import os
 import uuid
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+from typing import Any, Dict, List
 
 from devtools import debug
 from flask import (
@@ -19,30 +21,35 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from flask_login import current_user, login_required
 from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
+from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.openai_interface import OpenAIInterface
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+    add_object_to_library,
+)
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
-from app.utils import load_user
 
 tasks = Blueprint("tasks", __name__)
 
 EXTRACTION_PANEL_TEMPLATE = "toolpanel/extractions/extraction_panel.html"
 
 
+@login_required
 @tasks.route("/model/filter", methods=["POST"])
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])
     debug(data)
     validation_failed = False
-    user = load_user()
+    user = current_user
 
     settings_models = [m.model_dump() for m in settings.models]
     debug(settings_models)
@@ -84,6 +91,7 @@ def filter_models() -> ResponseReturnValue:
     return jsonify({"models": models, "current_model": current_model})
 
 
+@login_required
 @tasks.route("/model/update", methods=["POST"])
 def update_model() -> ResponseReturnValue:
     """Update the model for a search set."""
@@ -93,7 +101,7 @@ def update_model() -> ResponseReturnValue:
     temperature = data.get("temperature", 0.7)
     top_p = data.get("top_p", 0.9)
 
-    user = load_user()
+    user = current_user
 
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config is None:
@@ -111,12 +119,13 @@ def update_model() -> ResponseReturnValue:
 
 
 # Add a extraction set
+@login_required
 @tasks.route("/extraction/add_search_set", methods=["POST"])
 def add_search_set() -> ResponseReturnValue:
     """Add a new search set."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     data = request.get_json()
     debug(data)
@@ -137,6 +146,7 @@ def add_search_set() -> ResponseReturnValue:
 
 
 # Add a term to a search set
+@login_required
 @tasks.route("/extraction/add_search_term", methods=["POST"])
 def add_search_term() -> ResponseReturnValue:
     """Add a term to an existing search set."""
@@ -150,7 +160,7 @@ def add_search_term() -> ResponseReturnValue:
     attachments = data.get("attachments", None)
 
     if searchset.is_global:
-        user = load_user()
+        user = current_user
         if not user.is_admin:
             return jsonify(
                 {
@@ -182,6 +192,7 @@ def add_search_term() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/add_prompt", methods=["POST"])
 def add_prompt() -> ResponseReturnValue:
     """Add a new prompt to the database."""
@@ -198,7 +209,7 @@ def add_prompt() -> ResponseReturnValue:
             {"complete": False, "error": "Title and prompt cannot be empty."},
         )
 
-    user = load_user()
+    user = current_user
 
     searchsetitem = SearchSetItem(
         searchphrase=prompt,
@@ -209,6 +220,10 @@ def add_prompt() -> ResponseReturnValue:
     )
 
     searchsetitem.save()
+
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(searchsetitem, library=library, added_by_user_id=user.user_id)
+
     response = {"complete": True}
     return jsonify(response)
 
@@ -218,7 +233,6 @@ def edit_prompt() -> ResponseReturnValue:
     """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
-    load_user()
     prompt = SearchSetItem.objects(id=uuid).first()
 
     template = render_template(
@@ -239,7 +253,6 @@ def update_prompt() -> ResponseReturnValue:
     uuid = data["uuid"]
     title = data["title"]
     prompt = data["prompt"]
-    load_user()
     prompt_item = SearchSetItem.objects(id=uuid).first()
 
     prompt_item.title = title
@@ -315,12 +328,13 @@ def grab_template() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/extraction/update_title", methods=["POST"])
 def update_extraction_title() -> ResponseReturnValue:
     """Update the title of an extraction step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     extraction_data = request.get_json()
     extraction_uuid = extraction_data["extraction_uuid"]
     extraction_step = SearchSet.objects(uuid=extraction_uuid).first()
@@ -341,29 +355,30 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
-def normalize_results(results):
-    from collections import defaultdict
-
-    if isinstance(results, list):
-        collected = defaultdict(list)
-
-        for d in results:
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    if v not in collected[k]:
-                        collected[k].append(v)
-
-        # Convert to string or comma-separated string
-        flattened = {
-            k: v[0] if len(v) == 1 else ", ".join(str(val) for val in v)
-            for k, v in collected.items()
-        }
-        return flattened
-
-    elif isinstance(results, dict):
+def normalize_results(results) -> Dict[str, Any]:
+    """Normalize a list of dicts into a single dict of unique values (comma-joined),
+    or return the dict as-is. Non-list/dict inputs yield {}."""
+    if isinstance(results, dict):
         return results
+    if not isinstance(results, list):
+        return {}
 
-    return {}
+    collected: Dict[str, List[Any]] = defaultdict(list)
+    seen: Dict[str, set] = defaultdict(set)
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        for k, v in item.items():
+            if v in seen[k]:
+                continue
+            seen[k].add(v)
+            collected[k].append(v)
+
+    return {
+        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
+        for k, vals in collected.items()
+    }
 
 
 @tasks.route("/begin_search", methods=["POST"])
@@ -377,7 +392,6 @@ def begin_search() -> ResponseReturnValue:
 
     documents = []
     document_paths = []
-    load_user()
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
         documents.append(document)
@@ -490,20 +504,20 @@ def begin_search() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @tasks.route("/extract/build_from_document", methods=["POST"])
 def build_extraction_from_document() -> ResponseReturnValue:
     """Build extraction from document."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
-    load_user()
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
     em = ExtractionManager3()
     em.root_path = current_app.root_path
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     model = settings.base_model
     if model_config is not None:
@@ -594,6 +608,7 @@ def delete_search_set_item() -> ResponseReturnValue:
     return jsonify({"complete": True})
 
 
+@login_required
 @tasks.route("/begin_prompt_search", methods=["POST"])
 def begin_prompt_search() -> ResponseReturnValue:
     """Begin a prompt search."""
@@ -604,8 +619,11 @@ def begin_prompt_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     items = search_set.items()
 
+    user = current_user
+    user_id = user.user_id
+
     if len(items) > 0:
-        llm = OpenAIInterface()
+        llm = ChatManager()
 
         llm.load_document(document_path)
         results = {}

@@ -1,33 +1,49 @@
 # admin_routes.py (or wherever your Flask routes live)
+import secrets
 from datetime import datetime, timedelta
 
-from flask import Blueprint, abort, render_template, request
+from flask import (
+    Blueprint,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_login import current_user
 
 from app.models import (
-    Feedback,
-    SearchSet,
-    SearchSetItem,
-    SmartDocument,
+    ActivityEvent,
+    DailyUsageAggregate,
     Space,
+    Team,
+    TeamInvite,
+    TeamMembership,
     User,
-    Workflow,
-    WorkflowResult,
 )
+from app.utils import load_user
 
 admin = Blueprint("admin", __name__)
+
+from datetime import datetime, time, timedelta
+
+
+def day_bounds(start_dt: datetime, end_dt: datetime) -> tuple[datetime, datetime]:
+    """Return UTC day-bounded datetimes [start_of_start_day, start_of_day_after_end]."""
+    start_floor = datetime.combine(start_dt.date(), time.min)
+    end_exclusive = datetime.combine(end_dt.date(), time.min) + timedelta(days=1)
+    return start_floor, end_exclusive
 
 
 def parse_date(s: str, default: datetime) -> datetime:
     try:
-        # Accept YYYY-MM-DD or ISO-like
         return datetime.fromisoformat(s.strip())
     except Exception:
         return default
 
 
 def get_admin_user():
-    # Require admin
     u = (
         User.objects(user_id=str(current_user.id)).first()
         if hasattr(current_user, "id")
@@ -38,126 +54,210 @@ def get_admin_user():
     return u
 
 
-@admin.route("/usage", methods=["GET"])
-# @login_required
-def usage_dashboard():
-    # get_admin_user()
+def _agg_cursor(
+    scope: str, start: datetime, end: datetime, *, user_id=None, team_id=None
+):
+    # Pull the appropriate rollups
+    q = DailyUsageAggregate.objects(
+        date__gte=start.date(), date__lte=end.date(), scope=scope
+    )
+    if scope == "user" and user_id:
+        q = q.filter(user_id=user_id)
+    if scope == "team" and team_id:
+        q = q.filter(team_id=team_id)
+    return q
 
-    # Date range (defaults: last 30 days)
+
+def _sum_int(q, attr):
+    return sum(getattr(r, attr, 0) or 0 for r in q)
+
+
+@admin.route("/usage", methods=["GET"])
+def usage_dashboard():
+    # get_admin_user()  # enable when ready
+
     end_default = datetime.now()
     start_default = end_default - timedelta(days=30)
     start = parse_date(request.args.get("start", ""), start_default)
     end = parse_date(request.args.get("end", ""), end_default)
 
-    # Optional filters
-    user_id = request.args.get("user_id", "").strip() or None
-    space_id = request.args.get("space_id", "").strip() or None
+    user_id = (request.args.get("user_id") or "").strip() or None
+    team_id = (request.args.get("team_id") or "").strip() or None
+    space_id = (request.args.get("space_id") or "").strip() or None
 
-    # Build base filters
-    doc_q = SmartDocument.objects(created_at__gte=start, created_at__lte=end)
-    wf_q = Workflow.objects(created_at__gte=start, created_at__lte=end)
-    wfr_q = WorkflowResult.objects(start_time__gte=start, start_time__lte=end)
-    fb_q = Feedback.objects(created_at__gte=start, created_at__lte=end)
-    ss_q = SearchSet.objects(created_at__gte=start, created_at__lte=end)
-
+    # Which scope to read rollups from?
+    scope = "global"
     if user_id:
-        doc_q = doc_q.filter(user_id=user_id)
-        wf_q = wf_q.filter(user_id=user_id)
-        fb_q = fb_q.filter(user_id=user_id)
-        ss_q = ss_q.filter(user_id=user_id)
+        scope = "user"
+    elif team_id:
+        scope = "team"
 
+    rollups = _agg_cursor(scope, start, end, user_id=user_id, team_id=team_id)
+
+    # === KPIs (from rollups) ===
+    conversations = _sum_int(rollups, "conversations")
+    searches = _sum_int(rollups, "searches")
+    wf_started = _sum_int(rollups, "workflows_started")
+    wf_completed = _sum_int(rollups, "workflows_completed")
+    wf_failed = _sum_int(rollups, "workflows_failed")
+    tokens_in = _sum_int(rollups, "tokens_input")
+    tokens_out = _sum_int(rollups, "tokens_output")
+    conv_msgs = _sum_int(rollups, "conversation_messages")
+    total_wf_duration_ms = _sum_int(rollups, "workflow_duration_ms")
+    avg_wf_ms = (total_wf_duration_ms / wf_completed) if wf_completed else 0
+
+    # Active counts in range (from the event stream)
+    ev_q = ActivityEvent.objects(started_at__gte=start, started_at__lte=end)
+    if user_id:
+        ev_q = ev_q.filter(user_id=user_id)
+    if team_id:
+        ev_q = ev_q.filter(team_id=team_id)
     if space_id:
-        doc_q = doc_q.filter(space=space_id)
-        wf_q = wf_q.filter(space=space_id)
-        ss_q = ss_q.filter(space=space_id)
+        ev_q = ev_q.filter(space=space_id)
 
-    # === High-level KPIs ===
-    kpi = {
-        "total_users": User.objects.count(),
-        "total_spaces": Space.objects.count(),
-        "total_documents": SmartDocument.objects.count(),
-        "total_workflows": Workflow.objects.count(),
-        "total_results": WorkflowResult.objects.count(),
-    }
+    active_users = len(ev_q.distinct("user_id"))
+    active_teams = len([t for t in ev_q.distinct("team_id") if t])
 
-    # === In-range metrics ===
-    in_range = {
-        "docs_count": doc_q.count(),
-        "docs_processing": doc_q.filter(processing=True).count(),
-        "docs_validating": doc_q.filter(validating=True).count(),
-        "docs_invalid": doc_q.filter(valid=False).count(),
-        "workflows_count": wf_q.count(),
-        "workflow_results_count": wfr_q.count(),
-        "feedback_count": fb_q.count(),
-        "feedback_positive": fb_q.filter(feedback="positive").count(),
-        "feedback_negative": fb_q.filter(feedback="negative").count(),
-        "search_sets_count": ss_q.count(),
-        "search_items_count": SearchSetItem.objects(
-            searchset__in=[s.uuid for s in ss_q.only("uuid")]
-        ).count(),
-    }
-
-    # === Top users by uploads (in range) ===
-    match_rule = "$match"
-    group_rule = "$group"
-    sort_rule = "$sort"
-    pipeline_users = [
-        {match_rule: {"created_at": {"$gte": start, "$lte": end}}},
-        *([{match_rule: {"user_id": user_id}}] if user_id else []),
-        *([{match_rule: {"space": space_id}}] if space_id else []),
-        {group_rule: {"_id": "$user_id", "count": {"$sum": 1}}},
-        {sort_rule: {"count": -1}},
-        {"$limit": 10},
+    # === Status breakdown for workflow runs (from events) ===
+    wf_status_pipeline = [
+        {
+            "$match": {
+                "type": "workflow_run",
+                "started_at": {"$gte": start, "$lte": end},
+                **({"user_id": user_id} if user_id else {}),
+                **({"team_id": team_id} if team_id else {}),
+                **({"space": space_id} if space_id else {}),
+            }
+        },
+        {"$group": {"_id": "$status", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
     ]
-    top_users = list(SmartDocument.objects.aggregate(*pipeline_users))
-
-    # === Top spaces by uploads (in range) ===
-    pipeline_spaces = [
-        {match_rule: {"created_at": {"$gte": start, "$lte": end}}},
-        *([{match_rule: {"user_id": user_id}}] if user_id else []),
-        *([{match_rule: {"space": space_id}}] if space_id else []),
-        {group_rule: {"_id": "$space", "count": {"$sum": 1}}},
-        {sort_rule: {"count": -1}},
-        {"$limit": 10},
-    ]
-    top_spaces = list(SmartDocument.objects.aggregate(*pipeline_spaces))
-
-    # === Result status breakdown (in range) ===
-    results_by_status = (
-        wfr_q.only("status")
-        .as_pymongo()
-        .aggregate(
-            [
-                {"$group": {"_id": "$status", "count": {"$sum": 1}}},
-                {"$sort": {"count": -1}},
-            ]
-        )
+    results_by_status = list(
+        ActivityEvent._get_collection().aggregate(wf_status_pipeline)
     )
-    results_by_status = list(results_by_status)
 
-    # === Recent Activity (last 25 of each) ===
-    recent_docs = doc_q.order_by("-created_at").limit(25)
-    recent_results = wfr_q.order_by("-start_time").limit(25)
-    recent_feedback = fb_q.order_by("-created_at").limit(25)
+    # === Top users / teams by workflows completed (last N days) ===
+    # inside usage_dashboard()
+    start_floor, end_exclusive = day_bounds(start, end)
 
-    # For select options
-    all_users = User.objects.only("user_id").order_by("user_id")
+    top_users_pipeline = [
+        {
+            "$match": {
+                "scope": "user",
+                "date": {"$gte": start_floor, "$lt": end_exclusive},
+            }
+        },
+        # (Do NOT filter by team_id here; user-scope docs don't carry it.)
+        {"$group": {"_id": "$user_id", "completed": {"$sum": "$workflows_completed"}}},
+        {"$sort": {"completed": -1}},
+        {"$limit": 10},
+    ]
+    top_users = list(
+        DailyUsageAggregate._get_collection().aggregate(top_users_pipeline)
+    )
+
+    top_teams_pipeline = [
+        {
+            "$match": {
+                "scope": "team",
+                "date": {"$gte": start_floor, "$lt": end_exclusive},
+            }
+        },
+        {"$group": {"_id": "$team_id", "completed": {"$sum": "$workflows_completed"}}},
+        {"$sort": {"completed": -1}},
+        {"$limit": 10},
+    ]
+    top_teams = list(
+        DailyUsageAggregate._get_collection().aggregate(top_teams_pipeline)
+    )
+
+    # === Recent activity (unified stream)
+    # newest first; limit to 50 to keep page light
+    recent_events = ev_q.order_by("-started_at").limit(50)
+
+    # Selects
+    all_users = sorted(ActivityEvent.objects.distinct("user_id"))
+    all_teams = Team.objects.order_by("name")
     all_spaces = Space.objects.only("uuid", "title").order_by("title")
+
+    kpi = {
+        "conversations": conversations,
+        "searches": searches,
+        "wf_started": wf_started,
+        "wf_completed": wf_completed,
+        "wf_failed": wf_failed,
+        "tokens_in": tokens_in,
+        "tokens_out": tokens_out,
+        "avg_wf_ms": int(avg_wf_ms),
+        "active_users": active_users,
+        "active_teams": active_teams,
+    }
 
     return render_template(
         "admin/usage.html",
-        kpi=kpi,
-        in_range=in_range,
         start=start,
         end=end,
         user_id=user_id or "",
+        team_id=team_id or "",
         space_id=space_id or "",
-        top_users=top_users,
-        top_spaces=top_spaces,
+        kpi=kpi,
         results_by_status=results_by_status,
-        recent_docs=recent_docs,
-        recent_results=recent_results,
-        recent_feedback=recent_feedback,
+        top_users=top_users,
+        top_teams=top_teams,
+        recent_events=recent_events,
         all_users=all_users,
+        all_teams=all_teams,
         all_spaces=all_spaces,
     )
+
+
+@admin.route("/teams", methods=["GET"])
+def admin_teams():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    teams = Team.objects.order_by("name")
+    data = []
+    for t in teams:
+        members = TeamMembership.objects(team=t)
+        invites = TeamInvite.objects(team=t, accepted=False)
+        data.append({"team": t, "members": members, "invites": invites})
+    return render_template(
+        "admin/teams.html", teams=data, is_admin=True, current_user_name=user.name
+    )
+
+
+@admin.route("/teams/create", methods=["POST"])
+def admin_teams_create():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    name = request.form.get("name", "").strip()
+    owner_user_id = request.form.get("owner_user_id", "").strip()
+    if not name or not owner_user_id:
+        return jsonify({"error": "name and owner_user_id required"}), 400
+    t = Team(
+        uuid=secrets.token_urlsafe(12), name=name, owner_user_id=owner_user_id
+    ).save()
+    TeamMembership(team=t, user_id=owner_user_id, role="owner").save()
+    return redirect(url_for("admin.admin_teams"))
+
+
+@admin.route("/teams/invite", methods=["POST"])
+def admin_teams_invite():
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+    team_id = request.form.get("team_id")
+    email = request.form.get("email", "").strip().lower()
+    role = request.form.get("role", "member")
+    team = Team.objects(id=team_id).first()
+    if not team:
+        return jsonify({"error": "Team not found"}), 404
+    token = secrets.token_urlsafe(24)
+    TeamInvite(
+        team=team, email=email, role=role, invited_by_user_id=user.user_id, token=token
+    ).save()
+
+    # TODO: send mail
+    return redirect(url_for("admin.admin_teams"))

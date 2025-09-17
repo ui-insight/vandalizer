@@ -34,11 +34,13 @@
 
 
     {% if (documents != None) and documents | length > 0 %}
+    // prettier-ignore
     var documentData = {
-        id: "{{ documents[0].id|safe }}",
-        title: "{{ documents[0].title|safe }}",
-        raw_text: {{ documents[0].raw_text| tojson | safe }}
+        id: "{{ documents[0].pk }}",
+        title: {{ documents[0].title | tojson }},
+    raw_text: '{{ documents[0].raw_text | tojson }}',
     };
+
     {% else %}
     const documentData = null;
     {% endif %}
@@ -128,14 +130,14 @@
         $('#model-modal').hide();
     });
 
-function showChatInputModal() {
-    $('#chat-input-modal').show();
-    $('#chatinput').focus();
-  }
+    function showChatInputModal() {
+        $('#chat-input-modal').show();
+        $('#chatinput').focus();
+    }
 
-  $('#close-chat-input-modal').on('click', function () {
-    $('#chat-input-modal').hide();
-  });
+    $('#close-chat-input-modal').on('click', function () {
+        $('#chat-input-modal').hide();
+    });
 
     // click or keydown on submit button
     $('#submitChatInputBtn').on('click', function (e) {
@@ -193,7 +195,7 @@ function showChatInputModal() {
                 console.error("Error adding link:", thrownError);
                 alert("Failed to add the link. Please try again.");
             },
-            complete: function() {
+            complete: function () {
                 // Re-enable button
                 $('#submitChatInputBtn').prop('disabled', false);
             }
@@ -222,6 +224,11 @@ function showChatInputModal() {
     });
 
     function setSection(sectionName) {
+        $(".search-results-panel").hide();
+        $(".bottom-toolbar").hide();
+        $(".tab-content").hide();
+        $("#tasks-panel").hide();
+
         // Use the tabTitle variable as needed
         let href = window.location.href;
         const qs = new URLSearchParams(href.split("?")[1]);
@@ -241,11 +248,22 @@ function showChatInputModal() {
                     item.classList.add("active");
                 }
             } else {
-                if (sectionName == "Workflows") {
+                if (sectionName == "Library") {
                     item.classList.add("active");
                 }
             }
         });
+
+        if (sectionName == "Assistant") {
+            $("#chat-panel").show();
+            $("#bottom-toolbar-chat").show();
+        } else if (sectionName == "Workflows") {
+            $("#workflows-panel").show();
+            $("#bottom-toolbar-add-workflows").show();
+        }
+        else if (sectionName == "Library") {
+            $("#library-panel").show();
+        }
 
         cleanup();
     }
@@ -298,30 +316,22 @@ function showChatInputModal() {
                 $('#recommendation-task-card').on('click', function (e) {
                     e.preventDefault();
                     $("#tasks-panel").show();
-                    setSection("Tasks");
                 });
 
                 $('#recommendation-create-workflow-card').on('click', function (e) {
                     e.preventDefault();
-                    setSection("Workflows");
                     location.reload();
 
                 });
 
                 $('.workflow-recommendation-item').off("click").on("click", function () {
                     let uuid = $(this).attr("data-uuid");
-
-                    console.log("here1")
-                    console.log(document_uuids);
-                    setSection("Workflows");
                     fetchWorkflow(uuid);
                 });
 
                 $('.extraction-recommendation-item').off("click").on("click", function () {
                     let uuid = $(this).attr("data-uuid");
                     console.log(uuid);
-                    // $("#tasks-panel").show();
-                    // setSection("Tasks");
                     search_set_add_uuid = uuid;
                     updateSearchSetPanel(uuid);
                     performExtraction(uuid);
@@ -359,12 +369,12 @@ function showChatInputModal() {
                 console.log(modelTag);
                 // add the model tag to the model-text-icon div
                 if (modelSecurity) {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-unlock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-cloud-arrow-up' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     // Clear any existing tags before appending the new one
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 } else {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 }
@@ -375,7 +385,7 @@ function showChatInputModal() {
 
                 models.forEach(m => {
                     const isExternal = !!m.external;            // external → unlocked icon
-                    const iconClass = isExternal ? 'fa-unlock' : 'fa-lock';
+                    const iconClass = isExternal ? 'fa-cloud-arrow-up' : 'fa-lock';
                     const isSelected = m.name === newModel;
 
                     const $li = $('<li>', {
@@ -1013,7 +1023,6 @@ function showChatInputModal() {
         $('.tasks-btn').on('click', function (e) {
             e.preventDefault();
             $("#tasks-panel").show();
-            setSection("Tasks");
         });
 
         $('.tasks-close-button').off('click').on('click', function (e) {
@@ -2000,30 +2009,10 @@ function showChatInputModal() {
         item.addEventListener("click", function () {
             tabMenuItems.forEach((item) => item.classList.remove("active"));
             this.classList.add("active");
-            $(".search-results-panel").hide();
-            $(".tab-content").hide();
-            $(".bottom-toolbar").hide();
             var tabTitle = $(this).text();
-            setSection(tabTitle);
-            $("#tasks-panel").hide();
 
-            if (tabTitle == "Extract") {
-                $("#extraction-panel").show();
-                $("#bottom-toolbar-extraction").show();
-            } else if (tabTitle == "Prompt") {
-                $("#prompt-panel").show();
-                $("#bottom-toolbar-prompt").show();
-            } else if (tabTitle == "Assistant") {
-                $("#chat-panel").show();
-                $("#bottom-toolbar-chat").show();
-            } else if (tabTitle == "Workflows") {
-                $("#workflows-panel").show();
-                $("#bottom-toolbar-add-workflows").show();
-            } else if (tabTitle == "Tasks") {
-                $("#chat-panel").show();
-                $("#tasks-panel").show();
-                $("#bottom-toolbar-tasks").show();
-            }
+            setSection(tabTitle);
+
         });
     });
 
@@ -2046,6 +2035,8 @@ function showChatInputModal() {
 
     $(".add-new_workflow-button").on("click", function () {
         $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
 
         $("#newWorkflowBtn")
             .off("click")
@@ -2081,6 +2072,7 @@ function showChatInputModal() {
     $(".add-formatter-task-btn")
         .off("click")
         .on("click", function () {
+            console.log("here");
             newTaskType = "formatter";
             $("#newTaskModal").show();
             $("#add-task-container").hide();
@@ -2192,6 +2184,7 @@ function showChatInputModal() {
     $(".prompt-item").on("click", function () {
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
+        setSection("Assistant");
 
         if (document_uuids != "") {
             $("#tasks-panel").hide();
@@ -2784,10 +2777,6 @@ function showChatInputModal() {
         return searchTermDictionary;
     }
 
-    // document.addEventListener('DOMContentLoaded', () => {
-    //     const rail = document.getElementById('app-rail');
-    //     const railToggle = document.getElementById('rail-toggle');
-    //     const dockLeftToggle = document.getElementById('dock-left-toggle');
 
     //     // helper to apply CSS variable for left offsets
     //     const setRailVar = (px) => document.documentElement.style.setProperty('--rail-w', px);
@@ -2877,7 +2866,6 @@ function showChatInputModal() {
     // Click handler for the tasks link
     $("#tasks-link").on("click", function (e) {
         e.preventDefault();
-        setSection("Tasks");
         $("#tasks-panel").show();
     });
 
@@ -2903,6 +2891,7 @@ function showChatInputModal() {
         const conversation_uuid = $("#chat-history-select").val();
         console.log("conversation_uuid:", conversation_uuid);
 
+        $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
@@ -3144,6 +3133,7 @@ function showChatInputModal() {
         const copyBtn = makeLinkBtn("Copy", "copy-btn");
         const downloadBtn = makeLinkBtn("Download", "download-btn");
 
+
         feedbackDiv.appendChild(copyBtn);
         feedbackDiv.appendChild(downloadBtn);
         return feedbackDiv;
@@ -3289,4 +3279,8 @@ function showChatInputModal() {
             }
         }
     }
+
+    section = "{{ section }}"
+    console.log("Section is: " + section)
+    setSection(section);
 </script>

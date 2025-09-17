@@ -26,10 +26,10 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
-from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.openai_interface import (
-    OpenAIInterface,
+from app.utilities.chat_manager import (
+    ChatManager,
 )
+from app.utilities.extraction_manager3 import ExtractionManager3
 
 load_dotenv()
 
@@ -106,7 +106,7 @@ def format_llm_output(text: str) -> str:
 def llm_chat_model(model, prompt, data=None, docs=None):
     if docs is None:
         docs = []
-    open_ai_interface = OpenAIInterface()
+    chat_manager = ChatManager()
     output = None
     debug(model)
     if len(docs) == 0:
@@ -116,10 +116,9 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         result = chat_agent.run_sync(output_prompt)
         output = result.output
         debug(f"Output from chat agent: {output}")
-        # output = format_llm_output(output).strip()
 
     else:
-        output = open_ai_interface.ask_question_to_documents(
+        output = chat_manager.ask_question_to_documents(
             model=model,
             root_path=app.root_path,
             documents=docs,
@@ -127,8 +126,6 @@ def llm_chat_model(model, prompt, data=None, docs=None):
         )
         output = output.get("answer", "")
         debug(f"Output from chat agent: {output}")
-        # output = format_llm_output(output)
-        debug(output)
     return output
 
 
@@ -161,7 +158,6 @@ CRITICAL:
 - The bullet points should be in a list format.
 """
 
-    # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_agent = create_chat_agent(model)
     response = chat_agent.run_sync(prompt)
@@ -248,16 +244,8 @@ class DocumentNode(Node):
         self.docs = data.get("docs", [])
         self.attachments = []  # data.get("attachments", [])
         self.pdf_paths = []
-        user_id = data.get("user_id", "0")
-
-        # self.filename = data.get("filename", "")
-        # self.content = ""
         self.docs_uuids = []
         self.content = ""
-        # for doc in self.attachments:
-        #     if doc is None:
-        #         continue
-        #     self.docs_uuids.append(doc.uuid)
 
         for doc in self.docs:
             if doc is None:
@@ -269,8 +257,6 @@ class DocumentNode(Node):
         debug(self.docs_uuids)
 
     def process(self, inputs=None):
-        # data = inputs.get("data", None)
-
         return {"step_name": self.name, "output": self.docs_uuids, "input": None}
 
 
@@ -324,7 +310,6 @@ class ExtractionNode(Node):
 
         step_input = None
         docs_uuids = []
-        user_id = self.user_id
         extraction_response = None
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
@@ -443,7 +428,7 @@ class WorkflowEngine:
             else:
                 debug(node)
                 debug(latest_output)
-                # output = node.process(latest_output)
+
                 for task in node.tasks:
                     process_node = None
 
@@ -511,7 +496,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
     nodes = []
 
     for idx, step in enumerate(steps):
-        # node_id = uuid4().hex
         node = None
         debug(step.name, step.data)
         if step.name == "Document":  # this the trigger step
@@ -643,7 +627,7 @@ def execute_workflow_task(
 
     final_output, data = engine.execute(workflow_result)
     debug(final_output)
-    workflow_result.final_output = dict(output=final_output, data=data)
+    workflow_result.final_output = {"output": final_output, "data": data}
     workflow_result.status = "completed"
     workflow_result.save()
     print(
@@ -662,7 +646,6 @@ def execute_workflow_task(
 @celery_app.task(bind=True, name="tasks.workflow.execution_step_test")
 def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
     process_node = None
-    latest_output = None
     workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
     engine = WorkflowEngine()
     nodes = []
@@ -709,7 +692,7 @@ def execute_task_step_test(self, task_name, task_data, document_trigger_step_id)
             continue
         engine.connect(nodes[idx - 1], nodes[idx])
 
-    final_output, data = engine.execute()
+    final_output, _ = engine.execute()
     print(final_output)
 
     return final_output

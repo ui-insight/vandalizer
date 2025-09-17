@@ -1,0 +1,65 @@
+:root{ --rail-w: 220px; }
+
+/* Rail frame (unchanged) */
+.app-rail{
+  position: fixed; top: 69px; right: 0; bottom: 0;
+  width: var(--rail-w);
+  background:#EEEEEE; color:#111; display:flex; flex-direction:column;
+  z-index:650; border-left:1px solid #d8d8d8;
+}
+
+/* Header centered with icon + label */
+.rail-header{
+  padding: 17px 12px; border-bottom: 1px solid #ddd;
+}
+.rail-header-center{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-weight: 800; letter-spacing:.02em; text-transform:none;
+}
+.rail-header-center i{ font-size: 14px; }
+.rail-header-center span{ font-size: 13px; }
+
+/* Section wrapper */
+.rail-section{ padding: 8px; overflow:auto; }
+
+/* List: single-line, compact */
+.run-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+
+.run-item{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:8px; padding:6px 8px; border-radius:8px; cursor:pointer;
+}
+.run-item:hover{ background:#f7f7f7; }
+.run-item.is-running{ background:#f3f7ff; }
+
+.run-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+.run-right{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
+
+.run-type-icon{ color:#333; width:16px; text-align:center; }
+.run-state-icon{ opacity:.9; }
+
+.run-title{ font-size:12px; color:#111; }
+.truncate{
+  display:inline-block; max-width: 200px; /* adjust if needed */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Status chips (text-only, compact) */
+.run-meta{ font-size:11px; color:#0050d7; font-weight:700; }
+.run-meta.done{ color:#1a7f37; }
+.run-meta.failed{ color:#b3261e; }
+
+/* Layout reservation (kept from prior version) */
+.main-panel{ position:relative; width:100%; }
+.right-panel{ float:right; width:40%; margin-right:var(--rail-w); position:relative; }
+.left-panel{ float:left; width:calc(60% - var(--rail-w)); }
+
+body .main-panel .header{ position:fixed; left:0; right:calc(40% + var(--rail-w)); width:auto !important; z-index:400; }
+body .left-panel .semantic-panel{ left:30px; right:calc(40% + var(--rail-w) + 30px); width:auto; }
+
+.right-panel .bottom-toolbar, .floating-bottom-toolbar{ right:var(--rail-w); width:40%; }
+
+@media (max-width:1200px){
+  .left-panel{ min-width:520px; }
+  .right-panel{ width:calc(100% - var(--rail-w) - 520px); }
+}

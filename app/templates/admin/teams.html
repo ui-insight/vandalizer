@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Admin · Teams | Vandalizer{% endblock %}
+
+{% block content %}
+<div class="container" style="padding:20px">
+    <h3>All Teams</h3>
+
+    <form method="POST" action="/admin/teams/create" class="form-inline" style="margin:10px 0 24px 0">
+        <input type="text" name="name" class="form-control" placeholder="New team name" required>
+        <input type="text" name="owner_user_id" class="form-control" placeholder="Owner user_id" style="margin-left:8px"
+            required>
+        <button type="submit" class="btn btn-primary" style="margin-left:8px">Create</button>
+    </form>
+
+    {% for entry in teams %}
+    {% set t = entry.team %}
+    <div class="card" style="padding:16px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+                <strong>{{ t.name }}</strong>
+                <div style="color:#777">uuid: {{ t.uuid }} · owner: {{ t.owner_user_id }}</div>
+            </div>
+            <form method="POST" action="/admin/teams/invite" class="form-inline">
+                <input type="hidden" name="team_id" value="{{ t.id }}">
+                <input type="email" name="email" class="form-control" placeholder="Invite email" required>
+                <select name="role" class="form-control" style="margin-left:8px">
+                    <option value="member">member</option>
+                    <option value="admin">admin</option>
+                </select>
+                <button class="btn btn-secondary" type="submit" style="margin-left:8px">Invite</button>
+            </form>
+        </div>
+
+        <div style="margin-top:10px">
+            <strong>Members</strong>
+            <ul style="margin:8px 0 0 20px">
+                {% for m in entry.members %}
+                <li>{{ m.user_id }} — {{ m.role }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if entry.invites and entry.invites|length > 0 %}
+        <div style="margin-top:10px">
+            <strong>Pending Invites</strong>
+            <ul style="margin:8px 0 0 20px">
+                {% for inv in entry.invites %}
+                <li>{{ inv.email }} — {{ inv.role }} ({{ inv.created_at.strftime('%Y-%m-%d') }})</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -2,23 +2,24 @@
 """Models for the application. Defines data structures and relationships."""
 
 import datetime
+import datetime as dt
 import json
 import os
 from enum import Enum
 from pathlib import Path
 
 import mongoengine as me
-from mongoengine import CASCADE, PULL
+from mongoengine import CASCADE, PULL, signals
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    UserPromptPart,
-    TextPart,
     SystemPromptPart,
+    TextPart,
+    UserPromptPart,
 )
-
 from pypdf import PdfReader
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import app
 
@@ -92,6 +93,8 @@ class Workflow(me.Document):
     )
     num_executions = me.IntField(default=0)
     space = me.StringField(required=False, max_length=100)
+    verified = me.BooleanField(default=False)
+    created_by_user_id = me.StringField(required=False, max_length=200)
 
 
 class WorkflowResult(me.Document):
@@ -107,11 +110,125 @@ class WorkflowResult(me.Document):
     session_id = me.StringField(required=True, max_length=50)
 
 
+# Teams
+class Team(me.Document):
+    """A collaborative group of users."""
+
+    uuid = me.StringField(required=True, max_length=200, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    owner_user_id = me.StringField(required=True, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+
+class TeamMembership(me.Document):
+    """Users belonging to teams with a role."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "user_id"], "unique": True},
+        ],
+    }
+
+
+class TeamInvite(me.Document):
+    """Pending invite to a team by email."""
+
+    team = me.ReferenceField(Team, required=True, reverse_delete_rule=me.CASCADE)
+    email = me.StringField(required=True, max_length=320)  # RFC-ish
+    invited_by_user_id = me.StringField(required=True, max_length=200)
+    role = me.StringField(default="member", choices=["owner", "admin", "member"])
+    token = me.StringField(required=True, max_length=200, unique=True)  # secure random
+    accepted = me.BooleanField(default=False)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "indexes": [
+            {"fields": ["team", "email"], "unique": True},
+            {"fields": ["token"], "unique": True},
+        ]
+    }
+
+
 class User(me.Document):
     """User model. Represents a user in the system."""
 
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
+    name = me.StringField()
+
+    current_team = me.ReferenceField(
+        "Team", required=False, reverse_delete_rule=me.NULLIFY
+    )
+
+    @property
+    def current_team_uuid(self) -> str | None:
+        return getattr(self.current_team, "uuid", None)
+
+    def ensure_current_team(self) -> "Team | None":
+        if self.current_team:
+            return self.current_team
+        team = _pick_default_team_for_user(self.user_id)
+        if team:
+            self.current_team = team
+            self.save()  # triggers pre_save but already set, safe/idempotent
+        return team
+
+    password_hash = me.StringField()
+
+    def set_password(self, password):
+        """Create a hashed password."""
+        self.password_hash = generate_password_hash(password)
+
+    def check_password(self, password):
+        """Check a hashed password."""
+        return check_password_hash(self.password_hash, password)
+
+    # You might need to add this if you use Flask-Login
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return self.user_id
+
+
+def _role_rank(role: str) -> int:
+    # lower is higher priority
+    return {"owner": 0, "admin": 1, "member": 2}.get(role, 3)
+
+
+def _pick_default_team_for_user(user_id: str) -> "Team | None":
+    memberships = list(
+        TeamMembership.objects(user_id=user_id)  # uses your existing index
+    )
+    if not memberships:
+        return None
+    memberships.sort(key=lambda m: (_role_rank(m.role), m.created_at))
+    return memberships[0].team
+
+
+def _user_pre_save(sender, document: "User", **kwargs):
+    # Only fill if empty; don't override an explicit selection
+    if getattr(document, "current_team", None) is None:
+        team = _pick_default_team_for_user(document.user_id)
+        if team:
+            document.current_team = team
+
+
+signals.pre_save.connect(_user_pre_save, sender=User)
 
 
 class SmartDocument(me.Document):
@@ -247,6 +364,8 @@ class SearchSet(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user = me.StringField(required=False, max_length=200)
     fillable_pdf_url = me.StringField(required=False, max_length=200)
+    verified = me.BooleanField(default=False)
+    created_by_user_id = me.StringField(required=False, max_length=200)
 
     def item_count(self) -> int:
         """Return the count of items associated with this search set."""
@@ -326,73 +445,75 @@ class FeedbackCounter(me.Document):
 
 class ChatRole(Enum):
     """Represents a role in a chat."""
+
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"  # Added assistant role
 
+
 MAX_CHAT_MESSAGES = 20
+
 
 class FileAttachment(me.Document):
     """Represents a file attachment in a chat."""
+
     filename = me.StringField(required=True, max_length=200)
     filepath = me.StringField(required=True, max_length=500)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
 
+
 class UrlAttachment(me.Document):
     """Represents a URL attachment in a chat."""
+
     url = me.StringField(required=True, max_length=500)
     title = me.StringField(required=False, max_length=200)
     content = me.StringField(required=False, max_length=50000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
 
+
 class ChatMessage(me.Document):
     """Represents a message in a chat."""
+
     role = me.EnumField(ChatRole, required=True)
     message = me.StringField(required=True, max_length=500000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
 
     def to_dict(self):
         """Convert to dictionary format"""
-        return {
-            "role": self.role.value,
-            "content": self.message
-        }
+        return {"role": self.role.value, "content": self.message}
 
     def to_model_message(self) -> ModelMessage:
         """Convert to ModelMessage format for pydantic-ai"""
         if self.role == ChatRole.USER:
             # User messages become ModelRequest with UserPromptPart
-            return ModelRequest(
-                parts=[UserPromptPart(content=self.message)]
-            )
+            return ModelRequest(parts=[UserPromptPart(content=self.message)])
         elif self.role == ChatRole.ASSISTANT:
             # Assistant messages become ModelResponse with TextPart
-            return ModelResponse(
-                parts=[TextPart(content=self.message)]
-            )
+            return ModelResponse(parts=[TextPart(content=self.message)])
         elif self.role == ChatRole.SYSTEM:
             # System messages become ModelRequest with SystemPromptPart
-            return ModelRequest(
-                parts=[SystemPromptPart(content=self.message)]
-            )
+            return ModelRequest(parts=[SystemPromptPart(content=self.message)])
         else:
             # Fallback to user message if role is unknown
-            return ModelRequest(
-                parts=[UserPromptPart(content=self.message)]
-            )
+            return ModelRequest(parts=[UserPromptPart(content=self.message)])
 
 
 class ChatConversation(me.Document):
     """Represents a chat history for a user."""
+
     uuid = me.StringField(required=True, max_length=200, unique=True)
     title = me.StringField(required=True, max_length=200)
     user_id = me.StringField(required=True, max_length=200)
     messages = me.ListField(me.ReferenceField(ChatMessage, reverse_delete_rule=CASCADE))
     # attachments can be files or urls
-    file_attachments = me.ListField(me.ReferenceField(FileAttachment, reverse_delete_rule=CASCADE))
-    url_attachments = me.ListField(me.ReferenceField(UrlAttachment, reverse_delete_rule=CASCADE))
+    file_attachments = me.ListField(
+        me.ReferenceField(FileAttachment, reverse_delete_rule=CASCADE)
+    )
+    url_attachments = me.ListField(
+        me.ReferenceField(UrlAttachment, reverse_delete_rule=CASCADE)
+    )
     created_at = me.DateTimeField(default=datetime.datetime.now)
     updated_at = me.DateTimeField(default=datetime.datetime.now)
 
@@ -417,6 +538,7 @@ class ChatConversation(me.Document):
     def get_messages(self):
         """Get messages in format expected by pydantic_ai agent"""
         return [msg.to_dict() for msg in self.messages]
+
     def to_model_messages(self) -> list[ModelMessage]:
         """Get messages in ModelMessage format"""
         return [msg.to_model_message() for msg in self.messages]
@@ -424,8 +546,299 @@ class ChatConversation(me.Document):
     def generate_title(self):
         """Generate a title from the first user message"""
         if self.messages and self.title == "New Conversation":
-            first_user_msg = next((msg for msg in self.messages if msg.role == ChatRole.USER), None)
+            first_user_msg = next(
+                (msg for msg in self.messages if msg.role == ChatRole.USER), None
+            )
             if first_user_msg:
                 # Take first 50 characters of the message as title
-                self.title = first_user_msg.message[:50] + ("..." if len(first_user_msg.message) > 50 else "")
+                self.title = first_user_msg.message[:50] + (
+                    "..." if len(first_user_msg.message) > 50 else ""
+                )
                 self.save()
+
+
+class AgentHistory(me.Document):
+    """Simple agent history model for storing conversation messages as JSON."""
+
+    user_id = me.StringField(required=True)
+    messages = me.ListField(me.DictField())  # Store messages as plain JSON
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {"collection": "agent_history"}
+
+    @classmethod
+    def get_latest_conversation_messages(cls, user_id):
+        """Retrieve the latest conversation messages for a user."""
+        # Get today's conversation and filter by the latest conversation
+        # history = cls.objects(user_id=user_id).order_by("-created_at").first()
+        today_history = cls.objects(user_id=user_id).filter(
+            created_at__gte=datetime.datetime.now().replace(hour=0, minute=0, second=0),
+        )
+        if today_history:
+            latest_conversation = today_history.order_by("-created_at").first()
+
+            messages: list[ModelMessage] = []
+            for message in latest_conversation.messages:
+                # convert message to ModelMessage
+                if message["kind"] == "request":
+                    messages.append(ModelRequest(**message))
+                elif message["kind"] == "response":
+                    messages.append(ModelResponse(**message))
+            return messages
+        return []
+
+    @classmethod
+    def save_messages(cls, user_id, messages_json):
+        """Save new messages to the history."""
+        messages_data = json.loads(messages_json)
+        return AgentHistory(user_id=user_id, messages=messages_data).save()
+
+
+class LibraryScope(Enum):
+    PERSONAL = "personal"  # one per user
+    TEAM = "team"  # one per team
+    VERIFIED = "verified"  # global verified catalog
+
+
+class LibraryItem(me.Document):
+    """
+    A pointer to either a Workflow or a SearchSet, with provenance and optional verification stamp.
+    """
+
+    # Polymorphic reference to Workflow or SearchSet
+    obj = me.GenericReferenceField(required=True)  # Workflow OR SearchSet
+
+    # For quick filtering without dereferencing
+    kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+
+    added_by_user_id = me.StringField(required=True, max_length=200)
+    added_at = me.DateTimeField(default=datetime.datetime.now)
+
+    # Whether the referenced object is currently marked verified (mirrors source)
+    verified = me.BooleanField(default=False)
+    verified_at = me.DateTimeField(required=False)
+    verified_by_user_id = me.StringField(required=False, max_length=200)
+
+    # Optional tags/notes to help curate libraries
+    tags = me.ListField(me.StringField(max_length=100), default=[])
+    note = me.StringField(required=False, max_length=2000)
+
+    meta = {
+        "indexes": [
+            # Prevent duplicate entries for the same object inside the same library
+            {"fields": ["obj", "kind"]},
+        ]
+    }
+
+
+# Library
+class Library(me.Document):
+    scope = me.EnumField(
+        LibraryScope, required=True
+    )  # 'personal' | 'team' | 'verified'
+    title = me.StringField(required=True, max_length=200)
+    description = me.StringField(required=False, max_length=2000)
+
+    owner_user_id = me.StringField(required=False, max_length=200)  # PERSONAL
+    team = me.ReferenceField(
+        Team, required=False, reverse_delete_rule=me.CASCADE
+    )  # TEAM
+
+    # Make these timezone-aware in UTC
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    items = me.ListField(me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL))
+
+    meta = {
+        "indexes": [
+            # PERSONAL: one per user
+            {
+                "fields": ["scope", "owner_user_id"],
+                "unique": True,
+                "partialFilterExpression": {
+                    "scope": "personal",
+                    "owner_user_id": {"$exists": True},
+                    # optionally: {"$type": "string"}
+                },
+            },
+            # TEAM: one per team
+            {
+                "fields": ["scope", "team"],
+                "unique": True,
+                "partialFilterExpression": {
+                    "scope": "team",
+                    "team": {"$exists": True},
+                    # if you know it's an ObjectId, you can use:
+                    # "team": {"$type": "objectId"}
+                },
+            },
+            # VERIFIED: single global
+            {
+                "fields": ["scope"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "verified"},
+            },
+        ]
+    }
+
+    def clean(self):
+        # Optional: enforce mutual exclusivity at the app layer
+        if self.scope == "personal":
+            self.team = None
+            if not self.owner_user_id:
+                raise me.ValidationError("owner_user_id required for personal scope")
+        elif self.scope == "team":
+            self.owner_user_id = None
+            if not self.team:
+                raise me.ValidationError("team required for team scope")
+        elif self.scope == "verified":
+            self.owner_user_id = None
+            self.team = None
+
+
+# Activity / Data Analytics
+
+
+# ---- Activity Types & Status ----
+
+
+class ActivityType(str, Enum):
+    CONVERSATION = "conversation"  # chat/agent session messages
+    SEARCH_SET_RUN = "search_set_run"  # SearchSet execution
+    WORKFLOW_RUN = "workflow_run"  # WorkflowResult / workflow execution
+
+
+class ActivityStatus(str, Enum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+# ---- Activity Event ----
+
+
+class ActivityEvent(me.Document):
+    """
+    Immutable-ish append-only activity events for the live feed (and audits).
+    One document per top-level run (conversation session, search_set run, workflow run).
+    """
+
+    # What happened
+    type = me.StringField(required=True, choices=[t.value for t in ActivityType])
+    status = me.StringField(
+        required=True,
+        choices=[s.value for s in ActivityStatus],
+        default=ActivityStatus.RUNNING.value,
+    )
+
+    # Who/where
+    user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(
+        required=False, max_length=200
+    )  # optional: derive via TeamMembership
+    space = me.StringField(required=False, max_length=200)
+
+    # When
+    started_at = me.DateTimeField(default=dt.datetime.utcnow)
+    finished_at = me.DateTimeField(required=False)
+
+    # Linkage to domain objects (use whichever applies)
+    # NOTE: keep light to avoid deref unless needed in UI
+    conversation_id = me.StringField(
+        required=False, max_length=200
+    )  # ChatHistory.id or custom session id
+    search_set_uuid = me.StringField(required=False, max_length=200)
+    workflow_result = me.ReferenceField(
+        "WorkflowResult", reverse_delete_rule=me.CASCADE, required=False
+    )
+    workflow = me.ReferenceField(
+        "Workflow", reverse_delete_rule=me.NULLIFY, required=False
+    )
+
+    # Metrics (optional but handy for analytics + UI badges)
+    # keep primitives: ints/floats/short strings
+    message_count = me.IntField(default=0)  # conversation
+    tokens_input = me.IntField(default=0)  # LLM tokens in
+    tokens_output = me.IntField(default=0)  # LLM tokens out
+    documents_touched = me.IntField(default=0)  # # of docs referenced
+    steps_total = me.IntField(default=0)  # workflow
+    steps_completed = me.IntField(default=0)  # workflow
+    error = me.StringField(required=False, max_length=2000)
+
+    # Free-form details to inspect/debug without dereferencing
+    meta_summary = me.DictField(
+        default={}
+    )  # e.g., {"model":"gpt-4o", "search_set_title":"Acme NDA"}
+    tags = me.ListField(me.StringField(max_length=50), default=[])
+
+    meta = {
+        "indexes": [
+            {"fields": ["-started_at"]},
+            {"fields": ["user_id", "-started_at"]},
+            {"fields": ["team_id", "-started_at"]},
+            {"fields": ["type", "-started_at"]},
+            {"fields": ["status", "-started_at"]},
+        ]
+    }
+
+    @property
+    def is_running(self) -> bool:
+        return self.status in {
+            ActivityStatus.QUEUED.value,
+            ActivityStatus.RUNNING.value,
+        }
+
+    @property
+    def duration_ms(self) -> int | None:
+        if not self.finished_at:
+            return None
+        return int((self.finished_at - self.started_at).total_seconds() * 1000)
+
+
+class DailyUsageAggregate(me.Document):
+    """
+    Per-day rollups for analytics.
+    Separate docs per (scope, principal) so we can query by user, team, and global.
+    """
+
+    # Partition key
+    date = me.DateField(required=True)  # UTC day boundary
+    scope = me.StringField(required=True, choices=["user", "team", "global"])
+    user_id = me.StringField(required=False, max_length=200)  # when scope == 'user'
+    team_id = me.StringField(required=False, max_length=200)  # when scope == 'team'
+
+    # Generic counts by type
+    conversations = me.IntField(default=0)
+    searches = me.IntField(default=0)
+    workflows_started = me.IntField(default=0)
+    workflows_completed = me.IntField(default=0)
+    workflows_failed = me.IntField(default=0)
+
+    # Resource metrics
+    tokens_input = me.IntField(default=0)
+    tokens_output = me.IntField(default=0)
+    documents_touched = me.IntField(default=0)
+
+    # Time & size metrics (ms for precision; convert in UI)
+    workflow_duration_ms = me.IntField(default=0)  # sum of durations for completed
+    conversation_messages = me.IntField(default=0)
+
+    created_at = me.DateTimeField(default=dt.datetime.utcnow)
+    updated_at = me.DateTimeField(default=dt.datetime.utcnow)
+
+    meta = {
+        "indexes": [
+            {"fields": ["date", "scope", "user_id"], "unique": True, "sparse": True},
+            {"fields": ["date", "scope", "team_id"], "unique": True, "sparse": True},
+            {"fields": ["-date", "scope"]},
+        ]
+    }

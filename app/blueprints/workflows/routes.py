@@ -24,8 +24,10 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app.blueprints.home.routes import _get_teams
 from app.models import (
     SearchSet,
     SearchSetItem,
@@ -40,8 +42,13 @@ from app.models import (
     WorkflowStepTask,
 )
 from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import ActivityType, activity_start
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+    add_object_to_library,
+)
 from app.utilities.markdown_helpers import (
     generate_pdf_from_html,
 )
@@ -52,19 +59,19 @@ from app.utilities.workflow import (
     execute_task_step_test,
     execute_workflow_task,
 )
-from app.utils import load_user
 
 workflows = Blueprint("workflows", __name__)
 
 WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
 
 
+@login_required
 @workflows.route("/create_workflow", methods=["POST"])
 def add_workflow() -> ResponseReturnValue:
     """Create a new workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow = Workflow(
         name=workflow_data["name"],
@@ -72,6 +79,9 @@ def add_workflow() -> ResponseReturnValue:
         user_id=session["user_id"],
     )
     workflow.save()
+
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(workflow, library=library, added_by_user_id=user.user_id)
     return jsonify(
         {
             "reroute": url_for(
@@ -88,7 +98,6 @@ def edit_workflow() -> ResponseReturnValue:
     """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
-    load_user()
     workflow = Workflow.objects(id=uuid).first()
 
     template = render_template(
@@ -102,12 +111,13 @@ def edit_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/delete_workflow", methods=["POST"])
 def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     data = request.get_json()
     uuid = data["uuid"]
     print(uuid)
@@ -118,12 +128,13 @@ def delete_workflow() -> ResponseReturnValue:
     return {"success": True}
 
 
+@login_required
 @workflows.route("/update_workflow", methods=["POST"])
 def update_workflow() -> ResponseReturnValue:
     """Update a workflow by ID."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -133,19 +144,19 @@ def update_workflow() -> ResponseReturnValue:
     return {"success": True}
 
 
+@login_required
 @workflows.route("/workflow/run", methods=["POST"])
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
-    user = load_user()
+    user = current_user
+    user_id = user.user_id
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
     document_uuids = workflow_data["document_uuids"]
-
-    user_id = load_user().user_id
 
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
@@ -183,6 +194,15 @@ def run_workflow() -> ResponseReturnValue:
     workflow_trigger_step_id = str(document_trigger_step.id)
     print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
 
+    current_team, my_teams = _get_teams(user)
+    activity_start(
+        type=ActivityType.WORKFLOW_RUN,
+        user_id=user_id,
+        team_id=current_team.uuid,
+        workflow=workflow,
+        workflow_result=workflow_result,
+    )
+
     async_result = execute_workflow_task.delay(
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
@@ -212,12 +232,13 @@ def run_workflow() -> ResponseReturnValue:
     ), 202
 
 
+@login_required
 @workflows.route("/workflow/recommendations", methods=["POST"])
 def get_workflow_recommendations_sync() -> ResponseReturnValue:
     """Get workflow recommendations synchronously (for immediate results)."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     request_data = request.get_json()
     document_uuids = request_data.get("uuids", [])
@@ -303,19 +324,20 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         return jsonify({"error": str(e), "recommendations": []}), 500
 
 
+@login_required
 @workflows.route("/workflow/step/test", methods=["POST"])
 def test_workflow_step() -> ResponseReturnValue:
     """Run a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     task_name = workflow_data["task_name"]
     task_data = workflow_data["task_data"]
     document_uuids = workflow_data["document_uuids"]
 
-    user_id = load_user().user_id
+    user_id = user.user_id
     print(workflow_data)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     document_trigger_step = WorkflowStep(
@@ -519,6 +541,7 @@ def workflow_status() -> ResponseReturnValue:
 
 
 ## @MARK: Download
+@login_required
 @workflows.route("/download", methods=["GET"])
 def workflow_download() -> ResponseReturnValue:
     session_id = request.args.get("session_id")
@@ -561,7 +584,7 @@ def workflow_download() -> ResponseReturnValue:
             f"{raw_json}"
         )
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config:
         model = model_config.name
@@ -609,10 +632,11 @@ def workflow_download() -> ResponseReturnValue:
 
 
 ## @MARK: ~~ Integrate
+@login_required
 @workflows.route("/integrate", methods=["POST"])
 def workflow_integrate() -> ResponseReturnValue:
     """Integrate a workflow template."""
-    user = load_user()
+    user = current_user
     data = request.get_json()
     workflow_id = data.get("workflow_id")
 
@@ -646,12 +670,13 @@ def fetch_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/update_title", methods=["POST"])
 def update_workflow_title() -> ResponseReturnValue:
     """Update the title of a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["uuid"]
     workflow = Workflow.objects(id=ObjectId(workflow_id)).first()
@@ -663,12 +688,13 @@ def update_workflow_title() -> ResponseReturnValue:
 
 
 ## MARK: Workflow steps
+@login_required
 @workflows.route("/add_workflow_step", methods=["POST"])
 def add_workflow_step() -> ResponseReturnValue:
     """Add a new step to a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -690,12 +716,13 @@ def add_workflow_step() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/edit_step", methods=["POST"])
 def edit_workflow_step() -> ResponseReturnValue:
     """Edit a step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
@@ -712,12 +739,13 @@ def edit_workflow_step() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/update_title", methods=["POST"])
 def update_workflow_step_title() -> ResponseReturnValue:
     """Update the title of a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
@@ -728,12 +756,13 @@ def update_workflow_step_title() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/add_task", methods=["POST"])
 def add_workflow_add_task() -> ResponseReturnValue:
     """Add a task to a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
@@ -750,12 +779,13 @@ def add_workflow_add_task() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/add_step_task", methods=["POST"])
 def add_workflow_step_task() -> ResponseReturnValue:
     """Add a task to a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
@@ -768,12 +798,13 @@ def add_workflow_step_task() -> ResponseReturnValue:
     return jsonify({"complete": True})
 
 
+@login_required
 @workflows.route("/delete_step", methods=["POST"])
 def delete_workflow_step() -> ResponseReturnValue:
     """Delete a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_step_id = workflow_data["workflow_step_id"]
@@ -794,12 +825,13 @@ def delete_workflow_step() -> ResponseReturnValue:
     return jsonify({"success": True})
 
 
+@login_required
 @workflows.route("/delete_step_task", methods=["POST"])
 def delete_workflow_step_task() -> ResponseReturnValue:
     """Delete a specific task in a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     print(workflow_data)
@@ -817,12 +849,13 @@ def delete_workflow_step_task() -> ResponseReturnValue:
     return jsonify({"success": True})
 
 
+@login_required
 @workflows.route("/update_workflow_step", methods=["POST"])
 def update_workflow_step() -> ResponseReturnValue:
     """Update a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     step_index = workflow_data["step_index"]
@@ -941,6 +974,7 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
 
 ## @MARK: ~~ Attachments
+@login_required
 @workflows.route("/add_attachment", methods=["GET", "POST"])
 def workflow_add_attachment() -> ResponseReturnValue:
     """Handle the addition of attachments to a workflow step."""
@@ -950,7 +984,7 @@ def workflow_add_attachment() -> ResponseReturnValue:
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
-        user = load_user()
+        user = current_user
 
         workflow = Workflow.objects(id=workflow_id).first()
         current_space = Space.objects(uuid=space_id).first()
@@ -1005,7 +1039,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
             workflow_task = WorkflowStepTask.objects(id=workflow_task_id).first()
 
         prompts = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=current_user.user_id,
             space_id=current_space.uuid,
             searchtype="prompt",
         ).all()
@@ -1091,7 +1125,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         current_space = Space.objects(uuid=space_id).first()
         formatters = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=current_user.user_id,
             space_id=current_space.uuid,
             searchtype="formatter",
         ).all()
@@ -1204,11 +1238,12 @@ def workflow_add_document_step() -> ResponseReturnValue:
     return None
 
 
+@login_required
 @workflows.route("/duplicate/<workflow_id>")
 def duplicate_workflow(workflow_id):
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     # 1) Load original
     orig = Workflow.objects(id=workflow_id).first()
     if not orig:

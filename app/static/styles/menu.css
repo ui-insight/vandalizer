@@ -1,0 +1,97 @@
+
+  :root {
+    --menu-bg: #fff;
+    --menu-text: #111;
+    --menu-border: rgba(0,0,0,.15);
+    --menu-hover: rgba(0,0,0,.04);
+    --menu-shadow: 0 8px 24px rgba(0,0,0,.12);
+    --menu-radius: 8px;
+    --menu-item-pad-y: 10px;
+    --menu-item-pad-x: 14px;
+    --menu-min-w: 180px;
+    --menu-gap: 6px;
+  }
+
+  /* container that positions the menu */
+  .menu-anchor {
+    position: relative;
+    display: inline-block;
+  }
+
+  /* the popup itself */
+  .menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: var(--menu-min-w);
+    padding: var(--menu-gap);
+    background: var(--menu-bg);
+    border: 1px solid var(--menu-border);
+    border-radius: var(--menu-radius);
+    box-shadow: var(--menu-shadow);
+    z-index: 1000;
+  }
+
+.menu.menu-right {
+  right: 0;
+  left: auto;
+}
+
+/* menu that opens above instead of below */
+.menu.menu-up {
+  bottom: calc(100% + 8px);
+  top: auto;
+}
+
+/* if you also want right-align + above */
+.menu.menu-up.menu-right {
+  right: 0;
+  left: auto;
+}
+
+  /* items can be <a> or <button> */
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: var(--menu-item-pad-y) var(--menu-item-pad-x);
+    border-radius: 6px;
+    text-decoration: none;
+    border: 0;
+    background: transparent;
+    color: var(--menu-text);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .menu-item.center {
+    justify-content: center; /* matches your centered Teams links */
+  }
+
+  .menu-item:hover,
+  .menu-item:focus {
+    background: var(--menu-hover);
+    outline: none;
+  }
+
+  .menu-divider {
+    height: 1px;
+    margin: var(--menu-gap) 0;
+    background: #cdcdcd;
+    border: 0;
+  }
+
+  /* optional: tiny menu (for the 3-item “model” popup) */
+  .menu.menu-compact .menu-item {
+    padding: 8px 10px;
+  }
+
+  /* accessibility helpers */
+  .sr-only {
+    position: absolute !important;
+    height: 1px; width: 1px;
+    overflow: hidden; clip: rect(1px, 1px, 1px, 1px);
+    white-space: nowrap; border: 0; padding: 0; margin: -1px;
+  }

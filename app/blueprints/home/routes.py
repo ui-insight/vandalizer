@@ -3,19 +3,40 @@
 import asyncio
 import io
 import json
-import uuid
 import logging
+import uuid
 from datetime import datetime
-
 from itertools import chain
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+from urllib.parse import urlparse
 
+from app.blueprints.library.routes import _build_results_for_template
+from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import recent_activity_for_feed
+from app.utilities.chat_manager import ChatManager
+from app.utilities.config import settings
+from app.utilities.document_manager import (
+    cleanup_document,
+    perform_extraction_and_update,
+    update_document_fields,
+)
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+)
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
+from app.utilities.web_utils import URLContentFetcher  # You already have this
+from app.utils import load_user
 from devtools import debug
 from flask import (
     Blueprint,
     Response,
     current_app,
-    redirect,
+    jsonify,
     render_template,
     request,
     send_file,
@@ -23,45 +44,30 @@ from flask import (
     session,
     stream_with_context,
     url_for,
-    jsonify,
 )
 from flask.typing import ResponseReturnValue
-from flask_dance.contrib.azure import azure
+from flask_login import current_user, login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
 from app.models import (
+    ActivityEvent,
+    ChatConversation,
+    ChatRole,
     SearchSet,
     SearchSetItem,
     SmartDocument,
     SmartFolder,
     Space,
+    Team,
+    TeamMembership,
+    UrlAttachment,
+    User,
     UserModelConfig,
     Workflow,
     WorkflowStep,
-    ChatConversation,
-    ChatRole,
-    UrlAttachment,
 )
-from app.utilities.agents import create_chat_agent
-from app.utilities.config import settings
-from app.utilities.document_manager import (
-    cleanup_document,
-    perform_extraction_and_update,
-    update_document_fields,
-)
-from app.utilities.markdown_helpers import (
-    generate_pdf_from_html,
-)
-from app.utilities.openai_interface import OpenAIInterface
-from app.utilities.upload_manager import (
-    perform_document_validation,
-)
-from app.utils import is_dev, load_user
-from app.utilities.web_utils import URLContentFetcher  # You already have this
-import requests
-from urllib.parse import urlparse
 
 home = Blueprint("home", __name__)
 
@@ -69,23 +75,25 @@ WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 logger = logging.getLogger(__name__)
 
+
+@login_required
 @app.context_processor
 def inject_current_model():
     """
     Runs on *every* template render.  Looks up the user's ModelConfig,
     and makes `current_model` available in all templates.
     """
-    user = load_user()
-    if user:
-        model_config = UserModelConfig.objects(user_id=user.user_id).first()
-        models = [m.model_dump() for m in settings.models]
-        current_model = settings.base_model
-        if model_config:
-            current_model = model_config.name
-            if len(model_config.available_models) > 0:
-                models = json.loads(json.dumps(model_config.available_models))
+    # user = current_user
+    # if user:
+    #     model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    #     models = [m.model_dump() for m in settings.models]
+    #     current_model = settings.base_model
+    #     if model_config:
+    #         current_model = model_config.name
+    #         if len(model_config.available_models) > 0:
+    #             models = json.loads(json.dumps(model_config.available_models))
 
-        return {"current_model": current_model, "models": models}
+    #     return {"current_model": current_model, "models": models}
 
     return {"current_model": "", "models": []}
 
@@ -132,7 +140,7 @@ def build_breadcrumbs(
 
     # Start with Space as the root crumb
     crumbs: List[Dict[str, str]] = [
-        {"label": current_space.title, "href": url_for("home.index", folder_id="0")}
+        {"label": "My Files", "href": url_for("home.index", folder_id="0")}
     ]
 
     # If we’re at root, we’re done.
@@ -158,198 +166,70 @@ def build_breadcrumbs(
     return crumbs
 
 
+@login_required
 @home.route("/")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
-    # production environment
-    if not is_dev():
-        if not azure.authorized:
-            return redirect(url_for("azure.login"))
-        if "user_id" not in session:
-            debug("No user session")
-            resp = azure.get("/v1.0/me")
-            user_info = resp.json()
-            if "id" not in user_info:
-                debug("Got nothing from azure")
-                session["user_id"] = "admin"
-            else:
-                debug("Got user info from azure")
-                user_id = user_info["id"]
-                session["user_id"] = user_id
+    user = current_user
+    if user is None:
+        return
+    section = (request.args.get("section") or "Assistant").strip()
 
-    user = load_user()
-    section = request.args.get("section", default="Assistant").strip()
+    # Spaces
+    spaces_all = _ensure_default_space_and_get_all()
+    current_space = _resolve_current_space(spaces_all)
+    spaces = _order_spaces_with_current_first(spaces_all, current_space)
 
-    document = None
-    # Get the space
-    spaces = list(Space.objects())
-    if len(spaces) == 0:
-        space = Space(title="Default Space", uuid=uuid.uuid4().hex)
-        space.save()
-        spaces = list(Space.objects())
+    # Documents (may update current_space if a doc lives elsewhere)
+    documents, selected_document, maybe_space = _gather_documents()
+    if maybe_space is not None:
+        current_space = maybe_space
+        spaces = _order_spaces_with_current_first(spaces_all, current_space)
 
-    if request.args.get("space_id"):
-        session["space_id"] = request.args.get("space_id")
-        current_space = Space.objects(uuid=request.args.get("space_id")).first()
-    elif "space_id" in session and session["space_id"] != "":
-        current_space = Space.objects(uuid=session["space_id"]).first()
-    else:
-        current_space = spaces[0]
-
-    if current_space not in spaces:
-        current_space = spaces[0]
-
-    documents = []
-
-    selected_document = None
-
-    # Check for documents
-    if request.args.get("docid"):
-        doc_id = request.args.get("docid")
-        document = SmartDocument.objects(uuid=doc_id).first()
-        if document is not None:
-            documents.append(document)
-            verify_document(document)
-            current_space = Space.objects(uuid=document.space).first()
-            selected_document = document
-
-    if request.args.get("docids"):
-        doc_ids = request.args.get("docids").split(",")
-        for doc_id in doc_ids:
-            document = SmartDocument.objects(uuid=doc_id).first()
-            if document is not None:
-                documents.append(document)
-                verify_document(document)
-
-        if document is not None:
-            current_space = Space.objects(uuid=document.first.space).first()
-
-    spaces.remove(current_space)
-    spaces.insert(0, current_space)
-
-    # Get workflow if it exists
-    workflow_template = ""
-    workflow_step_template = ""
+    # Workflow templates (string fragments for the page)
     workflow_id = request.args.get("workflow_id", default=0)
-    if workflow_id != 0:
-        workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
+    workflow_tpl, workflow_step_tpl = _render_workflow_bits(workflow_id)
 
-        workflow_template = render_template(
-            "workflows/workflow.html",
-            workflow=workflow,
-        )
-
-        workflow_step_id = request.args.get("workflow_step_id", default=0)
-        if workflow_step_id != 0:
-            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-            workflow_step_template = render_template(
-                "workflows/workflow_steps/edit_workflow_step_modal.html",
-                workflow=workflow,
-                workflow_step_id=workflow_step.id,
-                workflow_step=workflow_step,
-            )
-
-        # Get workflow if it exists
-
-        workflow_step_id = request.args.get("workflow_step_id", default=0)
-        if workflow_step_id != 0:
-            workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
-            workflow_step_template = render_template(
-                "workflows/workflow_steps/edit_workflow_step_modal.html",
-                workflow=workflow,
-                workflow_step_id=workflow_step.id,
-                workflow_step=workflow_step,
-            )
-
-    # Get workflow if it exists
-
-    # Get the extraction and prompt sets
-    global_extraction_sets = SearchSet.objects(
-        space=current_space.uuid,
-        is_global=True,
-        set_type="extraction",
-    ).all()
-    user_extraction_sets = SearchSet.objects(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        is_global=False,
-        set_type="extraction",
-    ).all()
-    extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
-
-    # Get the prompt sets
-
-    prompts = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="prompt",
-    ).all()
-
-    formatters = SearchSetItem.objects(
-        user_id=user.user_id,
-        space_id=current_space.uuid,
-        searchtype="formatter",
-    ).all()
-
-    # Workflows
-    workflows = Workflow.objects(
-        user_id=user.user_id,
-    ).all()
-
-    # Get the folders
-    current_folder_id = "0"
-    current_folder_parent_id = "0"
-    if request.args.get("folder_id"):
-        current_folder_id = request.args.get("folder_id")
-
-    base_query = Q(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        folder=current_folder_id,
+    # Query sets & workflows
+    extraction_sets, prompts, formatters, workflows = _load_sets_and_workflows(
+        user, current_space
     )
 
-    default_doc_query = Q(user_id=user.user_id, is_default=True)
-
-    folder_docs = (
-        SmartDocument.objects(base_query | default_doc_query)
-        .order_by("-created_at")
-        .all()
+    # Folder context
+    current_folder_id, current_folder_parent_id, folder_docs, folders = _folder_context(
+        user, current_space
     )
-    # Check for OCR and semantic ingestion for documents in the folder
-    # This should resolve the issue with old documents not being processed
 
-    if current_folder_id not in {0, "0"}:
-        folder_docs = (
-            SmartDocument.objects(base_query | default_doc_query)
-            .order_by("-created_at")
-            .all()
-        )
-
-        folder = SmartFolder.objects(uuid=current_folder_id).first()
-        if folder:
-            current_folder_parent_id = folder.parent_id
-    folders = SmartFolder.objects(
-        user_id=user.user_id,
-        space=current_space.uuid,
-        parent_id="0",
-    ).all()
-    if current_folder_id != 0:
-        folders = SmartFolder.objects(
-            user_id=user.user_id,
-            space=current_space.uuid,
-            parent_id=current_folder_id,
-        ).all()
-
-    # Release Notes
-    release_seen = request.cookies.get("release_seen")
-    show_release_panel = release_seen != CURRENT_RELEASE_VERSION
-
+    # Release panel & breadcrumbs
+    show_release_panel = request.cookies.get("release_seen") != CURRENT_RELEASE_VERSION
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
-    conversations = ChatConversation.objects(
-        user_id=user.user_id
-    ).order_by("-created_at").all()
+    conversations = (
+        ChatConversation.objects(user_id=user.user_id).order_by("-created_at").all()
+    )
 
+    # Teams
+    current_team, my_teams = _get_teams(user)
+
+    # Activity
+    activities_qs = _build_activities(user=user)
+    activities = [event_to_dict(a) for a in activities_qs]
+
+    json.dumps(activities)
+    print(activities)
+
+    # ensure_everyone_has_libraries_and_backfill()
+
+    # Library
+    my_library = _get_or_create_personal_library(user_id=user.user_id)
+    scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
+    item_type = request.args.get("type", "workflows")  # 'workflows' | 'tasks' | 'all'
+    kinds_str = request.args.get("kinds", "extract,prompt,format")
+    kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
+    query = request.args.get("q", "")
+
+    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
+    initial_library_results = _initial_library_results(request)
 
     return render_template(
         "index.html",
@@ -368,14 +248,215 @@ def index() -> ResponseReturnValue:
         section=section,
         max_context_length=settings.max_context_length,
         workflows=workflows,
-        workflow_template=workflow_template,
-        workflow_step_template=workflow_step_template,
+        workflow_template=workflow_tpl,
+        workflow_step_template=workflow_step_tpl,
         workflow_id=workflow_id,
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
         current_release=CURRENT_RELEASE_VERSION,
         breadcrumbs=breadcrumbs,
+        is_admin=user.is_admin,
+        activities=activities,
+        current_team=current_team,
+        my_teams=my_teams,
+        my_library=my_library,
+        initial_library_results=initial_library_results,
+        filters=initial_filters,
     )
+
+
+# ---------------------------- helpers ----------------------------
+
+
+def event_to_dict(a: ActivityEvent) -> dict:
+    return {
+        "id": str(a.id),
+        "type": str(a.type),
+        "status": str(a.status),
+        "title": str(a.meta_summary.get("title") or "Activity"),
+        "conversation_id": str(a.conversation_id) if a.conversation_id else None,
+        "search_set_uuid": str(a.search_set_uuid) if a.search_set_uuid else None,
+        "workflow_id": str(a.workflow.id) if a.workflow else None,
+        "started_at": a.started_at.isoformat() if a.started_at else None,
+        "finished_at": a.finished_at.isoformat() if a.finished_at else None,
+        "error": str(a.error) if a.error else "",
+    }
+
+
+def _initial_library_results(request: Any) -> str:
+    scope = request.args.get("scope", "mine")  # 'team' | 'mine' | 'verified'
+    item_type = request.args.get("type", "all")  # 'workflows' | 'tasks' | 'all'
+    kinds_str = request.args.get("kinds", "extract,prompt,format")
+    kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
+    query = request.args.get("q", "")
+
+    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
+    ctx = _build_results_for_template(initial_filters)
+
+    # Render the partial once for first load so the panel is filled immediately
+    return render_template("library/_results.html", **ctx)
+
+
+def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
+    current_team = user.ensure_current_team()
+    my_teams = TeamMembership.objects(user_id=user.user_id)
+    return (current_team, my_teams)
+
+
+def _ensure_default_space_and_get_all() -> list[Space]:
+    """Guarantee at least one Space exists; return all spaces."""
+    spaces = list(Space.objects())
+    if not spaces:
+        Space(title="Default Space", uuid=uuid.uuid4().hex).save()
+        spaces = list(Space.objects())
+    return spaces
+
+
+def _resolve_current_space(spaces: list[Space]) -> Space:
+    """Pick current space from query, session, or first available."""
+    q_space_id = request.args.get("space_id")
+    if q_space_id:
+        session["space_id"] = q_space_id
+        found = Space.objects(uuid=q_space_id).first()
+        if found:
+            return found
+
+    sess_id = session.get("space_id")
+    if sess_id:
+        found = Space.objects(uuid=sess_id).first()
+        if found:
+            return found
+
+    return spaces[0]
+
+
+def _order_spaces_with_current_first(
+    spaces_all: list[Space], current: Space
+) -> list[Space]:
+    """Return spaces with current first (no duplicates)."""
+    ordered = [current] + [s for s in spaces_all if s.uuid != current.uuid]
+    return ordered
+
+
+def _gather_documents() -> tuple[
+    list[SmartDocument], Optional[SmartDocument], Optional[Space]
+]:
+    """
+    Collect selected docs based on 'docid'/'docids'.
+    Returns (documents, selected_document, current_space_override_if_any).
+    """
+    documents: list[SmartDocument] = []
+    selected_document: Optional[SmartDocument] = None
+    space_override: Optional[Space] = None
+
+    doc_id = request.args.get("docid")
+    if doc_id:
+        d = SmartDocument.objects(uuid=doc_id).first()
+        if d:
+            documents.append(d)
+            verify_document(d)
+            selected_document = d
+            space_override = Space.objects(uuid=d.space).first()
+
+    doc_ids = request.args.get("docids")
+    if doc_ids:
+        for did in doc_ids.split(","):
+            d = SmartDocument.objects(uuid=did).first()
+            if d:
+                documents.append(d)
+                verify_document(d)
+                # keep last space encountered (prior behavior used the last doc)
+                space_override = Space.objects(uuid=d.space).first()
+
+    return documents, selected_document, space_override
+
+
+def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
+    """Render workflow and (optional) workflow-step templates."""
+    if not workflow_id or workflow_id == 0:
+        return "", ""
+
+    workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
+    if not workflow:
+        return "", ""
+
+    workflow_tpl = render_template("workflows/workflow.html", workflow=workflow)
+
+    step_tpl = ""
+    step_id = request.args.get("workflow_step_id", default=0)
+    if step_id and step_id != 0:
+        workflow_step = WorkflowStep.objects(id=step_id).first()
+        if workflow_step:
+            step_tpl = render_template(
+                "workflows/workflow_steps/edit_workflow_step_modal.html",
+                workflow=workflow,
+                workflow_step_id=workflow_step.id,
+                workflow_step=workflow_step,
+            )
+    return workflow_tpl, step_tpl
+
+
+def _load_sets_and_workflows(user, current_space: Space):
+    """Load extraction sets, prompt/formatter items, and user workflows."""
+    global_extraction_sets = SearchSet.objects(
+        space=current_space.uuid, is_global=True, set_type="extraction"
+    ).all()
+    user_extraction_sets = SearchSet.objects(
+        user_id=user.user_id,
+        space=current_space.uuid,
+        is_global=False,
+        set_type="extraction",
+    ).all()
+    extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
+
+    prompts = SearchSetItem.objects(
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="prompt"
+    ).all()
+
+    formatters = SearchSetItem.objects(
+        user_id=user.user_id, space_id=current_space.uuid, searchtype="formatter"
+    ).all()
+
+    workflows = Workflow.objects(user_id=user.user_id).all()
+
+    return extraction_sets, prompts, formatters, workflows
+
+
+def _folder_context(user, current_space: Space):
+    """
+    Resolve folder id/parent, gather docs & subfolders.
+    Returns (current_folder_id, current_folder_parent_id, folder_docs, folders).
+    """
+    current_folder_id = request.args.get("folder_id", default="0")
+    current_folder_parent_id = "0"
+
+    base_query = Q(
+        user_id=user.user_id, space=current_space.uuid, folder=current_folder_id
+    )
+    default_doc_query = Q(user_id=user.user_id, is_default=True)
+    folder_docs = (
+        SmartDocument.objects(base_query | default_doc_query)
+        .order_by("-created_at")
+        .all()
+    )
+
+    if current_folder_id not in {"0", 0}:
+        folder = SmartFolder.objects(uuid=current_folder_id).first()
+        if folder:
+            current_folder_parent_id = folder.parent_id
+
+    folders = SmartFolder.objects(
+        user_id=user.user_id,
+        space=current_space.uuid,
+        parent_id=current_folder_id if current_folder_id != 0 else "0",
+    ).all()
+
+    return current_folder_id, current_folder_parent_id, folder_docs, folders
+
+
+def _build_activities(user: User) -> list[ActivityEvent]:
+    activities = recent_activity_for_feed(user_id=user.user_id)
+    return activities
 
 
 @home.route("/chat", methods=["POST"])
@@ -393,13 +474,17 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user = load_user()
+    user = current_user
     user_id = user.user_id
 
-    conversation = ChatConversation.objects(uuid=conversation_uuid, user_id=user_id).first()
+    conversation = ChatConversation.objects(
+        uuid=conversation_uuid, user_id=user_id
+    ).first()
     if conversation is None:
         title = message.strip()
-        conversation = ChatConversation(user_id=user.user_id, title=title, uuid=str(uuid.uuid4()))
+        conversation = ChatConversation(
+            user_id=user.user_id, title=title, uuid=str(uuid.uuid4())
+        )
         conversation.generate_title()
         conversation.save()
 
@@ -427,7 +512,7 @@ def chat() -> ResponseReturnValue:
     print(f"The model is {model}")
 
     def generate():
-        for chunk in OpenAIInterface().ask_question_to_documents_stream(
+        for chunk in ChatManager().ask_question_to_documents_stream(
             model,
             current_app.root_path,
             documents,
@@ -463,15 +548,12 @@ def add_link_to_chat():
         # Get or create conversation
         if conversation_uuid:
             conversation = ChatConversation.objects(
-                uuid=conversation_uuid,
-                user_id=user_id
+                uuid=conversation_uuid, user_id=user_id
             ).first()
         else:
             # Create new conversation if none exists
             conversation = ChatConversation(
-                uuid=str(uuid.uuid4()),
-                user_id=user_id,
-                title="New Conversation"
+                uuid=str(uuid.uuid4()), user_id=user_id, title="New Conversation"
             )
             conversation.save()
 
@@ -495,10 +577,7 @@ def add_link_to_chat():
 
         # Create URL attachment
         url_attachment = UrlAttachment(
-            url=link,
-            title=title,
-            content=content,
-            user_id=user_id
+            url=link, title=title, content=content, user_id=user_id
         )
         url_attachment.save()
 
@@ -507,17 +586,20 @@ def add_link_to_chat():
         conversation.updated_at = datetime.now()
         conversation.save()
 
-        return jsonify({
-            "success": True,
-            "conversation_uuid": conversation.uuid,
-            "attachment_id": str(url_attachment.id),
-            "title": title,
-            "content_preview": content[:500] if content else ""
-        }), 200
+        return jsonify(
+            {
+                "success": True,
+                "conversation_uuid": conversation.uuid,
+                "attachment_id": str(url_attachment.id),
+                "title": title,
+                "content_preview": content[:500] if content else "",
+            }
+        ), 200
 
     except Exception as e:
         logger.error(f"Error adding URL attachment: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/chat_history/<conversation_uuid>", methods=["GET"])
 def get_chat_history(conversation_uuid):
@@ -525,8 +607,7 @@ def get_chat_history(conversation_uuid):
     try:
         user = load_user()
         conversation = ChatConversation.objects(
-            uuid=conversation_uuid,
-            user_id=user.user_id
+            uuid=conversation_uuid, user_id=user.user_id
         ).first()
 
         if not conversation:
@@ -535,16 +616,20 @@ def get_chat_history(conversation_uuid):
         # Include URL attachments if they exist
         url_attachments = []
         for attachment in conversation.url_attachments:
-            url_attachments.append({
-                "url": attachment.url,
-                "title": attachment.title,
-                "created_at": attachment.created_at.isoformat()
-            })
+            url_attachments.append(
+                {
+                    "url": attachment.url,
+                    "title": attachment.title,
+                    "created_at": attachment.created_at.isoformat(),
+                }
+            )
 
-        return jsonify({
-            "messages": conversation.get_messages(),
-            "url_attachments": url_attachments
-        })
+        return jsonify(
+            {
+                "messages": conversation.get_messages(),
+                "url_attachments": url_attachments,
+            }
+        )
     except Exception as e:
         logger.error(f"Error fetching chat history: {e}")
         return jsonify({"error": "Failed to fetch conversation"}), 500
@@ -560,8 +645,7 @@ def delete_chat_history(conversation_uuid):
 
         # Find the conversation and verify it belongs to the user
         conversation = ChatConversation.objects(
-            uuid=conversation_uuid,
-            user_id=user_id
+            uuid=conversation_uuid, user_id=user_id
         ).first()
 
         if not conversation:
@@ -583,10 +667,9 @@ def delete_chat_history(conversation_uuid):
         # Delete the conversation itself
         conversation.delete()
 
-        return jsonify({
-            "success": True,
-            "message": "Conversation deleted successfully"
-        }), 200
+        return jsonify(
+            {"success": True, "message": "Conversation deleted successfully"}
+        ), 200
 
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
@@ -627,7 +710,7 @@ def chat_download() -> ResponseReturnValue:
             f"{final_output}"
         )
 
-    user = load_user()
+    user = current_user
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config:
         model = model_config.name

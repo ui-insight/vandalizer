@@ -141,7 +141,7 @@ def generate_pdf_from_html(html: str) -> io.BytesIO:
     print(full_html)
 
     buf = io.BytesIO()
-    link_cb = _link_callback_factory(None)
+    link_cb = _link_callback_factory("")
     # pisa.CreatePDF accepts file-like for src & dest; css within <style> is supported.
     result = pisa.CreatePDF(
         src=io.StringIO(full_html),

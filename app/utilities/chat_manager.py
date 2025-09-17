@@ -2,14 +2,12 @@ import asyncio
 import json
 import logging
 import os
-import uuid
 
 import openai
 from devtools import debug
 from dotenv import load_dotenv
 from pydantic_ai import Agent
 from pydantic_ai.messages import (
-    ModelMessagesTypeAdapter,
     PartDeltaEvent,
     PartStartEvent,
     TextPart,
@@ -19,10 +17,9 @@ from pydantic_ai.messages import (
 )
 
 from app.models import (
-    MAX_CHAT_MESSAGES,
-    UserModelConfig,
     ChatConversation,
     ChatRole,
+    UserModelConfig,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.config import settings
@@ -33,7 +30,6 @@ from app.utilities.llm_helpers import (
     remove_code_markers,
     remove_xml_content,
 )
-from app.utilities.web_utils import URLContentFetcher
 from app.utilities.redis_cache import RedisCache
 
 load_dotenv()
@@ -44,15 +40,14 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 ttl = 60 * 60 * 1
 cache = RedisCache(redis_url=f"redis://{REDIS_HOST}:6379/0", ttl=ttl)
 
-# TODO remove the formatting of the answer from the OpenAIInterface class
+# TODO remove the formatting of the answer from the ChatManager class
 # it is taking so much time to execute the call
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-# TODO we might need to rename the class
-class OpenAIInterface:
+class ChatManager:
     loaded_doc = ""
 
     def load_document(self, document_path) -> None:
@@ -134,16 +129,26 @@ class OpenAIInterface:
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
 
-        prompt = """Given the following document(s), answer the question. Return the result as nicely formatted markdown. Do not include the question in your response. At the end include a very short suggestion of next questions to ask or next steps the user might do with the documents."""
+        prompt = """You are given the following document(s). 
+Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
+Do not restate or include the original question in your answer. 
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
 
         if len(docs) == 0:
-            prompt = "Answer the question. Return the result as nicely formatted markdown. Do not include the question in your response."
+            prompt = """Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
+Do not restate or include the original question in your answer. 
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
 
         debug(user_id)
+        previous_messages, cache_key, llm_string = ChatManager.get_cache_messages(
+            user_id=user_id,
+            docs_ids_string=docs_ids_string,
+            session=session,
+        )
 
         max_context_length = settings.max_context_length
 
-        full_text = OpenAIInterface.get_full_text(documents, previous_messages)
+        full_text = ChatManager.get_full_text(documents, previous_messages)
         # remove base64 images from full_text
         full_text = remove_base64_images(full_text)
 
@@ -156,12 +161,15 @@ class OpenAIInterface:
             agent = create_rag_agent(model)
             debug("Rag chat", prompt)
 
-        return dict(
-            agent=agent,
-            prompt=prompt,
-            user_id=user_id,
-            full_text=full_text,
-        )
+        return {
+            "agent": agent,
+            "prompt": prompt,
+            "previous_messages": previous_messages,
+            "cache_key": cache_key,
+            "llm_string": llm_string,
+            "user_id": user_id,
+            "full_text": full_text,
+        }
 
     def ask_question_to_documents(
         self,
@@ -279,7 +287,9 @@ class OpenAIInterface:
         full_response = []
 
         async def streamer():
-            async with agent.iter(prompt, message_history=previous_messages) as agent_run:
+            async with agent.iter(
+                prompt, message_history=previous_messages
+            ) as agent_run:
                 async for node in agent_run:
                     if Agent.is_model_request_node(node):
                         async with node.stream(agent_run.ctx) as stream:
@@ -292,7 +302,7 @@ class OpenAIInterface:
                                         full_response.append(content)
                                         yield (
                                             json.dumps(
-                                                dict(kind="text", content=content)
+                                                {"kind": "text", "content": content}
                                             )
                                             + "\n"
                                         )
@@ -321,19 +331,18 @@ class OpenAIInterface:
                                     elif isinstance(event.delta, ThinkingPartDelta):
                                         yield (
                                             json.dumps(
-                                                dict(
-                                                    kind="thinking",
-                                                    content=event.delta.content_delta,
-                                                )
+                                                {
+                                                    "kind": "thinking",
+                                                    "content": event.delta.content_delta,
+                                                }
                                             )
                                             + "\n"
                                         )
                     # elif Agent.is_call_tools_node(node):
 
             if full_response:
-                assistant_message = ''.join(full_response)
+                assistant_message = "".join(full_response)
                 conversation.add_message(ChatRole.ASSISTANT, assistant_message)
-
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():

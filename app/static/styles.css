@@ -203,7 +203,7 @@ footer .footer-poweredby {
     box-shadow: -0.7rem 0 0 #f1b300;
 }
 
-.hero-content a:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
+.hero-content a.action-button:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
     -webkit-box-shadow: none;
     box-shadow: none;
     background: none;
@@ -212,7 +212,7 @@ footer .footer-poweredby {
     border-bottom: 0.1em solid #f1b300;
 }
 
-.hero-content a, .hero-content  button {
+.hero-content a.action-button, .hero-content  button {
     display: inline-block;
     width: 100%;
     color: #191919;
@@ -924,8 +924,12 @@ tr {
     flex-grow: 1;
 }
 
+.file-link i {
+    color: rgb(206, 206, 206);
+}
+
 .fa-file.invalid {
-    color: red;
+    color: rgba(255, 0, 0, 0.351);
 }
 
 .file-name {
@@ -1408,7 +1412,7 @@ think:hover > * {
   display: inline;              /* or block, depending on your markup */
 }
 
-//* 1) Positioning context */
+/* 1) Positioning context */
 .btn.shimmer,
 .btn-primary.shimmer {
   position: relative;
@@ -1445,3 +1449,59 @@ think:hover > * {
   0%   { transform: translateX(-100%) skewX(-20deg); }
   100% { transform: translateX(100%)  skewX(-20deg); }
 }
+
+.bootstrapless-button {
+  background: none;
+  border: none;
+}
+
+
+.vandalizer-checkbox {
+  appearance: none; /* Remove default OS checkbox */
+  -webkit-appearance: none; /* For Safari */
+  -moz-appearance: none;
+
+  width: 15px;
+  height: 15px;
+  border: 2px solid #888;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.vandalizer-checkbox:checked {
+  background-color: #ffffff; /* green when checked */
+  border-color: #c6c6c6;
+  color: black;
+}
+
+.vandalizer-checkbox:checked::after {
+  content: "✓";
+  color: rgb(0, 0, 0);
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 12px;
+}
+.local-login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 45px;
+      width: 100%;
+    }
+    .local-login-form input,
+    .local-login-form button {
+      padding: 12px 15px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 15px;
+    }
+    .local-login-form button {
+      background-color: #f1b300; /* Vandal Gold */
+      color: #000;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+    }
