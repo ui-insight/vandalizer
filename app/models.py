@@ -327,7 +327,8 @@ class SmartFolder(me.Document):
     title = me.StringField(required=True, max_length=200)
     uuid = me.StringField(required=True, max_length=200)
     space = me.StringField(required=True, max_length=200)
-    user_id = me.StringField(required=True, max_length=200)
+    user_id = me.StringField(max_length=200)
+    team_id = me.StringField(max_length=200)
 
     def number_of_documents(self) -> int:
         """Returns the number of documents in this smart folder."""
