@@ -560,35 +560,63 @@ class LibraryItem(me.Document):
 
 # Library
 class Library(me.Document):
-    """
-    A collection of library items under a given scope.
-    - PERSONAL:   one per user (owner_user_id populated)
-    - TEAM:       one per team (team ref populated)
-    - VERIFIED:   global catalog (neither owner_user_id nor team populated)
-    """
-
-    scope = me.EnumField(LibraryScope, required=True)
+    scope = me.EnumField(
+        LibraryScope, required=True
+    )  # 'personal' | 'team' | 'verified'
     title = me.StringField(required=True, max_length=200)
     description = me.StringField(required=False, max_length=2000)
 
-    # Only one of these is set depending on scope
     owner_user_id = me.StringField(required=False, max_length=200)  # PERSONAL
     team = me.ReferenceField(
         Team, required=False, reverse_delete_rule=me.CASCADE
     )  # TEAM
 
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-    updated_at = me.DateTimeField(default=datetime.datetime.now)
+    # Make these timezone-aware in UTC
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
 
     items = me.ListField(me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL))
 
     meta = {
         "indexes": [
-            # enforce uniqueness of library by scope & owner/team
-            {"fields": ["scope", "owner_user_id"], "unique": True, "sparse": True},
-            {"fields": ["scope", "team"], "unique": True, "sparse": True},
+            # PERSONAL: one per user
+            {
+                "fields": ["scope", "owner_user_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "personal"},
+            },
+            # TEAM: one per team
+            {
+                "fields": ["scope", "team"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "team", "team": {"$ne": None}},
+            },
+            # VERIFIED: single global
+            {
+                "fields": ["scope"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "verified"},
+            },
         ]
     }
+
+    def clean(self):
+        # Optional: enforce mutual exclusivity at the app layer
+        if self.scope == "personal":
+            self.team = None
+            if not self.owner_user_id:
+                raise me.ValidationError("owner_user_id required for personal scope")
+        elif self.scope == "team":
+            self.owner_user_id = None
+            if not self.team:
+                raise me.ValidationError("team required for team scope")
+        elif self.scope == "verified":
+            self.owner_user_id = None
+            self.team = None
 
 
 # Activity / Data Analytics
