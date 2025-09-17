@@ -12,7 +12,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
-from flask_login import login_user
+from flask_login import current_user, login_user
 
 from app.models import User
 
@@ -23,6 +23,9 @@ auth = Blueprint("auth", __name__)
 def index() -> ResponseReturnValue:
     """Render the landing page if not authorized."""
     # debug("Not authorized")
+    if current_user is not None:
+        return redirect(url_for("home.index"))
+
     return render_template("landing.html", AUTH_MODE=current_app.config["AUTH_MODE"])
 
 

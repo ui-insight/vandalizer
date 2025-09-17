@@ -200,8 +200,8 @@ def index() -> ResponseReturnValue:
     )
 
     # Folder context
-    current_folder_id, current_folder_parent_id, folder_docs, folders = _folder_context(
-        user, current_space
+    current_folder_id, current_folder_parent_id, folder_docs, folders, team_folders = (
+        _folder_context(user, current_space)
     )
 
     # Release panel & breadcrumbs
@@ -241,6 +241,7 @@ def index() -> ResponseReturnValue:
         prompts=prompts,
         formatters=formatters,
         folders=folders,
+        team_folders=team_folders,
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
@@ -450,12 +451,24 @@ def _folder_context(user, current_space: Space):
             current_folder_parent_id = folder.parent_id
 
     folders = SmartFolder.objects(
-        user_id=user.user_id,
+        team_id=user.user_id,
         space=current_space.uuid,
         parent_id=current_folder_id if current_folder_id != 0 else "0",
     ).all()
 
-    return current_folder_id, current_folder_parent_id, folder_docs, folders
+    current_team = user.ensure_current_team()
+    team_folders = SmartFolder.objects(
+        team_id=current_team.uuid,
+        parent_id=current_folder_id if current_folder_id != 0 else "0",
+    ).all()
+
+    return (
+        current_folder_id,
+        current_folder_parent_id,
+        folder_docs,
+        folders,
+        team_folders,
+    )
 
 
 def _build_activities(user: User) -> list[ActivityEvent]:

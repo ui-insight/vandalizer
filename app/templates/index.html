@@ -155,22 +155,31 @@
                     <th style="display: none;"></th>
                     <tbody id="doc-body">
 
-                        <!-- Shared Folder -->
+
+                        <!-- Folders -->
+                        {% for folder in team_folders %}
                         <tr class="folder">
                             <td>
                                 <span style="margin-right: 10px;"><input type="checkbox" class="document-selector"
-                                        data-doc-type="folder" data-doc-uuid="" data-doc-uuids=""
-                                        data-num-documents=" "></span>
+                                        data-doc-type="folder" data-doc-uuid="{{ folder.uuid }}"
+                                        data-doc-uuids="{{ folder.document_uuids() }}"
+                                        data-num-documents="{{ folder.number_of_documents() }} "></span>
 
-                                <a href="javascript:void(0);" onclick="">
-                                    <span><i class="fa-solid fa-folder" style="color:  rgb(0 128 128);"></i></span>
+                                <a href="javascript:void(0);" onclick="addFolderId('{{ folder.uuid }}')">
+                                    <span><i class="fa-solid fa-folder" style="color: rgb(0 128 128);"></i></span>
                                     <span
                                         style="padding-right: 10px; padding-left: 5px; font-weight: 450; overflow: ellipsis; color:#17181abb;">
-                                        {{ current_team.name }} shared folder</span>
+                                        {{ folder.title }}</span>
                                 </a>
 
+                                <button class="ellipsis-btn" style="float:right;" data-folder-id="{{ folder.uuid }}">
+                                    <span style="font-size: 1em; color: #191919;">
+                                        <i class="fa-solid fa-ellipsis-vertical"></i>
+                                    </span>
+                                </button>
                             </td>
                         </tr>
+                        {% endfor %}
 
                         <!-- Folders -->
                         {% for folder in folders %}

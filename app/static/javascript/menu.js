@@ -96,18 +96,43 @@ document.addEventListener('click', (e) => {
     const field = document.getElementById('add-folder-field');
     const name = window.prompt('New folder name');
     if (name && form && field) {
+        // Add hidden field for individual folder
+        let hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'folder_type';
+        hidden.value = 'individual';
+        form.appendChild(hidden);
+
         field.value = name.trim();
         form.submit();
     }
     closeDropdown();
-    } else if (action === 'trigger-file-input') {
+
+} else if (action === 'new-team-folder') {
+    const form = document.getElementById('add-form');
+    const field = document.getElementById('add-folder-field');
+    const name = window.prompt('New team folder name');
+    if (name && form && field) {
+        // Add hidden field for team folder
+        let hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'folder_type';
+        hidden.value = 'team';
+        form.appendChild(hidden);
+
+        field.value = name.trim();
+        form.submit();
+    }
+    closeDropdown();
+
+} else if (action === 'trigger-file-input') {
     const fi = document.getElementById('file-input');
     if (fi) fi.click();
     closeDropdown();
-    } else if (action === 'download-pdf' || action === 'download-csv' || action === 'download-text') {
-    // Replace with your handlers
+
+} else if (action === 'download-pdf' || action === 'download-csv' || action === 'download-text') {
     console.log('Do action:', action);
     closeDropdown();
-    }
+}
 });
 })();

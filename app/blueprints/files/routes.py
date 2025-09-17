@@ -423,21 +423,35 @@ def toggle_default_doc() -> ResponseReturnValue:
     return redirect(f"/home?{redirect_url}")
 
 
+@login_required
 @files.route("/create_folder", methods=["POST"])
 def create_folder() -> ResponseReturnValue:
     """Create a new folder."""
     parent_id = request.form["parent_id"]
     name = request.form["name"]
     space_id = request.form["space_id"]
+    folder_type = request.form["folder_type"]
+    user = current_user
+    current_team = user.ensure_current_team()
 
-    folder = SmartFolder.objects.create(
-        title=name,
-        parent_id=parent_id,
-        space=space_id,
-        user_id=session["user_id"],
-        uuid=uuid.uuid4().hex,
-    )
-    return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
+    if folder_type == "individual":
+        folder = SmartFolder.objects.create(
+            title=name,
+            parent_id=parent_id,
+            space=space_id,
+            user_id=session["user_id"],
+            uuid=uuid.uuid4().hex,
+        )
+        return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
+    else:
+        folder = SmartFolder.objects.create(
+            title=name,
+            parent_id=parent_id,
+            space=space_id,
+            team_id=current_team.uuid,
+            uuid=uuid.uuid4().hex,
+        )
+        return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
 
 
 @files.route("/upload_fillable_pdf", methods=["POST"])
