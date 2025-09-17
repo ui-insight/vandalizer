@@ -7,6 +7,7 @@ import json
 import os
 from enum import Enum
 from pathlib import Path
+from uuid import uuid4
 
 import mongoengine as me
 from mongoengine import CASCADE, PULL, signals
@@ -210,12 +211,36 @@ def _role_rank(role: str) -> int:
     return {"owner": 0, "admin": 1, "member": 2}.get(role, 3)
 
 
+def _ensure_personal_team_for_user(user_id: str, user_name: str | None = None) -> Team:
+    """
+    Ensure the user has a personal team:
+    - Create Team(name="My Team") owned by the user if none exists
+    - Create TeamMembership(owner) if missing
+    Returns the Team.
+    """
+    # Try to find an existing "personal" team owned by this user.
+    team = Team.objects(owner_user_id=user_id).first()
+    if not team:
+        team = Team(
+            uuid=str(uuid4()),
+            name="My Team",
+            owner_user_id=user_id,
+            created_at=datetime.datetime.now(),
+        ).save()
+
+    # Ensure membership as owner
+    if not TeamMembership.objects(team=team, user_id=user_id).first():
+        TeamMembership(team=team, user_id=user_id, role="owner").save()
+
+    return team
+
+
 def _pick_default_team_for_user(user_id: str) -> "Team | None":
-    memberships = list(
-        TeamMembership.objects(user_id=user_id)  # uses your existing index
-    )
+    memberships = list(TeamMembership.objects(user_id=user_id))
     if not memberships:
-        return None
+        # Auto-create a personal team and return it
+        return _ensure_personal_team_for_user(user_id)
+
     memberships.sort(key=lambda m: (_role_rank(m.role), m.created_at))
     return memberships[0].team
 

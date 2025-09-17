@@ -10,27 +10,6 @@ from itertools import chain
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from app.blueprints.library.routes import _build_results_for_template
-from app.utilities.agents import create_chat_agent
-from app.utilities.analytics_helper import recent_activity_for_feed
-from app.utilities.chat_manager import ChatManager
-from app.utilities.config import settings
-from app.utilities.document_manager import (
-    cleanup_document,
-    perform_extraction_and_update,
-    update_document_fields,
-)
-from app.utilities.library_helpers import (
-    _get_or_create_personal_library,
-)
-from app.utilities.markdown_helpers import (
-    generate_pdf_from_html,
-)
-from app.utilities.upload_manager import (
-    perform_document_validation,
-)
-from app.utilities.web_utils import URLContentFetcher  # You already have this
-from app.utils import load_user
 from devtools import debug
 from flask import (
     Blueprint,
@@ -51,6 +30,7 @@ from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
+from app.blueprints.library.routes import _build_results_for_template
 from app.models import (
     ActivityEvent,
     ChatConversation,
@@ -68,6 +48,30 @@ from app.models import (
     Workflow,
     WorkflowStep,
 )
+from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import (
+    ActivityType,
+    activity_start,
+    recent_activity_for_feed,
+)
+from app.utilities.chat_manager import ChatManager
+from app.utilities.config import settings
+from app.utilities.document_manager import (
+    cleanup_document,
+    perform_extraction_and_update,
+    update_document_fields,
+)
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+)
+from app.utilities.markdown_helpers import (
+    generate_pdf_from_html,
+)
+from app.utilities.upload_manager import (
+    perform_document_validation,
+)
+from app.utilities.web_utils import URLContentFetcher  # You already have this
+from app.utils import load_user
 
 home = Blueprint("home", __name__)
 
@@ -489,6 +493,15 @@ def chat() -> ResponseReturnValue:
         conversation.save()
 
         conversation.add_message(ChatRole.USER, message)
+
+        current_team, my_teams = _get_teams(user)
+        activity_start(
+            type=ActivityType.WORKFLOW_RUN,
+            user_id=user_id,
+            team_id=current_team.uuid,
+            conversation_id=conversation.uuid,
+        )
+
     else:
         conversation.add_message(ChatRole.USER, message)
 
