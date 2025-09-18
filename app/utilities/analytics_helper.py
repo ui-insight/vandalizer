@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from app.models import (
@@ -8,6 +9,27 @@ from app.models import (
     Workflow,
     WorkflowResult,
 )
+
+
+def _safe_duration_ms(ev) -> int | None:
+    try:
+        return ev.duration_ms
+    except Exception as e:
+        # Log once at warn; don't crash analytics
+        logger = logging.getLogger(__name__)
+        logger.warning("duration_ms failed for event %s: %s", getattr(ev, "id", "?"), e)
+        return None
+
+
+def _incs_for(ev):
+    dur = _safe_duration_ms(ev)
+    return {
+        "tokens_input": getattr(ev, "tokens_input", 0) or 0,
+        "tokens_output": getattr(ev, "tokens_output", 0) or 0,
+        "requests": 1,
+        "errors": 1 if getattr(ev, "had_error", False) else 0,
+        "duration_ms": dur or 0,  # record 0 if unknown instead of crashing
+    }
 
 
 def recent_activity_for_feed(
