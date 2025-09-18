@@ -5,6 +5,7 @@ import datetime
 import datetime as dt
 import json
 import os
+from datetime import timezone
 from enum import Enum
 from pathlib import Path
 from uuid import uuid4
@@ -23,6 +24,16 @@ from pypdf import PdfReader
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import app
+
+
+def _as_aware_utc(dt):
+    if dt is None:
+        return None
+    # If naive, assume it was intended as UTC (MongoEngine often stores UTC-naive)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    # If aware, normalize to UTC
+    return dt.astimezone(timezone.utc)
 
 
 class UserModelConfig(me.Document):
@@ -825,9 +836,11 @@ class ActivityEvent(me.Document):
 
     @property
     def duration_ms(self) -> int | None:
-        if not self.finished_at:
+        s = _as_aware_utc(self.started_at)
+        f = _as_aware_utc(self.finished_at)
+        if s is None or f is None:
             return None
-        return int((self.finished_at - self.started_at).total_seconds() * 1000)
+        return int((f - s).total_seconds() * 1000)
 
 
 class DailyUsageAggregate(me.Document):

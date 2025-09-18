@@ -14,9 +14,9 @@ from devtools import debug
 from flask import (
     Blueprint,
     Response,
-    redirect,
     current_app,
     jsonify,
+    redirect,
     render_template,
     request,
     send_file,
@@ -26,7 +26,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
-from flask_login import current_user, login_required
+from flask_login import login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
@@ -52,6 +52,7 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
+    activity_finish,
     activity_start,
     recent_activity_for_feed,
 )
@@ -176,7 +177,7 @@ def index() -> ResponseReturnValue:
     """Primary entry point."""
     user = load_user()
     if not user:
-       return redirect(url_for("auth.login"))
+        return redirect(url_for("auth.login"))
     section = (request.args.get("section") or "Assistant").strip()
 
     # Spaces
@@ -508,12 +509,14 @@ def chat() -> ResponseReturnValue:
         conversation.add_message(ChatRole.USER, message)
 
         current_team, my_teams = _get_teams(user)
-        activity_start(
+        event = activity_start(
             type=ActivityType.WORKFLOW_RUN,
             user_id=user_id,
             team_id=current_team.uuid,
             conversation_id=conversation.uuid,
         )
+
+        activity_finish(event)
 
     else:
         conversation.add_message(ChatRole.USER, message)
