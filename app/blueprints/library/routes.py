@@ -15,9 +15,9 @@ from app.models import (  # adjust import path if needed
     Workflow,
 )
 
-library = Blueprint("library", __name__)
+from app import load_user
 
-from app.utils import load_user
+library = Blueprint("library", __name__)
 
 
 # -----------------------------

@@ -14,6 +14,7 @@ from devtools import debug
 from flask import (
     Blueprint,
     Response,
+    redirect,
     current_app,
     jsonify,
     render_template,
@@ -29,7 +30,7 @@ from flask_login import current_user, login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 
-from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app
+from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app, load_user
 from app.blueprints.library.routes import _build_results_for_template
 from app.models import (
     ActivityEvent,
@@ -71,7 +72,6 @@ from app.utilities.upload_manager import (
     perform_document_validation,
 )
 from app.utilities.web_utils import URLContentFetcher  # You already have this
-from app.utils import load_user
 
 home = Blueprint("home", __name__)
 
@@ -175,8 +175,8 @@ def build_breadcrumbs(
 def index() -> ResponseReturnValue:
     """Primary entry point."""
     user = load_user()
-    if user is None:
-        return
+    if not user:
+       return redirect(url_for("auth.login"))
     section = (request.args.get("section") or "Assistant").strip()
 
     # Spaces
@@ -209,7 +209,7 @@ def index() -> ResponseReturnValue:
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
     conversations = (
-        ChatConversation.objects(user_id=user.user_id).order_by("-created_at").all()
+        ChatConversation.objects(user_id=user.get_id()).order_by("-created_at").all()
     )
 
     # Teams
@@ -225,7 +225,7 @@ def index() -> ResponseReturnValue:
     # ensure_everyone_has_libraries_and_backfill()
 
     # Library
-    my_library = _get_or_create_personal_library(user_id=user.user_id)
+    my_library = _get_or_create_personal_library(user_id=user.get_id())
     scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
     item_type = request.args.get("type", "workflows")  # 'workflows' | 'tasks' | 'all'
     kinds_str = request.args.get("kinds", "extract,prompt,format")
@@ -304,7 +304,7 @@ def _initial_library_results(request: Any) -> str:
 
 def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
     current_team = user.ensure_current_team()
-    my_teams = TeamMembership.objects(user_id=user.user_id)
+    my_teams = TeamMembership.objects(user_id=user.get_id())
     return (current_team, my_teams)
 
 
@@ -407,7 +407,7 @@ def _load_sets_and_workflows(user, current_space: Space):
         space=current_space.uuid, is_global=True, set_type="extraction"
     ).all()
     user_extraction_sets = SearchSet.objects(
-        user_id=user.user_id,
+        user_id=user.get_id(),
         space=current_space.uuid,
         is_global=False,
         set_type="extraction",
@@ -415,14 +415,14 @@ def _load_sets_and_workflows(user, current_space: Space):
     extraction_sets = list(chain(global_extraction_sets, user_extraction_sets))
 
     prompts = SearchSetItem.objects(
-        user_id=user.user_id, space_id=current_space.uuid, searchtype="prompt"
+        user_id=user.get_id(), space_id=current_space.uuid, searchtype="prompt"
     ).all()
 
     formatters = SearchSetItem.objects(
-        user_id=user.user_id, space_id=current_space.uuid, searchtype="formatter"
+        user_id=user.get_id(), space_id=current_space.uuid, searchtype="formatter"
     ).all()
 
-    workflows = Workflow.objects(user_id=user.user_id).all()
+    workflows = Workflow.objects(user_id=user.get_id()).all()
 
     return extraction_sets, prompts, formatters, workflows
 
@@ -436,9 +436,9 @@ def _folder_context(user, current_space: Space):
     current_folder_parent_id = "0"
 
     base_query = Q(
-        user_id=user.user_id, space=current_space.uuid, folder=current_folder_id
+        user_id=user.get_id(), space=current_space.uuid, folder=current_folder_id
     )
-    default_doc_query = Q(user_id=user.user_id, is_default=True)
+    default_doc_query = Q(user_id=user.get_id(), is_default=True)
     folder_docs = (
         SmartDocument.objects(base_query | default_doc_query)
         .order_by("-created_at")
@@ -451,7 +451,7 @@ def _folder_context(user, current_space: Space):
             current_folder_parent_id = folder.parent_id
 
     folders = SmartFolder.objects(
-        team_id=user.user_id,
+        team_id=user.get_id(),
         space=current_space.uuid,
         parent_id=current_folder_id if current_folder_id != 0 else "0",
     ).all()
@@ -472,7 +472,7 @@ def _folder_context(user, current_space: Space):
 
 
 def _build_activities(user: User) -> list[ActivityEvent]:
-    activities = recent_activity_for_feed(user_id=user.user_id)
+    activities = recent_activity_for_feed(user_id=user.get_id())
     return activities
 
 
@@ -491,8 +491,8 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user = current_user
-    user_id = user.user_id
+    user = load_user()
+    user_id = user.get_id()
 
     conversation = ChatConversation.objects(
         uuid=conversation_uuid, user_id=user_id
@@ -500,7 +500,7 @@ def chat() -> ResponseReturnValue:
     if conversation is None:
         title = message.strip()
         conversation = ChatConversation(
-            user_id=user.user_id, title=title, uuid=str(uuid.uuid4())
+            user_id=user_id, title=title, uuid=str(uuid.uuid4())
         )
         conversation.generate_title()
         conversation.save()
@@ -530,7 +530,7 @@ def chat() -> ResponseReturnValue:
 
     debug(documents)
     debug(docs)
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     if model_config:
         model = model_config.name
     else:
@@ -565,7 +565,7 @@ def add_link_to_chat():
         conversation_uuid = data.get("conversation_uuid")
 
         user = load_user()
-        user_id = user.user_id
+        user_id = user.get_id()
 
         # Validate URL
         # if not link or not link.startswith(('http://', 'https://')):
@@ -632,8 +632,9 @@ def get_chat_history(conversation_uuid):
     """Get chat conversation history."""
     try:
         user = load_user()
+        user_id = user.get_id()
         conversation = ChatConversation.objects(
-            uuid=conversation_uuid, user_id=user.user_id
+            uuid=conversation_uuid, user_id=user_id
         ).first()
 
         if not conversation:
@@ -667,7 +668,7 @@ def delete_chat_history(conversation_uuid):
     try:
         # Get the current user
         user = load_user()
-        user_id = user.user_id
+        user_id = user.get_id()
 
         # Find the conversation and verify it belongs to the user
         conversation = ChatConversation.objects(
@@ -736,8 +737,9 @@ def chat_download() -> ResponseReturnValue:
             f"{final_output}"
         )
 
-    user = current_user
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    user = load_user()
+    user_id = user.get_id()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     if model_config:
         model = model_config.name
     else:

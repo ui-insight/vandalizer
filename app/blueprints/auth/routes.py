@@ -1,5 +1,7 @@
 """Handles authorization routing."""
 
+from devtools import debug
+
 from flask import (
     Blueprint,
     current_app,
@@ -15,6 +17,7 @@ from flask_dance.contrib.azure import azure
 from flask_login import current_user, login_user
 
 from app.models import User
+from app import load_user
 
 auth = Blueprint("auth", __name__)
 
@@ -23,7 +26,9 @@ auth = Blueprint("auth", __name__)
 def index() -> ResponseReturnValue:
     """Render the landing page if not authorized."""
     # debug("Not authorized")
-    if current_user is not None:
+    user = load_user()
+    debug(user)
+    if user is not None:
         return redirect(url_for("home.index"))
 
     return render_template("landing.html", AUTH_MODE=current_app.config["AUTH_MODE"])

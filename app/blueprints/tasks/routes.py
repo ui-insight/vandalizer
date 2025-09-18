@@ -49,6 +49,9 @@ def filter_models() -> ResponseReturnValue:
     uuids = data.get("uuids", [])
     debug(data)
     validation_failed = False
+    user_id = current_user.get_id()
+    debug(user_id)
+    debug(current_user)
     user = current_user
 
     settings_models = [m.model_dump() for m in settings.models]
