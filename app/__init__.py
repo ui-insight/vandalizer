@@ -17,7 +17,7 @@ from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
-from flask_login import LoginManager, login_user
+from flask_login import LoginManager, login_user, current_user
 from flask_mail import Mail
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
@@ -120,9 +120,10 @@ login_manager.login_view = "auth.login"  # Redirect here if @login_required fail
 
 
 @login_manager.user_loader
-def load_user(user_id: str):
+def load_user(user_id: str | None = None) -> User | None:
     """Loads user from DB for session management."""
-    return User.objects(user_id=user_id).first()
+    id = user_id if user_id else current_user.get_id()
+    return User.objects(user_id=id).first()
 
 
 # Setup blueprints

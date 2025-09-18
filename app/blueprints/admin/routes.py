@@ -22,7 +22,7 @@ from app.models import (
     TeamMembership,
     User,
 )
-from app.utils import load_user
+from app import load_user
 
 admin = Blueprint("admin", __name__)
 

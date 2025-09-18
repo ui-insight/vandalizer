@@ -3,7 +3,7 @@ import secrets
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
 from app.models import Team, TeamInvite, TeamMembership
-from app.utils import load_user
+from app import load_user
 
 teams = Blueprint("team", __name__)
 
