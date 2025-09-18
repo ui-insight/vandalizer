@@ -140,11 +140,6 @@ Do not restate or include the original question in your answer.
 At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
 
         debug(user_id)
-        previous_messages, cache_key, llm_string = ChatManager.get_cache_messages(
-            user_id=user_id,
-            docs_ids_string=docs_ids_string,
-            session=session,
-        )
 
         max_context_length = settings.max_context_length
 
@@ -165,8 +160,6 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             "agent": agent,
             "prompt": prompt,
             "previous_messages": previous_messages,
-            "cache_key": cache_key,
-            "llm_string": llm_string,
             "user_id": user_id,
             "full_text": full_text,
         }
