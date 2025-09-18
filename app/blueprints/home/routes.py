@@ -174,7 +174,7 @@ def build_breadcrumbs(
 @home.route("/")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
-    user = current_user
+    user = load_user()
     if user is None:
         return
     section = (request.args.get("section") or "Assistant").strip()
