@@ -46,6 +46,7 @@ def activity_start(
     *,
     type: ActivityType,
     user_id: str,
+    title: str | None = None,
     team_id: str | None = None,
     space: str | None = None,
     conversation_id: str | None = None,
@@ -58,6 +59,7 @@ def activity_start(
 ) -> ActivityEvent:
     ev = ActivityEvent(
         type=type.value,
+        title=title,
         status=ActivityStatus.RUNNING.value,
         user_id=user_id,
         team_id=team_id,

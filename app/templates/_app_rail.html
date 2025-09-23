@@ -10,7 +10,7 @@
         <ul class="run-list" id="run-list">
             <!-- Completed chat -->
             <li class="run-item">
-                <a href="/home?docid={{ selected_document.uuid }}&section=Assistant">
+                <a href="/home?section=Assistant">
                     <span class="run-left">
                         <i class="fa-solid fa-pen-to-square" title="Chat" style="color: black;"></i>
                         <span class="run-title truncate" title="New chat">
@@ -113,10 +113,11 @@
         li.className = `run-item${isRunning ? " is-running" : ""}`;
         li.dataset.runId = a.id;
         li.onclick = () => openRun(a.id, a);
+        console.log("Creating li for activity:", a);
 
         li.innerHTML = `
       <span class="run-left">
-        <i class="fa-solid ${typeIcon} run-type-icon" title="${TYPE_ICON[a.type]?.title || "Activity"}"></i>
+        <i class="fa-solid ${typeIcon} run-type-icon" title="${a.title || "Activity"}"></i>
         <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
       </span>
       ${right}
@@ -139,16 +140,7 @@
     function openRun(id, a) {
         if (!a) return;
         // Route by type — adjust to your app’s real URLs
-        if (a.type === "conversation" && a.conversation_id) {
-            window.location.href = `/conversations/${encodeURIComponent(a.conversation_id)}`;
-        } else if (a.type === "workflow_run" && a.workflow_id) {
-            window.location.href = `/workflows/${encodeURIComponent(a.workflow_id)}/runs/${encodeURIComponent(id)}`;
-        } else if (a.type === "search_set_run" && a.search_set_uuid) {
-            window.location.href = `/search-sets/${encodeURIComponent(a.search_set_uuid)}/runs/${encodeURIComponent(id)}`;
-        } else {
-            // Fallback: open a generic run inspector
-            window.location.href = `/runs/${encodeURIComponent(id)}`;
-        }
+        window.location.href = `activity/runs/${encodeURIComponent(id)}`;
     }
 
     console.log("rendering activities");

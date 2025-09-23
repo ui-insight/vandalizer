@@ -43,22 +43,24 @@
 </style>
 
 <script>
-    // Show/hide delete button based on selection
-    $("#chat-history-select").on("change", function () {
-        const conversationId = $(this).val();
+    var conversationId = "{{ conversation_uuid|default('') }}";
 
-        // Show delete button only if a conversation is selected (not "New Conversation")
-        if (conversationId) {
-            $("#delete-conversation-btn").show();
-        } else {
-            $("#delete-conversation-btn").hide();
-        }
+    function toHtml(markdown) {
+        const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+        const rawText = window.marked.parse(outputText, {
+            gfm: true,
+            breaks: false,
+        });
+        return rawText;
+    }
 
-        if (!conversationId) {
-            // Clear chat history if "New Conversation" is chosen
-            $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
-            return;
-        }
+    if (!conversationId || conversationId === "None") {
+        // Clear chat history if "New Conversation" is chosen
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+    } else {
+
+
+
 
         fetch(`/chat_history/${conversationId}`)
             .then(res => res.json())
@@ -69,9 +71,9 @@
                 for (const msg of data.messages) {
                     let msgHtml = "";
                     if (msg.role === "user") {
-                        msgHtml = `<p><div class='message-you'>${msg.content}</div></p>`;
+                        msgHtml = `<p><div class='message-you'>${toHtml(msg.content)}</div></p>`;
                     } else {
-                        msgHtml = `<p><div class='message-response-body'>${window.marked ? window.marked.parse(msg.content) : msg.content}</div></p>`;
+                        msgHtml = `<p><div class='message-response-body'>${toHtml(msg.content)}</div></p>`;
                     }
                     $("#chat-panel").append(msgHtml);
                 }
@@ -81,53 +83,5 @@
             .catch(err => {
                 console.error("Error loading chat history:", err);
             });
-    });
-
-    // Handle delete button click
-    $("#delete-conversation-btn").on("click", function () {
-        const conversationId = $("#chat-history-select").val();
-
-        if (!conversationId) {
-            return;
-        }
-
-        // Confirm deletion
-        if (!confirm("Are you sure you want to delete this conversation? This action cannot be undone.")) {
-            return;
-        }
-
-        // Disable button during deletion
-        $(this).prop('disabled', true);
-
-        // Send delete request
-        fetch(`/chat_history/${conversationId}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            }
-        })
-            .then(response => {
-                if (response.ok) {
-                    // Remove the option from select
-                    $(`#chat-history-select option[value="${conversationId}"]`).remove();
-
-                    // Reset to "New Conversation"
-                    $("#chat-history-select").val("").trigger("change");
-
-                    // Show success message (optional)
-                    alert("Conversation deleted successfully");
-                    window.location.reload();
-                } else {
-                    throw new Error('Failed to delete conversation');
-                }
-            })
-            .catch(err => {
-                console.error("Error deleting conversation:", err);
-                alert("Failed to delete conversation. Please try again.");
-            })
-            .finally(() => {
-                // Re-enable button
-                $(this).prop('disabled', false);
-            });
-    });
+    }
 </script>

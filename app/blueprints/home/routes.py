@@ -9,6 +9,7 @@ from datetime import datetime
 from itertools import chain
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
+from bson.json_util import dumps
 
 from devtools import debug
 from flask import (
@@ -34,6 +35,7 @@ from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app, load_user
 from app.blueprints.library.routes import _build_results_for_template
 from app.models import (
     ActivityEvent,
+    ActivityStatus,
     ChatConversation,
     ChatRole,
     SearchSet,
@@ -209,9 +211,6 @@ def index() -> ResponseReturnValue:
     show_release_panel = request.cookies.get("release_seen") != CURRENT_RELEASE_VERSION
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
-    conversations = (
-        ChatConversation.objects(user_id=user.get_id()).order_by("-created_at").all()
-    )
 
     # Teams
     current_team, my_teams = _get_teams(user)
@@ -219,6 +218,8 @@ def index() -> ResponseReturnValue:
     # Activity
     activities_qs = _build_activities(user=user)
     activities = [event_to_dict(a) for a in activities_qs]
+    debug(activities)
+
 
     json.dumps(activities)
     print(activities)
@@ -236,9 +237,27 @@ def index() -> ResponseReturnValue:
     initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
     initial_library_results = _initial_library_results(request)
 
+    activity_id = request.args.get("activity_id", default="")
+    activity_type = None
+    conversation_uuid = None
+    activity = ActivityEvent()
+    if activity_id and len(str(activity_id).strip()) > 0:
+        activity = ActivityEvent.objects(id=activity_id).first()
+        if activity:
+            activity_type = activity.type
+            if activity_type == "conversation":
+                chat_conversation = ChatConversation.objects(
+                    uuid=activity.conversation_id,
+                    user_id=user.user_id,
+                ).first()
+                conversation_uuid = chat_conversation.uuid
+
+
+
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
+        activity=activity,
         prompts=prompts,
         formatters=formatters,
         folders=folders,
@@ -246,7 +265,7 @@ def index() -> ResponseReturnValue:
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
-        conversations=conversations,
+        conversation_uuid=conversation_uuid,
         selected_document=selected_document,
         folder_docs=folder_docs,
         spaces=spaces,
@@ -279,13 +298,16 @@ def event_to_dict(a: ActivityEvent) -> dict:
         "id": str(a.id),
         "type": str(a.type),
         "status": str(a.status),
-        "title": str(a.meta_summary.get("title") or "Activity"),
+        "title": str(a.title),
         "conversation_id": str(a.conversation_id) if a.conversation_id else None,
         "search_set_uuid": str(a.search_set_uuid) if a.search_set_uuid else None,
         "workflow_id": str(a.workflow.id) if a.workflow else None,
         "started_at": a.started_at.isoformat() if a.started_at else None,
         "finished_at": a.finished_at.isoformat() if a.finished_at else None,
         "error": str(a.error) if a.error else "",
+        "tokens_input": a.tokens_input,
+        "tokens_output": a.tokens_output,
+        "message_count": a.message_count,
     }
 
 
@@ -483,6 +505,8 @@ def chat() -> ResponseReturnValue:
     data = request.get_json()
     message = data["message"]
     conversation_uuid = data.get("conversation_uuid", None)
+    activity_id = data.get("activity_id", "")
+    # get activity if it exists
     debug("Message received:", message)
     debug("Conversation UUID:", conversation_uuid)
     message = escape(message)
@@ -495,31 +519,47 @@ def chat() -> ResponseReturnValue:
     user = load_user()
     user_id = user.get_id()
 
+    current_team, my_teams = _get_teams(user)
+    debug(current_team)
+    debug(my_teams)
+
     conversation = ChatConversation.objects(
         uuid=conversation_uuid, user_id=user_id
     ).first()
+    debug(conversation)
+
     if conversation is None:
         title = message.strip()
+        debug(user_id)
         conversation = ChatConversation(
             user_id=user_id, title=title, uuid=str(uuid.uuid4())
         )
+        debug(conversation)
         conversation.generate_title()
         conversation.save()
 
         conversation.add_message(ChatRole.USER, message)
 
-        current_team, my_teams = _get_teams(user)
-        event = activity_start(
-            type=ActivityType.WORKFLOW_RUN,
+
+    else:
+        conversation.add_message(ChatRole.USER, message)
+
+    activity = None
+    if activity_id and len(str(activity_id).strip()) > 0:
+        activity = ActivityEvent.objects(id=activity_id).first()
+
+    if activity:
+        activity.status = ActivityStatus.RUNNING
+        activity.save()
+    else:
+        activity = activity_start(
+            type=ActivityType.CONVERSATION,
             user_id=user_id,
             team_id=current_team.uuid,
             conversation_id=conversation.uuid,
         )
-
-        activity_finish(event)
-
-    else:
-        conversation.add_message(ChatRole.USER, message)
+        activity.title = conversation.title
+        activity.save()
 
     # migrate to new document user's location
     for doc_uuid in document_uuids:

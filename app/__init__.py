@@ -138,6 +138,7 @@ from .blueprints.spaces.routes import spaces  # noqa: E402
 from .blueprints.tasks.routes import tasks  # noqa: E402
 from .blueprints.team.routes import teams  # noqa: E402
 from .blueprints.workflows.routes import workflows  # noqa: E402
+from .blueprints.activity.routes import activity  # noqa: E402
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")
@@ -150,6 +151,7 @@ app.register_blueprint(office, url_prefix="/office")
 app.register_blueprint(admin, url_prefix="/admin")
 app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
+app.register_blueprint(activity, url_prefix="/activity")
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()

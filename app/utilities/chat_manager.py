@@ -20,6 +20,12 @@ from app.models import (
     ChatConversation,
     ChatRole,
     UserModelConfig,
+    ActivityEvent,
+    ActivityStatus,
+)
+
+from app.utilities.analytics_helper import (
+    activity_finish,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
 from app.utilities.config import settings
@@ -362,6 +368,15 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             if full_response:
                 assistant_message = "".join(full_response)
                 conversation.add_message(ChatRole.ASSISTANT, assistant_message)
+                activity = ActivityEvent.objects(
+                    user_id=user_id,
+                    conversation_id=conversation.uuid,
+                ).first()
+                if activity:
+                    activity.message_count = len(conversation.messages)
+                    activity.status = ActivityStatus.COMPLETED.value
+                    activity.save()
+                    activity_finish(activity)
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():
