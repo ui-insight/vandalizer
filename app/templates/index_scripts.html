@@ -22,7 +22,7 @@
     var conversationId = null;
 
 
-    const activity = {{ activity.to_json() | safe }};
+    const activity = {{ activity.to_json() | safe if activity else 'null' }};
     console.log("activity", activity);
 
     {% if (documents != None) and documents | length > 0 %}
@@ -38,6 +38,8 @@
     if (activity == null) {
         docLoaderProgressHandler.show();
         docLoaderProgressHandler.showDefaultMessage()
+    } else {
+        console.log("Activity not null")
     }
 
 
@@ -483,7 +485,6 @@
                     docLoaderProgressHandler.show();
                     docLoaderProgressHandler.showDefaultMessage();
                 }
-
             }
         }
 

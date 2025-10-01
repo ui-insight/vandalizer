@@ -237,7 +237,7 @@ def index() -> ResponseReturnValue:
     activity_id = request.args.get("activity_id", default="")
     activity_type = None
     conversation_uuid = None
-    activity = ActivityEvent()
+    activity = None
     if activity_id and len(str(activity_id).strip()) > 0:
         activity = ActivityEvent.objects(id=activity_id).first()
         if activity:
