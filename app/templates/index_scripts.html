@@ -19,6 +19,8 @@
     let runStepResolve = null;
     let animationInProgress = false;
 
+    var conversationId = null;
+
 
     const activity = {{ activity.to_json() | safe }};
     console.log("activity", activity);
@@ -149,7 +151,6 @@
         console.log("Submitting link: " + link);
 
         // Get current conversation UUID
-        let conversationId = null;
         if (activity && activity.type === "conversation" && activity.conversation_id) {
             conversationId = activity.conversation_id;
         }
@@ -464,7 +465,6 @@
 
         filterAvailableModels(uuids);
 
-        console.log("CHECKING");
         var docContainer = $('.document-container');
         if (docContainer.length > 0) {
             var docUuid = docContainer.data('doc-uuid');
@@ -473,7 +473,6 @@
                 getWorkflowRecommendations(uuids);
             }
         } else {
-            console.log("CHECKING TOTAL DOCS");
             if (totalDocs > 0) {
                 getWorkflowRecommendations(uuids);
             } else {
@@ -2885,7 +2884,7 @@
         display_question = ""
     ) {
 
-        let conversationId = null;
+
         if (activity && activity.type === "conversation" && activity.conversation_id) {
             conversationId = activity.conversation_id;
         }
@@ -2932,10 +2931,20 @@
         })
             .then((response) => {
                 if (!response.body) throw new Error("No response body");
-
+                const serverConvId = response.headers.get("X-Conversation-UUID");
+                if (serverConvId) {
+                    conversationId = serverConvId;
+                    // optionally persist across navigation:
+                    sessionStorage.setItem("conversation_uuid", conversationId);
+                    // if you keep an activity object, you can also mirror it there:
+                    if (activity && activity.type === "conversation") {
+                        activity.conversation_id = conversationId;
+                    }
+                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+
                 let markdownBuffer = "";
                 let thinkingBuffer = "";
                 let questionText = question + " " + additional_context;
@@ -3044,6 +3053,9 @@
                                         const $thinkingPanel = $("#" + responseId + " .thinking-panel");
                                         $thinkingPanel.show();
                                         $thinkingPanel.find(".thinking-content").text(thinkingBuffer);
+                                    } else if (data.kind === "meta" && data.conversation_uuid) {
+                                        conversationId = data.conversation_uuid;
+                                        sessionStorage.setItem("conversation_uuid", conversationId);
                                     }
                                 } catch (e) {
                                     console.error("Error parsing JSON:", e, "Line:", line);

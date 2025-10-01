@@ -2,8 +2,9 @@
 {{super()}}
 <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
-{% endblock %} {% block styles %} {{super()}}
+{% endblock %}
 
+{% block styles %} {{super()}}
 <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
 <link rel="stylesheet" href="{{url_for('static', filename='styles/chat.css')}}" />

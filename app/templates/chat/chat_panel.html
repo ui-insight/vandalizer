@@ -58,13 +58,10 @@
         // Clear chat history if "New Conversation" is chosen
         $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
     } else {
-
-
-
-
         fetch(`/chat_history/${conversationId}`)
             .then(res => res.json())
             .then(data => {
+                $('.loading-event-progress-container')[0].style.display = 'none';
                 // Clear previous messages
                 $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
                 // Add each message to chat panel in order
@@ -73,7 +70,7 @@
                     if (msg.role === "user") {
                         msgHtml = `<p><div class='message-you'>${toHtml(msg.content)}</div></p>`;
                     } else {
-                        msgHtml = `<p><div class='message-response-body'>${toHtml(msg.content)}</div></p>`;
+                        msgHtml = `<p><div class='message-response'>${toHtml(msg.content)}</div></p>`;
                     }
                     $("#chat-panel").append(msgHtml);
                 }

@@ -1,9 +1,55 @@
 {% extends "base.html" %}
 {% block title %}Team | Vandalizer{% endblock %}
 
+{% block styles %} {{super()}}
+<link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='main.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/chat.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='rightpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='leftpanel.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/loaders.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/identify.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='rawstyles.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='workflows.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/test_event_widget.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/app_rail.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/library.css')}}" />
+<link rel="stylesheet" href="{{url_for('static', filename='styles/menu.css')}}" />
+<script src="{{url_for('static', filename='javascript/jquery.js')}}"></script>
+<script src="{{url_for('static', filename='javascript/marked.umd.js')}}"></script>
+{% endblock %}
+
+{% block navbar %}
+<div style="display: none" id="current-space-id">{{ current_space_id }}</div>
+<div style="display: none" id="current-folder-id">{{ current_folder_id }}</div>
+<nav class="navbar navbar-default">
+    <div class="navbar-header">
+        <a href="/home">
+            <img id="navbar-img" style="float: left; width: 25px; height: 40px; margin-top: 20px; "
+                src="/static/images/joevandal.png" alt="Joe Vandal Logo">
+            <img id="navbar-img" style="float: left; width: 200px; height: 50px; margin-top: 15px; "
+                src="/static/images/Vandalizer_Wordmark_RGB.png" alt="Vandalizer LOGO">
+        </a>
+    </div>
+
+    <!-- User dropdown (right of Support) -->
+    {% include "_teams_dropdown.html" %}
+
+    <a href="https://reporting.insight.uidaho.edu" class="btn btn-secondary"
+        style="float: right; margin-top: 25px; margin-right: 15px;" target="_blank"><i
+            class="fa-solid fa-circle-question" style="margin-right:6px"></i>Support</a>
+
+
+
+
+    <!-- /.container-fluid -->
+</nav>
+
+{% endblock %}
+
+
 {% block content %}
 <div class="container" style="padding:20px">
-    <h3 style="margin-bottom:20px">My Team</h3>
 
     {% if not team %}
     <form method="POST" action="/teams/create" class="form-inline">
@@ -15,70 +61,74 @@
     <p style="margin-top:15px;color:#777">You are not a member of any team yet.</p>
     {% else %}
     <div class="card" style="padding:16px;margin-bottom:20px">
-        <h4 style="margin:0 0 10px 0">{{ team.name }}</h4>
+        <h3 style="margin:0 0 10px 0">{{ team.name }}</h3>
         <small>Owner: {{ team.owner_user_id }}</small>
     </div>
 
-    <h5>Members</h5>
-    <table class="table table-sm">
-        <thead>
-            <tr>
-                <th>User</th>
-                <th>Role</th>
-                <th style="width:220px">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for m in members %}
-            <tr>
-                <td>{{ m.user_id }}</td>
-                <td>{{ m.role }}</td>
-                <td>
-                    {% set can_manage = members|selectattr('user_id','equalto', current_user_name)|list %}
-                    <form method="POST" action="/team/member/role" style="display:inline-block">
-                        <input type="hidden" name="team_id" value="{{ team.id }}">
-                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
-                        <select name="role" class="form-control" style="display:inline-block;width:auto">
-                            <option value="owner" {% if m.role=='owner' %}selected{% endif %}>owner</option>
-                            <option value="admin" {% if m.role=='admin' %}selected{% endif %}>admin</option>
-                            <option value="member" {% if m.role=='member' %}selected{% endif %}>member</option>
-                        </select>
-                        <button class="btn btn-light btn-sm" type="submit">Change</button>
-                    </form>
-                    <form method="POST" action="/team/member/remove" style="display:inline-block;margin-left:6px">
-                        <input type="hidden" name="team_id" value="{{ team.id }}">
-                        <input type="hidden" name="user_id" value="{{ m.user_id }}">
-                        <button class="btn btn-danger btn-sm" type="submit">Remove</button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="card" style="padding:16px;margin-bottom:20px">
+        <h3 style="margin-top: 0px;">Members</h3>
+        <table class="table table-sm">
+            <thead>
+                <tr>
+                    <th>User</th>
+                    <th>Role</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr>
+                    <td>{{ m.user_id }}</td>
+                    <td>{{ m.role }}</td>
+                    <td>
+                        {% set can_manage = members|selectattr('user_id','equalto', current_user_name)|list %}
+                        <form method="POST" action="/teams/member/role" style="display:inline-block">
+                            <input type="hidden" name="team_id" value="{{ team.id }}">
+                            <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                            <select name="role" class="form-control" style="display:inline-block;width:auto">
+                                <option value="owner" {% if m.role=='owner' %}selected{% endif %}>owner</option>
+                                <option value="admin" {% if m.role=='admin' %}selected{% endif %}>admin</option>
+                                <option value="member" {% if m.role=='member' %}selected{% endif %}>member</option>
+                            </select>
+                            <button class="btn btn-light btn-sm" type="submit">Change</button>
+                        </form>
+                        <form method="POST" action="/teams/member/remove" style="display:inline-block;margin-left:6px">
+                            <input type="hidden" name="team_id" value="{{ team.id }}">
+                            <input type="hidden" name="user_id" value="{{ m.user_id }}">
+                            <button class="btn btn-danger btn-sm" type="submit">Remove</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 
-    <h5 style="margin-top:24px">Invite</h5>
-    <form method="POST" action="/team/invite" class="form-inline">
-        <input type="hidden" name="team_id" value="{{ team.id }}">
-        <div class="form-group">
-            <input name="email" type="email" class="form-control" placeholder="user@example.com" required>
-        </div>
-        <div class="form-group" style="margin-left:8px">
-            <select name="role" class="form-control">
-                <option value="member">member</option>
-                <option value="admin">admin</option>
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary" style="margin-left:8px">Send Invite</button>
-    </form>
+    <div class="card" style="padding:16px;margin-bottom:20px">
+        <h3 style="margin-top: 0px;">Invite</h5>
+            <form method="POST" action="/teams/invite" class="form-inline">
+                <input type="hidden" name="team_id" value="{{ team.id }}">
+                <div class="form-group">
+                    <input name="email" type="email" class="form-control" placeholder="user@example.com" required>
+                </div>
+                <div class="form-group" style="margin-left:8px">
+                    <select name="role" class="form-control">
+                        <option value="member">member</option>
+                        <option value="admin">admin</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-left:8px">Send Invite</button>
+            </form>
 
-    {% if invites and invites|length > 0 %}
-    <h6 style="margin-top:14px;color:#777">Pending invites</h6>
-    <ul>
-        {% for inv in invites %}
-        <li>{{ inv.email }} → {{ inv.role }} (invited {{ inv.created_at.strftime('%Y-%m-%d') }})</li>
-        {% endfor %}
-    </ul>
-    {% endif %}
-    {% endif %}
+            {% if invites and invites|length > 0 %}
+            <h6 style="margin-top:14px;color:#777">Pending invites</h6>
+            <ul>
+                {% for inv in invites %}
+                <li>{{ inv.email }} → {{ inv.role }} (invited {{ inv.created_at.strftime('%Y-%m-%d') }})</li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+            {% endif %}
+    </div>
 </div>
 {% endblock %}
