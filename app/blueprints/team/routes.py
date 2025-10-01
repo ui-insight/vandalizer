@@ -2,8 +2,8 @@ import secrets
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 
-from app.models import Team, TeamInvite, TeamMembership
 from app import load_user
+from app.models import Team, TeamInvite, TeamMembership, User
 
 teams = Blueprint("team", __name__)
 
@@ -28,12 +28,19 @@ def user_name(user_id: str) -> str:
 # ---------- TEAM (member-facing) ----------
 
 
+def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
+    current_team = user.ensure_current_team()
+    my_teams = TeamMembership.objects(user_id=user.get_id())
+    return (current_team, my_teams)
+
+
 @teams.route("/", methods=["GET"])
 def team_index():
     user = require_login()
     # Find teams the user belongs to (simplest: first one)
     memberships = TeamMembership.objects(user_id=user.user_id)
     team = memberships.first().team if memberships else None
+    current_team, my_teams = _get_teams(user)
     members = []
     invites = []
     if team:
@@ -44,6 +51,7 @@ def team_index():
         team=team,
         members=members,
         invites=invites,
+        current_team=current_team,
         is_admin=is_admin_user(user.user_id),
         current_user_name=user.name,
     )

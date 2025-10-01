@@ -9,7 +9,6 @@ from datetime import datetime
 from itertools import chain
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
-from bson.json_util import dumps
 
 from devtools import debug
 from flask import (
@@ -54,7 +53,6 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
-    activity_finish,
     activity_start,
     recent_activity_for_feed,
 )
@@ -211,7 +209,6 @@ def index() -> ResponseReturnValue:
     show_release_panel = request.cookies.get("release_seen") != CURRENT_RELEASE_VERSION
     breadcrumbs = build_breadcrumbs(current_folder_id, current_space)
 
-
     # Teams
     current_team, my_teams = _get_teams(user)
 
@@ -219,7 +216,6 @@ def index() -> ResponseReturnValue:
     activities_qs = _build_activities(user=user)
     activities = [event_to_dict(a) for a in activities_qs]
     debug(activities)
-
 
     json.dumps(activities)
     print(activities)
@@ -237,6 +233,7 @@ def index() -> ResponseReturnValue:
     initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
     initial_library_results = _initial_library_results(request)
 
+    # Resume activity
     activity_id = request.args.get("activity_id", default="")
     activity_type = None
     conversation_uuid = None
@@ -251,8 +248,6 @@ def index() -> ResponseReturnValue:
                     user_id=user.user_id,
                 ).first()
                 conversation_uuid = chat_conversation.uuid
-
-
 
     return render_template(
         "index.html",
@@ -540,26 +535,25 @@ def chat() -> ResponseReturnValue:
 
         conversation.add_message(ChatRole.USER, message)
 
+        activity = None
+        if activity_id and len(str(activity_id).strip()) > 0:
+            activity = ActivityEvent.objects(id=activity_id).first()
+
+        if activity:
+            activity.status = ActivityStatus.RUNNING
+            activity.save()
+        else:
+            activity = activity_start(
+                type=ActivityType.CONVERSATION,
+                user_id=user_id,
+                team_id=current_team.uuid,
+                conversation_id=conversation.uuid,
+            )
+            activity.title = conversation.title
+            activity.save()
 
     else:
         conversation.add_message(ChatRole.USER, message)
-
-    activity = None
-    if activity_id and len(str(activity_id).strip()) > 0:
-        activity = ActivityEvent.objects(id=activity_id).first()
-
-    if activity:
-        activity.status = ActivityStatus.RUNNING
-        activity.save()
-    else:
-        activity = activity_start(
-            type=ActivityType.CONVERSATION,
-            user_id=user_id,
-            team_id=current_team.uuid,
-            conversation_id=conversation.uuid,
-        )
-        activity.title = conversation.title
-        activity.save()
 
     # migrate to new document user's location
     for doc_uuid in document_uuids:
@@ -571,14 +565,11 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    debug(documents)
-    debug(docs)
     model_config = UserModelConfig.objects(user_id=user_id).first()
     if model_config:
         model = model_config.name
     else:
         model = settings.base_model
-    print(f"The model is {model}")
 
     def generate():
         for chunk in ChatManager().ask_question_to_documents_stream(
@@ -596,7 +587,9 @@ def chat() -> ResponseReturnValue:
             yield chunk
 
     # Use the appropriate MIME type. If you use Server-Sent Events, it's "text/event-stream".
-    return Response(stream_with_context(generate()), mimetype="text/event-stream")
+    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    resp.headers["X-Conversation-UUID"] = conversation.uuid
+    return resp
 
 
 @app.route("/chat/add_link", methods=["POST"])

@@ -113,7 +113,6 @@
         li.className = `run-item${isRunning ? " is-running" : ""}`;
         li.dataset.runId = a.id;
         li.onclick = () => openRun(a.id, a);
-        console.log("Creating li for activity:", a);
 
         li.innerHTML = `
       <span class="run-left">
@@ -127,11 +126,11 @@
 
     function renderActivities(list) {
         const ul = document.getElementById("run-list");
-        if (!ul) return;
 
-        // Keep first two items (your "New chat" and spacer) and clear the rest
-        const keep = 2;
-        while (ul.children.length > keep) ul.removeChild(ul.lastElementChild);
+        if (!ul) return;
+        // Empty old one out
+        ul.innerHTML = '';
+
 
         list.forEach(a => ul.appendChild(liForActivity(a)));
     }
