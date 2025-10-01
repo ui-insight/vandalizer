@@ -35,8 +35,10 @@
     window.document_displayed = false;
 
     const docLoaderProgressHandler = new ProgressLoader('.loading-event-progress-container');
-    docLoaderProgressHandler.show();
-    docLoaderProgressHandler.showDefaultMessage()
+    if (activity == null) {
+        docLoaderProgressHandler.show();
+        docLoaderProgressHandler.showDefaultMessage()
+    }
 
 
     {% if (documents != None) and documents | length > 0 %}
@@ -477,8 +479,11 @@
                 getWorkflowRecommendations(uuids);
             } else {
                 $('#recommendations-panel').empty();
-                docLoaderProgressHandler.show();
-                docLoaderProgressHandler.showDefaultMessage();
+                if (activity == null) {
+                    docLoaderProgressHandler.show();
+                    docLoaderProgressHandler.showDefaultMessage();
+                }
+
             }
         }
 
