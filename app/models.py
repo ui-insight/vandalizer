@@ -200,6 +200,49 @@ class User(me.Document):
         """Check a hashed password."""
         return check_password_hash(self.password_hash, password)
 
+    def _membership_for(self, team: "Team | None" = None) -> "TeamMembership | None":
+        """
+        Return the TeamMembership doc for this user in the given team (or current team).
+        """
+        if team is None:
+            team = self.ensure_current_team()
+        if not team:
+            return None
+        return TeamMembership.objects(team=team, user_id=self.user_id).first()
+
+    def role_in_team(self, team: "Team | None" = None) -> str | None:
+        """
+        Returns 'owner' | 'admin' | 'member' or None if not a member.
+        """
+        m = self._membership_for(team)
+        return m.role if m else None
+
+    def has_min_role(self, min_role: str, team: "Team | None" = None) -> bool:
+        """
+        True if the user's role rank in team <= rank(min_role).
+        """
+        role = self.role_in_team(team)
+        if role is None:
+            return False
+        return _role_rank(role) <= _role_rank(min_role)
+
+    # Convenience shorthands for the CURRENT team
+    @property
+    def is_owner_current_team(self) -> bool:
+        return self.has_min_role("owner")
+
+    @property
+    def is_admin_current_team(self) -> bool:
+        """
+        Admin-or-owner for the current team.
+        Prefer this over the legacy global boolean.
+        """
+        return self.has_min_role("admin")
+
+    @property
+    def is_member_current_team(self) -> bool:
+        return self.has_min_role("member")
+
     # You might need to add this if you use Flask-Login
     @property
     def is_active(self):
