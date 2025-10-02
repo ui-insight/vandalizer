@@ -203,5 +203,15 @@
     });
 
 
+    $(".prompt-item").off("click").on("click", function () {
+        let uuid = $(this).attr("data-uuid");
+        let datatitle = $(this).attr("data-title");
+        setSection("Assistant");
+        console.log("We got the click!");
+        beginPrompt(uuid, datatitle);
+
+    });
+
+
 
 </script>

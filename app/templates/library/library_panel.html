@@ -1,3 +1,6 @@
+{% set item_type = (filters.type if filters and filters.type else 'all') %}
+{% set scope = scope or 'mine' %}
+
 <div id="library-panel" class="tab-content" style="background-color: white; padding: 24px 0px;">
 
     <div style="display: flex; align-items: center; padding: 0 30px; margin-bottom: 20px;">
@@ -174,6 +177,7 @@
         $("#library-results").html("<p>Loading...</p>");
 
         const payload = JSON.stringify(LibraryState);
+        console.log(payload);
         $.ajax({
             url: '/library/filter',
             method: 'POST',

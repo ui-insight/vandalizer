@@ -2182,49 +2182,36 @@
         //performExtraction(uuid);
     });
 
-    $(".prompt-item").on("click", function () {
-        let uuid = $(this).attr("data-uuid");
-        let datatitle = $(this).attr("data-title");
-        setSection("Assistant");
 
-        if (document_uuids != "") {
-            $("#tasks-panel").hide();
+    function beginPrompt(uuid, item_title) {
+        $("#tasks-panel").hide();
 
-            let data = JSON.stringify({
-                uuid: uuid,
-            });
+        let data = JSON.stringify({
+            uuid: uuid,
+        });
 
-            $.ajax({
-                url: "/tasks/fetch_search_set_item",
-                type: "POST",
-                data: data,
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-                async: true,
-                success: function (data) {
-                    performChat(
-                        document_uuids,
-                        data.prompt,
-                        folder_uuid,
-                        "",
-                        (display_question = datatitle),
-                    );
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                },
-            });
-
-            return;
-        } else {
-            showToast("Select a document to chat");
-        }
-    });
-
-
-
-
+        $.ajax({
+            url: "/tasks/fetch_search_set_item",
+            type: "POST",
+            data: data,
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            async: true,
+            success: function (data) {
+                performChat(
+                    document_uuids,
+                    data.prompt,
+                    folder_uuid,
+                    "",
+                    (display_question = item_title),
+                );
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            },
+        });
+    }
 
 
     function performExtraction(search_set_uuid) {
@@ -2898,7 +2885,7 @@
 
 
         console.log("conversation_uuid:", conversationId);
-        console.log("activity:", activity, activity.conversation_id);
+        //console.log("activity:", activity, activity.conversation_id);
 
         $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);

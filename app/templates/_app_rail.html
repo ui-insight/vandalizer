@@ -21,48 +21,7 @@
             </li>
             <li style="height: 5px;"></li>
 
-            <!-- Running -->
-            <li class="run-item is-running" data-run-id="run_987651" onclick="openRun('run_987651')">
-                <span class="run-left">
-                    <i class="fa-solid fa-diagram-project run-type-icon" title="Workflow"></i>
-                    <span class="run-title truncate" title="Quarterly FERPA Audit">
-                        Quarterly FERPA Audit
-                    </span>
-                </span>
-                <span class="run-right">
-                    <i class="fa-solid fa-gear fa-spin run-state-icon" aria-label="Running"></i>
-                </span>
-            </li>
 
-            <!-- Completed chat -->
-            <li class="run-item" data-run-id="run_987650" onclick="openRun('run_987650')">
-                <span class="run-left">
-                    <i class="fa-solid fa-comments run-type-icon" title="Chat"></i>
-                    <span class="run-title truncate" title="Chat: Compare RAG vs. Full-text on Policy PDFs">
-                        Compare RAG vs. Full-text on Policy PDFs
-                    </span>
-                </span>
-            </li>
-
-            <!-- Completed task -->
-            <li class="run-item" data-run-id="run_987649" onclick="openRun('run_987649')">
-                <span class="run-left">
-                    <i class="fa-solid fa-list-check run-type-icon" title="Task"></i>
-                    <span class="run-title truncate" title="Task: Extract PII fields from New Hire Packets">
-                        Extract PII fields from New Hire Packets
-                    </span>
-                </span>
-            </li>
-
-            <!-- Failed workflow -->
-            <li class="run-item" data-run-id="run_987648" onclick="openRun('run_987648')">
-                <span class="run-left">
-                    <i class="fa-solid fa-diagram-project run-type-icon" title="Workflow"></i>
-                    <span class="run-title truncate" title="Workflow: Vendor Contract Redlines">
-                        Vendor Contract Redlines
-                    </span>
-                </span>
-            </li>
 
         </ul>
     </div>
@@ -129,7 +88,6 @@
 
         if (!ul) return;
         // Empty old one out
-        ul.innerHTML = '';
 
 
         list.forEach(a => ul.appendChild(liForActivity(a)));

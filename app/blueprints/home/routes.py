@@ -225,7 +225,7 @@ def index() -> ResponseReturnValue:
     # Library
     my_library = _get_or_create_personal_library(user_id=user.get_id())
     scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
-    item_type = request.args.get("type", "workflows")  # 'workflows' | 'tasks' | 'all'
+    item_type = request.args.get("type", "all")  # 'workflows' | 'tasks' | 'all'
     kinds_str = request.args.get("kinds", "extract,prompt,format")
     kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
     query = request.args.get("q", "")
