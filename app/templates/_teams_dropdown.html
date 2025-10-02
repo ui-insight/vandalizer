@@ -12,12 +12,12 @@
         </a>
         {% endfor %}
 
-        {% if is_admin %}
-        <hr class="menu-divider">
+        {% if current_user.is_admin_current_team %}
+        <!-- <hr class="menu-divider">
 
         <a class="menu-item" role="menuitem" href="/admin/teams">
             <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Admin: Teams
-        </a>
+        </a> -->
 
         <hr class="menu-divider">
 

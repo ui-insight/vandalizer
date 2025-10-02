@@ -58,12 +58,12 @@ Upload Compliance:
 #         # filter
 
 models = [
-    {"name": "openai/gpt-5", "tag": "Cloud", "external": True},
     {
         "name": "gpt-oss-32k:120b",
-        "tag": "Private",
+        "tag": "University of Idaho - Private",
         "external": False,
     },
+    {"name": "openai/gpt-5", "tag": "Cloud", "external": True},
 ]
 
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
