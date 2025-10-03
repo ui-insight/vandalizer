@@ -83,6 +83,7 @@ def _mk_library_item(obj, added_by_user_id: str) -> LibraryItem:
 def add_object_to_library(obj, library: Library, added_by_user_id: str) -> LibraryItem:
     # Avoid duplicate entries pointing to the same object in the same library
     existing = [it for it in library.items if it.obj == obj]
+    print("Adding object to library")
     if existing:
         return existing[0]
 

@@ -20,7 +20,6 @@ from flask import (
     render_template,
     request,
     send_file,
-    session,
     url_for,
 )
 from flask.typing import ResponseReturnValue
@@ -76,7 +75,7 @@ def add_workflow() -> ResponseReturnValue:
     workflow = Workflow(
         name=workflow_data["name"],
         description=workflow_data["description"],
-        user_id=session["user_id"],
+        user_id=current_user.user_id,
     )
     workflow.save()
 
@@ -84,11 +83,7 @@ def add_workflow() -> ResponseReturnValue:
     add_object_to_library(workflow, library=library, added_by_user_id=user.user_id)
     return jsonify(
         {
-            "reroute": url_for(
-                "home.index",
-                section="Workflows",
-                workflow_id=str(workflow.id),
-            ),
+            "uuid": str(workflow.id),
         },
     )
 

@@ -659,7 +659,7 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                location.href = "/home?section=Tasks"
+                location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -1452,6 +1452,7 @@
     }
 
     function fetchWorkflow(workflow_uuid) {
+        setSection("Library");
         showScanning();
         if (workflow_uuid == null || workflow_uuid == "") { return }
         current_workflow_id = workflow_uuid;
@@ -2133,7 +2134,7 @@
             dataType: "json",
             async: true,
             success: function (data) {
-                location.href = data.reroute;
+                fetchWorkflow(data.uuid);
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2176,10 +2177,8 @@
     $(".set-item").on("click", function () {
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
-        //performSearch(uuid, datatitle);
         search_set_add_uuid = uuid;
         updateSearchSetPanel(uuid);
-        //performExtraction(uuid);
     });
 
 

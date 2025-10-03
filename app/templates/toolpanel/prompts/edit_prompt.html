@@ -53,9 +53,7 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    console.log(data.template);
-                    location.href = "/home?section=Tasks"
-
+                    location.reload();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -79,9 +77,7 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    console.log(data.template);
-                    location.href = "/home?section=Tasks"
-
+                    location.reload();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
