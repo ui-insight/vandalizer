@@ -145,6 +145,10 @@ def add_search_set() -> ResponseReturnValue:
     )
 
     searchset.save()
+
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(searchset, library=library, added_by_user_id=user.user_id)
+
     return jsonify({"complete": True, "uuid": searchset.uuid})
 
 

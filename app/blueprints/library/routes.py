@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from flask import Blueprint, jsonify, render_template, request
+from mongoengine.errors import DoesNotExist
 
+from app import load_user
 from app.models import (  # adjust import path if needed
     Library,
     LibraryItem,
@@ -14,8 +16,6 @@ from app.models import (  # adjust import path if needed
     User,
     Workflow,
 )
-
-from app import load_user
 
 library = Blueprint("library", __name__)
 
@@ -104,7 +104,16 @@ def _build_results_for_template(filters: dict) -> dict:
     searchset_objs: list[SearchSet] = []
     searchset_items_objs: list[SearchSetItem] = []
 
+    print(lib_items)
+
     for li in lib_items:
+        try:
+            obj = (
+                li.obj
+            )  # <-- this may raise DoesNotExist if the target doc was deleted
+        except DoesNotExist:
+            li.delete()
+            continue
         # li.kind is "workflow" or "searchset"
         if li.kind == "workflow" and li.obj and isinstance(li.obj, Workflow):
             workflow_objs.append(li.obj)

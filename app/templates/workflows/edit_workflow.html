@@ -79,8 +79,7 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    console.log(data.template);
-                    location.href = "/home?section=Workflows"
+                    location.reload();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
