@@ -237,6 +237,7 @@ def index() -> ResponseReturnValue:
     activity_id = request.args.get("activity_id", default="")
     activity_type = None
     conversation_uuid = None
+    chat_conversation = None
     activity = None
     if activity_id and len(str(activity_id).strip()) > 0:
         activity = ActivityEvent.objects(id=activity_id).first()
@@ -246,13 +247,18 @@ def index() -> ResponseReturnValue:
                 chat_conversation = ChatConversation.objects(
                     uuid=activity.conversation_id,
                     user_id=user.user_id,
-                ).first()
+                ).select_related(max_depth=2)[0]
+                debug(chat_conversation)
                 conversation_uuid = chat_conversation.uuid
+    debug(activity)
+    if chat_conversation:
+        chat_conversation = chat_conversation.to_dict()
 
     return render_template(
         "index.html",
         extraction_sets=extraction_sets,
         activity=activity,
+        chat_conversation=chat_conversation,
         prompts=prompts,
         formatters=formatters,
         folders=folders,
@@ -260,7 +266,7 @@ def index() -> ResponseReturnValue:
         current_folder_parent_id=current_folder_parent_id,
         current_folder_id=current_folder_id,
         documents=documents,
-        conversation_uuid=conversation_uuid,
+        conversation_id=conversation_uuid,
         selected_document=selected_document,
         folder_docs=folder_docs,
         spaces=spaces,

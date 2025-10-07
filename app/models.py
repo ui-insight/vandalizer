@@ -636,6 +636,26 @@ class ChatConversation(me.Document):
                 )
                 self.save()
 
+    def to_dict(self):
+        return {
+            '_id': str(self.id),
+            'uuid': self.uuid,
+            'title': self.title,
+            'user_id': self.user_id,
+            'messages': [
+                {
+                    'role': msg.role.value,
+                    'message': msg.message,
+                    'created_at': msg.created_at,
+                    # add other message fields as needed
+                }
+                for msg in self.messages  # This will dereference
+            ],
+            'file_attachments': self.file_attachments,
+            'url_attachments': self.url_attachments,
+            'created_at': self.created_at,
+            'updated_at': self.updated_at,
+        }
 
 class AgentHistory(me.Document):
     """Simple agent history model for storing conversation messages as JSON."""
