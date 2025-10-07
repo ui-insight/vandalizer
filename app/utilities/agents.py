@@ -85,7 +85,7 @@ def create_rag_agent(agent_model):
     return Agent(
         model,
         deps_type=RagDeps,
-        system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
+        system_prompt="""You are a specialized knowledge chat assistant powered by retrieval-augmented generation.
 
     When responding to queries:
     1. Carefully analyze the retrieved context documents for relevance to the query
@@ -117,7 +117,7 @@ def create_chat_agent(agent_model, system_prompt=None):
     print(model)
     return Agent(
         model,
-        system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+        system_prompt="""You are an engaging conversational chat assistant designed to provide helpful, informative, and friendly responses.
 
     Your communication style:
     - Warm and approachable while maintaining professionalism
