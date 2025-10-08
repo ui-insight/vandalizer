@@ -13,12 +13,20 @@
     <p style="font-size: 12px; font-weight: 300; color: #00000077;"
         class="doc-selected-counter workflow-modal-subtitle">
     <div style="margin: 0px 30px; padding: 15px 0px;">
+        <label for="newTaskPromptName"
+            style="display: block; font-size: 13px; font-weight: 500; color: #333; margin-bottom: 6px;">
+            Prompt Title
+        </label>
         <input style="width: 100%; padding: 15px; height: 50px;" type="text" id="newTaskPromptName"
             placeholder="Title your prompt" value="{{ prompt.title }}">
     </div>
     </p>
     <div class="search-results-content-body">
         <div style="padding-bottom: 15px; width: 100%;">
+            <label for="newTaskPrompt"
+                style="display: block; font-size: 13px; font-weight: 500; color: #333; margin-bottom: 6px;">
+                Prompt Text
+            </label>
             <textarea id="newTaskPrompt" placeholder="Write your prompt here"
                 rows="10"> {{ prompt.searchphrase }}</textarea>
         </div>

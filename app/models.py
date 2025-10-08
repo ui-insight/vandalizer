@@ -49,7 +49,7 @@ class UserModelConfig(me.Document):
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
 
-    name = me.StringField(required=True, max_length=50)
+    name = me.StringField(required=True, max_length=500)
     data = me.DictField(required=True)
 
     def extraction_items(self):

@@ -101,10 +101,41 @@
         <div style="flex:1;">
             <div class="title">{{ p.title }}</div>
         </div>
+
+        {% if scope != 'verified' %}
+        <div class="menu-anchor" style="float:right;">
+            <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false" id="prMenuBtn-{{ p.id }}"
+                data-menu="#pr-menu-{{ p.id }}" style="margin-left:10px">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
+
+            <div id="pr-menu-{{ p.id }}" class="menu menu-right" role="menu" hidden>
+                {% if scope == 'mine' %}
+                <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="prompt"
+                    data-uuid="{{ p.id }}">
+                    <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                </a>
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="prompt"
+                    data-uuid="{{ p.id }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Submit to be verified
+                </a>
+                {% elif scope == 'team' %}
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="prompt"
+                    data-uuid="{{ p.id }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Submit to be verified
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ p.id }}" data-type="prompt"
-            style="margin-left:10px"> <i class="fa-regular fa-pen-to-square"></i></button>
+            style="margin-left:10px">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </button>
     </div>
 </div>
+
 {% endfor %}
 {% endif %}
 
@@ -122,10 +153,41 @@
         <div style="flex:1;">
             <div class="title">{{ f.title }}</div>
         </div>
+
+        {% if scope != 'verified' %}
+        <div class="menu-anchor" style="float:right;">
+            <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false" id="fmMenuBtn-{{ f.id }}"
+                data-menu="#fm-menu-{{ f.id }}" style="margin-left:10px">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
+
+            <div id="fm-menu-{{ f.id }}" class="menu menu-right" role="menu" hidden>
+                {% if scope == 'mine' %}
+                <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="formatter"
+                    data-uuid="{{ f.id }}">
+                    <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                </a>
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="formatter"
+                    data-uuid="{{ f.id }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Submit to be verified
+                </a>
+                {% elif scope == 'team' %}
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="formatter"
+                    data-uuid="{{ f.id }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> Submit to be verified
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
         <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ f.id }}" data-type="formatter"
-            style="margin-left:10px"> <i class="fa-regular fa-pen-to-square"></i></button>
+            style="margin-left:10px">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </button>
     </div>
 </div>
+
 {% endfor %}
 {% endif %}
 {% endif %}
@@ -212,6 +274,60 @@
 
     });
 
+    // Generic POST helper
+    function postJSON(url, payload, onDone) {
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                if (onDone) onDone(data);
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    // Map kind -> endpoints (tweak to your routes)
+    const SHARE_ENDPOINTS = {
+        workflow: '/workflows/share_to_team',
+        extraction: '/extractions/share_to_team',
+        prompt: '/prompts/share_to_team',
+        formatter: '/formatters/share_to_team'
+    };
+    const VERIFY_ENDPOINTS = {
+        workflow: '/workflows/submit_for_verification',
+        extraction: '/extractions/submit_for_verification',
+        prompt: '/prompts/submit_for_verification',
+        formatter: '/formatters/submit_for_verification'
+    };
+
+    // Share with my team
+    $(document).off('click', '.action-share-team').on('click', '.action-share-team', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const kind = $(this).data('kind');
+        const uuid = $(this).data('uuid');
+        const url = SHARE_ENDPOINTS[kind];
+        if (!url) return;
+        postJSON(url, { uuid }, function () { location.reload(); });
+    });
+
+    // Submit to be verified
+    $(document).off('click', '.action-submit-verified').on('click', '.action-submit-verified', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const kind = $(this).data('kind');
+        const uuid = $(this).data('uuid');
+        const url = VERIFY_ENDPOINTS[kind];
+        if (!url) return;
+        postJSON(url, { uuid }, function () { location.reload(); });
+    });
 
 
 </script>
