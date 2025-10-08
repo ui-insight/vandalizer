@@ -283,12 +283,17 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             uuid=conversation_uuid,
             user_id=user_id,
         ).first()
+        debug(user_id)
+        debug(conversation_uuid)
+        debug(conversation)
         if conversation:
             # Include URL attachments in the context
             url_context = ""
             for url_attachment in conversation.url_attachments:
                 if url_attachment.content:
                     url_context += f"\n\nWeb Content from {url_attachment.url}:\n{url_attachment.content[:10000]}\n"
+            previous_messages = conversation.to_model_messages()
+            debug(previous_messages)
 
         # Add URL context to the prompt if it exists
         if url_context:

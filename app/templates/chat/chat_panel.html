@@ -43,7 +43,7 @@
 </style>
 
 <script>
-    var conversationId = "{{ conversation_uuid|default('') }}";
+    const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
 
     function toHtml(markdown) {
         const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
@@ -54,31 +54,26 @@
         return rawText;
     }
 
-    if (!conversationId || conversationId === "None") {
+ console.log("chatConversation: ", chatConversation);
+
+    if (!chatConversation || (chatConversation && chatConversation.messages.length === 0)) {
         // Clear chat history if "New Conversation" is chosen
         $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
     } else {
-        fetch(`/chat_history/${conversationId}`)
-            .then(res => res.json())
-            .then(data => {
-                $('.loading-event-progress-container')[0].style.display = 'none';
-                // Clear previous messages
-                $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
-                // Add each message to chat panel in order
-                for (const msg of data.messages) {
-                    let msgHtml = "";
-                    if (msg.role === "user") {
-                        msgHtml = `<p><div class='message-you'>${toHtml(msg.content)}</div></p>`;
-                    } else {
-                        msgHtml = `<p><div class='message-response'>${toHtml(msg.content)}</div></p>`;
-                    }
-                    $("#chat-panel").append(msgHtml);
-                }
-                // Scroll to bottom
-                $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
-            })
-            .catch(err => {
-                console.error("Error loading chat history:", err);
-            });
+        $('.loading-event-progress-container')[0].style.display = 'none';
+        // Clear previous messages
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+        // Add each message to chat panel in order
+        for (const msg of chatConversation.messages) {
+            let msgHtml = "";
+            if (msg.role === "user") {
+                msgHtml = `<p><div class='message-you'>${toHtml(msg.message)}</div></p>`;
+            } else {
+                msgHtml = `<p><div class='message-response'>${toHtml(msg.message)}</div></p>`;
+            }
+            $("#chat-panel").append(msgHtml);
+        }
+        // Scroll to bottom
+        $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
     }
 </script>
