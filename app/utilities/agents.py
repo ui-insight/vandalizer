@@ -1,5 +1,6 @@
 """Utilities for agents."""
 
+import asyncio
 import json
 import os
 from dataclasses import dataclass
@@ -467,9 +468,14 @@ def extract_entities_with_agent(
             keys=uncached_keys,
         )
 
-        result = field_inference_agent.run_sync(
-            "Infer the types of the keys",
-            deps=field_inference_deps,
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        result = loop.run_until_complete(
+            field_inference_agent.run_sync(
+                "Infer the types of the keys",
+                deps=field_inference_deps,
+            )
         )
 
         new_fields = result.output
