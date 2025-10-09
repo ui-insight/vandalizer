@@ -73,15 +73,20 @@
         li.dataset.runId = a.id;
         li.onclick = () => openRun(a.id, a);
 
+        // add delete button for deleting the activity
         li.innerHTML = `
       <span class="run-left">
         <i class="fa-solid ${typeIcon} run-type-icon" title="${a.title || "Activity"}"></i>
         <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
       </span>
       ${right}
+      <span class="run-delete" onclick="deleteActivity(event, '${a.id}')" title="Delete activity">
+        <i class="fa-solid fa-trash" style="color: red;"></i>
+        </span>
     `;
         return li;
     }
+
 
     function renderActivities(list) {
         const ul = document.getElementById("run-list");
@@ -99,6 +104,33 @@
         // Route by type — adjust to your app’s real URLs
         window.location.href = `activity/runs/${encodeURIComponent(id)}`;
     }
+
+    function deleteActivity(event, itemId) {
+        event.stopPropagation(); // Prevent the click from propagating to the li element
+
+        if (!confirm("Are you sure you want to delete this activity?")) {
+            return;
+        }
+
+        fetch(`/activity/runs/delete/${encodeURIComponent(itemId)}`, {
+            method: 'POST',
+        }).then(response => {
+            if (response.ok) {
+                // Remove the item from the UI
+                const li = document.querySelector(`li.run-item[data-run-id='${itemId}']`);
+                if (li) {
+                    li.remove();
+                }
+            } else {
+                alert("Failed to delete activity.");
+            }
+        }).catch(error => {
+            console.error('Error deleting activity:', error);
+            alert("Error deleting activity.");
+        });
+
+    }
+        
 
     console.log("rendering activities");
     console.log(activity_items);

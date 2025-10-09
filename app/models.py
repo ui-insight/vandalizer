@@ -554,6 +554,7 @@ class UrlAttachment(me.Document):
     user_id = me.StringField(required=True, max_length=200)
 
 
+
 class ChatMessage(me.Document):
     """Represents a message in a chat."""
 
