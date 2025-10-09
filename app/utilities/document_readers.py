@@ -108,3 +108,57 @@ def extract_text_from_doc(doc_path, doc=None):
             with open(doc_path_str, encoding="utf-8") as file:
                 return file.read()
     return None
+
+def extract_text_from_file(file_path: str, file_extension: str) -> str:
+    """Extract text from a file based on its extension."""
+    file_extension = file_extension.lower().lstrip('.')
+    
+    try:
+        # PDF files
+        if file_extension == "pdf":
+            # Try basic extraction first
+            text = extract_text_from_pdf(file_path)
+            
+            # If text is too short, try OCR
+            MIN_PDF_TEXT_LENGTH = 100
+            if len(text.strip()) < MIN_PDF_TEXT_LENGTH:
+                debug(f"PDF text too short ({len(text)} chars), trying OCR...")
+                text = ocr_extract_text_from_pdf(file_path)
+            
+            return text
+        
+        # HTML files
+        elif file_extension in ["html", "htm"]:
+            return convert_to_markdown(file_path, keep_data_uris=False)
+        
+        # Plain text files
+        elif file_extension in ["txt", "md", "csv", "json", "xml", "log"]:
+            with open(file_path, encoding="utf-8") as file:
+                return file.read()
+        
+        # Office documents (DOCX, DOC, XLSX, PPTX, etc.)
+        elif file_extension in ["docx", "doc", "xlsx", "xls", "pptx", "ppt"]:
+            return convert_to_markdown(file_path, keep_data_uris=False)
+        
+        # Code files
+        elif file_extension in ["py", "js", "java", "cpp", "c", "h", "css", "sql"]:
+            with open(file_path, encoding="utf-8") as file:
+                return file.read()
+        
+        # Fallback: try markdown conversion
+        else:
+            try:
+                return convert_to_markdown(file_path, keep_data_uris=False)
+            except Exception as e:
+                debug(f"MarkItDown conversion failed: {e}")
+                # Last resort: try reading as plain text
+                try:
+                    with open(file_path, encoding="utf-8") as file:
+                        return file.read()
+                except:
+                    with open(file_path, encoding="latin-1") as file:
+                        return file.read()
+    
+    except Exception as e:
+        print(f"Error extracting text from {file_path}: {e}")
+        return f"[Error extracting content: {str(e)}]"

@@ -1,5 +1,7 @@
 """Handles primary routing for the home page and related functionalities."""
-
+import tempfile
+import shutil
+import os
 import asyncio
 import io
 import json
@@ -11,6 +13,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from devtools import debug
+from werkzeug.utils import secure_filename
 from flask import (
     Blueprint,
     Response,
@@ -37,6 +40,7 @@ from app.models import (
     ActivityStatus,
     ChatConversation,
     ChatRole,
+    FileAttachment,
     SearchSet,
     SearchSetItem,
     SmartDocument,
@@ -63,6 +67,7 @@ from app.utilities.document_manager import (
     perform_extraction_and_update,
     update_document_fields,
 )
+from app.utilities.document_readers import extract_text_from_file
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
@@ -598,7 +603,7 @@ def chat() -> ResponseReturnValue:
     return resp
 
 
-@app.route("/chat/add_link", methods=["POST"])
+@home.route("/chat/add_link", methods=["POST"])
 def add_link_to_chat():
     """Add a URL attachment to a chat conversation."""
     try:
@@ -652,6 +657,12 @@ def add_link_to_chat():
         # Add to conversation
         conversation.url_attachments.append(url_attachment)
         conversation.updated_at = datetime.now()
+
+        # add url attachment message to chat
+        conversation.add_message(
+            ChatRole.SYSTEM, f"[Link attached: {title}]\nURL: {link}]"
+        )
+
         conversation.save()
 
         return jsonify(
@@ -669,7 +680,182 @@ def add_link_to_chat():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/chat_history/<conversation_uuid>", methods=["GET"])
+@app.route("/chat/add_documents", methods=["POST"])
+def add_documents_to_chat():
+    """Add file attachments to a chat conversation."""
+    try:
+        conversation_uuid = request.form.get("conversation_uuid")
+        user = load_user()
+        user_id = user.get_id()
+        
+        # Get or create conversation
+        if conversation_uuid:
+            conversation = ChatConversation.objects(
+                uuid=conversation_uuid, user_id=user_id
+            ).first()
+        else:
+            # Create new conversation if none exists
+            conversation = ChatConversation(
+                uuid=str(uuid.uuid4()), 
+                user_id=user_id, 
+                title="New Conversation"
+            )
+            conversation.save()
+        
+        if not conversation:
+            return jsonify({"error": "Conversation not found"}), 404
+        
+        # Check if files were uploaded
+        if 'files' not in request.files:
+            return jsonify({"error": "No files uploaded"}), 400
+        
+        files = request.files.getlist('files')
+        if not files or files[0].filename == '':
+            return jsonify({"error": "No files selected"}), 400
+        
+        uploaded_attachments = []
+        
+        # Process each uploaded file
+        for file in files:
+            if file and file.filename:
+                # Secure the filename
+                filename = secure_filename(file.filename)
+                file_extension = os.path.splitext(filename)[1].lower()
+                
+                # Create a temporary file
+                temp_file = None
+                try:
+                    # Save to temporary file for processing
+                    with tempfile.NamedTemporaryFile(
+                        delete=False, 
+                        suffix=file_extension,
+                        mode='wb'
+                    ) as temp_file:
+                        file.save(temp_file.name)
+                        temp_file_path = temp_file.name
+                    
+                    debug(f"Processing file: {filename} at {temp_file_path}")
+                    
+                    # Extract text content using existing logic
+                    content = extract_text_from_file(temp_file_path, file_extension)
+                    debug(content)
+                    
+                    # Truncate content if too long (adjust max length as needed)
+                    max_content_length = 50000
+                    if len(content) > max_content_length:
+                        content = content[:max_content_length] + "\n\n[Content truncated...]"
+                    
+                    debug(f"Extracted {len(content)} characters from {filename}")
+                    
+                    # Create file attachment record
+                    file_attachment = FileAttachment(
+                        filename=filename,
+                        content=content,
+                        file_type=file_extension,
+                        user_id=user_id
+                    )
+                    file_attachment.save()
+                    
+                    # Add to conversation
+                    conversation.file_attachments.append(file_attachment)
+                    # add file attachment message to chat
+                    conversation.add_message(
+                        ChatRole.SYSTEM, 
+                        f"📎 File attached: {filename} ({len(content):,} characters)"
+                    )
+                        
+                    
+                    uploaded_attachments.append({
+                        "id": str(file_attachment.id),
+                        "filename": filename,
+                        "file_type": file_extension,
+                        "content_preview": content[:500] if content else "",
+                        "content_length": len(content),
+                        "created_at": file_attachment.created_at.isoformat()
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Error processing file {filename}: {e}")
+                    # Still create an attachment with error message
+                    file_attachment = FileAttachment(
+                        filename=filename,
+                        content=f"[Error processing file: {str(e)}]",
+                        file_type=file_extension,
+                        user_id=user_id
+                    )
+                    file_attachment.save()
+                    conversation.file_attachments.append(file_attachment)
+                    
+                    uploaded_attachments.append({
+                        "id": str(file_attachment.id),
+                        "filename": filename,
+                        "file_type": file_extension,
+                        "content_preview": f"Error: {str(e)}",
+                        "content_length": 0,
+                        "created_at": file_attachment.created_at.isoformat()
+                    })
+                
+                finally:
+                    # Clean up temporary file
+                    if temp_file and os.path.exists(temp_file_path):
+                        try:
+                            os.unlink(temp_file_path)
+                            debug(f"Cleaned up temp file: {temp_file_path}")
+                        except Exception as e:
+                            logger.error(f"Error deleting temp file: {e}")
+        
+        # Update conversation timestamp
+        conversation.updated_at = datetime.now()
+        conversation.save()
+        
+        return jsonify({
+            "success": True,
+            "conversation_uuid": conversation.uuid,
+            "attachments": uploaded_attachments
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error adding file attachments: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/chat/remove_document/<attachment_id>", methods=["DELETE"])
+def remove_document_from_chat(attachment_id):
+    """Remove a file attachment from chat conversation."""
+    try:
+        user = load_user()
+        user_id = user.get_id()
+        
+        # Find the attachment
+        attachment = FileAttachment.objects(id=attachment_id, user_id=user_id).first()
+        
+        if not attachment:
+            return jsonify({"error": "Attachment not found"}), 404
+        
+        # Find conversation containing this attachment
+        conversation = ChatConversation.objects(
+            file_attachments=attachment.id,
+            user_id=user_id
+        ).first()
+        
+        if conversation:
+            # Remove from conversation
+            conversation.file_attachments = [
+                att for att in conversation.file_attachments if str(att.id) != attachment_id
+            ]
+            conversation.save()
+        
+        # Delete attachment record (no file to delete from disk)
+        attachment.delete()
+        
+        return jsonify({"success": True}), 200
+        
+    except Exception as e:
+        logger.error(f"Error removing file attachment: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+
+@home.route("/chat_history/<conversation_uuid>", methods=["GET"])
 def get_chat_history(conversation_uuid):
     """Get chat conversation history."""
     try:
@@ -704,7 +890,7 @@ def get_chat_history(conversation_uuid):
         return jsonify({"error": "Failed to fetch conversation"}), 500
 
 
-@app.route("/chat_history/<conversation_uuid>", methods=["DELETE"])
+@home.route("/chat_history/<conversation_uuid>", methods=["DELETE"])
 def delete_chat_history(conversation_uuid):
     """Delete a chat conversation."""
     try:

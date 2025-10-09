@@ -286,31 +286,30 @@ At the end of your response, provide a short, relevant suggestion for a logical 
         debug(user_id)
         debug(conversation_uuid)
         debug(conversation)
+
+        # Build attachment context FIRST
+        attachment_context = ""
         if conversation:
-            # Include URL attachments in the context
-            url_context = ""
-            for url_attachment in conversation.url_attachments:
-                if url_attachment.content:
-                    url_context += f"\n\nWeb Content from {url_attachment.url}:\n{url_attachment.content[:10000]}\n"
+            # Add URL attachments to context
+            if conversation.url_attachments:
+                for url_attachment in conversation.url_attachments:
+                    if url_attachment.content:
+                        attachment_context += f"\n\n## Web Content: {url_attachment.title}\nSource: {url_attachment.url}\n\n{url_attachment.content[:10000]}\n"
+
+            # Add file attachments to context
+            if conversation.file_attachments:
+                for file_attachment in conversation.file_attachments:
+                    if file_attachment.content:
+                        attachment_context += f"\n\n## Document: {file_attachment.filename}\n\n{file_attachment.content[:10000]}\n"
+
+            # NOW load previous messages (which won't include the full content)
             previous_messages = conversation.to_model_messages()
             debug(previous_messages)
 
-        # Add URL context to the prompt if it exists
-        if url_context:
-            prompt += f"\n\nAdditional context from web links:{url_context}"
-
-        # fetcher = URLContentFetcher(max_content_length=30000)
-        # result = fetcher.process_chat_input(question)
-        # print(result)
-        # if isinstance(result, str):
-        #     # If result is a string, add it directly
-        #     prompt += result
-        # elif isinstance(result, (list, tuple)):
-        #     # If result is a list/tuple, join with newlines
-        #     prompt += "\n".join(str(item) for item in result)
-        # else:
-        #     # Fallback: convert to string
-        #     prompt += str(result)
+        # Add attachment context to prompt
+        if attachment_context:
+            prompt = f"{prompt}\n\n---\n## Attached Context:{attachment_context}\n---\n"
+    
         print("Final prompt to the model:")
         print(prompt)
 
