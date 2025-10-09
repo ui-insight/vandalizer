@@ -1,13 +1,14 @@
+import asyncio
+import json
 import os
 import time
+
 import openai
-import json
-from app.utilities.agents import create_chat_agent, extract_entities_with_agent
-from app.utilities.document_readers import extract_text_from_doc
-from app.utilities.config import settings
-from app.models import SmartDocument
-import asyncio
 from devtools import debug
+
+from app.models import SmartDocument
+from app.utilities.agents import create_chat_agent, extract_entities_with_agent
+from app.utilities.config import settings
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -21,7 +22,8 @@ class ExtractionManager3:
         time.time()
         for document_uuid in document_uuids:
             doc = SmartDocument.objects(uuid=document_uuid).first()
-            doc_text += doc.raw_text
+            if doc:
+                doc_text += doc.raw_text
 
         prompt = (
             """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
@@ -35,7 +37,11 @@ class ExtractionManager3:
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
         chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
-        result = chat_agent.run_sync(prompt)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        result = loop.run_until_complete(chat_agent.run_sync(prompt))
+
         output = result.output
         debug(output)
         output = output.replace("\\n", "")
@@ -63,8 +69,9 @@ class ExtractionManager3:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
                 doc_text = doc.raw_text
                 result = extract_entities_with_agent(
-                    text=doc_text, keys=fields_to_extract,
-                    model_name=settings.base_model
+                    text=doc_text,
+                    keys=fields_to_extract,
+                    model_name=settings.base_model,
                 )
                 extraction.extend(result)
         else:

@@ -20,7 +20,6 @@ from flask import (
     render_template,
     request,
     send_file,
-    session,
     url_for,
 )
 from flask.typing import ResponseReturnValue
@@ -65,12 +64,12 @@ def add_workflow() -> ResponseReturnValue:
     """Create a new workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow = Workflow(
         name=workflow_data["name"],
         description=workflow_data["description"],
-        user_id=session["user_id"],
+        user_id=user.user_id,
     )
     workflow.save()
     return jsonify(
@@ -108,7 +107,7 @@ def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     data = request.get_json()
     uuid = data["uuid"]
     print(uuid)
@@ -125,7 +124,7 @@ def update_workflow() -> ResponseReturnValue:
     """Update a workflow by ID."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -142,7 +141,7 @@ def run_workflow() -> ResponseReturnValue:
     user = current_user
     user_id = user.user_id
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
@@ -220,7 +219,7 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
     """Get workflow recommendations synchronously (for immediate results)."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     request_data = request.get_json()
     document_uuids = request_data.get("uuids", [])
@@ -312,7 +311,7 @@ def test_workflow_step() -> ResponseReturnValue:
     """Run a workflow step."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     task_name = workflow_data["task_name"]
@@ -658,7 +657,7 @@ def update_workflow_title() -> ResponseReturnValue:
     """Update the title of a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["uuid"]
     workflow = Workflow.objects(id=ObjectId(workflow_id)).first()
@@ -676,7 +675,7 @@ def add_workflow_step() -> ResponseReturnValue:
     """Add a new step to a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
@@ -704,7 +703,7 @@ def edit_workflow_step() -> ResponseReturnValue:
     """Edit a step in a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
@@ -727,7 +726,7 @@ def update_workflow_step_title() -> ResponseReturnValue:
     """Update the title of a workflow step."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
@@ -744,7 +743,7 @@ def add_workflow_add_task() -> ResponseReturnValue:
     """Add a task to a workflow step."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
@@ -767,7 +766,7 @@ def add_workflow_step_task() -> ResponseReturnValue:
     """Add a task to a specific step in a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
@@ -786,7 +785,7 @@ def delete_workflow_step() -> ResponseReturnValue:
     """Delete a specific step in a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_step_id = workflow_data["workflow_step_id"]
@@ -813,7 +812,7 @@ def delete_workflow_step_task() -> ResponseReturnValue:
     """Delete a specific task in a workflow step."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     print(workflow_data)
@@ -837,7 +836,7 @@ def update_workflow_step() -> ResponseReturnValue:
     """Update a specific step in a workflow."""
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     step_index = workflow_data["step_index"]
@@ -1225,7 +1224,7 @@ def workflow_add_document_step() -> ResponseReturnValue:
 def duplicate_workflow(workflow_id):
     user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     # 1) Load original
     orig = Workflow.objects(id=workflow_id).first()
     if not orig:

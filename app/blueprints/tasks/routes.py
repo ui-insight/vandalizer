@@ -383,9 +383,10 @@ def begin_search() -> ResponseReturnValue:
     document_paths = []
     for doc_uuid in document_uuids:
         document = SmartDocument.objects(uuid=doc_uuid).first()
-        documents.append(document)
-        absolute_path = document.absolute_path
-        document_paths.append(absolute_path)
+        if document:
+            documents.append(document)
+            absolute_path = document.absolute_path
+            document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     print("Searching for search set")

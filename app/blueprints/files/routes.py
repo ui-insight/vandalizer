@@ -423,6 +423,7 @@ def toggle_default_doc() -> ResponseReturnValue:
     return redirect(f"/home?{redirect_url}")
 
 
+@login_required
 @files.route("/create_folder", methods=["POST"])
 def create_folder() -> ResponseReturnValue:
     """Create a new folder."""
@@ -434,7 +435,7 @@ def create_folder() -> ResponseReturnValue:
         title=name,
         parent_id=parent_id,
         space=space_id,
-        user_id=session["user_id"],
+        user_id=current_user.user_id,
         uuid=uuid.uuid4().hex,
     )
     return redirect(url_for(HOME_ROUTE, folder_id=folder.uuid))
