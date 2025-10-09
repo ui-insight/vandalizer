@@ -538,7 +538,8 @@ class FileAttachment(me.Document):
     """Represents a file attachment in a chat."""
 
     filename = me.StringField(required=True, max_length=200)
-    filepath = me.StringField(required=True, max_length=500)
+    file_type = me.StringField(max_length=50)  # Store file extension
+    content = me.StringField(required=True, max_length=500000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
 
