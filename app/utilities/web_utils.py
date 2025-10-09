@@ -123,12 +123,30 @@ class URLContentFetcher:
         ]
         for selector in unwanted_selectors:
             for element in soup.select(selector):
-                element.decompose() # Remove the element from the parse tree.
+                element.decompose()
 
-        # Get the remaining text and clean up whitespace for better readability.
-        text = soup.get_text(separator='\n', strip=True)
-        return text
+        # Add newlines after block-level elements to preserve paragraph structure
+        block_elements = soup.find_all(['p', 'div', 'article', 'section', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'br'])
+        for element in block_elements:
+            if element.name == 'br':
+                element.replace_with('\n')
+            else:
+                # Add space after the element to avoid words running together
+                if element.string:
+                    element.string.replace_with(element.string + '\n')
+                else:
+                    element.append('\n')
 
+        # Get text with space separator to avoid breaking inline elements
+        text = soup.get_text(separator=' ', strip=True)
+
+        # Clean up excessive whitespace while preserving paragraph breaks
+        text = re.sub(r' +', ' ', text)  # Multiple spaces to single space
+        text = re.sub(r'\n +', '\n', text)  # Remove spaces after newlines
+        text = re.sub(r' +\n', '\n', text)  # Remove spaces before newlines
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
+
+        return text.strip()
 
     def fetch_url_content(self, url: str) -> Optional[Dict[str, str]]:
         """

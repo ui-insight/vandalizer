@@ -623,12 +623,6 @@ def add_link_to_chat():
             conversation = ChatConversation.objects(
                 uuid=conversation_uuid, user_id=user_id
             ).first()
-        else:
-            # Create new conversation if none exists
-            conversation = ChatConversation(
-                uuid=str(uuid.uuid4()), user_id=user_id, title="New Conversation"
-            )
-            conversation.save()
 
         if not conversation:
             return jsonify({"error": "Conversation not found"}), 404
@@ -637,7 +631,7 @@ def add_link_to_chat():
         debug(conversation)
 
         # Fetch URL content
-        fetcher = URLContentFetcher(max_content_length=50000)
+        fetcher = URLContentFetcher(max_content_length=500000)
         result = fetcher.fetch_url_content(link)
 
         # Extract title from URL or content
@@ -660,10 +654,11 @@ def add_link_to_chat():
 
         # add url attachment message to chat
         conversation.add_message(
-            ChatRole.SYSTEM, f"[Link attached: {title}]\nURL: {link}]"
+            ChatRole.USER, f"[Link attached: {title}]\nURL: {link}]"
         )
 
         conversation.save()
+        conversation.reload()
 
         return jsonify(
             {
@@ -680,8 +675,8 @@ def add_link_to_chat():
         return jsonify({"error": str(e)}), 500
 
 
-@app.route("/chat/add_documents", methods=["POST"])
-def add_documents_to_chat():
+@app.route("/chat/add_document", methods=["POST"])
+def add_document_to_chat():
     """Add file attachments to a chat conversation."""
     try:
         conversation_uuid = request.form.get("conversation_uuid")
@@ -689,25 +684,19 @@ def add_documents_to_chat():
         user_id = user.get_id()
         
         # Get or create conversation
+        conversation = None
         if conversation_uuid:
             conversation = ChatConversation.objects(
                 uuid=conversation_uuid, user_id=user_id
             ).first()
-        else:
-            # Create new conversation if none exists
-            conversation = ChatConversation(
-                uuid=str(uuid.uuid4()), 
-                user_id=user_id, 
-                title="New Conversation"
-            )
-            conversation.save()
         
         if not conversation:
             return jsonify({"error": "Conversation not found"}), 404
-        
+
         # Check if files were uploaded
         if 'files' not in request.files:
             return jsonify({"error": "No files uploaded"}), 400
+
         
         files = request.files.getlist('files')
         if not files or files[0].filename == '':
@@ -760,7 +749,7 @@ def add_documents_to_chat():
                     conversation.file_attachments.append(file_attachment)
                     # add file attachment message to chat
                     conversation.add_message(
-                        ChatRole.SYSTEM, 
+                        ChatRole.USER, 
                         f"📎 File attached: {filename} ({len(content):,} characters)"
                     )
                         
@@ -776,6 +765,7 @@ def add_documents_to_chat():
                     
                 except Exception as e:
                     logger.error(f"Error processing file {filename}: {e}")
+                    debug(f"Error processing file {filename}: {e}")
                     # Still create an attachment with error message
                     file_attachment = FileAttachment(
                         filename=filename,
@@ -807,6 +797,7 @@ def add_documents_to_chat():
         # Update conversation timestamp
         conversation.updated_at = datetime.now()
         conversation.save()
+        conversation.reload()
         
         return jsonify({
             "success": True,

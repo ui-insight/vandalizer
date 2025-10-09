@@ -56,11 +56,15 @@
     </div>
 </div>
 <script>
-console.log("Script block is loading...");
+
     /**
      * Show file picker and upload documents to chat
      */
     function showChatDocumentUpload() {
+        let currentActivity = {{ activity.to_json() | safe if activity else 'null' }};
+        console.log("Current activity:", currentActivity);
+        let conversationId = currentActivity && currentActivity.conversation_id ? currentActivity.conversation_id : null;
+
         // Create a hidden file input
         console.log("show document upload");
         const fileInput = document.createElement('input');
@@ -81,13 +85,13 @@ console.log("Script block is loading...");
                 formData.append('files', files[i]);
             }
 
+            console.log("Uploading files to conversation:", conversationId);
             // Get current conversation UUID
-            const conversationId = window.conversationId || '';
             formData.append('conversation_uuid', conversationId);
 
             // Upload files
             $.ajax({
-                url: '/chat/add_documents',
+                url: '/chat/add_document',
                 type: 'POST',
                 data: formData,
                 processData: false,  // Important: Don't process the data
@@ -95,9 +99,6 @@ console.log("Script block is loading...");
                 dataType: 'json',
                 success: function (response) {
                     // Update conversation UUID if it's a new conversation
-                    if (!window.conversationId && response.conversation_uuid) {
-                        window.conversationId = response.conversation_uuid;
-                    }
 
                     // Show confirmation in chat for each uploaded file
                     response.attachments.forEach(function (attachment) {
@@ -268,6 +269,4 @@ console.log("Script block is loading...");
         }
     }
 
-console.log("Script block is loaded");
-console.log("showChatDocumentUpload exists?", typeof showChatDocumentUpload);
 </script>

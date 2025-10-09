@@ -2,6 +2,7 @@
 """Models for the application. Defines data structures and relationships."""
 
 import datetime
+from devtools import debug
 import datetime as dt
 import json
 import os
@@ -543,15 +544,35 @@ class FileAttachment(me.Document):
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
 
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'filename': self.filename,
+            'file_type': self.file_type,
+            'content': self.content,
+            'created_at': self.created_at,
+            'user_id': self.user_id,
+        }
+
 
 class UrlAttachment(me.Document):
     """Represents a URL attachment in a chat."""
 
     url = me.StringField(required=True, max_length=500)
     title = me.StringField(required=False, max_length=200)
-    content = me.StringField(required=False, max_length=50000)
+    content = me.StringField(required=False, max_length=500000)
     created_at = me.DateTimeField(default=datetime.datetime.now)
     user_id = me.StringField(required=True, max_length=200)
+
+    def to_dict(self):
+        return {
+            'id': str(self.id),
+            'url': self.url,
+            'title': self.title,
+            'content': self.content,
+            'created_at': self.created_at,
+            'user_id': self.user_id,
+        }
 
 
 
@@ -615,6 +636,7 @@ class ChatConversation(me.Document):
         #     self.messages = self.messages[-MAX_CHAT_MESSAGES:]
 
         self.save()
+        debug(f"Added message to conversation {self.id}: {role} - {content[:30]}...")
         return message
 
     def get_messages(self):
@@ -653,8 +675,8 @@ class ChatConversation(me.Document):
                 }
                 for msg in self.messages  # This will dereference
             ],
-            'file_attachments': self.file_attachments,
-            'url_attachments': self.url_attachments,
+            'file_attachments': [u.to_dict() for u in self.file_attachments],
+            'url_attachments': [u.to_dict() for u in self.url_attachments],
             'created_at': self.created_at,
             'updated_at': self.updated_at,
         }
