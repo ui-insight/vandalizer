@@ -315,6 +315,8 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         full_response = []
 
+        usage = {}
+
         async def streamer():
             async with agent.iter(
                 prompt, message_history=previous_messages
@@ -368,19 +370,27 @@ At the end of your response, provide a short, relevant suggestion for a logical 
                                             + "\n"
                                         )
                     # elif Agent.is_call_tools_node(node):
+                     
+                if agent_run.result:
+                    usage = agent_run.result.usage()
+                    debug(usage)
+                    debug(agent_run)
+                    assistant_message = agent_run.result.output
+                    conversation.add_message(ChatRole.ASSISTANT, assistant_message)
+                    conversation.reload()
+                    activity = ActivityEvent.objects(
+                        user_id=user_id,
+                        conversation_id=conversation.uuid,
+                    ).first()
+                    if activity:
+                        activity.message_count = len(conversation.messages)
+                        activity.status = ActivityStatus.COMPLETED.value
 
-            if full_response:
-                assistant_message = "".join(full_response)
-                conversation.add_message(ChatRole.ASSISTANT, assistant_message)
-                activity = ActivityEvent.objects(
-                    user_id=user_id,
-                    conversation_id=conversation.uuid,
-                ).first()
-                if activity:
-                    activity.message_count = len(conversation.messages)
-                    activity.status = ActivityStatus.COMPLETED.value
-                    activity.save()
-                    activity_finish(activity)
+                        activity.tokens_input = usage.request_tokens
+                        activity.tokens_output = usage.response_tokens
+                        activity.message_count = len(conversation.messages)
+                        activity.save()
+                        activity_finish(activity)
 
         # Bridge the async generator to a sync iterator for Flask
         def sync_streamer():
@@ -395,5 +405,6 @@ At the end of your response, provide a short, relevant suggestion for a logical 
                 except StopAsyncIteration:
                     break
             loop.close()
+
 
         return sync_streamer()

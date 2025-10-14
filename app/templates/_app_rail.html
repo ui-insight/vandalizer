@@ -33,6 +33,22 @@
     // Injected from server
     const activity_items = {{ activities | tojson | safe }};
 
+    const eventSource = new EventSource("/activity/streams/");
+    console.log("EventSource created:", eventSource);
+
+    eventSource.onmessage = function (event) {
+        console.log("Received event:", event);
+        const data = JSON.parse(event.data);
+        console.log("Parsed data:", data);
+
+        const ul = document.getElementById("run-list");
+
+        if (!ul) return;
+        // Empty old one out
+
+        ul.appendChild(liForActivity(data));
+    };
+
     // Icon map by type
     const TYPE_ICON = {
         conversation: { cls: "fa-comments", title: "Chat" },
@@ -54,6 +70,8 @@
     }
 
     function liForActivity(a) {
+        if (!a) return;
+        console.log("Creating li for activity:", a, a._id.$oid);
         const isRunning = a.status === "running" || a.status === "queued";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
         const status = STATUS_ICON[a.status];
@@ -70,8 +88,9 @@
 
         const li = document.createElement("li");
         li.className = `run-item${isRunning ? " is-running" : ""}`;
-        li.dataset.runId = a.id;
-        li.onclick = () => openRun(a.id, a);
+        activity_id = a._id.$oid;
+        li.dataset.runId = activity_id;
+        li.onclick = () => openRun(activity_id, a);
 
         // add delete button for deleting the activity
         li.innerHTML = `
@@ -80,7 +99,7 @@
         <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
       </span>
       ${right}
-      <span class="run-delete" onclick="deleteActivity(event, '${a.id}')" title="Delete activity">
+      <span class="run-delete" onclick="deleteActivity(event, '${activity_id}')" title="Delete activity">
         <i class="fa-solid fa-trash" style="color: red;"></i>
         </span>
     `;
@@ -88,15 +107,6 @@
     }
 
 
-    function renderActivities(list) {
-        const ul = document.getElementById("run-list");
-
-        if (!ul) return;
-        // Empty old one out
-
-
-        list.forEach(a => ul.appendChild(liForActivity(a)));
-    }
 
     // Simple handler you can expand to route appropriately
     function openRun(id, a) {
@@ -134,10 +144,10 @@
     }
         
 
-    console.log("rendering activities");
-    console.log(activity_items);
+    // console.log("rendering activities");
+// console.log(activity_items);
     // Initial render
-    renderActivities(activity_items);
+    // renderActivities(activity_items);
 
     // (Optional) If you add SSE/WebSocket updates later, call renderActivities() again with new data.
 </script>
