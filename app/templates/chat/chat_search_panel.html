@@ -87,7 +87,11 @@
 
             console.log("Uploading files to conversation:", conversationId);
             // Get current conversation UUID
-            formData.append('conversation_uuid', conversationId);
+
+            const activity_id = new URLSearchParams(window.location.search).get('activity_id');
+    
+            formData.append('current_activity_id', activity_id);
+            formData.append('current_space_id', '{{ current_space_id }}');
 
             // Upload files
             $.ajax({
@@ -107,6 +111,8 @@
                     if(window.location.href.includes('activity_id=')) {
                         // Scroll to bottom
                         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                        const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
                     } else {
                         // Show success message
                         console.log(`Successfully uploaded ${response.attachments.length} document(s)`);

@@ -155,10 +155,8 @@
         console.log("Submitting link: " + link);
 
         // Get current conversation UUID
-        let currentConvId = conversationId;
-        if (!currentConvId && activity && activity.type === "conversation" && activity.conversation_id) {
-            currentConvId = activity.conversation_id;
-        }
+        const activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        console.log("adding link activity_id", activity_id);
     
 
         // Disable button during submission
@@ -169,7 +167,8 @@
             type: 'POST',
             data: JSON.stringify({
                 link: link,
-                conversation_uuid: currentConvId,
+                current_activity_id: activity_id,
+                current_space_id: current_space_id,
             }),
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
@@ -182,12 +181,13 @@
 
                     // Scroll to bottom
                     $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                    const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
                 }
                 else {
                     // If no conversation existed, we now have one
                     // reload the page to load it
                     // set the location /home?activity_id=${response.activity_id}=Assistant
-                    conversationId = response.conversation_uuid;
                     console.log("Response", response);
                     console.log("conversation id", response.conversation_uuid);
                     if(response.activity_id) {

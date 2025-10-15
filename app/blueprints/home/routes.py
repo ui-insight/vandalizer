@@ -622,8 +622,8 @@ def add_link_to_chat():
     try:
         data = request.get_json()
         link = data.get("link")
-        conversation_uuid = data.get("conversation_uuid")
         current_space_id = data.get("current_space_id", None)
+        current_activity_id = data.get("current_activity_id", None)
 
         user = load_user()
         user_id = user.get_id()
@@ -633,14 +633,8 @@ def add_link_to_chat():
         #     return jsonify({"error": "Invalid URL"}), 400
 
         # Get or create conversation
-        conversation = None
-        if conversation_uuid:
-            conversation = ChatConversation.objects(
-                uuid=conversation_uuid, user_id=user_id,
-            ).first()
 
-        activity = None
-        if not conversation:
+        if not current_activity_id or len(str(current_activity_id).strip()) == 0:
             conversation = ChatConversation(
                 user_id=user_id, uuid=str(uuid.uuid4()),
                 title="Link Attached"
@@ -654,11 +648,18 @@ def add_link_to_chat():
                 conversation_id=conversation.uuid,
                 space=current_space_id
             )
-            activity.save()
-            session["current_activity_id"] = str(activity.id)
 
+        else:
+            activity = ActivityEvent.objects(id=current_activity_id).first()
+            if activity:
+                activity.status = ActivityStatus.RUNNING
+                activity.save()
+                conversation = ChatConversation.objects(
+                    uuid=activity.conversation_id, user_id=user_id,
+                ).first()
+
+        session["current_activity_id"] = str(activity.id)
         session["current_conversation_id"] = str(conversation.id)
-
 
         debug(link)
         debug(conversation)
@@ -701,6 +702,7 @@ def add_link_to_chat():
                 "title": title,
                 "content_preview": content[:500] if content else "",
                 "activity_id": str(activity.id) if activity else None,
+                "attachment": url_attachment.to_dict(),
             }
         ), 200
 
@@ -713,20 +715,14 @@ def add_link_to_chat():
 def add_document_to_chat():
     """Add file attachments to a chat conversation."""
     try:
-        conversation_uuid = request.form.get("conversation_uuid")
         current_space_id = request.form.get("current_space_id", None)
+        current_activity_id = request.form.get("current_activity_id", None)
         user = load_user()
         user_id = user.get_id()
         
-        # Get or create conversation
         conversation = None
-        if conversation_uuid:
-            conversation = ChatConversation.objects(
-                uuid=conversation_uuid, user_id=user_id
-            ).first()
-        
         activity = None
-        if not conversation:
+        if not current_activity_id or len(str(current_activity_id).strip()) < 10:
             conversation = ChatConversation(
                 title="Attachments Added",
                 uuid=str(uuid.uuid4()),
@@ -734,15 +730,25 @@ def add_document_to_chat():
             )
             activity = activity_start(
                 type=ActivityType.CONVERSATION,
-                title="Attachments Added",
+                title="Document Attached",
                 user_id=user_id,
                 team_id=user.ensure_current_team().uuid,
                 conversation_id=conversation.uuid,
                 space=current_space_id
             )
-            session["current_activity_id"] = str(activity.id)
+        else:
+            activity = ActivityEvent.objects(id=current_activity_id).first()
+            if activity:
+                activity.status = ActivityStatus.RUNNING
+                activity.save()
+                conversation = ChatConversation.objects(
+                    uuid=activity.conversation_id, user_id=user_id,
+                ).first()
 
+
+        session["current_activity_id"] = str(activity.id)
         session["current_conversation_id"] = str(conversation.id)
+
 
         # Check if files were uploaded
         if 'files' not in request.files:
@@ -854,6 +860,7 @@ def add_document_to_chat():
             "success": True,
             "conversation_uuid": conversation.uuid,
             "attachments": uploaded_attachments,
+            "attachment": uploaded_attachments[0] if uploaded_attachments else None,
             "activity_id": str(activity.id) if activity else None,
         }), 200
         
