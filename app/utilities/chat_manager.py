@@ -179,7 +179,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         agent = None
         if len(full_text) < max_context_length:
-            prompt += f"""\n\n# Query: {question}\n\n # Context: \n{full_text}"""
+            prompt += f"""\n\n# Query: {question}\n\n# Context: \n{full_text}"""
             agent = create_chat_agent(model)
         else:
             prompt += f"""\n\n# Document(s): {[doc.uuid for doc in documents]}\n""" 

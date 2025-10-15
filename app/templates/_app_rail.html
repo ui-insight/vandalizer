@@ -49,7 +49,6 @@
         ul.appendChild(liForActivity(data));
 
         conversationId = data.conversation_id;
-        window.conversationId = data.conversation_id;
     };
 
     // Icon map by type
@@ -143,8 +142,8 @@
                 const li = document.querySelector(`li.run-item[data-run-id='${itemId}']`);
                 if (li) {
                     li.remove();
-                    // reload
-                    location.reload();
+                    // reload to the /home?section=Assistant
+                    window.location.href = "/home?section=Assistant";
                 }
             } else {
                 alert("Failed to delete activity.");

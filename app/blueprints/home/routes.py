@@ -241,10 +241,10 @@ def index() -> ResponseReturnValue:
     initial_library_results = _initial_library_results(request)
 
     # Resume activity
-    activity_id = request.args.get("activity_id", default="")
+    activity_id = request.args.get("activity_id", None)
     activity_type = None
 
-    conversation_uuid = request.args.get("conversation_id", default="")
+    conversation_uuid = request.args.get("conversation_id", None)
     chat_conversation = None
     activity = None
     if activity_id and len(str(activity_id).strip()) > 0:
@@ -255,7 +255,7 @@ def index() -> ResponseReturnValue:
                 chat_conversation = ChatConversation.objects(
                     uuid=activity.conversation_id,
                     user_id=user.user_id,
-                ).select_related(max_depth=2)[0]
+                ).first()
                 debug(chat_conversation)
                 conversation_uuid = chat_conversation.uuid
                 
@@ -639,6 +639,7 @@ def add_link_to_chat():
                 uuid=conversation_uuid, user_id=user_id,
             ).first()
 
+        activity = None
         if not conversation:
             conversation = ChatConversation(
                 user_id=user_id, uuid=str(uuid.uuid4()),
@@ -699,6 +700,7 @@ def add_link_to_chat():
                 "attachment_id": str(url_attachment.id),
                 "title": title,
                 "content_preview": content[:500] if content else "",
+                "activity_id": str(activity.id) if activity else None,
             }
         ), 200
 
@@ -723,6 +725,7 @@ def add_document_to_chat():
                 uuid=conversation_uuid, user_id=user_id
             ).first()
         
+        activity = None
         if not conversation:
             conversation = ChatConversation(
                 title="Attachments Added",
@@ -850,7 +853,8 @@ def add_document_to_chat():
         return jsonify({
             "success": True,
             "conversation_uuid": conversation.uuid,
-            "attachments": uploaded_attachments
+            "attachments": uploaded_attachments,
+            "activity_id": str(activity.id) if activity else None,
         }), 200
         
     except Exception as e:

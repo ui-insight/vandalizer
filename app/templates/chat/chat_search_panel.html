@@ -101,31 +101,19 @@
                     // Update conversation UUID if it's a new conversation
 
                     // Show confirmation in chat for each uploaded file
-                    response.attachments.forEach(function (attachment) {
-                        const contentPreview = attachment.content_preview
-                            ? `<div style="font-size: 0.85em; color: #666; margin-top: 5px; padding: 5px; background: white; border-radius: 3px; max-height: 60px; overflow: hidden;">${escapeHtml(attachment.content_preview)}</div>`
-                            : '';
 
-                        $("#chat-panel").append(`
-                        <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
-                            <i class="fa fa-file"></i> Added document: <strong>${attachment.filename}</strong>
-                            <button class="btn btn-sm btn-link" onclick="removeChatAttachment('${attachment.id}', this)" 
-                                    style="float: right; padding: 0; color: #999;" title="Remove">
-                                <i class="fa fa-times"></i>
-                            </button>
-                            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
-                                Content loaded (${attachment.content_length} chars)
-                            </div>
-                            ${contentPreview}
-                        </div>
-                    `);
-                    });
 
-                    // Scroll to bottom
-                    $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
-
-                    // Show success message
-                    console.log(`Successfully uploaded ${response.attachments.length} document(s)`);
+                    // check if there is a current activity id in the url
+                    if(window.location.href.includes('activity_id=')) {
+                        // Scroll to bottom
+                        $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                    } else {
+                        // Show success message
+                        console.log(`Successfully uploaded ${response.attachments.length} document(s)`);
+                        if(response.activity_id) {
+                            window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
+                        }
+                    }
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.error("Error uploading documents:", thrownError);

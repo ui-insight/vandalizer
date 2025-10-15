@@ -174,26 +174,28 @@
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             success: function (response) {
-                // Clear input and close modal
-                $('#chat-input-link').val('');
-                $('#chat-input-modal').hide();
+                // check if there is an activity_id in the url
+                if(window.location.href.includes("activity_id=")) {
+                    // Clear input and close modal
+                    $('#chat-input-link').val('');
+                    $('#chat-input-modal').hide();
 
-                // Show confirmation in chat
-                $("#chat-panel").append(`
-                    <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
-                        <i class="fa fa-link"></i> Added link: <a href="${link}" target="_blank">${response.title || link}</a>
-                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
-                            Content loaded (${response.content_preview ? response.content_preview.length + ' chars' : '0 chars'})
-                        </div>
-                    </div>
-                `);
-
-                // Scroll to bottom
-                $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                    // Scroll to bottom
+                    $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                }
+                else {
+                    // If no conversation existed, we now have one
+                    // reload the page to load it
+                    // set the location /home?activity_id=${response.activity_id}=Assistant
+                    conversationId = response.conversation_uuid;
+                    console.log("Response", response);
+                    console.log("conversation id", response.conversation_uuid);
+                    if(response.activity_id) {
+                        window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
+                    } 
+                }
 
                 // save the conversation id
-                console.log("add link response", response, window.conversationId);
-                console.log("conversation id", response.conversation_uuid);
             
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -2871,10 +2873,6 @@
         let currentConvId = conversationId;
 
         // Fallback checks
-        if (!currentConvId && window.conversationId) {
-            currentConvId = window.conversationId;
-            conversationId = currentConvId; // Sync the global
-        }
 
         if (!currentConvId && activity && activity.type === "conversation" && activity.conversation_id) {
             currentConvId = activity.conversation_id;
@@ -2930,7 +2928,6 @@
                 const serverConvId = response.headers.get("X-Conversation-UUID");
                 if (serverConvId) {
                     conversationId = serverConvId;
-                    window.conversationId = serverConvId;
                     console.log("Updated conversation_id from response:", conversationId);
                     if (activity && activity.type === "conversation") {
                         activity.conversation_id = conversationId;
