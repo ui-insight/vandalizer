@@ -47,6 +47,9 @@
         // Empty old one out
 
         ul.appendChild(liForActivity(data));
+
+        conversationId = data.conversation_id;
+        window.conversationId = data.conversation_id;
     };
 
     // Icon map by type
@@ -91,6 +94,16 @@
         activity_id = a._id.$oid;
         li.dataset.runId = activity_id;
         li.onclick = () => openRun(activity_id, a);
+
+        let title = a.title;
+        if(title.length == 0){
+            if(a.type === "workflow_run"){
+                title = a.workflow.name || "Workflow";
+            } else {
+                title = "Activity";
+            }
+        }
+
 
         // add delete button for deleting the activity
         li.innerHTML = `

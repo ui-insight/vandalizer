@@ -155,9 +155,11 @@
         console.log("Submitting link: " + link);
 
         // Get current conversation UUID
-        if (activity && activity.type === "conversation" && activity.conversation_id) {
-            conversationId = activity.conversation_id;
+        let currentConvId = conversationId;
+        if (!currentConvId && activity && activity.type === "conversation" && activity.conversation_id) {
+            currentConvId = activity.conversation_id;
         }
+    
 
         // Disable button during submission
         $(this).prop('disabled', true);
@@ -167,7 +169,7 @@
             type: 'POST',
             data: JSON.stringify({
                 link: link,
-                conversation_uuid: conversationId
+                conversation_uuid: currentConvId,
             }),
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
@@ -189,8 +191,10 @@
                 // Scroll to bottom
                 $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
 
-                // Optionally, you can now ask a question about the link
-                // askAboutLink(link);
+                // save the conversation id
+                console.log("add link response", response, window.conversationId);
+                console.log("conversation id", response.conversation_uuid);
+            
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.error("Error adding link:", thrownError);
@@ -402,18 +406,6 @@
 
                     $modelSelect.append($li);
                 });
-
-                // optional: selection handler
-                // $modelSelect.on('click keydown', 'li.model-option', function (e) {
-                //     if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
-                //         const name = $(this).data('value');
-                //         // update UI selection state
-                //         $(this).attr('aria-checked', 'true').addClass('selected')
-                //             .siblings().attr('aria-checked', 'false').removeClass('selected');
-                //         // your function to switch models:
-                //         // setModel(name);
-                //     }
-                // });
 
             },
             error: function (xhr, status, err) {
@@ -975,9 +967,7 @@
                     clearTimeout(pollTimeout);
                     isProcessingFile = false;
                 } else {
-                    // Some other error — you can choose to retry or stop
                     console.error("Error polling status:", status, error);
-                    // Example: retry once after 10 seconds
                     pollTimeout = setTimeout(() => pollStatus(docUuid), 10000);
                 }
             }
@@ -1644,6 +1634,7 @@
             space_id: current_space_id,
             document_uuids: document_uuids,
             session_id: session_id,
+            current_space_id: current_space_id
         });
 
         console.log(data);
@@ -2876,14 +2867,25 @@
         display_question = ""
     ) {
 
+        // Use the global conversationId variable
+        let currentConvId = conversationId;
 
-        if (activity && activity.type === "conversation" && activity.conversation_id) {
-            conversationId = activity.conversation_id;
+        // Fallback checks
+        if (!currentConvId && window.conversationId) {
+            currentConvId = window.conversationId;
+            conversationId = currentConvId; // Sync the global
         }
+
+        if (!currentConvId && activity && activity.type === "conversation" && activity.conversation_id) {
+            currentConvId = activity.conversation_id;
+            conversationId = currentConvId; // Sync the global
+        }
+
+    
         const activity_id = activity ? activity.id : null;
 
+        console.log("Sending chat with conversation_uuid:", conversationId);
 
-        console.log("conversation_uuid:", conversationId);
         console.log("activity:", activity);
 
         $('#recommendations-panel').empty();
@@ -2910,14 +2912,16 @@
 
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "slow");
 
+
         fetch("/home/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
             body: JSON.stringify({
                 document_uuids: document_uuids,
                 message: question + "\n" + additional_context,
-                conversation_uuid: conversationId,
+                conversation_uuid: currentConvId,
                 activity_id: activity_id,
+                current_space_id: current_space_id,
                 folder_uuid: folder_uuid,
             }),
         })
@@ -2926,9 +2930,8 @@
                 const serverConvId = response.headers.get("X-Conversation-UUID");
                 if (serverConvId) {
                     conversationId = serverConvId;
-                    // optionally persist across navigation:
-                    sessionStorage.setItem("conversation_uuid", conversationId);
-                    // if you keep an activity object, you can also mirror it there:
+                    window.conversationId = serverConvId;
+                    console.log("Updated conversation_id from response:", conversationId);
                     if (activity && activity.type === "conversation") {
                         activity.conversation_id = conversationId;
                     }
@@ -3047,7 +3050,6 @@
                                         $thinkingPanel.find(".thinking-content").text(thinkingBuffer);
                                     } else if (data.kind === "meta" && data.conversation_uuid) {
                                         conversationId = data.conversation_uuid;
-                                        sessionStorage.setItem("conversation_uuid", conversationId);
                                     }
                                 } catch (e) {
                                     console.error("Error parsing JSON:", e, "Line:", line);

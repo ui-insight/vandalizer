@@ -894,6 +894,7 @@ class ActivityEvent(me.Document):
     message_count = me.IntField(default=0)  # conversation
     tokens_input = me.IntField(default=0)  # LLM tokens in
     tokens_output = me.IntField(default=0)  # LLM tokens out
+    total_tokens = me.IntField(default=0)  # LLM tokens in+out
     documents_touched = me.IntField(default=0)  # # of docs referenced
     steps_total = me.IntField(default=0)  # workflow
     steps_completed = me.IntField(default=0)  # workflow

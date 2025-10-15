@@ -10,33 +10,14 @@ from app.models import (
     WorkflowResult,
 )
 
-
-def _safe_duration_ms(ev) -> int | None:
-    try:
-        return ev.duration_ms
-    except Exception as e:
-        # Log once at warn; don't crash analytics
-        logger = logging.getLogger(__name__)
-        logger.warning("duration_ms failed for event %s: %s", getattr(ev, "id", "?"), e)
-        return None
-
-
-def _incs_for(ev):
-    dur = _safe_duration_ms(ev)
-    return {
-        "tokens_input": getattr(ev, "tokens_input", 0) or 0,
-        "tokens_output": getattr(ev, "tokens_output", 0) or 0,
-        "requests": 1,
-        "errors": 1 if getattr(ev, "had_error", False) else 0,
-        "duration_ms": dur or 0,  # record 0 if unknown instead of crashing
-    }
+logger = logging.getLogger(__name__)
 
 
 def recent_activity_for_feed(
     user_id: str | None = None, team_id: str | None = None, limit: int = 100
 ):
     q = ActivityEvent.objects
-    print(f"Activites for {user_id} {team_id}")
+    print(f"Activities for {user_id} {team_id}")
     if user_id:
         q = q(user_id=user_id)
     return q.order_by("-started_at").limit(limit)
@@ -73,6 +54,11 @@ def activity_start(
         tags=tags or [],
     )
     ev.save()
+    
+    # Rollup "started" counts immediately for workflows
+    if type == ActivityType.WORKFLOW_RUN:
+        _rollup_workflow_started(ev)
+    
     return ev
 
 
@@ -112,13 +98,15 @@ def activity_finish(
     if error:
         ev.error = error[:2000]
     ev.save()
-    # Also push to daily aggregates (see below)
+    
+    # Roll up completion metrics
     rollup_event_to_daily_aggregates(ev)
 
 
 def _agg_key(ev: ActivityEvent):
+    """Generate aggregate keys for global, user, and team scopes."""
     day = ev.finished_at.date() if ev.finished_at else datetime.now(timezone.utc).date()
-    # emit 3 scopes to support user, team, and global dashboards
+    # Emit 3 scopes to support user, team, and global dashboards
     keys = [{"date": day, "scope": "global"}]
     if ev.user_id:
         keys.append({"date": day, "scope": "user", "user_id": ev.user_id})
@@ -127,45 +115,91 @@ def _agg_key(ev: ActivityEvent):
     return keys
 
 
-def _incs_for(ev: ActivityEvent) -> dict:
+def _get_increments_for_event(ev: ActivityEvent) -> dict:
+    """
+    Calculate increment values for a finished activity event.
+    Called once per event to avoid redundant calculations.
+    """
     inc = {
         "tokens_input": ev.tokens_input or 0,
         "tokens_output": ev.tokens_output or 0,
         "documents_touched": ev.documents_touched or 0,
         "conversation_messages": ev.message_count or 0,
     }
+    
     if ev.type == ActivityType.CONVERSATION.value:
         inc["conversations"] = 1
     elif ev.type == ActivityType.SEARCH_SET_RUN.value:
         inc["searches"] = 1
     elif ev.type == ActivityType.WORKFLOW_RUN.value:
-        inc["workflows_started"] = 1
+        # Don't increment started here - that happens in _rollup_workflow_started
         if ev.status == ActivityStatus.COMPLETED.value:
             inc["workflows_completed"] = 1
             if ev.duration_ms:
                 inc["workflow_duration_ms"] = ev.duration_ms
         elif ev.status == ActivityStatus.FAILED.value:
             inc["workflows_failed"] = 1
+    
     return inc
 
 
+def _rollup_workflow_started(ev: ActivityEvent):
+    """
+    Increment workflow_started count immediately when a workflow begins.
+    This separates "started" from "completed" tracking.
+    """
+    if ev.type != ActivityType.WORKFLOW_RUN.value:
+        return
+    
+    day = ev.started_at.date() if ev.started_at else datetime.now(timezone.utc).date()
+    keys = [{"date": day, "scope": "global"}]
+    if ev.user_id:
+        keys.append({"date": day, "scope": "user", "user_id": ev.user_id})
+    if ev.team_id:
+        keys.append({"date": day, "scope": "team", "team_id": ev.team_id})
+    
+    for key in keys:
+        try:
+            doc = DailyUsageAggregate.objects(**key).modify(
+                upsert=True,
+                new=True,
+                set__updated_at=datetime.now(timezone.utc),
+                inc__workflows_started=1,
+            )
+            # Ensure created_at on first upsert
+            if not doc.created_at:
+                doc.update(set__created_at=datetime.now(timezone.utc))
+        except Exception as e:
+            logger.warning(f"Failed to rollup workflow_started for key {key}: {e}")
+
+
 def rollup_event_to_daily_aggregates(ev: ActivityEvent):
+    """
+    Roll up a finished activity event into daily aggregates.
+    Called from activity_finish().
+    """
+    # Calculate increments once
+    increments = _get_increments_for_event(ev)
+    
+    # Apply to all relevant scopes (global, user, team)
     for key in _agg_key(ev):
-        doc = DailyUsageAggregate.objects(**key).modify(
-            upsert=True,
-            new=True,
-            set__updated_at=datetime.now(timezone.utc),
-            inc__tokens_input=_incs_for(ev).get("tokens_input", 0),
-            inc__tokens_output=_incs_for(ev).get("tokens_output", 0),
-            inc__documents_touched=_incs_for(ev).get("documents_touched", 0),
-            inc__conversation_messages=_incs_for(ev).get("conversation_messages", 0),
-            inc__conversations=_incs_for(ev).get("conversations", 0),
-            inc__searches=_incs_for(ev).get("searches", 0),
-            inc__workflows_started=_incs_for(ev).get("workflows_started", 0),
-            inc__workflows_completed=_incs_for(ev).get("workflows_completed", 0),
-            inc__workflows_failed=_incs_for(ev).get("workflows_failed", 0),
-            inc__workflow_duration_ms=_incs_for(ev).get("workflow_duration_ms", 0),
-        )
-        # ensure created_at on first upsert
-        if not doc.created_at:
-            doc.update(set__created_at=datetime.now(timezone.utc))
+        try:
+            doc = DailyUsageAggregate.objects(**key).modify(
+                upsert=True,
+                new=True,
+                set__updated_at=datetime.now(timezone.utc),
+                inc__tokens_input=increments.get("tokens_input", 0),
+                inc__tokens_output=increments.get("tokens_output", 0),
+                inc__documents_touched=increments.get("documents_touched", 0),
+                inc__conversation_messages=increments.get("conversation_messages", 0),
+                inc__conversations=increments.get("conversations", 0),
+                inc__searches=increments.get("searches", 0),
+                inc__workflows_completed=increments.get("workflows_completed", 0),
+                inc__workflows_failed=increments.get("workflows_failed", 0),
+                inc__workflow_duration_ms=increments.get("workflow_duration_ms", 0),
+            )
+            # Ensure created_at on first upsert
+            if not doc.created_at:
+                doc.update(set__created_at=datetime.now(timezone.utc))
+        except Exception as e:
+            logger.warning(f"Failed to rollup event {ev.id} for key {key}: {e}")

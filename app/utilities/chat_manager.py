@@ -91,20 +91,20 @@ class ChatManager:
         prompt = ""
         if len(item.text_blocks) > 0:
             prompt = (
-                """Given the following document, and the attached additional context, answer the following question. Return the result as nicely formatted markdown.\nQuestion:\n"""
+                """Given the following document(s), and the attached additional context, answer the following query. Return the result as nicely formatted markdown.\n## Query:\n"""
                 + item.searchphrase
             )
 
             for block in item.text_blocks:
-                prompt += "\n\nContext:\n" + block
+                prompt += "\n\n# Context:\n" + block
 
-            prompt += "\n\nDocument:\n" + self.loaded_doc
+            prompt += "\n\n# Document(s):\n" + self.loaded_doc
             # print(prompt)
         else:
             prompt = (
-                """Given the following document, answer the following question. Return the result as nicely formatted markdown.:\nQuestion:\n"""
+                """Given the following document(s), answer the following query. Return the result as nicely formatted markdown.:\n# Query:\n"""
                 + item.searchphrase
-                + "\n\nDocument:\n"
+                + "\n\n# Document(s):\n"
                 + self.loaded_doc
             )
 
@@ -130,10 +130,10 @@ class ChatManager:
                         document_content_in_previous_messages = True
                         break
             if document_content_in_previous_messages:
-                full_text += f"\n\nDocument: {document.title} "
+                full_text += f"\n\n## Document: {document.title}\n "
                 continue
             full_text += (
-                "\n\nDocument: "
+                "\n\n## Document:\n"
                 + extract_text_from_doc(doc=document, doc_path=absolute_path)
                 + " "
             )
@@ -160,16 +160,14 @@ class ChatManager:
         openai.api_key = os.getenv("OPENAI_API_KEY")
 
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
+        prompt = ""
 
-        prompt = """You are given the following document(s). 
-Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
-Do not restate or include the original question in your answer. 
-At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
+        if len(docs) > 0:
+            prompt = "You are given the following document(s). "
 
-        if len(docs) == 0:
-            prompt = """Answer the user’s question clearly and concisely, formatting your response in well-structured markdown. 
-Do not restate or include the original question in your answer. 
-At the end of your response, provide a short, relevant suggestion for a logical next step related to the user’s question, and phrase it as a question asking if they would like to do that specific suggestion."""
+        prompt += """Answer the query clearly and concisely, formatting your response in well-structured markdown. 
+Do not restate or include the original query in your answer. 
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the query, and phrase it as a question asking if the user would like to do that specific suggestion."""
 
         debug(user_id)
 
@@ -181,10 +179,10 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         agent = None
         if len(full_text) < max_context_length:
-            prompt += f"""\nQuestion: {question}\n{full_text}"""
+            prompt += f"""\n\n# Query: {question}\n\n # Context: \n{full_text}"""
             agent = create_chat_agent(model)
         else:
-            prompt += f"""\nDocument(s): {[doc.uuid for doc in documents]}\n Question: {question}"""
+            prompt += f"""\n\n# Document(s): {[doc.uuid for doc in documents]}\n""" 
             agent = create_rag_agent(model)
             debug("Rag chat", prompt)
 
@@ -308,14 +306,12 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         # Add attachment context to prompt
         if attachment_context:
-            prompt = f"{prompt}\n\n---\n## Attached Context:{attachment_context}\n---\n"
+            prompt = f"{prompt}\n\n---\n# Attached Context:{attachment_context}\n---\n"
     
         print("Final prompt to the model:")
         print(prompt)
 
         full_response = []
-
-        usage = {}
 
         async def streamer():
             async with agent.iter(
@@ -388,8 +384,9 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
                         activity.tokens_input = usage.request_tokens
                         activity.tokens_output = usage.response_tokens
+                        activity.total_tokens = usage.request_tokens + usage.response_tokens
                         activity.message_count = len(conversation.messages)
-                        activity.save()
+                        activity.documents_touched = len(documents)
                         activity_finish(activity)
 
         # Bridge the async generator to a sync iterator for Flask

@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 from devtools import debug
 from werkzeug.utils import secure_filename
 from flask import (
+    g,
     Blueprint,
     Response,
     current_app,
@@ -83,6 +84,7 @@ home = Blueprint("home", __name__)
 
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
+logging.basicConfig(format="%(loglevel) | %(filename)s:%(lineno)d | %(message)s", level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
@@ -241,7 +243,8 @@ def index() -> ResponseReturnValue:
     # Resume activity
     activity_id = request.args.get("activity_id", default="")
     activity_type = None
-    conversation_uuid = None
+
+    conversation_uuid = request.args.get("conversation_id", default="")
     chat_conversation = None
     activity = None
     if activity_id and len(str(activity_id).strip()) > 0:
@@ -255,6 +258,7 @@ def index() -> ResponseReturnValue:
                 ).select_related(max_depth=2)[0]
                 debug(chat_conversation)
                 conversation_uuid = chat_conversation.uuid
+                
     debug(activity)
     if chat_conversation:
         chat_conversation = chat_conversation.to_dict()
@@ -512,6 +516,7 @@ def chat() -> ResponseReturnValue:
     message = data["message"]
     conversation_uuid = data.get("conversation_uuid", None)
     activity_id = data.get("activity_id", "")
+    current_space_id = data.get("current_space_id", None)
     # get activity if it exists
     debug("Message received:", message)
     debug("Conversation UUID:", conversation_uuid)
@@ -537,12 +542,19 @@ def chat() -> ResponseReturnValue:
     if conversation is None:
         title = message.strip()
         debug(user_id)
-        conversation = ChatConversation(
-            user_id=user_id, title=title, uuid=str(uuid.uuid4())
-        )
+        current_conversation_id = session.get("current_conversation_id", None)
+        if current_conversation_id:
+            conversation = ChatConversation.objects(
+                id=current_conversation_id, user_id=user_id
+            ).first()
+        if not conversation:
+            conversation = ChatConversation(
+                user_id=user_id, title=title, uuid=str(uuid.uuid4())
+            )
+            conversation.generate_title()
+            conversation.save()
+
         debug(conversation)
-        conversation.generate_title()
-        conversation.save()
 
         conversation.add_message(ChatRole.USER, message)
 
@@ -559,6 +571,7 @@ def chat() -> ResponseReturnValue:
                 user_id=user_id,
                 team_id=current_team.uuid,
                 conversation_id=conversation.uuid,
+                space=current_space_id
             )
             activity.title = conversation.title
             activity.save()
@@ -610,6 +623,7 @@ def add_link_to_chat():
         data = request.get_json()
         link = data.get("link")
         conversation_uuid = data.get("conversation_uuid")
+        current_space_id = data.get("current_space_id", None)
 
         user = load_user()
         user_id = user.get_id()
@@ -619,13 +633,31 @@ def add_link_to_chat():
         #     return jsonify({"error": "Invalid URL"}), 400
 
         # Get or create conversation
+        conversation = None
         if conversation_uuid:
             conversation = ChatConversation.objects(
-                uuid=conversation_uuid, user_id=user_id
+                uuid=conversation_uuid, user_id=user_id,
             ).first()
 
         if not conversation:
-            return jsonify({"error": "Conversation not found"}), 404
+            conversation = ChatConversation(
+                user_id=user_id, uuid=str(uuid.uuid4()),
+                title="Link Attached"
+            )
+            conversation.save()
+            activity = activity_start(
+                title="Link Attached",
+                type=ActivityType.CONVERSATION,
+                user_id=user_id,
+                team_id=user.ensure_current_team().uuid,
+                conversation_id=conversation.uuid,
+                space=current_space_id
+            )
+            activity.save()
+            session["current_activity_id"] = str(activity.id)
+
+        session["current_conversation_id"] = str(conversation.id)
+
 
         debug(link)
         debug(conversation)
@@ -680,6 +712,7 @@ def add_document_to_chat():
     """Add file attachments to a chat conversation."""
     try:
         conversation_uuid = request.form.get("conversation_uuid")
+        current_space_id = request.form.get("current_space_id", None)
         user = load_user()
         user_id = user.get_id()
         
@@ -691,7 +724,22 @@ def add_document_to_chat():
             ).first()
         
         if not conversation:
-            return jsonify({"error": "Conversation not found"}), 404
+            conversation = ChatConversation(
+                title="Attachments Added",
+                uuid=str(uuid.uuid4()),
+                user_id=user_id,
+            )
+            activity = activity_start(
+                type=ActivityType.CONVERSATION,
+                title="Attachments Added",
+                user_id=user_id,
+                team_id=user.ensure_current_team().uuid,
+                conversation_id=conversation.uuid,
+                space=current_space_id
+            )
+            session["current_activity_id"] = str(activity.id)
+
+        session["current_conversation_id"] = str(conversation.id)
 
         # Check if files were uploaded
         if 'files' not in request.files:
