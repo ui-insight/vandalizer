@@ -40,7 +40,7 @@ class ExtractionManager3:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        result = loop.run_until_complete(chat_agent.run_sync(prompt))
+        result = chat_agent.run_sync(prompt)
 
         output = result.output
         debug(output)

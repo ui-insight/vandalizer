@@ -17,7 +17,7 @@ from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
-from flask_login import LoginManager, login_user, current_user
+from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
@@ -106,7 +106,7 @@ app.config.from_object(config_class)
 
 
 Bootstrap(app)  # flask-bootstrap
-Mail(app)
+mail = Mail(app)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -127,6 +127,7 @@ def load_user(user_id: str | None = None) -> User | None:
 
 
 # Setup blueprints
+from .blueprints.activity.routes import activity  # noqa: E402
 from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
@@ -138,7 +139,6 @@ from .blueprints.spaces.routes import spaces  # noqa: E402
 from .blueprints.tasks.routes import tasks  # noqa: E402
 from .blueprints.team.routes import teams  # noqa: E402
 from .blueprints.workflows.routes import workflows  # noqa: E402
-from .blueprints.activity.routes import activity  # noqa: E402
 
 app.register_blueprint(auth)
 app.register_blueprint(home, url_prefix="/home")

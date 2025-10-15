@@ -1,7 +1,6 @@
 """Handles authorization routing."""
 
 from devtools import debug
-
 from flask import (
     Blueprint,
     current_app,
@@ -14,10 +13,11 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
-from flask_login import current_user, login_user
+from flask_login import login_user
+from mongoengine.errors import NotUniqueError
 
-from app.models import User
 from app import load_user
+from app.models import TeamInvite, TeamMembership, User
 
 auth = Blueprint("auth", __name__)
 
@@ -62,12 +62,11 @@ def login() -> ResponseReturnValue:
     return redirect(url_for("home.index"))
 
 
-# <<< NEW REGISTRATION ROUTE >>>
 @auth.route("/register", methods=["GET", "POST"])
 def register():
     """Handles user registration."""
     if request.method == "POST":
-        email = request.form.get("email")
+        email = (request.form.get("email") or "").strip()
         password = request.form.get("password")
 
         # Check if user already exists
@@ -76,11 +75,43 @@ def register():
             return redirect(url_for("auth.register"))
 
         # Create new user
-        new_user = User(
-            user_id=email,
-        )
+        new_user = User(user_id=email)
         new_user.set_password(password)
         new_user.save()
+
+        # If there are pending invites for this email, attach memberships and accept them
+        # Normalize email to lowercase since invites are stored lowercased
+        pending_invites = list(TeamInvite.objects(email=email.lower(), accepted=False))
+
+        first_invited_team = None
+        for inv in pending_invites:
+            # Create membership if not already present (unique index will also protect us)
+            try:
+                existing = TeamMembership.objects(
+                    team=inv.team, user_id=new_user.user_id
+                ).first()
+                if not existing:
+                    TeamMembership(
+                        team=inv.team,
+                        user_id=new_user.user_id,
+                        role=inv.role,
+                    ).save()
+                # mark invite as accepted
+                inv.accepted = True
+                inv.save()
+                if first_invited_team is None:
+                    first_invited_team = inv.team
+            except NotUniqueError:
+                # Membership already exists due to race/duplicate; still mark invite accepted.
+                inv.accepted = True
+                inv.save()
+                if first_invited_team is None:
+                    first_invited_team = inv.team
+
+        # If they had at least one invite, make that team their current team
+        if first_invited_team is not None:
+            new_user.current_team = first_invited_team
+            new_user.save()
 
         # Log the user in automatically
         login_user(new_user)

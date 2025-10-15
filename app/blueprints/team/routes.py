@@ -1,8 +1,9 @@
 import secrets
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask_mail import Message
 
-from app import load_user
+from app import load_user, mail
 from app.models import Team, TeamInvite, TeamMembership, User
 
 teams = Blueprint("team", __name__)
@@ -25,6 +26,21 @@ def user_name(user_id: str) -> str:
     return user_id
 
 
+# ---------- helpers ----------
+
+
+def _owners_count(team: Team) -> int:
+    return TeamMembership.objects(team=team, role="owner").count()
+
+
+def _is_only_owner(team: Team, user_id: str) -> bool:
+    return (
+        _owners_count(team) == 1
+        and TeamMembership.objects(team=team, user_id=user_id, role="owner").first()
+        is not None
+    )
+
+
 # ---------- TEAM (member-facing) ----------
 
 
@@ -37,7 +53,6 @@ def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
 @teams.route("/", methods=["GET"])
 def team_index():
     user = require_login()
-    # Find teams the user belongs to (simplest: first one)
     memberships = TeamMembership.objects(user_id=user.user_id)
     team = memberships.first().team if memberships else None
     current_team, my_teams = _get_teams(user)
@@ -77,17 +92,44 @@ def team_invite():
     email = request.form.get("email", "").strip().lower()
     role = request.form.get("role", "member")
     team = Team.objects(id=team_id).first()
+
     if not team:
         return jsonify({"error": "Team not found"}), 404
-    # permission: only owner/admin can invite
+
     membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
     if not membership or membership.role not in ("owner", "admin"):
         return jsonify({"error": "Forbidden"}), 403
+
     token = secrets.token_urlsafe(24)
     TeamInvite(
         team=team, email=email, role=role, invited_by_user_id=user.user_id, token=token
     ).save()
-    # TODO: send email with accept link: url_for("team.team_accept_invite", token=token, _external=True)
+
+    # Construct acceptance URL
+    accept_url = url_for("team.team_accept_invite", token=token, _external=True)
+
+    # --- Send email ---
+    try:
+        subject = f"You've been invited to join {team.name} on Inkwell"
+        body = f"""
+        Hi there,
+
+        {user.name} has invited you to join the team "{team.name}" on Inkwell.
+
+        To accept your invitation, click the link below:
+        {accept_url}
+
+        If you did not expect this invitation, you can safely ignore this email.
+
+        — The Inkwell Team
+        """
+
+        msg = Message(subject=subject, recipients=[email], body=body)
+        mail.send(msg)
+    except Exception as e:
+        print(f"Error sending invite email: {e}")
+        return jsonify({"error": "Failed to send invite email"}), 500
+
     return redirect(url_for("team.team_index"))
 
 
@@ -97,7 +139,6 @@ def team_accept_invite(token):
     inv = TeamInvite.objects(token=token, accepted=False).first()
     if not inv:
         abort(404)
-    # Add member
     TeamMembership(team=inv.team, user_id=user.user_id, role=inv.role).save()
     inv.accepted = True
     inv.save()
@@ -113,15 +154,27 @@ def team_change_role():
     team = Team.objects(id=team_id).first()
     if not team:
         return jsonify({"error": "Team not found"}), 404
+
     actor = TeamMembership.objects(team=team, user_id=user.user_id).first()
     if not actor or actor.role not in ("owner", "admin"):
         return jsonify({"error": "Forbidden"}), 403
+
     tm = TeamMembership.objects(team=team, user_id=target_user_id).first()
     if not tm:
         return jsonify({"error": "Member not found"}), 404
-    # owner cannot be downgraded except by themselves or another owner (your policy)
+
+    # Only an owner can change another owner's role
     if tm.role == "owner" and actor.role != "owner":
         return jsonify({"error": "Only an owner can change another owner's role"}), 403
+
+    # Do not allow an owner to change their own role (prevents orphaned teams and matches your policy)
+    if target_user_id == user.user_id and tm.role == "owner":
+        return jsonify({"error": "Owners cannot change their own role."}), 403
+
+    # Never allow demoting the last remaining owner
+    if tm.role == "owner" and new_role != "owner" and _is_only_owner(team, tm.user_id):
+        return jsonify({"error": "Team must always have at least one owner."}), 403
+
     tm.role = new_role
     tm.save()
     return redirect(url_for("team.team_index"))
@@ -135,13 +188,22 @@ def team_remove_member():
     team = Team.objects(id=team_id).first()
     if not team:
         return jsonify({"error": "Team not found"}), 404
+
     actor = TeamMembership.objects(team=team, user_id=user.user_id).first()
     if not actor or actor.role not in ("owner", "admin"):
         return jsonify({"error": "Forbidden"}), 403
+
     tm = TeamMembership.objects(team=team, user_id=target_user_id).first()
     if not tm:
         return jsonify({"error": "Member not found"}), 404
+
+    # Explicitly block an owner from removing themselves
+    if target_user_id == user.user_id and tm.role == "owner":
+        return jsonify({"error": "Owners cannot remove themselves from the team."}), 403
+
+    # Block removal of any owner (your existing policy)
     if tm.role == "owner":
         return jsonify({"error": "Cannot remove the owner"}), 403
+
     tm.delete()
     return redirect(url_for("team.team_index"))

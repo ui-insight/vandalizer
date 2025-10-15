@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, render_template, request
 from mongoengine.errors import DoesNotExist
 
@@ -13,8 +16,14 @@ from app.models import (  # adjust import path if needed
     SearchSet,
     SearchSetItem,
     Team,
+    TeamMembership,
     User,
     Workflow,
+)
+from app.utilities.library_helpers import (
+    add_object_to_library,
+    get_or_create_team_library,
+    get_or_create_verified_library,
 )
 
 library = Blueprint("library", __name__)
@@ -38,6 +47,55 @@ def _current_team_for_user(user: User | None) -> Team | None:
     if not user:
         return None
     return user.ensure_current_team()
+
+
+# -----------------------------
+# Kind / object resolvers
+# -----------------------------
+def _resolve_obj(kind: str, uuid_or_id: str):
+    """
+    kind: 'workflow' | 'extraction' | 'prompt' | 'formatter'
+    uuid_or_id: for workflows = .id; search sets = .uuid; search set items (prompt/formatter) = .id
+    Returns (obj, normalized_kind) or (None, None)
+    """
+    k = (kind or "").strip().lower()
+    if k in ("workflow", "workflows"):
+        obj = Workflow.objects(id=uuid_or_id).first()
+        return (obj, "workflow")
+    if k in ("extraction", "extract", "searchset", "search_set", "extractions"):
+        obj = SearchSet.objects(uuid=uuid_or_id).first()
+        return (obj, "searchset")
+    if k in ("prompt", "prompts"):
+        obj = SearchSetItem.objects(id=uuid_or_id, searchtype="prompt").first()
+        return (obj, "prompt")
+    if k in ("formatter", "formatters"):
+        obj = SearchSetItem.objects(id=uuid_or_id, searchtype="formatter").first()
+        return (obj, "formatter")
+    return (None, None)
+
+
+def _ensure_verified_li_note(
+    li: LibraryItem, *, submitted_by: str, kind: str, uuid_or_id: str, form: dict
+):
+    """
+    Merge or create a JSON note payload on the LibraryItem for verification submissions.
+    """
+    payload = {
+        "submitted_by": submitted_by,
+        "kind": kind,
+        "uuid": str(uuid_or_id),
+        "description": form.get("description", ""),
+        "time_saved_estimate": form.get("time_saved_estimate", ""),
+        "reviewer_notes": form.get("reviewer_notes", ""),
+        "run_instructions": form.get("run_instructions", ""),
+        "status": "verifying",
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    }
+    li.note = json.dumps(payload)
+    tags = set(li.tags or [])
+    tags.add("verifying")
+    li.tags = sorted(list(tags))
+    li.save()
 
 
 def _get_or_none_library(
@@ -244,3 +302,153 @@ def filter_library_items():
     ctx = _build_results_for_template(filters)
     rendered_html = render_template("library/_results.html", **ctx)
     return jsonify({"template": rendered_html})
+
+
+# -----------------------------
+# Share with my team
+# -----------------------------
+@library.route("/workflows/share_to_team", methods=["POST"])
+def workflows_share_to_team():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    team = _current_team_for_user(user)
+    if not team:
+        return jsonify({"error": "no team"}), 400
+
+    # ensure membership
+    if not TeamMembership.objects(team=team, user_id=user.user_id).first():
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, kind = _resolve_obj("workflow", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    lib = get_or_create_team_library(team)
+    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    return jsonify({"ok": True})
+
+
+@library.route("/extractions/share_to_team", methods=["POST"])
+def extractions_share_to_team():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    team = _current_team_for_user(user)
+    if not team:
+        return jsonify({"error": "no team"}), 400
+
+    if not TeamMembership.objects(team=team, user_id=user.user_id).first():
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, kind = _resolve_obj("extraction", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    lib = get_or_create_team_library(team)
+    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    return jsonify({"ok": True})
+
+
+@library.route("/prompts/share_to_team", methods=["POST"])
+def prompts_share_to_team():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    team = _current_team_for_user(user)
+    if not team:
+        return jsonify({"error": "no team"}), 400
+
+    if not TeamMembership.objects(team=team, user_id=user.user_id).first():
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, kind = _resolve_obj("prompt", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    lib = get_or_create_team_library(team)
+    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    return jsonify({"ok": True})
+
+
+@library.route("/formatters/share_to_team", methods=["POST"])
+def formatters_share_to_team():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    team = _current_team_for_user(user)
+    if not team:
+        return jsonify({"error": "no team"}), 400
+
+    if not TeamMembership.objects(team=team, user_id=user.user_id).first():
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, kind = _resolve_obj("formatter", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    lib = get_or_create_team_library(team)
+    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    return jsonify({"ok": True})
+
+
+# -----------------------------
+# Submit to be verified
+# -----------------------------
+@library.route("/workflows/submit_for_verification", methods=["POST"])
+def workflows_submit_for_verification():
+    return _submit_for_verification_route("workflow")
+
+
+@library.route("/extractions/submit_for_verification", methods=["POST"])
+def extractions_submit_for_verification():
+    return _submit_for_verification_route("extraction")
+
+
+@library.route("/prompts/submit_for_verification", methods=["POST"])
+def prompts_submit_for_verification():
+    return _submit_for_verification_route("prompt")
+
+
+@library.route("/formatters/submit_for_verification", methods=["POST"])
+def formatters_submit_for_verification():
+    return _submit_for_verification_route("formatter")
+
+
+def _submit_for_verification_route(kind: str):
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    form = payload.get("form", {}) or {}
+
+    obj, normalized_kind = _resolve_obj(kind, uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    verified_lib = get_or_create_verified_library()
+    li = add_object_to_library(obj, verified_lib, added_by_user_id=user.user_id)
+
+    # tag & store submission details
+    _ensure_verified_li_note(
+        li,
+        submitted_by=user.user_id,
+        kind=normalized_kind,
+        uuid_or_id=uuid,
+        form=form,
+    )
+    return jsonify({"ok": True, "library_item_id": str(li.id)})
