@@ -1,4 +1,3 @@
-import asyncio
 import json
 import os
 import time
@@ -37,10 +36,11 @@ class ExtractionManager3:
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
         chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        # loop = asyncio.new_event_loop()
+        # asyncio.set_event_loop(loop)
 
-        result = loop.run_until_complete(chat_agent.run_sync(prompt))
+        # result = loop.run_until_complete(chat_agent.run_sync(prompt))
+        result = chat_agent.run_sync(prompt)
 
         output = result.output
         debug(output)
