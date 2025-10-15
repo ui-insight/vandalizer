@@ -514,12 +514,10 @@ def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
     message = data["message"]
-    conversation_uuid = data.get("conversation_uuid", None)
-    activity_id = data.get("activity_id", "")
+    activity_id = data.get("activity_id", None)
     current_space_id = data.get("current_space_id", None)
     # get activity if it exists
     debug("Message received:", message)
-    debug("Conversation UUID:", conversation_uuid)
     message = escape(message)
     debug("Sanitized message:", message)
     # sanitize message
@@ -534,50 +532,36 @@ def chat() -> ResponseReturnValue:
     debug(current_team)
     debug(my_teams)
 
-    conversation = ChatConversation.objects(
-        uuid=conversation_uuid, user_id=user_id
-    ).first()
-    debug(conversation)
+    activity = None
+    conversation = None
+    title = message.strip()
+    if not activity_id or len(str(activity_id).strip()) < 10:
+        conversation = ChatConversation(
+            title=title,
+            uuid=str(uuid.uuid4()),
+            user_id=user_id,
+        )
+        conversation.save()
+        conversation.generate_title()
+        activity = activity_start(
+            type=ActivityType.CONVERSATION,
+            title=title,
+            user_id=user_id,
+            team_id=user.ensure_current_team().uuid,
+            conversation_id=conversation.uuid,
+            space=current_space_id
+        )
 
-    if conversation is None:
-        title = message.strip()
-        debug(user_id)
-        current_conversation_id = session.get("current_conversation_id", None)
-        if current_conversation_id:
-            conversation = ChatConversation.objects(
-                id=current_conversation_id, user_id=user_id
-            ).first()
-        if not conversation:
-            conversation = ChatConversation(
-                user_id=user_id, title=title, uuid=str(uuid.uuid4())
-            )
-            conversation.generate_title()
-            conversation.save()
-
-        debug(conversation)
-
-        conversation.add_message(ChatRole.USER, message)
-
-        activity = None
-        if activity_id and len(str(activity_id).strip()) > 0:
-            activity = ActivityEvent.objects(id=activity_id).first()
-
+    else:
+        activity = ActivityEvent.objects(id=activity_id).first()
         if activity:
             activity.status = ActivityStatus.RUNNING
             activity.save()
-        else:
-            activity = activity_start(
-                type=ActivityType.CONVERSATION,
-                user_id=user_id,
-                team_id=current_team.uuid,
-                conversation_id=conversation.uuid,
-                space=current_space_id
-            )
-            activity.title = conversation.title
-            activity.save()
+            conversation = ChatConversation.objects(
+                uuid=activity.conversation_id, user_id=user_id,
+            ).first()
 
-    else:
-        conversation.add_message(ChatRole.USER, message)
+    conversation.add_message(ChatRole.USER, message)
 
     # migrate to new document user's location
     for doc_uuid in document_uuids:

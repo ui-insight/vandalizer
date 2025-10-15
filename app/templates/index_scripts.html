@@ -2869,22 +2869,8 @@
         display_question = ""
     ) {
 
-        // Use the global conversationId variable
-        let currentConvId = conversationId;
-
-        // Fallback checks
-
-        if (!currentConvId && activity && activity.type === "conversation" && activity.conversation_id) {
-            currentConvId = activity.conversation_id;
-            conversationId = currentConvId; // Sync the global
-        }
-
-    
-        const activity_id = activity ? activity.id : null;
-
-        console.log("Sending chat with conversation_uuid:", conversationId);
-
-        console.log("activity:", activity);
+        const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        
 
         $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
@@ -2917,22 +2903,13 @@
             body: JSON.stringify({
                 document_uuids: document_uuids,
                 message: question + "\n" + additional_context,
-                conversation_uuid: currentConvId,
-                activity_id: activity_id,
+                activity_id: current_activity_id,
                 current_space_id: current_space_id,
                 folder_uuid: folder_uuid,
             }),
         })
             .then((response) => {
                 if (!response.body) throw new Error("No response body");
-                const serverConvId = response.headers.get("X-Conversation-UUID");
-                if (serverConvId) {
-                    conversationId = serverConvId;
-                    console.log("Updated conversation_id from response:", conversationId);
-                    if (activity && activity.type === "conversation") {
-                        activity.conversation_id = conversationId;
-                    }
-                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
