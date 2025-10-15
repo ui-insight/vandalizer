@@ -335,7 +335,7 @@
                     console.log(uuid);
                     search_set_add_uuid = uuid;
                     updateSearchSetPanel(uuid);
-                    performExtraction(uuid);
+
                 });
             },
             error: function (xhr, status, err) {
@@ -2540,7 +2540,6 @@
                 $("#search-results-panel").empty();
                 $(data.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
-                performExtraction(set_uuid);
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
