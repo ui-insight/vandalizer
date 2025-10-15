@@ -77,6 +77,9 @@
         const isRunning = a.status === "running" || a.status === "queued";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
         const status = STATUS_ICON[a.status];
+        // active activity is the one that has the same activity_id as in the url 
+        const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        let active_activity = url_activity_id === a._id.$oid;
 
         // Title tooltip can include error on failure
         const tooltip = a.status === "failed" && a.error
@@ -89,8 +92,10 @@
             : "";
 
         const li = document.createElement("li");
-        li.className = `run-item${isRunning ? " is-running" : ""}`;
-        activity_id = a._id.$oid;
+        let classes = `run-item${isRunning ? " is-running" : ""}`;
+        classes += active_activity ? " active" : "";
+        li.className = classes;
+        let activity_id = a._id.$oid;
         li.dataset.runId = activity_id;
         li.onclick = () => openRun(activity_id, a);
 
@@ -123,6 +128,7 @@
     // Simple handler you can expand to route appropriately
     function openRun(id, a) {
         if (!a) return;
+        console.log("Opening run:", id, a);
         // Route by type — adjust to your app’s real URLs
         window.location.href = `activity/runs/${encodeURIComponent(id)}`;
     }

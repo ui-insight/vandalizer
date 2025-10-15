@@ -31,6 +31,8 @@
 }
 .run-item:hover{ background:#f7f7f7; }
 .run-item.is-running{ background:#f3f7ff; }
+/* active run item */
+.run-item.active{ background:#e4edff; border:1px solid #0050d7; box-shadow:0 1px 3px rgb(0 0 0 / 0.1); }
 
 .run-left{ display:flex; align-items:center; gap:8px; min-width:0; }
 .run-right{ display:flex; align-items:center; gap:6px; flex:0 0 auto; }
