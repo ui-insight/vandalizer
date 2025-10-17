@@ -356,7 +356,14 @@ def test_workflow_step() -> ResponseReturnValue:
         task_data=task_data,
         document_trigger_step_id=str(document_trigger_step.id),
     )
-    workflow_output = async_result.get(timeout=600)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        workflow_output = async_result.get(timeout=600)
+    finally:
+        loop.close()
+
     if workflow_output is None:
         return jsonify({"error": "Workflow execution failed"})
 
