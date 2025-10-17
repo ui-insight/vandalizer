@@ -155,9 +155,9 @@
         console.log("Submitting link: " + link);
 
         // Get current conversation UUID
-        if (activity && activity.type === "conversation" && activity.conversation_id) {
-            conversationId = activity.conversation_id;
-        }
+        const activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        console.log("adding link activity_id", activity_id);
+    
 
         // Disable button during submission
         $(this).prop('disabled', true);
@@ -167,30 +167,36 @@
             type: 'POST',
             data: JSON.stringify({
                 link: link,
-                conversation_uuid: conversationId
+                current_activity_id: activity_id,
+                current_space_id: current_space_id,
             }),
             contentType: 'application/json; charset=utf-8',
             dataType: 'json',
             success: function (response) {
-                // Clear input and close modal
-                $('#chat-input-link').val('');
-                $('#chat-input-modal').hide();
+                // check if there is an activity_id in the url
+                if(window.location.href.includes("activity_id=")) {
+                    // Clear input and close modal
+                    $('#chat-input-link').val('');
+                    $('#chat-input-modal').hide();
 
-                // Show confirmation in chat
-                $("#chat-panel").append(`
-                    <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
-                        <i class="fa fa-link"></i> Added link: <a href="${link}" target="_blank">${response.title || link}</a>
-                        <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
-                            Content loaded (${response.content_preview ? response.content_preview.length + ' chars' : '0 chars'})
-                        </div>
-                    </div>
-                `);
+                    // Scroll to bottom
+                    $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                    const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
+                }
+                else {
+                    // If no conversation existed, we now have one
+                    // reload the page to load it
+                    // set the location /home?activity_id=${response.activity_id}=Assistant
+                    console.log("Response", response);
+                    console.log("conversation id", response.conversation_uuid);
+                    if(response.activity_id) {
+                        window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
+                    } 
+                }
 
-                // Scroll to bottom
-                $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
-
-                // Optionally, you can now ask a question about the link
-                // askAboutLink(link);
+                // save the conversation id
+            
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.error("Error adding link:", thrownError);
@@ -402,18 +408,6 @@
 
                     $modelSelect.append($li);
                 });
-
-                // optional: selection handler
-                // $modelSelect.on('click keydown', 'li.model-option', function (e) {
-                //     if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
-                //         const name = $(this).data('value');
-                //         // update UI selection state
-                //         $(this).attr('aria-checked', 'true').addClass('selected')
-                //             .siblings().attr('aria-checked', 'false').removeClass('selected');
-                //         // your function to switch models:
-                //         // setModel(name);
-                //     }
-                // });
 
             },
             error: function (xhr, status, err) {
@@ -975,9 +969,7 @@
                     clearTimeout(pollTimeout);
                     isProcessingFile = false;
                 } else {
-                    // Some other error — you can choose to retry or stop
                     console.error("Error polling status:", status, error);
-                    // Example: retry once after 10 seconds
                     pollTimeout = setTimeout(() => pollStatus(docUuid), 10000);
                 }
             }
@@ -1644,6 +1636,7 @@
             space_id: current_space_id,
             document_uuids: document_uuids,
             session_id: session_id,
+            current_space_id: current_space_id
         });
 
         console.log(data);
@@ -2875,15 +2868,8 @@
         display_question = ""
     ) {
 
-
-        if (activity && activity.type === "conversation" && activity.conversation_id) {
-            conversationId = activity.conversation_id;
-        }
-        const activity_id = activity ? activity.id : null;
-
-
-        console.log("conversation_uuid:", conversationId);
-        console.log("activity:", activity);
+        const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        
 
         $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
@@ -2909,29 +2895,20 @@
 
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "slow");
 
+
         fetch("/home/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
             body: JSON.stringify({
                 document_uuids: document_uuids,
                 message: question + "\n" + additional_context,
-                conversation_uuid: conversationId,
-                activity_id: activity_id,
+                activity_id: current_activity_id,
+                current_space_id: current_space_id,
                 folder_uuid: folder_uuid,
             }),
         })
             .then((response) => {
                 if (!response.body) throw new Error("No response body");
-                const serverConvId = response.headers.get("X-Conversation-UUID");
-                if (serverConvId) {
-                    conversationId = serverConvId;
-                    // optionally persist across navigation:
-                    sessionStorage.setItem("conversation_uuid", conversationId);
-                    // if you keep an activity object, you can also mirror it there:
-                    if (activity && activity.type === "conversation") {
-                        activity.conversation_id = conversationId;
-                    }
-                }
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -3046,7 +3023,6 @@
                                         $thinkingPanel.find(".thinking-content").text(thinkingBuffer);
                                     } else if (data.kind === "meta" && data.conversation_uuid) {
                                         conversationId = data.conversation_uuid;
-                                        sessionStorage.setItem("conversation_uuid", conversationId);
                                     }
                                 } catch (e) {
                                     console.error("Error parsing JSON:", e, "Line:", line);
