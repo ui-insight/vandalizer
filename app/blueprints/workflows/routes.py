@@ -194,6 +194,7 @@ def run_workflow() -> ResponseReturnValue:
     activity_start(
         type=ActivityType.WORKFLOW_RUN,
         user_id=user_id,
+        title=workflow.name,
         team_id=current_team.uuid,
         space=current_space_id,
         workflow=workflow,

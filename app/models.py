@@ -132,6 +132,46 @@ class Team(me.Document):
     owner_user_id = me.StringField(required=True, max_length=200)
     created_at = me.DateTimeField(default=datetime.datetime.now)
 
+    def ensure_shared_folder(self, *, space_id: str | None = None) -> "SmartFolder":
+        """
+        Ensure the team has a root shared SmartFolder.
+        Returns the existing folder if present, otherwise creates/adopts one.
+        """
+        folder = SmartFolder.objects(
+            team_id=self.uuid, is_shared_team_root=True
+        ).first()
+        if folder:
+            if space_id and folder.space != space_id:
+                folder.space = space_id
+                folder.save()
+            return folder
+
+        existing = (
+            SmartFolder.objects(team_id=self.uuid, parent_id="0")
+            .order_by("id")
+            .first()
+        )
+        if existing:
+            existing.is_shared_team_root = True
+            if space_id and existing.space != space_id:
+                existing.space = space_id
+            if existing.parent_id != "0":
+                existing.parent_id = "0"
+            existing.save()
+            return existing
+
+        resolved_space = space_id or self.uuid
+        folder = SmartFolder(
+            parent_id="0",
+            title=f"{self.name} Shared",
+            uuid=uuid4().hex,
+            space=resolved_space,
+            team_id=self.uuid,
+            is_shared_team_root=True,
+        )
+        folder.save()
+        return folder
+
 
 class TeamMembership(me.Document):
     """Users belonging to teams with a role."""
@@ -384,6 +424,7 @@ class SmartFolder(me.Document):
     space = me.StringField(required=True, max_length=200)
     user_id = me.StringField(max_length=200)
     team_id = me.StringField(max_length=200)
+    is_shared_team_root = me.BooleanField(default=False)
 
     def number_of_documents(self) -> int:
         """Returns the number of documents in this smart folder."""

@@ -74,9 +74,15 @@
     function liForActivity(a) {
         if (!a) return;
         console.log("Creating li for activity:", a, a._id.$oid);
-        const isRunning = a.status === "running" || a.status === "queued";
+        const isProgress = a.status === "running" || a.status === "queued";
+        const isRunning = a.status === "running";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
-        const status = STATUS_ICON[a.status];
+        const isAutomationRun =
+            a.type === "search_set_run" || a.type === "workflow_run";
+        const status =
+            isRunning
+                ? (isAutomationRun ? STATUS_ICON.running : null)
+                : STATUS_ICON[a.status];
         // active activity is the one that has the same activity_id as in the url 
         const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
         let active_activity = url_activity_id === a._id.$oid;
@@ -87,12 +93,13 @@
             : safeTitle(a);
 
         // Build left and (optional) right content
-        const right = status && (a.status === "running" || a.status === "failed")
+        const right =
+            status && ((isRunning && isAutomationRun) || a.status === "failed")
             ? `<span class="run-right"><i class="fa-solid ${status.cls} run-state-icon" aria-label="${status.label}"></i></span>`
             : "";
 
         const li = document.createElement("li");
-        let classes = `run-item${isRunning ? " is-running" : ""}`;
+        let classes = `run-item${isProgress ? " is-running" : ""}`;
         classes += active_activity ? " active" : "";
         li.className = classes;
         let activity_id = a._id.$oid;
@@ -115,10 +122,12 @@
         <i class="fa-solid ${typeIcon} run-type-icon" title="${a.title || "Activity"}"></i>
         <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
       </span>
-      ${right}
-      <span class="run-delete" onclick="deleteActivity(event, '${activity_id}')" title="Delete activity">
-        <i class="fa-solid fa-trash" style="color: red;"></i>
-        </span>
+      <span class="run-actions">
+        ${right}
+        <button type="button" class="run-delete" onclick="deleteActivity(event, '${activity_id}')" title="Delete activity" aria-label="Delete activity">
+          <i class="fa-solid fa-trash"></i>
+        </button>
+      </span>
     `;
         return li;
     }

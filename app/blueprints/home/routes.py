@@ -483,17 +483,29 @@ def _folder_context(user, current_space: Space):
         if folder:
             current_folder_parent_id = folder.parent_id
 
+    parent_filter = (
+        current_folder_id if current_folder_id not in {"0", 0} else "0"
+    )
+
     folders = SmartFolder.objects(
-        team_id=user.get_id(),
+        user_id=user.get_id(),
         space=current_space.uuid,
-        parent_id=current_folder_id if current_folder_id != 0 else "0",
+        parent_id=parent_filter,
     ).all()
 
     current_team = user.ensure_current_team()
-    team_folders = SmartFolder.objects(
-        team_id=current_team.uuid,
-        parent_id=current_folder_id if current_folder_id != 0 else "0",
-    ).all()
+    if current_team:
+        current_team.ensure_shared_folder(space_id=current_space.uuid)
+        team_folders = (
+            SmartFolder.objects(
+                team_id=current_team.uuid,
+                parent_id=parent_filter,
+            )
+            .order_by("-is_shared_team_root", "title")
+            .all()
+        )
+    else:
+        team_folders = []
 
     return (
         current_folder_id,

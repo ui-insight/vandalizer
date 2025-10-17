@@ -385,6 +385,16 @@ def _redirect_home():
 def delete_folder() -> ResponseReturnValue:
     """Delete a folder and all its contents."""
     folder_id = request.args.get("folder_id")
+    folder = SmartFolder.objects(uuid=folder_id).first()
+
+    if not folder:
+        flash("Folder not found.", "warning")
+        return _redirect_home()
+
+    if folder.is_shared_team_root:
+        flash("Shared team folders cannot be deleted.", "warning")
+        return _redirect_home()
+
     SmartFolder.objects.filter(uuid=folder_id).delete()
 
     # Delete all subfolders and subdocuments
