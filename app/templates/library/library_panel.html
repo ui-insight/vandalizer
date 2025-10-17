@@ -1,5 +1,6 @@
 {% set item_type = (filters.type if filters and filters.type else 'all') %}
 {% set scope = scope or 'mine' %}
+{% set can_verify = can_verify if can_verify is defined else False %}
 
 <div id="library-panel" class="tab-content" style="background-color: white; padding: 24px 0px;">
 
@@ -65,6 +66,11 @@
                 <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
                     style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;">
                     Verified </a>
+                {% if can_verify %}
+                <a href="#" class="scope-tab {% if _scope=='verify' %}active{% endif %}" data-scope="verify"
+                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;">
+                    Verify </a>
+                {% endif %}
 
 
                 <div style="flex:1;"></div>
@@ -76,16 +82,38 @@
         </div>
     </div>
 
+    {% include "library/verification_modal.html" %}
     {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
 </div>
 
 <script>
     // --- State Management ---
-    const LibraryState = {
+const LibraryState = {
         scope: "{{ scope }}",
         type: "{{ item_type }}",
         kinds: {{ kinds | tojson }},
     q: "{{ query }}"
+    };
+
+    window.LIBRARY_SHARE_ENDPOINTS = window.LIBRARY_SHARE_ENDPOINTS || {
+        workflow: '/library/workflows/share_to_team',
+        extraction: '/library/extractions/share_to_team',
+        prompt: '/library/prompts/share_to_team',
+        formatter: '/library/formatters/share_to_team'
+    };
+    window.LIBRARY_VERIFY_ENDPOINTS = window.LIBRARY_VERIFY_ENDPOINTS || {
+        workflow: '/library/workflows/submit_for_verification',
+        extraction: '/library/extractions/submit_for_verification',
+        prompt: '/library/prompts/submit_for_verification',
+        formatter: '/library/formatters/submit_for_verification'
+    };
+
+    const verificationModalState = {
+        kind: null,
+        uuid: null,
+        submitUrl: null,
+        requestUuid: null,
+        editable: true,
     };
 
     // --- Helpers ---
@@ -104,6 +132,239 @@
             (treatAllAsEmpty && value === "all");
         if (empty) params.delete(key);
         else params.set(key, value);
+    }
+
+    function splitLines(value) {
+        if (!value) return [];
+        return value
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter(Boolean);
+    }
+
+    function splitTags(value) {
+        if (!value) return [];
+        return value
+            .split(/[\n,]/)
+            .map((tag) => tag.trim())
+            .filter(Boolean);
+    }
+
+    function formatStatusLabel(status) {
+        if (!status) return "";
+        return status
+            .toString()
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function updateVerificationStatus(status) {
+        const pill = $('#verification-status-pill');
+        const helper = $('#verification-status-helper');
+        const copy = {
+            draft: 'Fill out the form to begin verification.',
+            submitted: 'Submission received — awaiting review.',
+            in_review: 'Submission is currently being reviewed.',
+            approved: 'This item has been approved and marked verified.',
+            rejected: 'Updates are required before this can be approved.',
+        };
+
+        pill.removeClass('library-badge--pending library-badge--warning library-badge--success');
+
+        if (!status || status === 'draft') {
+            pill.hide();
+            helper.text(copy.draft);
+            return;
+        }
+
+        pill.attr('class', 'library-badge');
+        if (status === 'submitted' || status === 'in_review') {
+            pill.addClass('library-badge--pending');
+        } else if (status === 'approved') {
+            pill.addClass('library-badge--success');
+        } else if (status === 'rejected') {
+            pill.addClass('library-badge--warning');
+        }
+        pill.text(formatStatusLabel(status)).show();
+        helper.text(copy[status] || '');
+    }
+
+    function resetVerificationForm() {
+        const formEl = document.getElementById('verification-form');
+        if (formEl) {
+            formEl.reset();
+        }
+        $('#verification-error').hide().text('');
+        updateVerificationStatus('draft');
+        $('#verification-submit-btn').show().prop('disabled', false);
+    }
+
+    function fillVerificationForm(data) {
+        $('#verification-kind').val(verificationModalState.kind || '');
+        $('#verification-uuid').val(verificationModalState.uuid || '');
+        $('#verification-submitter-name').val(data.submitter_name || '');
+        $('#verification-submitter-org').val(data.submitter_org || '');
+        $('#verification-submitter-role').val(data.submitter_role || '');
+        $('#verification-item-title').val(data.item_title || '');
+        $('#verification-item-identifier').val(data.item_identifier || '');
+        $('#verification-item-version').val(data.item_version_hash || '');
+        $('#verification-category').val(data.category || 'workflow');
+        $('#verification-summary').val(data.summary || '');
+        $('#verification-description').val(data.description || '');
+        $('#verification-run-instructions').val(data.run_instructions || '');
+        $('#verification-example-inputs').val((data.example_inputs || []).join('\n'));
+        $('#verification-expected-outputs').val((data.expected_outputs || []).join('\n'));
+        $('#verification-dependencies').val((data.dependencies || []).join('\n'));
+        $('#verification-known-limitations').val(data.known_limitations || '');
+        $('#verification-intended-use-tags').val((data.intended_use_tags || []).join(', '));
+    }
+
+    function setVerificationModalLoading(isLoading) {
+        $('#verification-form').toggleClass('is-loading', isLoading);
+        $('#verification-submit-btn').prop('disabled', isLoading);
+    }
+
+    function setVerificationFormEditable(isEditable) {
+        const $inputs = $('#verification-form').find('input:not([type="hidden"]), textarea, select');
+        $inputs.prop('disabled', !isEditable);
+        $('#verification-item-identifier').prop('disabled', true);
+        if (isEditable) {
+            $('#verification-submit-btn').show();
+        } else {
+            $('#verification-submit-btn').hide();
+        }
+    }
+
+    function closeVerificationModal() {
+        $('#verification-modal').hide();
+        setVerificationModalLoading(false);
+        $('#verification-error').hide().text('');
+    }
+
+    window.openVerificationModal = function ({ kind, uuid }) {
+        const endpoints = window.LIBRARY_VERIFY_ENDPOINTS || {};
+        verificationModalState.kind = kind;
+        verificationModalState.uuid = uuid;
+        verificationModalState.submitUrl = endpoints[kind];
+        verificationModalState.requestUuid = null;
+        verificationModalState.editable = true;
+
+        if (!verificationModalState.submitUrl) {
+            console.warn('No verification endpoint registered for kind:', kind);
+            return;
+        }
+
+        resetVerificationForm();
+        $('#verification-modal-heading').text('Submit for Verification');
+        $('#verification-submit-btn').text('Submit for verification').show();
+        setVerificationFormEditable(true);
+        $('#verification-modal').fadeIn(120);
+        setVerificationModalLoading(true);
+
+        $.getJSON('/library/verification/request', { kind, uuid })
+            .done(function (resp) {
+                if (!resp || resp.ok === false) {
+                    const errorText = resp?.error || 'Unable to load verification details.';
+                    $('#verification-error').text(errorText).show();
+                    return;
+                }
+
+                const data = resp.data || {};
+                fillVerificationForm(data);
+                const status = resp.status || data.status || 'draft';
+                updateVerificationStatus(status);
+
+                const isExisting = Boolean(resp.request_uuid || (data.status && data.status !== 'draft'));
+                if (isExisting) {
+                    $('#verification-modal-heading').text('Edit Verification Submission');
+                    $('#verification-submit-btn').text('Update submission');
+                }
+
+                verificationModalState.requestUuid = resp.request_uuid || data.uuid || null;
+                verificationModalState.editable = resp.editable !== false && status !== 'approved' && !resp.is_verified;
+                setVerificationFormEditable(verificationModalState.editable);
+
+                if (resp.is_verified) {
+                    $('#verification-status-helper').text('This item is already verified. Edits are disabled.');
+                }
+            })
+            .fail(function (xhr) {
+                const message = xhr?.responseJSON?.error || 'Unable to load verification details.';
+                $('#verification-error').text(message).show();
+            })
+            .always(function () {
+                setVerificationModalLoading(false);
+            });
+    };
+
+    function submitVerificationForm(e) {
+        e.preventDefault();
+        if (!verificationModalState.submitUrl) {
+            $('#verification-error').text('This item cannot be verified at the moment.').show();
+            return;
+        }
+
+        const formData = {
+            submitter_name: $('#verification-submitter-name').val().trim(),
+            submitter_org: $('#verification-submitter-org').val().trim(),
+            submitter_role: $('#verification-submitter-role').val().trim(),
+            item_title: $('#verification-item-title').val().trim(),
+            item_version_hash: $('#verification-item-version').val().trim(),
+            category: $('#verification-category').val(),
+            summary: $('#verification-summary').val().trim(),
+            description: $('#verification-description').val().trim(),
+            run_instructions: $('#verification-run-instructions').val().trim(),
+            example_inputs: splitLines($('#verification-example-inputs').val()),
+            expected_outputs: splitLines($('#verification-expected-outputs').val()),
+            dependencies: splitLines($('#verification-dependencies').val()),
+            known_limitations: $('#verification-known-limitations').val().trim(),
+            intended_use_tags: splitTags($('#verification-intended-use-tags').val()),
+        };
+
+        if (!formData.item_title) {
+            $('#verification-error').text('Title is required before submitting.').show();
+            return;
+        }
+
+        setVerificationModalLoading(true);
+        $('#verification-error').hide().text('');
+
+        $.ajax({
+            url: verificationModalState.submitUrl,
+            type: 'POST',
+            data: JSON.stringify({
+                uuid: verificationModalState.uuid,
+                form: formData,
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function () {
+                closeVerificationModal();
+                if (window.LibraryState && typeof refreshResults === 'function') {
+                    LibraryState.scope = 'verified';
+                    try {
+                        updateURL({ mode: 'push' });
+                    } catch (err) {
+                        console.warn('updateURL failed', err);
+                    }
+                    $('.scope-tab').removeClass('active');
+                    $('.scope-tab[data-scope="verified"]').addClass('active');
+                    if (typeof window.updateKindFilterAppearance === 'function') {
+                        window.updateKindFilterAppearance();
+                    }
+                    refreshResults();
+                } else {
+                    window.location.reload();
+                }
+            },
+            error: function (xhr) {
+                const message = xhr?.responseJSON?.error || 'Failed to submit verification request.';
+                $('#verification-error').text(message).show();
+            },
+            complete: function () {
+                setVerificationModalLoading(false);
+            },
+        });
     }
 
     // Replace your existing updateURL() with this:
@@ -135,12 +396,23 @@
 
     // Optional (nice UX): use push on coarse changes, replace for typing
     $(document).ready(function () {
+        function updateKindFilterAppearance() {
+            if (LibraryState.scope === 'verify') {
+                $("#task-kind-filter").css({ opacity: 0.25, 'pointer-events': 'none' });
+                return;
+            }
+            $("#task-kind-filter").css('pointer-events', 'auto');
+            $("#task-kind-filter").css('opacity', LibraryState.type === 'workflows' ? 0.45 : 1);
+        }
+        window.updateKindFilterAppearance = updateKindFilterAppearance;
+
         $('.scope-tab').on('click', function (e) {
             e.preventDefault();
             $('.scope-tab').removeClass('active');
             $(this).addClass('active');
             LibraryState.scope = $(this).data('scope');
             updateURL({ mode: "push" });
+            updateKindFilterAppearance();
             refreshResults();
         });
 
@@ -149,7 +421,7 @@
             $('.library-type-section').removeClass('active');
             $(this).addClass('active');
             LibraryState.type = $(this).data('type');
-            $("#task-kind-filter").css('opacity', LibraryState.type === 'workflows' ? .45 : 1);
+            updateKindFilterAppearance();
             updateURL({ mode: "push" });
             refreshResults();
         });
@@ -167,10 +439,16 @@
             updateURL({ mode: "replace" }); // avoid flooding history while typing
             refreshResults();
         }, 300));
+
+        updateKindFilterAppearance();
     });
 
 
     function refreshResults() {
+        if (LibraryState.scope === 'verify') {
+            refreshVerificationQueue();
+            return;
+        }
         updateURL(); // Update the URL every time filters change
 
         // Show loading indicator (optional)
@@ -187,6 +465,12 @@
             success: function (res) {
                 if (res && res.template) {
                     $("#library-results").html(res.template);
+                    if (typeof window.initializeLibraryResults === 'function') {
+                        window.initializeLibraryResults();
+                    }
+                    if (typeof window.updateKindFilterAppearance === 'function') {
+                        window.updateKindFilterAppearance();
+                    }
                 }
             },
             error: function (xhr) {
@@ -196,52 +480,78 @@
         });
     }
 
+    function refreshVerificationQueue() {
+        updateURL();
+        $("#library-results").html("<p>Loading...</p>");
+        $.ajax({
+            url: '/library/verification/queue',
+            method: 'POST',
+            data: JSON.stringify({}),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (res) {
+                if (res && res.template) {
+                    $("#library-results").html(res.template);
+                    if (typeof window.initializeLibraryResults === 'function') {
+                        window.initializeLibraryResults();
+                    }
+                    if (typeof window.updateKindFilterAppearance === 'function') {
+                        window.updateKindFilterAppearance();
+                    }
+                }
+            },
+            error: function (xhr) {
+                $("#library-results").html("<p>Error loading verification queue.</p>");
+                console.log('Verification queue error', xhr.status, xhr.responseText);
+            }
+        });
+    }
+
     // --- Event Handlers ---
     $(document).ready(function () {
-        // --- Scope tabs ---
-        $('.scope-tab').on('click', function (e) {
-            e.preventDefault();
-            $('.scope-tab').removeClass('active');
-            $(this).addClass('active');
-            LibraryState.scope = $(this).data('scope');
-            refreshResults();
-        });
-
-        // --- Type list items ---
-        $('.library-type-section').on('click', function (e) {
-            e.preventDefault();
-            $('.library-type-section').removeClass('active');
-            $(this).addClass('active');
-            LibraryState.type = $(this).data('type');
-
-            if (LibraryState.type === 'workflows') {
-                $("#task-kind-filter").css('opacity', .45);
-            } else {
-                $("#task-kind-filter").css('opacity', 1);
+        $('#verification-cancel-btn, #verification-close-btn').on('click', closeVerificationModal);
+        $('#verification-modal').on('click', function (e) {
+            if (e.target === this) {
+                closeVerificationModal();
             }
-            refreshResults();
+        });
+        $('#verification-form').on('submit', submitVerificationForm);
+        $(document).on('keydown.verificationModal', function (e) {
+            if (e.key === 'Escape' && $('#verification-modal').is(':visible')) {
+                closeVerificationModal();
+            }
         });
 
-        // --- Kind checkboxes ---
-        $("#task-kind-filter .kind-checkbox").on('change', function () {
-            const kinds = [];
-            $("#task-kind-filter .kind-checkbox:checked").each(function () {
-                kinds.push($(this).val());
+        $(document).off('click', '.verification-status-action').on('click', '.verification-status-action', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const requestUuid = $(this).data('request');
+            const status = $(this).data('status');
+            if (!requestUuid || !status) return;
+
+            const confirmMessages = {
+                approved: 'Mark this submission as verified?',
+                rejected: 'Send this submission back for changes?',
+            };
+            if (confirmMessages[status] && !confirm(confirmMessages[status])) {
+                return;
+            }
+
+            $.ajax({
+                url: `/library/verification/${requestUuid}/status`,
+                type: 'POST',
+                data: JSON.stringify({ status }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function () {
+                    refreshVerificationQueue();
+                },
+                error: function (xhr) {
+                    const message = xhr?.responseJSON?.error || 'Failed to update verification status.';
+                    alert(message);
+                },
             });
-            LibraryState.kinds = kinds;
-            refreshResults();
         });
 
-        // --- Search ---
-        $("#library-search").on('input', debounce(function () {
-            LibraryState.q = $(this).val();
-            refreshResults();
-        }, 300));
-
-        // --- Initial State Check ---
-        // On page load, correctly set the opacity of the task kind filter
-        if (LibraryState.type === 'workflows') {
-            $("#task-kind-filter").css('opacity', .45);
-        }
     });
 </script>
