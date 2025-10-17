@@ -151,6 +151,7 @@ def run_workflow() -> ResponseReturnValue:
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
+    current_space_id = workflow_data.get("current_space_id", "None")
     document_uuids = workflow_data["document_uuids"]
 
     workflow = Workflow.objects(id=workflow_id).first()
@@ -194,6 +195,7 @@ def run_workflow() -> ResponseReturnValue:
         type=ActivityType.WORKFLOW_RUN,
         user_id=user_id,
         team_id=current_team.uuid,
+        space=current_space_id,
         workflow=workflow,
         workflow_result=workflow_result,
     )

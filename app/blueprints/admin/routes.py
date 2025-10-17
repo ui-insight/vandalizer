@@ -1,6 +1,7 @@
 # admin_routes.py (or wherever your Flask routes live)
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta, timezone
+from devtools import debug
 
 from flask import (
     Blueprint,
@@ -26,21 +27,33 @@ from app import load_user
 
 admin = Blueprint("admin", __name__)
 
-from datetime import datetime, time, timedelta
-
 
 def day_bounds(start_dt: datetime, end_dt: datetime) -> tuple[datetime, datetime]:
-    """Return UTC day-bounded datetimes [start_of_start_day, start_of_day_after_end]."""
-    start_floor = datetime.combine(start_dt.date(), time.min)
-    end_exclusive = datetime.combine(end_dt.date(), time.min) + timedelta(days=1)
+    """
+    Return UTC day-bounded datetimes [start_of_start_day, start_of_day_after_end].
+    
+    Returns timezone-aware UTC datetimes for proper comparison with stored dates.
+    """
+    # Get date portion and create timezone-aware UTC datetimes
+    start_floor = datetime.combine(start_dt.date(), time.min, tzinfo=timezone.utc)
+    end_exclusive = datetime.combine(end_dt.date(), time.min, tzinfo=timezone.utc) + timedelta(days=1)
     return start_floor, end_exclusive
 
 
 def parse_date(s: str, default: datetime) -> datetime:
+    """Parse ISO date string, returning timezone-aware datetime."""
     try:
-        return datetime.fromisoformat(s.strip())
+        dt = datetime.fromisoformat(s.strip())
+        # If parsed datetime is naive, make it UTC-aware
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
     except Exception:
+        # Make sure default is also timezone-aware
+        if default.tzinfo is None:
+            return default.replace(tzinfo=timezone.utc)
         return default
+
 
 
 def get_admin_user():
@@ -76,7 +89,7 @@ def _sum_int(q, attr):
 def usage_dashboard():
     # get_admin_user()  # enable when ready
 
-    end_default = datetime.now()
+    end_default = datetime.now(timezone.utc)  # Make timezone-aware
     start_default = end_default - timedelta(days=30)
     start = parse_date(request.args.get("start", ""), start_default)
     end = parse_date(request.args.get("end", ""), end_default)
@@ -84,6 +97,9 @@ def usage_dashboard():
     user_id = (request.args.get("user_id") or "").strip() or None
     team_id = (request.args.get("team_id") or "").strip() or None
     space_id = (request.args.get("space_id") or "").strip() or None
+
+    # Normalize to start/end of day for consistency
+    start_floor, end_exclusive = day_bounds(start, end)
 
     # Which scope to read rollups from?
     scope = "global"
@@ -96,6 +112,7 @@ def usage_dashboard():
 
     # === KPIs (from rollups) ===
     conversations = _sum_int(rollups, "conversations")
+    debug(f"Conversations: {conversations}")
     searches = _sum_int(rollups, "searches")
     wf_started = _sum_int(rollups, "workflows_started")
     wf_completed = _sum_int(rollups, "workflows_completed")
@@ -106,24 +123,50 @@ def usage_dashboard():
     total_wf_duration_ms = _sum_int(rollups, "workflow_duration_ms")
     avg_wf_ms = (total_wf_duration_ms / wf_completed) if wf_completed else 0
 
-    # Active counts in range (from the event stream)
-    ev_q = ActivityEvent.objects(started_at__gte=start, started_at__lte=end)
+    # === Active users/teams (from ActivityEvent with CONSISTENT date filtering) ===
+    # Use the SAME date range as aggregates
+    ev_match = {
+        "started_at": {"$gte": start_floor, "$lt": end_exclusive}
+    }
     if user_id:
-        ev_q = ev_q.filter(user_id=user_id)
+        ev_match["user_id"] = user_id
     if team_id:
-        ev_q = ev_q.filter(team_id=team_id)
+        ev_match["team_id"] = team_id
     if space_id:
-        ev_q = ev_q.filter(space=space_id)
+        ev_match["space"] = space_id
 
-    active_users = len(ev_q.distinct("user_id"))
-    active_teams = len([t for t in ev_q.distinct("team_id") if t])
+    # Single aggregation to get distinct users and teams efficiently
+    active_counts_pipeline = [
+        {"$match": ev_match},
+        {
+            "$group": {
+                "_id": None,
+                "users": {"$addToSet": "$user_id"},
+                "teams": {"$addToSet": "$team_id"},
+            }
+        },
+    ]
+    
+    active_counts = list(ActivityEvent._get_collection().aggregate(active_counts_pipeline))
+    
+    if active_counts:
+        users_set = active_counts[0].get("users", [])
+        teams_set = active_counts[0].get("teams", [])
+        # Filter out None/empty values
+        active_users = len([u for u in users_set if u])
+        active_teams = len([t for t in teams_set if t])
+    else:
+        active_users = 0
+        active_teams = 0
+    
+    debug(f"Active users: {active_users}, Active teams: {active_teams}")
 
     # === Status breakdown for workflow runs (from events) ===
     wf_status_pipeline = [
         {
             "$match": {
                 "type": "workflow_run",
-                "started_at": {"$gte": start, "$lte": end},
+                "started_at": {"$gte": start_floor, "$lt": end_exclusive},
                 **({"user_id": user_id} if user_id else {}),
                 **({"team_id": team_id} if team_id else {}),
                 **({"space": space_id} if space_id else {}),
@@ -136,10 +179,8 @@ def usage_dashboard():
         ActivityEvent._get_collection().aggregate(wf_status_pipeline)
     )
 
-    # === Top users / teams by workflows completed (last N days) ===
-    # inside usage_dashboard()
-    start_floor, end_exclusive = day_bounds(start, end)
-
+    # === Top users / teams by workflows completed ===
+    # Note: Don't call .date() - MongoDB needs datetime objects
     top_users_pipeline = [
         {
             "$match": {
@@ -147,7 +188,6 @@ def usage_dashboard():
                 "date": {"$gte": start_floor, "$lt": end_exclusive},
             }
         },
-        # (Do NOT filter by team_id here; user-scope docs don't carry it.)
         {"$group": {"_id": "$user_id", "completed": {"$sum": "$workflows_completed"}}},
         {"$sort": {"completed": -1}},
         {"$limit": 10},
@@ -171,8 +211,18 @@ def usage_dashboard():
         DailyUsageAggregate._get_collection().aggregate(top_teams_pipeline)
     )
 
-    # === Recent activity (unified stream)
-    # newest first; limit to 50 to keep page light
+    # === Recent activity (unified stream) ===
+    ev_q = ActivityEvent.objects(
+        started_at__gte=start_floor, 
+        started_at__lt=end_exclusive
+    )
+    if user_id:
+        ev_q = ev_q.filter(user_id=user_id)
+    if team_id:
+        ev_q = ev_q.filter(team_id=team_id)
+    if space_id:
+        ev_q = ev_q.filter(space=space_id)
+    
     recent_events = ev_q.order_by("-started_at").limit(50)
 
     # Selects
@@ -192,6 +242,7 @@ def usage_dashboard():
         "active_users": active_users,
         "active_teams": active_teams,
     }
+    debug(kpi)
 
     return render_template(
         "admin/usage.html",
@@ -209,7 +260,6 @@ def usage_dashboard():
         all_teams=all_teams,
         all_spaces=all_spaces,
     )
-
 
 @admin.route("/teams", methods=["GET"])
 def admin_teams():

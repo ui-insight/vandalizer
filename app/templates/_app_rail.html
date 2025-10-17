@@ -33,6 +33,24 @@
     // Injected from server
     const activity_items = {{ activities | tojson | safe }};
 
+    const eventSource = new EventSource("/activity/streams/");
+    console.log("EventSource created:", eventSource);
+
+    eventSource.onmessage = function (event) {
+        console.log("Received event:", event);
+        const data = JSON.parse(event.data);
+        console.log("Parsed data:", data);
+
+        const ul = document.getElementById("run-list");
+
+        if (!ul) return;
+        // Empty old one out
+
+        ul.appendChild(liForActivity(data));
+
+        conversationId = data.conversation_id;
+    };
+
     // Icon map by type
     const TYPE_ICON = {
         conversation: { cls: "fa-comments", title: "Chat" },
@@ -54,9 +72,14 @@
     }
 
     function liForActivity(a) {
+        if (!a) return;
+        console.log("Creating li for activity:", a, a._id.$oid);
         const isRunning = a.status === "running" || a.status === "queued";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
         const status = STATUS_ICON[a.status];
+        // active activity is the one that has the same activity_id as in the url 
+        const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        let active_activity = url_activity_id === a._id.$oid;
 
         // Title tooltip can include error on failure
         const tooltip = a.status === "failed" && a.error
@@ -69,9 +92,22 @@
             : "";
 
         const li = document.createElement("li");
-        li.className = `run-item${isRunning ? " is-running" : ""}`;
-        li.dataset.runId = a.id;
-        li.onclick = () => openRun(a.id, a);
+        let classes = `run-item${isRunning ? " is-running" : ""}`;
+        classes += active_activity ? " active" : "";
+        li.className = classes;
+        let activity_id = a._id.$oid;
+        li.dataset.runId = activity_id;
+        li.onclick = () => openRun(activity_id, a);
+
+        let title = a.title;
+        if (title.length == 0) {
+            if (a.type === "workflow_run") {
+                title = a.workflow.name || "Workflow";
+            } else {
+                title = "Activity";
+            }
+        }
+
 
         // add delete button for deleting the activity
         li.innerHTML = `
@@ -80,27 +116,19 @@
         <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
       </span>
       ${right}
-      <span class="run-delete" onclick="deleteActivity(event, '${a.id}')" title="Delete activity">
-        <i class="fa-solid fa-trash" style="color: transparent;"></i>
+      <span class="run-delete" onclick="deleteActivity(event, '${activity_id}')" title="Delete activity">
+        <i class="fa-solid fa-trash" style="color: red;"></i>
         </span>
     `;
         return li;
     }
 
 
-    function renderActivities(list) {
-        const ul = document.getElementById("run-list");
-
-        if (!ul) return;
-        // Empty old one out
-
-
-        list.forEach(a => ul.appendChild(liForActivity(a)));
-    }
 
     // Simple handler you can expand to route appropriately
     function openRun(id, a) {
         if (!a) return;
+        console.log("Opening run:", id, a);
         // Route by type — adjust to your app’s real URLs
         window.location.href = `activity/runs/${encodeURIComponent(id)}`;
     }
@@ -120,8 +148,8 @@
                 const li = document.querySelector(`li.run-item[data-run-id='${itemId}']`);
                 if (li) {
                     li.remove();
-                    // reload
-                    location.reload();
+                    // reload to the /home?section=Assistant
+                    window.location.href = "/home?section=Assistant";
                 }
             } else {
                 alert("Failed to delete activity.");
@@ -134,10 +162,10 @@
     }
 
 
-    console.log("rendering activities");
-    console.log(activity_items);
+    // console.log("rendering activities");
+    // console.log(activity_items);
     // Initial render
-    renderActivities(activity_items);
+    // renderActivities(activity_items);
 
     // (Optional) If you add SSE/WebSocket updates later, call renderActivities() again with new data.
 </script>
