@@ -72,6 +72,7 @@
     document.addEventListener('click', function dropdownRouter(e) {
         const trigger = e.target.closest('[data-menu]');
         const menuItem = e.target.closest('.menu-item[data-action]');
+        const genericMenuItem = e.target.closest('.menu-item');
         const inMenu = e.target.closest('.menu');
 
         // 1) Trigger clicked → toggle
@@ -139,8 +140,10 @@
 
         // 3) Clicked inside menu but not on an actionable item → swallow so cards don't see it
         if (inMenu) {
-            e.stopPropagation();
-            e.stopImmediatePropagation();
+            if (!genericMenuItem) {
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+            }
             return;
         }
 

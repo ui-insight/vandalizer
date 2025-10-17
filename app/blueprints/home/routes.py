@@ -297,6 +297,8 @@ def index() -> ResponseReturnValue:
         my_library=my_library,
         initial_library_results=initial_library_results,
         filters=initial_filters,
+        scope=scope,
+        can_verify=user.is_examiner,
     )
 
 

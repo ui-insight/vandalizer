@@ -1,0 +1,114 @@
+<div id="verification-modal" class="modal" style="display: none;">
+    <div class="modal-content verification-modal__content">
+        <div class="verification-modal__header">
+            <h3 id="verification-modal-heading">Submit for Verification</h3>
+            <button type="button" class="modal-close" id="verification-close-btn" aria-label="Close verification form">
+                &times;
+            </button>
+        </div>
+
+        <div class="verification-modal__status">
+            <span id="verification-status-pill" class="library-badge library-badge--pending" style="display:none;"></span>
+            <span id="verification-status-helper" class="verification-modal__status-text"></span>
+        </div>
+
+        <form id="verification-form" class="verification-form">
+            <input type="hidden" id="verification-kind">
+            <input type="hidden" id="verification-uuid">
+
+            <fieldset class="verification-form__section">
+                <legend>Submitter</legend>
+                <label class="verification-form__field">
+                    <span>Submitter name / organization</span>
+                    <input type="text" id="verification-submitter-name" placeholder="Name or organization" maxlength="200">
+                </label>
+                <label class="verification-form__field">
+                    <span>Submitter organization</span>
+                    <input type="text" id="verification-submitter-org" placeholder="Organization" maxlength="200">
+                </label>
+                <label class="verification-form__field">
+                    <span>Submitter role</span>
+                    <input type="text" id="verification-submitter-role" placeholder="Role" maxlength="200">
+                </label>
+            </fieldset>
+
+            <fieldset class="verification-form__section">
+                <legend>Task Details</legend>
+                <label class="verification-form__field">
+                    <span>Title</span>
+                    <input type="text" id="verification-item-title" placeholder="Workflow or task title" maxlength="300" required>
+                </label>
+                <div class="verification-form__field verification-form__field--inline">
+                    <label>
+                        <span>Task / workflow ID</span>
+                        <input type="text" id="verification-item-identifier" readonly>
+                    </label>
+                    <label>
+                        <span>Version hash</span>
+                        <input type="text" id="verification-item-version" placeholder="Version hash or timestamp" maxlength="200">
+                    </label>
+                </div>
+                <label class="verification-form__field">
+                    <span>Category</span>
+                    <select id="verification-category">
+                        <option value="workflow">Workflow</option>
+                        <option value="extraction">Extraction</option>
+                        <option value="prompt">Prompt</option>
+                        <option value="transform">Transform</option>
+                    </select>
+                </label>
+            </fieldset>
+
+            <fieldset class="verification-form__section">
+                <legend>Description</legend>
+                <label class="verification-form__field">
+                    <span>Summary (1–2 sentences)</span>
+                    <textarea id="verification-summary" rows="2" maxlength="500" placeholder="Brief summary of what this automation does"></textarea>
+                </label>
+                <label class="verification-form__field">
+                    <span>Detailed description / intended outcome</span>
+                    <textarea id="verification-description" rows="4" maxlength="5000" placeholder="Describe logic, goals, and success criteria"></textarea>
+                </label>
+                <label class="verification-form__field">
+                    <span>Run instructions (Markdown supported)</span>
+                    <textarea id="verification-run-instructions" rows="4" maxlength="5000" placeholder="Steps to execute the task locally or in-app"></textarea>
+                </label>
+            </fieldset>
+
+            <fieldset class="verification-form__section">
+                <legend>Artifacts</legend>
+                <label class="verification-form__field">
+                    <span>Example input document(s)</span>
+                    <textarea id="verification-example-inputs" rows="3" placeholder="One URL or file path per line"></textarea>
+                </label>
+                <label class="verification-form__field">
+                    <span>Expected output(s)</span>
+                    <textarea id="verification-expected-outputs" rows="3" placeholder="Links or JSON snippets per line"></textarea>
+                </label>
+            </fieldset>
+
+            <fieldset class="verification-form__section">
+                <legend>Dependencies & Limits</legend>
+                <label class="verification-form__field">
+                    <span>Dependencies or data models used</span>
+                    <textarea id="verification-dependencies" rows="3" placeholder="List any external dependencies, one per line"></textarea>
+                </label>
+                <label class="verification-form__field">
+                    <span>Known limitations / failure cases</span>
+                    <textarea id="verification-known-limitations" rows="3" maxlength="2000" placeholder="Document known limitations"></textarea>
+                </label>
+                <label class="verification-form__field">
+                    <span>Intended use domain (tags)</span>
+                    <input type="text" id="verification-intended-use-tags" placeholder="Comma-separated tags e.g. finance, compliance">
+                </label>
+            </fieldset>
+
+            <div id="verification-error" class="verification-modal__error" role="alert" style="display:none;"></div>
+
+            <div class="verification-modal__actions">
+                <button type="button" class="btn btn-secondary" id="verification-cancel-btn">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="verification-submit-btn">Submit for verification</button>
+            </div>
+        </form>
+    </div>
+</div>

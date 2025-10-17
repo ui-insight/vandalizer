@@ -212,6 +212,7 @@ class User(me.Document):
 
     user_id = me.StringField(required=True, max_length=200)
     is_admin = me.BooleanField(default=False)
+    is_examiner = me.BooleanField(default=False)
     name = me.StringField()
 
     current_team = me.ReferenceField(
@@ -866,6 +867,109 @@ class Library(me.Document):
         elif self.scope == "verified":
             self.owner_user_id = None
             self.team = None
+
+
+class VerificationStatus(str, Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    IN_REVIEW = "in_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
+class VerificationRequest(me.Document):
+    """
+    Metadata captured when a workflow/task is submitted for verification.
+    """
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    item_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    item_identifier = me.StringField(required=True, max_length=200)
+    library_item = me.ReferenceField("LibraryItem", required=False)
+    team = me.ReferenceField(Team, required=False, reverse_delete_rule=me.NULLIFY)
+
+    status = me.EnumField(VerificationStatus, default=VerificationStatus.SUBMITTED)
+
+    submitter_user_id = me.StringField(required=True, max_length=200)
+    submitter_name = me.StringField(required=False, max_length=200)
+    submitter_org = me.StringField(required=False, max_length=200)
+    submitter_role = me.StringField(required=False, max_length=200)
+
+    item_title = me.StringField(required=True, max_length=300)
+    item_version_hash = me.StringField(required=False, max_length=200)
+    category = me.StringField(required=False, max_length=100)
+    summary = me.StringField(required=False, max_length=500)
+    description = me.StringField(required=False, max_length=5000)
+    example_inputs = me.ListField(me.StringField(max_length=500), default=[])
+    expected_outputs = me.ListField(me.StringField(max_length=500), default=[])
+    dependencies = me.ListField(me.StringField(max_length=300), default=[])
+    run_instructions = me.StringField(required=False, max_length=5000)
+    known_limitations = me.StringField(required=False, max_length=2000)
+    intended_use_tags = me.ListField(me.StringField(max_length=100), default=[])
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    submitted_at = me.DateTimeField(required=False)
+
+    meta = {
+        "indexes": [
+            {"fields": ["item_kind", "item_identifier"], "unique": True},
+            {"fields": ["status"]},
+            {"fields": ["team", "status"]},
+        ],
+        "ordering": ["-updated_at"],
+    }
+
+    def save(self, *args, **kwargs):
+        if not self.uuid:
+            self.uuid = uuid4().hex
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if not self.created_at:
+            self.created_at = now
+        self.updated_at = now
+        if (
+            self.status in (VerificationStatus.SUBMITTED, VerificationStatus.IN_REVIEW)
+            and not self.submitted_at
+        ):
+            self.submitted_at = now
+        return super().save(*args, **kwargs)
+
+    def to_public_dict(self) -> dict:
+        status_value = (
+            self.status.value if isinstance(self.status, VerificationStatus) else self.status
+        )
+        return {
+            "id": str(self.id),
+            "uuid": self.uuid,
+            "item_kind": self.item_kind,
+            "item_identifier": self.item_identifier,
+            "team_id": str(self.team.id) if self.team else None,
+            "team_name": self.team.name if self.team else "",
+            "status": status_value,
+            "submitter_user_id": self.submitter_user_id,
+            "submitter_name": self.submitter_name or "",
+            "submitter_org": self.submitter_org or "",
+            "submitter_role": self.submitter_role or "",
+            "item_title": self.item_title,
+            "item_version_hash": self.item_version_hash or "",
+            "category": self.category or "",
+            "summary": self.summary or "",
+            "description": self.description or "",
+            "example_inputs": self.example_inputs or [],
+            "expected_outputs": self.expected_outputs or [],
+            "dependencies": self.dependencies or [],
+            "run_instructions": self.run_instructions or "",
+            "known_limitations": self.known_limitations or "",
+            "intended_use_tags": self.intended_use_tags or [],
+            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
 
 
 # Activity / Data Analytics
