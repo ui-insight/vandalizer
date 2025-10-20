@@ -33,23 +33,6 @@
     // Injected from server
     const activity_items = {{ activities | tojson | safe }};
 
-    const eventSource = new EventSource("/activity/streams/");
-    console.log("EventSource created:", eventSource);
-
-    eventSource.onmessage = function (event) {
-        console.log("Received event:", event);
-        const data = JSON.parse(event.data);
-        console.log("Parsed data:", data);
-
-        const ul = document.getElementById("run-list");
-
-        if (!ul) return;
-        // Empty old one out
-
-        ul.appendChild(liForActivity(data));
-
-        conversationId = data.conversation_id;
-    };
 
     // Icon map by type
     const TYPE_ICON = {

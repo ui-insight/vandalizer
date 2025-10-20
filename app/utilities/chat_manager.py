@@ -376,7 +376,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
                     conversation.reload()
                     activity = ActivityEvent.objects(
                         user_id=user_id,
-                        conversation_id=conversation.uuid,
+                        conversation_uuid=conversation.uuid,
                     ).first()
                     if activity:
                         activity.message_count = len(conversation.messages)

@@ -244,7 +244,7 @@ def index() -> ResponseReturnValue:
     activity_id = request.args.get("activity_id", None)
     activity_type = None
 
-    conversation_uuid = request.args.get("conversation_id", None)
+    conversation_uuid = request.args.get("conversation_uuid", None)
     chat_conversation = None
     activity = None
     if activity_id and len(str(activity_id).strip()) > 0:
@@ -715,6 +715,7 @@ def add_document_to_chat():
     try:
         current_space_id = request.form.get("current_space_id", None)
         current_activity_id = request.form.get("current_activity_id", None)
+        debug(request.form)
         user = load_user()
         user_id = user.get_id()
         
