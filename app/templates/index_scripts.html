@@ -20,6 +20,7 @@
     let animationInProgress = false;
 
     var conversationId = null;
+    var activity_id = null;
 
 
     const activity = {{ activity.to_json() | safe if activity else 'null' }};
@@ -65,6 +66,130 @@
     "{{document.uuid}}",
         {% endfor %}
     ];
+
+    const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
+
+
+    const eventSource = new EventSource("/activity/streams/");
+    console.log("EventSource created:", eventSource);
+
+    eventSource.onmessage = function (event) {
+        console.log("Received event:", event);
+        const data = JSON.parse(event.data);
+        console.log("Parsed data:", data);
+
+        const ul = document.getElementById("run-list");
+
+        if (!ul) return;
+        // Empty old one out
+
+        ul.appendChild(liForActivity(data));
+
+        conversationId = data.conversation_id;
+        activity_id = data._id.$oid;
+    };
+
+    function toHtml(markdown) {
+        const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+        let rawText = window.marked.parse(outputText, {
+            gfm: true,
+            breaks: false,
+        });
+        return rawText;
+    }
+
+    function createDocumentAttachment(attachment) {
+        const content_preview = attachment.content ? attachment.content.slice(0, 500) : '';
+
+        const preview = `<div style="font-size: 0.85em; color: #666; margin-top: 5px; padding: 5px; background: white; border-radius: 3px; max-height: 60px; overflow: hidden;">${escapeHtml(content_preview)}</div>`;
+        const content_length = attachment.content.length;
+
+        return `
+        <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
+            <i class="fa fa-file"></i> Added document: <strong>${attachment.filename}</strong>
+            <button class="btn btn-sm btn-link" onclick="removeChatAttachment('${attachment.id}', this)" 
+                    style="float: right; padding: 0; color: #999;" title="Remove">
+                <i class="fa fa-times"></i>
+            </button>
+            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                Content loaded (${content_length} chars)
+            </div>
+            ${preview}
+        </div>
+     `
+    }
+
+    function createUrlAttachment(attachment) {
+        const link = attachment.url;
+        // limited to first 500 characters
+        const content_preview = attachment.content ? attachment.content.slice(0, 500) : '';
+        return `
+
+        <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
+            <i class="fa fa-link"></i> Added link: <a href="${link}" target="_blank">${attachment.title || link}</a>
+            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                Content loaded (${content_preview ? content_preview.length + ' chars' : '0 chars'})
+            </div>
+        </div>
+     `
+    }
+    // "[Link attached: pydantic_ai.run - Pydantic AI]
+    // URL: https://ai.pydantic.dev/api/run/#pydantic_ai.run.AgentRun]"
+    // "📎 File attached: Test_test_test.docx (14 characters)"
+
+    console.log("chatConversation: ", chatConversation);
+
+    if (!chatConversation || (chatConversation && chatConversation.messages.length === 0)) {
+        // Clear chat history if "New Conversation" is chosen
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+    } else {
+        $('.loading-event-progress-container')[0].style.display = 'none';
+        // Clear previous messages
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+        // Add each message to chat panel in order
+        for (const msg of chatConversation.messages) {
+            let msgHtml = "";
+            if (msg.role === "user") {
+                // if the msg start with '[Link attached: url_attachment.title]' is a link message
+                if(msg.message.startsWith('[Link attached')) {
+                    const attachment = chatConversation.url_attachments.find(att => msg.message.startsWith(`[Link attached: ${att.title}]`));
+                    console.log("link attachment: ", attachment);
+                    msgHtml = createUrlAttachment(attachment);
+                }
+                else if(msg.message.startsWith('📎 File attached')) {
+                    const attachment = chatConversation.file_attachments.find(att => msg.message.startsWith(`📎 File attached: ${att.filename}`));
+                    console.log("file attachment: ", attachment);
+                    msgHtml = createDocumentAttachment(attachment);
+                }
+                else {
+                    msgHtml = `<p><div class='message-you message-response-body'>${toHtml(msg.message)}</div></p>`;
+                }
+            } else {
+                msgHtml = `<p><div class='message-response message-response-body'>${toHtml(msg.message)}</div></p>`;
+            }
+            // const msgHtmlDom = $(msgHtml).append(createFeedbackButtons());
+            $("#chat-panel").append(msgHtml).append(createFeedbackButtons());
+
+            $(".copy-btn").on("click", function () {
+                let responseHtml = $(this).find(".message-response-body").html();
+                copyRichTextToClipboard(responseHtml);
+            });
+            $(".download-btn").on("click", function () {
+                const $body = $(this)
+                    .find(".message-response-body")
+                    .first()
+                    .clone();
+
+                // Remove the feedback row(s) just for the download payload
+                $body.find(".feedback-buttons").remove();
+
+                // (Optional) If your popup menu ever gets injected inside the body, strip it too
+                attachChatDownloadUI(this, $body);
+            });
+        }
+        // Scroll to bottom
+        $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+    }
 
     function dismissReleasePanel() {
         // Set a cookie 'release_seen' to the current release version.
@@ -155,8 +280,8 @@
         console.log("Submitting link: " + link);
 
         // Get current conversation UUID
-        const activity_id = new URLSearchParams(window.location.search).get('activity_id');
-        console.log("adding link activity_id", activity_id);
+        const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        console.log("adding link activity_id", url_activity_id);
     
 
         // Disable button during submission
@@ -167,7 +292,7 @@
             type: 'POST',
             data: JSON.stringify({
                 link: link,
-                current_activity_id: activity_id,
+                current_activity_id: url_activity_id,
                 current_space_id: current_space_id,
             }),
             contentType: 'application/json; charset=utf-8',
@@ -2992,6 +3117,15 @@
                                 const responseHtml = $body.html().trim();
                                 attachChatDownloadUI(this, responseHtml);
                             });
+                            // Check if we need to redirect to add activity_id to URL
+                            const currentUrl = new URL(window.location.href);
+                            const hasActivityId = currentUrl.searchParams.has('activity_id');
+                            console.log("message finished activity_id", activity_id);
+                            if(!hasActivityId && activity_id) {
+                                window.location.href = `/home?activity_id=${activity_id}&section=Assistant`;
+    
+                            }
+
                             return;
                         }
 
