@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     )
 
     base_model: str = Field(
-        default="openai/gpt-4.1", description="The specific model to use for LLM tasks."
+        default="gpt-oss-32k:120b", description="The specific model to use for LLM tasks."
     )
     models: list[ModelType] = Field(
         default=models,
