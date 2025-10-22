@@ -83,6 +83,7 @@ def verify_document(document: SmartDocument) -> None:
     debug("Document processing", document.processing)
 
     extension = document.extension
+    print(document.absolute_path)
 
     if not document.raw_text or document.raw_text == "":
         extraction_task = perform_extraction_and_update.s(
