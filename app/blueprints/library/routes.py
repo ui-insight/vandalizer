@@ -566,7 +566,7 @@ def workflows_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
@@ -590,7 +590,7 @@ def extractions_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
 
 
 @library.route("/prompts/share_to_team", methods=["POST"])
@@ -614,7 +614,7 @@ def prompts_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
 
 
 @library.route("/formatters/share_to_team", methods=["POST"])
@@ -638,7 +638,7 @@ def formatters_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True})
+    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
 
 
 # -----------------------------
@@ -823,5 +823,6 @@ def _submit_for_verification_route(kind: str):
             "library_item_id": str(li.id) if li else None,
             "verification_request": response_payload,
             "status": response_payload.get("status"),
+            "redirect_url": url_for("home.index", scope="mine"),
         }
     )
