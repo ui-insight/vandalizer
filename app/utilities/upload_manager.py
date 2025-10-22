@@ -31,7 +31,7 @@ def validate_chunk(
     Returns a dict with keys: valid (bool), feedback (str), index (int).
     """
     debug(
-        f"Validating chunk {index}/{total} of document {document_path}, model: {upload_agent.model}"
+        f"Validating chunk {index}/{total} of document {document_path}, model: {upload_agent.model.model_name}"
     )
     try:
         prompt = f"""
@@ -67,13 +67,19 @@ def summarize_results(self, results: list, document_uuid: str) -> dict:
     else:
         combined = "\n\n".join(feedback_list)
 
+    debug(f"Combined validation feedback:\n{combined}")
+
     # Summarize via chat_agent
     try:
-        summary = upload_agent.run_sync(f"""Act as a compliance officer. Given the following validation feedback, write an active, clear summary describing why the document failed validation and what must be done to fix it. Be concise and direct. Avoid repetition.
+        summary = upload_agent.run_sync(f"""Analyze this validation feedback and return a structured response.
+Validation results: {"PASSED" if all_valid else "FAILED"}
 
-    Validation feedback:
-    {combined}
-    """)
+Validation feedback:
+{combined}
+
+Return:
+- valid: {str(all_valid).lower()}
+- feedback: {"Confirm all sections passed validation" if all_valid else "Concise summary of failures and required fixes"}""")
     except Exception as e:
         debug(f"Error summarizing results: {e}")
         self.retry(exc=e)
