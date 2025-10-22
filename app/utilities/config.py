@@ -117,11 +117,13 @@ class Settings(BaseSettings):
     # the model type to use, either openai or insight server (ollama)
     # model_type = "insight" or "openai"
     model_type: str = Field(
-        default="openai", description="Type of the model to use (openai or insight)."
+        default="gpt-oss-32k:120b",
+        description="Type of the model to use (openai or insight).",
     )
 
     base_model: str = Field(
-        default="gpt-oss-32k:120b", description="The specific model to use for LLM tasks."
+        default="gpt-oss-32k:120b",
+        description="The specific model to use for LLM tasks.",
     )
     models: list[ModelType] = Field(
         default=models,

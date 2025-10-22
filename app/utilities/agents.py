@@ -184,6 +184,7 @@ def create_upload_agent(agent_model):
     )
 
 
+print(f"Creating upload agent {settings.base_model}")
 upload_agent = create_upload_agent(settings.base_model)
 
 rag_agent = create_rag_agent(settings.base_model)
