@@ -179,7 +179,25 @@ def create_upload_agent(agent_model):
     model = get_agent_model(agent_model)
     return Agent(
         model,
-        system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+        system_prompt="""You are an expert in document validation and compliance checking. 
+
+Your role is to analyze document and provide structured validation feedback.
+
+You MUST return your response in this exact structure ```json{"valid": boolean, "feedback": string}```:
+- valid: boolean indicating if the document passes validation
+- feedback: string containing clear, actionable feedback
+
+For valid documents:
+- Set valid=True
+- Provide brief confirmation in feedback
+
+For invalid documents:
+- Set valid=False  
+- In feedback, clearly explain what failed and what actions are needed to fix it
+- Be concise, direct, and actionable
+- Avoid repetition
+
+Always return structured data, never plain text.""",
         output_type=UploadResult,
     )
 
