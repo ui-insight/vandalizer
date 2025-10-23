@@ -6,7 +6,6 @@ import json
 import os
 import uuid
 from itertools import chain
-from pathlib import Path
 
 import pypandoc
 from bson import ObjectId
@@ -197,7 +196,7 @@ def run_workflow() -> ResponseReturnValue:
     for doc in docs:
         ingestion_text += f"\n{doc.raw_text}"
 
-    persist_directory = Path("data/recommendations_vectordb")
+    persist_directory = "data/recommendations_vectordb"
     recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
     recommendation_manager.ingest_recommendation_item(
         identifier=workflow_id,
@@ -228,81 +227,81 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
     if not document_uuids:
         return jsonify({"recommendations": []}), 200
 
-    try:
-        # Load documents
-        documents = []
-        for uuid in document_uuids:
-            doc = SmartDocument.objects(uuid=uuid).first()
-            if doc:
-                documents.append(doc)
+    # try:
+    # Load documents
+    documents = []
+    for uuid in document_uuids:
+        doc = SmartDocument.objects(uuid=uuid).first()
+        if doc:
+            documents.append(doc)
 
-        if not documents:
-            return jsonify(
-                {"recommendations": [], "message": "No valid documents found"}
-            ), 200
-
-        are_documents_valid = True
-        for document in documents:
-            if not document.valid:
-                are_documents_valid = False
-
-        persist_directory = Path("data/recommendations_vectordb")
-        recommendation_manager = SemanticRecommender(
-            persist_directory=persist_directory,
-        )
-
-        # Get recommendations
-        recommendations = recommendation_manager.search_recommendations(
-            selected_documents=documents,
-            limit=limit,
-        )
-
-        templates = []
-
-        recommended_workflows = []
-        for recommendation in recommendations:
-            identifier = recommendation["identifier"]
-            recommendation_type = recommendation["recommendation_type"]
-            if recommendation_type == "Workflow":
-                workflow = Workflow.objects(id=identifier).first()
-                if workflow and (workflow not in recommended_workflows):
-                    recommended_workflows.append(workflow)
-
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-workflow.html",
-                        workflow=workflow,
-                        user=user,
-                    )
-                    templates.append(template)
-            elif recommendation_type == "Extraction":
-                search_set = SearchSet.objects(uuid=identifier).first()
-                if search_set and (search_set not in recommended_workflows):
-                    recommended_workflows.append(search_set)
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-extraction.html",
-                        search_set=search_set,
-                    )
-                    templates.append(template)
-        if len(templates) == 0:
-            template = render_template(
-                "toolpanel/recommendations/recommendations-none.html",
-            )
-            templates.append(template)
-        else:
-            templates = [
-                render_template(
-                    "toolpanel/recommendations/recommendation-title.html",
-                )
-            ] + templates
-
-        print(recommendations)
+    if not documents:
         return jsonify(
-            {"templates": templates, "are_documents_valid": are_documents_valid}
+            {"recommendations": [], "message": "No valid documents found"}
         ), 200
 
-    except Exception as e:
-        print(e)
-        return jsonify({"error": str(e), "recommendations": []}), 500
+    are_documents_valid = True
+    for document in documents:
+        if not document.valid:
+            are_documents_valid = False
+
+    persist_directory = "data/recommendations_vectordb"
+    recommendation_manager = SemanticRecommender(
+        persist_directory=persist_directory,
+    )
+
+    # Get recommendations
+    recommendations = recommendation_manager.search_recommendations(
+        selected_documents=documents,
+        limit=limit,
+    )
+
+    templates = []
+
+    recommended_workflows = []
+    for recommendation in recommendations:
+        identifier = recommendation["identifier"]
+        recommendation_type = recommendation["recommendation_type"]
+        if recommendation_type == "Workflow":
+            workflow = Workflow.objects(id=identifier).first()
+            if workflow and (workflow not in recommended_workflows):
+                recommended_workflows.append(workflow)
+
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-workflow.html",
+                    workflow=workflow,
+                    user=user,
+                )
+                templates.append(template)
+        elif recommendation_type == "Extraction":
+            search_set = SearchSet.objects(uuid=identifier).first()
+            if search_set and (search_set not in recommended_workflows):
+                recommended_workflows.append(search_set)
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-extraction.html",
+                    search_set=search_set,
+                )
+                templates.append(template)
+    if len(templates) == 0:
+        template = render_template(
+            "toolpanel/recommendations/recommendations-none.html",
+        )
+        templates.append(template)
+    else:
+        templates = [
+            render_template(
+                "toolpanel/recommendations/recommendation-title.html",
+            )
+        ] + templates
+
+    print(recommendations)
+    return jsonify(
+        {"templates": templates, "are_documents_valid": are_documents_valid}
+    ), 200
+
+    # except Exception as e:
+    #     print(e)
+    #     return jsonify({"error": str(e), "recommendations": []}), 500
 
 
 @login_required

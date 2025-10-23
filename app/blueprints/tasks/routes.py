@@ -469,7 +469,7 @@ def begin_search() -> ResponseReturnValue:
         for doc in documents:
             ingestion_text += f"\n{doc.raw_text}"
 
-        persist_directory = Path("data/recommendations_vectordb")
+        persist_directory = "data/recommendations_vectordb"
         recommendation_manager = SemanticRecommender(
             persist_directory=persist_directory
         )
