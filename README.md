@@ -29,21 +29,21 @@ Before deploying to each environment, update the configuration by:
 5. Installing `Pandoc` with `pdflatex` for Docx to PDF conversion:
 - 5.a MacOS: 
 ```bash
-brew install --cask mactex-no-gui
+brew install --cask mactex
 brew install pandoc
 ```
 
 - 5.b Debian/Ubuntu: 
 ```bash
 sudo apt-get update 
-sudo apt-get install pandoc texlive-xetex
+sudo apt-get install pandoc texlive-latex
 ```
 
 - 5.c Rocky Linux/CentOS:
 
 ```bash
 sudo dnf update 
-sudo dnf install pandoc texlive-xetex
+sudo dnf install pandoc texlive-latex
 ```
 
 
