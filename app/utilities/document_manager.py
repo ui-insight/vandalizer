@@ -17,9 +17,8 @@ import chromadb
 import pypandoc
 from chromadb.config import Settings
 from devtools import debug
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app import app
 from app.celery_worker import celery_app
@@ -216,22 +215,15 @@ class DocumentManager:
     def __enter__(self):
         return self
 
-    def get_user_collection(self, user_id: str) -> Chroma:
+    def get_user_collection(self, user_id: str) -> chromadb.Collection:
         """Get or create a collection for a specific user."""
         collection_name = f"user_{user_id}_docs"
         # Check if collection exists in the client
         try:
-            self.client.get_or_create_collection(name=collection_name)
+            return self.client.get_or_create_collection(name=collection_name)
         except ValueError:
             # Collection doesn't exist, create an empty collection
-            self.client.create_collection(name=collection_name)
-
-        return Chroma(
-            client=self.client,  # Use the existing client
-            collection_name=collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=self.persist_directory,
-        )
+            return self.client.create_collection(name=collection_name)
 
     def add_document(
         self,

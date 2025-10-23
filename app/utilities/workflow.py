@@ -13,8 +13,8 @@ import chromadb
 from chromadb.config import Settings
 from devtools import debug
 from dotenv import load_dotenv
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app import app
 from app.celery_worker import celery_app
