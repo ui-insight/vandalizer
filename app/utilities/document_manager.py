@@ -1,6 +1,5 @@
-import sys
 import re
-import markdown
+import sys
 
 from app.models import SmartDocument
 
@@ -15,36 +14,35 @@ from pathlib import Path
 from typing import Any, Optional
 
 import chromadb
+import pypandoc
 from chromadb.config import Settings
 from devtools import debug
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_chroma.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from app import app
 from app.celery_worker import celery_app
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.document_readers import (
-   extract_text_from_doc,
     convert_to_markdown,
+    extract_text_from_doc,
 )
-
-import pypandoc
 
 MIN_PDF_TEXT_LENGTH = 100
 doctr_url = "https://ocr.insight.uidaho.edu/doctr"
 
+
 def remove_images_from_markdown(markdown_text):
     """Remove all image references and their size attributes from markdown text"""
     # Remove inline images: ![alt text](url)
-    text = re.sub(r'!\[([^\]]*)\]\([^)]*\)', '', markdown_text)
+    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", "", markdown_text)
 
     # Remove reference-style images: ![alt text][id]
-    text = re.sub(r'!\[([^\]]*)\]\[[^\]]*\]', '', text)
+    text = re.sub(r"!\[([^\]]*)\]\[[^\]]*\]", "", text)
 
     # Remove pandoc image attributes like {width="0.46in" height="0.17in"}
     # This pattern matches curly braces containing width/height specifications
-    text = re.sub(r'\{[^}]*(?:width|height)\s*=\s*"[^"]*"[^}]*\}', '', text)
+    text = re.sub(r'\{[^}]*(?:width|height)\s*=\s*"[^"]*"[^}]*\}', "", text)
 
     # Alternative more aggressive pattern - removes any standalone curly brace blocks with attributes
     # Use this if the above doesn't catch all cases
@@ -52,21 +50,26 @@ def remove_images_from_markdown(markdown_text):
 
     # Remove any remaining standalone attribute blocks (more general)
     # This catches any {key="value"} patterns that might be left
-    text = re.sub(r'\{[^{}]*="[^"]*"[^{}]*\}', '', text)
+    text = re.sub(r'\{[^{}]*="[^"]*"[^{}]*\}', "", text)
 
     # Remove reference definitions that are likely for images
-    text = re.sub(r'^\s*\[[^\]]+\]:\s*[^\s]+.*$', '', text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\[[^\]]+\]:\s*[^\s]+.*$", "", text, flags=re.MULTILINE)
 
     # Clean up extra blank lines that might be left
-    text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
+    text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
 
     # Clean up any extra spaces left on lines
-    text = re.sub(r'^\s+$', '', text, flags=re.MULTILINE)
+    text = re.sub(r"^\s+$", "", text, flags=re.MULTILINE)
 
     return text.strip()
 
 
-@celery_app.task(name="tasks.document.extraction", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
+@celery_app.task(
+    name="tasks.document.extraction",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=5,
+)
 def perform_extraction_and_update(document_uuid, extension):
     document = SmartDocument.objects(uuid=document_uuid).first()
     if not document:
@@ -90,12 +93,11 @@ def perform_extraction_and_update(document_uuid, extension):
     document.processing = True
     document.task_status = "ocr"
     raw_text = ""
-    extra_args=['-V', 'geometry:margin=2cm']
+    extra_args = ["-V", "geometry:margin=2cm"]
     pdf_path = absolute_path.with_suffix(".pdf")
     document.path = str(Path(document.path).with_suffix(".pdf"))
     document.save()
     try:
-
         if extension in ["xlsx", "xls"]:
             # Convert to HTML
             debug("Extracting excel")
@@ -108,11 +110,13 @@ def perform_extraction_and_update(document_uuid, extension):
             document.path = str(Path(document.path).with_suffix(".html"))
             document.raw_text = raw_text
         elif extension in ["docx", "doc"]:
-            pypandoc.convert_file(absolute_path, "pdf", outputfile=pdf_path, extra_args=extra_args)
+            pypandoc.convert_file(
+                absolute_path, "pdf", outputfile=pdf_path, extra_args=extra_args
+            )
             raw_text = pypandoc.convert_file(absolute_path, "markdown")
             raw_text = remove_images_from_markdown(raw_text)
             document.raw_text = raw_text
-        else: # pdf and others
+        else:  # pdf and others
             raw_text = extract_text_from_doc(document.absolute_path, doc=document)
             document.raw_text = raw_text
 
@@ -128,14 +132,25 @@ def perform_extraction_and_update(document_uuid, extension):
 
     return raw_text
 
-@celery_app.task(name="tasks.document.update", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
+
+@celery_app.task(
+    name="tasks.document.update",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=5,
+)
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_id = None
     document.save()
 
 
-@celery_app.task(name="tasks.document.cleanup", autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
+@celery_app.task(
+    name="tasks.document.cleanup",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=5,
+)
 def cleanup_document(document_uuid: str):
     """
     Delete the document record and its file when validation or ingestion fails.
@@ -148,8 +163,12 @@ def cleanup_document(document_uuid: str):
     document.save()
 
 
-@celery_app.task(name="tasks.document.semantic_ingestion",
-    autoretry_for=(Exception,), max_retries=3, default_retry_delay=5)
+@celery_app.task(
+    name="tasks.document.semantic_ingestion",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=5,
+)
 def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_status = "readying"
@@ -200,22 +219,15 @@ class DocumentManager:
     def __enter__(self):
         return self
 
-    def get_user_collection(self, user_id: str) -> Chroma:
+    def get_user_collection(self, user_id: str) -> chromadb.Collection:
         """Get or create a collection for a specific user."""
         collection_name = f"user_{user_id}_docs"
         # Check if collection exists in the client
         try:
-            self.client.get_or_create_collection(name=collection_name)
+            return self.client.get_or_create_collection(name=collection_name)
         except ValueError:
             # Collection doesn't exist, create an empty collection
-            self.client.create_collection(name=collection_name)
-
-        return Chroma(
-            client=self.client,  # Use the existing client
-            collection_name=collection_name,
-            embedding_function=self.embeddings,
-            persist_directory=self.persist_directory,
-        )
+            return self.client.create_collection(name=collection_name)
 
     def add_document(
         self,

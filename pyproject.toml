@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "chardet",
-    "chromadb",
+    "chromadb==1.0.0",
     "datasets",
     "gunicorn",
     "devtools",
@@ -21,9 +21,6 @@ dependencies = [
     "wtforms",
     "httpx",
     "itsdangerous",
-    "langchain",
-    "langchain_chroma",
-    "langchain_community",
     "langchain_openai",
     "langchain_redis",
     "langchain_text_splitters",
