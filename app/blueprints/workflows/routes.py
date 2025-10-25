@@ -508,11 +508,20 @@ def workflow_status() -> ResponseReturnValue:
         final_output = workflow_result.final_output.get("output", None)
     debug("Workflow result", final_output)
 
+    # Get the associated activity
+    activity = None
+    activity_id = None
+    from app.models import ActivityEvent
+    activity = ActivityEvent.objects(workflow_result=workflow_result).first()
+    if activity:
+        activity_id = str(activity.id)
+
     response = {
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
         "output": final_output,
         "status": workflow_result.status,
+        "activity_id": activity_id,
     }
 
     return jsonify(response)
@@ -583,8 +592,11 @@ def workflow_download() -> ResponseReturnValue:
         )
     else:  # txt
         prompt = (
-            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
-            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            "Convert the following HTML document into plain text format. "
+            "Strip out all HTML tags and formatting. "
+            "Do NOT use markdown syntax (no *, #, or other markdown formatting). "
+            "Return only clean, readable plain text with proper line breaks and indentation.\n\n"
+            "Do not include any description of your own or commentary, just return the plain text output.\n\n"
             f"{raw_json}"
         )
 

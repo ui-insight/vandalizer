@@ -423,7 +423,11 @@
         });
 
 
-        $(".prompt-item").off("click").on("click", function () {
+        $(".prompt-item").off("click").on("click", function (e) {
+            // Don't run prompt if clicking on a button or menu item
+            if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+                return;
+            }
             let uuid = $(this).attr("data-uuid");
             let datatitle = $(this).attr("data-title");
             setSection("Assistant");
@@ -488,6 +492,10 @@
             }
         }
         postJSON(url, { uuid }, function () {
+            // Show success toast
+            if (typeof showToast === 'function') {
+                showToast('Successfully shared to team!');
+            }
             if (window.LibraryState && typeof refreshResults === "function") {
                 LibraryState.scope = "team";
                 try {

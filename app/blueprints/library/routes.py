@@ -566,7 +566,27 @@ def workflows_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
+
+    # Move attached documents to team's shared folder
+    from app.models import SmartDocument, SmartFolder, WorkflowAttachment
+
+    # Get team's shared folder (use the workflow's space)
+    space_id = obj.space if hasattr(obj, 'space') and obj.space else None
+    if space_id:
+        shared_folder = team.ensure_shared_folder(space_id=space_id)
+
+        # Move all attached documents
+        if hasattr(obj, 'attachments') and obj.attachments:
+            for attachment_ref in obj.attachments:
+                if attachment_ref and hasattr(attachment_ref, 'attachment'):
+                    doc_uuid = attachment_ref.attachment
+                    doc = SmartDocument.objects(uuid=doc_uuid).first()
+                    if doc:
+                        # Update document's folder to team's shared folder
+                        doc.folder = shared_folder.uuid
+                        doc.save()
+
+    return jsonify({"ok": True})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
@@ -590,7 +610,7 @@ def extractions_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
+    return jsonify({"ok": True})
 
 
 @library.route("/prompts/share_to_team", methods=["POST"])
@@ -614,7 +634,7 @@ def prompts_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
+    return jsonify({"ok": True})
 
 
 @library.route("/formatters/share_to_team", methods=["POST"])
@@ -638,7 +658,7 @@ def formatters_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    return jsonify({"ok": True, "redirect_url": url_for("home.index", scope="mine")})
+    return jsonify({"ok": True})
 
 
 # -----------------------------

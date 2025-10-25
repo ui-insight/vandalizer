@@ -139,7 +139,18 @@ def team_accept_invite(token):
     inv = TeamInvite.objects(token=token, accepted=False).first()
     if not inv:
         abort(404)
-    TeamMembership(team=inv.team, user_id=user.user_id, role=inv.role).save()
+
+    # Check if user is already a member of this team
+    existing_membership = TeamMembership.objects(team=inv.team, user_id=user.user_id).first()
+    if not existing_membership:
+        # Create new membership only if they're not already a member
+        TeamMembership(team=inv.team, user_id=user.user_id, role=inv.role).save()
+        # Update user's current_team if they don't have one
+        if not user.current_team:
+            user.current_team = inv.team
+            user.save()
+    # else: User is already a member, just mark invite as accepted
+
     inv.accepted = True
     inv.save()
     return redirect(url_for("team.team_index"))
@@ -206,4 +217,15 @@ def team_remove_member():
         return jsonify({"error": "Cannot remove the owner"}), 403
 
     tm.delete()
+
+    # Reassign the removed user to another team (or create a personal team for them)
+    target_user = User.objects(user_id=target_user_id).first()
+    if target_user:
+        # If their current_team was the one they were just removed from, clear it
+        if target_user.current_team and str(target_user.current_team.id) == str(team.id):
+            target_user.current_team = None
+            target_user.save()
+        # ensure_current_team will pick/create a default team for them
+        target_user.ensure_current_team()
+
     return redirect(url_for("team.team_index"))

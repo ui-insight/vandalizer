@@ -81,12 +81,30 @@
         const ul = document.getElementById("run-list");
 
         if (!ul) return;
-        // Empty old one out
 
-        ul.appendChild(liForActivity(data));
+        // Check if this activity already exists to prevent duplicates
+        const activityId = data._id?.$oid;
+        if (activityId) {
+            const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+            if (existing) {
+                console.log("Activity already exists, skipping:", activityId);
+                return;
+            }
+        }
+
+        // Insert new activities at the top (after "New chat" and spacer)
+        // ul.children[0] = "New chat", ul.children[1] = spacer, ul.children[2] = first activity
+        const newLi = liForActivity(data);
+        if (newLi) {
+            if (ul.children.length > 2) {
+                ul.insertBefore(newLi, ul.children[2]);
+            } else {
+                ul.appendChild(newLi);
+            }
+        }
 
         conversationId = data.conversation_id;
-        activity_id = data._id.$oid;
+        activity_id = activityId;
     };
 
     function toHtml(markdown) {
@@ -151,12 +169,12 @@
             let msgHtml = "";
             if (msg.role === "user") {
                 // if the msg start with '[Link attached: url_attachment.title]' is a link message
-                if(msg.message.startsWith('[Link attached')) {
+                if (msg.message.startsWith('[Link attached')) {
                     const attachment = chatConversation.url_attachments.find(att => msg.message.startsWith(`[Link attached: ${att.title}]`));
                     console.log("link attachment: ", attachment);
                     msgHtml = createUrlAttachment(attachment);
                 }
-                else if(msg.message.startsWith('📎 File attached')) {
+                else if (msg.message.startsWith('📎 File attached')) {
                     const attachment = chatConversation.file_attachments.find(att => msg.message.startsWith(`📎 File attached: ${att.filename}`));
                     console.log("file attachment: ", attachment);
                     msgHtml = createDocumentAttachment(attachment);
@@ -165,27 +183,19 @@
                     msgHtml = `<p><div class='message-you message-response-body'>${toHtml(msg.message)}</div></p>`;
                 }
             } else {
-                msgHtml = `<p><div class='message-response message-response-body'>${toHtml(msg.message)}</div></p>`;
+                // Wrap assistant message with response ID for feedback buttons
+                const responseId = "response-" + new Date().getTime() + "-" + Math.random().toString(36).substr(2, 9);
+                const $responseDiv = $(`<div class='message-response message-response-body' id='${responseId}'></div>`);
+                $responseDiv.html(toHtml(msg.message));
+                $responseDiv.append(createFeedbackButtons());
+                msgHtml = $("<p>").append($responseDiv);
             }
-            // const msgHtmlDom = $(msgHtml).append(createFeedbackButtons());
-            $("#chat-panel").append(msgHtml).append(createFeedbackButtons());
-
-            $(".copy-btn").on("click", function () {
-                let responseHtml = $(this).find(".message-response-body").html();
-                copyRichTextToClipboard(responseHtml);
-            });
-            $(".download-btn").on("click", function () {
-                const $body = $(this)
-                    .find(".message-response-body")
-                    .first()
-                    .clone();
-
-                // Remove the feedback row(s) just for the download payload
-                $body.find(".feedback-buttons").remove();
-
-                // (Optional) If your popup menu ever gets injected inside the body, strip it too
-                attachChatDownloadUI(this, $body);
-            });
+            // Only add feedback buttons to assistant responses, not user messages or attachments
+            if (msg.role !== "user") {
+                $("#chat-panel").append(msgHtml);
+            } else {
+                $("#chat-panel").append(msgHtml);
+            }
         }
         // Scroll to bottom
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
@@ -282,7 +292,7 @@
         // Get current conversation UUID
         const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
         console.log("adding link activity_id", url_activity_id);
-    
+
 
         // Disable button during submission
         $(this).prop('disabled', true);
@@ -299,7 +309,7 @@
             dataType: 'json',
             success: function (response) {
                 // check if there is an activity_id in the url
-                if(window.location.href.includes("activity_id=")) {
+                if (window.location.href.includes("activity_id=")) {
                     // Clear input and close modal
                     $('#chat-input-link').val('');
                     $('#chat-input-modal').hide();
@@ -307,7 +317,7 @@
                     // Scroll to bottom
                     $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
                     const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-                        window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
+                    window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
                 }
                 else {
                     // If no conversation existed, we now have one
@@ -315,17 +325,21 @@
                     // set the location /home?activity_id=${response.activity_id}=Assistant
                     console.log("Response", response);
                     console.log("conversation id", response.conversation_uuid);
-                    if(response.activity_id) {
+                    if (response.activity_id) {
                         window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
-                    } 
+                    }
                 }
 
                 // save the conversation id
-            
+
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.error("Error adding link:", thrownError);
-                alert("Failed to add the link. Please try again.");
+                let errorMessage = "Failed to add the link. Please try again.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                alert(errorMessage);
             },
             complete: function () {
                 // Re-enable button
@@ -395,6 +409,10 @@
         }
         else if (sectionName == "Library") {
             $("#library-panel").show();
+            // If the search-results-panel has content (like an extraction panel), show it
+            if ($("#search-results-panel").children().length > 0) {
+                $("#search-results-panel").show();
+            }
         }
 
         cleanup();
@@ -447,13 +465,14 @@
 
                 $('#recommendation-task-card').on('click', function (e) {
                     e.preventDefault();
-                    $("#tasks-panel").show();
+                    setSection("Library");
+                    $("#newTaskModal").show();
                 });
 
                 $('#recommendation-create-workflow-card').on('click', function (e) {
                     e.preventDefault();
-                    location.reload();
-
+                    setSection("Library");
+                    $("#newWorkflowModal").show();
                 });
 
                 $('.workflow-recommendation-item').off("click").on("click", function () {
@@ -736,7 +755,10 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                location.reload();
+                // Preserve existing URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', 'Library');
+                location.href = url.toString();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -778,7 +800,10 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                location.reload();
+                // Preserve existing URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', 'Library');
+                location.href = url.toString();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -1105,6 +1130,16 @@
     $(document).ready(function () {
         var docContainer = $('.document-container');
 
+        // Show extraction panel on page load if we're in Library section and it has content
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSection = urlParams.get('section');
+        if (currentSection === 'Library') {
+            const searchResultsPanel = $('#search-results-panel');
+            if (searchResultsPanel.children().length > 0) {
+                searchResultsPanel.show();
+            }
+        }
+
         // Stop polling when the user navigates away from the page
         window.addEventListener('beforeunload', function () {
             pollingActive = false;
@@ -1193,7 +1228,13 @@
             } else if (selectedOption == "Logout") {
                 window.location.href = "/logout";
             } else {
-                window.location.href = "/home?space_id=" + selectedOption;
+                // Preserve section when switching spaces
+                const url = new URL(window.location.href);
+                url.searchParams.set('space_id', selectedOption);
+                // Clear document-specific parameters when switching spaces
+                url.searchParams.delete('docid');
+                url.searchParams.delete('folder_id');
+                window.location.href = url.toString();
             }
         });
 
@@ -1380,6 +1421,19 @@
             dataType: 'json',
             async: true,
             success: function (data) {
+                // Preserve workflow_id, workflow_step_id, and section in URL to keep modal open after reload
+                const url = new URL(window.location.href);
+                if (current_workflow_id && current_workflow_id != "0") {
+                    url.searchParams.set('workflow_id', current_workflow_id);
+                }
+                if (workflow_step_id && workflow_step_id != 0) {
+                    url.searchParams.set('workflow_step_id', workflow_step_id);
+                }
+                // Only set section to Workflows if we have a valid workflow_id
+                if (current_workflow_id && current_workflow_id != "0") {
+                    url.searchParams.set('section', 'Workflows');
+                }
+                window.history.replaceState(null, '', url.toString());
                 location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -1500,7 +1554,7 @@
 
 
 
-    $('.workflow-item').on("click", function () {
+    $(document).on("click", ".workflow-item", function () {
         let uuid = $(this).attr("data-uuid");
 
         console.log("here1")
@@ -1597,11 +1651,10 @@
                 addWorkflowListeners();
 
                 // Update the browser URL with the current_workflow_id without refreshing the page
-                const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
                 const url = new URL(window.location.href);
                 url.searchParams.delete('workflow_id');
                 url.searchParams.set('workflow_id', current_workflow_id)
-                url.searchParams.set('section', "Workflows");
+                url.searchParams.set('section', "Library");
 
                 window.history.replaceState(null, '', url.toString());
             },
@@ -1901,6 +1954,27 @@
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
                     }
+
+                    // Update the activity in the side rail
+                    const activityId = data.activity_id;
+                    if (activityId) {
+                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activityId}']`);
+                        if (activityItem) {
+                            // Remove running class
+                            activityItem.classList.remove('is-running');
+                            // Remove the spinning gear icon
+                            const runRight = activityItem.querySelector('.run-right');
+                            if (runRight) {
+                                if (status === 'completed') {
+                                    runRight.remove();
+                                } else if (status === 'failed') {
+                                    // Replace with failed icon
+                                    runRight.innerHTML = '<i class="fa-solid fa-triangle-exclamation run-state-icon" aria-label="Failed"></i>';
+                                }
+                            }
+                        }
+                    }
+
                     if (status === 'failed') {
                         showToast("Workflow failed");
                     } else {
@@ -2253,6 +2327,10 @@
             async: true,
             success: function (data) {
                 fetchWorkflow(data.uuid);
+                // Refresh the library to show the new workflow
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2292,13 +2370,45 @@
         });
     }
 
-    $(".set-item").on("click", function () {
+    $(document).on("click", ".set-item", function () {
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
         search_set_add_uuid = uuid;
         updateSearchSetPanel(uuid);
     });
 
+    // Delegated event handlers for copy and download buttons
+    $(document).on("click", ".copy-btn", function () {
+        // Find the closest message-response-body container
+        const $messageBody = $(this).closest('.message-response-body');
+        if ($messageBody.length === 0) {
+            console.error("Could not find message-response-body");
+            return;
+        }
+        // Clone and remove feedback buttons before getting HTML
+        const $clone = $messageBody.clone();
+        $clone.find(".feedback-buttons").remove();
+        const responseHtml = $clone.html().trim();
+        copyRichTextToClipboard(responseHtml);
+    });
+
+    $(document).on("click", ".download-btn", function () {
+        // Find the closest message-response-body container
+        const $messageBody = $(this).closest('.message-response-body');
+        if ($messageBody.length === 0) {
+            console.error("Could not find message-response-body");
+            return;
+        }
+        const $body = $messageBody.clone();
+
+        // Remove the feedback row(s) just for the download payload
+        $body.find(".feedback-buttons").remove();
+
+        // (Optional) If your popup menu ever gets injected inside the body, strip it too
+        $body.find("#chat-model-popup-menu").remove();
+        const responseHtml = $body.html().trim();
+        attachChatDownloadUI(this, responseHtml);
+    });
 
     function beginPrompt(uuid, item_title) {
         $("#tasks-panel").hide();
@@ -2376,6 +2486,12 @@
                     $('#run-term-button')[0].textContent = "RUN";
                 }
                 $('#run-term-button').removeClass('shimmer');
+
+                // Reload the page to show the completed activity in the side rail
+                if (data.activity_id) {
+                    // Just reload the page - the activity will appear in the rail
+                    location.reload();
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2642,6 +2758,7 @@
         console.log("Performing search");
         console.log(set_uuid);
         console.log(document_uuids);
+        setSection("Library");
         $.ajax({
             url: "/tasks/search_results",
             type: "POST",
@@ -2658,6 +2775,11 @@
                 $("#search-results-panel").empty();
                 $(data.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
+
+                // Update URL to maintain Library section context
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', "Library");
+                window.history.replaceState(null, '', url.toString());
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2994,7 +3116,7 @@
     ) {
 
         const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-                        
+
 
         $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
@@ -3098,32 +3220,14 @@
                                 $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
                             }
 
-                            $(".copy-btn").on("click", function () {
-                                let responseHtml = $(this).closest('[id^="response"]').find(".message-response-body").html().trim();
-                                copyRichTextToClipboard(responseHtml);
-                            });
-                            $(".download-btn").on("click", function () {
-                                const $body = $(this)
-                                    .closest('[id^="response"]')
-                                    .find(".message-response-body")
-                                    .first()
-                                    .clone();
-
-                                // Remove the feedback row(s) just for the download payload
-                                $body.find(".feedback-buttons").remove();
-
-                                // (Optional) If your popup menu ever gets injected inside the body, strip it too
-                                $body.find("#chat-model-popup-menu").remove();
-                                const responseHtml = $body.html().trim();
-                                attachChatDownloadUI(this, responseHtml);
-                            });
+                            // Note: Copy and download button handlers are handled by delegated event handlers
                             // Check if we need to redirect to add activity_id to URL
                             const currentUrl = new URL(window.location.href);
                             const hasActivityId = currentUrl.searchParams.has('activity_id');
                             console.log("message finished activity_id", activity_id);
-                            if(!hasActivityId && activity_id) {
+                            if (!hasActivityId && activity_id) {
                                 window.location.href = `/home?activity_id=${activity_id}&section=Assistant`;
-    
+
                             }
 
                             return;

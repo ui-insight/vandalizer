@@ -36,7 +36,8 @@
 }
 .run-item.is-running{ background:#f3f7ff; }
 /* active run item */
-.run-item.active{ background:#e4edff; border:1px solid #0050d7; box-shadow:0 1px 3px rgb(0 0 0 / 0.1); }
+.run-item.active{ background:#e4edff; border:1px solid #0050d7; }
+.run-item.active:hover{ box-shadow:0 1px 3px rgb(0 0 0 / 0.1); }
 
 .run-left{ display:flex; align-items:center; gap:8px; min-width:0; }
 .run-actions{

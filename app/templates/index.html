@@ -209,7 +209,7 @@
 
                         <!-- Files -->
                         {% for doc in folder_docs %}
-                        <tr id="file-item" class="file">
+                        <tr id="file-item" class="file" draggable="true">
                             <td style="white-space: nowrap;">
                                 <span style="margin-right: 10px;">
                                     <input type="checkbox" class="document-selector" data-doc-uuid="{{ doc.uuid }}"
@@ -218,7 +218,7 @@
                                 </span>
 
                                 <button type="button" class="file-link bootstrapless-button"
-                                    onclick="addDocId('{{ doc.uuid }}')" {% if not doc.valid %}disabled{% endif %}>
+                                    onclick="addDocId('{{ doc.uuid }}')">
                                     <span>
                                         <i
                                             class="fa-solid fa-file{% if not doc.valid and not doc.processing %} invalid{% endif %}"></i>
@@ -307,6 +307,11 @@
                 {{ workflow_step_template|safe }}
                 {% endif %}
 
+            </div>
+
+            {% elif extraction_panel_html and section=="Library" %}
+            <div class="search-results-panel" id="search-results-panel" style="margin: 0px 0px; text-align: left; display: block;">
+                {{ extraction_panel_html|safe }}
             </div>
 
             {% else %}
