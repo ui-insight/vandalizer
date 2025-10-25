@@ -634,6 +634,13 @@ def execute_workflow_task(
         f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
     )
 
+    # Update the activity status to completed
+    from app.utilities.analytics_helper import activity_finish
+    from app.models import ActivityEvent, ActivityStatus
+    activity = ActivityEvent.objects(workflow_result=workflow_result).first()
+    if activity:
+        activity_finish(activity.id, status=ActivityStatus.COMPLETED)
+
     return {
         "status": "completed",
         "result_id": workflow_result_id,

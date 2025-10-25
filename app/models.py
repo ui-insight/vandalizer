@@ -344,9 +344,14 @@ def _pick_default_team_for_user(user_id: str) -> "Team | None":
 def _user_pre_save(sender, document: "User", **kwargs):
     # Only fill if empty; don't override an explicit selection
     if getattr(document, "current_team", None) is None:
-        team = _pick_default_team_for_user(document.user_id)
-        if team:
-            document.current_team = team
+        # Check if there are pending team invites for this user
+        # If so, skip auto-creating a personal team; let the invite processing set the team
+        from app.models import TeamInvite
+        pending_invites = TeamInvite.objects(email=document.user_id.lower(), accepted=False).first()
+        if not pending_invites:
+            team = _pick_default_team_for_user(document.user_id)
+            if team:
+                document.current_team = team
 
 
 signals.pre_save.connect(_user_pre_save, sender=User)

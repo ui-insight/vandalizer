@@ -77,13 +77,22 @@ def register():
         # Create new user
         new_user = User(user_id=email)
         new_user.set_password(password)
-        new_user.save()
 
-        # If there are pending invites for this email, attach memberships and accept them
+        # Check for pending invites BEFORE saving the user
+        # This prevents the pre_save hook from creating a personal team
         # Normalize email to lowercase since invites are stored lowercased
         pending_invites = list(TeamInvite.objects(email=email.lower(), accepted=False))
 
         first_invited_team = None
+        if pending_invites:
+            # Set the current_team before first save to prevent personal team creation
+            first_invited_team = pending_invites[0].team
+            new_user.current_team = first_invited_team
+
+        # Now save the user (with current_team set if there are invites)
+        new_user.save()
+
+        # Process the invites: create memberships and mark as accepted
         for inv in pending_invites:
             # Create membership if not already present (unique index will also protect us)
             try:
@@ -99,19 +108,10 @@ def register():
                 # mark invite as accepted
                 inv.accepted = True
                 inv.save()
-                if first_invited_team is None:
-                    first_invited_team = inv.team
             except NotUniqueError:
                 # Membership already exists due to race/duplicate; still mark invite accepted.
                 inv.accepted = True
                 inv.save()
-                if first_invited_team is None:
-                    first_invited_team = inv.team
-
-        # If they had at least one invite, make that team their current team
-        if first_invited_team is not None:
-            new_user.current_team = first_invited_team
-            new_user.save()
 
         # Log the user in automatically
         login_user(new_user)

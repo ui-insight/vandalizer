@@ -112,12 +112,20 @@
                         // Scroll to bottom
                         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
                         const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-                        window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
+                        // Preserve existing URL parameters
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', current_activity_id);
+                        url.searchParams.set('section', 'Assistant');
+                        window.location.href = url.toString();
                     } else {
                         // Show success message
                         console.log(`Successfully uploaded ${response.attachments.length} document(s)`);
                         if(response.activity_id) {
-                            window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
+                            // Preserve existing URL parameters
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('activity_id', response.activity_id);
+                            url.searchParams.set('section', 'Assistant');
+                            window.location.href = url.toString();
                         }
                     }
                 },

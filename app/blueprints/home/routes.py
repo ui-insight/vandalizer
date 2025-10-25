@@ -232,7 +232,7 @@ def index() -> ResponseReturnValue:
 
     # Library
     my_library = _get_or_create_personal_library(user_id=user.get_id())
-    scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
+    scope = request.args.get("scope", "mine")  # 'team' | 'mine' | 'verified'
     item_type = request.args.get("type", "all")  # 'workflows' | 'tasks' | 'all'
     kinds_str = request.args.get("kinds", "extract,prompt,format")
     kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
@@ -248,6 +248,8 @@ def index() -> ResponseReturnValue:
     conversation_uuid = request.args.get("conversation_uuid", None)
     chat_conversation = None
     activity = None
+    workflow_result = None
+    extraction_panel_html = None
     if activity_id and len(str(activity_id).strip()) > 0:
         activity = ActivityEvent.objects(id=activity_id).first()
         if activity:
@@ -259,7 +261,34 @@ def index() -> ResponseReturnValue:
                 ).first()
                 debug(chat_conversation)
                 conversation_uuid = chat_conversation.uuid
-                
+            elif activity_type == "workflow_run":
+                # Load the workflow result to display
+                workflow_result = activity.workflow_result
+                if workflow_result and workflow_result.workflow:
+                    # Set workflow_id so the workflow panel opens
+                    workflow_id = str(workflow_result.workflow.id)
+                    workflow_tpl, workflow_step_tpl = _render_workflow_bits(workflow_id)
+                    # Switch to the Workflows section
+                    section = "Workflows"
+                    debug(f"Loading workflow {workflow_id} from activity, template length: {len(workflow_tpl)}")
+            elif activity_type == "search_set_run":
+                # Load the search set to display
+                search_set_uuid = activity.search_set_uuid
+                if search_set_uuid:
+                    from app.models import SearchSet
+                    search_set = SearchSet.objects(uuid=search_set_uuid).first()
+                    if search_set:
+                        # Switch to Library section and show the extraction panel
+                        section = "Library"
+                        # Render the extraction panel without results (user can re-run if needed)
+                        from flask import render_template
+                        extraction_panel_html = render_template(
+                            "toolpanel/extractions/extraction_panel.html",
+                            search_set=search_set,
+                            documents=[],
+                            results=None
+                        )
+
     debug(activity)
     if chat_conversation:
         chat_conversation = chat_conversation.to_dict()
@@ -287,6 +316,8 @@ def index() -> ResponseReturnValue:
         workflow_template=workflow_tpl,
         workflow_step_template=workflow_step_tpl,
         workflow_id=workflow_id,
+        workflow_result=workflow_result,
+        extraction_panel_html=extraction_panel_html,
         release_notes=RELEASE_NOTES,
         show_release_panel=show_release_panel,
         current_release=CURRENT_RELEASE_VERSION,
@@ -417,7 +448,9 @@ def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
     if not workflow_id or workflow_id == 0:
         return "", ""
 
-    workflow = Workflow.objects(id=request.args.get("workflow_id")).first()
+    # Use the passed workflow_id parameter, or fall back to request.args
+    wf_id = workflow_id if workflow_id and workflow_id != 0 else request.args.get("workflow_id")
+    workflow = Workflow.objects(id=wf_id).first()
     if not workflow:
         return "", ""
 
@@ -471,20 +504,28 @@ def _folder_context(user, current_space: Space):
     current_folder_id = request.args.get("folder_id", default="0")
     current_folder_parent_id = "0"
 
-    base_query = Q(
-        user_id=user.get_id(), space=current_space.uuid, folder=current_folder_id
-    )
+    # Check if current folder is a team folder
+    is_team_folder = False
+    if current_folder_id not in {"0", 0}:
+        folder = SmartFolder.objects(uuid=current_folder_id).first()
+        if folder:
+            current_folder_parent_id = folder.parent_id
+            # If the folder has a team_id, it's a team folder
+            is_team_folder = bool(folder.team_id)
+
+    # Build document query - if it's a team folder, show all docs in that folder
+    # Otherwise, show only user's docs
+    if is_team_folder:
+        base_query = Q(space=current_space.uuid, folder=current_folder_id)
+    else:
+        base_query = Q(user_id=user.get_id(), space=current_space.uuid, folder=current_folder_id)
+
     default_doc_query = Q(user_id=user.get_id(), is_default=True)
     folder_docs = (
         SmartDocument.objects(base_query | default_doc_query)
         .order_by("-created_at")
         .all()
     )
-
-    if current_folder_id not in {"0", 0}:
-        folder = SmartFolder.objects(uuid=current_folder_id).first()
-        if folder:
-            current_folder_parent_id = folder.parent_id
 
     parent_filter = (
         current_folder_id if current_folder_id not in {"0", 0} else "0"
@@ -666,6 +707,13 @@ def add_link_to_chat():
         # Fetch URL content
         fetcher = URLContentFetcher(max_content_length=500000)
         result = fetcher.fetch_url_content(link)
+
+        # Check if the fetch failed
+        if result is None:
+            return jsonify({"error": "Invalid URL or unsupported content type"}), 400
+
+        if result.get("error"):
+            return jsonify({"error": f"Failed to fetch URL: {result.get('error')}"}), 400
 
         # Extract title from URL or content
         title = urlparse(link).netloc

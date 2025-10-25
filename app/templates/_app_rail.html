@@ -82,7 +82,8 @@
             : "";
 
         const li = document.createElement("li");
-        let classes = `run-item${isProgress ? " is-running" : ""}`;
+        // Only add is-running class to automation runs (tasks/workflows), not chats
+        let classes = `run-item${isProgress && isAutomationRun ? " is-running" : ""}`;
         classes += active_activity ? " active" : "";
         li.className = classes;
         let activity_id = a._id.$oid;
@@ -140,8 +141,11 @@
                 const li = document.querySelector(`li.run-item[data-run-id='${itemId}']`);
                 if (li) {
                     li.remove();
-                    // reload to the /home?section=Assistant
-                    window.location.href = "/home?section=Assistant";
+                    // Preserve existing URL parameters
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Assistant');
+                    url.searchParams.delete('activity_id'); // Remove the deleted activity ID
+                    window.location.href = url.toString();
                 }
             } else {
                 alert("Failed to delete activity.");
@@ -154,10 +158,52 @@
     }
 
 
-    // console.log("rendering activities");
-    // console.log(activity_items);
-    // Initial render
-    // renderActivities(activity_items);
+    // Track if activities have been rendered to prevent duplicates
+    let activitiesRendered = false;
 
-    // (Optional) If you add SSE/WebSocket updates later, call renderActivities() again with new data.
+    // Render activities on page load
+    function renderActivities() {
+        if (activitiesRendered) {
+            console.log("Activities already rendered, skipping");
+            return;
+        }
+
+        const ul = document.getElementById("run-list");
+        if (!ul) return;
+
+        // Clear existing activities (keep "New chat" and spacer)
+        while (ul.children.length > 2) {
+            ul.removeChild(ul.lastChild);
+        }
+
+        // Get existing activity IDs to prevent duplicates
+        const existingIds = new Set();
+        for (let i = 2; i < ul.children.length; i++) {
+            const id = ul.children[i].dataset?.runId;
+            if (id) existingIds.add(id);
+        }
+
+        // Render activities (already sorted newest first from server)
+        activity_items.forEach(activity => {
+            const activityId = activity._id.$oid;
+            // Only add if not already present
+            if (!existingIds.has(activityId)) {
+                const li = liForActivity(activity);
+                if (li) {
+                    ul.appendChild(li);
+                    existingIds.add(activityId);
+                }
+            }
+        });
+
+        activitiesRendered = true;
+        console.log("Activities rendered:", activity_items.length);
+    }
+
+    // Initial render on page load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderActivities);
+    } else {
+        renderActivities();
+    }
 </script>

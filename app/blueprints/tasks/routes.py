@@ -25,7 +25,7 @@ from flask_login import current_user, login_required
 from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig
+from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig, ActivityEvent, ActivityType, ActivityStatus
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
@@ -418,9 +418,25 @@ def begin_search() -> ResponseReturnValue:
             keys.append(item.searchphrase)
 
     if len(keys) > 0:
+        # Create activity event for the extraction run
+        user = current_user
+        activity = ActivityEvent(
+            type=ActivityType.SEARCH_SET_RUN.value,
+            title=search_set.title if search_set and search_set.title else "Extraction",
+            status=ActivityStatus.RUNNING.value,
+            user_id=user.get_id(),
+            search_set_uuid=searchset_uuid,
+            documents_touched=len(document_uuids)
+        )
+        activity.save()
+
         em = ExtractionManager3()
         em.root_path = current_app.root_path
         results = em.extract(keys, document_uuids)
+
+        # Update activity to completed
+        activity.status = ActivityStatus.COMPLETED.value
+        activity.save()
         if len(results) == 1:
             results = results[0]
 
@@ -478,6 +494,7 @@ def begin_search() -> ResponseReturnValue:
         )
         response = {
             "template": template,
+            "activity_id": str(activity.id),
         }
 
         # Ingest workflow into vector database for future recommendations
@@ -584,6 +601,10 @@ def rename_search_set() -> ResponseReturnValue:
 @tasks.route("/clone_search_set", methods=["POST"])
 def clone_search_set() -> ResponseReturnValue:
     """Clone a search set."""
+    user = current_user
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
     data = request.get_json()
     search_set_uuid = data["search_set_uuid"]
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
@@ -600,6 +621,10 @@ def clone_search_set() -> ResponseReturnValue:
         new_item.id = None
         new_item.searchset = new_search_set.uuid
         new_item.save()
+
+    # Add the cloned search set to the user's library
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(new_search_set, library=library, added_by_user_id=user.user_id)
 
     return jsonify({"complete": True})
 

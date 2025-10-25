@@ -61,7 +61,10 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    location.reload();
+                    // Preserve existing URL parameters
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    location.href = url.toString();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -85,7 +88,10 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    location.reload();
+                    // Preserve existing URL parameters
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    location.href = url.toString();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
