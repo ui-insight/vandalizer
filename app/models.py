@@ -1054,6 +1054,7 @@ class ActivityEvent(me.Document):
     meta_summary = me.DictField(
         default={}
     )  # e.g., {"model":"gpt-4o", "search_set_title":"Acme NDA"}
+    result_snapshot = me.DictField(default=dict)
     tags = me.ListField(me.StringField(max_length=50), default=[])
 
     meta = {

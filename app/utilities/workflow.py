@@ -639,7 +639,27 @@ def execute_workflow_task(
     from app.models import ActivityEvent, ActivityStatus
     activity = ActivityEvent.objects(workflow_result=workflow_result).first()
     if activity:
-        activity_finish(activity.id, status=ActivityStatus.COMPLETED)
+        snapshot = dict(activity.result_snapshot or {})
+
+        snapshot_output = final_output
+        try:
+            json.dumps(snapshot_output)
+        except TypeError:
+            snapshot_output = str(snapshot_output)
+
+        snapshot.update(
+            {
+                "output": snapshot_output,
+                "history": data,
+                "steps_total": workflow_result.num_steps_total,
+                "steps_completed": workflow_result.num_steps_completed,
+                "status": workflow_result.status,
+                "workflow_result_id": workflow_result_id,
+            },
+        )
+
+        activity.result_snapshot = snapshot
+        activity_finish(activity, status=ActivityStatus.COMPLETED)
 
     return {
         "status": "completed",

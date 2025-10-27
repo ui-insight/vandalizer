@@ -6,7 +6,6 @@ from typing import Any, Dict, List
 import chromadb
 from chromadb.config import Settings
 from devtools import debug
-from langchain_openai import OpenAIEmbeddings
 
 from app.models import SmartDocument
 
@@ -14,7 +13,6 @@ from app.models import SmartDocument
 class SemanticRecommender:
     def __init__(self, persist_directory=None) -> None:
         self.persist_directory = persist_directory or "./chroma_db"
-        self.embeddings = OpenAIEmbeddings()
 
         Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(
@@ -48,13 +46,10 @@ class SemanticRecommender:
         )
 
         try:
-            # Generate embedding
-            search_embedding = self.embeddings.embed_query(search_text)
-
             # If the collection is empty, .query may still return empty lists rather than error,
             # but wrap anyway in case Chromadb changes behavior.
             results = self.collection.query(
-                query_embeddings=[search_embedding],
+                query_texts=[search_text],
                 n_results=limit,
                 include=["metadatas", "documents", "distances"],
             )
@@ -98,36 +93,26 @@ class SemanticRecommender:
     ) -> Dict[str, Any]:
         """Ingest (or upsert) an item into the vector store, averaging embeddings on each run."""
         try:
-            new_embedding = self.embeddings.embed_query(ingestion_text)
             doc_uuid = uuid.uuid4().hex
             doc_id = f"{identifier}_{doc_uuid}"
 
             # Try to fetch existing; if it fails or is empty, we'll add fresh
             try:
-                existing = self.collection.get(
-                    ids=[doc_id], include=["embeddings", "metadatas"]
-                )
+                existing = self.collection.get(ids=[doc_id], include=["metadatas"])
                 has_existing = bool(existing.get("ids"))
             except Exception:
                 debug("No existing record found or error fetching it, will create new")
                 has_existing = False
 
             if has_existing:
-                old_embed = existing["embeddings"][0]
                 meta = existing["metadatas"][0] or {}
                 old_count = meta.get("num_executions", 1)
                 new_count = old_count + 1
 
-                # Average embeddings
-                avg_embed = [
-                    (oe * old_count + ne) / new_count
-                    for oe, ne in zip(old_embed, new_embedding)
-                ]
                 updated_meta = {**meta, "num_executions": new_count}
 
                 self.collection.update(
                     ids=[doc_id],
-                    embeddings=[avg_embed],
                     documents=[ingestion_text],
                     metadatas=[updated_meta],
                 )
@@ -139,7 +124,6 @@ class SemanticRecommender:
                     "num_executions": new_count,
                 }
                 self.collection.add(
-                    embeddings=[new_embedding],
                     documents=[ingestion_text],
                     metadatas=[initial_meta],
                     ids=[doc_id],

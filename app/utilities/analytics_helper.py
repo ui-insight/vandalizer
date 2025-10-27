@@ -14,12 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 def recent_activity_for_feed(
-    user_id: str | None = None, team_id: str | None = None, limit: int = 100
+    user_id: str | None = None,
+    team_id: str | None = None,
+    limit: int = 100,
+    include_completed: bool = False,
 ):
     q = ActivityEvent.objects
     print(f"Activities for {user_id} {team_id}")
     if user_id:
         q = q(user_id=user_id)
+    if not include_completed:
+        q = q(
+            status__in=[
+                ActivityStatus.RUNNING.value,
+                ActivityStatus.QUEUED.value,
+                ActivityStatus.FAILED.value,
+                ActivityStatus.CANCELED.value,
+            ]
+        )
     return q.order_by("-started_at").limit(limit)
 
 

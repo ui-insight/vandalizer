@@ -3,6 +3,7 @@
 import asyncio
 import json
 import os
+import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -378,6 +379,7 @@ def get_cache_key(key: str, context: str) -> str:
 class ExtractionDeps:
     extraction_context: Optional[str]
     fields: dict[str, tuple]
+    field_metadata: dict[str, dict[str, Optional[str]]]
     text: str
 
 
@@ -399,9 +401,21 @@ def extraction_system_prompt(
 ):
     text = context.deps.text
     fields = context.deps.fields
-    field_descriptions = [
-        f"- {field}: {field_type[0]}" for field, field_type in fields.items()
-    ]
+    field_metadata = context.deps.field_metadata
+
+    field_descriptions = []
+    for field_name, field_spec in fields.items():
+        meta = field_metadata.get(field_name, {})
+        type_label = meta.get("type")
+        if not type_label:
+            type_label = reverse_type_mapping.get(field_spec, "Any")
+        description = meta.get("description")
+        if description:
+            field_descriptions.append(
+                f"- {field_name} ({type_label}): {description}"
+            )
+        else:
+            field_descriptions.append(f"- {field_name}: {type_label}")
     field_str = "\n".join(field_descriptions)
 
     multiple_entity_instruction = (
@@ -450,6 +464,127 @@ def filter_empty_entities(result: dict) -> list:
     return [e for e in raw_entities if is_non_empty(e)]
 
 
+def _clean_heuristic_text(value: str) -> str:
+    """Trim heuristic extraction text and cap length."""
+    cleaned = value.strip().strip(":").strip(" -\t")
+    if len(cleaned) > 500:
+        cleaned = cleaned[:500].rstrip()
+    return cleaned
+
+
+def _heuristic_extract_field(text: str, key: str) -> Optional[str]:
+    """Attempt simple pattern-based extraction for a single key."""
+    if not text or not key:
+        return None
+
+    # Pattern: Key: Value
+    pattern = re.compile(
+        rf"{re.escape(key)}\s*[:\-–]\s*(.+)",
+        re.IGNORECASE,
+    )
+    for match in pattern.finditer(text):
+        value = match.group(1).strip()
+        # stop at first line break
+        value = value.splitlines()[0].strip()
+        value = _clean_heuristic_text(value)
+        if value:
+            return value
+
+    # Pattern: `Key` on its own line followed by value
+    lines = text.splitlines()
+    lowered_key = key.lower().strip()
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.lower() == lowered_key and idx + 1 < len(lines):
+            candidate = _clean_heuristic_text(lines[idx + 1])
+            if candidate:
+                return candidate
+        # Handle "Key value" with whitespace
+        if stripped.lower().startswith(lowered_key):
+            remainder = stripped[len(key) :].strip(" -:\t")
+            if remainder:
+                remainder = _clean_heuristic_text(remainder)
+                if remainder:
+                    return remainder
+
+    return None
+
+
+def _coerce_heuristic_value(value: str, field_spec: tuple) -> Optional[Any]:
+    """Convert heuristic string values into the expected Python type."""
+    if value is None or field_spec is None or len(field_spec) == 0:
+        return None
+
+    target_type = field_spec[0]
+
+    if target_type is str:
+        return value
+
+    if target_type is int:
+        match = re.search(r"[-+]?\d+", value.replace(",", ""))
+        if match:
+            try:
+                return int(match.group())
+            except ValueError:
+                return None
+        return None
+
+    if target_type is float:
+        normalized = value.replace(",", "")
+        match = re.search(r"[-+]?\d+(?:\.\d+)?", normalized)
+        if match:
+            try:
+                return float(match.group())
+            except ValueError:
+                return None
+        return None
+
+    if target_type is bool:
+        lowered = value.lower()
+        if lowered in {"true", "yes", "y", "1"}:
+            return True
+        if lowered in {"false", "no", "n", "0"}:
+            return False
+        return None
+
+    if target_type == list[str]:
+        parts = [p.strip() for p in re.split(r"[;,]", value) if p.strip()]
+        return parts if parts else None
+
+    if target_type == list[int]:
+        parts = []
+        for fragment in re.split(r"[;,]", value):
+            fragment = fragment.strip()
+            if not fragment:
+                continue
+            match = re.search(r"[-+]?\d+", fragment.replace(",", ""))
+            if match:
+                try:
+                    parts.append(int(match.group()))
+                except ValueError:
+                    continue
+        return parts if parts else None
+
+    if target_type == list[float]:
+        parts = []
+        for fragment in re.split(r"[;,]", value):
+            fragment = fragment.strip()
+            if not fragment:
+                continue
+            normalized = fragment.replace(",", "")
+            match = re.search(r"[-+]?\d+(?:\.\d+)?", normalized)
+            if match:
+                try:
+                    parts.append(float(match.group()))
+                except ValueError:
+                    continue
+        return parts if parts else None
+
+    return value or None
+
+
 # @observe()
 def extract_entities_with_agent(
     text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
@@ -474,6 +609,7 @@ def extract_entities_with_agent(
 
     # Individual field type caching
     inferred_fields = {}
+    field_metadata: dict[str, dict[str, Optional[str]]] = {}
     uncached_keys = []
 
     # Check cache for each individual key
@@ -481,7 +617,9 @@ def extract_entities_with_agent(
         key_cache_key = get_cache_key(key, context)
         cached = cache.lookup(key_cache_key, "field_inference")
         if cached:
-            inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
+            cached_type = cached[0]
+            inferred_fields[key] = type_mapping.get(cached_type, (Any, ...))
+            field_metadata[key] = {"type": cached_type, "description": None}
         else:
             uncached_keys.append(key)
 
@@ -518,12 +656,30 @@ def extract_entities_with_agent(
                     field_inference_deps,
                 )
 
-        elif isinstance(new_fields, dict):
+        normalized_fields: dict[str, dict[str, Optional[str]]] = {}
+
+        if isinstance(new_fields, dict):
             # Cache newly inferred fields individually
-            for key, field_type in new_fields.items():
+            for key, field_info in new_fields.items():
+                description: Optional[str] = None
+                if isinstance(field_info, dict):
+                    field_type = field_info.get("type")
+                    description = field_info.get("description")
+                else:
+                    field_type = field_info
+
+                if not isinstance(field_type, str):
+                    debug(
+                        "Field inference response missing type information.",
+                        key,
+                        field_info,
+                    )
+                    continue
+
+                normalized_fields[key] = {"type": field_type, "description": description}
+
                 key_cache_key = get_cache_key(key, context)
-                type_str = reverse_type_mapping.get(field_type, "Any")
-                cache.update(key_cache_key, "field_inference", [type_str])
+                cache.update(key_cache_key, "field_inference", [field_type])
         else:
             # Handle the case where the response is not a dict
             debug(
@@ -533,10 +689,26 @@ def extract_entities_with_agent(
             )
             new_fields = {}
 
-        if isinstance(new_fields, dict):
-            for key_name, key_type in new_fields.items():
+        if normalized_fields:
+            for key_name, key_info in normalized_fields.items():
+                key_type = key_info.get("type")
+                if not isinstance(key_type, str):
+                    continue
+                field_metadata[key_name] = key_info
                 if key_name not in inferred_fields:
-                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
+                    inferred_fields[key_name] = type_mapping.get(
+                        key_type, (Any, ...)
+                    )
+
+    # Ensure metadata exists for any fields inferred solely from cache
+    for key_name, field_spec in inferred_fields.items():
+        field_metadata.setdefault(
+            key_name,
+            {
+                "type": reverse_type_mapping.get(field_spec, "Any"),
+                "description": None,
+            },
+        )
 
     debug(inferred_fields)
 
@@ -559,6 +731,7 @@ def extract_entities_with_agent(
     extractor_deps = ExtractionDeps(
         extraction_context=context,
         fields=inferred_fields,
+        field_metadata=field_metadata,
         text=text,
     )
     try:
@@ -576,6 +749,43 @@ def extract_entities_with_agent(
             filtered_entities = filter_empty_entities(
                 result,
             )
+
+        if filtered_entities:
+            unique_entities = []
+            seen_entities = set()
+            for entity in filtered_entities:
+                try:
+                    serialized = json.dumps(entity, sort_keys=True)
+                except TypeError:
+                    # Fallback: skip non-serializable entries
+                    continue
+                if serialized in seen_entities:
+                    continue
+                seen_entities.add(serialized)
+                unique_entities.append(entity)
+            filtered_entities = unique_entities
+        else:
+            heuristic_entity: dict[str, Any] = {}
+            for key_name in keys:
+                raw_value = _heuristic_extract_field(text, key_name)
+                if raw_value is None:
+                    continue
+                field_spec = inferred_fields.get(key_name)
+                coerced_value = (
+                    _coerce_heuristic_value(raw_value, field_spec)
+                    if field_spec
+                    else None
+                )
+                if coerced_value is None:
+                    coerced_value = raw_value
+                heuristic_entity[key_name] = coerced_value
+
+            if heuristic_entity:
+                debug(
+                    "Heuristic extraction fallback used.",
+                    heuristic_entity,
+                )
+                filtered_entities = [heuristic_entity]
         return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message

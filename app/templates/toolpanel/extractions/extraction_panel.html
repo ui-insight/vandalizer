@@ -62,26 +62,16 @@
                         </a>
                     </div>
                 </div>
-
-                {% if results == null and documents != None and documents|length > 0 %}
-                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
-                    data-title="{{ search_set.title }}">
-                    <div class="set-content ">
-                        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">processing</p>
+                {% if results is defined and results is not none %}
+                    {% set result_value = results[item.searchphrase|trim] %}
+                    {% if result_value is not none %}
+                    <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
+                        data-title="{{ search_set.title }}">
+                        <div class="set-content ">
+                            <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ result_value }}</p>
+                        </div>
                     </div>
-                </div>
-                {% endif %}
-                {% if results != null %}
-                {% if results[item.searchphrase|trim] != null %}
-                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
-                    data-title="{{ search_set.title }}">
-                    <div class="set-content ">
-
-                        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{
-                            results[item.searchphrase|trim] }}</p>
-                    </div>
-                </div>
-                {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
 

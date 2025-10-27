@@ -58,6 +58,7 @@ from app.models import (
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
+    activity_finish,
     activity_start,
     recent_activity_for_feed,
 )
@@ -249,11 +250,16 @@ def index() -> ResponseReturnValue:
     chat_conversation = None
     activity = None
     workflow_result = None
+    workflow_activity_snapshot: dict[str, Any] | None = None
+    workflow_activity_status: str | None = None
+    workflow_activity_id: str | None = None
     extraction_panel_html = None
     if activity_id and len(str(activity_id).strip()) > 0:
         activity = ActivityEvent.objects(id=activity_id).first()
         if activity:
             activity_type = activity.type
+            workflow_activity_id = str(activity.id)
+            workflow_activity_status = activity.status
             if activity_type == "conversation":
                 chat_conversation = ChatConversation.objects(
                     uuid=activity.conversation_id,
@@ -271,27 +277,61 @@ def index() -> ResponseReturnValue:
                     # Switch to the Workflows section
                     section = "Workflows"
                     debug(f"Loading workflow {workflow_id} from activity, template length: {len(workflow_tpl)}")
+                    snapshot: dict[str, Any] = dict(activity.result_snapshot or {})
+                    if workflow_result.final_output and isinstance(workflow_result.final_output, dict):
+                        final_output_value = workflow_result.final_output.get("output")
+                        if final_output_value is not None and "output" not in snapshot:
+                            snapshot["output"] = final_output_value
+                    if workflow_result.num_steps_total is not None and "steps_total" not in snapshot:
+                        snapshot["steps_total"] = workflow_result.num_steps_total
+                    if workflow_result.num_steps_completed is not None and "steps_completed" not in snapshot:
+                        snapshot["steps_completed"] = workflow_result.num_steps_completed
+                    if workflow_result.status and "status" not in snapshot:
+                        snapshot["status"] = workflow_result.status
+                    if workflow_result.session_id and "session_id" not in snapshot:
+                        snapshot["session_id"] = workflow_result.session_id
+                    workflow_activity_snapshot = snapshot or None
             elif activity_type == "search_set_run":
                 # Load the search set to display
                 search_set_uuid = activity.search_set_uuid
                 if search_set_uuid:
-                    from app.models import SearchSet
                     search_set = SearchSet.objects(uuid=search_set_uuid).first()
                     if search_set:
+                        snapshot = activity.result_snapshot or {}
+                        stored_results = snapshot.get("normalized") or snapshot.get("raw")
+                        stored_doc_uuids = snapshot.get("document_uuids") or []
+                        snapshot_documents = []
+                        for doc_uuid in stored_doc_uuids:
+                            doc = SmartDocument.objects(uuid=doc_uuid).first()
+                            if doc:
+                                snapshot_documents.append(doc)
+
                         # Switch to Library section and show the extraction panel
                         section = "Library"
                         # Render the extraction panel without results (user can re-run if needed)
-                        from flask import render_template
                         extraction_panel_html = render_template(
                             "toolpanel/extractions/extraction_panel.html",
                             search_set=search_set,
-                            documents=[],
-                            results=None
+                            documents=snapshot_documents or documents,
+                            results=stored_results,
                         )
 
     debug(activity)
     if chat_conversation:
         chat_conversation = chat_conversation.to_dict()
+
+    if extraction_panel_html is None:
+        search_set_uuid_param = request.args.get("search_set_uuid")
+        if search_set_uuid_param:
+            search_set = SearchSet.objects(uuid=search_set_uuid_param).first()
+            if search_set:
+                section = "Library"
+                extraction_panel_html = render_template(
+                    "toolpanel/extractions/extraction_panel.html",
+                    search_set=search_set,
+                    documents=documents,
+                    results=None,
+                )
 
     return render_template(
         "index.html",
@@ -331,6 +371,9 @@ def index() -> ResponseReturnValue:
         filters=initial_filters,
         scope=scope,
         can_verify=user.is_examiner,
+        workflow_activity_snapshot=workflow_activity_snapshot,
+        workflow_activity_status=workflow_activity_status,
+        workflow_activity_id=workflow_activity_id,
     )
 
 
@@ -352,6 +395,7 @@ def event_to_dict(a: ActivityEvent) -> dict:
         "tokens_input": a.tokens_input,
         "tokens_output": a.tokens_output,
         "message_count": a.message_count,
+        "result_snapshot": a.result_snapshot or {},
     }
 
 
@@ -561,8 +605,38 @@ def _folder_context(user, current_space: Space):
 
 
 def _build_activities(user: User) -> list[ActivityEvent]:
-    activities = recent_activity_for_feed(user_id=user.get_id())
-    return activities
+    activities = list(
+        recent_activity_for_feed(
+            user_id=user.get_id(),
+            include_completed=True,
+        )
+    )
+
+    visible_activities: list[ActivityEvent] = []
+    for activity in activities:
+        # Keep workflow activities in sync with their workflow result status
+        if (
+            activity.type == ActivityType.WORKFLOW_RUN.value
+            and activity.workflow_result is not None
+        ):
+            result_status = (activity.workflow_result.status or "").lower()
+            if result_status in {
+                ActivityStatus.COMPLETED.value,
+                ActivityStatus.FAILED.value,
+                ActivityStatus.CANCELED.value,
+            }:
+                if activity.status != result_status:
+                    status_enum = ActivityStatus(result_status)
+                    activity_finish(activity, status=status_enum)
+                    activity.reload()
+
+        # Hide completed activities from the rail feed
+        if activity.status == ActivityStatus.COMPLETED.value:
+            continue
+
+        visible_activities.append(activity)
+
+    return visible_activities
 
 
 @home.route("/chat", methods=["POST"])

@@ -54,21 +54,44 @@
         return a.title && a.title.trim().length ? a.title : (TYPE_ICON[a.type]?.title ?? "Activity");
     }
 
+    function resolveActivityId(activity) {
+        if (!activity) return null;
+        if (typeof activity.id === "string" && activity.id.length) {
+            return activity.id;
+        }
+        const rawId = activity._id;
+        if (!rawId) return null;
+        if (typeof rawId === "string" && rawId.length) {
+            return rawId;
+        }
+        if (typeof rawId === "object" && rawId !== null && typeof rawId.$oid === "string") {
+            return rawId.$oid;
+        }
+        return null;
+    }
+
     function liForActivity(a) {
         if (!a) return;
-        console.log("Creating li for activity:", a, a._id.$oid);
+        const activityId = resolveActivityId(a);
+        if (!activityId) {
+            console.warn("Skipping activity with missing id", a);
+            return;
+        }
+        console.log("Creating li for activity:", a, activityId);
         const isProgress = a.status === "running" || a.status === "queued";
         const isRunning = a.status === "running";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
         const isAutomationRun =
             a.type === "search_set_run" || a.type === "workflow_run";
         const status =
-            isRunning
-                ? (isAutomationRun ? STATUS_ICON.running : null)
-                : STATUS_ICON[a.status];
+            a.status === "failed"
+                ? STATUS_ICON.failed
+                : a.status === "canceled"
+                    ? STATUS_ICON.canceled
+                    : null;
         // active activity is the one that has the same activity_id as in the url 
         const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-        let active_activity = url_activity_id === a._id.$oid;
+        let active_activity = url_activity_id === activityId;
 
         // Title tooltip can include error on failure
         const tooltip = a.status === "failed" && a.error
@@ -77,7 +100,7 @@
 
         // Build left and (optional) right content
         const right =
-            status && ((isRunning && isAutomationRun) || a.status === "failed")
+            status
             ? `<span class="run-right"><i class="fa-solid ${status.cls} run-state-icon" aria-label="${status.label}"></i></span>`
             : "";
 
@@ -86,14 +109,13 @@
         let classes = `run-item${isProgress && isAutomationRun ? " is-running" : ""}`;
         classes += active_activity ? " active" : "";
         li.className = classes;
-        let activity_id = a._id.$oid;
-        li.dataset.runId = activity_id;
-        li.onclick = () => openRun(activity_id, a);
+        li.dataset.runId = activityId;
+        li.onclick = () => openRun(activityId, a);
 
         let title = a.title;
-        if (title.length == 0) {
+        if (!title || title.length === 0) {
             if (a.type === "workflow_run") {
-                title = a.workflow.name || "Workflow";
+                title = a.workflow?.name || "Workflow";
             } else {
                 title = "Activity";
             }
@@ -108,7 +130,7 @@
       </span>
       <span class="run-actions">
         ${right}
-        <button type="button" class="run-delete" onclick="deleteActivity(event, '${activity_id}')" title="Delete activity" aria-label="Delete activity">
+        <button type="button" class="run-delete" onclick="deleteActivity(event, '${activityId}')" title="Delete activity" aria-label="Delete activity">
           <i class="fa-solid fa-trash"></i>
         </button>
       </span>
@@ -185,7 +207,11 @@
 
         // Render activities (already sorted newest first from server)
         activity_items.forEach(activity => {
-            const activityId = activity._id.$oid;
+            const activityId = resolveActivityId(activity);
+            if (!activityId) {
+                console.warn("Skipping activity with missing id", activity);
+                return;
+            }
             // Only add if not already present
             if (!existingIds.has(activityId)) {
                 const li = liForActivity(activity);

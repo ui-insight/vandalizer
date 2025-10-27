@@ -299,7 +299,7 @@
             </div>
 
             {% include "workflows/add_workflow_bottom_panel.html" %}
-            {% if workflow_template != "" and section=="Workflows" %}
+{% if workflow_template != "" %}
             <div class="search-results-panel" id="search-results-panel" style="margin: 0px 0px; text-align: left;">
                 {{ workflow_template|safe }}
 
@@ -309,7 +309,7 @@
 
             </div>
 
-            {% elif extraction_panel_html and section=="Library" %}
+{% elif extraction_panel_html and section=="Library" %}
             <div class="search-results-panel" id="search-results-panel" style="margin: 0px 0px; text-align: left; display: block;">
                 {{ extraction_panel_html|safe }}
             </div>

@@ -14,6 +14,21 @@
     var total_steps = 1;
     var workflow_interval_id = null;
 
+    let workflowActivitySnapshot = {{ workflow_activity_snapshot | tojson | safe }};
+    const workflowActivityStatus = {{ workflow_activity_status | tojson | safe }};
+    const workflowActivityId = {{ workflow_activity_id | tojson | safe }};
+    if (
+        workflowActivitySnapshot &&
+        typeof workflowActivitySnapshot === "object" &&
+        Object.keys(workflowActivitySnapshot).length === 0
+    ) {
+        workflowActivitySnapshot = null;
+    }
+    window.__workflowSnapshot = workflowActivitySnapshot;
+    if (workflowActivitySnapshot && workflowActivitySnapshot.session_id) {
+        workflow_session_id = workflowActivitySnapshot.session_id;
+    }
+
 
     let animationStepIndex = 0;
     let runStepResolve = null;
@@ -114,6 +129,114 @@
             breaks: false,
         });
         return rawText;
+    }
+
+    function hasWorkflowOutput(snapshot) {
+        if (!snapshot || typeof snapshot !== "object") {
+            return false;
+        }
+        if (snapshot.output || snapshot.final_output || snapshot.finalOutput) {
+            return true;
+        }
+        if (Array.isArray(snapshot.history) && snapshot.history.length > 0) {
+            return snapshot.history.some((step) => step && step.output);
+        }
+        return false;
+    }
+
+    function normalizeWorkflowOutput(response) {
+        if (response == null) {
+            return null;
+        }
+
+        let content = response;
+
+        if (Array.isArray(content)) {
+            if (content.length === 1 && typeof content[0] === "string") {
+                content = content[0];
+            } else {
+                content = JSON.stringify(content, null, 2);
+            }
+        } else if (typeof content === "object") {
+            try {
+                content = JSON.stringify(content, null, 2);
+            } catch (err) {
+                console.warn("Unable to serialize workflow output, falling back to string", err);
+                content = String(content);
+            }
+        }
+
+        if (typeof content !== "string") {
+            return null;
+        }
+
+        const outputText = content.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "").trim();
+        return window.marked.parse(outputText, {
+            gfm: true,
+            breaks: true,
+        });
+    }
+
+    function hydrateWorkflowSnapshot(snapshot) {
+        if (!hasWorkflowOutput(snapshot)) {
+            return;
+        }
+
+        const $outputContainer = $(".workflow-output");
+        if ($outputContainer.length === 0) {
+            return;
+        }
+
+        if (workflowActivityId) {
+            $(".add-step").hide();
+        }
+
+        const $outputSection = $(".workflow-output-section");
+        if ($outputSection.length === 0) {
+            return;
+        }
+
+        const response =
+            snapshot.output ??
+            snapshot.final_output ??
+            snapshot.finalOutput ??
+            (() => {
+                if (Array.isArray(snapshot.history) && snapshot.history.length > 0) {
+                    const lastStep = [...snapshot.history].reverse().find((step) => step && step.output);
+                    return lastStep ? lastStep.output : null;
+                }
+                return null;
+            })();
+
+        const html = normalizeWorkflowOutput(response);
+        if (!html) {
+            return;
+        }
+
+        $outputContainer.removeClass("hidden").addClass("active");
+        $outputContainer.find(".step-connector").addClass("active");
+        $(".workflow-loader").hide();
+
+        $outputSection.show().empty().append(html);
+        $(".workflow-output-buttons").removeClass("hidden");
+
+        const stepsCompleted =
+            snapshot.steps_completed ?? snapshot.stepsCompleted ?? snapshot.num_steps_completed;
+        const stepsTotal = snapshot.steps_total ?? snapshot.stepsTotal ?? snapshot.num_steps_total;
+        const status = snapshot.status ?? workflowActivityStatus;
+
+        const info = $outputContainer.find(".workflow-output-attachment-info");
+        if (info.length) {
+            if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
+                const completed = Math.max(stepsCompleted, 0);
+                info.html(`<span>${completed} / ${stepsTotal} steps completed</span>`);
+            } else if (status) {
+                const label = status.charAt(0).toUpperCase() + status.slice(1);
+                info.html(`<span>${label}</span>`);
+            } else {
+                info.html(`<span>Workflow complete</span>`);
+            }
+        }
     }
 
     function createDocumentAttachment(attachment) {
@@ -371,7 +494,6 @@
 
     function setSection(sectionName) {
         $(".search-results-panel").hide();
-        $(".bottom-toolbar").hide();
         $(".tab-content").hide();
         $("#tasks-panel").hide();
 
@@ -388,13 +510,14 @@
         const tabMenuItems = tabMenu.querySelectorAll("li");
 
         tabMenuItems.forEach((item) => item.classList.remove("active"));
+        const libraryShouldBeActive = sectionName == "Library" || sectionName == "Workflows";
         tabMenuItems.forEach((item) => {
             if (item.innerText === "Assistant") {
                 if (sectionName == "Tasks" || sectionName == "Assistant") {
                     item.classList.add("active");
                 }
             } else {
-                if (sectionName == "Library") {
+                if (libraryShouldBeActive) {
                     item.classList.add("active");
                 }
             }
@@ -406,6 +529,12 @@
         } else if (sectionName == "Workflows") {
             $("#workflows-panel").show();
             $("#bottom-toolbar-add-workflows").show();
+            if ($("#search-results-panel").children().length > 0) {
+                $("#search-results-panel").show();
+            }
+            if (window.__workflowSnapshot && workflowActivityId) {
+                $(".add-step").hide();
+            }
         }
         else if (sectionName == "Library") {
             $("#library-panel").show();
@@ -1133,10 +1262,19 @@
         // Show extraction panel on page load if we're in Library section and it has content
         const urlParams = new URLSearchParams(window.location.search);
         const currentSection = urlParams.get('section');
+        const activeExtraction = urlParams.get('search_set_uuid');
+        if (activeExtraction) {
+            search_set_add_uuid = activeExtraction;
+        }
         if (currentSection === 'Library') {
             const searchResultsPanel = $('#search-results-panel');
             if (searchResultsPanel.children().length > 0) {
                 searchResultsPanel.show();
+                addResultListeners();
+                const runButton = $("#run-term-button");
+                if (runButton.length && !runButton.attr("data-uuid") && activeExtraction) {
+                    runButton.attr("data-uuid", activeExtraction);
+                }
             }
         }
 
@@ -1955,6 +2093,14 @@
                         clearInterval(workflow_interval_id);
                     }
 
+                    window.__workflowSnapshot = {
+                        output: data.output ?? null,
+                        steps_completed: steps_completed,
+                        steps_total: total_steps,
+                        status: status,
+                        session_id: workflow_session_id,
+                    };
+
                     // Update the activity in the side rail
                     const activityId = data.activity_id;
                     if (activityId) {
@@ -1995,6 +2141,13 @@
                             // Otherwise stringify the object
                             workflow_response = JSON.stringify(workflow_response, null, 2);
                         }
+                        window.__workflowSnapshot = {
+                            output: workflow_response,
+                            steps_completed: steps_completed,
+                            steps_total: total_steps,
+                            status: status,
+                            session_id: workflow_session_id,
+                        };
                         // Clean up the text
                         let outputText = workflow_response
                             .replace(/^```(html|json|markdown)?\\s*|\\s*```$/g, '')
@@ -2149,8 +2302,15 @@
 
     function downloadWorkflowOutput(format) {
         console.log("Downloading workflow output in format:", format);
-        // Go to the server to download the file in the specified format
-        location.href = `/workflows/download?session_id=${workflow_session_id}&format=${format} `; // Redirect to the download URL
+        if (!workflow_session_id) {
+            if (typeof showToast === "function") {
+                showToast("No downloadable workflow result available yet.");
+            }
+            return;
+        }
+        const encodedSession = encodeURIComponent(workflow_session_id);
+        const encodedFormat = encodeURIComponent(format);
+        location.href = `/workflows/download?session_id=${encodedSession}&format=${encodedFormat}`;
     }
 
     function hideDownloadPopupMenu() {
@@ -2472,27 +2632,37 @@
             data: data,
             contentType: "application/json; charset=utf-8",
             dataType: "json",
-            async: true,
-            success: function (data) {
-                console.log("Got some data!");
-                console.log(data);
-                hideWorking();
-                stopScanning();
-                $("#search-results-panel").show();
-                $("#search-results-panel").empty();
-                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-                addResultListeners();
-                if ($('#run-term-button').length > 0) {
-                    $('#run-term-button')[0].textContent = "RUN";
+        async: true,
+        success: function (data) {
+            console.log("Got some data!");
+            console.log(data);
+            hideWorking();
+            stopScanning();
+            if (data.activity_id) {
+                const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
+                if (activityItem) {
+                    activityItem.classList.remove('is-running');
+                    const runRight = activityItem.querySelector('.run-right');
+                    if (runRight) {
+                        runRight.remove();
+                    }
                 }
-                $('#run-term-button').removeClass('shimmer');
-
-                // Reload the page to show the completed activity in the side rail
-                if (data.activity_id) {
-                    // Just reload the page - the activity will appear in the rail
-                    location.reload();
-                }
-            },
+            }
+            $("#search-results-panel").show();
+            $("#search-results-panel").empty();
+            $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+            addResultListeners();
+            search_set_add_uuid = search_set_uuid;
+            if ($('#run-term-button').length > 0) {
+                $('#run-term-button')[0].textContent = "RUN";
+            }
+            $('#run-term-button').removeClass('shimmer');
+            // Persist Library + extraction context without reloading
+            const url = new URL(window.location.href);
+            url.searchParams.set('section', "Library");
+            url.searchParams.set('search_set_uuid', search_set_uuid);
+            window.history.replaceState(null, '', url.toString());
+        },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -2533,6 +2703,16 @@
                 success: function (data) {
                     hideWorking();
                     stopScanning();
+                    if (data.activity_id) {
+                        const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
+                        if (activityItem) {
+                            activityItem.classList.remove('is-running');
+                            const runRight = activityItem.querySelector('.run-right');
+                            if (runRight) {
+                                runRight.remove();
+                            }
+                        }
+                    }
                     $("#search-results-panel").show();
                     $("#search-results-panel").empty();
                     $(data.template).hide().appendTo("#search-results-panel").fadeIn();
@@ -2557,12 +2737,22 @@
         });
 
         $("#run-term-button").on("click", function () {
-            let uuid = $(this).attr("data-uuid");
+            let uuid = $(this).attr("data-uuid") || search_set_add_uuid;
+            if (!uuid) {
+                showToast("Select an extraction to run.");
+                return;
+            }
             performExtraction(uuid);
         });
 
         $("#set-close-button").on("click", function () {
-            location.reload();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('search_set_uuid');
+            window.history.replaceState(null, '', url.toString());
+            search_set_add_uuid = "";
+            $("#search-results-panel").fadeOut(function () {
+                $(this).empty();
+            });
         });
         $(".semantic-entry").on("click", function () {
             searchTerm = $(this).attr("data-title");
@@ -2759,28 +2949,30 @@
         console.log(set_uuid);
         console.log(document_uuids);
         setSection("Library");
-        $.ajax({
-            url: "/tasks/search_results",
-            type: "POST",
-            data: JSON.stringify({
-                search_set_uuid: set_uuid,
+    $.ajax({
+        url: "/tasks/search_results",
+        type: "POST",
+        data: JSON.stringify({
+            search_set_uuid: set_uuid,
                 document_uuids: document_uuids,
                 edit_mode: edit_mode,
             }),
             contentType: "application/json; charset=utf-8",
             dataType: "json",
-            async: true,
-            success: function (data) {
-                $("#search-results-panel").show();
-                $("#search-results-panel").empty();
-                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-                addResultListeners();
+        async: true,
+        success: function (data) {
+            $("#search-results-panel").show();
+            $("#search-results-panel").empty();
+            $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+            addResultListeners();
+            search_set_add_uuid = set_uuid;
 
-                // Update URL to maintain Library section context
-                const url = new URL(window.location.href);
-                url.searchParams.set('section', "Library");
-                window.history.replaceState(null, '', url.toString());
-            },
+            // Update URL to maintain Library section context
+            const url = new URL(window.location.href);
+            url.searchParams.set('section', "Library");
+            url.searchParams.set('search_set_uuid', set_uuid);
+            window.history.replaceState(null, '', url.toString());
+        },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -3507,4 +3699,7 @@
     section = "{{ section }}"
     console.log("Section is: " + section)
     setSection(section);
+    if (window.__workflowSnapshot && hasWorkflowOutput(window.__workflowSnapshot)) {
+        hydrateWorkflowSnapshot(window.__workflowSnapshot);
+    }
 </script>

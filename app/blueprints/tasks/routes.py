@@ -4,6 +4,7 @@ import os
 import uuid
 from collections import defaultdict
 from copy import deepcopy
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -377,6 +378,8 @@ def normalize_results(results) -> Dict[str, Any]:
         if not isinstance(item, dict):
             continue
         for k, v in item.items():
+            if v in (None, "", [], {}):
+                continue
             if v in seen[k]:
                 continue
             seen[k].add(v)
@@ -433,10 +436,8 @@ def begin_search() -> ResponseReturnValue:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
         results = em.extract(keys, document_uuids)
+        raw_results = deepcopy(results)
 
-        # Update activity to completed
-        activity.status = ActivityStatus.COMPLETED.value
-        activity.save()
         if len(results) == 1:
             results = results[0]
 
@@ -486,6 +487,17 @@ def begin_search() -> ResponseReturnValue:
 
         normalized_results = normalize_results(results)
         print(normalize_results)
+
+        activity.status = ActivityStatus.COMPLETED.value
+        activity.finished_at = datetime.utcnow()
+        activity.result_snapshot = {
+            "raw": raw_results,
+            "normalized": normalized_results,
+            "document_uuids": document_uuids,
+            "search_set_uuid": searchset_uuid,
+        }
+        activity.save()
+
         template = render_template(
             EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
