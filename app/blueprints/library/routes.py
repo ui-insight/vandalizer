@@ -661,6 +661,53 @@ def formatters_share_to_team():
     return jsonify({"ok": True})
 
 
+@library.route("/team/remove", methods=["POST"])
+def remove_from_team_library():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    team = _current_team_for_user(user)
+    if not team:
+        return jsonify({"error": "no team"}), 400
+
+    membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
+    if not membership:
+        return jsonify({"error": "forbidden"}), 403
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    kind = payload.get("kind")
+    if not uuid or not kind:
+        return jsonify({"error": "invalid request"}), 400
+
+    obj, normalized_kind = _resolve_obj(kind, uuid)
+    if not obj or not normalized_kind:
+        return jsonify({"error": "not found"}), 404
+
+    team_library = Library.objects(
+        scope=LibraryScope.TEAM, team=team
+    ).first()
+    if not team_library:
+        return jsonify({"ok": False, "removed": False}), 200
+
+    target_item = None
+    for item in list(team_library.items):
+        if item.kind == normalized_kind and item.obj == obj:
+            target_item = item
+            break
+
+    if not target_item:
+        return jsonify({"ok": False, "removed": False}), 200
+
+    team_library.items.remove(target_item)
+    team_library.updated_at = datetime.now(timezone.utc)
+    team_library.save()
+    target_item.delete()
+
+    return jsonify({"ok": True, "removed": True})
+
+
 # -----------------------------
 # Submit to be verified
 # -----------------------------

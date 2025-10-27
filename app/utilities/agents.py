@@ -517,7 +517,14 @@ def _coerce_heuristic_value(value: str, field_spec: tuple) -> Optional[Any]:
     if value is None or field_spec is None or len(field_spec) == 0:
         return None
 
+    # Defensive: ensure field_spec behaves like a sequence (type, default)
+    if not isinstance(field_spec, (tuple, list)):
+        return value
+
     target_type = field_spec[0]
+
+    if not isinstance(value, str):
+        value = str(value)
 
     if target_type is str:
         return value
@@ -605,7 +612,17 @@ def extract_entities_with_agent(
     if isinstance(keys, str):
         keys = [k.strip() for k in keys.split(",")]
     else:
-        keys = [k.strip() for k in keys]
+        cleaned_keys: list[str] = []
+        for key in keys:
+            if key is None:
+                continue
+            if isinstance(key, dict):
+                candidate = key.get("label") or key.get("name") or key.get("value")
+                if candidate:
+                    cleaned_keys.append(str(candidate).strip())
+            else:
+                cleaned_keys.append(str(key).strip())
+        keys = [k for k in cleaned_keys if k]
 
     # Individual field type caching
     inferred_fields = {}
@@ -771,11 +788,19 @@ def extract_entities_with_agent(
                 if raw_value is None:
                     continue
                 field_spec = inferred_fields.get(key_name)
-                coerced_value = (
-                    _coerce_heuristic_value(raw_value, field_spec)
-                    if field_spec
-                    else None
-                )
+                try:
+                    coerced_value = (
+                        _coerce_heuristic_value(raw_value, field_spec)
+                        if field_spec
+                        else None
+                    )
+                except TypeError:
+                    debug(
+                        "Heuristic coercion failed due to unhashable field spec.",
+                        key_name,
+                        field_spec,
+                    )
+                    coerced_value = None
                 if coerced_value is None:
                     coerced_value = raw_value
                 heuristic_entity[key_name] = coerced_value

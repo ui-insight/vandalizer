@@ -88,12 +88,13 @@
 
 <script>
     // --- State Management ---
-const LibraryState = {
+    const LibraryState = window.LibraryState || {
         scope: "{{ scope }}",
         type: "{{ item_type }}",
         kinds: {{ kinds | tojson }},
-    q: "{{ query }}"
+        q: "{{ query }}"
     };
+    window.LibraryState = LibraryState;
 
     window.LIBRARY_SHARE_ENDPOINTS = window.LIBRARY_SHARE_ENDPOINTS || {
         workflow: '/library/workflows/share_to_team',
@@ -479,6 +480,7 @@ const LibraryState = {
             }
         });
     }
+    window.refreshResults = refreshResults;
 
     function refreshVerificationQueue() {
         updateURL();
