@@ -32,6 +32,7 @@
 <script>
     // Injected from server
     const activity_items = {{ activities | tojson | safe }};
+    console.log("Loaded activity items:", activity_items);
 
 
     // Icon map by type
@@ -56,7 +57,7 @@
 
     function liForActivity(a) {
         if (!a) return;
-        console.log("Creating li for activity:", a, a._id.$oid);
+        console.log("Creating li for activity:", a, a.id);
         const isProgress = a.status === "running" || a.status === "queued";
         const isRunning = a.status === "running";
         const typeIcon = TYPE_ICON[a.type]?.cls || "fa-bolt";
@@ -68,7 +69,7 @@
                 : STATUS_ICON[a.status];
         // active activity is the one that has the same activity_id as in the url 
         const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-        let active_activity = url_activity_id === a._id.$oid;
+        let active_activity = url_activity_id === a.id;
 
         // Title tooltip can include error on failure
         const tooltip = a.status === "failed" && a.error
@@ -86,7 +87,7 @@
         let classes = `run-item${isProgress && isAutomationRun ? " is-running" : ""}`;
         classes += active_activity ? " active" : "";
         li.className = classes;
-        let activity_id = a._id.$oid;
+        let activity_id = a.id;
         li.dataset.runId = activity_id;
         li.onclick = () => openRun(activity_id, a);
 
@@ -185,7 +186,7 @@
 
         // Render activities (already sorted newest first from server)
         activity_items.forEach(activity => {
-            const activityId = activity._id.$oid;
+            const activityId = activity.id;
             // Only add if not already present
             if (!existingIds.has(activityId)) {
                 const li = liForActivity(activity);
