@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from devtools import debug
 from werkzeug.utils import secure_filename
 from flask import (
-    g,
     Blueprint,
     Response,
     current_app,
@@ -53,8 +52,9 @@ from app.models import (
     User,
     UserModelConfig,
     Workflow,
-    WorkflowStep,
-)
+    WorkflowStep
+    )
+
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
@@ -275,13 +275,11 @@ def index() -> ResponseReturnValue:
                 # Load the search set to display
                 search_set_uuid = activity.search_set_uuid
                 if search_set_uuid:
-                    from app.models import SearchSet
                     search_set = SearchSet.objects(uuid=search_set_uuid).first()
                     if search_set:
                         # Switch to Library section and show the extraction panel
                         section = "Library"
                         # Render the extraction panel without results (user can re-run if needed)
-                        from flask import render_template
                         extraction_panel_html = render_template(
                             "toolpanel/extractions/extraction_panel.html",
                             search_set=search_set,
