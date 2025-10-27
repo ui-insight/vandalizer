@@ -15,7 +15,6 @@ from urllib.parse import urlparse
 from devtools import debug
 from werkzeug.utils import secure_filename
 from flask import (
-    g,
     Blueprint,
     Response,
     current_app,
@@ -53,8 +52,9 @@ from app.models import (
     User,
     UserModelConfig,
     Workflow,
-    WorkflowStep,
-)
+    WorkflowStep
+    )
+
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
