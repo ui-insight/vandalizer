@@ -918,7 +918,75 @@
         });
     }
 
+    function libraryScopeIsTeam() {
+        return !!(window.LibraryState && window.LibraryState.scope === 'team');
+    }
+
+    function removeFromTeamLibrary(kind, uuid, onSuccess, onError) {
+        $.ajax({
+            url: '/library/team/remove',
+            type: 'POST',
+            data: JSON.stringify({
+                kind: kind,
+                uuid: uuid,
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (msg) {
+                if (typeof showToast === 'function') {
+                    showToast('Removed from team library');
+                }
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (window.LibraryState) {
+                    LibraryState.scope = 'team';
+                    try {
+                        if (typeof updateURL === 'function') {
+                            updateURL({ mode: "push" });
+                        }
+                    } catch (err) {
+                        console.warn('updateURL failed', err);
+                    }
+                    if (typeof window.updateKindFilterAppearance === 'function') {
+                        window.updateKindFilterAppearance();
+                    }
+                    if (typeof refreshResults === 'function') {
+                        refreshResults();
+                    }
+                } else {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    url.searchParams.set('scope', 'team');
+                    window.location.href = url.toString();
+                }
+                const panel = $("#search-results-panel");
+                if (panel.length) {
+                    panel.hide().empty();
+                }
+                if (typeof onSuccess === 'function') {
+                    onSuccess(msg);
+                }
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (typeof showToast === 'function') {
+                    showToast('Failed to update team library');
+                }
+                if (typeof onError === 'function') {
+                    onError(xhr);
+                }
+            }
+        });
+    }
+
     function deleteSearchSet(uuid) {
+        if (libraryScopeIsTeam()) {
+            removeFromTeamLibrary('extraction', uuid);
+            return;
+        }
         $.ajax({
             url: '/tasks/delete_search_set',
             type: 'POST',
@@ -941,7 +1009,11 @@
         });
     }
 
-    function deleteSearchSetItem(uuid) {
+    function deleteSearchSetItem(uuid, kind) {
+        if (kind && libraryScopeIsTeam()) {
+            removeFromTeamLibrary(kind, uuid);
+            return;
+        }
         $.ajax({
             url: '/tasks/delete_search_set_item',
             type: 'POST',

@@ -492,11 +492,16 @@
             }
         }
         postJSON(url, { uuid }, function () {
-            // Show success toast
+            const toastMessage = 'Shared with your team!';
             if (typeof showToast === 'function') {
-                showToast('Successfully shared to team!');
+                showToast(toastMessage);
             }
-            if (window.LibraryState && typeof refreshResults === "function") {
+
+            if (typeof setSection === 'function') {
+                setSection('Library');
+            }
+
+            const activateTeamScope = () => {
                 LibraryState.scope = "team";
                 try {
                     updateURL({ mode: "push" });
@@ -508,9 +513,18 @@
                 if (typeof window.updateKindFilterAppearance === 'function') {
                     window.updateKindFilterAppearance();
                 }
-                refreshResults();
+                if (typeof refreshResults === "function") {
+                    refreshResults();
+                }
+            };
+
+            if (window.LibraryState) {
+                activateTeamScope();
             } else {
-                location.reload();
+                const urlObj = new URL(window.location.href);
+                urlObj.searchParams.set('section', 'Library');
+                urlObj.searchParams.set('scope', 'team');
+                window.location.href = urlObj.toString();
             }
         });
     });

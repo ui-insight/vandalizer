@@ -74,6 +74,11 @@
                 uuid: uuid,
             });
 
+            if (typeof libraryScopeIsTeam === 'function' && libraryScopeIsTeam()) {
+                removeFromTeamLibrary('workflow', uuid);
+                return;
+            }
+
             $.ajax({
                 url: '/workflows/delete_workflow',
                 type: 'POST',
