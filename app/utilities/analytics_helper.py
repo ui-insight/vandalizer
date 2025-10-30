@@ -32,7 +32,7 @@ def recent_activity_for_feed(
                 ActivityStatus.CANCELED.value,
             ]
         )
-    return q.order_by("-started_at").limit(limit)
+    return q.order_by("-started_at", "-id").limit(limit)
 
 
 def activity_start(

@@ -149,6 +149,100 @@ def _notify_examiners_of_submission(
         print(f"Failed to send verification notification: {exc}")
 
 
+def _notify_team_of_share(
+    team: Team,
+    obj,
+    kind: str,
+    added_by: User,
+) -> None:
+    if not team:
+        return
+
+    members = TeamMembership.objects(team=team)
+    recipients = {
+        m.user_id
+        for m in members
+        if m.user_id and added_by and m.user_id != added_by.user_id
+    }
+    if not recipients:
+        return
+
+    item_title = _object_title(kind, obj) or "Untitled item"
+    category_label = _default_category_for_kind(kind).capitalize()
+    link = url_for(
+        "home.index",
+        section="Library",
+        scope="team",
+        _external=True,
+    )
+    actor_name = added_by.name or added_by.user_id
+    team_name = team.name or "Team"
+    subject = f"[{team_name}] New {category_label} added to the team library"
+    body = (
+        f"Hi,\n\n"
+        f"{actor_name} just added “{item_title}” ({category_label}) to the {team_name} team library.\n\n"
+        f"Open the library: {link}\n\n"
+        "— Vandalizer"
+    )
+
+    try:
+        msg = Message(subject=subject, recipients=list(recipients), body=body)
+        mail.send(msg)
+    except Exception as exc:  # pragma: no cover - best-effort notification
+        print(f"Failed to notify team of share: {exc}")
+
+
+def _format_status_label(status: VerificationStatus | str | None) -> str:
+    if isinstance(status, VerificationStatus):
+        status = status.value
+    if not status:
+        return "draft"
+    return status.replace("_", " ").title()
+
+
+def _notify_submitter_of_status_change(
+    request_doc: VerificationRequest,
+    previous_status: VerificationStatus,
+    new_status: VerificationStatus,
+    actor: User | None,
+) -> None:
+    recipient = request_doc.submitter_user_id
+    if not recipient:
+        return
+    if actor and recipient == actor.user_id:
+        return
+    if previous_status == new_status:
+        return
+
+    submitter_name = request_doc.submitter_name or recipient
+    actor_name = actor.name if actor and actor.name else (actor.user_id if actor else "A verifier")
+    team_name = request_doc.team.name if request_doc.team else "Global"
+    item_title = request_doc.item_title or _object_title(request_doc.item_kind, None) or "Your submission"
+    previous_label = _format_status_label(previous_status)
+    new_label = _format_status_label(new_status)
+    link = url_for(
+        "home.index",
+        section="Library",
+        scope="team",
+        _external=True,
+    )
+
+    subject = f"[{team_name}] Verification status updated: {item_title}"
+    body = (
+        f"Hi {submitter_name},\n\n"
+        f"{actor_name} updated the verification status for “{item_title}”.\n"
+        f"Status: {previous_label} → {new_label}\n\n"
+        f"You can review the item in the team library here:\n{link}\n\n"
+        "— Vandalizer"
+    )
+
+    try:
+        msg = Message(subject=subject, recipients=[recipient], body=body)
+        mail.send(msg)
+    except Exception as exc:  # pragma: no cover - best-effort notification
+        print(f"Failed to notify submitter of status change: {exc}")
+
+
 def _build_verification_queue(
     team: Team | None = None, *, restrict_to_team: bool = False
 ) -> list[dict]:
@@ -518,6 +612,7 @@ def get_verification_request():
         "run_instructions": "",
         "known_limitations": "",
         "intended_use_tags": [],
+        "evaluation_notes": "",
     }
 
     if request_doc:
@@ -567,6 +662,8 @@ def workflows_share_to_team():
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
 
+    _notify_team_of_share(team, obj, kind, user)
+
     # Move attached documents to team's shared folder
     from app.models import SmartDocument, SmartFolder, WorkflowAttachment
 
@@ -610,6 +707,7 @@ def extractions_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, obj, kind, user)
     return jsonify({"ok": True})
 
 
@@ -634,6 +732,7 @@ def prompts_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, obj, kind, user)
     return jsonify({"ok": True})
 
 
@@ -753,6 +852,7 @@ def update_verification_status(request_uuid: str):
         return jsonify({"error": "invalid status"}), 400
 
     new_status = status_map[status_str]
+    previous_status = req.status
     req.status = new_status
     req.save()
 
@@ -783,6 +883,8 @@ def update_verification_status(request_uuid: str):
 
     if li:
         _ensure_verified_li_note(li, req)
+
+    _notify_submitter_of_status_change(req, previous_status, new_status, user)
 
     return jsonify({"ok": True, "status": req.status.value})
 
@@ -858,10 +960,14 @@ def _submit_for_verification_route(kind: str):
     request_doc.description = (form.get("description") or "").strip()
     request_doc.example_inputs = _coerce_string_list(form.get("example_inputs"))
     request_doc.expected_outputs = _coerce_string_list(form.get("expected_outputs"))
-    request_doc.dependencies = _coerce_string_list(form.get("dependencies"))
+    if "dependencies" in form:
+        request_doc.dependencies = _coerce_string_list(form.get("dependencies"))
     request_doc.run_instructions = (form.get("run_instructions") or "").strip()
-    request_doc.known_limitations = (form.get("known_limitations") or "").strip()
-    request_doc.intended_use_tags = _coerce_tags(form.get("intended_use_tags"))
+    if "known_limitations" in form:
+        request_doc.known_limitations = (form.get("known_limitations") or "").strip()
+    if "intended_use_tags" in form:
+        request_doc.intended_use_tags = _coerce_tags(form.get("intended_use_tags"))
+    request_doc.evaluation_notes = (form.get("evaluation_notes") or "").strip()
 
     request_doc.team = team or request_doc.team
 

@@ -143,13 +143,17 @@
             .filter(Boolean);
     }
 
-    function splitTags(value) {
-        if (!value) return [];
-        return value
-            .split(/[\n,]/)
-            .map((tag) => tag.trim())
-            .filter(Boolean);
-    }
+function formatCategoryLabel(category) {
+    const map = {
+        workflow: 'Workflow',
+        searchset: 'Extraction',
+        extraction: 'Extraction',
+        prompt: 'Prompt',
+        formatter: 'Transform',
+        transform: 'Transform',
+    };
+    return map[(category || '').toLowerCase()] || (category || 'Workflow');
+}
 
     function formatStatusLabel(status) {
         if (!status) return "";
@@ -198,6 +202,10 @@
         $('#verification-error').hide().text('');
         updateVerificationStatus('draft');
         $('#verification-submit-btn').show().prop('disabled', false);
+        $('#verification-category-display').text('');
+        $('#verification-category').val('');
+        $('#verification-item-version').val('');
+        $('#verification-item-identifier').val('');
     }
 
     function fillVerificationForm(data) {
@@ -205,19 +213,23 @@
         $('#verification-uuid').val(verificationModalState.uuid || '');
         $('#verification-submitter-name').val(data.submitter_name || '');
         $('#verification-submitter-org').val(data.submitter_org || '');
-        $('#verification-submitter-role').val(data.submitter_role || '');
         $('#verification-item-title').val(data.item_title || '');
-        $('#verification-item-identifier').val(data.item_identifier || '');
-        $('#verification-item-version').val(data.item_version_hash || '');
-        $('#verification-category').val(data.category || 'workflow');
+        const identifier = data.item_identifier || '';
+        $('#verification-item-identifier').val(identifier);
+        const versionHash = data.item_version_hash || '';
+        $('#verification-item-version').val(versionHash);
+        const categoryValue =
+            data.category ||
+            verificationModalState.kind ||
+            'workflow';
+        $('#verification-category').val(categoryValue);
+        $('#verification-category-display').text(formatCategoryLabel(categoryValue));
         $('#verification-summary').val(data.summary || '');
         $('#verification-description').val(data.description || '');
         $('#verification-run-instructions').val(data.run_instructions || '');
         $('#verification-example-inputs').val((data.example_inputs || []).join('\n'));
         $('#verification-expected-outputs').val((data.expected_outputs || []).join('\n'));
-        $('#verification-dependencies').val((data.dependencies || []).join('\n'));
-        $('#verification-known-limitations').val(data.known_limitations || '');
-        $('#verification-intended-use-tags').val((data.intended_use_tags || []).join(', '));
+        $('#verification-eval-notes').val(data.evaluation_notes || '');
     }
 
     function setVerificationModalLoading(isLoading) {
@@ -308,7 +320,6 @@
         const formData = {
             submitter_name: $('#verification-submitter-name').val().trim(),
             submitter_org: $('#verification-submitter-org').val().trim(),
-            submitter_role: $('#verification-submitter-role').val().trim(),
             item_title: $('#verification-item-title').val().trim(),
             item_version_hash: $('#verification-item-version').val().trim(),
             category: $('#verification-category').val(),
@@ -317,9 +328,7 @@
             run_instructions: $('#verification-run-instructions').val().trim(),
             example_inputs: splitLines($('#verification-example-inputs').val()),
             expected_outputs: splitLines($('#verification-expected-outputs').val()),
-            dependencies: splitLines($('#verification-dependencies').val()),
-            known_limitations: $('#verification-known-limitations').val().trim(),
-            intended_use_tags: splitTags($('#verification-intended-use-tags').val()),
+            evaluation_notes: $('#verification-eval-notes').val().trim(),
         };
 
         if (!formData.item_title) {

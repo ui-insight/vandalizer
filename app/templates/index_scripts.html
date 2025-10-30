@@ -562,6 +562,33 @@
         stopSpinningJoe();
     }
 
+    function shouldFetchRecommendations() {
+        // Only fetch recommendations if we're in the Assistant tab AND there's an active chat
+
+        // Check if we're in the Assistant section by checking both URL and visible state
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSection = urlParams.get('section');
+
+        // Also check if chat panel is visible (more reliable for direct file opens)
+        const chatPanelVisible = $('#chat-panel').is(':visible');
+        const isInAssistantTab = urlSection === 'Assistant' || chatPanelVisible;
+
+        if (!isInAssistantTab) {
+            return false;
+        }
+
+        // Check if there's an active chat conversation with messages
+        // Either from initial page load (chatConversation) or from current session (conversationId)
+        const hasInitialChat = chatConversation && chatConversation.messages && chatConversation.messages.length > 0;
+        const hasActiveConversation = conversationId !== null;
+
+        if (!hasInitialChat && !hasActiveConversation) {
+            return false;
+        }
+
+        return true;
+    }
+
     function getWorkflowRecommendations(uuids) {
         docLoaderProgressHandler.showRecommendationMessage();
         $.ajax({
@@ -741,11 +768,15 @@
             var docUuid = docContainer.data('doc-uuid');
             var isProcessing = docContainer.data('processing');
             if (totalDocs > 0 && !isProcessingFile && !isProcessing) {
-                getWorkflowRecommendations(uuids);
+                if (shouldFetchRecommendations()) {
+                    getWorkflowRecommendations(uuids);
+                }
             }
         } else {
             if (totalDocs > 0) {
-                getWorkflowRecommendations(uuids);
+                if (shouldFetchRecommendations()) {
+                    getWorkflowRecommendations(uuids);
+                }
             } else {
                 $('#recommendations-panel').empty();
                 if (activity == null) {
@@ -2706,34 +2737,34 @@
             dataType: "json",
         async: true,
         success: function (data) {
-            console.log("Got some data!");
+            console.log("Extraction task started!");
             console.log(data);
-            hideWorking();
-            stopScanning();
-            if (data.activity_id) {
+
+            if (data.status === "queued" && data.activity_id) {
+                // Mark task as running in app rail
                 const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
                 if (activityItem) {
-                    activityItem.classList.remove('is-running');
-                    const runRight = activityItem.querySelector('.run-right');
-                    if (runRight) {
-                        runRight.remove();
-                    }
+                    activityItem.classList.add('is-running');
                 }
+
+                // Update URL immediately
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', "Library");
+                url.searchParams.set('search_set_uuid', search_set_uuid);
+                url.searchParams.set('activity_id', data.activity_id);
+                window.history.replaceState(null, '', url.toString());
+
+                // Show loading message
+                $("#search-results-panel").show();
+                $("#search-results-panel").html("<div style='padding: 20px; text-align: center;'><i class='fa fa-spinner fa-spin fa-2x'></i><p>Running extraction...</p></div>");
+
+                // Poll for completion
+                pollExtractionStatus(data.activity_id, search_set_uuid);
+            } else {
+                hideWorking();
+                stopScanning();
+                showToast("Error starting extraction: " + (data.message || "Unknown error"));
             }
-            $("#search-results-panel").show();
-            $("#search-results-panel").empty();
-            $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-            addResultListeners();
-            search_set_add_uuid = search_set_uuid;
-            if ($('#run-term-button').length > 0) {
-                $('#run-term-button')[0].textContent = "RUN";
-            }
-            $('#run-term-button').removeClass('shimmer');
-            // Persist Library + extraction context without reloading
-            const url = new URL(window.location.href);
-            url.searchParams.set('section', "Library");
-            url.searchParams.set('search_set_uuid', search_set_uuid);
-            window.history.replaceState(null, '', url.toString());
         },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2773,22 +2804,33 @@
                 dataType: "json",
                 async: true,
                 success: function (data) {
-                    hideWorking();
-                    stopScanning();
-                    if (data.activity_id) {
+                    console.log("Extraction task started!");
+                    console.log(data);
+
+                    if (data.status === "queued" && data.activity_id) {
+                        // Mark task as running in app rail
                         const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
                         if (activityItem) {
-                            activityItem.classList.remove('is-running');
-                            const runRight = activityItem.querySelector('.run-right');
-                            if (runRight) {
-                                runRight.remove();
-                            }
+                            activityItem.classList.add('is-running');
                         }
+
+                        // Update URL immediately
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', data.activity_id);
+                        window.history.replaceState(null, '', url.toString());
+
+                        // Show loading message
+                        $("#search-results-panel").show();
+                        $("#search-results-panel").html("<div style='padding: 20px; text-align: center;'><i class='fa fa-spinner fa-spin fa-2x'></i><p>Running extraction...</p></div>");
+
+                        // Poll for completion
+                        const search_set_uuid = data.search_set_uuid || new URLSearchParams(window.location.search).get('search_set_uuid');
+                        pollExtractionStatus(data.activity_id, search_set_uuid);
+                    } else {
+                        hideWorking();
+                        stopScanning();
+                        showToast("Error starting extraction: " + (data.message || "Unknown error"));
                     }
-                    $("#search-results-panel").show();
-                    $("#search-results-panel").empty();
-                    $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-                    addResultListeners();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -3154,6 +3196,89 @@
         addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 
+    function pollExtractionStatus(activity_id, search_set_uuid) {
+        let pollCount = 0;
+        const maxPolls = 120; // 2 minutes max (120 * 1000ms)
+
+        const intervalId = setInterval(function() {
+            pollCount++;
+
+            $.ajax({
+                url: `/tasks/extraction_status/${activity_id}`,
+                type: "GET",
+                dataType: "json",
+                success: function(response) {
+                    console.log("Extraction status:", response.status);
+
+                    if (response.status === "completed") {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+
+                        // Mark task as complete in app rail
+                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activity_id}']`);
+                        if (activityItem) {
+                            activityItem.classList.remove('is-running');
+                            const runRight = activityItem.querySelector('.run-right');
+                            if (runRight) {
+                                runRight.remove();
+                            }
+                        }
+
+                        // Display results
+                        $("#search-results-panel").empty();
+                        $(response.template).hide().appendTo("#search-results-panel").fadeIn();
+                        addResultListeners();
+                        search_set_add_uuid = search_set_uuid;
+
+                        if ($('#run-term-button').length > 0) {
+                            $('#run-term-button')[0].textContent = "RUN";
+                        }
+                        $('#run-term-button').removeClass('shimmer');
+
+                        showToast("Extraction completed!");
+
+                    } else if (response.status === "failed") {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+
+                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activity_id}']`);
+                        if (activityItem) {
+                            activityItem.classList.remove('is-running');
+                        }
+
+                        $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Extraction failed: " + (response.error || "Unknown error") + "</div>");
+
+                        if ($('#run-term-button').length > 0) {
+                            $('#run-term-button')[0].textContent = "RUN";
+                        }
+                        $('#run-term-button').removeClass('shimmer');
+
+                        showToast("Extraction failed");
+                    } else if (pollCount >= maxPolls) {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+                        $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction is taking longer than expected. Check back later.</div>");
+                        showToast("Extraction timeout");
+                    }
+                    // Otherwise keep polling (status is "queued" or "running")
+                },
+                error: function(xhr, ajaxOptions, thrownError) {
+                    console.log("Error polling extraction status:", xhr.status, thrownError);
+                    if (pollCount >= 5) {
+                        // After 5 failed attempts, give up
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+                        $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error checking extraction status</div>");
+                    }
+                }
+            });
+        }, 1000); // Poll every second
+    }
+
     function addSearchSet(title, category) {
         $.ajax({
             url: "/tasks/extraction/add_search_set",
@@ -3169,6 +3294,10 @@
             success: function (msg) {
                 search_set_add_uuid = msg.uuid;
                 updateSearchSetPanel(msg.uuid);
+                // Refresh library to show the new extraction
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -3485,13 +3614,14 @@
                             }
 
                             // Note: Copy and download button handlers are handled by delegated event handlers
-                            // Check if we need to redirect to add activity_id to URL
+                            // Update URL with activity_id if not present (without page reload)
                             const currentUrl = new URL(window.location.href);
                             const hasActivityId = currentUrl.searchParams.has('activity_id');
                             console.log("message finished activity_id", activity_id);
                             if (!hasActivityId && activity_id) {
-                                window.location.href = `/home?activity_id=${activity_id}&section=Assistant`;
-
+                                currentUrl.searchParams.set('activity_id', activity_id);
+                                currentUrl.searchParams.set('section', 'Assistant');
+                                window.history.replaceState({}, '', currentUrl);
                             }
 
                             return;
@@ -3771,6 +3901,13 @@
     section = "{{ section }}"
     console.log("Section is: " + section)
     setSection(section);
+
+    // Trigger recommendations check after section is set (important for direct file opens)
+    // Use setTimeout to ensure DOM is fully updated after setSection
+    setTimeout(function() {
+        updateDocumentSelections();
+    }, 100);
+
     if (window.__workflowSnapshot && hasWorkflowOutput(window.__workflowSnapshot)) {
         hydrateWorkflowSnapshot(window.__workflowSnapshot);
     }

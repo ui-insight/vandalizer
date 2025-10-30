@@ -206,20 +206,8 @@ def run_workflow() -> ResponseReturnValue:
         workflow_trigger_step_id=workflow_trigger_step_id,
         model=model,
     )
-    # Ingest workflow into vector database for future recommendations
-    ingestion_text = ""
-    ingestion_text += "# Documents selected:"
-
-    for doc in docs:
-        ingestion_text += f"\n{doc.raw_text}"
-
-    persist_directory = "data/recommendations_vectordb"
-    recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
-    recommendation_manager.ingest_recommendation_item(
-        identifier=workflow_id,
-        ingestion_text=ingestion_text,
-        recommendation_type="Workflow",
-    )
+    # Note: Workflow recommendation ingestion now happens asynchronously
+    # in the execute_workflow_task Celery task
     return jsonify(
         {
             "status": "accepted",

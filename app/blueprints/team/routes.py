@@ -91,39 +91,76 @@ def team_invite():
     team_id = request.form.get("team_id")
     email = request.form.get("email", "").strip().lower()
     role = request.form.get("role", "member")
-    team = Team.objects(id=team_id).first()
 
+    team = Team.objects(id=team_id).first()
     if not team:
         return jsonify({"error": "Team not found"}), 404
 
+    # Only owners/admins may invite
     membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
     if not membership or membership.role not in ("owner", "admin"):
         return jsonify({"error": "Forbidden"}), 403
 
+    # If the email already corresponds to a user who is on the team, short-circuit.
+    invitee_user = User.objects(email=email).first()
+    if invitee_user:
+        existing_member = TeamMembership.objects(
+            team=team, user_id=invitee_user.user_id
+        ).first()
+        if existing_member:
+            # Already a member; optionally notify inviter that the user is already on the team.
+            return redirect(url_for("team.team_index"))
+
+    # Find or create invite. If one exists and is not accepted, update & resend.
     token = secrets.token_urlsafe(24)
-    TeamInvite(
-        team=team, email=email, role=role, invited_by_user_id=user.user_id, token=token
-    ).save()
+    existing_invite = TeamInvite.objects(team=team, email=email).first()
+
+    if existing_invite:
+        if existing_invite.accepted:
+            # Already accepted. Treat as no-op (or you could optionally email “you’re already on the team”).
+            return redirect(url_for("team.team_index"))
+
+        # Update and RESEND
+        existing_invite.role = role
+        existing_invite.invited_by_user_id = user.user_id
+        existing_invite.token = token
+        existing_invite.sent_at = (
+            datetime.utcnow()
+        )  # add this field to your model if not present
+        existing_invite.resend_count = (
+            existing_invite.resend_count or 0
+        ) + 1  # add this field too
+        existing_invite.save()
+        invite = existing_invite
+    else:
+        invite = TeamInvite(
+            team=team,
+            email=email,
+            role=role,
+            invited_by_user_id=user.user_id,
+            token=token,
+            sent_at=datetime.utcnow(),  # optional metadata
+            resend_count=0,  # optional metadata
+        ).save()
 
     # Construct acceptance URL
     accept_url = url_for("team.team_accept_invite", token=token, _external=True)
 
-    # --- Send email ---
+    # Send (or re-send) the email
     try:
         subject = f"You've been invited to join {team.name} on Inkwell"
         body = f"""
-        Hi there,
+Hi there,
 
-        {user.name} has invited you to join the team "{team.name}" on Inkwell.
+{user.name} has invited you to join the team "{team.name}" on Inkwell.
 
-        To accept your invitation, click the link below:
-        {accept_url}
+To accept your invitation, click the link below:
+{accept_url}
 
-        If you did not expect this invitation, you can safely ignore this email.
+If you did not expect this invitation, you can safely ignore this email.
 
-        — The Inkwell Team
-        """
-
+— The Inkwell Team
+"""
         msg = Message(subject=subject, recipients=[email], body=body)
         mail.send(msg)
     except Exception as e:
@@ -141,7 +178,9 @@ def team_accept_invite(token):
         abort(404)
 
     # Check if user is already a member of this team
-    existing_membership = TeamMembership.objects(team=inv.team, user_id=user.user_id).first()
+    existing_membership = TeamMembership.objects(
+        team=inv.team, user_id=user.user_id
+    ).first()
     if not existing_membership:
         # Create new membership only if they're not already a member
         TeamMembership(team=inv.team, user_id=user.user_id, role=inv.role).save()
@@ -222,7 +261,9 @@ def team_remove_member():
     target_user = User.objects(user_id=target_user_id).first()
     if target_user:
         # If their current_team was the one they were just removed from, clear it
-        if target_user.current_team and str(target_user.current_team.id) == str(team.id):
+        if target_user.current_team and str(target_user.current_team.id) == str(
+            team.id
+        ):
             target_user.current_team = None
             target_user.save()
         # ensure_current_team will pick/create a default team for them

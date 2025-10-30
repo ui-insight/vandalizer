@@ -105,7 +105,6 @@
 
     .token-warning {
         position: relative;
-        z-index: 1000;
     }
 
     .token-warning .tooltiptext {

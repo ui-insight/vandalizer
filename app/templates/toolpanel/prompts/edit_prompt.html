@@ -83,6 +83,12 @@
 
             if (typeof deleteSearchSetItem === 'function') {
                 deleteSearchSetItem(uuid, itemKind);
+                // Close the modal after deletion
+                $('#edit-prompt-modal').modal('hide');
+                // Refresh library if available
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
                 return;
             }
 
@@ -94,10 +100,16 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    // Preserve existing URL parameters
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('section', 'Library');
-                    location.href = url.toString();
+                    // Close the modal
+                    $('#edit-prompt-modal').modal('hide');
+                    // Refresh library if available, otherwise redirect
+                    if (typeof refreshResults === 'function') {
+                        refreshResults();
+                    } else {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('section', 'Library');
+                        location.href = url.toString();
+                    }
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
