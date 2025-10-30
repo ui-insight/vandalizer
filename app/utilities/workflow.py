@@ -634,6 +634,28 @@ def execute_workflow_task(
         f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
     )
 
+    # Ingest workflow into vector database for future recommendations (async)
+    try:
+        from app.utilities.semantic_recommender import SemanticRecommender
+        from app.models import SmartDocument
+
+        docs = workflow_trigger_step.data.get("docs", [])
+        ingestion_text = "# Documents selected:"
+        for doc in docs:
+            if hasattr(doc, 'raw_text'):
+                ingestion_text += f"\n{doc.raw_text}"
+
+        persist_directory = "data/recommendations_vectordb"
+        recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
+        recommendation_manager.ingest_recommendation_item(
+            identifier=workflow_id,
+            ingestion_text=ingestion_text,
+            recommendation_type="Workflow",
+        )
+        debug("Workflow recommendation ingested successfully")
+    except Exception as e:
+        debug(f"Error ingesting workflow recommendation: {e}")
+
     # Update the activity status to completed
     from app.utilities.analytics_helper import activity_finish
     from app.models import ActivityEvent, ActivityStatus

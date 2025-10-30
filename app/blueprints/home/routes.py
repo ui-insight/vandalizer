@@ -1,19 +1,20 @@
 """Handles primary routing for the home page and related functionalities."""
-import tempfile
-import shutil
-import os
+
 import asyncio
 import io
 import json
 import logging
+import os
+import tempfile
 import uuid
 from datetime import datetime
 from itertools import chain
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+import pypandoc
 from devtools import debug
-from werkzeug.utils import secure_filename
 from flask import (
     Blueprint,
     Response,
@@ -32,6 +33,7 @@ from flask.typing import ResponseReturnValue
 from flask_login import login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
+from werkzeug.utils import secure_filename
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app, load_user
 from app.blueprints.library.routes import _build_results_for_template
@@ -52,9 +54,8 @@ from app.models import (
     User,
     UserModelConfig,
     Workflow,
-    WorkflowStep
-    )
-
+    WorkflowStep,
+)
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
     ActivityType,
@@ -85,7 +86,9 @@ home = Blueprint("home", __name__)
 
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
-logging.basicConfig(format="%(loglevel) | %(filename)s:%(lineno)d | %(message)s", level=logging.DEBUG)
+logging.basicConfig(
+    format="%(loglevel) | %(filename)s:%(lineno)d | %(message)s", level=logging.DEBUG
+)
 logger = logging.getLogger(__name__)
 
 
@@ -276,16 +279,28 @@ def index() -> ResponseReturnValue:
                     workflow_tpl, workflow_step_tpl = _render_workflow_bits(workflow_id)
                     # Switch to the Workflows section
                     section = "Workflows"
-                    debug(f"Loading workflow {workflow_id} from activity, template length: {len(workflow_tpl)}")
+                    debug(
+                        f"Loading workflow {workflow_id} from activity, template length: {len(workflow_tpl)}"
+                    )
                     snapshot: dict[str, Any] = dict(activity.result_snapshot or {})
-                    if workflow_result.final_output and isinstance(workflow_result.final_output, dict):
+                    if workflow_result.final_output and isinstance(
+                        workflow_result.final_output, dict
+                    ):
                         final_output_value = workflow_result.final_output.get("output")
                         if final_output_value is not None and "output" not in snapshot:
                             snapshot["output"] = final_output_value
-                    if workflow_result.num_steps_total is not None and "steps_total" not in snapshot:
+                    if (
+                        workflow_result.num_steps_total is not None
+                        and "steps_total" not in snapshot
+                    ):
                         snapshot["steps_total"] = workflow_result.num_steps_total
-                    if workflow_result.num_steps_completed is not None and "steps_completed" not in snapshot:
-                        snapshot["steps_completed"] = workflow_result.num_steps_completed
+                    if (
+                        workflow_result.num_steps_completed is not None
+                        and "steps_completed" not in snapshot
+                    ):
+                        snapshot["steps_completed"] = (
+                            workflow_result.num_steps_completed
+                        )
                     if workflow_result.status and "status" not in snapshot:
                         snapshot["status"] = workflow_result.status
                     if workflow_result.session_id and "session_id" not in snapshot:
@@ -298,7 +313,9 @@ def index() -> ResponseReturnValue:
                     search_set = SearchSet.objects(uuid=search_set_uuid).first()
                     if search_set:
                         snapshot = activity.result_snapshot or {}
-                        stored_results = snapshot.get("normalized") or snapshot.get("raw")
+                        stored_results = snapshot.get("normalized") or snapshot.get(
+                            "raw"
+                        )
                         stored_doc_uuids = snapshot.get("document_uuids") or []
                         snapshot_documents = []
                         for doc_uuid in stored_doc_uuids:
@@ -493,7 +510,11 @@ def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
         return "", ""
 
     # Use the passed workflow_id parameter, or fall back to request.args
-    wf_id = workflow_id if workflow_id and workflow_id != 0 else request.args.get("workflow_id")
+    wf_id = (
+        workflow_id
+        if workflow_id and workflow_id != 0
+        else request.args.get("workflow_id")
+    )
     workflow = Workflow.objects(id=wf_id).first()
     if not workflow:
         return "", ""
@@ -562,7 +583,9 @@ def _folder_context(user, current_space: Space):
     if is_team_folder:
         base_query = Q(space=current_space.uuid, folder=current_folder_id)
     else:
-        base_query = Q(user_id=user.get_id(), space=current_space.uuid, folder=current_folder_id)
+        base_query = Q(
+            user_id=user.get_id(), space=current_space.uuid, folder=current_folder_id
+        )
 
     default_doc_query = Q(user_id=user.get_id(), is_default=True)
     folder_docs = (
@@ -571,9 +594,7 @@ def _folder_context(user, current_space: Space):
         .all()
     )
 
-    parent_filter = (
-        current_folder_id if current_folder_id not in {"0", 0} else "0"
-    )
+    parent_filter = current_folder_id if current_folder_id not in {"0", 0} else "0"
 
     folders = SmartFolder.objects(
         user_id=user.get_id(),
@@ -636,6 +657,11 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 
         visible_activities.append(activity)
 
+    # Sort activities: chats first, then by started_at (most recent first)
+    visible_activities.sort(
+        key=lambda a: (-(a.started_at.timestamp() if a.started_at else 0),)
+    )
+
     return visible_activities
 
 
@@ -679,7 +705,7 @@ def chat() -> ResponseReturnValue:
             user_id=user_id,
             team_id=user.ensure_current_team().uuid,
             conversation_id=conversation.uuid,
-            space=current_space_id
+            space=current_space_id,
         )
 
     else:
@@ -688,7 +714,8 @@ def chat() -> ResponseReturnValue:
             activity.status = ActivityStatus.RUNNING
             activity.save()
             conversation = ChatConversation.objects(
-                uuid=activity.conversation_id, user_id=user_id,
+                uuid=activity.conversation_id,
+                user_id=user_id,
             ).first()
 
     conversation.add_message(ChatRole.USER, message)
@@ -750,8 +777,7 @@ def add_link_to_chat():
 
         if not current_activity_id or len(str(current_activity_id).strip()) == 0:
             conversation = ChatConversation(
-                user_id=user_id, uuid=str(uuid.uuid4()),
-                title="Link Attached"
+                user_id=user_id, uuid=str(uuid.uuid4()), title="Link Attached"
             )
             conversation.save()
             activity = activity_start(
@@ -760,7 +786,7 @@ def add_link_to_chat():
                 user_id=user_id,
                 team_id=user.ensure_current_team().uuid,
                 conversation_id=conversation.uuid,
-                space=current_space_id
+                space=current_space_id,
             )
 
         else:
@@ -769,7 +795,8 @@ def add_link_to_chat():
                 activity.status = ActivityStatus.RUNNING
                 activity.save()
                 conversation = ChatConversation.objects(
-                    uuid=activity.conversation_id, user_id=user_id,
+                    uuid=activity.conversation_id,
+                    user_id=user_id,
                 ).first()
 
         session["current_activity_id"] = str(activity.id)
@@ -787,7 +814,9 @@ def add_link_to_chat():
             return jsonify({"error": "Invalid URL or unsupported content type"}), 400
 
         if result.get("error"):
-            return jsonify({"error": f"Failed to fetch URL: {result.get('error')}"}), 400
+            return jsonify(
+                {"error": f"Failed to fetch URL: {result.get('error')}"}
+            ), 400
 
         # Extract title from URL or content
         title = urlparse(link).netloc
@@ -841,7 +870,7 @@ def add_document_to_chat():
         debug(request.form)
         user = load_user()
         user_id = user.get_id()
-        
+
         conversation = None
         activity = None
         if not current_activity_id or len(str(current_activity_id).strip()) < 10:
@@ -856,7 +885,7 @@ def add_document_to_chat():
                 user_id=user_id,
                 team_id=user.ensure_current_team().uuid,
                 conversation_id=conversation.uuid,
-                space=current_space_id
+                space=current_space_id,
             )
         else:
             activity = ActivityEvent.objects(id=current_activity_id).first()
@@ -864,84 +893,83 @@ def add_document_to_chat():
                 activity.status = ActivityStatus.RUNNING
                 activity.save()
                 conversation = ChatConversation.objects(
-                    uuid=activity.conversation_id, user_id=user_id,
+                    uuid=activity.conversation_id,
+                    user_id=user_id,
                 ).first()
-
 
         session["current_activity_id"] = str(activity.id)
         session["current_conversation_id"] = str(conversation.id)
 
-
         # Check if files were uploaded
-        if 'files' not in request.files:
+        if "files" not in request.files:
             return jsonify({"error": "No files uploaded"}), 400
 
-        
-        files = request.files.getlist('files')
-        if not files or files[0].filename == '':
+        files = request.files.getlist("files")
+        if not files or files[0].filename == "":
             return jsonify({"error": "No files selected"}), 400
-        
+
         uploaded_attachments = []
-        
+
         # Process each uploaded file
         for file in files:
             if file and file.filename:
                 # Secure the filename
                 filename = secure_filename(file.filename)
                 file_extension = os.path.splitext(filename)[1].lower()
-                
+
                 # Create a temporary file
                 temp_file = None
                 try:
                     # Save to temporary file for processing
                     with tempfile.NamedTemporaryFile(
-                        delete=False, 
-                        suffix=file_extension,
-                        mode='wb'
+                        delete=False, suffix=file_extension, mode="wb"
                     ) as temp_file:
                         file.save(temp_file.name)
                         temp_file_path = temp_file.name
-                    
+
                     debug(f"Processing file: {filename} at {temp_file_path}")
-                    
+
                     # Extract text content using existing logic
                     content = extract_text_from_file(temp_file_path, file_extension)
                     debug(content)
-                    
+
                     # Truncate content if too long (adjust max length as needed)
                     max_content_length = 50000
                     if len(content) > max_content_length:
-                        content = content[:max_content_length] + "\n\n[Content truncated...]"
-                    
+                        content = (
+                            content[:max_content_length] + "\n\n[Content truncated...]"
+                        )
+
                     debug(f"Extracted {len(content)} characters from {filename}")
-                    
+
                     # Create file attachment record
                     file_attachment = FileAttachment(
                         filename=filename,
                         content=content,
                         file_type=file_extension,
-                        user_id=user_id
+                        user_id=user_id,
                     )
                     file_attachment.save()
-                    
+
                     # Add to conversation
                     conversation.file_attachments.append(file_attachment)
                     # add file attachment message to chat
                     conversation.add_message(
-                        ChatRole.USER, 
-                        f"📎 File attached: {filename} ({len(content):,} characters)"
+                        ChatRole.USER,
+                        f"📎 File attached: {filename} ({len(content):,} characters)",
                     )
-                        
-                    
-                    uploaded_attachments.append({
-                        "id": str(file_attachment.id),
-                        "filename": filename,
-                        "file_type": file_extension,
-                        "content_preview": content[:500] if content else "",
-                        "content_length": len(content),
-                        "created_at": file_attachment.created_at.isoformat()
-                    })
-                    
+
+                    uploaded_attachments.append(
+                        {
+                            "id": str(file_attachment.id),
+                            "filename": filename,
+                            "file_type": file_extension,
+                            "content_preview": content[:500] if content else "",
+                            "content_length": len(content),
+                            "created_at": file_attachment.created_at.isoformat(),
+                        }
+                    )
+
                 except Exception as e:
                     logger.error(f"Error processing file {filename}: {e}")
                     debug(f"Error processing file {filename}: {e}")
@@ -950,20 +978,22 @@ def add_document_to_chat():
                         filename=filename,
                         content=f"[Error processing file: {str(e)}]",
                         file_type=file_extension,
-                        user_id=user_id
+                        user_id=user_id,
                     )
                     file_attachment.save()
                     conversation.file_attachments.append(file_attachment)
-                    
-                    uploaded_attachments.append({
-                        "id": str(file_attachment.id),
-                        "filename": filename,
-                        "file_type": file_extension,
-                        "content_preview": f"Error: {str(e)}",
-                        "content_length": 0,
-                        "created_at": file_attachment.created_at.isoformat()
-                    })
-                
+
+                    uploaded_attachments.append(
+                        {
+                            "id": str(file_attachment.id),
+                            "filename": filename,
+                            "file_type": file_extension,
+                            "content_preview": f"Error: {str(e)}",
+                            "content_length": 0,
+                            "created_at": file_attachment.created_at.isoformat(),
+                        }
+                    )
+
                 finally:
                     # Clean up temporary file
                     if temp_file and os.path.exists(temp_file_path):
@@ -972,23 +1002,26 @@ def add_document_to_chat():
                             debug(f"Cleaned up temp file: {temp_file_path}")
                         except Exception as e:
                             logger.error(f"Error deleting temp file: {e}")
-        
+
         # Update conversation timestamp
         conversation.updated_at = datetime.now()
         conversation.save()
         conversation.reload()
-        
-        return jsonify({
-            "success": True,
-            "conversation_uuid": conversation.uuid,
-            "attachments": uploaded_attachments,
-            "attachment": uploaded_attachments[0] if uploaded_attachments else None,
-            "activity_id": str(activity.id) if activity else None,
-        }), 200
-        
+
+        return jsonify(
+            {
+                "success": True,
+                "conversation_uuid": conversation.uuid,
+                "attachments": uploaded_attachments,
+                "attachment": uploaded_attachments[0] if uploaded_attachments else None,
+                "activity_id": str(activity.id) if activity else None,
+            }
+        ), 200
+
     except Exception as e:
         logger.error(f"Error adding file attachments: {e}")
         return jsonify({"error": str(e)}), 500
+
 
 @app.route("/chat/remove_document/<attachment_id>", methods=["DELETE"])
 def remove_document_from_chat(attachment_id):
@@ -996,35 +1029,35 @@ def remove_document_from_chat(attachment_id):
     try:
         user = load_user()
         user_id = user.get_id()
-        
+
         # Find the attachment
         attachment = FileAttachment.objects(id=attachment_id, user_id=user_id).first()
-        
+
         if not attachment:
             return jsonify({"error": "Attachment not found"}), 404
-        
+
         # Find conversation containing this attachment
         conversation = ChatConversation.objects(
-            file_attachments=attachment.id,
-            user_id=user_id
+            file_attachments=attachment.id, user_id=user_id
         ).first()
-        
+
         if conversation:
             # Remove from conversation
             conversation.file_attachments = [
-                att for att in conversation.file_attachments if str(att.id) != attachment_id
+                att
+                for att in conversation.file_attachments
+                if str(att.id) != attachment_id
             ]
             conversation.save()
-        
+
         # Delete attachment record (no file to delete from disk)
         attachment.delete()
-        
+
         return jsonify({"success": True}), 200
-        
+
     except Exception as e:
         logger.error(f"Error removing file attachment: {e}")
         return jsonify({"error": str(e)}), 500
-
 
 
 @home.route("/chat_history/<conversation_uuid>", methods=["GET"])
@@ -1184,6 +1217,39 @@ def chat_download() -> ResponseReturnValue:
             as_attachment=True,
             download_name="chat_output.txt",
         )
+
+
+def markdown_or_html_to_pdf_bytes(
+    input_text: str,
+    input_format: str = "markdown",  # or "html"
+    extra_args: list[str] | None = None,
+) -> io.BytesIO:
+    """
+    Convert Markdown or HTML to PDF bytes using pandoc (via pypandoc).
+    Requires pandoc installed; for high-quality output you typically want a LaTeX engine (xelatex).
+    """
+    if extra_args is None:
+        extra_args = [
+            "--pdf-engine=xelatex",
+            "-V",
+            "geometry:margin=2cm",
+            "-V",
+            "mainfont=Helvetica",
+        ]
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        out_path = Path(tmpdir) / "export.pdf"
+        # Pandoc writes binary PDFs only when outputfile is specified
+        pypandoc.convert_text(
+            input_text,
+            to="pdf",
+            format=input_format,
+            outputfile=str(out_path),
+            extra_args=extra_args,
+        )
+        bio = io.BytesIO(out_path.read_bytes())
+        bio.seek(0)
+        return bio
 
 
 @home.route("/static/fontawesome/webfonts/<path:filename>")

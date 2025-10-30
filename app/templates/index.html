@@ -182,6 +182,8 @@
                         </tr>
                         {% endfor %}
 
+
+
                         <!-- Folders -->
                         {% for folder in folders %}
                         <tr class="folder">
@@ -206,6 +208,45 @@
                             </td>
                         </tr>
                         {% endfor %}
+
+                        {% if (folder_docs|length == 0) %}
+                        <tr class="empty-state-spacer">
+                            <td style="height: 30px; border: none; pointer-events: none;"></td>
+                        </tr>
+                        <tr class="empty-state">
+                            <td style="padding: 40px 20px; text-align: center; color: #5d5f63;" draggable="false">
+                                <div
+                                    style="display: flex; flex-direction: column; align-items: center; gap: 12px; user-select: none;">
+                                    <i class="fa-regular fa-folder-open" style="font-size: 28px; color: #b0b3b8;"></i>
+                                    <div style="font-weight: 600; color: #2d2f33;">No files yet</div>
+                                    <div style="font-size: 13px; max-width: 320px;">
+                                        Use the + Add button above or drag files in to get started. You can also
+                                        create folders to keep things organized.
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        <script>
+                            (function () {
+                                document.addEventListener('DOMContentLoaded', function () {
+                                    document.querySelectorAll('.empty-state').forEach(function (row) {
+                                        if (row.dataset.ctxDisabled === 'true') {
+                                            return;
+                                        }
+                                        const blockContext = function (evt) {
+                                            evt.preventDefault();
+                                            return false;
+                                        };
+                                        row.dataset.ctxDisabled = 'true';
+                                        row.addEventListener('contextmenu', blockContext, { capture: true });
+                                        row.querySelectorAll('*').forEach(function (child) {
+                                            child.addEventListener('contextmenu', blockContext, { capture: true });
+                                        });
+                                    });
+                                });
+                            })();
+                        </script>
+                        {% endif %}
 
                         <!-- Files -->
                         {% for doc in folder_docs %}
@@ -299,7 +340,7 @@
             </div>
 
             {% include "workflows/add_workflow_bottom_panel.html" %}
-{% if workflow_template != "" %}
+            {% if workflow_template != "" %}
             <div class="search-results-panel" id="search-results-panel" style="margin: 0px 0px; text-align: left;">
                 {{ workflow_template|safe }}
 
@@ -309,8 +350,9 @@
 
             </div>
 
-{% elif extraction_panel_html and section=="Library" %}
-            <div class="search-results-panel" id="search-results-panel" style="margin: 0px 0px; text-align: left; display: block;">
+            {% elif extraction_panel_html and section=="Library" %}
+            <div class="search-results-panel" id="search-results-panel"
+                style="margin: 0px 0px; text-align: left; display: block;">
                 {{ extraction_panel_html|safe }}
             </div>
 

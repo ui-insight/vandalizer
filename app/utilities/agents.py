@@ -1,9 +1,7 @@
 """Utilities for agents."""
 
-import asyncio
 import json
 import os
-import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
@@ -74,6 +72,15 @@ def get_agent_model(agent_model):
     )
 
 
+# Cache dictionaries for agents to prevent context leaks
+# These MUST be defined before any agent creation functions are called
+_chat_agent_cache = {}
+_rag_agent_cache = {}
+_prompt_agent_cache = {}
+_upload_agent_cache = {}
+_extraction_agent_cache = {}
+
+
 @dataclass
 class RagDeps:
     doc_manager: DocumentManager
@@ -82,12 +89,15 @@ class RagDeps:
 
 
 def create_rag_agent(agent_model):
-    model = get_agent_model(agent_model)
+    """Create or retrieve a cached RAG agent to prevent context leaks."""
+    cache_key = f"rag_{agent_model}"
 
-    return Agent(
-        model,
-        deps_type=RagDeps,
-        system_prompt="""You are a specialized knowledge chat assistant powered by retrieval-augmented generation.
+    if cache_key not in _rag_agent_cache:
+        model = get_agent_model(agent_model)
+        _rag_agent_cache[cache_key] = Agent(
+            model,
+            deps_type=RagDeps,
+            system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
 
     When responding to queries:
     1. Carefully analyze the retrieved context documents for relevance to the query
@@ -106,20 +116,23 @@ def create_rag_agent(agent_model):
     - If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
 
     Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
-    )
+        )
+
+    return _rag_agent_cache[cache_key]
 
 
 def create_chat_agent(agent_model, system_prompt=None):
-    model = get_agent_model(agent_model)
-    if system_prompt is not None:
-        return Agent(
-            model,
-            system_prompt=system_prompt,
-        )
-    print(model)
-    return Agent(
-        model,
-        system_prompt="""You are an engaging conversational chat assistant designed to provide helpful, informative, and friendly responses.
+    """Create or retrieve a cached chat agent to prevent context leaks.
+
+    Args:
+        agent_model: The model name to use
+        system_prompt: Optional custom system prompt
+
+    Returns:
+        Cached Agent instance
+    """
+    # Create cache key from model and system prompt
+    default_prompt = """You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
 
     Your communication style:
     - Warm and approachable while maintaining professionalism
@@ -141,15 +154,31 @@ def create_chat_agent(agent_model, system_prompt=None):
     - Avoid unnecessary jargon unless the conversation indicates technical expertise
     - Respect privacy and security best practices
 
-    Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
-    )
+    Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style."""
+
+    prompt_to_use = system_prompt if system_prompt is not None else default_prompt
+    cache_key = f"{agent_model}_{hash(prompt_to_use)}"
+
+    # Return cached agent if available
+    if cache_key not in _chat_agent_cache:
+        model = get_agent_model(agent_model)
+        _chat_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt=prompt_to_use,
+        )
+
+    return _chat_agent_cache[cache_key]
 
 
 def create_prompt_agent(agent_model):
-    model = get_agent_model(agent_model)
-    return Agent(
-        model,
-        system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
+    """Create or retrieve a cached prompt agent to prevent context leaks."""
+    cache_key = f"prompt_{agent_model}"
+
+    if cache_key not in _prompt_agent_cache:
+        model = get_agent_model(agent_model)
+        _prompt_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
 
     When generating search prompts:
     1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
@@ -168,7 +197,9 @@ def create_prompt_agent(agent_model):
     - Include special operators or syntax unless specified
 
     Your output should be the search prompt only, with no additional text.""",
-    )
+        )
+
+    return _prompt_agent_cache[cache_key]
 
 
 class UploadResult(BaseModel):
@@ -177,33 +208,20 @@ class UploadResult(BaseModel):
 
 
 def create_upload_agent(agent_model):
-    model = get_agent_model(agent_model)
-    return Agent(
-        model,
-        system_prompt="""You are an expert in document validation and compliance checking. 
+    """Create or retrieve a cached upload agent to prevent context leaks."""
+    cache_key = f"upload_{agent_model}"
 
-Your role is to analyze document and provide structured validation feedback.
+    if cache_key not in _upload_agent_cache:
+        model = get_agent_model(agent_model)
+        _upload_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+            output_type=UploadResult,
+        )
 
-You MUST return your response in this exact structure ```json{"valid": boolean, "feedback": string}```:
-- valid: boolean indicating if the document passes validation
-- feedback: string containing clear, actionable feedback
-
-For valid documents:
-- Set valid=True
-- Provide brief confirmation in feedback
-
-For invalid documents:
-- Set valid=False  
-- In feedback, clearly explain what failed and what actions are needed to fix it
-- Be concise, direct, and actionable
-- Avoid repetition
-
-Always return structured data, never plain text.""",
-        output_type=UploadResult,
-    )
+    return _upload_agent_cache[cache_key]
 
 
-print(f"Creating upload agent {settings.base_model}")
 upload_agent = create_upload_agent(settings.base_model)
 
 rag_agent = create_rag_agent(settings.base_model)
@@ -328,11 +346,6 @@ Return a json object where keys are field names and values are the recommended t
 Consider making fields Optional if they might not always be present."""
 
 
-MAP_OPTIONAL_STR = "Optional[str]"
-MAP_OPTIONAL_INT = "Optional[int]"
-MAP_OPTIONAL_FLOAT = "Optional[float]"
-
-
 type_mapping = {
     "str": (str, ...),
     "int": (int, ...),
@@ -342,9 +355,9 @@ type_mapping = {
     "List[int]": (list[int], ...),
     "List[float]": (list[float], ...),
     "Dict[str, str]": (dict[str, str], ...),
-    MAP_OPTIONAL_STR: (str, None),
-    MAP_OPTIONAL_INT: (int, None),
-    MAP_OPTIONAL_FLOAT: (float, None),
+    "Optional[str]": (str, None),
+    "Optional[int]": (int, None),
+    "Optional[float]": (float, None),
     "Optional[bool]": (bool, None),
     "Optional[List[str]]": (list[str], None),
     "Optional[List[int]]": (list[int], None),
@@ -359,13 +372,13 @@ reverse_type_mapping = {
     (list[str], ...): "List[str]",
     (list[int], ...): "List[int]",
     (list[float], ...): "List[float]",
-    (Optional[str], None): MAP_OPTIONAL_STR,
-    (Optional[int], None): MAP_OPTIONAL_INT,
-    (Optional[float], None): MAP_OPTIONAL_FLOAT,
+    (Optional[str], None): "Optional[str]",
+    (Optional[int], None): "Optional[int]",
+    (Optional[float], None): "Optional[float]",
     (dict[str, str], ...): "Dict[str, str]",
-    (str, None): MAP_OPTIONAL_STR,
-    (int, None): MAP_OPTIONAL_INT,
-    (float, None): MAP_OPTIONAL_FLOAT,
+    (str, None): "Optional[str]",
+    (int, None): "Optional[int]",
+    (float, None): "Optional[float]",
     (bool, None): "Optional[bool]",
 }
 
@@ -379,7 +392,6 @@ def get_cache_key(key: str, context: str) -> str:
 class ExtractionDeps:
     extraction_context: Optional[str]
     fields: dict[str, tuple]
-    field_metadata: dict[str, dict[str, Optional[str]]]
     text: str
 
 
@@ -401,21 +413,9 @@ def extraction_system_prompt(
 ):
     text = context.deps.text
     fields = context.deps.fields
-    field_metadata = context.deps.field_metadata
-
-    field_descriptions = []
-    for field_name, field_spec in fields.items():
-        meta = field_metadata.get(field_name, {})
-        type_label = meta.get("type")
-        if not type_label:
-            type_label = reverse_type_mapping.get(field_spec, "Any")
-        description = meta.get("description")
-        if description:
-            field_descriptions.append(
-                f"- {field_name} ({type_label}): {description}"
-            )
-        else:
-            field_descriptions.append(f"- {field_name}: {type_label}")
+    field_descriptions = [
+        f"- {field}: {field_type[0]}" for field, field_type in fields.items()
+    ]
     field_str = "\n".join(field_descriptions)
 
     multiple_entity_instruction = (
@@ -464,134 +464,6 @@ def filter_empty_entities(result: dict) -> list:
     return [e for e in raw_entities if is_non_empty(e)]
 
 
-def _clean_heuristic_text(value: str) -> str:
-    """Trim heuristic extraction text and cap length."""
-    cleaned = value.strip().strip(":").strip(" -\t")
-    if len(cleaned) > 500:
-        cleaned = cleaned[:500].rstrip()
-    return cleaned
-
-
-def _heuristic_extract_field(text: str, key: str) -> Optional[str]:
-    """Attempt simple pattern-based extraction for a single key."""
-    if not text or not key:
-        return None
-
-    # Pattern: Key: Value
-    pattern = re.compile(
-        rf"{re.escape(key)}\s*[:\-–]\s*(.+)",
-        re.IGNORECASE,
-    )
-    for match in pattern.finditer(text):
-        value = match.group(1).strip()
-        # stop at first line break
-        value = value.splitlines()[0].strip()
-        value = _clean_heuristic_text(value)
-        if value:
-            return value
-
-    # Pattern: `Key` on its own line followed by value
-    lines = text.splitlines()
-    lowered_key = key.lower().strip()
-    for idx, line in enumerate(lines):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        if stripped.lower() == lowered_key and idx + 1 < len(lines):
-            candidate = _clean_heuristic_text(lines[idx + 1])
-            if candidate:
-                return candidate
-        # Handle "Key value" with whitespace
-        if stripped.lower().startswith(lowered_key):
-            remainder = stripped[len(key) :].strip(" -:\t")
-            if remainder:
-                remainder = _clean_heuristic_text(remainder)
-                if remainder:
-                    return remainder
-
-    return None
-
-
-def _coerce_heuristic_value(value: str, field_spec: tuple) -> Optional[Any]:
-    """Convert heuristic string values into the expected Python type."""
-    if value is None or field_spec is None or len(field_spec) == 0:
-        return None
-
-    # Defensive: ensure field_spec behaves like a sequence (type, default)
-    if not isinstance(field_spec, (tuple, list)):
-        return value
-
-    target_type = field_spec[0]
-
-    if not isinstance(value, str):
-        value = str(value)
-
-    if target_type is str:
-        return value
-
-    if target_type is int:
-        match = re.search(r"[-+]?\d+", value.replace(",", ""))
-        if match:
-            try:
-                return int(match.group())
-            except ValueError:
-                return None
-        return None
-
-    if target_type is float:
-        normalized = value.replace(",", "")
-        match = re.search(r"[-+]?\d+(?:\.\d+)?", normalized)
-        if match:
-            try:
-                return float(match.group())
-            except ValueError:
-                return None
-        return None
-
-    if target_type is bool:
-        lowered = value.lower()
-        if lowered in {"true", "yes", "y", "1"}:
-            return True
-        if lowered in {"false", "no", "n", "0"}:
-            return False
-        return None
-
-    if target_type == list[str]:
-        parts = [p.strip() for p in re.split(r"[;,]", value) if p.strip()]
-        return parts if parts else None
-
-    if target_type == list[int]:
-        parts = []
-        for fragment in re.split(r"[;,]", value):
-            fragment = fragment.strip()
-            if not fragment:
-                continue
-            match = re.search(r"[-+]?\d+", fragment.replace(",", ""))
-            if match:
-                try:
-                    parts.append(int(match.group()))
-                except ValueError:
-                    continue
-        return parts if parts else None
-
-    if target_type == list[float]:
-        parts = []
-        for fragment in re.split(r"[;,]", value):
-            fragment = fragment.strip()
-            if not fragment:
-                continue
-            normalized = fragment.replace(",", "")
-            match = re.search(r"[-+]?\d+(?:\.\d+)?", normalized)
-            if match:
-                try:
-                    parts.append(float(match.group()))
-                except ValueError:
-                    continue
-        return parts if parts else None
-
-    return value or None
-
-
 # @observe()
 def extract_entities_with_agent(
     text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
@@ -612,21 +484,10 @@ def extract_entities_with_agent(
     if isinstance(keys, str):
         keys = [k.strip() for k in keys.split(",")]
     else:
-        cleaned_keys: list[str] = []
-        for key in keys:
-            if key is None:
-                continue
-            if isinstance(key, dict):
-                candidate = key.get("label") or key.get("name") or key.get("value")
-                if candidate:
-                    cleaned_keys.append(str(candidate).strip())
-            else:
-                cleaned_keys.append(str(key).strip())
-        keys = [k for k in cleaned_keys if k]
+        keys = [k.strip() for k in keys]
 
     # Individual field type caching
     inferred_fields = {}
-    field_metadata: dict[str, dict[str, Optional[str]]] = {}
     uncached_keys = []
 
     # Check cache for each individual key
@@ -634,9 +495,7 @@ def extract_entities_with_agent(
         key_cache_key = get_cache_key(key, context)
         cached = cache.lookup(key_cache_key, "field_inference")
         if cached:
-            cached_type = cached[0]
-            inferred_fields[key] = type_mapping.get(cached_type, (Any, ...))
-            field_metadata[key] = {"type": cached_type, "description": None}
+            inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
         else:
             uncached_keys.append(key)
 
@@ -646,9 +505,6 @@ def extract_entities_with_agent(
             extraction_context=context,
             keys=uncached_keys,
         )
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
 
         result = field_inference_agent.run_sync(
             "Infer the types of the keys",
@@ -673,30 +529,12 @@ def extract_entities_with_agent(
                     field_inference_deps,
                 )
 
-        normalized_fields: dict[str, dict[str, Optional[str]]] = {}
-
-        if isinstance(new_fields, dict):
+        elif isinstance(new_fields, dict):
             # Cache newly inferred fields individually
-            for key, field_info in new_fields.items():
-                description: Optional[str] = None
-                if isinstance(field_info, dict):
-                    field_type = field_info.get("type")
-                    description = field_info.get("description")
-                else:
-                    field_type = field_info
-
-                if not isinstance(field_type, str):
-                    debug(
-                        "Field inference response missing type information.",
-                        key,
-                        field_info,
-                    )
-                    continue
-
-                normalized_fields[key] = {"type": field_type, "description": description}
-
+            for key, field_type in new_fields.items():
                 key_cache_key = get_cache_key(key, context)
-                cache.update(key_cache_key, "field_inference", [field_type])
+                type_str = reverse_type_mapping.get(field_type, "Any")
+                cache.update(key_cache_key, "field_inference", [type_str])
         else:
             # Handle the case where the response is not a dict
             debug(
@@ -706,49 +544,43 @@ def extract_entities_with_agent(
             )
             new_fields = {}
 
-        if normalized_fields:
-            for key_name, key_info in normalized_fields.items():
-                key_type = key_info.get("type")
-                if not isinstance(key_type, str):
-                    continue
-                field_metadata[key_name] = key_info
+        if isinstance(new_fields, dict):
+            for key_name, key_type in new_fields.items():
                 if key_name not in inferred_fields:
-                    inferred_fields[key_name] = type_mapping.get(
-                        key_type, (Any, ...)
-                    )
-
-    # Ensure metadata exists for any fields inferred solely from cache
-    for key_name, field_spec in inferred_fields.items():
-        field_metadata.setdefault(
-            key_name,
-            {
-                "type": reverse_type_mapping.get(field_spec, "Any"),
-                "description": None,
-            },
-        )
+                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
 
     debug(inferred_fields)
 
-    # Proceed with entity extraction
-    dynamic_model = create_model("DynamicEntity", **inferred_fields)
-    extraction_model = create_model(
-        "ExtractionModel",
-        entities=(list[dynamic_model], ...),
+    # Create a cache key based on model name and field schema
+    # Using frozenset to make the fields hashable
+    field_signature = frozenset(
+        (k, str(v)) for k, v in inferred_fields.items()
     )
+    cache_key = f"{model_name}_{hash(field_signature)}"
 
-    model = get_agent_model(model_name)
-    extractor_agent = Agent(
-        model,
-        deps_type=ExtractionDeps,
-        output_type=extraction_model,
-        output_retries=3,
-        retries=3,
-    )
+    # Reuse cached agent if available to prevent context leaks
+    if cache_key not in _extraction_agent_cache:
+        # Proceed with entity extraction
+        dynamic_model = create_model("DynamicEntity", **inferred_fields)
+        extraction_model = create_model(
+            "ExtractionModel",
+            entities=(list[dynamic_model], ...),
+        )
+
+        model = get_agent_model(model_name)
+        _extraction_agent_cache[cache_key] = Agent(
+            model,
+            deps_type=ExtractionDeps,
+            output_type=extraction_model,
+            output_retries=3,
+            retries=3,
+        )
+
+    extractor_agent = _extraction_agent_cache[cache_key]
 
     extractor_deps = ExtractionDeps(
         extraction_context=context,
         fields=inferred_fields,
-        field_metadata=field_metadata,
         text=text,
     )
     try:
@@ -766,51 +598,6 @@ def extract_entities_with_agent(
             filtered_entities = filter_empty_entities(
                 result,
             )
-
-        if filtered_entities:
-            unique_entities = []
-            seen_entities = set()
-            for entity in filtered_entities:
-                try:
-                    serialized = json.dumps(entity, sort_keys=True)
-                except TypeError:
-                    # Fallback: skip non-serializable entries
-                    continue
-                if serialized in seen_entities:
-                    continue
-                seen_entities.add(serialized)
-                unique_entities.append(entity)
-            filtered_entities = unique_entities
-        else:
-            heuristic_entity: dict[str, Any] = {}
-            for key_name in keys:
-                raw_value = _heuristic_extract_field(text, key_name)
-                if raw_value is None:
-                    continue
-                field_spec = inferred_fields.get(key_name)
-                try:
-                    coerced_value = (
-                        _coerce_heuristic_value(raw_value, field_spec)
-                        if field_spec
-                        else None
-                    )
-                except TypeError:
-                    debug(
-                        "Heuristic coercion failed due to unhashable field spec.",
-                        key_name,
-                        field_spec,
-                    )
-                    coerced_value = None
-                if coerced_value is None:
-                    coerced_value = raw_value
-                heuristic_entity[key_name] = coerced_value
-
-            if heuristic_entity:
-                debug(
-                    "Heuristic extraction fallback used.",
-                    heuristic_entity,
-                )
-                filtered_entities = [heuristic_entity]
         return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message
@@ -828,7 +615,7 @@ def extract_entities_with_agent(
                 entity = json.loads(entity_str)
                 debug(entity)
                 return [entity]
-            except json.JSONDecodeError:
+            except:
                 pass
         # If we can't recover, return empty results
         return []

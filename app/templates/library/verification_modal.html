@@ -15,6 +15,9 @@
         <form id="verification-form" class="verification-form">
             <input type="hidden" id="verification-kind">
             <input type="hidden" id="verification-uuid">
+            <input type="hidden" id="verification-item-identifier">
+            <input type="hidden" id="verification-item-version">
+            <input type="hidden" id="verification-category">
 
             <fieldset class="verification-form__section">
                 <legend>Submitter</legend>
@@ -26,10 +29,6 @@
                     <span>Submitter organization</span>
                     <input type="text" id="verification-submitter-org" placeholder="Organization" maxlength="200">
                 </label>
-                <label class="verification-form__field">
-                    <span>Submitter role</span>
-                    <input type="text" id="verification-submitter-role" placeholder="Role" maxlength="200">
-                </label>
             </fieldset>
 
             <fieldset class="verification-form__section">
@@ -38,25 +37,10 @@
                     <span>Title</span>
                     <input type="text" id="verification-item-title" placeholder="Workflow or task title" maxlength="300" required>
                 </label>
-                <div class="verification-form__field verification-form__field--inline">
-                    <label>
-                        <span>Task / workflow ID</span>
-                        <input type="text" id="verification-item-identifier" readonly>
-                    </label>
-                    <label>
-                        <span>Version hash</span>
-                        <input type="text" id="verification-item-version" placeholder="Version hash or timestamp" maxlength="200">
-                    </label>
-                </div>
-                <label class="verification-form__field">
+                <div class="verification-form__field">
                     <span>Category</span>
-                    <select id="verification-category">
-                        <option value="workflow">Workflow</option>
-                        <option value="extraction">Extraction</option>
-                        <option value="prompt">Prompt</option>
-                        <option value="transform">Transform</option>
-                    </select>
-                </label>
+                    <div id="verification-category-display" class="verification-inline-field" aria-live="polite" style="font-weight:600;"></div>
+                </div>
             </fieldset>
 
             <fieldset class="verification-form__section">
@@ -73,6 +57,10 @@
                     <span>Run instructions (Markdown supported)</span>
                     <textarea id="verification-run-instructions" rows="4" maxlength="5000" placeholder="Steps to execute the task locally or in-app"></textarea>
                 </label>
+                <label class="verification-form__field">
+                    <span>How did you evaluate this task?</span>
+                    <textarea id="verification-eval-notes" rows="4" maxlength="4000" placeholder="Explain how you verified behavior, reviewed outputs, and determined quality."></textarea>
+                </label>
             </fieldset>
 
             <fieldset class="verification-form__section">
@@ -84,22 +72,6 @@
                 <label class="verification-form__field">
                     <span>Expected output(s)</span>
                     <textarea id="verification-expected-outputs" rows="3" placeholder="Links or JSON snippets per line"></textarea>
-                </label>
-            </fieldset>
-
-            <fieldset class="verification-form__section">
-                <legend>Dependencies & Limits</legend>
-                <label class="verification-form__field">
-                    <span>Dependencies or data models used</span>
-                    <textarea id="verification-dependencies" rows="3" placeholder="List any external dependencies, one per line"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>Known limitations / failure cases</span>
-                    <textarea id="verification-known-limitations" rows="3" maxlength="2000" placeholder="Document known limitations"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>Intended use domain (tags)</span>
-                    <input type="text" id="verification-intended-use-tags" placeholder="Comma-separated tags e.g. finance, compliance">
                 </label>
             </fieldset>
 

@@ -913,6 +913,7 @@ class VerificationRequest(me.Document):
     run_instructions = me.StringField(required=False, max_length=5000)
     known_limitations = me.StringField(required=False, max_length=2000)
     intended_use_tags = me.ListField(me.StringField(max_length=100), default=[])
+    evaluation_notes = me.StringField(required=False, max_length=5000)
 
     created_at = me.DateTimeField(
         default=lambda: datetime.datetime.now(datetime.timezone.utc)
@@ -972,6 +973,7 @@ class VerificationRequest(me.Document):
             "run_instructions": self.run_instructions or "",
             "known_limitations": self.known_limitations or "",
             "intended_use_tags": self.intended_use_tags or [],
+            "evaluation_notes": self.evaluation_notes or "",
             "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }

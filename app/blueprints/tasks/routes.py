@@ -4,7 +4,6 @@ import os
 import uuid
 from collections import defaultdict
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -26,10 +25,18 @@ from flask_login import current_user, login_required
 from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 
-from app.models import SearchSet, SearchSetItem, SmartDocument, UserModelConfig, ActivityEvent, ActivityType, ActivityStatus
+from app.models import (
+    ActivityType,
+    SearchSet,
+    SearchSetItem,
+    SmartDocument,
+    UserModelConfig,
+)
+from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.extraction_tasks import perform_extraction_task
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
@@ -393,7 +400,7 @@ def normalize_results(results) -> Dict[str, Any]:
 
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
-    """Begin a search."""
+    """Begin a search - now runs asynchronously using Celery."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
@@ -423,14 +430,134 @@ def begin_search() -> ResponseReturnValue:
     if len(keys) > 0:
         # Create activity event for the extraction run
         user = current_user
-        activity = ActivityEvent(
-            type=ActivityType.SEARCH_SET_RUN.value,
+        activity = activity_start(
+            type=ActivityType.SEARCH_SET_RUN,
             title=search_set.title if search_set and search_set.title else "Extraction",
-            status=ActivityStatus.RUNNING.value,
             user_id=user.get_id(),
             search_set_uuid=searchset_uuid,
-            documents_touched=len(document_uuids)
         )
+        activity.status = "queued"
+        activity.save()
+
+        # Start async extraction task
+        fillable_pdf_url = (
+            search_set.fillable_pdf_url
+            if search_set and hasattr(search_set, "fillable_pdf_url")
+            else None
+        )
+
+        perform_extraction_task.apply_async(
+            args=[
+                str(activity.id),
+                searchset_uuid,
+                document_uuids,
+                keys,
+                current_app.root_path,
+                fillable_pdf_url,
+            ]
+        )
+
+        # Return immediately with activity info
+        response = {
+            "status": "queued",
+            "activity_id": str(activity.id),
+            "message": "Extraction task started",
+        }
+        return jsonify(response)
+
+    # No keys to extract
+    response = {
+        "status": "error",
+        "message": "No extraction keys found",
+    }
+    return jsonify(response), 400
+
+
+@tasks.route("/extraction_status/<activity_id>", methods=["GET"])
+def extraction_status(activity_id: str) -> ResponseReturnValue:
+    """Check the status of an extraction task."""
+    from app.models import ActivityEvent
+
+    activity = ActivityEvent.objects(id=activity_id).first()
+    if not activity:
+        return jsonify({"error": "Activity not found"}), 404
+
+    response = {
+        "activity_id": str(activity.id),
+        "status": activity.status,
+        "title": activity.title,
+    }
+
+    # If completed, include results and rendered template
+    if activity.status == "completed" and activity.result_snapshot:
+        search_set_uuid = activity.result_snapshot.get("search_set_uuid")
+        document_uuids = activity.result_snapshot.get("document_uuids", [])
+        normalized_results = activity.result_snapshot.get("normalized", [])
+
+        # Get search set and documents
+        search_set = SearchSet.objects(uuid=search_set_uuid).first()
+        documents = []
+        for doc_uuid in document_uuids:
+            document = SmartDocument.objects(uuid=doc_uuid).first()
+            if document:
+                documents.append(document)
+
+        # Render template
+        template = render_template(
+            EXTRACTION_PANEL_TEMPLATE,
+            search_set=search_set,
+            results=normalized_results,
+            documents=documents,
+        )
+
+        response["template"] = template
+        response["results"] = normalized_results
+
+    elif activity.status == "failed":
+        response["error"] = getattr(activity, "error", "Unknown error")
+
+    return jsonify(response)
+
+
+@tasks.route("/begin_search_sync", methods=["POST"])
+def begin_search_sync() -> ResponseReturnValue:
+    """Begin a search synchronously - fallback for cases that need immediate results."""
+    data = request.get_json()
+    searchset_uuid = data["search_set_uuid"]
+    document_uuids = data["document_uuids"]
+
+    print(data)
+
+    documents = []
+    document_paths = []
+    for doc_uuid in document_uuids:
+        document = SmartDocument.objects(uuid=doc_uuid).first()
+        if document:
+            documents.append(document)
+            absolute_path = document.absolute_path
+            document_paths.append(absolute_path)
+
+    search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    print("Searching for search set")
+    print(searchset_uuid)
+    keys = []
+    items = []
+    if search_set is not None:
+        items = search_set.items()
+    for item in items:
+        if item.searchtype == "extraction":
+            keys.append(item.searchphrase)
+
+    if len(keys) > 0:
+        # Create activity event for the extraction run
+        user = current_user
+        activity = activity_start(
+            type=ActivityType.SEARCH_SET_RUN,
+            title=search_set.title if search_set and search_set.title else "Extraction",
+            user_id=user.get_id(),
+            search_set_uuid=searchset_uuid,
+        )
+        # activity.documents_touched = (len(document_uuids),)
         activity.save()
 
         em = ExtractionManager3()
@@ -488,8 +615,7 @@ def begin_search() -> ResponseReturnValue:
         normalized_results = normalize_results(results)
         print(normalize_results)
 
-        activity.status = ActivityStatus.COMPLETED.value
-        activity.finished_at = datetime.utcnow()
+        activity_finish(activity)
         activity.result_snapshot = {
             "raw": raw_results,
             "normalized": normalized_results,
@@ -636,7 +762,9 @@ def clone_search_set() -> ResponseReturnValue:
 
     # Add the cloned search set to the user's library
     library = _get_or_create_personal_library(user.user_id)
-    add_object_to_library(new_search_set, library=library, added_by_user_id=user.user_id)
+    add_object_to_library(
+        new_search_set, library=library, added_by_user_id=user.user_id
+    )
 
     return jsonify({"complete": True})
 
