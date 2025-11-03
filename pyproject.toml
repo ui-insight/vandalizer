@@ -35,7 +35,7 @@ dependencies = [
     "openpyxl",
     "pandas",
     "pydantic",
-    "pydantic-ai==0.6.2",
+    "pydantic-ai==1.9.1",
     "pymongo",
     "pymupdf",
     "pymupdf4llm",
