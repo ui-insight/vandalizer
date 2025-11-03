@@ -25,11 +25,16 @@ from app.models import (
     WorkflowResult,
     WorkflowStep,
 )
+
+from app.utilities.semantic_recommender import SemanticRecommender
 from app.utilities.agents import create_chat_agent
 from app.utilities.chat_manager import (
     ChatManager,
 )
 from app.utilities.extraction_manager3 import ExtractionManager3
+
+from app.utilities.analytics_helper import activity_finish
+from app.models import ActivityEvent, ActivityStatus
 
 load_dotenv()
 
@@ -636,8 +641,6 @@ def execute_workflow_task(
 
     # Ingest workflow into vector database for future recommendations (async)
     try:
-        from app.utilities.semantic_recommender import SemanticRecommender
-        from app.models import SmartDocument
 
         docs = workflow_trigger_step.data.get("docs", [])
         ingestion_text = "# Documents selected:"
@@ -657,8 +660,6 @@ def execute_workflow_task(
         debug(f"Error ingesting workflow recommendation: {e}")
 
     # Update the activity status to completed
-    from app.utilities.analytics_helper import activity_finish
-    from app.models import ActivityEvent, ActivityStatus
     activity = ActivityEvent.objects(workflow_result=workflow_result).first()
     if activity:
         snapshot = dict(activity.result_snapshot or {})

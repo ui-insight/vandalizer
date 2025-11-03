@@ -573,7 +573,7 @@ def workflow_download() -> ResponseReturnValue:
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
             "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
-            "Please format your entire response using Markdown.\n\n"
+            "Please format your entire response using HTML.\n\n"
             "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
             "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
             f"Here is the HTML data:\n\n{raw_json}"
