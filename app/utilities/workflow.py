@@ -143,7 +143,7 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
             document_uuids.append(doc)
         else:
             document_uuids.append(doc.uuid)
-    output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
+    output = extraction_manager.extract(keys, document_uuids, model, full_text=full_text)
 
     debug(output)
     prompt = "Format the extracted data as a nicely formatted markdown with the extracted data as bullet points. Show only the extracted data in the output and no other text. Do not include any explanations or additional text.\n\n"

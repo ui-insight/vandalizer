@@ -4,6 +4,7 @@ import os
 import uuid
 from copy import deepcopy
 from pathlib import Path
+from collections import defaultdict
 
 from devtools import debug
 from flask import (
@@ -18,6 +19,7 @@ from flask import (
     send_file,
     url_for,
 )
+from typing import Dict, List, Any
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
 from markupsafe import escape
@@ -345,29 +347,32 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
-def normalize_results(results):
-    from collections import defaultdict
-
-    if isinstance(results, list):
-        collected = defaultdict(list)
-
-        for d in results:
-            if isinstance(d, dict):
-                for k, v in d.items():
-                    if v not in collected[k]:
-                        collected[k].append(v)
-
-        # Convert to string or comma-separated string
-        flattened = {
-            k: v[0] if len(v) == 1 else ", ".join(str(val) for val in v)
-            for k, v in collected.items()
-        }
-        return flattened
-
-    elif isinstance(results, dict):
+def normalize_results(results) -> Dict[str, Any]:
+    """Normalize a list of dicts into a single dict of unique values (comma-joined),
+    or return the dict as-is. Non-list/dict inputs yield {}."""
+    if isinstance(results, dict):
         return results
+    if not isinstance(results, list):
+        return {}
 
-    return {}
+    collected: Dict[str, List[Any]] = defaultdict(list)
+    seen: Dict[str, set] = defaultdict(set)
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        for k, v in item.items():
+            if v in (None, "", [], {}):
+                continue
+            if v in seen[k]:
+                continue
+            seen[k].add(v)
+            collected[k].append(v)
+
+    return {
+        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
+        for k, vals in collected.items()
+    }
 
 
 @tasks.route("/begin_search", methods=["POST"])
@@ -376,6 +381,7 @@ def begin_search() -> ResponseReturnValue:
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
+    user_id = current_user.get_id()
 
     print(data)
 
@@ -399,10 +405,15 @@ def begin_search() -> ResponseReturnValue:
         if item.searchtype == "extraction":
             keys.append(item.searchphrase)
 
+    user_model_config = UserModelConfig.objects(user_id=user_id).first()
+    model = settings.base_model
+    if user_model_config is not None:
+        model = user_model_config.name
+
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_uuids)
+        results = em.extract(keys, document_uuids, model)
         if len(results) == 1:
             results = results[0]
 
@@ -504,14 +515,15 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
+    user_id = current_user.get_id()
+    user_model_config = UserModelConfig.objects(user_id=user_id).first()
+    model = settings.base_model
+    if user_model_config is not None:
+        model = user_model_config.name
+
     em = ExtractionManager3()
     em.root_path = current_app.root_path
 
-    user = current_user
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = settings.base_model
-    if model_config is not None:
-        model = model_config.name
     keys = em.build_from_documents(document_uuids, model)
 
     if "entities" in keys:
