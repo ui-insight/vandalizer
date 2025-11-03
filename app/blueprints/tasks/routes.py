@@ -36,7 +36,7 @@ from app.utilities.analytics_helper import ActivityType, activity_finish, activi
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.extraction_tasks import perform_extraction_task
+from app.utilities.extraction_tasks import perform_extraction_task, normalize_results
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
@@ -370,33 +370,6 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
-def normalize_results(results) -> Dict[str, Any]:
-    """Normalize a list of dicts into a single dict of unique values (comma-joined),
-    or return the dict as-is. Non-list/dict inputs yield {}."""
-    if isinstance(results, dict):
-        return results
-    if not isinstance(results, list):
-        return {}
-
-    collected: Dict[str, List[Any]] = defaultdict(list)
-    seen: Dict[str, set] = defaultdict(set)
-
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-        for k, v in item.items():
-            if v in (None, "", [], {}):
-                continue
-            if v in seen[k]:
-                continue
-            seen[k].add(v)
-            collected[k].append(v)
-
-    return {
-        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
-        for k, vals in collected.items()
-    }
-
 
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
@@ -566,7 +539,13 @@ def begin_search_sync() -> ResponseReturnValue:
 
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_uuids)
+        # get current model
+        user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
+        model_name = settings.base_model
+        if user_config:
+            model_name = user_config.name
+        
+        results = em.extract(keys, document_uuids, model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:

@@ -23,11 +23,11 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from app.models import SmartDocument
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
-from app.utilities.llm_helpers import remove_code_markers
 
 load_dotenv()
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Standard cache
 # cache ttl is 1 month
@@ -296,27 +296,19 @@ def retrieve(
     return content
 
 
-@dataclass
-class FieldInferenceDeps:
-    extraction_context: Optional[str]
-    keys: list[str]
+def create_field_inference_agent(agent_model, keys, context, prompt_context=None):
+    model = get_agent_model(agent_model)
+    system_prompt = create_field_inference_system_prompt(keys, context)
+    return Agent(
+        model,
+        system_prompt=system_prompt,
+        retries=3,
+    )
 
 
-model = get_agent_model(settings.base_model)
-
-field_inference_agent = Agent(
-    model,
-    retries=3,
-    deps_type=FieldInferenceDeps,
-    system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
-)
-
-
-@field_inference_agent.system_prompt
-def field_inference_system_prompt(context: RunContext[FieldInferenceDeps]) -> str:
-    keys = context.deps.keys
-    prompt_context = context.deps.extraction_context
-    return f"""Given these field names{" and prompt_context" if prompt_context else ""}:
+def create_field_inference_system_prompt(keys, context, prompt_context=None) -> str:
+    return f"""You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.
+Given these field names{" and prompt_context" if prompt_context else ""}:
 
 Field names:
 {json.dumps(keys, indent=2)}
@@ -413,21 +405,33 @@ def extraction_system_prompt(
 ):
     text = context.deps.text
     fields = context.deps.fields
-    field_descriptions = [
-        f"- {field}: {field_type[0]}" for field, field_type in fields.items()
-    ]
+    field_descriptions = [f"- {field}" for field in fields.keys()]
     field_str = "\n".join(field_descriptions)
 
     multiple_entity_instruction = (
-        "\n\nImportant: Extract ALL relevant entities from the text only if it is present. "
-        "Return a JSON array of objects, where each object represents a distinct entity. "
-        "If no multiple entities are found, return a single-item array."
+        "\n\nExtract ALL relevant entities from the text that have actual values. "
+        "Return a JSON array of objects, where each object represents a distinct entity with at least one non-null field. "
+        'If no entities with actual values are found, return an empty array: {"entities": []}'
     )
 
     system_prompt = (
-        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format."
-        'CRITICAL: Your response MUST be valid JSON with this exact format: {"entities": [...]}'
-        "Each entity should be a complete object with all requested fields (use null for missing values)."
+        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. "
+        "Be as faithful as possible during extraction and do not modify the extracted items. "
+        "\n\nTYPE SELECTION GUIDELINES:\n"
+        "- Use strings for text, dates, monetary values, and formatted numbers\n"
+        "- Use integers for whole numbers without decimals\n"
+        "- Use floats for decimal numbers\n"
+        "- Use booleans for true/false values\n"
+        "- Use lists when multiple values are present for a field\n"
+        "- Preserve ALL original formatting (commas, currency symbols, decimal places)\n"
+        "- DO NOT convert between types or modify formatting\n"
+        '\nCRITICAL: Your response MUST be valid JSON with this exact format: {"entities": [...]}\n'
+        "IMPORTANT RULES:\n"
+        "1. Only create an entity object if you find at least ONE non-null value for the requested fields\n"
+        '2. If no relevant information is found for ANY field, return {"entities": []}\n'
+        "3. Do NOT create entities with all null values\n"
+        "4. Each entity should represent a distinct, real item from the text\n"
+        "5. Choose the most appropriate data type for each field based on the actual value found"
     )
 
     return (
@@ -444,26 +448,6 @@ Text:
     )
 
 
-def filter_empty_entities(result: dict) -> list:
-    """Filter out empty entities from the list.
-
-    Args:
-        result: The result dictionary containing entities
-
-    Returns:
-        Filtered list of entities
-
-    """
-    raw_entities = result.get("entities", [])
-
-    def is_non_empty(e: dict) -> bool:
-        if not isinstance(e, dict) or not e:
-            return False
-        return any(v not in (None, "", [], {}) for v in e.values())
-
-    return [e for e in raw_entities if is_non_empty(e)]
-
-
 # @observe()
 def extract_entities_with_agent(
     text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
@@ -473,97 +457,100 @@ def extract_entities_with_agent(
     Args:
         text: Input text to extract information from
         keys: List of fields to extract
+        context: Optional context for extraction
+        model_name: Model to use for extraction
 
     Returns:
         A JSON object with extracted entities
 
     """
-    # check if previous extraction exists in cache
-
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
         keys = [k.strip() for k in keys.split(",")]
     else:
         keys = [k.strip() for k in keys]
 
-    # Individual field type caching
-    inferred_fields = {}
-    uncached_keys = []
+    # Set all fields to Any type - let the model decide appropriate types
+    inferred_fields = {key: (Any, None) for key in keys}
+
+    debug(f"Fields for extraction: {inferred_fields}")
 
     # Check cache for each individual key
-    for key in keys:
-        key_cache_key = get_cache_key(key, context)
-        cached = cache.lookup(key_cache_key, "field_inference")
-        if cached:
-            inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
-        else:
-            uncached_keys.append(key)
+    # for key in keys:
+    #     key_cache_key = get_cache_key(key, context)
+    #     cached = cache.lookup(key_cache_key, "field_inference")
+    #     if cached:
+    #         inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
+    #     else:
+    #         uncached_keys.append(key)
 
-    # Process uncached keys in a single batch if any
-    if uncached_keys:
-        field_inference_deps = FieldInferenceDeps(
-            extraction_context=context,
-            keys=uncached_keys,
-        )
+    # # Process uncached keys in a single batch if any
+    # if uncached_keys:
+    #     field_inference_deps = FieldInferenceDeps(
+    #         extraction_context=context,
+    #         keys=uncached_keys,
+    #     )
 
-        result = field_inference_agent.run_sync(
-            "Infer the types of the keys",
-            deps=field_inference_deps,
-        )
+    #     result = field_inference_agent.run_sync(
+    #         "Infer the types of the keys",
+    #         deps=field_inference_deps,
+    #     )
 
-        new_fields = result.output
+    #     new_fields = result.output
 
-        if isinstance(new_fields, str):
-            new_fields = remove_code_markers(result.output)
-            debug(new_fields)
+    #     if isinstance(new_fields, str):
+    #         new_fields = remove_code_markers(result.output)
+    #         debug(new_fields)
 
-        if isinstance(new_fields, str):
-            try:
-                new_fields = json.loads(new_fields)
-            except json.JSONDecodeError:
-                new_fields = {}
-                # Handle the case where JSON parsing fails
-                debug(
-                    "Failed to parse field inference response as JSON.",
-                    new_fields,
-                    field_inference_deps,
-                )
+    #     if isinstance(new_fields, str):
+    #         try:
+    #             new_fields = json.loads(new_fields)
+    #         except json.JSONDecodeError:
+    #             new_fields = {}
+    #             # Handle the case where JSON parsing fails
+    #             debug(
+    #                 "Failed to parse field inference response as JSON.",
+    #                 new_fields,
+    #                 field_inference_deps,
+    #             )
 
-        elif isinstance(new_fields, dict):
-            # Cache newly inferred fields individually
-            for key, field_type in new_fields.items():
-                key_cache_key = get_cache_key(key, context)
-                if isinstance(field_type, str):
-                    type_name = field_type
-                else:
-                    type_name = reverse_type_mapping.get(field_type, "Any")
-                cache.update(key_cache_key, "field_inference", [type_name])
-        else:
-            # Handle the case where the response is not a dict
-            debug(
-                "Unexpected field inference response format.",
-                new_fields,
-                field_inference_deps,
-            )
-            new_fields = {}
+    #     elif isinstance(new_fields, dict):
+    #         # Cache newly inferred fields individually
+    #         for key, field_type in new_fields.items():
+    #             key_cache_key = get_cache_key(key, context)
+    #             if isinstance(field_type, str):
+    #                 type_name = field_type
+    #             else:
+    #                 type_name = reverse_type_mapping.get(field_type, "Any")
+    #             cache.update(key_cache_key, "field_inference", [type_name])
+    #     else:
+    #         # Handle the case where the response is not a dict
+    #         debug(
+    #             "Unexpected field inference response format.",
+    #             new_fields,
+    #             field_inference_deps,
+    #         )
+    #         new_fields = {}
 
-        if isinstance(new_fields, dict):
-            for key_name, key_type in new_fields.items():
-                if key_name not in inferred_fields:
-                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
+    #     if isinstance(new_fields, dict):
+    #         for key_name, key_type in new_fields.items():
+    #             if key_name not in inferred_fields:
+    #                 inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
 
-    debug(inferred_fields)
+    # debug(inferred_fields)
 
-    # Create a cache key based on model name and field schema
-    # Using frozenset to make the fields hashable
-    field_signature = frozenset(
-        (k, str(v)) for k, v in inferred_fields.items()
-    )
+    # # Create a cache key based on model name and field schema
+    # # Using frozenset to make the fields hashable
+    # field_signature = frozenset(
+    #     (k, str(v)) for k, v in inferred_fields.items()
+    # )
+    # Create a cache key based on model name and field names only
+    field_signature = frozenset(keys)
     cache_key = f"{model_name}_{hash(field_signature)}"
 
     # Reuse cached agent if available to prevent context leaks
     if cache_key not in _extraction_agent_cache:
-        # Proceed with entity extraction
+        # Create dynamic model with Any types
         dynamic_model = create_model("DynamicEntity", **inferred_fields)
         extraction_model = create_model(
             "ExtractionModel",
@@ -613,8 +600,6 @@ def extract_entities_with_agent(
                     "Expected code to be unreachable, but got: ",
                     "",
                 )
-                # This may be incomplete JSON due to truncation in the error message
-                # You might need a more robust approach to reconstruct it
                 entity = json.loads(entity_str)
                 debug(entity)
                 return [entity]
@@ -622,3 +607,23 @@ def extract_entities_with_agent(
                 pass
         # If we can't recover, return empty results
         return []
+
+
+def filter_empty_entities(result: dict) -> list:
+    """Filter out empty entities from the list.
+
+    Args:
+        result: The result dictionary containing entities
+
+    Returns:
+        Filtered list of entities
+
+    """
+    raw_entities = result.get("entities", [])
+
+    def is_non_empty(e: dict) -> bool:
+        if not isinstance(e, dict) or not e:
+            return False
+        return any(v not in (None, "", [], {}) for v in e.values())
+
+    return [e for e in raw_entities if is_non_empty(e)]

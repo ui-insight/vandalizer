@@ -92,27 +92,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-@login_required
-@app.context_processor
-def inject_current_model():
-    """
-    Runs on *every* template render.  Looks up the user's ModelConfig,
-    and makes `current_model` available in all templates.
-    """
-    # user = current_user
-    # if user:
-    #     model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    #     models = [m.model_dump() for m in settings.models]
-    #     current_model = settings.base_model
-    #     if model_config:
-    #         current_model = model_config.name
-    #         if len(model_config.available_models) > 0:
-    #             models = json.loads(json.dumps(model_config.available_models))
-
-    #     return {"current_model": current_model, "models": models}
-
-    return {"current_model": "", "models": []}
-
 
 def verify_document(document: SmartDocument) -> None:
     """Verify and update the document if necessary."""
@@ -719,6 +698,8 @@ def chat() -> ResponseReturnValue:
                 user_id=user_id,
             ).first()
 
+    debug(activity)
+    debug(conversation)
     conversation.add_message(ChatRole.USER, message)
 
     # migrate to new document user's location

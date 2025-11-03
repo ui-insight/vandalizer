@@ -2504,6 +2504,10 @@
             var tabTitle = $(this).text();
 
             setSection(tabTitle);
+            // reset the URL (base url + home?section=tabTitle)
+            const newUrl = `${window.location.origin}/home?section=${tabTitle}`;
+            window.history.replaceState(null, '', newUrl);
+
 
         });
     });

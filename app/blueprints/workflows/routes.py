@@ -600,10 +600,16 @@ def workflow_download() -> ResponseReturnValue:
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
             "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
-            "Please format your entire response using Markdown.\n\n"
+            "Please format your entire response using HTML.\n\n"
+            "IMPORTANT STYLING RULES:\n"
+            "- Use ONLY inline styles with concrete color values (e.g., color: #333, background: #f5f5f5)\n"
+            "- DO NOT use CSS variables like var(--anything)\n"
+            "- DO NOT use CSS functions except rgb() and rgba()\n"
+            "- Use simple, standard HTML tags: h1-h6, p, ul, ol, li, table, strong, em\n"
+            "- Keep styling minimal and use hex colors or named colors (black, white, gray, etc.)\n\n"
             "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
-            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
-            f"Here is the HTML data:\n\n{raw_json}"
+            "Do not include any of your own commentary or descriptions outside of the HTML output.\n\n"
+            f"Here is the data to format:\n\n{raw_json}"
         )
     else:  # txt
         prompt = (

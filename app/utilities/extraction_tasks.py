@@ -2,29 +2,55 @@
 
 from copy import deepcopy
 from pathlib import Path
+from typing import Dict, Any, List
+from collections import defaultdict
+from app.utilities.config import settings
+
 
 from devtools import debug
 from flask import current_app, render_template
 from pypdf import PdfReader, PdfWriter
 
 from app.celery_worker import celery_app
-from app.models import ActivityEvent, SearchSet, SearchSetItem, SmartDocument
+from app.models import (
+    ActivityEvent,
+    ActivityStatus,
+    SearchSet,
+    SearchSetItem,
+    SmartDocument,
+    UserModelConfig,
+)
 from app.utilities.analytics_helper import activity_finish
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.semantic_recommender import SemanticRecommender
 
 
-def normalize_results(results):
-    """Normalize extraction results for display."""
+def normalize_results(results) -> Dict[str, Any]:
+    """Normalize a list of dicts into a single dict of unique values (comma-joined),
+    or return the dict as-is. Non-list/dict inputs yield {}."""
     if isinstance(results, dict):
-        # Single document result - convert to list format
-        return [results]
-    elif isinstance(results, list):
-        # Already a list
         return results
-    else:
-        return []
+    if not isinstance(results, list):
+        return {}
 
+    collected: Dict[str, List[Any]] = defaultdict(list)
+    seen: Dict[str, set] = defaultdict(set)
+
+    for item in results:
+        if not isinstance(item, dict):
+            continue
+        for k, v in item.items():
+            if v in (None, "", [], {}):
+                continue
+            if v in seen[k]:
+                continue
+            seen[k].add(v)
+            collected[k].append(v)
+
+    return {
+        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
+        for k, vals in collected.items()
+    }
 
 @celery_app.task(
     name="tasks.extraction.run",
@@ -61,10 +87,21 @@ def perform_extraction_task(
             activity.status = "running"
             activity.save()
 
+        # get user model config
+        user_id = activity.user_id if activity else None
+        user_model_config = UserModelConfig.objects(
+            user_id=user_id
+        ).first()
+        model_name = (
+            user_model_config.name
+            if user_model_config and user_model_config.name
+            else settings.base_model
+        )
+
         # Perform extraction
         em = ExtractionManager3()
         em.root_path = root_path
-        results = em.extract(keys, document_uuids)
+        results = em.extract(keys, document_uuids, model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:
@@ -154,5 +191,5 @@ def perform_extraction_task(
         if activity:
             activity.status = "failed"
             activity.error = str(e)
-            activity.save()
+            activity_finish(activity, status=ActivityStatus.FAILED, error=str(e))
         raise
