@@ -34,7 +34,11 @@ class ExtractionManager3:
 
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
-        chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
+
+        if not model:
+            model = settings.base_model
+
+        chat_agent = create_chat_agent(model, system_prompt=system_prompt)
         result = chat_agent.run_sync(prompt)
         output = result.output
         debug(output)
@@ -46,7 +50,7 @@ class ExtractionManager3:
             return json.loads(output.strip())
         return None
 
-    def extract(self, extract_keys, document_uuids, full_text=None):
+    def extract(self, extract_keys, document_uuids, model_name, full_text=None):
         # if extract_keys is string convert to list by splitting on comma
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
@@ -58,6 +62,9 @@ class ExtractionManager3:
         openai.api_key = OPENAI_API_KEY
         time.time()
         extraction = []
+        if not model_name:
+            model_name = settings.base_model
+
         if full_text is None:
             for document_uuid in document_uuids:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
@@ -65,13 +72,13 @@ class ExtractionManager3:
                 result = extract_entities_with_agent(
                     text=doc_text,
                     keys=fields_to_extract,
-                    model_name=settings.base_model,
+                    model_name=model_name,
                 )
                 extraction.extend(result)
         else:
             doc_text = full_text
             extraction = extract_entities_with_agent(
-                text=doc_text, keys=fields_to_extract
+                text=doc_text, keys=fields_to_extract, model_name=model_name,
             )
 
         return extraction
