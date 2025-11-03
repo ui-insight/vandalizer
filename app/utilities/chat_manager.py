@@ -2,6 +2,9 @@ import asyncio
 import json
 import logging
 import os
+import queue
+import threading
+
 
 import openai
 from devtools import debug
@@ -389,19 +392,44 @@ At the end of your response, provide a short, relevant suggestion for a logical 
                         activity.documents_touched = len(documents)
                         activity_finish(activity)
 
-        # Bridge the async generator to a sync iterator for Flask
+        # Bridge async to sync using a thread and queue
         def sync_streamer():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            agen = streamer().__aiter__()
+            q = queue.Queue()
+            exception_holder = []
 
-            while True:
+            def run_async_generator():
                 try:
-                    chunk = loop.run_until_complete(agen.__anext__())
-                    yield chunk
-                except StopAsyncIteration:
-                    break
-            loop.close()
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
 
+                    async def consume():
+                        try:
+                            async for chunk in streamer():
+                                q.put(chunk)
+                        except Exception as e:
+                            exception_holder.append(e)
+                        finally:
+                            q.put(None)  # Sentinel to signal completion
+
+                    loop.run_until_complete(consume())
+                    loop.close()
+                except Exception as e:
+                    exception_holder.append(e)
+                    q.put(None)
+
+            # Start the async generator in a separate thread
+            thread = threading.Thread(target=run_async_generator, daemon=True)
+            thread.start()
+
+            # Yield chunks as they become available
+            while True:
+                chunk = q.get()
+                if chunk is None:  # Sentinel value
+                    break
+                if exception_holder:
+                    raise exception_holder[0]
+                yield chunk
+
+            thread.join(timeout=1)  # Brief wait for cleanup
 
         return sync_streamer()

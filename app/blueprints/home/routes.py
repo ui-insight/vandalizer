@@ -718,6 +718,8 @@ def chat() -> ResponseReturnValue:
                 user_id=user_id,
             ).first()
 
+    debug(activity)
+    debug(conversation)
     conversation.add_message(ChatRole.USER, message)
 
     # migrate to new document user's location
