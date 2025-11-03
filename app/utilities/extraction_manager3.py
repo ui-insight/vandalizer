@@ -52,7 +52,7 @@ class ExtractionManager3:
             return json.loads(output.strip())
         return None
 
-    def extract(self, extract_keys, document_uuids, full_text=None):
+    def extract(self, extract_keys, document_uuids, model, full_text=None):
         # if extract_keys is string convert to list by splitting on comma
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
@@ -71,13 +71,13 @@ class ExtractionManager3:
                 result = extract_entities_with_agent(
                     text=doc_text,
                     keys=fields_to_extract,
-                    model_name=settings.base_model,
+                    model_name=model,
                 )
                 extraction.extend(result)
         else:
             doc_text = full_text
             extraction = extract_entities_with_agent(
-                text=doc_text, keys=fields_to_extract
+                text=doc_text, keys=fields_to_extract, model_name=model,
             )
 
         return extraction

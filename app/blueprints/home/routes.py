@@ -55,28 +55,6 @@ home = Blueprint("home", __name__)
 WEBFONTS_DIR = "static/fontawesome/webfonts"
 
 
-@login_required
-@app.context_processor
-def inject_current_model():
-    """
-    Runs on *every* template render.  Looks up the user's ModelConfig,
-    and makes `current_model` available in all templates.
-    """
-    # user = current_user
-    # if user:
-    #     model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    #     models = [m.model_dump() for m in settings.models]
-    #     current_model = settings.base_model
-    #     if model_config:
-    #         current_model = model_config.name
-    #         if len(model_config.available_models) > 0:
-    #             models = json.loads(json.dumps(model_config.available_models))
-
-    #     return {"current_model": current_model, "models": models}
-
-    return {"current_model": "", "models": []}
-
-
 def verify_document(document: SmartDocument) -> None:
     """Verify and update the document if necessary."""
     debug("Updating old document", document.title)
@@ -152,7 +130,7 @@ def index() -> ResponseReturnValue:
     """Primary entry point."""
     # production environment
     user = current_user
-    user_id = user.user_id
+    user_id = user.get_id()
     section = request.args.get("section", default="Assistant").strip()
 
     document = None
@@ -245,7 +223,7 @@ def index() -> ResponseReturnValue:
         set_type="extraction",
     ).all()
     user_extraction_sets = SearchSet.objects(
-        user_id=user.user_id,
+        user_id=user_id,
         space=current_space.uuid,
         is_global=False,
         set_type="extraction",
@@ -255,20 +233,20 @@ def index() -> ResponseReturnValue:
     # Get the prompt sets
 
     prompts = SearchSetItem.objects(
-        user_id=user.user_id,
+        user_id=user_id,
         space_id=current_space.uuid,
         searchtype="prompt",
     ).all()
 
     formatters = SearchSetItem.objects(
-        user_id=user.user_id,
+        user_id=user_id,
         space_id=current_space.uuid,
         searchtype="formatter",
     ).all()
 
     # Workflows
     workflows = Workflow.objects(
-        user_id=user.user_id,
+        user_id=user_id,
     ).all()
 
     # Get the folders
@@ -278,12 +256,12 @@ def index() -> ResponseReturnValue:
         current_folder_id = request.args.get("folder_id")
 
     base_query = Q(
-        user_id=user.user_id,
+        user_id=user_id,
         space=current_space.uuid,
         folder=current_folder_id,
     )
 
-    default_doc_query = Q(user_id=user.user_id, is_default=True)
+    default_doc_query = Q(user_id=user_id, is_default=True)
 
     folder_docs = (
         SmartDocument.objects(base_query | default_doc_query)
@@ -304,13 +282,13 @@ def index() -> ResponseReturnValue:
         if folder:
             current_folder_parent_id = folder.parent_id
     folders = SmartFolder.objects(
-        user_id=user.user_id,
+        user_id=user_id,
         space=current_space.uuid,
         parent_id="0",
     ).all()
     if current_folder_id != 0:
         folders = SmartFolder.objects(
-            user_id=user.user_id,
+            user_id=user_id,
             space=current_space.uuid,
             parent_id=current_folder_id,
         ).all()
@@ -361,7 +339,7 @@ def chat() -> ResponseReturnValue:
     folder = data["folder_uuid"]
     documents = []
     user = current_user
-    user_id = user.user_id
+    user_id = user.get_id()
     debug(document_uuids)
     # migrate to new document user's location
     for doc_uuid in document_uuids:
@@ -375,7 +353,7 @@ def chat() -> ResponseReturnValue:
 
     debug(documents)
     debug(docs)
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     if model_config:
         model = model_config.name
     else:
@@ -434,7 +412,8 @@ def chat_download() -> ResponseReturnValue:
         )
 
     user = current_user
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    user_id = user.get_id()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     if model_config:
         model = model_config.name
     else:
