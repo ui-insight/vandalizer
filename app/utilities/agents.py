@@ -419,16 +419,24 @@ def extraction_system_prompt(
     field_str = "\n".join(field_descriptions)
 
     multiple_entity_instruction = (
-        "\n\nImportant: Extract ALL relevant entities from the text only if it is present. "
-        "Return a JSON array of objects, where each object represents a distinct entity. "
-        "If no multiple entities are found, return a single-item array."
+        "\n\nExtract ALL relevant entities from the text that have actual values. "
+        "Return a JSON array of objects, where each object represents a distinct entity with at least one non-null field. "
+        "If no entities with actual values are found, return an empty array: {\"entities\": []}"
     )
 
     system_prompt = (
-        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format."
-        'CRITICAL: Your response MUST be valid JSON with this exact format: {"entities": [...]}'
-        "Each entity should be a complete object with all requested fields (use null for missing values)."
+        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. "
+        "Be as faithful as possible during extraction and do not modify the extracted items. "
+        "Do not convert integer to float and vice versa, or change the number of decimal places. "
+        "Preserve commas and other punctuation in the extracted text and numbers. "
+        "CRITICAL: Your response MUST be valid JSON with this exact format: {\"entities\": [...]}\n"
+        "IMPORTANT RULES:\n"
+        "1. Only create an entity object if you find at least ONE non-null value for the requested fields\n"
+        "2. If no relevant information is found for ANY field, return {\"entities\": []}\n"
+        "3. Do NOT create entities with all null values\n"
+        "4. Each entity should represent a distinct, real item from the text"
     )
+
 
     return (
         f"""
