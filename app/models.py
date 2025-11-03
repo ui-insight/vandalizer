@@ -211,6 +211,7 @@ class User(me.Document):
     """User model. Represents a user in the system."""
 
     user_id = me.StringField(required=True, max_length=200)
+    email = me.StringField(max_length=320)  # User's email address
     is_admin = me.BooleanField(default=False)
     is_examiner = me.BooleanField(default=False)
     name = me.StringField()
@@ -1027,6 +1028,7 @@ class ActivityEvent(me.Document):
     # When
     started_at = me.DateTimeField(default=dt.datetime.utcnow)
     finished_at = me.DateTimeField(required=False)
+    last_updated_at = me.DateTimeField(default=dt.datetime.utcnow)
 
     # Linkage to domain objects (use whichever applies)
     # NOTE: keep light to avoid deref unless needed in UI
@@ -1062,10 +1064,11 @@ class ActivityEvent(me.Document):
     meta = {
         "indexes": [
             {"fields": ["-started_at"]},
-            {"fields": ["user_id", "-started_at"]},
-            {"fields": ["team_id", "-started_at"]},
-            {"fields": ["type", "-started_at"]},
-            {"fields": ["status", "-started_at"]},
+            {"fields": ["-last_updated_at"]},
+            {"fields": ["user_id", "-last_updated_at"]},
+            {"fields": ["team_id", "-last_updated_at"]},
+            {"fields": ["type", "-last_updated_at"]},
+            {"fields": ["status", "-last_updated_at"]},
         ]
     }
 

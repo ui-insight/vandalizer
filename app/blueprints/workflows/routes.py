@@ -1,6 +1,7 @@
 """Handle workflow routes."""
 
 import asyncio
+import datetime
 import io
 import json
 import os
@@ -25,7 +26,7 @@ from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
-from app.blueprints.home.routes import _get_teams
+from app.blueprints.home.routes import _get_teams, markdown_or_html_to_pdf_bytes
 from app.models import (
     SearchSet,
     SearchSetItem,
@@ -190,15 +191,40 @@ def run_workflow() -> ResponseReturnValue:
     print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
 
     current_team, my_teams = _get_teams(user)
-    activity_start(
+
+    # Check if there's an existing completed activity for this workflow
+    # If so, reuse it instead of creating a new one
+    from app.models import ActivityEvent
+    existing_activity = ActivityEvent.objects(
         type=ActivityType.WORKFLOW_RUN,
         user_id=user_id,
-        title=workflow.name,
-        team_id=current_team.uuid,
-        space=current_space_id,
         workflow=workflow,
-        workflow_result=workflow_result,
-    )
+        status="completed"
+    ).order_by("-started_at").first()
+
+    if existing_activity:
+        # Reuse the existing activity with new results
+        activity = existing_activity
+        activity.workflow_result = workflow_result
+        activity.status = "queued"
+        activity.started_at = datetime.datetime.now(datetime.timezone.utc)
+        activity.last_updated_at = datetime.datetime.now(datetime.timezone.utc)
+        activity.finished_at = None
+        activity.error = None
+        activity.steps_completed = 0
+        activity.result_snapshot = None
+        activity.save()
+    else:
+        # Create a new activity for first-time run
+        activity = activity_start(
+            type=ActivityType.WORKFLOW_RUN,
+            user_id=user_id,
+            title=workflow.name,
+            team_id=current_team.uuid,
+            space=current_space_id,
+            workflow=workflow,
+            workflow_result=workflow_result,
+        )
 
     async_result = execute_workflow_task.delay(
         workflow_result_id=workflow_result_id,
@@ -213,6 +239,7 @@ def run_workflow() -> ResponseReturnValue:
             "status": "accepted",
             "workflow_result_id": workflow_result_id,
             "task_id": async_result.id,
+            "activity_id": str(activity.id),
         },
     ), 202
 
@@ -616,7 +643,7 @@ def workflow_download() -> ResponseReturnValue:
             download_name="workflow_output.csv",
         )
     elif fmt == "pdf":
-        buf = generate_pdf_from_html(formatted)
+        buf = markdown_or_html_to_pdf_bytes(formatted, input_format="markdown")
         return send_file(
             buf,
             mimetype="application/pdf",

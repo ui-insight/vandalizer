@@ -81,17 +81,6 @@
                 uuid: uuid,
             });
 
-            if (typeof deleteSearchSetItem === 'function') {
-                deleteSearchSetItem(uuid, itemKind);
-                // Close the modal after deletion
-                $('#edit-prompt-modal').modal('hide');
-                // Refresh library if available
-                if (typeof refreshResults === 'function') {
-                    refreshResults();
-                }
-                return;
-            }
-
             $.ajax({
                 url: '/tasks/delete_search_set_item',
                 type: 'POST',
@@ -100,16 +89,13 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    // Close the modal
-                    $('#edit-prompt-modal').modal('hide');
-                    // Refresh library if available, otherwise redirect
-                    if (typeof refreshResults === 'function') {
-                        refreshResults();
-                    } else {
-                        const url = new URL(window.location.href);
-                        url.searchParams.set('section', 'Library');
-                        location.href = url.toString();
-                    }
+                    // Close the edit panel
+                    $("#search-results-panel").hide();
+                    $("#search-results-panel").empty();
+                    // Redirect to library with the item removed
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    location.href = url.toString();
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

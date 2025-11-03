@@ -187,9 +187,20 @@ if AUTH_MODE == "AZURE":
 
         if not user:
             # Create a new user if they don't exist
+            # Try to get email from 'mail' field, fallback to 'userPrincipalName'
+            email = info.get("mail") or info.get("userPrincipalName")
             user = User(
-                user_id=info["userPrincipalName"], name=info["displayName"]
+                user_id=info["userPrincipalName"],
+                email=email,
+                name=info["displayName"]
             ).save()
+        else:
+            # Update existing user's email and name if they're missing
+            if not user.email:
+                user.email = info.get("mail") or info.get("userPrincipalName")
+            if not user.name:
+                user.name = info["displayName"]
+            user.save()
 
         login_user(user)  # This is the critical step to create the user session
 

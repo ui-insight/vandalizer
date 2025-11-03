@@ -7,7 +7,7 @@ import logging
 import os
 import tempfile
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from itertools import chain
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -712,6 +712,7 @@ def chat() -> ResponseReturnValue:
         activity = ActivityEvent.objects(id=activity_id).first()
         if activity:
             activity.status = ActivityStatus.RUNNING
+            activity.last_updated_at = datetime.now(timezone.utc)
             activity.save()
             conversation = ChatConversation.objects(
                 uuid=activity.conversation_id,
@@ -793,6 +794,7 @@ def add_link_to_chat():
             activity = ActivityEvent.objects(id=current_activity_id).first()
             if activity:
                 activity.status = ActivityStatus.RUNNING
+                activity.last_updated_at = datetime.now(timezone.utc)
                 activity.save()
                 conversation = ChatConversation.objects(
                     uuid=activity.conversation_id,
@@ -891,6 +893,7 @@ def add_document_to_chat():
             activity = ActivityEvent.objects(id=current_activity_id).first()
             if activity:
                 activity.status = ActivityStatus.RUNNING
+                activity.last_updated_at = datetime.now(timezone.utc)
                 activity.save()
                 conversation = ChatConversation.objects(
                     uuid=activity.conversation_id,
@@ -1200,7 +1203,7 @@ def chat_download() -> ResponseReturnValue:
         )
 
     elif fmt == "pdf":
-        buf = generate_pdf_from_html(formatted)
+        buf = markdown_or_html_to_pdf_bytes(formatted, input_format="html")
         return send_file(
             buf,
             mimetype="application/pdf",

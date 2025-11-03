@@ -274,6 +274,33 @@
         </div>
      `
     }
+
+    /**
+     * Remove attachment from chat
+     */
+    async function removeChatAttachment(attachmentId, buttonElement) {
+        if (!confirm('Remove this attachment?')) return;
+
+        try {
+            const response = await fetch(`/chat/remove_document/${attachmentId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Remove from UI
+                $(buttonElement).closest('.system-message').fadeOut(300, function() {
+                    $(this).remove();
+                });
+                console.log('Attachment removed successfully');
+            } else {
+                alert('Failed to remove attachment. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error removing attachment:', error);
+            alert('Error removing attachment. Please try again.');
+        }
+    }
+
     // "[Link attached: pydantic_ai.run - Pydantic AI]
     // URL: https://ai.pydantic.dev/api/run/#pydantic_ai.run.AgentRun]"
     // "📎 File attached: Test_test_test.docx (14 characters)"
@@ -2084,6 +2111,14 @@
             success: function (data) {
                 console.log("Workflow run response:", data);
 
+                // Redirect to the page with activity_id to highlight the new activity in side rail
+                if (data.activity_id) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('activity_id', data.activity_id);
+                    url.searchParams.set('section', 'Assistant');
+                    window.location.href = url.toString();
+                }
+
                 if (download) {
                     downloadWorkflow(session_id)
                 }
@@ -2756,7 +2791,7 @@
 
                 // Show loading message
                 $("#search-results-panel").show();
-                $("#search-results-panel").html("<div style='padding: 20px; text-align: center;'><i class='fa fa-spinner fa-spin fa-2x'></i><p>Running extraction...</p></div>");
+                $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
 
                 // Poll for completion
                 pollExtractionStatus(data.activity_id, search_set_uuid);
@@ -2821,7 +2856,7 @@
 
                         // Show loading message
                         $("#search-results-panel").show();
-                        $("#search-results-panel").html("<div style='padding: 20px; text-align: center;'><i class='fa fa-spinner fa-spin fa-2x'></i><p>Running extraction...</p></div>");
+                        $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
 
                         // Poll for completion
                         const search_set_uuid = data.search_set_uuid || new URLSearchParams(window.location.search).get('search_set_uuid');
@@ -2862,11 +2897,14 @@
         $("#set-close-button").on("click", function () {
             const url = new URL(window.location.href);
             url.searchParams.delete('search_set_uuid');
-            window.history.replaceState(null, '', url.toString());
+            url.searchParams.delete('activity_id');
+            url.searchParams.set('section', 'Library');
             search_set_add_uuid = "";
             $("#search-results-panel").fadeOut(function () {
                 $(this).empty();
             });
+            // Redirect to library to show updated extraction
+            location.href = url.toString();
         });
         $(".semantic-entry").on("click", function () {
             searchTerm = $(this).attr("data-title");

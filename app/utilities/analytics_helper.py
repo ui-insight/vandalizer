@@ -32,7 +32,7 @@ def recent_activity_for_feed(
                 ActivityStatus.CANCELED.value,
             ]
         )
-    return q.order_by("-started_at", "-id").limit(limit)
+    return q.order_by("-last_updated_at", "-id").limit(limit)
 
 
 def activity_start(
@@ -96,6 +96,7 @@ def activity_progress(
         ev.tokens_output += tokens_out_inc
     if meta_updates:
         ev.meta_summary.update(meta_updates)
+    ev.last_updated_at = datetime.now(timezone.utc)
     ev.save()
 
 
@@ -107,6 +108,7 @@ def activity_finish(
 ):
     ev.status = status.value
     ev.finished_at = datetime.now(timezone.utc)
+    ev.last_updated_at = datetime.now(timezone.utc)
     if error:
         ev.error = error[:2000]
     ev.save()

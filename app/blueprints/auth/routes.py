@@ -66,6 +66,7 @@ def login() -> ResponseReturnValue:
 def register():
     """Handles user registration."""
     if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()
         password = request.form.get("password")
 
@@ -75,7 +76,7 @@ def register():
             return redirect(url_for("auth.register"))
 
         # Create new user
-        new_user = User(user_id=email)
+        new_user = User(user_id=email, email=email, name=name)
         new_user.set_password(password)
 
         # Check for pending invites BEFORE saving the user

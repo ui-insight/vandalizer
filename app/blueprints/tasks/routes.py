@@ -430,10 +430,12 @@ def begin_search() -> ResponseReturnValue:
     if len(keys) > 0:
         # Create activity event for the extraction run
         user = current_user
+        current_team = user.ensure_current_team()
         activity = activity_start(
             type=ActivityType.SEARCH_SET_RUN,
             title=search_set.title if search_set and search_set.title else "Extraction",
             user_id=user.get_id(),
+            team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
         )
         activity.status = "queued"
@@ -551,10 +553,12 @@ def begin_search_sync() -> ResponseReturnValue:
     if len(keys) > 0:
         # Create activity event for the extraction run
         user = current_user
+        current_team = user.ensure_current_team()
         activity = activity_start(
             type=ActivityType.SEARCH_SET_RUN,
             title=search_set.title if search_set and search_set.title else "Extraction",
             user_id=user.get_id(),
+            team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
         )
         # activity.documents_touched = (len(document_uuids),)

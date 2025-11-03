@@ -533,8 +533,11 @@ def extract_entities_with_agent(
             # Cache newly inferred fields individually
             for key, field_type in new_fields.items():
                 key_cache_key = get_cache_key(key, context)
-                type_str = reverse_type_mapping.get(field_type, "Any")
-                cache.update(key_cache_key, "field_inference", [type_str])
+                if isinstance(field_type, str):
+                    type_name = field_type
+                else:
+                    type_name = reverse_type_mapping.get(field_type, "Any")
+                cache.update(key_cache_key, "field_inference", [type_name])
         else:
             # Handle the case where the response is not a dict
             debug(
