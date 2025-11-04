@@ -434,9 +434,19 @@ def extract_entities_with_agent(
         filtered_entities = []
         # cache the result if it is not empty
         if result and "entities" in result and len(result["entities"]) > 0:
-            filtered_entities = filter_empty_entities(
-                result,
-            )
+            filtered_entities = filter_empty_entities(result)
+
+            # Deduplicate identical entity payloads to prevent runaway growth
+            deduped_entities: list[dict] = []
+            seen_signatures = set()
+            for entity in filtered_entities:
+                signature = json.dumps(entity, sort_keys=True)
+                if signature in seen_signatures:
+                    continue
+                seen_signatures.add(signature)
+                deduped_entities.append(entity)
+
+            filtered_entities = deduped_entities
         return filtered_entities
     except AssertionError as e:
         # Extract the dictionary from the error message
