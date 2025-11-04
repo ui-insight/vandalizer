@@ -58,8 +58,8 @@ Upload Compliance:
 #         # filter
 
 models = [
-    {"name": "openai/gpt-4.1", "tag": "Cloud", "external": True},
-    {"name": "qwen3-32k:32b", "tag": "Private", "external": False},
+    {"name": "openai/gpt-5", "tag": "Cloud", "external": True},
+    {"name": "gpt-oss-32k:120b", "tag": "Private", "external": False},
 ]
 
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     # the model type to use, either openai or insight server (ollama)
     # model_type = "insight" or "openai"
     model_type: str = Field(
-        default="openai/gpt-4.1", description="The specific model to use for LLM tasks."
+        default="openai/gpt-5", description="The specific model to use for LLM tasks."
     )
 
     base_model: str = Field(
