@@ -148,6 +148,7 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
     debug(output)
     prompt = "Format the extracted data as a nicely formatted markdown with the extracted data as bullet points. Show only the extracted data in the output and no other text. Do not include any explanations or additional text.\n\n"
     prompt += json.dumps(output, indent=4)
+    debug(prompt)
     chat_agent = create_chat_agent(model)
     result = chat_agent.run_sync(prompt)
     return result.output

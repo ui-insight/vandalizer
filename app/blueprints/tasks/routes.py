@@ -346,15 +346,32 @@ def semantic_search() -> ResponseReturnValue:
     abort(403)
     return jsonify({"error": "This endpoint is not available."})
 
-
 def normalize_results(results) -> Dict[str, Any]:
-    """Normalize a list of dicts into a single dict of unique values (comma-joined),
-    or return the dict as-is. Non-list/dict inputs yield {}."""
+    """Normalize extraction results into a single dict.
+    
+    Args:
+        results: Can be a dict, list of dicts, or other
+        
+    Returns:
+        A normalized dictionary with extracted values
+    """
+    # If already a dict, return as-is
     if isinstance(results, dict):
         return results
+    
+    # If not a list, return empty dict
     if not isinstance(results, list):
         return {}
 
+    # If list is empty, return empty dict
+    if len(results) == 0:
+        return {}
+    
+    # If single item in list, return that item
+    if len(results) == 1:
+        return results[0] if isinstance(results[0], dict) else {}
+    
+    # Multiple items - merge them
     collected: Dict[str, List[Any]] = defaultdict(list)
     seen: Dict[str, set] = defaultdict(set)
 
@@ -364,9 +381,11 @@ def normalize_results(results) -> Dict[str, Any]:
         for k, v in item.items():
             if v in (None, "", [], {}):
                 continue
-            if v in seen[k]:
+            # Convert to string for comparison to handle different types
+            v_str = str(v)
+            if v_str in seen[k]:
                 continue
-            seen[k].add(v)
+            seen[k].add(v_str)
             collected[k].append(v)
 
     return {
@@ -374,16 +393,14 @@ def normalize_results(results) -> Dict[str, Any]:
         for k, vals in collected.items()
     }
 
-
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
     """Begin a search."""
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
-    user_id = current_user.get_id()
 
-    print(data)
+    debug(data)
 
     documents = []
     document_paths = []
@@ -395,8 +412,8 @@ def begin_search() -> ResponseReturnValue:
             document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    print("Searching for search set")
-    print(searchset_uuid)
+    debug(f"Searching for search set: {searchset_uuid}")
+    
     keys = []
     items = []
     if search_set is not None:
@@ -405,30 +422,39 @@ def begin_search() -> ResponseReturnValue:
         if item.searchtype == "extraction":
             keys.append(item.searchphrase)
 
-    user_model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = settings.base_model
-    if user_model_config is not None:
-        model = user_model_config.name
-
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_uuids, model)
-        if len(results) == 1:
-            results = results[0]
+        results = em.extract(keys, document_uuids)
+        
+        debug(f"Raw extraction results: {results}")
 
-        debug(results)
+        # Handle empty or no results
+        if not results:
+            template = render_template(
+                EXTRACTION_PANEL_TEMPLATE,
+                search_set=search_set,
+                results={},
+                documents=documents,
+            )
+            return jsonify({"template": template})
 
+        # Normalize results
+        normalized_results = normalize_results(results)
+        debug(f"Normalized results: {normalized_results}")
+
+        # Handle fillable PDF if configured
         if (
             search_set.fillable_pdf_url != ""
             and search_set.fillable_pdf_url is not None
         ):
             bindings = {}
-            for key in results:
+            for key, value in normalized_results.items():
                 search_set_item = SearchSetItem.objects(searchphrase=key).first()
-                bindings[search_set_item.pdf_binding] = results[key]
+                if search_set_item and search_set_item.pdf_binding:
+                    bindings[search_set_item.pdf_binding] = value
 
-            # Define the file path for the CSV file
+            # Define the file path for the PDF file
             pdf_path = (
                 Path(current_app.root_path)
                 / "static"
@@ -441,7 +467,6 @@ def begin_search() -> ResponseReturnValue:
             writer = PdfWriter()
             writer.append(reader)
 
-            # for page in reader.pages:
             writer.update_page_form_field_values(
                 writer.pages[0],
                 bindings,
@@ -454,15 +479,12 @@ def begin_search() -> ResponseReturnValue:
             with Path.open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
-            # Return the path to the CSV file
             return send_file(
                 "static/fillable_form.pdf",
-                mimetype="text/pdf",
+                mimetype="application/pdf",
                 as_attachment=True,
             )
 
-        normalized_results = normalize_results(results)
-        print(normalize_results)
         template = render_template(
             EXTRACTION_PANEL_TEMPLATE,
             search_set=search_set,
@@ -474,9 +496,7 @@ def begin_search() -> ResponseReturnValue:
         }
 
         # Ingest workflow into vector database for future recommendations
-        ingestion_text = ""
-        ingestion_text += "# Documents selected:"
-
+        ingestion_text = "# Documents selected:"
         for doc in documents:
             ingestion_text += f"\n{doc.raw_text}"
 
@@ -494,6 +514,7 @@ def begin_search() -> ResponseReturnValue:
         )
 
         return jsonify(response)
+    
     template = render_template(
         EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
@@ -503,6 +524,7 @@ def begin_search() -> ResponseReturnValue:
         "template": template,
     }
     return jsonify(response)
+
 
 
 @login_required

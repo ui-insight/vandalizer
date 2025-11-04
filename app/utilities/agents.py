@@ -316,8 +316,6 @@ def create_extraction_agent(agent_model):
 
 extraction_agent = create_extraction_agent(settings.base_model)
 
-
-
 @extraction_agent.system_prompt
 def extraction_system_prompt(
     context: RunContext[ExtractionDeps],
@@ -326,12 +324,6 @@ def extraction_system_prompt(
     fields = context.deps.fields
     field_descriptions = [f"- {field}" for field in fields.keys()]
     field_str = "\n".join(field_descriptions)
-
-    multiple_entity_instruction = (
-        "\n\nExtract ALL relevant entities from the text that have actual values. "
-        "Return a JSON array of objects, where each object represents a distinct entity with at least one non-null field. "
-        "If no entities with actual values are found, return an empty array: {\"entities\": []}"
-    )
 
     system_prompt = (
         "You are a precise entity extraction assistant. Extract only the requested information in a single execution. "
@@ -344,23 +336,25 @@ def extraction_system_prompt(
         "- Use lists when multiple values are present for a field\n"
         "- Preserve ALL original formatting (commas, currency symbols, decimal places)\n"
         "- DO NOT convert between types or modify formatting\n"
-        "\nCRITICAL: Your response MUST be valid JSON with this exact format: {\"entities\": [...]}\n"
+        "\nCRITICAL: Your response MUST be valid JSON as a single object with the requested fields.\n"
         "IMPORTANT RULES:\n"
-        "1. Only create an entity object if you find at least ONE non-null value for the requested fields\n"
-        "2. If no relevant information is found for ANY field, return {\"entities\": []}\n"
-        "3. Do NOT create entities with all null values\n"
-        "4. Each entity should represent a distinct, real item from the text\n"
-        "5. Choose the most appropriate data type for each field based on the actual value found"
+        "1. Set field values to null if the information is not found in the text\n"
+        "2. Only include a field with a non-null value if you find that information in the text\n"
+        "3. Do NOT make up or infer information that isn't explicitly stated\n"
+        "4. Choose the most appropriate data type for each field based on the actual value found\n"
+        "5. Return a flat JSON object with the field names as keys"
     )
 
     return (
         f"""
 {system_prompt}
+
 Extract the following information from the text below only if it is present:
 
 {field_str}
 
-Return the information in JSON format and be as precise as possible{multiple_entity_instruction}
+Return the information as a JSON object with these exact field names as keys.
+Set a field to null only if that information is not present in the text.
 
 Text:
 {text}""",
@@ -369,7 +363,7 @@ Text:
 # @observe()
 def extract_entities_with_agent(
     text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
-) -> list:
+) -> dict:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
@@ -379,8 +373,7 @@ def extract_entities_with_agent(
         model_name: Model to use for extraction
 
     Returns:
-        A JSON object with extracted entities
-
+        A dictionary with extracted field values
     """
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
@@ -399,12 +392,11 @@ def extract_entities_with_agent(
 
     # Reuse cached agent if available to prevent context leaks
     if cache_key not in _extraction_agent_cache:
-        # Create dynamic model with Any types
-        dynamic_model = create_model("DynamicEntity", **inferred_fields)
-        extraction_model = create_model(
-            "ExtractionModel",
-            entities=(list[dynamic_model], ...),
-        )
+        # Create dynamic model with UNIQUE name based on fields hash
+        unique_model_name = f"ExtractionResult_{abs(hash(field_signature))}"
+        
+        # Create a single model directly (not wrapped in "entities" array)
+        extraction_model = create_model(unique_model_name, **inferred_fields)
 
         model = get_agent_model(model_name)
         _extraction_agent_cache[cache_key] = Agent(
@@ -422,36 +414,27 @@ def extract_entities_with_agent(
         fields=inferred_fields,
         text=text,
     )
+    
     try:
         # Run the agent synchronously
         extraction = extractor_agent.run_sync(text, deps=extractor_deps)
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)
-        debug(result)
 
         result = json.loads(result)
-        filtered_entities = []
-        # cache the result if it is not empty
-        if result and "entities" in result and len(result["entities"]) > 0:
-            filtered_entities = filter_empty_entities(result)
-
-            # Deduplicate identical entity payloads to prevent runaway growth
-            deduped_entities: list[dict] = []
-            seen_signatures = set()
-            for entity in filtered_entities:
-                signature = json.dumps(entity, sort_keys=True)
-                if signature in seen_signatures:
-                    continue
-                seen_signatures.add(signature)
-                deduped_entities.append(entity)
-
-            filtered_entities = deduped_entities
-        return filtered_entities
+        debug(result)
+        
+        # Filter out None/empty values
+        # filtered_result = {k: v for k, v in result.items() if v not in (None, "", [], {})}
+        
+        # return filtered_result
+        return result
+        
     except AssertionError as e:
         # Extract the dictionary from the error message
         error_msg = str(e)
-        debug(e)
+        debug(f"AssertionError during extraction: {e}")
         if error_msg.startswith("Expected code to be unreachable, but got: "):
             try:
                 # Try to parse the dictionary from the error message
@@ -461,28 +444,15 @@ def extract_entities_with_agent(
                 )
                 entity = json.loads(entity_str)
                 debug(entity)
-                return [entity]
-            except:
+                # Filter out None values
+                return {k: v for k, v in entity.items() if v not in (None, "", [], {})}
+            except Exception as parse_error:
+                debug(f"Failed to parse error message: {parse_error}")
                 pass
-        # If we can't recover, return empty results
-        return []
+        # If we can't recover, return empty dict
+        return {}
+        
+    except Exception as e:
+        debug(f"Unexpected error during extraction: {e}")
+        return {}
 
-
-def filter_empty_entities(result: dict) -> list:
-    """Filter out empty entities from the list.
-
-    Args:
-        result: The result dictionary containing entities
-
-    Returns:
-        Filtered list of entities
-
-    """
-    raw_entities = result.get("entities", [])
-
-    def is_non_empty(e: dict) -> bool:
-        if not isinstance(e, dict) or not e:
-            return False
-        return any(v not in (None, "", [], {}) for v in e.values())
-
-    return [e for e in raw_entities if is_non_empty(e)]

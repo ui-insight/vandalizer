@@ -73,7 +73,7 @@ class ExtractionManager3:
                     keys=fields_to_extract,
                     model_name=model,
                 )
-                extraction.extend(result)
+                extraction.append(result)
         else:
             doc_text = full_text
             extraction = extract_entities_with_agent(
