@@ -413,6 +413,13 @@ def begin_search() -> ResponseReturnValue:
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     debug(f"Searching for search set: {searchset_uuid}")
+
+    user_model_config = UserModelConfig.objects(
+        user_id=current_user.get_id()
+    ).first()
+    model = settings.base_model
+    if user_model_config is not None:
+        model = user_model_config.name
     
     keys = []
     items = []
@@ -425,7 +432,7 @@ def begin_search() -> ResponseReturnValue:
     if len(keys) > 0:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
-        results = em.extract(keys, document_uuids)
+        results = em.extract(keys, document_uuids, model)
         
         debug(f"Raw extraction results: {results}")
 
