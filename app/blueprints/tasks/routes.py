@@ -2,9 +2,10 @@ import csv
 import io
 import os
 import uuid
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from collections import defaultdict
+from typing import Any, Dict, List
 
 from devtools import debug
 from flask import (
@@ -19,7 +20,6 @@ from flask import (
     send_file,
     url_for,
 )
-from typing import Dict, List, Any
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
 from markupsafe import escape
@@ -79,7 +79,9 @@ def filter_models() -> ResponseReturnValue:
         debug(models)
         model_names = [m["name"] for m in models]
         current_model = (
-            model_config.name if model_config.name in model_names else "qwen3-32k:32b"
+            model_config.name
+            if model_config.name in model_names
+            else "gpt-oss-32k:120b"
         )
     elif model_config:
         current_model = model_config.name
@@ -346,19 +348,20 @@ def semantic_search() -> ResponseReturnValue:
     abort(403)
     return jsonify({"error": "This endpoint is not available."})
 
+
 def normalize_results(results) -> Dict[str, Any]:
     """Normalize extraction results into a single dict.
-    
+
     Args:
         results: Can be a dict, list of dicts, or other
-        
+
     Returns:
         A normalized dictionary with extracted values
     """
     # If already a dict, return as-is
     if isinstance(results, dict):
         return results
-    
+
     # If not a list, return empty dict
     if not isinstance(results, list):
         return {}
@@ -366,11 +369,11 @@ def normalize_results(results) -> Dict[str, Any]:
     # If list is empty, return empty dict
     if len(results) == 0:
         return {}
-    
+
     # If single item in list, return that item
     if len(results) == 1:
         return results[0] if isinstance(results[0], dict) else {}
-    
+
     # Multiple items - merge them
     collected: Dict[str, List[Any]] = defaultdict(list)
     seen: Dict[str, set] = defaultdict(set)
@@ -393,6 +396,7 @@ def normalize_results(results) -> Dict[str, Any]:
         for k, vals in collected.items()
     }
 
+
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
     """Begin a search."""
@@ -414,13 +418,11 @@ def begin_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     debug(f"Searching for search set: {searchset_uuid}")
 
-    user_model_config = UserModelConfig.objects(
-        user_id=current_user.get_id()
-    ).first()
+    user_model_config = UserModelConfig.objects(user_id=current_user.get_id()).first()
     model = settings.base_model
     if user_model_config is not None:
         model = user_model_config.name
-    
+
     keys = []
     items = []
     if search_set is not None:
@@ -433,7 +435,7 @@ def begin_search() -> ResponseReturnValue:
         em = ExtractionManager3()
         em.root_path = current_app.root_path
         results = em.extract(keys, document_uuids, model)
-        
+
         debug(f"Raw extraction results: {results}")
 
         # Handle empty or no results
@@ -521,7 +523,7 @@ def begin_search() -> ResponseReturnValue:
         )
 
         return jsonify(response)
-    
+
     template = render_template(
         EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
@@ -531,7 +533,6 @@ def begin_search() -> ResponseReturnValue:
         "template": template,
     }
     return jsonify(response)
-
 
 
 @login_required
