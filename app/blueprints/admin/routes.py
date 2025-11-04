@@ -58,9 +58,7 @@ def parse_date(s: str, default: datetime) -> datetime:
 
 def get_admin_user():
     u = (
-        User.objects(user_id=str(current_user.id)).first()
-        if hasattr(current_user, "id")
-        else None
+        User.objects(user_id=str(current_user.get_id())).first()
     )
     if not u or not u.is_admin:
         abort(403)

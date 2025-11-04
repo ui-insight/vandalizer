@@ -15,12 +15,14 @@ from flask import (
     redirect,
     request,
     send_file,
-    session,
     url_for,
 )
 from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
 from pypdf import PdfReader
+
+# Normalize filename/extension early
+from werkzeug.utils import secure_filename
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
 from app.utilities.document_manager import (
@@ -99,6 +101,8 @@ def upload():
     if not data:
         return jsonify({"error": "Invalid JSON payload."}), 400
 
+    user = current_user
+    user_id = user.get_id()
     space = data.get("space")
     parent_folder_id = data.get("folder") or None
     new_folder_name = (data.get("rootFolderName") or "").strip() or None
@@ -111,9 +115,6 @@ def upload():
         return jsonify(
             {"error": "Missing required fields: file content, file name, or space."}
         ), 400
-
-    # Normalize filename/extension early
-    from werkzeug.utils import secure_filename
 
     safe_filename = secure_filename(filename)
     extension = raw_extension.lower().lstrip(".")
@@ -131,7 +132,7 @@ def upload():
     if new_folder_name:
         smart_folder = SmartFolder(
             title=new_folder_name,
-            user_id=user.user_id,
+            user_id=user_id,
             space=space,
             parent_id=parent_folder_id,
         )
@@ -146,7 +147,7 @@ def upload():
     # De-duplicate on (title, user, space, folder)
     existing = SmartDocument.objects(
         title=safe_filename,
-        user_id=user.user_id,
+        user_id=user_id,
         space=space,
         folder=str(target_folder),
     )
@@ -172,10 +173,10 @@ def upload():
         ), 400
 
     # Save to per-user directory
-    relative_file_path = Path(user.user_id) / f"{uid}.{extension}"
+    relative_file_path = Path(user.get_id()) / f"{uid}.{extension}"
     base_upload_dir = Path(current_app.root_path) / "static" / "uploads"
     base_upload_dir.mkdir(parents=True, exist_ok=True)
-    upload_dir = base_upload_dir / user.user_id
+    upload_dir = base_upload_dir / user.get_id()
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     file_path = upload_dir / f"{uid}.{extension}"
@@ -192,7 +193,7 @@ def upload():
         path=str(relative_file_path),
         extension=extension,
         uuid=uid,
-        user_id=user.user_id,
+        user_id=user_id,
         space=space,
         folder=str(target_folder),
         task_id=None,
@@ -332,6 +333,7 @@ def download_document() -> ResponseReturnValue:
 def delete_document() -> ResponseReturnValue:
     """Delete a document record and its file, but never crash the server."""
     doc_id = request.args.get("docid")
+    user_id = current_user.get_id()
     if not doc_id:
         flash("No document specified.", "warning")
         return _redirect_home()
@@ -343,7 +345,7 @@ def delete_document() -> ResponseReturnValue:
     # 1) Delete via manager (e.g. remove metadata/storage)
     try:
         DocumentManager().delete_document(
-            user_id=session.get("user_id"),
+            user_id=user_id,
             document_id=doc_id,  # noqa: COM812
         )
     except Exception as e:

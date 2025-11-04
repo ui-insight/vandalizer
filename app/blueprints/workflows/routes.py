@@ -48,9 +48,6 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
 )
-from app.utilities.markdown_helpers import (
-    generate_pdf_from_html,
-)
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -69,6 +66,7 @@ WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
 def add_workflow() -> ResponseReturnValue:
     """Create a new workflow."""
     user = current_user
+    user_id = user.get_id()
     if user is None:
         return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
@@ -144,7 +142,7 @@ def update_workflow() -> ResponseReturnValue:
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
     user = current_user
-    user_id = user.user_id
+    user_id = user.get_id()
     if user is None:
         return redirect(url_for("auth.login"))
 
@@ -180,7 +178,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name
@@ -195,12 +193,17 @@ def run_workflow() -> ResponseReturnValue:
     # Check if there's an existing completed activity for this workflow
     # If so, reuse it instead of creating a new one
     from app.models import ActivityEvent
-    existing_activity = ActivityEvent.objects(
-        type=ActivityType.WORKFLOW_RUN,
-        user_id=user_id,
-        workflow=workflow,
-        status="completed"
-    ).order_by("-started_at").first()
+
+    existing_activity = (
+        ActivityEvent.objects(
+            type=ActivityType.WORKFLOW_RUN,
+            user_id=user_id,
+            workflow=workflow,
+            status="completed",
+        )
+        .order_by("-started_at")
+        .first()
+    )
 
     if existing_activity:
         # Reuse the existing activity with new results
@@ -349,7 +352,7 @@ def test_workflow_step() -> ResponseReturnValue:
     task_data = workflow_data["task_data"]
     document_uuids = workflow_data["document_uuids"]
 
-    user_id = user.user_id
+    user_id = user.get_id()
     print(workflow_data)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     document_trigger_step = WorkflowStep(
@@ -358,7 +361,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name
@@ -412,6 +415,8 @@ def run_workflow_integrated() -> ResponseReturnValue:
     if not workflow:
         return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
+    user_id = current_user.get_id()
+
     # **4. Handle File Uploads**
     uploaded_files = request.files.getlist("file")
     if not uploaded_files:
@@ -462,7 +467,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
             path=f"{user.id}/{uid}.{extension}",
             extension=extension,
             uuid=uid,
-            user_id=user.user_id,
+            user_id=user_id,
             space="None",
         )
         document.save()
@@ -527,6 +532,7 @@ def workflow_status() -> ResponseReturnValue:
     activity = None
     activity_id = None
     from app.models import ActivityEvent
+
     activity = ActivityEvent.objects(workflow_result=workflow_result).first()
     if activity:
         activity_id = str(activity.id)
@@ -1015,6 +1021,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 @workflows.route("/add_attachment", methods=["GET", "POST"])
 def workflow_add_attachment() -> ResponseReturnValue:
     """Handle the addition of attachments to a workflow step."""
+    user = current_user
+    user_id = user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1026,7 +1034,7 @@ def workflow_add_attachment() -> ResponseReturnValue:
         workflow = Workflow.objects(id=workflow_id).first()
         current_space = Space.objects(uuid=space_id).first()
         files = SmartDocument.objects(
-            user_id=user.user_id,
+            user_id=user_id,
             space=current_space.uuid,
         )
 
@@ -1057,6 +1065,7 @@ def workflow_add_attachment() -> ResponseReturnValue:
 @workflows.route("/add_prompt_step", methods=["GET", "POST"])
 def workflow_add_prompt_step() -> ResponseReturnValue:
     """Add a prompt step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1076,7 +1085,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
             workflow_task = WorkflowStepTask.objects(id=workflow_task_id).first()
 
         prompts = SearchSetItem.objects(
-            user_id=current_user.user_id,
+            user_id=user_id,
             space_id=current_space.uuid,
             searchtype="prompt",
         ).all()
@@ -1143,6 +1152,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
 @workflows.route("/add_formatter_step", methods=["GET", "POST"])
 def workflow_add_format_step() -> ResponseReturnValue:
     """Add a formatter step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1162,7 +1172,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         current_space = Space.objects(uuid=space_id).first()
         formatters = SearchSetItem.objects(
-            user_id=current_user.user_id,
+            user_id=user_id,
             space_id=current_space.uuid,
             searchtype="formatter",
         ).all()
@@ -1230,6 +1240,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 @workflows.route("/add_document_step", methods=["GET", "POST"])
 def workflow_add_document_step() -> ResponseReturnValue:
     """Add a document step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1246,7 +1257,7 @@ def workflow_add_document_step() -> ResponseReturnValue:
             set_type="document",
         ).all()
         user_extraction_sets = SearchSet.objects(
-            user_id=workflow.user_id,
+            user_id=user_id,
             space=current_space.uuid,
             is_global=False,
             set_type="extraction",
@@ -1283,6 +1294,7 @@ def duplicate_workflow(workflow_id):
         return redirect(url_for("auth.login"))
     # 1) Load original
     orig = Workflow.objects(id=workflow_id).first()
+    user_id = user.get_id()
     if not orig:
         return
         # abort(404, "Workflow not found")
@@ -1311,7 +1323,7 @@ def duplicate_workflow(workflow_id):
     dup_wf = Workflow(
         name=orig.name,
         description=orig.description,
-        user_id=user.user_id,
+        user_id=user_id,
         space=Space.objects()[0].uuid,  # or however you track the user’s active space
         steps=new_steps,
         attachments=new_atts,

@@ -2,10 +2,8 @@ import csv
 import io
 import os
 import uuid
-from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Dict, List
 
 from devtools import debug
 from flask import (
@@ -36,7 +34,7 @@ from app.utilities.analytics_helper import ActivityType, activity_finish, activi
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
-from app.utilities.extraction_tasks import perform_extraction_task, normalize_results
+from app.utilities.extraction_tasks import normalize_results, perform_extraction_task
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
@@ -94,7 +92,9 @@ def filter_models() -> ResponseReturnValue:
         debug(models)
         model_names = [m["name"] for m in models]
         current_model = (
-            model_config.name if model_config.name in model_names else "qwen3-32k:32b"
+            model_config.name
+            if model_config.name in model_names
+            else "gpt-oss-32k:120b"
         )
     elif model_config:
         current_model = model_config.name
@@ -370,7 +370,6 @@ def semantic_search() -> ResponseReturnValue:
     return jsonify({"error": "This endpoint is not available."})
 
 
-
 @tasks.route("/begin_search", methods=["POST"])
 def begin_search() -> ResponseReturnValue:
     """Begin a search - now runs asynchronously using Celery."""
@@ -378,7 +377,7 @@ def begin_search() -> ResponseReturnValue:
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
 
-    print(data)
+    debug(data)
 
     documents = []
     document_paths = []
@@ -390,8 +389,13 @@ def begin_search() -> ResponseReturnValue:
             document_paths.append(absolute_path)
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
-    print("Searching for search set")
-    print(searchset_uuid)
+    debug(f"Searching for search set: {searchset_uuid}")
+
+    user_model_config = UserModelConfig.objects(user_id=current_user.get_id()).first()
+    model = settings.base_model
+    if user_model_config is not None:
+        model = user_model_config.name
+
     keys = []
     items = []
     if search_set is not None:
@@ -544,25 +548,41 @@ def begin_search_sync() -> ResponseReturnValue:
         model_name = settings.base_model
         if user_config:
             model_name = user_config.name
-        
+
         results = em.extract(keys, document_uuids, model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:
             results = results[0]
 
-        debug(results)
+        debug(f"Raw extraction results: {results}")
 
+        # Handle empty or no results
+        if not results:
+            template = render_template(
+                EXTRACTION_PANEL_TEMPLATE,
+                search_set=search_set,
+                results={},
+                documents=documents,
+            )
+            return jsonify({"template": template})
+
+        # Normalize results
+        normalized_results = normalize_results(results)
+        debug(f"Normalized results: {normalized_results}")
+
+        # Handle fillable PDF if configured
         if (
             search_set.fillable_pdf_url != ""
             and search_set.fillable_pdf_url is not None
         ):
             bindings = {}
-            for key in results:
+            for key, value in normalized_results.items():
                 search_set_item = SearchSetItem.objects(searchphrase=key).first()
-                bindings[search_set_item.pdf_binding] = results[key]
+                if search_set_item and search_set_item.pdf_binding:
+                    bindings[search_set_item.pdf_binding] = value
 
-            # Define the file path for the CSV file
+            # Define the file path for the PDF file
             pdf_path = (
                 Path(current_app.root_path)
                 / "static"
@@ -575,7 +595,6 @@ def begin_search_sync() -> ResponseReturnValue:
             writer = PdfWriter()
             writer.append(reader)
 
-            # for page in reader.pages:
             writer.update_page_form_field_values(
                 writer.pages[0],
                 bindings,
@@ -588,10 +607,9 @@ def begin_search_sync() -> ResponseReturnValue:
             with Path.open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
-            # Return the path to the CSV file
             return send_file(
                 "static/fillable_form.pdf",
-                mimetype="text/pdf",
+                mimetype="application/pdf",
                 as_attachment=True,
             )
 
@@ -619,9 +637,7 @@ def begin_search_sync() -> ResponseReturnValue:
         }
 
         # Ingest workflow into vector database for future recommendations
-        ingestion_text = ""
-        ingestion_text += "# Documents selected:"
-
+        ingestion_text = "# Documents selected:"
         for doc in documents:
             ingestion_text += f"\n{doc.raw_text}"
 
@@ -639,6 +655,7 @@ def begin_search_sync() -> ResponseReturnValue:
         )
 
         return jsonify(response)
+
     template = render_template(
         EXTRACTION_PANEL_TEMPLATE,
         search_set=search_set,
@@ -660,14 +677,15 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
 
+    user_id = current_user.get_id()
+    user_model_config = UserModelConfig.objects(user_id=user_id).first()
+    model = settings.base_model
+    if user_model_config is not None:
+        model = user_model_config.name
+
     em = ExtractionManager3()
     em.root_path = current_app.root_path
 
-    user = current_user
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = settings.base_model
-    if model_config is not None:
-        model = model_config.name
     keys = em.build_from_documents(document_uuids, model)
 
     if "entities" in keys:
