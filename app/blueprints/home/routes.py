@@ -74,9 +74,6 @@ from app.utilities.document_readers import extract_text_from_file
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
-from app.utilities.markdown_helpers import (
-    generate_pdf_from_html,
-)
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -90,7 +87,6 @@ logging.basicConfig(
     format="%(loglevel) | %(filename)s:%(lineno)d | %(message)s", level=logging.DEBUG
 )
 logger = logging.getLogger(__name__)
-
 
 
 def verify_document(document: SmartDocument) -> None:
