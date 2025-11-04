@@ -117,7 +117,8 @@ class Settings(BaseSettings):
     )
 
     base_model: str = Field(
-        default="openai", description="Type of the model to use (openai or insight)."
+        default="openai/gpt-5",
+        description="Type of the model to use (openai or insight).",
     )
     models: list[ModelType] = Field(
         default=models,
