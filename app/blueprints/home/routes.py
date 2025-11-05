@@ -634,8 +634,10 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 
     # Sort activities: chats first, then by started_at (most recent first)
     visible_activities.sort(
-        key=lambda a: (-(a.started_at.timestamp() if a.started_at else 0),)
+        key=lambda a: ((a.started_at.timestamp() if a.started_at else 0),)
     )
+
+    debug(f"Visible Activities: {visible_activities}")
 
     return visible_activities
 

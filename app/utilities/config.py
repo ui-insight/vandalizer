@@ -120,6 +120,11 @@ class Settings(BaseSettings):
         default="openai/gpt-5", description="The specific model to use for LLM tasks."
     )
 
+    secure_model: str = Field(
+        default="gpt-oss-32k:120b",
+        description="Type of the model to use (openai or insight).",
+    )
+
     base_model: str = Field(
         default="openai/gpt-5",
         description="Type of the model to use (openai or insight).",
