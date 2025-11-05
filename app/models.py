@@ -2,7 +2,6 @@
 """Models for the application. Defines data structures and relationships."""
 
 import datetime
-from devtools import debug
 import datetime as dt
 import json
 import os
@@ -12,6 +11,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import mongoengine as me
+from devtools import debug
 from mongoengine import CASCADE, PULL, signals
 from pydantic_ai.messages import (
     ModelMessage,
@@ -147,9 +147,7 @@ class Team(me.Document):
             return folder
 
         existing = (
-            SmartFolder.objects(team_id=self.uuid, parent_id="0")
-            .order_by("id")
-            .first()
+            SmartFolder.objects(team_id=self.uuid, parent_id="0").order_by("id").first()
         )
         if existing:
             existing.is_shared_team_root = True
@@ -198,6 +196,8 @@ class TeamInvite(me.Document):
     token = me.StringField(required=True, max_length=200, unique=True)  # secure random
     accepted = me.BooleanField(default=False)
     created_at = me.DateTimeField(default=datetime.datetime.now)
+    sent_at = me.DateTimeField(default=datetime.datetime.now)
+    resend_count = me.IntField(default=0)
 
     meta = {
         "indexes": [
@@ -348,7 +348,10 @@ def _user_pre_save(sender, document: "User", **kwargs):
         # Check if there are pending team invites for this user
         # If so, skip auto-creating a personal team; let the invite processing set the team
         from app.models import TeamInvite
-        pending_invites = TeamInvite.objects(email=document.user_id.lower(), accepted=False).first()
+
+        pending_invites = TeamInvite.objects(
+            email=document.user_id.lower(), accepted=False
+        ).first()
         if not pending_invites:
             team = _pick_default_team_for_user(document.user_id)
             if team:
@@ -594,12 +597,12 @@ class FileAttachment(me.Document):
 
     def to_dict(self):
         return {
-            'id': str(self.id),
-            'filename': self.filename,
-            'file_type': self.file_type,
-            'content': self.content,
-            'created_at': self.created_at,
-            'user_id': self.user_id,
+            "id": str(self.id),
+            "filename": self.filename,
+            "file_type": self.file_type,
+            "content": self.content,
+            "created_at": self.created_at,
+            "user_id": self.user_id,
         }
 
 
@@ -614,14 +617,13 @@ class UrlAttachment(me.Document):
 
     def to_dict(self):
         return {
-            'id': str(self.id),
-            'url': self.url,
-            'title': self.title,
-            'content': self.content,
-            'created_at': self.created_at,
-            'user_id': self.user_id,
+            "id": str(self.id),
+            "url": self.url,
+            "title": self.title,
+            "content": self.content,
+            "created_at": self.created_at,
+            "user_id": self.user_id,
         }
-
 
 
 class ChatMessage(me.Document):
@@ -710,24 +712,25 @@ class ChatConversation(me.Document):
 
     def to_dict(self):
         return {
-            '_id': str(self.id),
-            'uuid': self.uuid,
-            'title': self.title,
-            'user_id': self.user_id,
-            'messages': [
+            "_id": str(self.id),
+            "uuid": self.uuid,
+            "title": self.title,
+            "user_id": self.user_id,
+            "messages": [
                 {
-                    'role': msg.role.value,
-                    'message': msg.message,
-                    'created_at': msg.created_at,
+                    "role": msg.role.value,
+                    "message": msg.message,
+                    "created_at": msg.created_at,
                     # add other message fields as needed
                 }
                 for msg in self.messages  # This will dereference
             ],
-            'file_attachments': [u.to_dict() for u in self.file_attachments],
-            'url_attachments': [u.to_dict() for u in self.url_attachments],
-            'created_at': self.created_at,
-            'updated_at': self.updated_at,
+            "file_attachments": [u.to_dict() for u in self.file_attachments],
+            "url_attachments": [u.to_dict() for u in self.url_attachments],
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }
+
 
 class AgentHistory(me.Document):
     """Simple agent history model for storing conversation messages as JSON."""
@@ -949,7 +952,9 @@ class VerificationRequest(me.Document):
 
     def to_public_dict(self) -> dict:
         status_value = (
-            self.status.value if isinstance(self.status, VerificationStatus) else self.status
+            self.status.value
+            if isinstance(self.status, VerificationStatus)
+            else self.status
         )
         return {
             "id": str(self.id),
@@ -975,7 +980,9 @@ class VerificationRequest(me.Document):
             "known_limitations": self.known_limitations or "",
             "intended_use_tags": self.intended_use_tags or [],
             "evaluation_notes": self.evaluation_notes or "",
-            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
+            "submitted_at": self.submitted_at.isoformat()
+            if self.submitted_at
+            else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 

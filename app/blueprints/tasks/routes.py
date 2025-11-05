@@ -53,15 +53,10 @@ EXTRACTION_PANEL_TEMPLATE = "toolpanel/extractions/extraction_panel.html"
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])
-    debug(data)
     validation_failed = False
-    user_id = current_user.get_id()
-    debug(user_id)
-    debug(current_user)
     user = current_user
 
     settings_models = [m.model_dump() for m in settings.models]
-    debug(settings_models)
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if not model_config:
         model_config = UserModelConfig(user_id=user.user_id, name=settings.base_model)
@@ -89,7 +84,6 @@ def filter_models() -> ResponseReturnValue:
     if validation_failed:
         # filter out the external models
         models = [m for m in model_config.available_models if not m.get("external")]
-        debug(models)
         model_names = [m["name"] for m in models]
         current_model = (
             model_config.name

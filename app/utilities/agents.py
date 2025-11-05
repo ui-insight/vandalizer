@@ -88,6 +88,7 @@ _rag_agent_cache = {}
 _prompt_agent_cache = {}
 _upload_agent_cache = {}
 _extraction_agent_cache = {}
+_secure_agent_cache = {}
 
 
 @dataclass
@@ -231,11 +232,28 @@ def create_upload_agent(agent_model):
     return _upload_agent_cache[cache_key]
 
 
+def create_secure_agent(agent_model):
+    """Create or retrieve a cached upload agent to prevent context leaks."""
+    cache_key = f"upload_{agent_model}"
+
+    if cache_key not in _secure_agent_cache:
+        model = get_agent_model(agent_model)
+        _secure_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+            output_type=UploadResult,
+        )
+
+    return _secure_agent_cache[cache_key]
+
+
 upload_agent = create_upload_agent(settings.base_model)
 
 rag_agent = create_rag_agent(settings.base_model)
 
 prompt_agent = create_prompt_agent(settings.base_model)
+
+secure_agent = create_secure_agent(settings.secure_model)
 
 
 @rag_agent.tool

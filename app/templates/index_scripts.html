@@ -288,7 +288,7 @@
 
             if (response.ok) {
                 // Remove from UI
-                $(buttonElement).closest('.system-message').fadeOut(300, function() {
+                $(buttonElement).closest('.system-message').fadeOut(300, function () {
                     $(this).remove();
                 });
                 console.log('Attachment removed successfully');
@@ -555,7 +555,6 @@
             $("#bottom-toolbar-chat").show();
         } else if (sectionName == "Workflows") {
             $("#workflows-panel").show();
-            $("#bottom-toolbar-add-workflows").show();
             if ($("#search-results-panel").children().length > 0) {
                 $("#search-results-panel").show();
             }
@@ -2774,37 +2773,37 @@
             data: data,
             contentType: "application/json; charset=utf-8",
             dataType: "json",
-        async: true,
-        success: function (data) {
-            console.log("Extraction task started!");
-            console.log(data);
+            async: true,
+            success: function (data) {
+                console.log("Extraction task started!");
+                console.log(data);
 
-            if (data.status === "queued" && data.activity_id) {
-                // Mark task as running in app rail
-                const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
-                if (activityItem) {
-                    activityItem.classList.add('is-running');
+                if (data.status === "queued" && data.activity_id) {
+                    // Mark task as running in app rail
+                    const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
+                    if (activityItem) {
+                        activityItem.classList.add('is-running');
+                    }
+
+                    // Update URL immediately
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', "Library");
+                    url.searchParams.set('search_set_uuid', search_set_uuid);
+                    url.searchParams.set('activity_id', data.activity_id);
+                    window.history.replaceState(null, '', url.toString());
+
+                    // Show loading message
+                    $("#search-results-panel").show();
+                    $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+
+                    // Poll for completion
+                    pollExtractionStatus(data.activity_id, search_set_uuid);
+                } else {
+                    hideWorking();
+                    stopScanning();
+                    showToast("Error starting extraction: " + (data.message || "Unknown error"));
                 }
-
-                // Update URL immediately
-                const url = new URL(window.location.href);
-                url.searchParams.set('section', "Library");
-                url.searchParams.set('search_set_uuid', search_set_uuid);
-                url.searchParams.set('activity_id', data.activity_id);
-                window.history.replaceState(null, '', url.toString());
-
-                // Show loading message
-                $("#search-results-panel").show();
-                $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
-
-                // Poll for completion
-                pollExtractionStatus(data.activity_id, search_set_uuid);
-            } else {
-                hideWorking();
-                stopScanning();
-                showToast("Error starting extraction: " + (data.message || "Unknown error"));
-            }
-        },
+            },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -3105,30 +3104,30 @@
         console.log(set_uuid);
         console.log(document_uuids);
         setSection("Library");
-    $.ajax({
-        url: "/tasks/search_results",
-        type: "POST",
-        data: JSON.stringify({
-            search_set_uuid: set_uuid,
+        $.ajax({
+            url: "/tasks/search_results",
+            type: "POST",
+            data: JSON.stringify({
+                search_set_uuid: set_uuid,
                 document_uuids: document_uuids,
                 edit_mode: edit_mode,
             }),
             contentType: "application/json; charset=utf-8",
             dataType: "json",
-        async: true,
-        success: function (data) {
-            $("#search-results-panel").show();
-            $("#search-results-panel").empty();
-            $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-            addResultListeners();
-            search_set_add_uuid = set_uuid;
+            async: true,
+            success: function (data) {
+                $("#search-results-panel").show();
+                $("#search-results-panel").empty();
+                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+                addResultListeners();
+                search_set_add_uuid = set_uuid;
 
-            // Update URL to maintain Library section context
-            const url = new URL(window.location.href);
-            url.searchParams.set('section', "Library");
-            url.searchParams.set('search_set_uuid', set_uuid);
-            window.history.replaceState(null, '', url.toString());
-        },
+                // Update URL to maintain Library section context
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', "Library");
+                url.searchParams.set('search_set_uuid', set_uuid);
+                window.history.replaceState(null, '', url.toString());
+            },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
@@ -3242,14 +3241,14 @@
         let pollCount = 0;
         const maxPolls = 120; // 2 minutes max (120 * 1000ms)
 
-        const intervalId = setInterval(function() {
+        const intervalId = setInterval(function () {
             pollCount++;
 
             $.ajax({
                 url: `/tasks/extraction_status/${activity_id}`,
                 type: "GET",
                 dataType: "json",
-                success: function(response) {
+                success: function (response) {
                     console.log("Extraction status:", response.status);
 
                     if (response.status === "completed") {
@@ -3307,7 +3306,7 @@
                     }
                     // Otherwise keep polling (status is "queued" or "running")
                 },
-                error: function(xhr, ajaxOptions, thrownError) {
+                error: function (xhr, ajaxOptions, thrownError) {
                     console.log("Error polling extraction status:", xhr.status, thrownError);
                     if (pollCount >= 5) {
                         // After 5 failed attempts, give up
@@ -3946,7 +3945,7 @@
 
     // Trigger recommendations check after section is set (important for direct file opens)
     // Use setTimeout to ensure DOM is fully updated after setSection
-    setTimeout(function() {
+    setTimeout(function () {
         updateDocumentSelections();
     }, 100);
 

@@ -61,8 +61,8 @@ class ExtractionManager3:
         openai.api_key = OPENAI_API_KEY
         time.time()
         extraction = []
-        if not model_name:
-            model_name = settings.base_model
+        if not model:
+            model = settings.base_model
 
         if full_text is None:
             for document_uuid in document_uuids:
