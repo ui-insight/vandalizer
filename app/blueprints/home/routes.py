@@ -252,8 +252,8 @@ def index() -> ResponseReturnValue:
                     # Set workflow_id so the workflow panel opens
                     workflow_id = str(workflow_result.workflow.id)
                     workflow_tpl, workflow_step_tpl = _render_workflow_bits(workflow_id)
-                    # Switch to the Workflows section
-                    section = "Workflows"
+                    # Ensure the Library section is active beneath the workflow panel
+                    section = "Library"
                     debug(
                         f"Loading workflow {workflow_id} from activity, template length: {len(workflow_tpl)}"
                     )
@@ -281,6 +281,16 @@ def index() -> ResponseReturnValue:
                     if workflow_result.session_id and "session_id" not in snapshot:
                         snapshot["session_id"] = workflow_result.session_id
                     workflow_activity_snapshot = snapshot or None
+
+                    stored_doc_uuids = snapshot.get("document_uuids") or []
+                    workflow_documents: list[SmartDocument] = []
+                    for doc_uuid in stored_doc_uuids:
+                        doc = SmartDocument.objects(uuid=doc_uuid).first()
+                        if doc:
+                            workflow_documents.append(doc)
+                    if workflow_documents:
+                        documents = workflow_documents
+                        selected_document = workflow_documents[0]
             elif activity_type == "search_set_run":
                 # Load the search set to display
                 search_set_uuid = activity.search_set_uuid
@@ -297,6 +307,10 @@ def index() -> ResponseReturnValue:
                             doc = SmartDocument.objects(uuid=doc_uuid).first()
                             if doc:
                                 snapshot_documents.append(doc)
+
+                        if snapshot_documents:
+                            documents = snapshot_documents
+                            selected_document = snapshot_documents[0]
 
                         # Switch to Library section and show the extraction panel
                         section = "Library"
@@ -1159,14 +1173,18 @@ def chat_download() -> ResponseReturnValue:
         model = model_config.name
     else:
         model = settings.base_model
-    chat_agent = create_chat_agent(model)
-    # get current event loop
-    # if there is no current loop, create a new one
-    formatted = asyncio.run(chat_agent.run(prompt))
-    formatted = formatted.output
 
-    # Remove the tick marks before and after blocks
-    formatted = formatted.strip("`").strip()
+    if fmt == "pdf":
+        formatted = final_output
+    else:
+        chat_agent = create_chat_agent(model)
+        # get current event loop
+        # if there is no current loop, create a new one
+        formatted = asyncio.run(chat_agent.run(prompt))
+        formatted = formatted.output
+
+        # Remove the tick marks before and after blocks
+        formatted = formatted.strip("`").strip()
 
     # 4) package it up
     buf = io.BytesIO()

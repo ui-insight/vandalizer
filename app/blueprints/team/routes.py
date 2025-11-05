@@ -59,9 +59,15 @@ def team_index():
     current_team, my_teams = _get_teams(user)
     members = []
     invites = []
+    can_edit_team = False
+    team_id: str | None = None
     if team:
         members = TeamMembership.objects(team=team)
         invites = TeamInvite.objects(team=team, accepted=False)
+        membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
+        if membership and membership.role in ("owner", "admin"):
+            can_edit_team = True
+        team_id = str(team.id)
     return render_template(
         "teams/team.html",
         team=team,
@@ -70,6 +76,8 @@ def team_index():
         current_team=current_team,
         is_admin=is_admin_user(user.user_id),
         current_user_name=user.name,
+        can_edit_team=can_edit_team,
+        team_id=team_id,
     )
 
 
@@ -84,6 +92,30 @@ def team_create():
     ).save()
     TeamMembership(team=t, user_id=user.user_id, role="owner").save()
     return redirect(url_for("team.team_index"))
+
+
+@teams.route("/update_name", methods=["POST"])
+def update_team_name():
+    user = require_login()
+    data = request.get_json(silent=True) or {}
+    team_id = data.get("team_id")
+    new_name = (data.get("name") or "").strip()
+
+    if not team_id or not new_name:
+        return jsonify({"error": "Team id and name are required."}), 400
+
+    team = Team.objects(id=team_id).first()
+    if not team:
+        return jsonify({"error": "Team not found."}), 404
+
+    membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
+    if not membership or membership.role not in ("owner", "admin"):
+        return jsonify({"error": "You do not have permission to rename this team."}), 403
+
+    team.name = new_name
+    team.save()
+
+    return jsonify({"status": "success", "name": team.name})
 
 
 @teams.route("/invite", methods=["POST"])

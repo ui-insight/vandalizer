@@ -628,19 +628,24 @@ def workflow_download() -> ResponseReturnValue:
         )
 
     user = current_user
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = settings.base_model
-    chat_agent = create_chat_agent(model)
-    # get current event loop
-    # if there is no current loop, create a new one
-    formatted = asyncio.run(chat_agent.run(prompt))
-    formatted = formatted.output
 
-    # Remove the tick marks before and after blocks
-    formatted = formatted.strip("`").strip()
+    if fmt == "pdf":
+        formatted = final_output
+    else:
+        model_config = UserModelConfig.objects(user_id=user.user_id).first()
+        if model_config:
+            model = model_config.name
+        else:
+            model = settings.base_model
+
+        chat_agent = create_chat_agent(model)
+        # get current event loop
+        # if there is no current loop, create a new one
+        formatted = asyncio.run(chat_agent.run(prompt))
+        formatted = formatted.output
+
+        # Remove the tick marks before and after blocks
+        formatted = formatted.strip("`").strip()
 
     # 4) package it up
     buf = io.BytesIO()

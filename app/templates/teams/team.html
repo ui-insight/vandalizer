@@ -61,7 +61,17 @@
     <p style="margin-top:15px;color:#777">You are not a member of any team yet.</p>
     {% else %}
     <div class="card" style="padding:16px;margin-bottom:20px">
-        <h3 style="margin:0 0 10px 0">{{ team.name }}</h3>
+        <h3 style="margin:0 0 10px 0; display: flex; align-items: center; gap: 8px;">
+            <span id="teamName">{{ team.name }}</span>
+            {% if can_edit_team %}
+            <i class="fa-regular fa-pen-to-square" id="editTeamNameBtn"
+                style="font-size: 16px; color: #adadad99; cursor: pointer;"></i>
+            {% endif %}
+        </h3>
+        {% if can_edit_team %}
+        <input id="teamNameInput" type="text" value="{{ team.name }}"
+            style="display: none; font-size: 20px; margin-bottom: 10px; width: 100%;" />
+        {% endif %}
         <small>Owner: {{ team.owner_user_id }}</small>
     </div>
 
@@ -131,4 +141,83 @@
             {% endif %}
     </div>
 </div>
+
+{% if can_edit_team %}
+<script>
+    $(function () {
+        var $editButton = $("#editTeamNameBtn");
+        var $nameDisplay = $("#teamName");
+        var $input = $("#teamNameInput");
+        if ($editButton.length === 0 || $input.length === 0) {
+            return;
+        }
+
+        var teamId = {{ team_id | tojson }};
+    var currentName = $nameDisplay.text().trim();
+    var cancelFromEsc = false;
+
+    function cancelEdit() {
+        $input.hide();
+        $nameDisplay.show();
+        $editButton.show();
+        $input.val(currentName);
+    }
+
+    function submitNewName() {
+        var newName = $input.val().trim();
+        if (!newName || newName === currentName) {
+            cancelEdit();
+            return;
+        }
+
+        $.ajax({
+            url: "/teams/update_name",
+            type: "POST",
+            data: JSON.stringify({ team_id: teamId, name: newName }),
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            success: function (response) {
+                currentName = response.name || newName;
+                $nameDisplay.text(currentName);
+            },
+            error: function (xhr) {
+                var message = "Unable to update team name.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    message = xhr.responseJSON.error;
+                }
+                alert(message);
+            },
+            complete: function () {
+                cancelEdit();
+            }
+        });
+    }
+
+    $editButton.on("click", function (event) {
+        event.preventDefault();
+        cancelFromEsc = false;
+        $nameDisplay.hide();
+        $editButton.hide();
+        $input.val(currentName).show().focus().select();
+    });
+
+    $input.on("keypress", function (event) {
+        if (event.which === 13) {
+            submitNewName();
+        } else if (event.which === 27) {
+            cancelFromEsc = true;
+            cancelEdit();
+        }
+    });
+
+    $input.on("blur", function () {
+        if (cancelFromEsc) {
+            cancelFromEsc = false;
+            return;
+        }
+        submitNewName();
+    });
+    });
+</script>
+{% endif %}
 {% endblock %}

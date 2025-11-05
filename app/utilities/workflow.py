@@ -641,9 +641,10 @@ def execute_workflow_task(
     )
 
     # Ingest workflow into vector database for future recommendations (async)
+    docs = workflow_trigger_step.data.get("docs", [])
+
     try:
 
-        docs = workflow_trigger_step.data.get("docs", [])
         ingestion_text = "# Documents selected:"
         for doc in docs:
             if hasattr(doc, 'raw_text'):
@@ -671,6 +672,15 @@ def execute_workflow_task(
         except TypeError:
             snapshot_output = str(snapshot_output)
 
+        document_uuids: list[str] = []
+        for doc in docs or []:
+            if doc is None:
+                continue
+            if hasattr(doc, "uuid"):
+                document_uuids.append(doc.uuid)
+            elif isinstance(doc, str):
+                document_uuids.append(doc)
+
         snapshot.update(
             {
                 "output": snapshot_output,
@@ -679,8 +689,13 @@ def execute_workflow_task(
                 "steps_completed": workflow_result.num_steps_completed,
                 "status": workflow_result.status,
                 "workflow_result_id": workflow_result_id,
+                "document_uuids": document_uuids,
+                "session_id": workflow_result.session_id,
             },
         )
+
+        if document_uuids:
+            activity.documents_touched = len(set(document_uuids))
 
         activity.result_snapshot = snapshot
         activity_finish(activity, status=ActivityStatus.COMPLETED)

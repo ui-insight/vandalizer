@@ -37,6 +37,90 @@
     var conversationId = null;
     var activity_id = null;
 
+    var pendingActivityActivation = null;
+
+    function clearRailActiveState() {
+        document.querySelectorAll("#run-list li.run-item.active").forEach(function (li) {
+            li.classList.remove("active");
+        });
+    }
+
+    function promoteActivityInRail(activityId) {
+        const ul = document.getElementById("run-list");
+        if (!ul || !activityId) {
+            return null;
+        }
+        const li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        if (!li) {
+            return null;
+        }
+        if (ul.children.length > 2) {
+            ul.insertBefore(li, ul.children[2]);
+        } else {
+            ul.appendChild(li);
+        }
+        return li;
+    }
+
+    function setActiveRailActivity(activityId, options) {
+        if (!activityId) {
+            return;
+        }
+
+        const opts = Object.assign({ promote: false, running: false }, options || {});
+        const ul = document.getElementById("run-list");
+        if (!ul) {
+            return;
+        }
+
+        clearRailActiveState();
+
+        const apply = function () {
+            let li;
+            if (opts.promote) {
+                li = promoteActivityInRail(activityId);
+            }
+            if (!li) {
+                li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+            }
+            if (!li) {
+                pendingActivityActivation = { activityId: activityId, options: opts };
+                return;
+            }
+
+            clearRailActiveState();
+            li.classList.add("active");
+            if (opts.running) {
+                li.classList.add("is-running");
+            }
+            pendingActivityActivation = null;
+        };
+
+        const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        if (existing) {
+            apply();
+            return;
+        }
+
+        pendingActivityActivation = { activityId: activityId, options: opts };
+    }
+
+    function fulfillPendingActivityActivation() {
+        if (!pendingActivityActivation) {
+            return;
+        }
+        const ul = document.getElementById("run-list");
+        if (!ul) {
+            return;
+        }
+        const candidate = ul.querySelector(`li.run-item[data-run-id='${pendingActivityActivation.activityId}']`);
+        if (candidate) {
+            const opts = pendingActivityActivation.options || {};
+            pendingActivityActivation = null;
+            setActiveRailActivity(candidate.dataset.runId, opts);
+        }
+    }
+
 
     const activity = {{ activity.to_json() | safe if activity else 'null' }};
     console.log("activity", activity);
@@ -120,6 +204,8 @@
 
         conversationId = data.conversation_id;
         activity_id = activityId;
+
+        fulfillPendingActivityActivation();
     };
 
     function toHtml(markdown) {
@@ -213,11 +299,16 @@
             return;
         }
 
+        if (snapshot.session_id) {
+            workflow_session_id = snapshot.session_id;
+        }
+
         $outputContainer.removeClass("hidden").addClass("active");
         $outputContainer.find(".step-connector").addClass("active");
         $(".workflow-loader").hide();
 
         $outputSection.show().empty().append(html);
+        configureWorkflowDownloadButton();
         $(".workflow-output-buttons").removeClass("hidden");
 
         const stepsCompleted =
@@ -229,7 +320,11 @@
         if (info.length) {
             if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
                 const completed = Math.max(stepsCompleted, 0);
-                info.html(`<span>${completed} / ${stepsTotal} steps completed</span>`);
+                let statusLabel = status || "Completed";
+                if (typeof statusLabel === "string" && statusLabel.length > 0) {
+                    statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+                }
+                info.html(`<span>${completed} / ${stepsTotal} steps completed</span><span><i>${statusLabel}</i></span>`);
             } else if (status) {
                 const label = status.charAt(0).toUpperCase() + status.slice(1);
                 info.html(`<span>${label}</span>`);
@@ -1884,9 +1979,8 @@
             $('.workflow-output').fadeOut();
         });
 
-        $('#download-popup-menu').off('click').on('click', function (e) {
-            e.stopPropagation();
-        });
+        configureWorkflowDownloadButton();
+        wireWorkflowDownloadOptions();
     }
 
     function fetchWorkflow(workflow_uuid) {
@@ -2049,6 +2143,29 @@
         stopScanning();
     }
 
+    function prepareWorkflowOutputPanel() {
+        const $outputContainer = $(".workflow-output");
+        if ($outputContainer.length === 0) {
+            return;
+        }
+
+        hideDownloadPopupMenu();
+        $outputContainer.removeClass("hidden");
+
+        const $section = $(".workflow-output-section");
+        const placeholderHtml = [
+            '<div class="workflow-output-placeholder"',
+            '     style="display: flex; align-items: center; gap: 8px; justify-content: center; padding: 40px 0;">',
+            '  <i class="fa-solid fa-spinner fa-spin" style="font-size: 18px;"></i>',
+            '  <span>Preparing workflow output...</span>',
+            '</div>'
+        ].join("");
+
+        $section.show().empty().append(placeholderHtml);
+        $(".workflow-output-buttons").addClass("hidden");
+        $(".workflow-output-attachment-info").html('<span>Preparing output</span><span><i>0s elapsed</i></span>');
+    }
+
     function runWorkflow(download = false) {
         if (document_uuids == "") {
             showToast("Select a document to run workflow");
@@ -2088,8 +2205,7 @@
 
         $('.workflow-output').removeClass('active');
         $('.add-step').hide();
-        $('.workflow-output-section').hide();
-        $('.workflow-output').removeClass('hidden');
+        prepareWorkflowOutputPanel();
         $('.workflow-output').fadeIn();
 
         workflow_interval_id = pollWorkflowStatus(session_id);
@@ -2110,12 +2226,13 @@
             success: function (data) {
                 console.log("Workflow run response:", data);
 
-                // Redirect to the page with activity_id to highlight the new activity in side rail
+                // Track the activity without leaving the page
                 if (data.activity_id) {
                     const url = new URL(window.location.href);
                     url.searchParams.set('activity_id', data.activity_id);
-                    url.searchParams.set('section', 'Assistant');
-                    window.location.href = url.toString();
+                    window.history.replaceState({}, "", url.toString());
+                    activity_id = data.activity_id;
+                    setActiveRailActivity(data.activity_id, { promote: true, running: true });
                 }
 
                 if (download) {
@@ -2187,6 +2304,9 @@
             type: 'GET',
             dataType: 'json',
             success: function (data) {
+                if (data.session_id) {
+                    workflow_session_id = data.session_id;
+                }
                 //const { steps_completed, total_steps, status } = data;
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
@@ -2315,58 +2435,7 @@
                     $('.workflow-step').eq(active_step).removeClass('active');
                     $('.workflow-output').addClass('active');
 
-                    $('#downloadWorkflowBtn').on('click', function (e) {
-                        e.stopPropagation();
-                        const $btn = $(this);
-                        const $popup = $('#download-popup-menu');
-
-                        // 1) move it so it's not clipped by any parent
-                        $('body').append($popup);
-
-                        // 2) show invisibly to get its dimensions
-                        $popup.css({
-                            position: 'absolute',
-                            visibility: 'hidden',
-                            display: 'block'
-                        });
-                        const popupW = $popup.outerWidth();
-                        const popupH = $popup.outerHeight();
-
-                        // 3) figure out where the button is on the page
-                        const btnOff = $btn.offset();
-
-                        // 4) calculate your top/left
-                        let left = btnOff.left;               // align left edges
-                        let top = btnOff.top - popupH - 10; // sit 10px above the button
-
-                        // 5) keep it inside the viewport
-                        const winW = $(window).width();
-                        if (left + popupW > winW) left = winW - popupW - 5;
-
-                        // 6) show it for real
-                        $popup.css({
-                            visibility: 'visible',
-                            top: `${top}px`,
-                            left: `${left}px`,
-                            opacity: 0
-                        }).animate({ opacity: 1 }, 200);
-
-
-                        $('#download-pdf-option').off('click').on("click", function () {
-                            console.log("here");
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('pdf');
-
-                        });
-                        $('#download-csv-option').off('click').on("click", function () {
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('csv');
-                        });
-                        $('#download-text-option').off('click').on("click", function () {
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('txt');
-                        });
-                    });
+                    configureWorkflowDownloadButton();
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -2380,6 +2449,103 @@
                 showToast("Error polling workflow status");
             }
         });
+    }
+
+    function showWorkflowDownloadMenu($btn) {
+        const $popup = $('#download-popup-menu');
+        if ($popup.length === 0) {
+            return;
+        }
+
+        if ($popup.is(':visible')) {
+            hideDownloadPopupMenu();
+            return;
+        }
+
+        $('body').append($popup);
+
+        $popup.css({
+            position: 'absolute',
+            visibility: 'hidden',
+            display: 'block'
+        });
+
+        const popupWidth = $popup.outerWidth();
+        const popupHeight = $popup.outerHeight();
+        const offset = $btn.offset();
+
+        let left = offset.left;
+        let top = offset.top - popupHeight - 10;
+
+        const viewportWidth = $(window).width();
+        if (left + popupWidth > viewportWidth) {
+            left = viewportWidth - popupWidth - 5;
+        }
+
+        $popup.css({
+            visibility: 'visible',
+            top: `${top}px`,
+            left: `${left}px`,
+            opacity: 0
+        }).animate({ opacity: 1 }, 200);
+    }
+
+    function configureWorkflowDownloadButton() {
+        const $btn = $('#downloadWorkflowBtn');
+        if ($btn.length === 0) {
+            return;
+        }
+
+        $btn.off('click.workflow-download').on('click.workflow-download', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!workflow_session_id) {
+                if (typeof showToast === 'function') {
+                    showToast('No downloadable workflow result available yet.');
+                }
+                return;
+            }
+
+            showWorkflowDownloadMenu($(this));
+        });
+    }
+
+    function wireWorkflowDownloadOptions() {
+        const $popup = $('#download-popup-menu');
+        if ($popup.length === 0) {
+            return;
+        }
+
+        $(document)
+            .off('click.workflow-dl-pdf')
+            .on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download PDF option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('pdf');
+            });
+
+        $(document)
+            .off('click.workflow-dl-csv')
+            .on('click.workflow-dl-csv', '#download-csv-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download CSV option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('csv');
+            });
+
+        $(document)
+            .off('click.workflow-dl-txt')
+            .on('click.workflow-dl-txt', '#download-text-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download Text option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('txt');
+            });
     }
 
     function downloadWorkflow(session_id) {
@@ -2401,12 +2567,12 @@
     }
 
     // hide popup when popup menu loses focus and popup menu is visible
-    $(document).on("click", function (e) {
-        const $popupMenu = $('#download-popup-menu');
-        if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
-            hideDownloadPopupMenu();
-        }
-    });
+        $(document).on("click", function (e) {
+            const $popupMenu = $('#download-popup-menu');
+            if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
+                hideDownloadPopupMenu();
+            }
+        });
 
 
 
@@ -2416,26 +2582,26 @@
     //            e.stopPropagation();
     //        });
 
-    $(document).on('click', '#download-pdf-option', function (e) {
-        e.stopPropagation();
-        console.log("Download PDF option clicked");
-        hideDownloadPopupMenu();
-        downloadWorkflowOutput('pdf');
-    });
+        $(document).off('click.workflow-dl-pdf').on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
+            e.stopPropagation();
+            console.log("Download PDF option clicked");
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('pdf');
+        });
 
-    $(document).on('click', '#download-csv-option', function (e) {
-        e.stopPropagation();
-        console.log("Download CSV option clicked");
-        hideDownloadPopupMenu();
-        downloadWorkflowOutput('csv');
-    });
+        $(document).off('click.workflow-dl-csv').on('click.workflow-dl-csv', '#download-csv-option', function (e) {
+            e.stopPropagation();
+            console.log("Download CSV option clicked");
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('csv');
+        });
 
-    $(document).on('click', '#download-text-option', function (e) {
-        e.stopPropagation();
-        console.log("Download Text option clicked");
-        hideDownloadPopupMenu();
-        downloadWorkflowOutput('txt');
-    });
+        $(document).off('click.workflow-dl-txt').on('click.workflow-dl-txt', '#download-text-option', function (e) {
+            e.stopPropagation();
+            console.log("Download Text option clicked");
+            hideDownloadPopupMenu();
+            downloadWorkflowOutput('txt');
+        });
 
     function downloadWorkflowOutput(format) {
         console.log("Downloading workflow output in format:", format);
@@ -2780,10 +2946,7 @@
 
                 if (data.status === "queued" && data.activity_id) {
                     // Mark task as running in app rail
-                    const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
-                    if (activityItem) {
-                        activityItem.classList.add('is-running');
-                    }
+                    setActiveRailActivity(data.activity_id, { promote: true, running: true });
 
                     // Update URL immediately
                     const url = new URL(window.location.href);
@@ -2949,8 +3112,14 @@
         });
 
         $("#build-extraction-from-document-btn").on("click", function () {
-            let uuid = $(this).attr("data-uuid");
-            buildExtractionFromDocument(uuid);
+            const $button = $(this);
+            if ($button.data("loading")) {
+                return;
+            }
+
+            const uuid = $button.attr("data-uuid");
+            setBuildExtractionButtonLoading($button, true);
+            buildExtractionFromDocument(uuid, $button);
         });
 
         $("#build-extraction-from-fillable-pdf-btn").on("click", function () {
@@ -3193,7 +3362,47 @@
         });
     }
 
-    function buildExtractionFromDocument(uuid) {
+    function setBuildExtractionButtonLoading($button, isLoading) {
+        if (!$button || $button.length === 0) {
+            return;
+        }
+
+        const $iconContainer = $button.find(".add-task-icon-container");
+        const $title = $button.find(".add-task-title");
+
+        if (isLoading) {
+            $button.data("loading", true);
+            $button.attr("aria-disabled", "true");
+            $button.css("pointer-events", "none");
+
+            if (!$button.data("original-icon")) {
+                $button.data("original-icon", $iconContainer.html());
+            }
+            if (!$button.data("original-title")) {
+                $button.data("original-title", $title.text());
+            }
+
+            $iconContainer.html(
+                '<i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #252c32;"></i>'
+            );
+            $title.text("Building...");
+        } else {
+            $button.data("loading", false);
+            $button.removeAttr("aria-disabled");
+            $button.css("pointer-events", "");
+
+            const originalIcon = $button.data("original-icon");
+            const originalTitle = $button.data("original-title");
+            if (originalIcon) {
+                $iconContainer.html(originalIcon);
+            }
+            if (originalTitle) {
+                $title.text(originalTitle);
+            }
+        }
+    }
+
+    function buildExtractionFromDocument(uuid, $trigger) {
         showScanning();
         showWorking();
         $.ajax({
@@ -3209,6 +3418,11 @@
             success: function (msg) {
                 if (msg.complete == false) {
                     showToast(msg.error);
+                    stopScanning();
+                    hideWorking();
+                    if ($trigger) {
+                        setBuildExtractionButtonLoading($trigger, false);
+                    }
                     return;
                 }
 
@@ -3219,10 +3433,18 @@
                 $("#search-results-panel").empty();
                 $(msg.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
+                if ($trigger) {
+                    setBuildExtractionButtonLoading($trigger, false);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                stopScanning();
+                hideWorking();
+                if ($trigger) {
+                    setBuildExtractionButtonLoading($trigger, false);
+                }
             },
         });
     }
