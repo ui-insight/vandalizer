@@ -14,6 +14,8 @@
     var total_steps = 1;
     var workflow_interval_id = null;
 
+    var recommendationRequests = new Set();
+
     let workflowActivitySnapshot = {{ workflow_activity_snapshot | tojson | safe }};
     const workflowActivityStatus = {{ workflow_activity_status | tojson | safe }};
     const workflowActivityId = {{ workflow_activity_id | tojson | safe }};
@@ -1431,6 +1433,14 @@
                     $('#loading-spinner, #processing-indicator').hide();
                     $('#raw-text-icon').show();
                     isProcessingFile = false;
+
+                    if (docUuid) {
+                        document_uuids = [docUuid];
+                        if (!recommendationRequests.has(docUuid) && shouldFetchRecommendations()) {
+                            recommendationRequests.add(docUuid);
+                            getWorkflowRecommendations([docUuid]);
+                        }
+                    }
 
                     if (processingFileOriginalText) {
                         $('.processing-file-text-question-holder').text(processingFileOriginalText);
