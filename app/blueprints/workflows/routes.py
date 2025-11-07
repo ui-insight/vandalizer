@@ -453,7 +453,9 @@ def run_workflow_integrated() -> ResponseReturnValue:
         # **Optional: Handle File Conversion**
         if extension == "docx":
             pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+            # SHENEMAN
             pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
+            pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path, extra_args="--pdf-engine=xelatex")
             extension = "pdf"
         elif extension in ["xlsx", "xls"]:
             html_path = os.path.join(upload_dir, f"{uid}.html")
