@@ -93,7 +93,12 @@ def perform_extraction_and_update(document_uuid, extension):
     document.processing = True
     document.task_status = "ocr"
     raw_text = ""
-    extra_args = ["-V", "geometry:margin=2cm"]
+
+    # SHENEMAN - Added the --pdf-engine=xelatex flag
+    #extra_args = ["-V", "geometry:margin=2cm"]
+    extra_args = ["--pdf-engine=xelatex", "-V", "geometry:margin=2cm"]
+
+
     pdf_path = absolute_path.with_suffix(".pdf")
     document.path = str(Path(document.path).with_suffix(".pdf"))
     document.save()
