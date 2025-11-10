@@ -1094,6 +1094,26 @@ class ActivityEvent(me.Document):
             return None
         return int((f - s).total_seconds() * 1000)
 
+    @property
+    def safe_workflow_name(self) -> str:
+        """
+        Safely retrieve workflow name without throwing DoesNotExist error.
+        Returns workflow name from meta_summary, or from workflow reference if available,
+        or a fallback string if workflow was deleted.
+        """
+        # Try meta_summary first (preferred, no dereferencing)
+        if self.meta_summary and self.meta_summary.get("workflow_name"):
+            return self.meta_summary["workflow_name"]
+
+        # Try to dereference workflow, handle DoesNotExist
+        try:
+            if self.workflow:
+                return self.workflow.name
+        except me.DoesNotExist:
+            pass
+
+        return "(workflow)"
+
 
 class DailyUsageAggregate(me.Document):
     """
