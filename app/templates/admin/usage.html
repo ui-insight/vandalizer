@@ -394,8 +394,7 @@
                     </td>
                     <td>
                         {% if ev.type == 'workflow_run' %}
-                        {{ (ev.meta_summary.workflow_name or (ev.workflow.name if ev.workflow else '(workflow)')) if
-                        ev.meta_summary else (ev.workflow.name if ev.workflow else '(workflow)') }}
+                        {{ ev.safe_workflow_name }}
                         — Steps {{ ev.steps_completed }}/{{ ev.steps_total }}
                         {% elif ev.type == 'search_set_run' %}
                         {{ ev.meta_summary.search_set_title if ev.meta_summary else '' }} {{ ev.search_set_uuid or '' }}
