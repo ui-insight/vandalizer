@@ -1231,10 +1231,6 @@ def markdown_or_html_to_pdf_bytes(
     if extra_args is None:
         extra_args = [
             "--pdf-engine=xelatex",
-            "-V",
-            "geometry:margin=2cm",
-            "-V",
-            "mainfont=Helvetica",
         ]
 
     with tempfile.TemporaryDirectory() as tmpdir:
