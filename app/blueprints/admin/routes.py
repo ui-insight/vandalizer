@@ -224,7 +224,7 @@ def usage_dashboard():
     recent_events = ev_q.order_by("-started_at").limit(50)
 
     # Selects
-    all_users = sorted(ActivityEvent.objects.distinct("user_id"))
+    all_users = sorted([u for u in ActivityEvent.objects.distinct("user_id") if u is not None])
     all_teams = Team.objects.order_by("name")
     all_spaces = Space.objects.only("uuid", "title").order_by("title")
 
