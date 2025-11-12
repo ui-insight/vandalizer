@@ -55,10 +55,49 @@ from app.utilities.workflow import (
     execute_task_step_test,
     execute_workflow_task,
 )
+from app.utilities.verification_helpers import user_can_modify_verified
 
 workflows = Blueprint("workflows", __name__)
 
 WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
+
+
+def _workflow_user_or_none():
+    try:
+        if current_user.is_authenticated:
+            return current_user
+    except Exception:
+        return None
+    return None
+
+
+def _verified_workflow_forbidden():
+    return (
+        jsonify(
+            {
+                "error": "forbidden",
+                "message": "Verified workflows can only be modified by examiners.",
+            }
+        ),
+        403,
+    )
+
+
+def _workflow_is_editable(workflow: Workflow | None) -> bool:
+    return bool(workflow and user_can_modify_verified(_workflow_user_or_none(), workflow))
+
+
+def _workflow_for_step(step: WorkflowStep | None) -> Workflow | None:
+    if not step:
+        return None
+    return Workflow.objects(steps=step).first()
+
+
+def _workflow_for_task(task: WorkflowStepTask | None) -> Workflow | None:
+    if not task:
+        return None
+    step = WorkflowStep.objects(tasks=task).first()
+    return _workflow_for_step(step)
 
 
 @login_required
@@ -92,6 +131,11 @@ def edit_workflow() -> ResponseReturnValue:
     data = request.get_json()
     uuid = data["uuid"]
     workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     template = render_template(
         "workflows/edit_workflow.html",
@@ -115,6 +159,11 @@ def delete_workflow() -> ResponseReturnValue:
     uuid = data["uuid"]
     print(uuid)
     workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     WorkflowResult.objects(workflow=workflow).delete()
     workflow.delete()
@@ -131,6 +180,12 @@ def update_workflow() -> ResponseReturnValue:
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow.name = workflow_data["name"]
     workflow.description = workflow_data["description"]
     workflow.save()
@@ -707,10 +762,12 @@ def fetch_workflow() -> ResponseReturnValue:
     data = request.get_json()
     workflow_id = data["workflow_uuid"]
     workflow = Workflow.objects(id=workflow_id).first()
+    can_customize = _workflow_is_editable(workflow)
 
     template = render_template(
         "workflows/workflow.html",
         workflow=workflow,
+        can_customize_workflow=can_customize,
     )
 
     response = {
@@ -730,6 +787,12 @@ def update_workflow_title() -> ResponseReturnValue:
     workflow_data = request.get_json()
     workflow_id = workflow_data["uuid"]
     workflow = Workflow.objects(id=ObjectId(workflow_id)).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow.name = workflow_data["title"]
     workflow.save()
 
@@ -748,6 +811,12 @@ def add_workflow_step() -> ResponseReturnValue:
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     step_title = workflow_step_data["title"]
 
     workflow_step = WorkflowStep(name=step_title)
@@ -777,6 +846,12 @@ def edit_workflow_step() -> ResponseReturnValue:
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
     template = render_template(
         "workflows/workflow_steps/edit_workflow_step_modal.html",
@@ -799,6 +874,16 @@ def update_workflow_step_title() -> ResponseReturnValue:
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+    if not workflow_step:
+        return jsonify({"error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(workflow_step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step.name = workflow_step_data["title"]
     workflow_step.save()
 
@@ -817,6 +902,12 @@ def add_workflow_add_task() -> ResponseReturnValue:
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
     template = render_template(
         "workflows/workflow_steps/new_workflow_task_modal.html",
@@ -839,6 +930,16 @@ def add_workflow_step_task() -> ResponseReturnValue:
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+    if not workflow_step:
+        return jsonify({"error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(workflow_step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     task_name = workflow_step_data["task_name"]
     task_data = workflow_step_data["task_data"]
     workflow_step_task = WorkflowStepTask(name=task_name, data=task_data)
@@ -861,6 +962,13 @@ def delete_workflow_step() -> ResponseReturnValue:
     step = WorkflowStep.objects(id=workflow_step_id).first()
     if not step:
         return jsonify({"success": False, "error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     # Delete all associated WorkflowStepTasks
     for task in step.tasks:
@@ -890,6 +998,13 @@ def delete_workflow_step_task() -> ResponseReturnValue:
     if not task:
         return jsonify({"success": False, "error": "Step not found"}), 404
 
+    workflow = _workflow_for_task(task)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     # Remove references to the step in any Workflow
     WorkflowStep.objects(tasks=task).update(pull__tasks=task)
 
@@ -911,6 +1026,12 @@ def update_workflow_step() -> ResponseReturnValue:
     step_index = workflow_data["step_index"]
     step = workflow_data["step"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     if step_index < len(workflow.steps):
         error = "Step index out of range"
         return jsonify({"error": error})

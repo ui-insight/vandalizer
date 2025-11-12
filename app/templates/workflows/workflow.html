@@ -1,3 +1,4 @@
+{% set can_customize_workflow = can_customize_workflow if can_customize_workflow is defined else True %}
 <div class="workflow-container">
     <div>
         <p style="font-size: 24px; font-weight: 600;">
@@ -14,6 +15,11 @@
             </span>
         </p>
     </div>
+    {% if not can_customize_workflow %}
+    <div style="margin: 8px 0 16px; font-size: 12px; color: #a16c2d;">
+        Verified workflows are view-only unless you are an examiner. Clone the workflow to make changes.
+    </div>
+    {% endif %}
     <div class="trigger">Trigger</div>
 
     <div class="workflow-step active">
@@ -35,7 +41,7 @@
 
     <div class="workflow-step">
         <div class=" step-connector top"></div>
-        <div class="step-content edit-workflow-step-btn" data-step-id="{{ step.id }}"
+        <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}" data-step-id="{{ step.id }}"
             data-step-type="{{ step.name|lower }}">
             <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
                 {{ loop.index }}
@@ -58,9 +64,11 @@
     <div class="step-connection-line"></div>
     {% endfor %}
 
+    {% if can_customize_workflow %}
     <div class="add-step">
         <button id="add-workflow-step-btn">+ ADD STEP</button>
     </div>
+    {% endif %}
 
 
     <div class="workflow-step workflow-output hidden">
