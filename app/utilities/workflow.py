@@ -426,7 +426,6 @@ class WorkflowEngine:
         for idx, node in enumerate(nodes):
             debug(node)
 
-            node_outputs = []
             if idx == 0:
                 output = node.process({})
                 debug(output)
@@ -435,42 +434,8 @@ class WorkflowEngine:
                 debug(node)
                 debug(latest_output)
 
-                for task in node.tasks:
-                    process_node = None
-
-                    if task.name == "Extraction":
-                        process_node = ExtractionNode(
-                            data=task.data,
-                        )
-                    elif task.name == "Prompt":
-                        process_node = PromptNode(
-                            data=task.data,
-                        )
-                    elif task.name == "Formatter":
-                        process_node = FormatNode(
-                            data=task.data,
-                        )
-                    else:
-                        process_node = Node(task.name)
-
-                    output = process_node.process(latest_output)
-                    debug(output)
-                    task_output = output.get("output", "")
-                    # add the input and the step_name to the output
-                    node_output = output.get("output", "")
-                    if isinstance(task_output, list):
-                        node_outputs.extend(node_output)
-                    else:
-                        node_outputs.append(node_output)
-
-                # combine the outputs
-                debug(node_outputs)
-                latest_output = {
-                    "output": node_outputs,
-                    "input": output.get("input", ""),
-                    "step_name": output.get("step_name", ""),
-                }
-                # debug(latest_output)
+                output = node.process(latest_output)
+                latest_output = output
 
             if workflow_result:
                 step_name = sanitize_step_name(node.name)

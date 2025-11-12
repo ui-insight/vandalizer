@@ -657,7 +657,7 @@ class ChatConversation(me.Document):
     """Represents a chat history for a user."""
 
     uuid = me.StringField(required=True, max_length=200, unique=True)
-    title = me.StringField(required=True, max_length=200)
+    title = me.StringField(required=True, max_length=2000)
     user_id = me.StringField(required=True, max_length=200)
     messages = me.ListField(me.ReferenceField(ChatMessage, reverse_delete_rule=CASCADE))
     # attachments can be files or urls

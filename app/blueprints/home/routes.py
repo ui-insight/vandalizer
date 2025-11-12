@@ -648,7 +648,7 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 
     # Sort activities: chats first, then by started_at (most recent first)
     visible_activities.sort(
-        key=lambda a: ((a.started_at.timestamp() if a.started_at else 0),)
+        key=lambda a: (-(a.started_at.timestamp() if a.started_at else 0),), reverse=False
     )
 
     debug(f"Visible Activities: {visible_activities}")
@@ -806,11 +806,17 @@ def add_link_to_chat():
 
         # Check if the fetch failed
         if result is None:
-            return jsonify({"error": "Invalid URL or unsupported content type"}), 400
+            # Mark activity as failed before returning error
+            if activity:
+                activity_finish(activity, status=ActivityStatus.FAILED, error="Invalid URL or unsupported content type")
+            return jsonify({"error": "Invalid URL or unsupported content type", "activity_id": str(activity.id) if activity else None}), 400
 
         if result.get("error"):
+            # Mark activity as failed before returning error
+            if activity:
+                activity_finish(activity, status=ActivityStatus.FAILED, error=f"Failed to fetch URL: {result.get('error')}")
             return jsonify(
-                {"error": f"Failed to fetch URL: {result.get('error')}"}
+                {"error": f"Failed to fetch URL: {result.get('error')}", "activity_id": str(activity.id) if activity else None}
             ), 400
 
         # Extract title from URL or content
@@ -839,6 +845,9 @@ def add_link_to_chat():
         conversation.save()
         conversation.reload()
 
+        # Don't mark as completed - keep the conversation active so user can continue chatting
+        # The activity will remain visible in the rail
+
         return jsonify(
             {
                 "success": True,
@@ -853,7 +862,10 @@ def add_link_to_chat():
 
     except Exception as e:
         logger.error(f"Error adding URL attachment: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Mark activity as failed on exception
+        if 'activity' in locals() and activity:
+            activity_finish(activity, status=ActivityStatus.FAILED, error=str(e))
+        return jsonify({"error": str(e), "activity_id": str(activity.id) if 'activity' in locals() and activity else None}), 500
 
 
 @app.route("/chat/add_document", methods=["POST"])
@@ -898,11 +910,15 @@ def add_document_to_chat():
 
         # Check if files were uploaded
         if "files" not in request.files:
-            return jsonify({"error": "No files uploaded"}), 400
+            if activity:
+                activity_finish(activity, status=ActivityStatus.FAILED, error="No files uploaded")
+            return jsonify({"error": "No files uploaded", "activity_id": str(activity.id) if activity else None}), 400
 
         files = request.files.getlist("files")
         if not files or files[0].filename == "":
-            return jsonify({"error": "No files selected"}), 400
+            if activity:
+                activity_finish(activity, status=ActivityStatus.FAILED, error="No files selected")
+            return jsonify({"error": "No files selected", "activity_id": str(activity.id) if activity else None}), 400
 
         uploaded_attachments = []
 
@@ -1004,6 +1020,9 @@ def add_document_to_chat():
         conversation.save()
         conversation.reload()
 
+        # Don't mark as completed - keep the conversation active so user can continue chatting
+        # The activity will remain visible in the rail
+
         return jsonify(
             {
                 "success": True,
@@ -1016,7 +1035,10 @@ def add_document_to_chat():
 
     except Exception as e:
         logger.error(f"Error adding file attachments: {e}")
-        return jsonify({"error": str(e)}), 500
+        # Mark activity as failed on exception
+        if 'activity' in locals() and activity:
+            activity_finish(activity, status=ActivityStatus.FAILED, error=str(e))
+        return jsonify({"error": str(e), "activity_id": str(activity.id) if 'activity' in locals() and activity else None}), 500
 
 
 @app.route("/chat/remove_document/<attachment_id>", methods=["DELETE"])
