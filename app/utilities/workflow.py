@@ -148,12 +148,44 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
     output = extraction_manager.extract(keys, document_uuids, model, full_text=full_text)
 
     debug(output)
-    prompt = "Format the extracted data as a nicely formatted markdown with the extracted data as bullet points. Show only the extracted data in the output and no other text. Do not include any explanations or additional text.\n\n"
-    prompt += json.dumps(output, indent=4)
-    debug(prompt)
-    chat_agent = create_chat_agent(model)
-    result = chat_agent.run_sync(prompt)
-    return result.output
+    formatted_output = format_extraction_results(output)
+    return formatted_output
+
+
+def format_extraction_results(data):
+    """
+    Convert extraction JSON results into a markdown bullet list without invoking an LLM.
+    """
+    if data is None:
+        return ""
+
+    if isinstance(data, dict):
+        items = [data]
+    elif isinstance(data, list):
+        items = data
+    else:
+        return str(data)
+
+    lines = []
+    for item in items:
+        if isinstance(item, dict):
+            for key, value in item.items():
+                value_str = _stringify_extraction_value(value)
+                lines.append(f"- {key}: {value_str}")
+        else:
+            lines.append(f"- {item}")
+
+    return "\n".join(lines)
+
+
+def _stringify_extraction_value(value):
+    if value is None:
+        return "N/A"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_stringify_extraction_value(v) for v in value if v is not None)
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2)
+    return str(value)
 
 
 def format_model(model, formatting_prompt, text):
