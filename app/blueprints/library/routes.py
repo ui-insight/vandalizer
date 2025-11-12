@@ -368,6 +368,7 @@ def _build_results_for_template(filters: dict) -> dict:
 
     # Resolve library by scope
     user = load_user()
+    can_edit_verified = bool(user and user.is_examiner)
     team = _current_team_for_user(user)
     lib_scope = _resolve_scope(scope_in)
     lib = _get_or_none_library(lib_scope, user=user, team=team)
@@ -496,6 +497,7 @@ def _build_results_for_template(filters: dict) -> dict:
         "scope": "team"
         if lib_scope == LibraryScope.TEAM
         else ("mine" if lib_scope == LibraryScope.PERSONAL else "verified"),
+        "can_edit_verified": can_edit_verified,
     }
     return context
 

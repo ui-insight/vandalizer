@@ -7,6 +7,7 @@
 {% set _type = filters.type if filters and filters.type else 'workflows' %}
 {% set _kinds = filters.kinds if filters and filters.kinds else ['extract','prompt','format'] %}
 {% set verification_map = verification_requests if verification_requests else {} %}
+{% set can_edit_verified = can_edit_verified if can_edit_verified is defined else False %}
 
 {% if _type in ['all','workflows'] %}
 <div style="margin: 6px 0 12px 0; font-size:14px; font-weight:700;">Workflows</div>
@@ -22,6 +23,8 @@
 {% set wf_request_uuid = wf_verification.uuid if wf_verification else '' %}
 {% set wf_verified = workflow.verified %}
 {% set wf_can_submit = (scope != 'verified') and (not wf_verified or (wf_verification and wf_status != 'approved')) %}
+{% set wf_is_verified = (wf_status == 'approved') or wf_verified %}
+{% set wf_can_edit = can_edit_verified or not wf_is_verified %}
 {% if wf_verification %}
     {% if wf_status in ['submitted', 'in_review'] %}
         {% set wf_submit_label = 'Edit verification submission' %}
@@ -67,9 +70,11 @@
                     </div>
                 </div>
                 {% endif %}
+                {% if wf_can_edit %}
                 <button type="button" class="btn btn-secondary edit-workflow-button" data-uuid="{{ workflow.id }}">
                     <i class="fa-regular fa-pen-to-square"></i>
                 </button>
+                {% endif %}
             </div>
             <div class="title"><b>{{ workflow.name }}</b></div>
             {% if workflow.description %}
@@ -107,6 +112,8 @@
 {% set ex_request_uuid = ex_verification.uuid if ex_verification else '' %}
 {% set ex_verified = s.verified %}
 {% set ex_can_submit = (scope != 'verified') and (not ex_verified or (ex_verification and ex_status != 'approved')) %}
+{% set ex_is_verified = (ex_status == 'approved') or ex_verified %}
+{% set ex_can_edit = can_edit_verified or not ex_is_verified %}
 {% if ex_verification %}
     {% if ex_status in ['submitted', 'in_review'] %}
         {% set ex_submit_label = 'Edit verification submission' %}
@@ -152,8 +159,10 @@
                     </div>
                 </div>
                 {% endif %}
+                {% if ex_can_edit %}
                 <button type="button" class="btn btn-secondary edit-extraction-button" data-uuid="{{ s.uuid }}"
                     style="margin-left:0;"><i class="fa-regular fa-pen-to-square"></i></button>
+                {% endif %}
             </div>
             <div class="title">
                 {% if s.is_global %}<i class="fa-solid fa-globe" style="margin-right:4px;"></i>{% endif %}
@@ -198,6 +207,7 @@
 {% set pr_request_uuid = pr_verification.uuid if pr_verification else '' %}
 {% set pr_verified = pr_status == 'approved' %}
 {% set pr_can_submit = (scope != 'verified') and (not pr_verified or (pr_verification and pr_status != 'approved')) %}
+{% set pr_can_edit = can_edit_verified or not pr_verified %}
 {% if pr_verification %}
     {% if pr_status in ['submitted', 'in_review'] %}
         {% set pr_submit_label = 'Edit verification submission' %}
@@ -256,10 +266,12 @@
         </div>
         {% endif %}
 
+        {% if pr_can_edit %}
         <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ p.id }}" data-type="prompt"
             style="margin-left:10px">
             <i class="fa-regular fa-pen-to-square"></i>
         </button>
+        {% endif %}
     </div>
 </div>
 
@@ -280,6 +292,8 @@
 {% set fm_request_uuid = fm_verification.uuid if fm_verification else '' %}
 {% set fm_verified = fm_status == 'approved' %}
 {% set fm_can_submit = (scope != 'verified') and (not fm_verified or (fm_verification and fm_status != 'approved')) %}
+{% set fm_is_verified = (fm_status == 'approved') or fm_verified %}
+{% set fm_can_edit = can_edit_verified or not fm_is_verified %}
 {% if fm_verification %}
     {% if fm_status in ['submitted', 'in_review'] %}
         {% set fm_submit_label = 'Edit verification submission' %}
@@ -329,10 +343,12 @@
         </div>
         {% endif %}
 
+        {% if fm_can_edit %}
         <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ f.id }}" data-type="formatter"
             style="margin-left:10px">
             <i class="fa-regular fa-pen-to-square"></i>
         </button>
+        {% endif %}
     </div>
 
     <div class="meta" style="margin-top:8px;">

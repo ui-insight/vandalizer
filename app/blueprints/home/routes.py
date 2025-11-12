@@ -78,6 +78,7 @@ from app.utilities.upload_manager import (
     perform_document_validation,
 )
 from app.utilities.web_utils import URLContentFetcher  # You already have this
+from app.utilities.verification_helpers import user_can_modify_verified
 
 home = Blueprint("home", __name__)
 
@@ -508,7 +509,12 @@ def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
     if not workflow:
         return "", ""
 
-    workflow_tpl = render_template("workflows/workflow.html", workflow=workflow)
+    can_customize = user_can_modify_verified(load_user(), workflow)
+    workflow_tpl = render_template(
+        "workflows/workflow.html",
+        workflow=workflow,
+        can_customize_workflow=can_customize,
+    )
 
     step_tpl = ""
     step_id = request.args.get("workflow_step_id", default=0)

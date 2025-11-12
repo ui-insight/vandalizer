@@ -42,10 +42,43 @@ from app.utilities.library_helpers import (
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
+from app.utilities.verification_helpers import user_can_modify_verified
 
 tasks = Blueprint("tasks", __name__)
 
 EXTRACTION_PANEL_TEMPLATE = "toolpanel/extractions/extraction_panel.html"
+
+
+def _active_user_or_none():
+    """Return the authenticated user or None."""
+    try:
+        if current_user.is_authenticated:
+            return current_user
+    except Exception:
+        return None
+    return None
+
+
+def _verified_edit_forbidden_response():
+    return (
+        jsonify(
+            {
+                "error": "forbidden",
+                "message": "Verified items can only be modified by examiners.",
+            }
+        ),
+        403,
+    )
+
+
+def _can_edit_search_set(search_set: SearchSet | None) -> bool:
+    return bool(search_set and user_can_modify_verified(_active_user_or_none(), search_set))
+
+
+def _render_extraction_panel(search_set: SearchSet, **context):
+    context.setdefault("can_edit_extraction", _can_edit_search_set(search_set))
+    context["search_set"] = search_set
+    return render_template(EXTRACTION_PANEL_TEMPLATE, **context)
 
 
 @login_required
@@ -243,6 +276,11 @@ def edit_prompt() -> ResponseReturnValue:
     data = request.get_json()
     uuid = data["uuid"]
     prompt = SearchSetItem.objects(id=uuid).first()
+    if not prompt:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), prompt):
+        return _verified_edit_forbidden_response()
 
     template = render_template(
         "toolpanel/prompts/edit_prompt.html",
@@ -263,6 +301,11 @@ def update_prompt() -> ResponseReturnValue:
     title = data["title"]
     prompt = data["prompt"]
     prompt_item = SearchSetItem.objects(id=uuid).first()
+    if not prompt_item:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), prompt_item):
+        return _verified_edit_forbidden_response()
 
     prompt_item.title = title
     prompt_item.searchphrase = prompt
@@ -306,9 +349,8 @@ def grab_template() -> ResponseReturnValue:
         return jsonify({"error": "Search set not found."})
 
     if search_set.set_type == "extraction":
-        template = render_template(
-            EXTRACTION_PANEL_TEMPLATE,
-            search_set=search_set,
+        template = _render_extraction_panel(
+            search_set,
             documents=documents,
         )
         response = {
@@ -347,6 +389,12 @@ def update_extraction_title() -> ResponseReturnValue:
     extraction_data = request.get_json()
     extraction_uuid = extraction_data["extraction_uuid"]
     extraction_step = SearchSet.objects(uuid=extraction_uuid).first()
+    if not extraction_step:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), extraction_step):
+        return _verified_edit_forbidden_response()
+
     extraction_step.title = extraction_data["title"]
     extraction_step.save()
 
@@ -476,9 +524,8 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
                 documents.append(document)
 
         # Render template
-        template = render_template(
-            EXTRACTION_PANEL_TEMPLATE,
-            search_set=search_set,
+        template = _render_extraction_panel(
+            search_set,
             results=normalized_results,
             documents=documents,
         )
@@ -553,9 +600,8 @@ def begin_search_sync() -> ResponseReturnValue:
 
         # Handle empty or no results
         if not results:
-            template = render_template(
-                EXTRACTION_PANEL_TEMPLATE,
-                search_set=search_set,
+            template = _render_extraction_panel(
+                search_set,
                 results={},
                 documents=documents,
             )
@@ -619,9 +665,8 @@ def begin_search_sync() -> ResponseReturnValue:
         }
         activity.save()
 
-        template = render_template(
-            EXTRACTION_PANEL_TEMPLATE,
-            search_set=search_set,
+        template = _render_extraction_panel(
+            search_set,
             results=normalized_results,
             documents=documents,
         )
@@ -650,9 +695,8 @@ def begin_search_sync() -> ResponseReturnValue:
 
         return jsonify(response)
 
-    template = render_template(
-        EXTRACTION_PANEL_TEMPLATE,
-        search_set=search_set,
+    template = _render_extraction_panel(
+        search_set,
         documents=documents,
     )
     response = {
@@ -670,6 +714,11 @@ def build_extraction_from_document() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
 
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
+    if not search_set:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), search_set):
+        return _verified_edit_forbidden_response()
 
     user_id = current_user.get_id()
     user_model_config = UserModelConfig.objects(user_id=user_id).first()
@@ -697,10 +746,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
         }
         return jsonify(response)
 
-    template = render_template(
-        EXTRACTION_PANEL_TEMPLATE,
-        search_set=search_set,
-    )
+    template = _render_extraction_panel(search_set)
     response = {
         "template": template,
     }
@@ -714,6 +760,12 @@ def delete_search_set() -> ResponseReturnValue:
     data = request.get_json()
     search_set_uuid = data["uuid"]
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    if not search_set:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), search_set):
+        return _verified_edit_forbidden_response()
+
     search_set.delete()
     return jsonify({"success": True})
 
@@ -725,6 +777,12 @@ def rename_search_set() -> ResponseReturnValue:
     search_set_uuid = data["search_set_uuid"]
     new_title = data["new_title"]
     search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    if not search_set:
+        return jsonify({"error": "not found"}), 404
+
+    if not user_can_modify_verified(_active_user_or_none(), search_set):
+        return _verified_edit_forbidden_response()
+
     search_set.title = new_title
     search_set.save()
 
@@ -769,10 +827,20 @@ def delete_search_set_item() -> ResponseReturnValue:
     """Delete a search set item."""
     data = request.get_json()
     search_set_item_uuid = data["uuid"]
-    search_set = SearchSetItem.objects(id=search_set_item_uuid).first()
-    if not search_set:
+    item = SearchSetItem.objects(id=search_set_item_uuid).first()
+    if not item:
         return jsonify({"error": "Search set item not found"}), 404
-    search_set.delete()
+    search_type = (item.searchtype or "").lower()
+    user = _active_user_or_none()
+    if search_type == "extraction":
+        parent = SearchSet.objects(uuid=item.searchset).first()
+        if not user_can_modify_verified(user, parent):
+            return _verified_edit_forbidden_response()
+    else:
+        if not user_can_modify_verified(user, item):
+            return _verified_edit_forbidden_response()
+
+    item.delete()
     return jsonify({"complete": True})
 
 

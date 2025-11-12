@@ -75,24 +75,23 @@
 
         $('#delete-prompt-button').off('click').on('click', function (e) {
             e.preventDefault();
-            let uuid = $(this).attr("data-uuid");
+            const uuid = $(this).attr("data-uuid");
             const itemKind = ($(this).data("kind") || "prompt").toString().toLowerCase() === "formatter" ? "formatter" : "prompt";
-            const data = JSON.stringify({
-                uuid: uuid,
-            });
+
+            if (typeof deleteSearchSetItem === 'function') {
+                deleteSearchSetItem(uuid, itemKind);
+                return;
+            }
 
             $.ajax({
                 url: '/tasks/delete_search_set_item',
                 type: 'POST',
-                data: data,
+                data: JSON.stringify({ uuid }),
                 contentType: 'application/json; charset=utf-8',
                 dataType: 'json',
                 async: true,
-                success: function (data) {
-                    // Close the edit panel
-                    $("#search-results-panel").hide();
-                    $("#search-results-panel").empty();
-                    // Redirect to library with the item removed
+                success: function () {
+                    $("#search-results-panel").hide().empty();
                     const url = new URL(window.location.href);
                     url.searchParams.set('section', 'Library');
                     location.href = url.toString();
