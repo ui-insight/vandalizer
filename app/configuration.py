@@ -35,7 +35,7 @@ class ProductionConfig(Config):
     MAIL_PORT = 25
     MAIL_USE_TLS = True
     MAIL_USE_SSL = False
-    MAIL_DEFAULT_SENDER = "bugs@insight.uidaho.edu"
+    MAIL_DEFAULT_SENDER = "vandalizer@insight.uidaho.edu"
     MAIL_SUPPRESS_SEND = False
 
 
@@ -61,5 +61,5 @@ class TestingConfig(Config):
     MAIL_PORT = 25
     MAIL_USE_TLS = True
     MAIL_USE_SSL = False
-    MAIL_DEFAULT_SENDER = "bugs@insight.uidaho.edu"
+    MAIL_DEFAULT_SENDER = "vandalizer@insight.uidaho.edu"
     MAIL_SUPPRESS_SEND = False

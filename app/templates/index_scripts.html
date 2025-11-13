@@ -13,6 +13,9 @@
     var steps_completed = 0;
     var total_steps = 1;
     var workflow_interval_id = null;
+    var workflowActiveMessageIntervalId = null;
+    var workflowActiveLabel = "";
+    var workflowActiveTemplateIndex = 0;
 
     var recommendationRequests = new Set();
 
@@ -30,6 +33,13 @@
     if (workflowActivitySnapshot && workflowActivitySnapshot.session_id) {
         workflow_session_id = workflowActivitySnapshot.session_id;
     }
+
+    const workflowActiveMessageTemplates = [
+        (label) => `Working on ${label}`,
+        (label) => `Analyzing ${label}`,
+        (label) => `Organizing ${label}`,
+        (label) => `Finalizing ${label}`,
+    ];
 
 
     let animationStepIndex = 0;
@@ -272,6 +282,86 @@
         });
     }
 
+    function formatWorkflowElapsed(seconds) {
+        const safeSeconds = Math.max(Number(seconds) || 0, 0);
+        const mins = Math.floor(safeSeconds / 60);
+        const secs = safeSeconds % 60;
+        return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function updateWorkflowProgressInfo(stepsCompleted = 0, totalSteps = null, elapsedSeconds = 0, options = {}) {
+        const info = $(".workflow-output-attachment-info");
+        if (!info.length) {
+            return;
+        }
+        const completed = Math.max(Number(stepsCompleted) || 0, 0);
+        let stepsLabel = `${completed} steps completed`;
+        if (typeof totalSteps === "number" && totalSteps >= 0) {
+            stepsLabel = `${completed} / ${totalSteps} steps completed`;
+        }
+        const opts = Object.assign({ trailingLabel: null }, options || {});
+        const trailing = opts.trailingLabel || `${formatWorkflowElapsed(elapsedSeconds)} elapsed`;
+        info.html(`<span>${stepsLabel}</span><span><i>${trailing}</i></span>`);
+    }
+
+    function resetWorkflowActiveStatus() {
+        if (workflowActiveMessageIntervalId) {
+            clearInterval(workflowActiveMessageIntervalId);
+            workflowActiveMessageIntervalId = null;
+        }
+        workflowActiveLabel = "";
+        workflowActiveTemplateIndex = 0;
+        const container = $(".workflow-active-step-status");
+        if (container.length) {
+            container.addClass("hidden");
+        }
+        $("#workflow-active-step-label").removeClass("shimmer").text("");
+    }
+
+    function ensureWorkflowActiveMessageCycle() {
+        if (workflowActiveMessageIntervalId) {
+            return;
+        }
+        workflowActiveMessageIntervalId = setInterval(() => {
+            if (!workflowActiveLabel) {
+                resetWorkflowActiveStatus();
+                return;
+            }
+            workflowActiveTemplateIndex =
+                (workflowActiveTemplateIndex + 1) % workflowActiveMessageTemplates.length;
+            renderWorkflowActiveMessage();
+        }, 3200);
+    }
+
+    function renderWorkflowActiveMessage() {
+        const container = $(".workflow-active-step-status");
+        if (!container.length) {
+            return;
+        }
+        if (!workflowActiveLabel) {
+            container.addClass("hidden");
+            $("#workflow-active-step-label").removeClass("shimmer").text("");
+            return;
+        }
+        const template = workflowActiveMessageTemplates[workflowActiveTemplateIndex] || ((label) => label);
+        const message =
+            typeof template === "function" ? template(workflowActiveLabel) : `${template} ${workflowActiveLabel}`;
+        container.removeClass("hidden");
+        $("#workflow-active-step-label").addClass("shimmer").text(message);
+    }
+
+    function setWorkflowActiveLabel(labelText) {
+        const normalized = (labelText || "").trim();
+        if (!normalized) {
+            resetWorkflowActiveStatus();
+            return;
+        }
+        workflowActiveLabel = normalized;
+        workflowActiveTemplateIndex = 0;
+        renderWorkflowActiveMessage();
+        ensureWorkflowActiveMessageCycle();
+    }
+
     function hydrateWorkflowSnapshot(snapshot) {
         if (!hasWorkflowOutput(snapshot)) {
             return;
@@ -325,21 +415,18 @@
         const stepsTotal = snapshot.steps_total ?? snapshot.stepsTotal ?? snapshot.num_steps_total;
         const status = snapshot.status ?? workflowActivityStatus;
 
-        const info = $outputContainer.find(".workflow-output-attachment-info");
-        if (info.length) {
-            if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
-                const completed = Math.max(stepsCompleted, 0);
-                let statusLabel = status || "Completed";
-                if (typeof statusLabel === "string" && statusLabel.length > 0) {
-                    statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
-                }
-                info.html(`<span>${completed} / ${stepsTotal} steps completed</span><span><i>${statusLabel}</i></span>`);
-            } else if (status) {
-                const label = status.charAt(0).toUpperCase() + status.slice(1);
-                info.html(`<span>${label}</span>`);
-            } else {
-                info.html(`<span>Workflow complete</span>`);
+        if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
+            const completed = Math.max(stepsCompleted, 0);
+            let statusLabel = status || "Completed";
+            if (typeof statusLabel === "string" && statusLabel.length > 0) {
+                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
             }
+            updateWorkflowProgressInfo(completed, stepsTotal, 0, { trailingLabel: statusLabel });
+        } else if (status) {
+            const label = status.charAt(0).toUpperCase() + status.slice(1);
+            updateWorkflowProgressInfo(0, null, 0, { trailingLabel: label });
+        } else {
+            updateWorkflowProgressInfo(0, null, 0, { trailingLabel: "Workflow complete" });
         }
     }
 
@@ -2165,6 +2252,7 @@
         $('.workflow-step').removeClass('active');
         $('.step-connector').removeClass('active');
         $('.workflow-loader').hide();
+        resetWorkflowActiveStatus();
         stopScanning();
     }
 
@@ -2178,21 +2266,21 @@
         $outputContainer.removeClass("hidden");
 
         const $section = $(".workflow-output-section");
-        const placeholderHtml = [
-            '<div class="workflow-output-placeholder"',
-            '     style="display: flex; align-items: center; gap: 8px; justify-content: center; padding: 40px 0;">',
-            '  <i class="fa-solid fa-spinner fa-spin" style="font-size: 18px;"></i>',
-            '  <span>Preparing workflow output...</span>',
-            '</div>'
-        ].join("");
-
-        $section.show().empty().append(placeholderHtml);
+        if ($section.length) {
+            $section.addClass("hidden").empty();
+        }
         $(".workflow-output-buttons").addClass("hidden");
-        $(".workflow-output-attachment-info").html('<span>Preparing output </span><span><i>0s elapsed</i></span>');
+        resetWorkflowActiveStatus();
+        setWorkflowActiveLabel("the workflow");
+        updateWorkflowProgressInfo(0, null, 0);
+    }
+
+    function hasWorkflowDocumentsSelected() {
+        return Array.isArray(document_uuids) && document_uuids.length > 0;
     }
 
     function runWorkflow(download = false) {
-        if (document_uuids == "") {
+        if (!hasWorkflowDocumentsSelected()) {
             showToast("Select a document to run workflow");
             return;
         }
@@ -2313,41 +2401,16 @@
 
     function updateWorkflowStatus() {
         // Update the UI with current elapsed time
-        $('.workflow-output-attachment-info').html(`
-                  <span>${steps_completed} / ${total_steps} tasks completed</span>
-                  <span><i>${workflow_elapsed_time} seconds elapsed</i></span>
-              `);
+        updateWorkflowProgressInfo(steps_completed, total_steps, workflow_elapsed_time);
     }
 
-    function renderActiveStepStatus(stepName, detail, preview) {
-        const container = $('.workflow-active-step-status');
-        if (!container.length) {
+    function renderActiveStepStatus(stepName, detail) {
+        const baseLabel = (detail || stepName || '').trim();
+        if (!baseLabel) {
+            resetWorkflowActiveStatus();
             return;
         }
-        const labelEl = $('#workflow-active-step-label');
-        const previewEl = $('#workflow-active-step-preview');
-        const labelText = detail || stepName || '';
-        const previewText = preview || '';
-
-        if (!labelText && !previewText) {
-            container.hide();
-            labelEl.text('');
-            previewEl.text('');
-            return;
-        }
-
-        container.show();
-        labelEl.text(labelText);
-        if (previewText) {
-            try {
-                previewEl.html(toHtml(previewText));
-            } catch (err) {
-                console.warn("Unable to render streaming preview, falling back to text", err);
-                previewEl.text(previewText);
-            }
-        } else {
-            previewEl.text('');
-        }
+        setWorkflowActiveLabel(baseLabel);
     }
 
 
@@ -2368,9 +2431,8 @@
                 let status = data.status;
                 const currentStepName = data.current_step_name;
                 const currentStepDetail = data.current_step_detail;
-                const currentStepPreview = data.current_step_preview;
 
-                renderActiveStepStatus(currentStepName, currentStepDetail, currentStepPreview);
+                renderActiveStepStatus(currentStepName, currentStepDetail);
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
@@ -2394,14 +2456,7 @@
                     active_step = steps_completed + 1;
                 }
 
-                const minutes = Math.floor(workflow_time / 60);
-                const seconds = workflow_time % 60;
-
-                // Update steps completed and time elapsed
-                $('.workflow-output-attachment-info').html(`
-                      <span>${steps_completed} / ${total_steps} steps completed</span>
-                      <span><i>${minutes}m ${seconds}s elapsed</i></span>
-                  `);
+                updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time);
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
@@ -2409,7 +2464,11 @@
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
                     }
-                    renderActiveStepStatus(null, null, null);
+                    resetWorkflowActiveStatus();
+                    const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
+                    updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
+                        trailingLabel: trailingLabel,
+                    });
 
                     window.__workflowSnapshot = {
                         output: data.output ?? null,
@@ -2466,10 +2525,10 @@
                             return;
                         }
 
-                        $('.workflow-output-section').empty();
-                        $('.workflow-output-section').show();
+                        const $outputSection = $('.workflow-output-section');
+                        $outputSection.removeClass('hidden').empty().show();
                         $('.workflow-output-buttons').removeClass('hidden');
-                        $('.workflow-output-section').append(html);
+                        $outputSection.append(html);
                         $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
                         $('.workflow-step').removeClass('active');
                         // Add 'active' class to the nth $('.workflow-step') element (0-based index)
