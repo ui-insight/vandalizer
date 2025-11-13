@@ -194,6 +194,14 @@
             e.preventDefault();
             e.stopPropagation();
 
+            const docsSelected = typeof hasWorkflowDocumentsSelected === "function"
+                ? hasWorkflowDocumentsSelected()
+                : (Array.isArray(document_uuids) && document_uuids.length > 0);
+            if (!docsSelected) {
+                showToast("Select a document to test workflow steps");
+                return;
+            }
+
             // 1) Reset the “cancel” flag, spin the loader, and start runSteps()
             loadingCancelled = false;
             beginSpinningJoe();

@@ -50,6 +50,14 @@
 
 {% block content %}
 <div class="container" style="padding:20px">
+    {% set return_target = request.args.get('next') %}
+    {% if not return_target or not return_target.startswith('/') %}
+    {% set return_target = url_for('home.index') %}
+    {% endif %}
+    <a class="btn btn-outline-secondary" href="{{ return_target }}" style="margin-bottom:16px">
+        <i class="fa-solid fa-arrow-left"></i>
+        Back
+    </a>
 
     {% if not team %}
     <form method="POST" action="/teams/create" class="form-inline">

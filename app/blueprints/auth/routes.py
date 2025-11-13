@@ -1,6 +1,5 @@
 """Handles authorization routing."""
 
-from devtools import debug
 from flask import (
     Blueprint,
     current_app,
@@ -27,7 +26,6 @@ def index() -> ResponseReturnValue:
     """Render the landing page if not authorized."""
     # debug("Not authorized")
     user = load_user()
-    debug(user)
     if user is not None:
         return redirect(url_for("home.index"))
 

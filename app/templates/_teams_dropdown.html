@@ -7,10 +7,22 @@
     <div id="user-menu" class="menu menu-right" role="menu" hidden>
 
         {% for team_membership in my_teams %}
-        <a class="menu-item" role="menuitem" href="/teams">
+        {% set is_active = current_team and (team_membership.team.id == current_team.id) %}
+        <a class="menu-item" role="menuitem"
+            href="{{ url_for('team.team_switch', team_uuid=team_membership.team.uuid, next=request.full_path or request.path) }}">
             <i class="fa-solid fa-users" style="width:18px;"></i> {{ team_membership.team.name }}
+            {% if is_active %}
+            <span style="font-size: 11px; color: #36c; margin-left:8px;">(current)</span>
+            {% endif %}
         </a>
         {% endfor %}
+
+        <hr class="menu-divider">
+
+        <a class="menu-item" role="menuitem"
+            href="{{ url_for('team.team_index', next=request.full_path or request.path) }}">
+            <i class="fa-solid fa-gear" style="width:18px;"></i> Manage teams
+        </a>
 
         {% if current_user.is_admin_current_team %}
         <!-- <hr class="menu-divider">

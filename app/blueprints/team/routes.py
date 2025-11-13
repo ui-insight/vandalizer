@@ -1,8 +1,19 @@
 import secrets
 from datetime import datetime
+from urllib.parse import urlparse
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    flash,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from flask_mail import Message
+from werkzeug.exceptions import HTTPException
 
 from app import load_user, mail
 from app.models import Team, TeamInvite, TeamMembership, User
@@ -10,8 +21,20 @@ from app.models import Team, TeamInvite, TeamMembership, User
 teams = Blueprint("team", __name__)
 
 
+class _LoginRedirect(HTTPException):
+    def __init__(self, location: str):
+        super().__init__()
+        self.response = redirect(location)
+
+
 def require_login():
-    return load_user()
+    user = load_user()
+    if user:
+        return user
+    next_target = request.full_path or request.path or url_for("home.index")
+    if next_target.endswith("?"):
+        next_target = next_target[:-1]
+    raise _LoginRedirect(url_for("auth.login", next=next_target))
 
 
 def is_admin_user(user_id: str) -> bool:
@@ -51,12 +74,27 @@ def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:
     return (current_team, my_teams)
 
 
+def _safe_next_url():
+    candidate = request.args.get("next")
+    if candidate and candidate.startswith("/"):
+        return candidate
+
+    referrer = request.referrer
+    if referrer:
+        parsed = urlparse(referrer)
+        if parsed.netloc == request.host:
+            if parsed.query:
+                return f"{parsed.path}?{parsed.query}"
+            return parsed.path
+    return url_for("home.index")
+
+
 @teams.route("/", methods=["GET"])
 def team_index():
     user = require_login()
     memberships = TeamMembership.objects(user_id=user.user_id)
-    team = memberships.first().team if memberships else None
     current_team, my_teams = _get_teams(user)
+    team = current_team or (memberships.first().team if memberships else None)
     members = []
     invites = []
     can_edit_team = False
@@ -78,6 +116,7 @@ def team_index():
         current_user_name=user.name,
         can_edit_team=can_edit_team,
         team_id=team_id,
+        my_teams=my_teams,
     )
 
 
@@ -206,7 +245,7 @@ If you did not expect this invitation, you can safely ignore this email.
 @teams.route("/invite/accept/<token>", methods=["GET"])
 def team_accept_invite(token):
     user = require_login()
-    inv = TeamInvite.objects(token=token, accepted=False).first()
+    inv = TeamInvite.objects(token=token).first()
     if not inv:
         abort(404)
 
@@ -214,18 +253,51 @@ def team_accept_invite(token):
     existing_membership = TeamMembership.objects(
         team=inv.team, user_id=user.user_id
     ).first()
+
+    # Invite already consumed: still switch the user's context if they're on that team.
+    if inv.accepted:
+        if existing_membership:
+            user.current_team = inv.team
+            user.save()
+            flash(f"You're already a member of {inv.team.name}.", "info")
+            return redirect(url_for("team.team_index"))
+
+        # Someone else has already used this invite (or it was auto-consumed during signup).
+        flash("This invite link has already been used.", "warning")
+        return redirect(url_for("team.team_index"))
+
     if not existing_membership:
         # Create new membership only if they're not already a member
         TeamMembership(team=inv.team, user_id=user.user_id, role=inv.role).save()
-        # Update user's current_team if they don't have one
-        if not user.current_team:
-            user.current_team = inv.team
-            user.save()
-    # else: User is already a member, just mark invite as accepted
+    else:
+        # Update role if invite grants higher access
+        if existing_membership.role != inv.role:
+            existing_membership.role = inv.role
+            existing_membership.save()
+
+    # Always switch the user's current team to the one they just joined
+    user.current_team = inv.team
+    user.save()
 
     inv.accepted = True
     inv.save()
+    flash(f"You've joined {inv.team.name}.", "success")
     return redirect(url_for("team.team_index"))
+
+
+@teams.route("/switch/<team_uuid>", methods=["GET"])
+def team_switch(team_uuid: str):
+    user = require_login()
+    membership = TeamMembership.objects(
+        user_id=user.user_id, team__uuid=team_uuid
+    ).first()
+    if not membership:
+        flash("You are not a member of that team.", "warning")
+        return redirect(url_for("team.team_index"))
+
+    user.current_team = membership.team
+    user.save()
+    return redirect(_safe_next_url())
 
 
 @teams.route("/member/role", methods=["POST"])

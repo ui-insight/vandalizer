@@ -205,7 +205,15 @@ def run_workflow() -> ResponseReturnValue:
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
     current_space_id = workflow_data.get("current_space_id", "None")
-    document_uuids = workflow_data["document_uuids"]
+    document_uuids = workflow_data.get("document_uuids") or []
+
+    if not document_uuids:
+        return (
+            jsonify(
+                {"status": "error", "message": "Select a document before running."}
+            ),
+            400,
+        )
 
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
@@ -405,7 +413,12 @@ def test_workflow_step() -> ResponseReturnValue:
     workflow_data = request.get_json()
     task_name = workflow_data["task_name"]
     task_data = workflow_data["task_data"]
-    document_uuids = workflow_data["document_uuids"]
+    document_uuids = workflow_data.get("document_uuids") or []
+    if not document_uuids:
+        return (
+            jsonify({"error": "Select a document before testing this step."}),
+            400,
+        )
 
     user_id = user.get_id()
     print(workflow_data)
