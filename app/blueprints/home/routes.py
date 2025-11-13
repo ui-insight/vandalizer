@@ -219,7 +219,6 @@ def index() -> ResponseReturnValue:
     query = request.args.get("q", "")
 
     initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
-    initial_library_results = _initial_library_results(request)
 
     # Resume activity
     activity_id = request.args.get("activity_id", None)
@@ -374,7 +373,7 @@ def index() -> ResponseReturnValue:
         current_team=current_team,
         my_teams=my_teams,
         my_library=my_library,
-        initial_library_results=initial_library_results,
+        initial_library_results="",
         filters=initial_filters,
         scope=scope,
         can_verify=user.is_examiner,
@@ -405,19 +404,6 @@ def event_to_dict(a: ActivityEvent) -> dict:
         "result_snapshot": a.result_snapshot or {},
     }
 
-
-def _initial_library_results(request: Any) -> str:
-    scope = request.args.get("scope", "mine")  # 'team' | 'mine' | 'verified'
-    item_type = request.args.get("type", "all")  # 'workflows' | 'tasks' | 'all'
-    kinds_str = request.args.get("kinds", "extract,prompt,format")
-    kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
-    query = request.args.get("q", "")
-
-    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
-    ctx = _build_results_for_template(initial_filters)
-
-    # Render the partial once for first load so the panel is filled immediately
-    return render_template("library/_results.html", **ctx)
 
 
 def _get_teams(user: User) -> tuple[Team, list[TeamMembership]]:

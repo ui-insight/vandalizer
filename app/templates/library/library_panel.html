@@ -77,7 +77,15 @@
             </div>
 
             <section id="library-results" style="flex-grow: 1; overflow-y: auto; padding-right: 30px;">
-                {{ initial_library_results | safe }}
+                {% if initial_library_results %}
+                    {{ initial_library_results | safe }}
+                {% else %}
+                    <div class="library-card">
+                        <div class="meta">
+                            Loading library items…
+                        </div>
+                    </div>
+                {% endif %}
             </section>
         </div>
     </div>
@@ -451,6 +459,7 @@ function formatCategoryLabel(category) {
         }, 300));
 
         updateKindFilterAppearance();
+        refreshResults();
     });
 
 

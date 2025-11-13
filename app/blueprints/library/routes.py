@@ -32,6 +32,11 @@ from app.utilities.library_helpers import (
 
 library = Blueprint("library", __name__)
 
+MAX_LIBRARY_WORKFLOWS = 40
+MAX_LIBRARY_EXTRACTIONS = 60
+MAX_LIBRARY_PROMPTS = 60
+MAX_LIBRARY_FORMATTERS = 60
+
 
 # -----------------------------
 # Helpers to resolve scope
@@ -376,13 +381,33 @@ def _build_results_for_template(filters: dict) -> dict:
     # If there is no library yet, present empty lists gracefully
     lib_items: list[LibraryItem] = list(lib.items) if lib else []
 
-    # --- Separate polymorphic objects
+    # Determine which categories we need to collect & cap counts to avoid massive payloads
+    needs_workflows = item_type in ("workflows", "all")
+    needs_tasks = item_type in ("tasks", "all")
+    wants_extract = needs_tasks and (not kinds or "extract" in kinds)
+    wants_prompt = needs_tasks and (not kinds or "prompt" in kinds)
+    wants_formatter = needs_tasks and (not kinds or "format" in kinds)
+
+    needs_map = {
+        "workflow": needs_workflows,
+        "searchset": wants_extract,
+        "prompt": wants_prompt,
+        "formatter": wants_formatter,
+    }
+    limits = {
+        "workflow": MAX_LIBRARY_WORKFLOWS if needs_workflows else 0,
+        "searchset": MAX_LIBRARY_EXTRACTIONS if wants_extract else 0,
+        "prompt": MAX_LIBRARY_PROMPTS if wants_prompt else 0,
+        "formatter": MAX_LIBRARY_FORMATTERS if wants_formatter else 0,
+    }
+    gathered = {k: 0 for k in needs_map}
+
+    # --- Separate polymorphic objects (bounded)
     workflow_objs: list[Workflow] = []
     searchset_objs: list[SearchSet] = []
-    searchset_items_objs: list[SearchSetItem] = []
+    prompt_objs: list[SearchSetItem] = []
+    formatter_objs: list[SearchSetItem] = []
     verification_keys: dict[str, tuple[str, str]] = {}
-
-    print(lib_items)
 
     for li in lib_items:
         try:
@@ -392,6 +417,13 @@ def _build_results_for_template(filters: dict) -> dict:
         except DoesNotExist:
             li.delete()
             continue
+
+        if not needs_map.get(li.kind, False):
+            continue
+        if gathered[li.kind] >= limits.get(li.kind, 0):
+            # Already have enough of this type
+            continue
+
         identifier = _verification_identifier(li.kind, obj)
         if identifier:
             verification_keys[f"{li.kind}:{identifier}"] = (li.kind, identifier)
@@ -399,12 +431,22 @@ def _build_results_for_template(filters: dict) -> dict:
         # li.kind is "workflow" or "searchset"
         if li.kind == "workflow" and obj and isinstance(obj, Workflow):
             workflow_objs.append(obj)
+            gathered["workflow"] += 1
         elif li.kind == "searchset" and obj and isinstance(obj, SearchSet):
             searchset_objs.append(obj)
+            gathered["searchset"] += 1
         elif li.kind == "prompt" and obj and isinstance(obj, SearchSetItem):
-            searchset_items_objs.append(obj)
+            prompt_objs.append(obj)
+            gathered["prompt"] += 1
         elif li.kind == "formatter" and obj and isinstance(obj, SearchSetItem):
-            searchset_items_objs.append(obj)
+            formatter_objs.append(obj)
+            gathered["formatter"] += 1
+
+        if all(
+            (not needs_map[k]) or gathered.get(k, 0) >= limits.get(k, 0)
+            for k in needs_map
+        ):
+            break
 
     verification_docs: dict[str, VerificationRequest] = {}
     if verification_keys:
@@ -431,28 +473,26 @@ def _build_results_for_template(filters: dict) -> dict:
     prompts = []  # placeholders; not defined in provided model
     formatters = []  # placeholders; not defined in provided model
 
-    print(item_type)
-
     # Filter workflows
     if item_type in ("workflows", "all"):
         workflows = workflow_objs
 
     # Filter task sets (SearchSet) by kind
     if item_type in ("tasks", "all"):
-        want_extract = (not kinds) or ("extract" in kinds)
-        # If you later support 'prompt' & 'format' catalogs, branch here.
-        if want_extract:
+        if wants_extract:
             extraction_sets = [
                 s for s in searchset_objs if (s.set_type or "").lower() == "extraction"
             ]
-        prompts = [
-            s for s in searchset_items_objs if (s.searchtype or "").lower() == "prompt"
-        ]
-        formatters = [
-            s
-            for s in searchset_items_objs
-            if (s.searchtype or "").lower() == "formatter"
-        ]
+        if wants_prompt:
+            prompts = [
+                s for s in prompt_objs if (s.searchtype or "").lower() == "prompt"
+            ]
+        if wants_formatter:
+            formatters = [
+                s
+                for s in formatter_objs
+                if (s.searchtype or "").lower() == "formatter"
+            ]
 
     # --- Text search
     if query:
@@ -523,26 +563,13 @@ def library_page():
     if scope == "verify" and not can_verify:
         scope = "team"
 
-    initial_filters = {"scope": scope, "type": item_type, "kinds": kinds, "q": query}
-    ctx = _build_results_for_template(initial_filters)
-
-    # Render the partial once for first load so the panel is filled immediately
-    if scope == "verify" and can_verify:
-        initial_results_html = render_template(
-            "library/_verification_queue.html",
-            requests=_build_verification_queue(),
-            team=None,
-        )
-    else:
-        initial_results_html = render_template("library/_results.html", **ctx)
-
     return render_template(
         "index.html",  # your main page template
         scope=scope,
         item_type=item_type,
         kinds=kinds,
         query=query,
-        initial_results_html=initial_results_html,
+        initial_library_results="",
         can_verify=can_verify,
     )
 
