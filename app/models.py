@@ -121,6 +121,9 @@ class WorkflowResult(me.Document):
     start_time = me.DateTimeField(default=datetime.datetime.now)
     status = me.StringField(default="running")
     session_id = me.StringField(required=True, max_length=50)
+    current_step_name = me.StringField(required=False, max_length=200)
+    current_step_detail = me.StringField(required=False, max_length=2000)
+    current_step_preview = me.StringField(required=False)
 
 
 # Teams

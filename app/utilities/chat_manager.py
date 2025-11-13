@@ -153,6 +153,7 @@ class ChatManager:
         session=None,
         user_id=None,
         default_docs=None,
+        include_next_step=True,
     ):
         if default_docs is None:
             default_docs = []
@@ -169,7 +170,9 @@ class ChatManager:
             prompt = "You are given the following document(s). "
 
         prompt += """Answer the query clearly and concisely, formatting your response in well-structured markdown. 
-Do not restate or include the original query in your answer. 
+Do not restate or include the original query in your answer."""
+        if include_next_step:
+            prompt += """
 At the end of your response, provide a short, relevant suggestion for a logical next step related to the query, and phrase it as a question asking if the user would like to do that specific suggestion."""
 
         debug(user_id)
@@ -183,7 +186,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
         agent = None
         if len(full_text) < max_context_length:
             prompt += f"""\n\n# Query: {question}\n\n# Context: \n{full_text}"""
-            agent = create_chat_agent(model)
+            agent = create_chat_agent(model, include_next_step=include_next_step)
         else:
             prompt += f"""\n\n# Document(s): {[doc.uuid for doc in documents]}\n""" 
             agent = create_rag_agent(model)
@@ -208,6 +211,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
         session=None,
         user_id=None,
         default_docs=None,
+        include_next_step=True,
     ):
         prepared_data = self._prepare_chat(
             model=model,
@@ -218,6 +222,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             session=session,
             user_id=user_id,
             default_docs=default_docs,
+            include_next_step=include_next_step,
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
@@ -256,6 +261,69 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         return {"question": question, "answer": answer, "formatted_answer": answer}
 
+    def stream_prompt(
+        self,
+        model,
+        prompt,
+        previous_messages=None,
+        progress_callback=None,
+        include_next_step=True,
+    ):
+        """Run a simple prompt with streaming updates, invoking the callback as text arrives."""
+
+        previous_messages = previous_messages or []
+        agent = create_chat_agent(model, include_next_step=include_next_step)
+
+        async def _consume_stream():
+            buffer = []
+            async with agent.iter(prompt, message_history=previous_messages) as agent_run:
+                async for node in agent_run:
+                    if Agent.is_model_request_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                text = self._extract_text_from_event(event)
+                                if text:
+                                    buffer.append(text)
+                                    if progress_callback:
+                                        progress_callback("".join(buffer))
+                if agent_run.result and agent_run.result.output:
+                    return agent_run.result.output
+            return "".join(buffer)
+
+        try:
+            return asyncio.run(_consume_stream())
+        except RuntimeError:
+            # Fallback for environments with an active loop – create a new one in a thread
+            return self._run_stream_in_thread(_consume_stream)
+
+    def _run_stream_in_thread(self, coro_factory):
+        q = queue.Queue()
+        result_holder = {}
+
+        def runner():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(coro_factory())
+                result_holder["result"] = result
+            finally:
+                loop.close()
+                q.put(True)
+
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+        q.get()
+        thread.join(timeout=1)
+        return result_holder.get("result", "")
+
+    @staticmethod
+    def _extract_text_from_event(event):
+        if isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
+            return event.part.content or ""
+        if isinstance(event, PartDeltaEvent) and isinstance(event.delta, TextPartDelta):
+            return event.delta.content_delta or ""
+        return ""
+
     def ask_question_to_documents_stream(
         self,
         model,
@@ -267,6 +335,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
         session=None,
         user_id=None,
         default_docs=None,
+        include_next_step=True,
     ):
         prepared_data = self._prepare_chat(
             model=model,
@@ -276,6 +345,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             session=session,
             user_id=user_id,
             default_docs=default_docs,
+            include_next_step=include_next_step,
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]

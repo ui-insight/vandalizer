@@ -886,6 +886,15 @@
             }
         }
 
+        var docContainer = $('.document-container');
+        if (docContainer.length > 0) {
+            var activeDocUuid = docContainer.data('doc-uuid');
+            var docProcessing = docContainer.data('processing');
+            if (activeDocUuid && !docProcessing && !uuids.includes(activeDocUuid)) {
+                uuids.push(activeDocUuid);
+            }
+        }
+
         totalDocs += uuids.length;
         document_uuids = uuids;
 
@@ -893,7 +902,6 @@
 
         filterAvailableModels(uuids);
 
-        var docContainer = $('.document-container');
         if (docContainer.length > 0) {
             var docUuid = docContainer.data('doc-uuid');
             var isProcessing = docContainer.data('processing');
@@ -2180,7 +2188,7 @@
 
         $section.show().empty().append(placeholderHtml);
         $(".workflow-output-buttons").addClass("hidden");
-        $(".workflow-output-attachment-info").html('<span>Preparing output</span><span><i>0s elapsed</i></span>');
+        $(".workflow-output-attachment-info").html('<span>Preparing output </span><span><i>0s elapsed</i></span>');
     }
 
     function runWorkflow(download = false) {
@@ -2311,6 +2319,36 @@
               `);
     }
 
+    function renderActiveStepStatus(stepName, detail, preview) {
+        const container = $('.workflow-active-step-status');
+        if (!container.length) {
+            return;
+        }
+        const labelEl = $('#workflow-active-step-label');
+        const previewEl = $('#workflow-active-step-preview');
+        const labelText = detail || stepName || '';
+        const previewText = preview || '';
+
+        if (!labelText && !previewText) {
+            container.hide();
+            labelEl.text('');
+            previewEl.text('');
+            return;
+        }
+
+        container.show();
+        labelEl.text(labelText);
+        if (previewText) {
+            try {
+                previewEl.html(toHtml(previewText));
+            } catch (err) {
+                console.warn("Unable to render streaming preview, falling back to text", err);
+                previewEl.text(previewText);
+            }
+        } else {
+            previewEl.text('');
+        }
+    }
 
 
 
@@ -2328,6 +2366,11 @@
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
                 let status = data.status;
+                const currentStepName = data.current_step_name;
+                const currentStepDetail = data.current_step_detail;
+                const currentStepPreview = data.current_step_preview;
+
+                renderActiveStepStatus(currentStepName, currentStepDetail, currentStepPreview);
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
@@ -2366,6 +2409,7 @@
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
                     }
+                    renderActiveStepStatus(null, null, null);
 
                     window.__workflowSnapshot = {
                         output: data.output ?? null,
@@ -2405,37 +2449,27 @@
                         resetWorkflowButton();
                         // show the results
 
-                        let workflow_response = data.output;
-                        console.log("workflow response:", data.output);
+                        const workflow_response = data.output;
+                        console.log("workflow response:", workflow_response);
 
-                        if (Array.isArray(workflow_response) && workflow_response.length === 1 && typeof workflow_response[0] === 'string') {
-                            // Just use the HTML string directly
-                            workflow_response = workflow_response[0];
-                        } else {
-                            // Otherwise stringify the object
-                            workflow_response = JSON.stringify(workflow_response, null, 2);
-                        }
+                        const snapshotPayload = workflow_response ?? "";
                         window.__workflowSnapshot = {
-                            output: workflow_response,
+                            output: snapshotPayload,
                             steps_completed: steps_completed,
                             steps_total: total_steps,
                             status: status,
                             session_id: workflow_session_id,
                         };
-                        // Clean up the text
-                        let outputText = workflow_response
-                            .replace(/^```(html|json|markdown)?\\s*|\\s*```$/g, '')
-                            .trim();
 
-                        outputText = window.marked.parse(outputText, {
-                            gfm: true,
-                            breaks: true,
-                        });
+                        const html = normalizeWorkflowOutput(snapshotPayload);
+                        if (!html) {
+                            return;
+                        }
 
                         $('.workflow-output-section').empty();
                         $('.workflow-output-section').show();
                         $('.workflow-output-buttons').removeClass('hidden');
-                        $('.workflow-output-section').append(`${outputText}`);
+                        $('.workflow-output-section').append(html);
                         $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
                         $('.workflow-step').removeClass('active');
                         // Add 'active' class to the nth $('.workflow-step') element (0-based index)
@@ -2584,12 +2618,12 @@
     }
 
     // hide popup when popup menu loses focus and popup menu is visible
-        $(document).on("click", function (e) {
-            const $popupMenu = $('#download-popup-menu');
-            if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
-                hideDownloadPopupMenu();
-            }
-        });
+    $(document).on("click", function (e) {
+        const $popupMenu = $('#download-popup-menu');
+        if ($popupMenu.is(':visible') && !$(e.target).closest('#downloadWorkflowBtn, #download-popup-menu').length) {
+            hideDownloadPopupMenu();
+        }
+    });
 
 
 
@@ -2599,26 +2633,26 @@
     //            e.stopPropagation();
     //        });
 
-        $(document).off('click.workflow-dl-pdf').on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
-            e.stopPropagation();
-            console.log("Download PDF option clicked");
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('pdf');
-        });
+    $(document).off('click.workflow-dl-pdf').on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
+        e.stopPropagation();
+        console.log("Download PDF option clicked");
+        hideDownloadPopupMenu();
+        downloadWorkflowOutput('pdf');
+    });
 
-        $(document).off('click.workflow-dl-csv').on('click.workflow-dl-csv', '#download-csv-option', function (e) {
-            e.stopPropagation();
-            console.log("Download CSV option clicked");
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('csv');
-        });
+    $(document).off('click.workflow-dl-csv').on('click.workflow-dl-csv', '#download-csv-option', function (e) {
+        e.stopPropagation();
+        console.log("Download CSV option clicked");
+        hideDownloadPopupMenu();
+        downloadWorkflowOutput('csv');
+    });
 
-        $(document).off('click.workflow-dl-txt').on('click.workflow-dl-txt', '#download-text-option', function (e) {
-            e.stopPropagation();
-            console.log("Download Text option clicked");
-            hideDownloadPopupMenu();
-            downloadWorkflowOutput('txt');
-        });
+    $(document).off('click.workflow-dl-txt').on('click.workflow-dl-txt', '#download-text-option', function (e) {
+        e.stopPropagation();
+        console.log("Download Text option clicked");
+        hideDownloadPopupMenu();
+        downloadWorkflowOutput('txt');
+    });
 
     function downloadWorkflowOutput(format) {
         console.log("Downloading workflow output in format:", format);

@@ -600,6 +600,9 @@ def workflow_status() -> ResponseReturnValue:
         "output": final_output,
         "status": workflow_result.status,
         "activity_id": activity_id,
+        "current_step_name": workflow_result.current_step_name,
+        "current_step_detail": workflow_result.current_step_detail,
+        "current_step_preview": workflow_result.current_step_preview,
     }
 
     return jsonify(response)
@@ -646,9 +649,26 @@ def workflow_download() -> ResponseReturnValue:
     if not workflow_result:
         return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
-    # 2) pull the final output payload
-    final_output = list(workflow_result.steps_output.values())[-1]["output"]
-    raw_json = json.dumps(final_output, indent=2)
+    # 2) pull the final output payload (prefer the stored final_output field, fall back to last step)
+    final_payload = workflow_result.final_output or {}
+    final_output = final_payload.get("output")
+    if final_output is None:
+        steps_outputs = list(workflow_result.steps_output.values())
+        if steps_outputs:
+            final_output = steps_outputs[-1].get("output")
+
+    if isinstance(final_output, (list, dict)):
+        raw_json = json.dumps(final_output, indent=2, default=str)
+        final_output_str = raw_json
+    elif final_output is None:
+        raw_json = ""
+        final_output_str = ""
+    else:
+        raw_json = final_output
+        final_output_str = final_output
+
+    if not raw_json:
+        raw_json = "No workflow output was produced."
     print(raw_json)
     # 3) ask the LLM to format
     #    tailor the prompt to each format
@@ -687,7 +707,7 @@ def workflow_download() -> ResponseReturnValue:
     user = current_user
 
     if fmt == "pdf":
-        formatted = final_output
+        formatted = final_output_str
     else:
         model_config = UserModelConfig.objects(user_id=user.user_id).first()
         if model_config:

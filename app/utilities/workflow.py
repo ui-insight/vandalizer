@@ -108,7 +108,14 @@ def format_llm_output(text: str) -> str:
     return text.strip()
 
 
-def llm_chat_model(model, prompt, data=None, docs=None):
+def llm_chat_model(
+    model,
+    prompt,
+    data=None,
+    docs=None,
+    progress_callback=None,
+    include_next_step=True,
+):
     if docs is None:
         docs = []
     chat_manager = ChatManager()
@@ -117,9 +124,16 @@ def llm_chat_model(model, prompt, data=None, docs=None):
     if len(docs) == 0:
         full_text = json.dumps(data)
         output_prompt = f"""Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot. Only show the markdown output and add no text before it.\n\nInstruction: {prompt}\n\n {full_text}"""
-        chat_agent = create_chat_agent(model)
-        result = chat_agent.run_sync(output_prompt)
-        output = result.output
+        def _on_chunk(text):
+            if progress_callback:
+                progress_callback(text)
+
+        output = chat_manager.stream_prompt(
+            model=model,
+            prompt=output_prompt,
+            progress_callback=_on_chunk,
+            include_next_step=include_next_step,
+        )
         debug(f"Output from chat agent: {output}")
 
     else:
@@ -128,13 +142,18 @@ def llm_chat_model(model, prompt, data=None, docs=None):
             root_path=app.root_path,
             documents=docs,
             question=prompt,
+            include_next_step=include_next_step,
         )
         output = output.get("answer", "")
         debug(f"Output from chat agent: {output}")
+        if progress_callback:
+            progress_callback(output)
     return output
 
 
-def data_extraction_model(model, keys, documents=[], full_text=None):
+def data_extraction_model(model, keys, documents=None, full_text=None, progress_callback=None):
+    if documents is None:
+        documents = []
     output = None
     extraction_manager = ExtractionManager3()
     document_uuids = []
@@ -149,7 +168,13 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
 
     debug(output)
     formatted_output = format_extraction_results(output)
-    return formatted_output
+    extraction_payload = {
+        "raw": output,
+        "formatted": formatted_output,
+    }
+    if progress_callback:
+        progress_callback(extraction_payload)
+    return extraction_payload
 
 
 def format_extraction_results(data):
@@ -166,16 +191,19 @@ def format_extraction_results(data):
     else:
         return str(data)
 
-    lines = []
-    for item in items:
+    block_lines = []
+    for idx, item in enumerate(items, start=1):
         if isinstance(item, dict):
+            if len(items) > 1:
+                block_lines.append(f"#### Result {idx}")
             for key, value in item.items():
                 value_str = _stringify_extraction_value(value)
-                lines.append(f"- {key}: {value_str}")
+                block_lines.append(f"- **{key}**: {value_str}")
+            block_lines.append("")  # spacing
         else:
-            lines.append(f"- {item}")
+            block_lines.append(f"- {item}")
 
-    return "\n".join(lines)
+    return "\n".join(line for line in block_lines if line is not None)
 
 
 def _stringify_extraction_value(value):
@@ -220,6 +248,7 @@ class Node:
         self.inputs = {}
         self.outputs = {}
         self.tasks = []
+        self.progress_reporter = None
 
     def process(self, inputs) -> NoReturn:
         raise NotImplementedError
@@ -227,6 +256,10 @@ class Node:
     def __repr__(self) -> str:
         node_class = self.__class__.__name__
         return f"""{node_class}(name={self.name}, inputs={self.inputs}, outputs={self.outputs})"""
+
+    def report_progress(self, detail=None, preview=None):
+        if self.progress_reporter:
+            self.progress_reporter(detail, preview)
 
 
 class MultiTaskNode(Node):
@@ -309,6 +342,7 @@ class FormatNode(Node):
 
         data = inputs.get("output", None)
         prev_step_name = inputs.get("step_name", None)
+        self.report_progress(f"Formatter: {formatting_prompt}")
         text = None
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
@@ -349,10 +383,24 @@ class ExtractionNode(Node):
         step_input = None
         docs_uuids = []
         extraction_response = None
+        self.report_progress("Extraction running")
+
+        def _on_progress(preview):
+            if isinstance(preview, dict):
+                preview_text = preview.get("formatted") or format_extraction_results(preview.get("raw"))
+            else:
+                preview_text = preview
+            self.report_progress("Extraction running", preview_text)
+
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             step_input = docs_uuids
-            extraction_response = data_extraction_model(self.model, keys, docs_uuids)
+            extraction_response = data_extraction_model(
+                self.model,
+                keys,
+                docs_uuids,
+                progress_callback=_on_progress,
+            )
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
@@ -364,6 +412,7 @@ class ExtractionNode(Node):
                 keys,
                 docs_uuids,
                 full_text=step_input,
+                progress_callback=_on_progress,
             )
         elif prev_step_name in {"Extraction", "Formatter"}:
             step_input = inputs.get("output", None)
@@ -372,10 +421,13 @@ class ExtractionNode(Node):
                 keys,
                 docs_uuids,
                 full_text=step_input,
+                progress_callback=_on_progress,
             )
 
+        formatted_output = extraction_response.get("formatted") if isinstance(extraction_response, dict) else extraction_response
+
         return {
-            "output": extraction_response,
+            "output": formatted_output,
             "input": step_input,
             "step_name": self.name,
         }
@@ -396,6 +448,10 @@ class PromptNode(Node):
         prev_step_name = inputs.get("step_name", None)
         debug("Prompt", inputs, prompt)
         chat_response = None
+        self.report_progress(f"Prompt: {prompt}")
+
+        def _on_stream_update(preview):
+            self.report_progress(f"Prompt: {prompt}", preview)
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             docs = []
@@ -404,7 +460,13 @@ class PromptNode(Node):
                 if doc is not None:
                     docs.append(doc)
 
-            chat_response = llm_chat_model(model=self.model, docs=docs, prompt=prompt)
+            chat_response = llm_chat_model(
+                model=self.model,
+                docs=docs,
+                prompt=prompt,
+                include_next_step=False,
+                progress_callback=_on_stream_update,
+            )
         else:
             data = inputs.get("output", None)
 
@@ -413,6 +475,8 @@ class PromptNode(Node):
                 docs=[],
                 prompt=prompt,
                 data=data,
+                progress_callback=_on_stream_update,
+                include_next_step=False,
             )
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
@@ -436,6 +500,7 @@ class WorkflowEngine:
         self.graph = graphlib.TopologicalSorter()
         self.graph_built = False
         self.max_workers = multiprocessing.cpu_count()
+        self._last_progress_snapshot = None
 
     def add_node(self, node) -> None:
         self.graph.add(node)
@@ -457,6 +522,12 @@ class WorkflowEngine:
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
+            if workflow_result:
+                self._report_progress(
+                    workflow_result,
+                    node.name,
+                    detail=f"Starting {node.name}",
+                )
 
             if idx == 0:
                 output = node.process({})
@@ -465,6 +536,17 @@ class WorkflowEngine:
             else:
                 debug(node)
                 debug(latest_output)
+
+                if workflow_result and isinstance(node, MultiTaskNode):
+                    for task in node.tasks:
+                        task.progress_reporter = (
+                            lambda detail=None, preview=None, step=node.name, task_name=task.name: self._report_progress(
+                                workflow_result,
+                                step,
+                                detail=detail or task_name,
+                                preview=preview,
+                            )
+                        )
 
                 output = node.process(latest_output)
                 latest_output = output
@@ -491,8 +573,75 @@ class WorkflowEngine:
         if workflow_result:
             workflow_result.status = "completed"
             workflow_result.save()
-        return latest_output.get("output"), data
+            self._report_progress(
+                workflow_result,
+                None,
+                detail="Workflow completed",
+                preview=None,
+            )
+            workflow_result.save()
+            self._report_progress(
+                workflow_result,
+                None,
+                detail="Workflow completed",
+                preview=None,
+            )
+        final_value = self._format_final_output(latest_output.get("output"))
+        return final_value, data
 
+    def _format_final_output(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            formatted_items = [
+                self._format_final_output(item) if isinstance(item, (list, dict)) else self._normalize_text(str(item))
+                for item in value
+            ]
+            formatted_items = [item for item in formatted_items if item]
+            if not formatted_items:
+                return ""
+            if len(formatted_items) == 1:
+                return formatted_items[0]
+            blocks = []
+            for idx, item in enumerate(formatted_items, start=1):
+                stripped = item.lstrip()
+                if stripped.startswith("#"):
+                    blocks.append(item)
+                else:
+                    blocks.append(f"### Result {idx}\n{item}")
+            return "\n\n".join(blocks)
+        if isinstance(value, dict):
+            try:
+                return json.dumps(value, indent=2)
+            except Exception:
+                return str(value)
+        return self._normalize_text(str(value))
+
+    @staticmethod
+    def _normalize_text(text):
+        if not isinstance(text, str):
+            text = str(text)
+        return text.replace("\\n", "\n").replace("\\t", "\t")
+
+    def _report_progress(self, workflow_result, step_name, detail=None, preview=None):
+        if not workflow_result:
+            return
+
+        update_ops = {}
+        if step_name is not None:
+            workflow_result.current_step_name = step_name
+            update_ops["set__current_step_name"] = step_name
+        if detail is not None:
+            workflow_result.current_step_detail = detail
+            update_ops["set__current_step_detail"] = detail
+        if preview is not None:
+            workflow_result.current_step_preview = preview
+            update_ops["set__current_step_preview"] = preview
+        elif preview is None and "set__current_step_preview" not in update_ops and detail in {"Workflow completed", None}:
+            update_ops["unset__current_step_preview"] = 1
+
+        if update_ops:
+            WorkflowResult.objects(id=workflow_result.id).update_one(**update_ops)
 
 def build_workflow_engine(steps, workflow, model, user_id=None):
     engine = WorkflowEngine()
