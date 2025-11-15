@@ -183,19 +183,45 @@
 
     const ACTIVITY_POLL_INTERVAL_MS = 5000;
     let activityPollTimeout = null;
-    let latestActivityCursor = null;
+    let latestActivityCursor = window.__initialActivityCursor || null;
+
+    function getActivityId(activity) {
+        if (!activity) {
+            return null;
+        }
+        try {
+            if (typeof resolveActivityId !== "undefined") {
+                const resolved = resolveActivityId(activity);
+                if (resolved) {
+                    return resolved;
+                }
+            }
+        } catch (err) {
+            console.warn("Failed to resolve activity id via helper", err);
+        }
+        if (typeof activity.id === "string" && activity.id.length) {
+            return activity.id;
+        }
+        if (activity._id && typeof activity._id.$oid === "string") {
+            return activity._id.$oid;
+        }
+        return null;
+    }
 
     function handleActivityEvent(data) {
         if (!data) return;
         const ul = document.getElementById("run-list");
         if (!ul) return;
 
-        const activityId = data._id?.$oid;
-        if (activityId) {
-            const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-            if (existing) {
-                return;
-            }
+        const activityId = getActivityId(data);
+        if (!activityId) {
+            console.warn("Skipping activity with missing id", data);
+            return;
+        }
+
+        const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        if (existing) {
+            return;
         }
 
         const newLi = liForActivity(data);
@@ -242,7 +268,7 @@
 
             if (events.length) {
                 const newest = events[events.length - 1];
-                const newestId = newest?._id?.$oid;
+                const newestId = getActivityId(newest);
                 if (newestId) {
                     latestActivityCursor = newestId;
                 }
