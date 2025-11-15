@@ -4,26 +4,50 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import chromadb
-from chromadb.config import Settings
+from chromadb.config import Settings as ChromaSettings
 from devtools import debug
 
 from app.models import SmartDocument
+from app.utilities.config import settings
 
 
 class SemanticRecommender:
     def __init__(self, persist_directory=None) -> None:
         self.persist_directory = persist_directory or "./chroma_db"
 
-        Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
-        self.client = chromadb.PersistentClient(
-            path=self.persist_directory,
-            settings=Settings(
-                anonymized_telemetry=False,
-                is_persistent=True,
-                # Performance optimization: allow more threads for parallel processing
-                allow_reset=True,
-            ),
-        )
+        # Determine if we should use ChromaDB server or persistent client
+        use_server = settings.use_chroma_server or settings.environment in ["staging", "production"]
+
+        if use_server:
+            # Use HttpClient to connect to ChromaDB server
+            debug(f"Connecting to ChromaDB server at {settings.chroma_host}:{settings.chroma_port}")
+            try:
+                self.client = chromadb.HttpClient(
+                    host=settings.chroma_host,
+                    port=settings.chroma_port,
+                    settings=ChromaSettings(
+                        anonymized_telemetry=False,
+                    ),
+                )
+                debug("Successfully connected to ChromaDB server")
+            except Exception as e:
+                debug(f"Failed to connect to ChromaDB server: {e}")
+                debug("Falling back to persistent client")
+                use_server = False
+
+        if not use_server:
+            # Use PersistentClient for local development
+            debug(f"Using persistent ChromaDB client at {self.persist_directory}")
+            Path(self.persist_directory).mkdir(parents=True, exist_ok=True)
+            self.client = chromadb.PersistentClient(
+                path=self.persist_directory,
+                settings=ChromaSettings(
+                    anonymized_telemetry=False,
+                    is_persistent=True,
+                    # Performance optimization: allow more threads for parallel processing
+                    allow_reset=True,
+                ),
+            )
 
         # Ensure our collection exists (or create it)
         existing = {col.name for col in self.client.list_collections()}
