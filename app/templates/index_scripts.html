@@ -181,30 +181,23 @@
     const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
 
 
-    const eventSource = new EventSource("/activity/streams/");
-    console.log("EventSource created:", eventSource);
+    const ACTIVITY_POLL_INTERVAL_MS = 5000;
+    let activityPollTimeout = null;
+    let latestActivityCursor = null;
 
-    eventSource.onmessage = function (event) {
-        console.log("Received event:", event);
-        const data = JSON.parse(event.data);
-        console.log("Parsed data:", data);
-
+    function handleActivityEvent(data) {
+        if (!data) return;
         const ul = document.getElementById("run-list");
-
         if (!ul) return;
 
-        // Check if this activity already exists to prevent duplicates
         const activityId = data._id?.$oid;
         if (activityId) {
             const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
             if (existing) {
-                console.log("Activity already exists, skipping:", activityId);
                 return;
             }
         }
 
-        // Insert new activities at the top (after "New chat" and spacer)
-        // ul.children[0] = "New chat", ul.children[1] = spacer, ul.children[2] = first activity
         const newLi = liForActivity(data);
         if (newLi) {
             if (ul.children.length > 2) {
@@ -213,19 +206,55 @@
                 ul.appendChild(newLi);
             }
 
-            // Check if this activity should be active based on URL
             const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
             if (url_activity_id === activityId) {
-                console.log("Setting new activity as active:", activityId);
                 newLi.classList.add("active");
             }
         }
 
-        conversationId = data.conversation_id;
-        activity_id = activityId;
+        if (data.conversation_id) {
+            conversationId = data.conversation_id;
+        }
+        if (activityId) {
+            activity_id = activityId;
+        }
 
         fulfillPendingActivityActivation();
-    };
+    }
+
+    async function pollActivityStream() {
+        const params = new URLSearchParams({ limit: "50" });
+        if (latestActivityCursor) {
+            params.set("after", latestActivityCursor);
+        }
+
+        try {
+            const response = await fetch(`/activity/streams/?${params.toString()}`, {
+                cache: "no-store",
+                headers: { Accept: "application/json" },
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to poll activity stream: ${response.status}`);
+            }
+            const payload = await response.json();
+            const events = Array.isArray(payload.events) ? payload.events : [];
+            events.forEach(handleActivityEvent);
+
+            if (events.length) {
+                const newest = events[events.length - 1];
+                const newestId = newest?._id?.$oid;
+                if (newestId) {
+                    latestActivityCursor = newestId;
+                }
+            }
+        } catch (error) {
+            console.error("Error while polling activity stream", error);
+        } finally {
+            activityPollTimeout = setTimeout(pollActivityStream, ACTIVITY_POLL_INTERVAL_MS);
+        }
+    }
+
+    pollActivityStream();
 
     function toHtml(markdown) {
         const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');

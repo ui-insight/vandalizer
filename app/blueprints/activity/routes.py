@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
+import json
 import logging
-import time
 
+from bson import ObjectId
+from bson.errors import InvalidId
 from devtools import debug
-from flask import (
-    Blueprint,
-    Response,
-    jsonify,
-    redirect,
-    request,
-    url_for,
-)
+from flask import Blueprint, jsonify, redirect, request, url_for
 
 from app import load_user
 from app.models import ActivityEvent, ChatConversation
@@ -72,34 +67,32 @@ def delete_activity(activity_id):
         ), 404
 
 
-def generate_events(user_id, limit=100, poll_interval=2):
-    """
-    SSE generator that streams only NEW activities.
-    """
-    # Track the IDs we've already sent
-    sent_ids = set()
-
-    while True:
-        # Query the most recent events (descending order - newest first)
-        events = list(
-            ActivityEvent.objects(user_id=user_id).order_by("started_at").limit(limit)
-        )
-
-        # Only send events we haven't sent before
-        for ev in events:
-            event_id = str(ev.id)
-            if event_id not in sent_ids:
-                yield f"data: {ev.to_json()}\n\n"
-                sent_ids.add(event_id)
-
-        # Sleep briefly to avoid hammering the DB
-        time.sleep(poll_interval)
-
-
 @activity.route("/streams/", methods=["GET"])
 def activity_streams():
     user = load_user()
     user_id = user.get_id()
 
-    limit = int(request.args.get("limit", 100))
-    return Response(generate_events(user_id, limit), mimetype="text/event-stream")
+    # Sanitize the limit so polling cannot overwhelm the DB.
+    try:
+        limit = int(request.args.get("limit", 50))
+    except (TypeError, ValueError):
+        limit = 50
+    limit = max(1, min(limit, 200))
+
+    after = request.args.get("after")
+
+    query = ActivityEvent.objects(user_id=user_id)
+
+    if after:
+        try:
+            after_oid = ObjectId(after)
+        except (InvalidId, TypeError):
+            logger.warning("Ignoring invalid 'after' cursor for activity stream")
+        else:
+            query = query.filter(id__gt=after_oid)
+
+    events = list(query.order_by("-started_at").limit(limit))
+    events.reverse()  # Oldest first so DOM insertions keep newest at the top.
+    serialized_events = [json.loads(event.to_json()) for event in events]
+
+    return jsonify({"events": serialized_events})
