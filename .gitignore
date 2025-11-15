@@ -1,3 +1,5 @@
+app/chroma_db
+app/chroma_db/*
 data/recommendations_vectordb
 uv.lock
 app/static/fillable_form.pdf
