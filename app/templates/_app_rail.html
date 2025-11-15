@@ -144,10 +144,34 @@
 
     // Simple handler you can expand to route appropriately
     function openRun(id, a) {
-        if (!a) return;
-        console.log("Opening run:", id, a);
-        // Route by type — adjust to your app’s real URLs
-        window.location.href = `activity/runs/${encodeURIComponent(id)}`;
+        if (!id || !a) {
+            return;
+        }
+        const url = new URL(window.location.origin + "/home");
+        url.searchParams.set("activity_id", id);
+
+        switch (a.type) {
+            case "conversation":
+                url.searchParams.set("section", "Assistant");
+                break;
+            case "search_set_run":
+                url.searchParams.set("section", "Library");
+                if (a.search_set_uuid) {
+                    url.searchParams.set("search_set_uuid", a.search_set_uuid);
+                }
+                break;
+            case "workflow_run":
+                url.searchParams.set("section", "Library");
+                if (a.workflow_id) {
+                    url.searchParams.set("workflow_id", a.workflow_id);
+                }
+                break;
+            default:
+                url.searchParams.set("section", "Assistant");
+                break;
+        }
+
+        window.location.href = url.toString();
     }
 
     function deleteActivity(event, itemId) {
