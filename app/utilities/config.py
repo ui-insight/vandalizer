@@ -149,5 +149,27 @@ class Settings(BaseSettings):
     openai_api_key: str
     redis_host: str
 
+    # Environment configuration
+    environment: str = Field(
+        default="development",
+        description="Application environment: development, staging, or production",
+    )
+
+    # ChromaDB configuration
+    chroma_host: str = Field(
+        default="localhost",
+        description="ChromaDB server host for staging/production",
+    )
+
+    chroma_port: int = Field(
+        default=8000,
+        description="ChromaDB server port for staging/production",
+    )
+
+    use_chroma_server: bool = Field(
+        default=False,
+        description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
+    )
+
 
 settings = Settings()
