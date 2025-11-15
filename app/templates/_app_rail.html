@@ -33,6 +33,7 @@
     // Injected from server
     const activity_items = {{ activities | tojson | safe }};
     console.log("Loaded activity items:", activity_items);
+    window.__initialActivityCursor = activity_items.length > 0 ? activity_items[0].id : null;
 
 
     // Icon map by type

@@ -82,7 +82,6 @@ def activity_streams():
     after = request.args.get("after")
 
     query = ActivityEvent.objects(user_id=user_id)
-
     if after:
         try:
             after_oid = ObjectId(after)
@@ -91,8 +90,7 @@ def activity_streams():
         else:
             query = query.filter(id__gt=after_oid)
 
-    events = list(query.order_by("-started_at").limit(limit))
-    events.reverse()  # Oldest first so DOM insertions keep newest at the top.
+    events = list(query.order_by("started_at").limit(limit))
     serialized_events = [json.loads(event.to_json()) for event in events]
 
     return jsonify({"events": serialized_events})
