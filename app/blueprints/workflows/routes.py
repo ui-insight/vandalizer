@@ -23,9 +23,11 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from celery.result import AsyncResult
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app.celery_worker import celery_app
 from app.blueprints.home.routes import _get_teams, markdown_or_html_to_pdf_bytes
 from app.models import (
     SearchSet,
@@ -55,6 +57,23 @@ from app.utilities.workflow import (
     execute_task_step_test,
     execute_workflow_task,
 )
+
+# Singleton instance for recommendations to avoid repeated initialization
+_recommendation_manager_instance = None
+
+def get_recommendation_manager():
+    """Get or create singleton SemanticRecommender instance."""
+    global _recommendation_manager_instance
+    if _recommendation_manager_instance is None:
+        persist_directory = "data/recommendations_vectordb"
+        _recommendation_manager_instance = SemanticRecommender(
+            persist_directory=persist_directory,
+        )
+    return _recommendation_manager_instance
+
+# Server-side cache for recommendations (TTL: 5 minutes)
+_recommendations_cache = {}
+_CACHE_TTL_SECONDS = 300  # 5 minutes
 from app.utilities.verification_helpers import user_can_modify_verified
 
 workflows = Blueprint("workflows", __name__)
@@ -325,13 +344,22 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
     if not document_uuids:
         return jsonify({"recommendations": []}), 200
 
+    # Create cache key from sorted UUIDs
+    cache_key = ",".join(sorted(document_uuids))
+
+    # Check server-side cache first
+    now = datetime.datetime.now()
+    if cache_key in _recommendations_cache:
+        cached_data, cached_time = _recommendations_cache[cache_key]
+        age_seconds = (now - cached_time).total_seconds()
+
+        if age_seconds < _CACHE_TTL_SECONDS:
+            debug(f"Using server-side cache (age: {age_seconds:.1f}s)")
+            return jsonify(cached_data), 200
+
     # try:
-    # Load documents
-    documents = []
-    for uuid in document_uuids:
-        doc = SmartDocument.objects(uuid=uuid).first()
-        if doc:
-            documents.append(doc)
+    # Load documents - use __in for batch query instead of loop
+    documents = list(SmartDocument.objects(uuid__in=document_uuids))
 
     if not documents:
         return jsonify(
@@ -343,10 +371,8 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         if not document.valid:
             are_documents_valid = False
 
-    persist_directory = "data/recommendations_vectordb"
-    recommendation_manager = SemanticRecommender(
-        persist_directory=persist_directory,
-    )
+    # Use singleton instance to avoid re-initialization overhead
+    recommendation_manager = get_recommendation_manager()
 
     # Get recommendations
     recommendations = recommendation_manager.search_recommendations(
@@ -393,9 +419,21 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
         ] + templates
 
     print(recommendations)
-    return jsonify(
-        {"templates": templates, "are_documents_valid": are_documents_valid}
-    ), 200
+
+    # Prepare response
+    response_data = {"templates": templates, "are_documents_valid": are_documents_valid}
+
+    # Cache the response (store both data and timestamp)
+    _recommendations_cache[cache_key] = (response_data, now)
+
+    # Clean up old cache entries (simple LRU: keep only last 100 entries)
+    if len(_recommendations_cache) > 100:
+        # Remove oldest entries
+        sorted_cache = sorted(_recommendations_cache.items(), key=lambda x: x[1][1])
+        for old_key, _ in sorted_cache[:20]:  # Remove 20 oldest
+            del _recommendations_cache[old_key]
+
+    return jsonify(response_data), 200
 
     # except Exception as e:
     #     print(e)
@@ -443,19 +481,10 @@ def test_workflow_step() -> ResponseReturnValue:
         document_trigger_step_id=str(document_trigger_step.id),
     )
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        workflow_output = async_result.get(timeout=600)
-    finally:
-        loop.close()
-
-    if workflow_output is None:
-        return jsonify({"error": "Workflow execution failed"})
-
-    debug(workflow_output)
-
-    return {"output": workflow_output}
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
 
 
 # @MARK: ~~ Run integration
@@ -617,6 +646,29 @@ def workflow_status() -> ResponseReturnValue:
         "current_step_detail": workflow_result.current_step_detail,
         "current_step_preview": workflow_result.current_step_preview,
     }
+
+    return jsonify(response)
+
+
+@login_required
+@workflows.route("/workflow/step/status/<task_id>", methods=["GET"])
+def workflow_step_test_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of a workflow step test Celery task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {
+        "task_id": task_id,
+        "state": state,
+    }
+
+    if result.successful():
+        response["output"] = result.result
+    elif result.failed():
+        err = result.result
+        response["error"] = str(err)
 
     return jsonify(response)
 

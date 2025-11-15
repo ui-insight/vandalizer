@@ -568,6 +568,19 @@
     function removeDocIdAndGo() {
         const url = new URL(window.location.href);
         url.searchParams.delete('docid');
+        url.searchParams.delete('docids');
+        url.searchParams.delete('search_set_uuid');
+        url.searchParams.delete('workflow_id');
+        url.searchParams.delete('workflow_step_id');
+        url.searchParams.delete('activity_id');
+        url.searchParams.delete('section');
+
+        const panel = document.getElementById('search-results-panel');
+        if (panel) {
+            panel.style.display = "none";
+            panel.innerHTML = "";
+        }
+
         window.location.href = url.toString();
     }
 
@@ -715,14 +728,10 @@
         $(".tab-content").hide();
         $("#tasks-panel").hide();
 
-        // Use the tabTitle variable as needed
-        let href = window.location.href;
-        const qs = new URLSearchParams(href.split("?")[1]);
-        qs.delete("section");
-        qs.append("section", sectionName);
-        const newQs = qs.toString();
-        const newhref = `/home?${newQs}`;
-        window.history.pushState({}, "", newhref);
+        // Preserve the current URL params (docid, activity, etc.) while switching sections
+        const url = new URL(window.location.href);
+        url.searchParams.set("section", sectionName);
+        window.history.pushState({}, "", url.toString());
 
         const tabMenu = document.querySelector(".tab-menu");
         const tabMenuItems = tabMenu.querySelectorAll("li");
@@ -806,64 +815,110 @@
         return true;
     }
 
+    // Debounce timer for recommendations
+    var recommendationsTimer = null;
+    var currentRecommendationRequest = null;
+    var recommendationsCache = {}; // Cache recommendations by document UUIDs
+
     function getWorkflowRecommendations(uuids) {
-        docLoaderProgressHandler.showRecommendationMessage();
-        $.ajax({
-            url: '/workflows/workflow/recommendations',
-            type: 'POST',
-            contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify({ uuids, space: $('#current-space-id')[0].innerHTML, limit: 5 }),
-            dataType: 'json',
-            success: function (msg) {
+        // Cancel any pending recommendation requests
+        clearTimeout(recommendationsTimer);
+        if (currentRecommendationRequest) {
+            currentRecommendationRequest.abort();
+        }
 
-                const recommendations = msg.templates;
+        // Create cache key from sorted UUIDs
+        const cacheKey = [...uuids].sort().join(',');
 
+        // Check cache first
+        if (recommendationsCache[cacheKey]) {
+            console.log('Using cached recommendations');
+            const cachedData = recommendationsCache[cacheKey];
+            updateRecommendationsUI(cachedData.templates, cachedData.are_documents_valid);
+            return;
+        }
 
-                const are_documents_valid = msg.are_documents_valid;
-                if (!are_documents_valid) {
-                    docLoaderProgressHandler.showSecurityFailureMessage();
-                } else {
+        // Debounce: wait 300ms before making the request
+        // This prevents hammering the server during rapid document selection changes
+        recommendationsTimer = setTimeout(function() {
+            docLoaderProgressHandler.showRecommendationMessage();
+
+            currentRecommendationRequest = $.ajax({
+                url: '/workflows/workflow/recommendations',
+                type: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ uuids, space: $('#current-space-id')[0].innerHTML, limit: 5 }),
+                dataType: 'json',
+                timeout: 10000, // 10 second timeout to prevent blocking
+                success: function (msg) {
+                    currentRecommendationRequest = null;
+
+                    // Cache the results for future use
+                    recommendationsCache[cacheKey] = {
+                        templates: msg.templates,
+                        are_documents_valid: msg.are_documents_valid
+                    };
+
+                    updateRecommendationsUI(msg.templates, msg.are_documents_valid);
+                },
+                error: function (xhr, status, err) {
+                    currentRecommendationRequest = null;
                     docLoaderProgressHandler.fastHide();
+
+                    // Don't log aborted requests (user changed selection)
+                    if (status === 'timeout') {
+                        console.warn('Recommendations request timed out - consider optimizing ChromaDB');
+                        $('#recommendations-panel').empty();
+                        $('#recommendations-panel').append('<li>Recommendations timed out. Try selecting fewer documents.</li>');
+                    } else if (status !== 'abort') {
+                        console.error('Error fetching workflow recommendations:', status, err);
+                    }
                 }
+            });
+        }, 300); // 300ms debounce delay
+    }
 
-                // Update the UI with the recommendations
-                $('#recommendations-panel').empty();
-                if (recommendations && recommendations.length > 0) {
-                    recommendations.forEach(rec => {
-                        $('#recommendations-panel').append(`${rec}`);
-                    });
-                } else {
-                    $('#recommendations-panel').append('<li>No recommendations available</li>');
-                }
+    // Separate UI update function for recommendations (used by both cache and AJAX)
+    function updateRecommendationsUI(recommendations, are_documents_valid) {
+        if (!are_documents_valid) {
+            docLoaderProgressHandler.showSecurityFailureMessage();
+        } else {
+            docLoaderProgressHandler.fastHide();
+        }
 
-                $('#recommendation-task-card').on('click', function (e) {
-                    e.preventDefault();
-                    setSection("Library");
-                    $("#newTaskModal").show();
-                });
+        // Update the UI with the recommendations
+        $('#recommendations-panel').empty();
+        if (recommendations && recommendations.length > 0) {
+            recommendations.forEach(rec => {
+                $('#recommendations-panel').append(`${rec}`);
+            });
+        } else {
+            $('#recommendations-panel').append('<li>No recommendations available</li>');
+        }
 
-                $('#recommendation-create-workflow-card').on('click', function (e) {
-                    e.preventDefault();
-                    setSection("Library");
-                    $("#newWorkflowModal").show();
-                });
+        // Attach event handlers
+        $('#recommendation-task-card').on('click', function (e) {
+            e.preventDefault();
+            setSection("Library");
+            $("#newTaskModal").show();
+        });
 
-                $('.workflow-recommendation-item').off("click").on("click", function () {
-                    let uuid = $(this).attr("data-uuid");
-                    fetchWorkflow(uuid);
-                });
+        $('#recommendation-create-workflow-card').on('click', function (e) {
+            e.preventDefault();
+            setSection("Library");
+            $("#newWorkflowModal").show();
+        });
 
-                $('.extraction-recommendation-item').off("click").on("click", function () {
-                    let uuid = $(this).attr("data-uuid");
-                    console.log(uuid);
-                    search_set_add_uuid = uuid;
-                    updateSearchSetPanel(uuid);
+        $('.workflow-recommendation-item').off("click").on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            fetchWorkflow(uuid);
+        });
 
-                });
-            },
-            error: function (xhr, status, err) {
-                console.error('Error fetching workflow recommendations:', status, err);
-            }
+        $('.extraction-recommendation-item').off("click").on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            console.log(uuid);
+            search_set_add_uuid = uuid;
+            updateSearchSetPanel(uuid);
         });
     }
 
@@ -1644,8 +1699,8 @@
             }
         }
 
-        // call this function to refresh the document selection on load
-        updateDocumentSelections();
+        // Note: updateDocumentSelections() is called via setTimeout after setSection()
+        // at the end of this script to ensure DOM is fully updated
 
         $('.tasks-btn').on('click', function (e) {
             e.preventDefault();
@@ -1905,7 +1960,7 @@
                 }
                 // Only set section to Workflows if we have a valid workflow_id
                 if (current_workflow_id && current_workflow_id != "0") {
-                    url.searchParams.set('section', 'Workflows');
+                    url.searchParams.set('section', 'Library');
                 }
                 window.history.replaceState(null, '', url.toString());
                 location.reload();
@@ -2364,6 +2419,98 @@
         });
     }
 
+    function waitForWorkflowStepTest(taskId, handlers) {
+        const options = Object.assign(
+            {
+                interval: 2000,
+                maxAttempts: 180,
+            },
+            handlers || {}
+        );
+        let attempts = 0;
+        let done = false;
+        let timer = null;
+
+        function cleanup() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        function fail(payload) {
+            if (done) {
+                return;
+            }
+            done = true;
+            cleanup();
+            if (typeof options.onError === "function") {
+                options.onError(payload || { error: "Workflow test failed." });
+            }
+        }
+
+        function handleSuccess(payload) {
+            if (done) {
+                return;
+            }
+            done = true;
+            cleanup();
+            if (typeof options.onComplete === "function") {
+                options.onComplete(payload);
+            }
+        }
+
+        function poll() {
+            $.ajax({
+                url: `/workflows/workflow/step/status/${encodeURIComponent(taskId)}`,
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    const state = (res.state || "").toUpperCase();
+                    if (state === "SUCCESS") {
+                        handleSuccess(res);
+                        return;
+                    }
+                    if (state === "FAILURE" || res.error) {
+                        fail(res);
+                        return;
+                    }
+                    attempts += 1;
+                    if (attempts >= options.maxAttempts) {
+                        fail({ error: "Timed out waiting for workflow test." });
+                    }
+                },
+                error: function (xhr, status, err) {
+                    attempts += 1;
+                    if (attempts >= options.maxAttempts) {
+                        fail({
+                            error:
+                                xhr?.responseJSON?.error ||
+                                err ||
+                                "Unable to retrieve workflow test status.",
+                        });
+                    }
+                },
+            });
+        }
+
+        poll();
+        timer = setInterval(poll, options.interval);
+        return () => {
+            cleanup();
+        };
+    }
+
+    function handleWorkflowStepTestResponse(response, handlers) {
+        if (response && response.task_id && !Object.prototype.hasOwnProperty.call(response, "output")) {
+            waitForWorkflowStepTest(response.task_id, handlers);
+            return;
+        }
+        if (typeof handlers.onComplete === "function") {
+            handlers.onComplete(response);
+        }
+    }
+
     // If there is a workflow in the browser href
     let workflow_template = {{ workflow_template| length
     }}
@@ -2774,16 +2921,10 @@
 
     tabMenuItems.forEach((item) => {
         item.addEventListener("click", function () {
-            tabMenuItems.forEach((item) => item.classList.remove("active"));
+            tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
-            var tabTitle = $(this).text();
-
+            const tabTitle = $(this).text().trim();
             setSection(tabTitle);
-            // reset the URL (base url + home?section=tabTitle)
-            const newUrl = `${window.location.origin}/home?section=${tabTitle}`;
-            window.history.replaceState(null, '', newUrl);
-
-
         });
     });
 
