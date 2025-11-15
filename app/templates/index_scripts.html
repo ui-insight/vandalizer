@@ -1029,7 +1029,10 @@
         }
 
         var docContainer = $('.document-container');
-        if (docContainer.length > 0) {
+        const isDocumentOpen = docContainer.length > 0;
+        const canRequestRecommendations = shouldFetchRecommendations() || isDocumentOpen;
+
+        if (isDocumentOpen) {
             var activeDocUuid = docContainer.data('doc-uuid');
             var docProcessing = docContainer.data('processing');
             if (activeDocUuid && !docProcessing && !uuids.includes(activeDocUuid)) {
@@ -1044,17 +1047,17 @@
 
         filterAvailableModels(uuids);
 
-        if (docContainer.length > 0) {
+        if (isDocumentOpen) {
             var docUuid = docContainer.data('doc-uuid');
             var isProcessing = docContainer.data('processing');
             if (totalDocs > 0 && !isProcessingFile && !isProcessing) {
-                if (shouldFetchRecommendations()) {
+                if (canRequestRecommendations) {
                     getWorkflowRecommendations(uuids);
                 }
             }
         } else {
             if (totalDocs > 0) {
-                if (shouldFetchRecommendations()) {
+                if (canRequestRecommendations) {
                     getWorkflowRecommendations(uuids);
                 }
             } else {
@@ -2093,6 +2096,11 @@
 
     function addWorkflowListeners() {
         console.log("Add workflow listeners");
+        const urlParams = new URLSearchParams(window.location.search);
+        const directDocId = urlParams.get('docid');
+        if (directDocId && !document_uuids.includes(directDocId)) {
+            document_uuids.push(directDocId);
+        }
         updateDocumentSelections();
 
         $('#workflow-close-button').off("click").on("click", function () {

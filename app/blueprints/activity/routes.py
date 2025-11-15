@@ -82,7 +82,7 @@ def generate_events(user_id, limit=100, poll_interval=2):
     while True:
         # Query the most recent events (descending order - newest first)
         events = list(
-            ActivityEvent.objects(user_id=user_id).order_by("-started_at").limit(limit)
+            ActivityEvent.objects(user_id=user_id).order_by("started_at").limit(limit)
         )
 
         # Only send events we haven't sent before
