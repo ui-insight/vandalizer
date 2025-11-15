@@ -129,7 +129,6 @@ def filter_models() -> ResponseReturnValue:
     return jsonify({"models": models, "current_model": current_model})
 
 
-@login_required
 @tasks.route("/model/update", methods=["POST"])
 def update_model() -> ResponseReturnValue:
     """Update the model for a search set."""
@@ -140,6 +139,8 @@ def update_model() -> ResponseReturnValue:
     top_p = data.get("top_p", 0.9)
 
     user = current_user
+    if not getattr(user, "is_authenticated", False) or not getattr(user, "user_id", None):
+        return jsonify({"error": "login required"}), 401
 
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if model_config is None:

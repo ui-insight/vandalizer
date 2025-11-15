@@ -201,6 +201,42 @@
             beginSpinningJoe();
             runSteps();
             contentEl.innerHTML = "";
+            function renderTestOutput(outputHtml) {
+                stopSpinningJoe();
+                loadingCancelled = true;
+                contentBarEl.style.display = 'none';
+                messageEl.style.display = 'none';
+                titleEl.style.display = 'none';
+                container.classList.remove("shimmer");
+                titleEl.classList.remove("shimmer");
+                messageEl.classList.remove("shimmer");
+                fadeOutContainer(() => {
+                    titleEl.innerHTML = "";
+                    messageEl.innerHTML = "";
+                    contentEl.innerHTML = outputHtml || "";
+                    $(progressEl).hide();
+                    fadeInContainer();
+                });
+            }
+
+            function renderTestError(message) {
+                const msg = message || "Workflow test failed.";
+                stopSpinningJoe();
+                loadingCancelled = true;
+                contentBarEl.style.display = 'none';
+                messageEl.style.display = 'none';
+                titleEl.style.display = 'none';
+                container.classList.remove("shimmer");
+                titleEl.classList.remove("shimmer");
+                messageEl.classList.remove("shimmer");
+                fadeOutContainer(() => {
+                    titleEl.innerHTML = "";
+                    messageEl.innerHTML = "";
+                    contentEl.innerHTML = `<div class="text-danger">${msg}</div>`;
+                    $(progressEl).hide();
+                    fadeInContainer();
+                });
+            }
 
             // 2) Build task_data and JSON payload as before...
             let task_data = { type: "extraction" };
@@ -228,39 +264,20 @@
                 dataType: 'json',
                 async: true,
                 success: function (response) {
-                    // --- as soon as we get a response:
-
-                    // a) Stop the spinner and tell runSteps to quit immediately
-                    stopSpinningJoe();
-                    loadingCancelled = true;
-                    contentBarEl.style.display = 'none';
-                    messageEl.style.display = 'none';
-                    titleEl.style.display = 'none';
-
-
-                    // b) Remove shimmer (if container/title has a shimmer class, take it off)
-                    //    Adjust the selector if you applied shimmer to a different element.
-                    container.classList.remove("shimmer");
-                    titleEl.classList.remove("shimmer");
-                    messageEl.classList.remove("shimmer");
-
-                    // c) Fade out the entire loading container, THEN inject final HTML & fade back in
-                    fadeOutContainer(() => {
-                        // Use innerHTML so any HTML tags in response.output actually render
-                        titleEl.innerHTML = "";
-                        messageEl.innerHTML = "";
-                        // Inject the final 
-                        contentEl.innerHTML = response.output || "";
-                        // (If you have a separate “details” field, otherwise just messageEl.innerHTML = "")
-
-                        // Hide the progress bar entirely
-                        $(progressEl).hide();
-                        // Finally, fade the container (with new content) back in
-                        fadeInContainer();
+                    handleWorkflowStepTestResponse(response, {
+                        onComplete: function (payload) {
+                            renderTestOutput((payload && payload.output) || "");
+                        },
+                        onError: function (errPayload) {
+                            const msg = (errPayload && errPayload.error) || "Workflow test failed.";
+                            renderTestError(msg);
+                        }
                     });
                 },
                 error: function (xhr, thrownError) {
                     console.error("AJAX error:", thrownError);
+                    const msg = (xhr.responseJSON && xhr.responseJSON.error) || thrownError || "Workflow test failed.";
+                    renderTestError(msg);
                 }
             });
         });
