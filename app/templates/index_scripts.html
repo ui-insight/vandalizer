@@ -57,64 +57,22 @@
         });
     }
 
-    function promoteActivityInRail(activityId) {
-        const ul = document.getElementById("run-list");
-        if (!ul || !activityId) {
-            return null;
-        }
-        const li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-        if (!li) {
-            return null;
-        }
-        if (ul.children.length > 2) {
-            ul.insertBefore(li, ul.children[2]);
-        } else {
-            ul.appendChild(li);
-        }
-        return li;
-    }
-
     function setActiveRailActivity(activityId, options) {
-        if (!activityId) {
-            return;
-        }
+        if (!activityId) return;
 
-        const opts = Object.assign({ promote: false, running: false }, options || {});
+        const opts = Object.assign({ running: false }, options || {});
         const ul = document.getElementById("run-list");
-        if (!ul) {
-            return;
-        }
+        if (!ul) return;
 
         clearRailActiveState();
 
-        const apply = function () {
-            let li;
-            if (opts.promote) {
-                li = promoteActivityInRail(activityId);
-            }
-            if (!li) {
-                li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-            }
-            if (!li) {
-                pendingActivityActivation = { activityId: activityId, options: opts };
-                return;
-            }
+        const li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        if (!li) return;
 
-            clearRailActiveState();
-            li.classList.add("active");
-            if (opts.running) {
-                li.classList.add("is-running");
-            }
-            pendingActivityActivation = null;
-        };
-
-        const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-        if (existing) {
-            apply();
-            return;
+        li.classList.add("active");
+        if (opts.running) {
+            li.classList.add("is-running");
         }
-
-        pendingActivityActivation = { activityId: activityId, options: opts };
     }
 
     function fulfillPendingActivityActivation() {
@@ -250,9 +208,6 @@
 
     async function pollActivityStream() {
         const params = new URLSearchParams({ limit: "50" });
-        if (latestActivityCursor) {
-            params.set("after", latestActivityCursor);
-        }
 
         try {
             const response = await fetch(`/activity/streams/?${params.toString()}`, {
@@ -262,12 +217,18 @@
             if (!response.ok) {
                 throw new Error(`Failed to poll activity stream: ${response.status}`);
             }
+
             const payload = await response.json();
             const events = Array.isArray(payload.events) ? payload.events : [];
-            events.forEach(handleActivityEvent);
+
+            // Backend returns newest → oldest.
+            // We want newest closest to top, inserting at index 2, so:
+            // process from oldest → newest to preserve order.
+            events.slice().reverse().forEach(handleActivityEvent);
 
             if (events.length) {
-                const newest = events[events.length - 1];
+                // index 0 is newest (because backend is newest → oldest)
+                const newest = events[0];
                 const newestId = getActivityId(newest);
                 if (newestId) {
                     latestActivityCursor = newestId;
@@ -279,6 +240,7 @@
             activityPollTimeout = setTimeout(pollActivityStream, ACTIVITY_POLL_INTERVAL_MS);
         }
     }
+
 
     pollActivityStream();
 

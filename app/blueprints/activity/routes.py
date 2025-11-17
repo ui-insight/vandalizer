@@ -3,8 +3,6 @@
 import json
 import logging
 
-from bson import ObjectId
-from bson.errors import InvalidId
 from devtools import debug
 from flask import Blueprint, jsonify, redirect, request, url_for
 
@@ -79,18 +77,17 @@ def activity_streams():
         limit = 50
     limit = max(1, min(limit, 200))
 
-    after = request.args.get("after")
+    # after = request.args.get("after")
 
     query = ActivityEvent.objects(user_id=user_id)
-    if after:
-        try:
-            after_oid = ObjectId(after)
-        except (InvalidId, TypeError):
-            logger.warning("Ignoring invalid 'after' cursor for activity stream")
-        else:
-            query = query.filter(id__gt=after_oid)
+    # if after:
+    #     try:
+    #         after_oid = ObjectId(after)
+    #     except (InvalidId, TypeError):
+    #         logger.warning("Ignoring invalid 'after' cursor for activity stream")
+    #     else:
+    #         query = query.filter(id__gt=after_oid)
 
-    events = list(query.order_by("started_at").limit(limit))
+    events = list(query.order_by("-started_at").limit(limit))
     serialized_events = [json.loads(event.to_json()) for event in events]
-
     return jsonify({"events": serialized_events})

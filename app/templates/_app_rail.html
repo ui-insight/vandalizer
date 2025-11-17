@@ -210,49 +210,24 @@
     // Track if activities have been rendered to prevent duplicates
     let activitiesRendered = false;
 
-    // Render activities on page load
     function renderActivities() {
-        if (activitiesRendered) {
-            console.log("Activities already rendered, skipping");
-            return;
-        }
+        if (activitiesRendered) return;  // don’t re-run on SPA-like transitions
 
         const ul = document.getElementById("run-list");
         if (!ul) return;
 
-        // Clear existing activities (keep "New chat" and spacer)
         while (ul.children.length > 2) {
             ul.removeChild(ul.lastChild);
         }
 
-        // Get existing activity IDs to prevent duplicates
-        const existingIds = new Set();
-        for (let i = 2; i < ul.children.length; i++) {
-            const id = ul.children[i].dataset?.runId;
-            if (id) existingIds.add(id);
-        }
-
-        // Render activities (already sorted newest first from server)
         activity_items.forEach(activity => {
-            const activityId = resolveActivityId(activity);
-            if (!activityId) {
-                console.warn("Skipping activity with missing id", activity);
-                return;
-            }
-            // Only add if not already present
-            if (!existingIds.has(activityId)) {
-                const li = liForActivity(activity);
-                if (li) {
-                    ul.appendChild(li);
-                    existingIds.add(activityId);
-                }
-            }
-
+            const li = liForActivity(activity);
+            if (li) ul.appendChild(li);
         });
 
         activitiesRendered = true;
-        console.log("Activities rendered:", activity_items.length);
     }
+
 
     // Initial render on page load
     if (document.readyState === 'loading') {
