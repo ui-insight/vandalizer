@@ -356,7 +356,7 @@
         }
         const opts = Object.assign({ trailingLabel: null }, options || {});
         const trailing = opts.trailingLabel || `${formatWorkflowElapsed(elapsedSeconds)} elapsed`;
-        info.html(`<span>${stepsLabel}</span><span><i>${trailing}</i></span>`);
+        info.html(`<span>${stepsLabel} </span><span><i>${trailing}</i></span>`);
     }
 
     function resetWorkflowActiveStatus() {
@@ -895,7 +895,7 @@
 
         // Debounce: wait 300ms before making the request
         // This prevents hammering the server during rapid document selection changes
-        recommendationsTimer = setTimeout(function() {
+        recommendationsTimer = setTimeout(function () {
             docLoaderProgressHandler.showRecommendationMessage();
 
             currentRecommendationRequest = $.ajax({
