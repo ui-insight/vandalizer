@@ -34,6 +34,10 @@ def get_activity_data(activity_id):
     from app.blueprints.home.routes import event_to_dict
     activity_data = event_to_dict(event)
     
+    # Add workflow session_id if this is a workflow activity
+    if event.type == "workflow_run" and event.workflow_result:
+        activity_data["workflow_session_id"] = event.workflow_result.session_id
+    
     return jsonify({"activity": activity_data})
 
 

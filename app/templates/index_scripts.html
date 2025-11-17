@@ -215,12 +215,34 @@
     const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
 
 
-    // Helper function to update activity item status in the app rail
-    function updateActivityItemStatus(activityId, status) {
+    // Helper function to add a one-time shimmer effect to an activity item
+    function shimmerActivityItem(activityId) {
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) return;
         
-        const isProgress = status === "running" || status === "queued";
+        // Add shimmer class
+        activityItem.classList.add('shimmer');
+        
+        // Remove shimmer after animation completes (typically 1-2 seconds)
+        setTimeout(() => {
+            activityItem.classList.remove('shimmer');
+        }, 2000);
+    }
+    
+    // Helper function to update activity item status in the app rail
+    function updateActivityItemStatus(activityId, status) {
+        if (!activityId || !status) return;
+        
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) {
+            console.warn("Activity item not found for:", activityId);
+            return;
+        }
+        
+        // Normalize status to lowercase for comparison
+        const normalizedStatus = String(status).toLowerCase();
+        const isProgress = normalizedStatus === "running" || normalizedStatus === "queued";
+        
         // Check if it's an automation run by looking at the type icon
         const typeIcon = activityItem.querySelector('.run-type-icon');
         const isAutomationRun = typeIcon && (
@@ -229,10 +251,16 @@
         );
         
         // Update is-running class
+        const wasRunning = activityItem.classList.contains("is-running");
         if (isProgress && isAutomationRun) {
             activityItem.classList.add("is-running");
         } else {
             activityItem.classList.remove("is-running");
+            
+            // If it was running and now completed, add shimmer effect
+            if (wasRunning && (normalizedStatus === "completed" || normalizedStatus === "failed" || normalizedStatus === "canceled")) {
+                shimmerActivityItem(activityId);
+            }
         }
         
         // Update status icon
@@ -2359,9 +2387,12 @@
 
 
     function resetWorkflowButton() {
-        $('.run-workflow')[0].textContent = "RUN";
-        $('.run-workflow')[0].style = ""
-        $('.run-workflow').removeClass('shimmer');
+        const $runButton = $('.run-workflow');
+        if ($runButton.length > 0) {
+            $runButton[0].textContent = "RUN";
+            $runButton[0].style = "";
+            $runButton.removeClass('shimmer');
+        }
         $('.workflow-step').removeClass('active');
         $('.step-connector').removeClass('active');
         $('.workflow-loader').hide();
@@ -2672,10 +2703,17 @@
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
-                    console.log("Workflow completed or failed");
+                    console.log("Workflow completed or failed", { activityId, status });
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
+                        workflow_interval_id = null;
                     }
+                    
+                    // Ensure activity status is updated (in case updateActivityItemStatus didn't catch it)
+                    if (activityId) {
+                        updateActivityItemStatus(activityId, status);
+                    }
+                    
                     resetWorkflowActiveStatus();
                     const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
                     updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
@@ -2721,7 +2759,10 @@
                         $outputSection.removeClass('hidden').empty().show();
                         $('.workflow-output-buttons').removeClass('hidden');
                         $outputSection.append(html);
-                        $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
+                        const $workflowContainer = $('.workflow-container');
+                        if ($workflowContainer.length > 0) {
+                            $workflowContainer.animate({ scrollTop: $workflowContainer[0].scrollHeight }, 'slow');
+                        }
                         $('.workflow-step').removeClass('active');
                         // Add 'active' class to the nth $('.workflow-step') element (0-based index)
                         $('.workflow-output').addClass('active');
@@ -4555,4 +4596,146 @@
     if (window.__workflowSnapshot && hasWorkflowOutput(window.__workflowSnapshot)) {
         hydrateWorkflowSnapshot(window.__workflowSnapshot);
     }
+
+    // Resume polling for running activities on page load
+    function resumePollingForRunningActivities() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const activityId = urlParams.get('activity_id');
+        const searchSetUuid = urlParams.get('search_set_uuid');
+        
+        // Check for running workflow - try workflow_session_id first, then check activity_id
+        if (workflow_session_id && workflowActivityStatus) {
+            const status = workflowActivityStatus.toLowerCase();
+            if (status === 'running' || status === 'queued') {
+                console.log("Resuming workflow polling for session:", workflow_session_id);
+                if (workflow_interval_id) {
+                    clearInterval(workflow_interval_id);
+                }
+                workflow_interval_id = pollWorkflowStatus(workflow_session_id);
+                beginSpinningJoe();
+                showScanning();
+            }
+        } else if (activityId) {
+            // Check if this activity is a running workflow
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) return;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activity = data.activity;
+                        if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued')) {
+                            // Get session_id from activity data
+                            const sessionId = activity.workflow_session_id;
+                            if (sessionId) {
+                                console.log("Resuming workflow polling for session from activity:", sessionId);
+                                if (workflow_interval_id) {
+                                    clearInterval(workflow_interval_id);
+                                }
+                                workflow_session_id = sessionId;
+                                workflow_interval_id = pollWorkflowStatus(sessionId);
+                                beginSpinningJoe();
+                                showScanning();
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.warn("Failed to check workflow activity:", err));
+        }
+        
+        // Check for running extraction
+        if (activityId && searchSetUuid) {
+            // Fetch activity to check status
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) return;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activity = data.activity;
+                        const status = (activity.status || '').toLowerCase();
+                        if (status === 'running' || status === 'queued') {
+                            console.log("Resuming extraction polling for activity:", activityId);
+                            // Show loading state
+                            showWorking();
+                            showScanning();
+                            $("#search-results-panel").show();
+                            $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                            // Resume polling
+                            pollExtractionStatus(activityId, searchSetUuid);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to check activity status for polling resume:", err);
+                });
+        }
+        
+        // Also check all activities in the rail for running ones
+        const runList = document.getElementById("run-list");
+        if (runList) {
+            const runningItems = runList.querySelectorAll('li.run-item.is-running');
+            runningItems.forEach(item => {
+                const itemActivityId = item.dataset.runId;
+                if (!itemActivityId) return;
+                
+                // Check if it's an extraction (has search_set_uuid in URL or we can fetch it)
+                const typeIcon = item.querySelector('.run-type-icon');
+                if (typeIcon && typeIcon.classList.contains('fa-list-check')) {
+                    // It's an extraction - check if we're already polling
+                    // We'll fetch the activity to get search_set_uuid
+                    fetch(`/activity/runs/${itemActivityId}/data`)
+                        .then(response => {
+                            if (!response.ok) return;
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data && data.activity) {
+                                const activity = data.activity;
+                                if (activity.search_set_uuid && (activity.status === 'running' || activity.status === 'queued')) {
+                                    // Only resume if we're not already polling this one
+                                    if (itemActivityId !== activityId) {
+                                        console.log("Resuming extraction polling for activity in rail:", itemActivityId);
+                                        pollExtractionStatus(itemActivityId, activity.search_set_uuid);
+                                    }
+                                }
+                            }
+                        })
+                        .catch(err => console.warn("Failed to resume polling for activity:", err));
+                } else if (typeIcon && typeIcon.classList.contains('fa-diagram-project')) {
+                    // It's a workflow - fetch activity to get session_id
+                    fetch(`/activity/runs/${itemActivityId}/data`)
+                        .then(response => {
+                            if (!response.ok) return;
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data && data.activity) {
+                                const activity = data.activity;
+                                if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued')) {
+                                    const sessionId = activity.workflow_session_id;
+                                    if (sessionId && sessionId !== workflow_session_id) {
+                                        // Only resume if we're not already polling this one
+                                        console.log("Resuming workflow polling for activity in rail:", itemActivityId);
+                                        if (workflow_interval_id) {
+                                            clearInterval(workflow_interval_id);
+                                        }
+                                        workflow_session_id = sessionId;
+                                        workflow_interval_id = pollWorkflowStatus(sessionId);
+                                        beginSpinningJoe();
+                                        showScanning();
+                                    }
+                                }
+                            }
+                        })
+                        .catch(err => console.warn("Failed to resume workflow polling for activity:", err));
+                }
+            });
+        }
+    }
+    
+    // Resume polling after a short delay to ensure DOM is ready
+    setTimeout(resumePollingForRunningActivities, 500);
 </script>
