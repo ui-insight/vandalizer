@@ -71,9 +71,15 @@ def get_recommendation_manager():
         )
     return _recommendation_manager_instance
 
-# Server-side cache for recommendations (TTL: 5 minutes)
+def clear_recommendations_cache():
+    """Clear the recommendations cache to force fresh results."""
+    global _recommendations_cache
+    _recommendations_cache.clear()
+    debug("Recommendations cache cleared")
+
+# Server-side cache for recommendations (TTL: 30 seconds - reduced for faster updates)
+_CACHE_TTL_SECONDS = 30
 _recommendations_cache = {}
-_CACHE_TTL_SECONDS = 300  # 5 minutes
 from app.utilities.verification_helpers import user_can_modify_verified
 
 workflows = Blueprint("workflows", __name__)

@@ -847,12 +847,18 @@
         // Create cache key from sorted UUIDs
         const cacheKey = [...uuids].sort().join(',');
 
-        // Check cache first
-        if (recommendationsCache[cacheKey]) {
-            console.log('Using cached recommendations');
-            const cachedData = recommendationsCache[cacheKey];
-            updateRecommendationsUI(cachedData.templates, cachedData.are_documents_valid);
-            return;
+        // Check cache first (with shorter TTL - 30 seconds to match server)
+        const cachedData = recommendationsCache[cacheKey];
+        if (cachedData && cachedData.timestamp) {
+            const ageSeconds = (Date.now() - cachedData.timestamp) / 1000;
+            if (ageSeconds < 30) {  // 30 second cache TTL
+                console.log('Using cached recommendations');
+                updateRecommendationsUI(cachedData.templates, cachedData.are_documents_valid);
+                return;
+            } else {
+                // Remove stale cache entry
+                delete recommendationsCache[cacheKey];
+            }
         }
 
         // Debounce: wait 300ms before making the request
@@ -870,10 +876,11 @@
                 success: function (msg) {
                     currentRecommendationRequest = null;
 
-                    // Cache the results for future use
+                    // Cache the results for future use (with timestamp)
                     recommendationsCache[cacheKey] = {
                         templates: msg.templates,
-                        are_documents_valid: msg.are_documents_valid
+                        are_documents_valid: msg.are_documents_valid,
+                        timestamp: Date.now()
                     };
 
                     updateRecommendationsUI(msg.templates, msg.are_documents_valid);
@@ -2103,9 +2110,20 @@
 
 
 
-    $(document).on("click", ".workflow-item", function () {
-        let uuid = $(this).attr("data-uuid");
+    $(document).on("click", ".workflow-item", function (e) {
+        // Don't run workflow if clicking on a button or menu item
+        if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+            return;
+        }
 
+        // Don't run workflow if in Verified tab and item is in verification
+        let verificationStatus = $(this).attr("data-verification-status");
+        let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+        if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+            return;
+        }
+
+        let uuid = $(this).attr("data-uuid");
         console.log("here1")
         console.log(document_uuids);
         fetchWorkflow(uuid);
@@ -3115,7 +3133,18 @@
         });
     }
 
-    $(document).on("click", ".set-item", function () {
+    $(document).on("click", ".set-item", function (e) {
+        // Don't run extraction if clicking on a button or menu item
+        if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+            return;
+        }
+
+        // Don't run extraction if in Verified tab and item is in verification
+        let verificationStatus = $(this).attr("data-verification-status");
+        let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+        if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+            return;
+        }
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
         search_set_add_uuid = uuid;
