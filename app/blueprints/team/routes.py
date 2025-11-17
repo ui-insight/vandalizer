@@ -288,8 +288,13 @@ def team_accept_invite(token):
 @teams.route("/switch/<team_uuid>", methods=["GET"])
 def team_switch(team_uuid: str):
     user = require_login()
+    team = Team.objects(uuid=team_uuid).first()
+    if not team:
+        flash("Team not found.", "warning")
+        return redirect(url_for("team.team_index"))
+
     membership = TeamMembership.objects(
-        user_id=user.user_id, team__uuid=team_uuid
+        user_id=user.user_id, team=team
     ).first()
     if not membership:
         flash("You are not a member of that team.", "warning")

@@ -24,7 +24,8 @@
 {% set wf_verified = workflow.verified %}
 {% set wf_can_submit = (scope != 'verified') and (not wf_verified or (wf_verification and wf_status != 'approved')) %}
 {% set wf_is_verified = (wf_status == 'approved') or wf_verified %}
-{% set wf_can_edit = can_edit_verified or not wf_is_verified %}
+{% set wf_in_verification = wf_status in ['submitted', 'in_review'] %}
+{% set wf_can_edit = can_edit_verified or (not wf_is_verified and not (scope == 'verified' and wf_in_verification)) %}
 {% if wf_verification %}
     {% if wf_status in ['submitted', 'in_review'] %}
         {% set wf_submit_label = 'Edit verification submission' %}
@@ -113,7 +114,8 @@
 {% set ex_verified = s.verified %}
 {% set ex_can_submit = (scope != 'verified') and (not ex_verified or (ex_verification and ex_status != 'approved')) %}
 {% set ex_is_verified = (ex_status == 'approved') or ex_verified %}
-{% set ex_can_edit = can_edit_verified or not ex_is_verified %}
+{% set ex_in_verification = ex_status in ['submitted', 'in_review'] %}
+{% set ex_can_edit = can_edit_verified or (not ex_is_verified and not (scope == 'verified' and ex_in_verification)) %}
 {% if ex_verification %}
     {% if ex_status in ['submitted', 'in_review'] %}
         {% set ex_submit_label = 'Edit verification submission' %}
@@ -207,7 +209,8 @@
 {% set pr_request_uuid = pr_verification.uuid if pr_verification else '' %}
 {% set pr_verified = pr_status == 'approved' %}
 {% set pr_can_submit = (scope != 'verified') and (not pr_verified or (pr_verification and pr_status != 'approved')) %}
-{% set pr_can_edit = can_edit_verified or not pr_verified %}
+{% set pr_in_verification = pr_status in ['submitted', 'in_review'] %}
+{% set pr_can_edit = can_edit_verified or (not pr_verified and not (scope == 'verified' and pr_in_verification)) %}
 {% if pr_verification %}
     {% if pr_status in ['submitted', 'in_review'] %}
         {% set pr_submit_label = 'Edit verification submission' %}
@@ -293,7 +296,8 @@
 {% set fm_verified = fm_status == 'approved' %}
 {% set fm_can_submit = (scope != 'verified') and (not fm_verified or (fm_verification and fm_status != 'approved')) %}
 {% set fm_is_verified = (fm_status == 'approved') or fm_verified %}
-{% set fm_can_edit = can_edit_verified or not fm_is_verified %}
+{% set fm_in_verification = fm_status in ['submitted', 'in_review'] %}
+{% set fm_can_edit = can_edit_verified or (not fm_is_verified and not (scope == 'verified' and fm_in_verification)) %}
 {% if fm_verification %}
     {% if fm_status in ['submitted', 'in_review'] %}
         {% set fm_submit_label = 'Edit verification submission' %}
@@ -444,6 +448,14 @@
             if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
                 return;
             }
+
+            // Don't run prompt if in Verified tab and item is in verification
+            let verificationStatus = $(this).attr("data-verification-status");
+            let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+            if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+                return;
+            }
+
             let uuid = $(this).attr("data-uuid");
             let datatitle = $(this).attr("data-title");
             setSection("Assistant");
