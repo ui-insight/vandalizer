@@ -57,17 +57,93 @@
         });
     }
 
+    // Add a new activity to the top of the app rail
+    function addActivityToRail(activityId, activityData) {
+        if (!activityId) return;
+        
+        const ul = document.getElementById("run-list");
+        if (!ul) return;
+        
+        // Check if activity already exists
+        const existing = ul.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (existing) {
+            // If it exists, just update it and move to top
+            ul.insertBefore(existing, ul.children[2]);
+            return existing;
+        }
+        
+        // Use liForActivity from _app_rail.html if available
+        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity 
+            ? window.liForActivity 
+            : null;
+        
+        if (!liForActivityFn) {
+            console.warn("liForActivity function not available");
+            return null;
+        }
+        
+        // Create the activity item
+        const li = liForActivityFn(activityData);
+        if (!li) {
+            console.warn("Failed to create activity item", activityData);
+            return null;
+        }
+        
+        // Insert at the top (after "New chat" and spacer, which are indices 0 and 1)
+        if (ul.children.length > 2) {
+            ul.insertBefore(li, ul.children[2]);
+        } else {
+            ul.appendChild(li);
+        }
+        
+        return li;
+    }
+    
     function setActiveRailActivity(activityId, options) {
         if (!activityId) return;
 
-        const opts = Object.assign({ running: false }, options || {});
+        const opts = Object.assign({ running: false, promote: false }, options || {});
         const ul = document.getElementById("run-list");
         if (!ul) return;
 
         clearRailActiveState();
 
-        const li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        let li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        
+        // If activity doesn't exist and we have promote option, try to fetch and add it
+        if (!li && opts.promote) {
+            // Fetch activity data from server
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activityData = data.activity;
+                        li = addActivityToRail(activityId, activityData);
+                        if (li) {
+                            li.classList.add("active");
+                            if (opts.running) {
+                                li.classList.add("is-running");
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to fetch activity for rail:", err);
+                });
+            return;
+        }
+        
         if (!li) return;
+        
+        // Move to top if promote is true
+        if (opts.promote && ul.children.length > 2) {
+            ul.insertBefore(li, ul.children[2]);
+        }
 
         li.classList.add("active");
         if (opts.running) {
@@ -139,110 +215,49 @@
     const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
 
 
-    const ACTIVITY_POLL_INTERVAL_MS = 5000;
-    let activityPollTimeout = null;
-    let latestActivityCursor = window.__initialActivityCursor || null;
-
-    function getActivityId(activity) {
-        if (!activity) {
-            return null;
+    // Helper function to update activity item status in the app rail
+    function updateActivityItemStatus(activityId, status) {
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) return;
+        
+        const isProgress = status === "running" || status === "queued";
+        // Check if it's an automation run by looking at the type icon
+        const typeIcon = activityItem.querySelector('.run-type-icon');
+        const isAutomationRun = typeIcon && (
+            typeIcon.classList.contains('fa-list-check') || // search_set_run
+            typeIcon.classList.contains('fa-diagram-project') // workflow_run
+        );
+        
+        // Update is-running class
+        if (isProgress && isAutomationRun) {
+            activityItem.classList.add("is-running");
+        } else {
+            activityItem.classList.remove("is-running");
         }
-        try {
-            if (typeof resolveActivityId !== "undefined") {
-                const resolved = resolveActivityId(activity);
-                if (resolved) {
-                    return resolved;
-                }
-            }
-        } catch (err) {
-            console.warn("Failed to resolve activity id via helper", err);
+        
+        // Update status icon
+        const runActions = activityItem.querySelector('.run-actions');
+        if (!runActions) return;
+        
+        // Remove existing status icon (look for .run-right that contains .run-state-icon)
+        const existingRight = runActions.querySelector('.run-right');
+        if (existingRight && existingRight.querySelector('.run-state-icon')) {
+            existingRight.remove();
         }
-        if (typeof activity.id === "string" && activity.id.length) {
-            return activity.id;
-        }
-        if (activity._id && typeof activity._id.$oid === "string") {
-            return activity._id.$oid;
-        }
-        return null;
-    }
-
-    function handleActivityEvent(data) {
-        if (!data) return;
-        const ul = document.getElementById("run-list");
-        if (!ul) return;
-
-        const activityId = getActivityId(data);
-        if (!activityId) {
-            console.warn("Skipping activity with missing id", data);
-            return;
-        }
-
-        const existing = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-        if (existing) {
-            return;
-        }
-
-        const newLi = liForActivity(data);
-        if (newLi) {
-            if (ul.children.length > 2) {
-                ul.insertBefore(newLi, ul.children[2]);
-            } else {
-                ul.appendChild(newLi);
-            }
-
-            const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
-            if (url_activity_id === activityId) {
-                newLi.classList.add("active");
-            }
-        }
-
-        if (data.conversation_id) {
-            conversationId = data.conversation_id;
-        }
-        if (activityId) {
-            activity_id = activityId;
-        }
-
-        fulfillPendingActivityActivation();
-    }
-
-    async function pollActivityStream() {
-        const params = new URLSearchParams({ limit: "50" });
-
-        try {
-            const response = await fetch(`/activity/streams/?${params.toString()}`, {
-                cache: "no-store",
-                headers: { Accept: "application/json" },
-            });
-            if (!response.ok) {
-                throw new Error(`Failed to poll activity stream: ${response.status}`);
-            }
-
-            const payload = await response.json();
-            const events = Array.isArray(payload.events) ? payload.events : [];
-
-            // Backend returns newest → oldest.
-            // We want newest closest to top, inserting at index 2, so:
-            // process from oldest → newest to preserve order.
-            events.slice().reverse().forEach(handleActivityEvent);
-
-            if (events.length) {
-                // index 0 is newest (because backend is newest → oldest)
-                const newest = events[0];
-                const newestId = getActivityId(newest);
-                if (newestId) {
-                    latestActivityCursor = newestId;
-                }
-            }
-        } catch (error) {
-            console.error("Error while polling activity stream", error);
-        } finally {
-            activityPollTimeout = setTimeout(pollActivityStream, ACTIVITY_POLL_INTERVAL_MS);
+        
+        // Add new status icon if needed
+        if (status === "failed") {
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'run-right';
+            iconSpan.innerHTML = '<i class="fa-solid fa-triangle-exclamation run-state-icon" aria-label="Failed"></i>';
+            runActions.insertBefore(iconSpan, runActions.firstChild);
+        } else if (status === "canceled") {
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'run-right';
+            iconSpan.innerHTML = '<i class="fa-solid fa-circle-minus run-state-icon" aria-label="Canceled"></i>';
+            runActions.insertBefore(iconSpan, runActions.firstChild);
         }
     }
-
-
-    pollActivityStream();
 
     function toHtml(markdown) {
         const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
@@ -2606,6 +2621,7 @@
 
 
     function performWorkflowStatus(session_id, workflow_time) {
+        // This function is called by pollWorkflowStatus to check workflow status
 
         $.ajax({
             url: `/workflows/workflow/status?session_id=${session_id}`,
@@ -2648,6 +2664,12 @@
 
                 updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time);
 
+                // Update activity status in app rail on every poll
+                const activityId = data.activity_id;
+                if (activityId) {
+                    updateActivityItemStatus(activityId, status);
+                }
+
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
                     console.log("Workflow completed or failed");
@@ -2667,26 +2689,6 @@
                         status: status,
                         session_id: workflow_session_id,
                     };
-
-                    // Update the activity in the side rail
-                    const activityId = data.activity_id;
-                    if (activityId) {
-                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activityId}']`);
-                        if (activityItem) {
-                            // Remove running class
-                            activityItem.classList.remove('is-running');
-                            // Remove the spinning gear icon
-                            const runRight = activityItem.querySelector('.run-right');
-                            if (runRight) {
-                                if (status === 'completed') {
-                                    runRight.remove();
-                                } else if (status === 'failed') {
-                                    // Replace with failed icon
-                                    runRight.innerHTML = '<i class="fa-solid fa-triangle-exclamation run-state-icon" aria-label="Failed"></i>';
-                                }
-                            }
-                        }
-                    }
 
                     if (status === 'failed') {
                         showToast("Workflow failed");
@@ -3797,20 +3799,13 @@
                 success: function (response) {
                     console.log("Extraction status:", response.status);
 
+                    // Update activity status in app rail
+                    updateActivityItemStatus(activity_id, response.status);
+                    
                     if (response.status === "completed") {
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
-
-                        // Mark task as complete in app rail
-                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activity_id}']`);
-                        if (activityItem) {
-                            activityItem.classList.remove('is-running');
-                            const runRight = activityItem.querySelector('.run-right');
-                            if (runRight) {
-                                runRight.remove();
-                            }
-                        }
 
                         // Display results
                         $("#search-results-panel").empty();
@@ -3829,11 +3824,9 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
-
-                        const activityItem = document.querySelector(`li.run-item[data-run-id='${activity_id}']`);
-                        if (activityItem) {
-                            activityItem.classList.remove('is-running');
-                        }
+                        
+                        // Update activity status in app rail
+                        updateActivityItemStatus(activity_id, response.status);
 
                         $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Extraction failed: " + (response.error || "Unknown error") + "</div>");
 
@@ -4180,6 +4173,20 @@
             }),
         })
             .then((response) => {
+                // Check if this is a new activity (no current_activity_id was sent)
+                if (!current_activity_id) {
+                    const newActivityId = response.headers.get("X-Activity-ID");
+                    if (newActivityId) {
+                        // Add new activity to rail
+                        setActiveRailActivity(newActivityId, { promote: true, running: true });
+                        // Update URL
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', newActivityId);
+                        url.searchParams.set('section', 'Assistant');
+                        window.history.replaceState({}, '', url);
+                    }
+                }
+                
                 if (!response.body) throw new Error("No response body");
 
                 const reader = response.body.getReader();

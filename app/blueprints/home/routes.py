@@ -60,7 +60,6 @@ from app.utilities.analytics_helper import (
     ActivityType,
     activity_finish,
     activity_start,
-    recent_activity_for_feed,
 )
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
@@ -202,10 +201,7 @@ def index() -> ResponseReturnValue:
     # Activity
     activities_qs = _build_activities(user=user)
     activities = [event_to_dict(a) for a in activities_qs]
-    debug(activities)
-
     json.dumps(activities)
-    print(activities)
 
     # ensure_everyone_has_libraries_and_backfill()
 
@@ -605,11 +601,12 @@ def _folder_context(user, current_space: Space):
 
 
 def _build_activities(user: User) -> list[ActivityEvent]:
+    """Get the last 20 activities for the user, including completed ones."""
+    # Get last 20 activities, ordered by most recent
     activities = list(
-        recent_activity_for_feed(
-            user_id=user.get_id(),
-            include_completed=True,
-        )
+        ActivityEvent.objects(user_id=user.get_id())
+        .order_by("-last_updated_at", "-id")
+        .limit(20)
     )
 
     visible_activities: list[ActivityEvent] = []
@@ -630,19 +627,7 @@ def _build_activities(user: User) -> list[ActivityEvent]:
                     activity_finish(activity, status=status_enum)
                     activity.reload()
 
-        # Hide completed activities from the rail feed
-        if activity.status == ActivityStatus.COMPLETED.value:
-            continue
-
         visible_activities.append(activity)
-
-    # Sort activities: chats first, then by started_at (most recent first)
-    visible_activities.sort(
-        key=lambda a: (-(a.started_at.timestamp() if a.started_at else 0),),
-        reverse=False,
-    )
-
-    debug(f"Visible Activities: {visible_activities}")
 
     return visible_activities
 
@@ -739,6 +724,8 @@ def chat() -> ResponseReturnValue:
     # Use the appropriate MIME type. If you use Server-Sent Events, it's "text/event-stream".
     resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
     resp.headers["X-Conversation-UUID"] = conversation.uuid
+    if activity:
+        resp.headers["X-Activity-ID"] = str(activity.id)
     return resp
 
 
