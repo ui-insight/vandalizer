@@ -16,11 +16,16 @@ class SemanticRecommender:
         self.persist_directory = persist_directory or "./chroma_db"
 
         # Determine if we should use ChromaDB server or persistent client
-        use_server = settings.use_chroma_server or settings.environment in ["staging", "production"]
+        use_server = settings.use_chroma_server or settings.environment in [
+            "staging",
+            "production",
+        ]
 
         if use_server:
             # Use HttpClient to connect to ChromaDB server
-            debug(f"Connecting to ChromaDB server at {settings.chroma_host}:{settings.chroma_port}")
+            debug(
+                f"Connecting to ChromaDB server at {settings.chroma_host}:{settings.chroma_port}"
+            )
             try:
                 self.client = chromadb.HttpClient(
                     host=settings.chroma_host,
@@ -60,8 +65,11 @@ class SemanticRecommender:
             # Default is sentence-transformers/all-MiniLM-L12-v2 which is slower
             try:
                 from chromadb.utils import embedding_functions
-                embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(
-                    model_name="all-MiniLM-L6-v2"  # 80MB, 2x faster than L12
+
+                embedding_func = (
+                    embedding_functions.SentenceTransformerEmbeddingFunction(
+                        model_name="all-MiniLM-L6-v2"  # 80MB, 2x faster than L12
+                    )
                 )
                 self.collection = self.client.create_collection(
                     name=self.collection_name,
@@ -69,7 +77,9 @@ class SemanticRecommender:
                     embedding_function=embedding_func,
                 )
             except Exception as e:
-                debug(f"Failed to use optimized embedding model, falling back to default: {e}")
+                debug(
+                    f"Failed to use optimized embedding model, falling back to default: {e}"
+                )
                 self.collection = self.client.create_collection(
                     name=self.collection_name,
                     metadata={"hnsw:space": "cosine"},
@@ -84,12 +94,18 @@ class SemanticRecommender:
         limit: int = 3,
     ) -> List[Dict[str, Any]]:
         """Search for recommendations based on selected documents."""
-        # Early exit if collection is empty - avoid expensive embedding computation
-        if self.is_empty:
-            debug("Collection is empty, skipping search")
-            return []
+        # Re-check if collection is actually empty (in case items were added since initialization)
+        try:
+            count = self.collection.count()
+            self.is_empty = count == 0
+            if self.is_empty:
+                debug("Collection is empty, search will return no results")
+        except Exception as e:
+            debug(f"Error checking collection count: {e}")
+            # Continue anyway - let the search handle it
 
-        min_similarity = 0.9
+        # Proceed with search even if empty - ChromaDB will return empty results naturally
+        min_similarity = 0.7
 
         # Build the text prompt using a summary instead of full raw_text
         # This dramatically improves performance for large documents
@@ -111,9 +127,9 @@ class SemanticRecommender:
             results = self.collection.query(
                 query_texts=[search_text],
                 n_results=limit,
-                include=["metadatas", "documents", "distances"],
+                include=["metadatas", "distances"],
             )
-
+            print(results)
             recommendations = []
             ids = results.get("ids", [[]])[0]
             metas = results.get("metadatas", [[]])[0]

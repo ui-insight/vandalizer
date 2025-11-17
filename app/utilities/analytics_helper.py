@@ -50,6 +50,7 @@ def activity_start(
     meta_summary: dict | None = None,
     tags: list[str] | None = None,
 ) -> ActivityEvent:
+    now = datetime.now(timezone.utc)
     ev = ActivityEvent(
         type=type.value,
         title=title,
@@ -64,6 +65,8 @@ def activity_start(
         steps_total=steps_total,
         meta_summary=meta_summary or {},
         tags=tags or [],
+        started_at=now,
+        last_updated_at=now,
     )
     ev.save()
     
