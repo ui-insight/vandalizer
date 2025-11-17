@@ -146,6 +146,7 @@ def perform_extraction_and_update(document_uuid, extension):
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
     document.task_id = None
+    document.task_status = "complete"
     document.save()
 
 
