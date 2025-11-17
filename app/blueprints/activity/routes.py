@@ -20,6 +20,23 @@ def activity_index(activity_id):
     return redirect(url_for("home.index", activity_id=activity_id))
 
 
+@activity.route("/runs/<activity_id>/data", methods=["GET"])
+def get_activity_data(activity_id):
+    """Get activity data as JSON for client-side rendering."""
+    user = load_user()
+    user_id = user.get_id()
+    
+    event = ActivityEvent.objects(id=activity_id, user_id=user_id).first()
+    if not event:
+        return jsonify({"error": "Activity not found"}), 404
+    
+    # Convert to dict format similar to what _build_activities returns
+    from app.blueprints.home.routes import event_to_dict
+    activity_data = event_to_dict(event)
+    
+    return jsonify({"activity": activity_data})
+
+
 @activity.route("/runs/delete/<activity_id>", methods=["POST"])
 def delete_activity(activity_id):
     user = load_user()

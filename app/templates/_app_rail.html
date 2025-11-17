@@ -207,32 +207,35 @@
     }
 
 
-    // Track if activities have been rendered to prevent duplicates
-    let activitiesRendered = false;
-
-    function renderActivities() {
-        if (activitiesRendered) return;  // don’t re-run on SPA-like transitions
-
+    // Render initial activities from server on page load
+    function renderInitialActivities() {
         const ul = document.getElementById("run-list");
         if (!ul) return;
 
+        // Clear existing activities (keep "New chat" and spacer)
         while (ul.children.length > 2) {
             ul.removeChild(ul.lastChild);
         }
 
-        activity_items.forEach(activity => {
-            const li = liForActivity(activity);
-            if (li) ul.appendChild(li);
-        });
-
-        activitiesRendered = true;
+        // Render initial activities from server - these come from /home route
+        if (Array.isArray(activity_items) && activity_items.length > 0) {
+            activity_items.forEach(activity => {
+                const li = liForActivity(activity);
+                if (li) ul.appendChild(li);
+            });
+        }
     }
 
-
-    // Initial render on page load
+    // Initial render on page load - render activities immediately
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', renderActivities);
+        document.addEventListener('DOMContentLoaded', renderInitialActivities);
     } else {
-        renderActivities();
+        renderInitialActivities();
+    }
+    
+    // Make functions available globally for polling updates
+    if (typeof window !== 'undefined') {
+        window.liForActivity = liForActivity;
+        window.resolveActivityId = resolveActivityId;
     }
 </script>
