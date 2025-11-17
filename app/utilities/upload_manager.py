@@ -60,9 +60,13 @@ def validate_chunk(
     default_retry_delay=5,
     rate_limit="1/s",
 )
-def summarize_results(self, results: list, document_uuid: str) -> dict:
+def summarize_results(self, results: list, document_uuid: str, background: bool = False) -> dict:
     """
     Summarize validation feedback from all chunks and update the SmartDocument.
+
+    Args:
+        background: If True, don't set task_status (validation running in background).
+                   If False, set task_status to complete (sequential validation).
     """
     feedback_list = []
     all_valid = True
@@ -104,9 +108,14 @@ Return:
     doc.valid = all_valid
     doc.validation_feedback = summary.get("feedback", "")
     doc.validating = False
-    doc.task_status = "complete"
+
+    # Only set task_status for sequential validation (external models)
+    # For background validation (internal models), document is already usable
+    if not background:
+        doc.task_status = "complete"
+
     doc.save()
-    debug(f"Document {document_uuid} validation updated: valid={all_valid}")
+    debug(f"Document {document_uuid} validation updated: valid={all_valid}, background={background}")
     return summary
 
 
@@ -125,14 +134,21 @@ def perform_document_validation(
     document_path: str,
     chunk_size: int = 8000,
     chunk_overlap: int = 200,
+    background: bool = False,
 ):
     """
     Entry point: splits document, launches chunk validations, and the summarizer via a chord.
+
+    Args:
+        background: If True, validation runs in background and doesn't block document usage.
+                   If False, validation blocks document until complete (external models).
     """
 
     document = SmartDocument.objects(uuid=document_uuid).first()
     if document is not None:
-        document.task_status = "security"
+        if not background:
+            # Only set task_status for sequential validation (external models)
+            document.task_status = "security"
         document.validating = True
         document.save()
 
@@ -160,7 +176,7 @@ def perform_document_validation(
     ]
 
     # Use a chord to run summary after all chunks finish
-    callback = summarize_results.s(document_uuid)
+    callback = summarize_results.s(document_uuid, background)
     chord(header)(callback)  # Executes validate_chunk tasks, then summarize_results
 
     elapsed = time.perf_counter() - start

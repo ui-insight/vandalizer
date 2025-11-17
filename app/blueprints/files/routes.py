@@ -24,7 +24,7 @@ from pypdf import PdfReader
 # Normalize filename/extension early
 from werkzeug.utils import secure_filename
 
-from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
+from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder, UserModelConfig
 from app.utilities.document_manager import (
     DocumentManager,
     cleanup_document,
@@ -201,6 +201,16 @@ def upload():
     )
     document.save()
 
+    # Check if the user's model is external
+    model_config = UserModelConfig.objects(user_id=user_id).first()
+    is_external_model = False
+    if model_config and model_config.available_models:
+        # Find the current model in available_models
+        for model in model_config.available_models:
+            if model.get("name") == model_config.name:
+                is_external_model = model.get("external", False)
+                break
+
     # Kick off tasks
     extraction_task = perform_extraction_and_update.s(
         document_uuid=document.uuid,
@@ -210,12 +220,35 @@ def upload():
         document_uuid=document.uuid,
         document_path=str(file_path),
     )
-    workflow = extraction_task | validation_task
-    workflow_task_result = workflow.apply_async(
-        link=update_document_fields.si(document.uuid),
-        link_error=cleanup_document.si(document.uuid),
-    )
-    document.task_id = workflow_task_result.id
+
+    if is_external_model:
+        # External model: Sequential flow (extraction -> validation)
+        # Document not usable until both complete
+        workflow = extraction_task | validation_task
+        workflow_task_result = workflow.apply_async(
+            link=update_document_fields.si(document.uuid),
+            link_error=cleanup_document.si(document.uuid),
+        )
+        document.task_id = workflow_task_result.id
+    else:
+        # Internal model: Parallel flow
+        # Document usable after extraction, validation runs in background
+        workflow_task_result = extraction_task.apply_async(
+            link=update_document_fields.si(document.uuid),
+            link_error=cleanup_document.si(document.uuid),
+        )
+        document.task_id = workflow_task_result.id
+
+        # Run validation in the background independently with background=True flag
+        # Pass None for document_text - the task will extract it from the file
+        validation_task_background = perform_document_validation.s(
+            document_text=None,
+            document_uuid=document.uuid,
+            document_path=str(file_path),
+            background=True,
+        )
+        validation_task_background.apply_async()
+
     document.save()
 
     return jsonify({"complete": True, "uuid": uid}), 200
