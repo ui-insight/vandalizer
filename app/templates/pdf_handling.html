@@ -10,10 +10,21 @@
 
 <script>
     $('#semantic-panel').hide();
-    var highlightTerms = [];
+    // Make highlightTerms globally accessible so extraction result clicks can update it
+    if (typeof window.highlightTerms === 'undefined') {
+        window.highlightTerms = [];
+    }
+    // Make current_search_item globally accessible for navigation
+    if (typeof window.current_search_item === 'undefined') {
+        window.current_search_item = 0;
+    }
+    // Make needsScroll globally accessible
+    if (typeof window.needsScroll === 'undefined') {
+        window.needsScroll = true;
+    }
     var searchTerm = "";
-    var current_search_item = 0;
-    needsScroll = true;
+    var current_search_item = window.current_search_item;
+    var needsScroll = window.needsScroll;
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/javascript/pdf/pdf.worker.js';
     window.document_displayed = false;
 
@@ -79,7 +90,8 @@
             renderTask.promise.then(function () {
                 pageRendering = false;
                 // pass overlay instead of the wrapper/canvas for highlight placement
-                highlightText(page, highlightTerms, viewport, overlay);
+                // Use global highlightTerms to ensure we have the latest value
+                highlightText(page, window.highlightTerms || [], viewport, overlay);
             });
         });
     }
@@ -90,8 +102,13 @@
 
     function renderPDF() {
         pdfContainer.innerHTML = '';
+        window.current_search_item = 0;
         current_search_item = 0;
-        needsScroll = false;
+        // Preserve needsScroll flag if it was set externally (e.g., from extraction result click)
+        if (typeof window.needsScroll === 'undefined' || !window.needsScroll) {
+            window.needsScroll = false;
+        }
+        needsScroll = window.needsScroll;
         renderedPages.clear();
         pageWrappers = [];
 
@@ -230,7 +247,8 @@
 
             const renderTask = page.render(renderContext);
             renderTask.promise.then(function () {
-                highlightText(page, highlightTerms, viewport, overlay);
+                // Use global highlightTerms to ensure we have the latest value
+                highlightText(page, window.highlightTerms || [], viewport, overlay);
             });
         });
     }
@@ -296,25 +314,106 @@
                 overlayEl.appendChild(highlight);
             });
 
-            const highlights = $('.highlight');
-            if (highlights.length === 0) {
-                $('#semantic-panel').hide();
-            } else {
-                $('#semantic-panel').show();
-                $('#semantic-panel-term').text(searchTerm);
-                $('#semantic-panel-count').text((current_search_item + 1) + " of " + highlights.length);
-
-                if (needsScroll) {
-                    needsScroll = false;
-                    const $scrollHost = $('.left-panel');
-                    const $target = $(highlights[current_search_item]);
-                    const delta = $target.offset().top - $scrollHost.offset().top + $scrollHost.scrollTop() - 40;
-                    $scrollHost.animate({ scrollTop: delta }, 600);
+            // Check for highlights after a short delay to allow all pages to render
+            setTimeout(function() {
+                const highlights = document.querySelectorAll('.highlight');
+                if (highlights.length === 0) {
+                    $('#semantic-panel').hide();
+                } else {
+                    $('#semantic-panel').show();
+                    $('#semantic-panel-term').text(searchTerm);
+                    // Reset to first highlight when new highlights are created
+                    window.current_search_item = 0;
+                    current_search_item = 0;
+                    
+                    // Update display and scroll to first highlight
+                    if (typeof window.updateHighlightDisplay !== 'undefined') {
+                        window.updateHighlightDisplay();
+                    }
+                    
+                    if (needsScroll || window.needsScroll) {
+                        needsScroll = false;
+                        window.needsScroll = false;
+                        setTimeout(function() {
+                            scrollToHighlight(0);
+                        }, 100);
+                    }
                 }
-            }
+            }, 100);
         });
     }
 
+    // Scroll to a specific highlight by index
+    function scrollToHighlight(index) {
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0 || index < 0 || index >= highlights.length) {
+            return;
+        }
+        
+        const target = highlights[index];
+        if (!target) return;
+        
+        // Find the scrollable container - the .document element inside .left-panel
+        const scrollContainer = document.querySelector('.left-panel .document');
+        
+        if (scrollContainer) {
+            // Get the highlight's position
+            const highlightRect = target.getBoundingClientRect();
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const currentScrollTop = scrollContainer.scrollTop;
+            
+            // Calculate the highlight's position relative to the container
+            const highlightTopRelativeToContainer = highlightRect.top - containerRect.top;
+            const targetScrollTop = currentScrollTop + highlightTopRelativeToContainer - 150;
+            
+            // Scroll the container
+            scrollContainer.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+            });
+        } else {
+            // Fallback: use scrollIntoView
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'nearest'
+            });
+        }
+    }
+
+    // Update highlight display and scroll to current highlight
+    function updateHighlightDisplay() {
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        const currentIndex = window.current_search_item || 0;
+        
+        // Ensure index is within bounds
+        const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
+        window.current_search_item = safeIndex;
+        
+        // Update all highlights to yellow
+        highlights.forEach((hl, idx) => {
+            hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
+            hl.style.opacity = 0.5;
+        });
+        
+        // Update count display
+        if ($('#semantic-panel-count').length) {
+            $('#semantic-panel-count').text((safeIndex + 1) + " of " + highlights.length);
+        }
+        
+        // Scroll to current highlight - use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(function() {
+            setTimeout(function() {
+                scrollToHighlight(safeIndex);
+            }, 100);
+        });
+    }
+
+    // Make functions globally accessible
+    window.scrollToHighlight = scrollToHighlight;
+    window.updateHighlightDisplay = updateHighlightDisplay;
 
     function documentExists(url, callback) {
         $.ajax({
@@ -348,6 +447,13 @@
         console.log("extension: " + extension);
 
         if (extension == "pdf") {
+            // If PDF is already loaded, just re-render with new highlights
+            if (pdfDoc && window.document_displayed) {
+                console.log("PDF already loaded, re-rendering with highlights");
+                renderPDF();
+                return;
+            }
+
             // Show loading message
             pdfContainer.innerHTML = `
                 <div style="text-align: center; padding: 40px; color: #666;">

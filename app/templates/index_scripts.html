@@ -3097,9 +3097,11 @@
             async: true,
             success: function (msg) {
                 searchTerm = term;
-                highlightTerms = [term];
-                documents = msg.results.documents[0];
-                highlightTerms = documents;
+                if (typeof window !== 'undefined') {
+                    window.highlightTerms = [term];
+                    documents = msg.results.documents[0];
+                    window.highlightTerms = documents;
+                }
 
                 renderDocument();
                 setTimeout(function () {
@@ -3531,16 +3533,33 @@
 
         $(".extraction-result").on("click", function () {
             // get text content
-            searchTerm = $(this).text();
-            highlightTerms = [searchTerm];
+            const searchTerm = $(this).text();
+            // Update global highlightTerms so PDF highlighting can use it
+            if (typeof window !== 'undefined') {
+                window.highlightTerms = [searchTerm];
+                // Reset to first highlight
+                window.current_search_item = 0;
+                // Set flag to scroll to first highlight after rendering
+                window.needsScroll = true;
+            }
 
             showToast("Copied to clipboard");
             navigator.clipboard.writeText(searchTerm);
 
-            renderDocument();
-            setTimeout(function () {
-                nextHighlight();
-            }, 500);
+            // Re-render PDF with highlights
+            if (typeof renderDocument !== 'undefined') {
+                renderDocument();
+                // Wait for PDF to render, then scroll to first highlight
+                setTimeout(function () {
+                    if (typeof window.updateHighlightDisplay !== 'undefined') {
+                        window.updateHighlightDisplay();
+                    } else if (typeof nextHighlight !== 'undefined') {
+                        // Fallback to old method
+                        window.current_search_item = 0;
+                        nextHighlight();
+                    }
+                }, 1000);
+            }
         });
     }
 
@@ -3862,12 +3881,23 @@
     });
 
     function nextHighlight() {
-        current_search_item += 1;
-        if (current_search_item >= highlights.length) {
-            current_search_item = 0;
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        if (typeof window.current_search_item === 'undefined') {
+            window.current_search_item = 0;
+        }
+        
+        window.current_search_item += 1;
+        if (window.current_search_item >= highlights.length) {
+            window.current_search_item = 0;
         }
 
-        updateHighlights();
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+        } else {
+            updateHighlights();
+        }
     }
 
     $("#prev-semantic-button").on("click", function (e) {
@@ -3882,31 +3912,65 @@
     });
 
     function previousHighlight() {
-        current_search_item -= 1;
-        if (current_search_item == -1) {
-            current_search_item = highlights.length - 1;
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        if (typeof window.current_search_item === 'undefined') {
+            window.current_search_item = 0;
+        }
+        
+        window.current_search_item -= 1;
+        if (window.current_search_item < 0) {
+            window.current_search_item = highlights.length - 1;
         }
 
-        updateHighlights();
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+        } else {
+            updateHighlights();
+        }
     }
 
     function updateHighlights() {
-        highlights = $(".highlight");
-
-        highlights[current_search_item].scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "nearest",
-        });
-        $("#semantic-panel-count").text(
-            current_search_item + 1 + " of " + highlights.length,
-        );
-        for (var i = 0; i < highlights.length; i++) {
-            highlights[i].style.backgroundColor = "yellow";
-            highlights[i].style.opacity = 0.5;
+        // Use the global updateHighlightDisplay function if available
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+            return;
         }
-
-        highlights[current_search_item].style.backgroundColor = "red";
+        
+        // Fallback implementation
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        const currentIndex = window.current_search_item || 0;
+        const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
+        window.current_search_item = safeIndex;
+        
+        // Update all highlights
+        highlights.forEach((hl, idx) => {
+            hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
+            hl.style.opacity = 0.5;
+        });
+        
+        // Update count
+        $("#semantic-panel-count").text((safeIndex + 1) + " of " + highlights.length);
+        
+        // Scroll to current highlight using the global function if available
+        if (typeof window.scrollToHighlight !== 'undefined') {
+            setTimeout(function() {
+                window.scrollToHighlight(safeIndex);
+            }, 50);
+        } else {
+            // Fallback: use scrollIntoView
+            const target = highlights[safeIndex];
+            if (target) {
+                target.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                    inline: "nearest",
+                });
+            }
+        }
     }
 
     function getRating() {
