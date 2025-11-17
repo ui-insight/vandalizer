@@ -382,6 +382,7 @@
         if (workflowActiveMessageIntervalId) {
             return;
         }
+        // Cycle through messages every 4 seconds (nice interval between 3-5 seconds)
         workflowActiveMessageIntervalId = setInterval(() => {
             if (!workflowActiveLabel) {
                 resetWorkflowActiveStatus();
@@ -390,7 +391,7 @@
             workflowActiveTemplateIndex =
                 (workflowActiveTemplateIndex + 1) % workflowActiveMessageTemplates.length;
             renderWorkflowActiveMessage();
-        }, 3200);
+        }, 4000);
     }
 
     function renderWorkflowActiveMessage() {
@@ -411,11 +412,22 @@
     }
 
     function setWorkflowActiveLabel(labelText) {
-        const normalized = (labelText || "").trim();
+        // Truncate to one line: remove newlines and limit length
+        const normalized = (labelText || "").trim()
+            .replace(/\n/g, " ")  // Replace newlines with spaces
+            .replace(/\s+/g, " ")  // Collapse multiple spaces
+            .substring(0, 100);     // Limit to 100 characters
+        
         if (!normalized) {
             resetWorkflowActiveStatus();
             return;
         }
+        
+        // Only update if the label actually changed to prevent spamming
+        if (workflowActiveLabel === normalized) {
+            return;
+        }
+        
         workflowActiveLabel = normalized;
         workflowActiveTemplateIndex = 0;
         renderWorkflowActiveMessage();
@@ -2238,7 +2250,6 @@
 
     function fetchWorkflow(workflow_uuid) {
         setSection("Library");
-        showScanning();
         if (workflow_uuid == null || workflow_uuid == "") { return }
         current_workflow_id = workflow_uuid;
 
@@ -2256,9 +2267,6 @@
             success: function (data) {
                 console.log("here2")
                 console.log(document_uuids);
-
-                hideWorking();
-                stopScanning();
                 $('#search-results-panel').show();
                 $('#search-results-panel').empty();
                 $(data.template).hide().appendTo('#search-results-panel').fadeIn();
