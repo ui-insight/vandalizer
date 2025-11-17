@@ -796,14 +796,32 @@ def execute_workflow_task(
             if hasattr(doc, 'raw_text'):
                 ingestion_text += f"\n{doc.raw_text}"
 
-        persist_directory = "data/recommendations_vectordb"
-        recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
-        recommendation_manager.ingest_recommendation_item(
-            identifier=workflow_id,
-            ingestion_text=ingestion_text,
-            recommendation_type="Workflow",
-        )
-        debug("Workflow recommendation ingested successfully")
+        # Use singleton instance to avoid expensive re-initialization
+        try:
+            from app.blueprints.workflows.routes import get_recommendation_manager
+            recommendation_manager = get_recommendation_manager()
+            recommendation_manager.ingest_recommendation_item(
+                identifier=workflow_id,
+                ingestion_text=ingestion_text,
+                recommendation_type="Workflow",
+            )
+            debug("Workflow recommendation ingested successfully")
+            # Clear recommendations cache so new workflow appears immediately
+            try:
+                from app.blueprints.workflows.routes import clear_recommendations_cache
+                clear_recommendations_cache()
+            except Exception as cache_error:
+                debug(f"Error clearing recommendations cache: {cache_error}")
+        except ImportError:
+            # Fallback if singleton not available (shouldn't happen in normal flow)
+            persist_directory = "data/recommendations_vectordb"
+            recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
+            recommendation_manager.ingest_recommendation_item(
+                identifier=workflow_id,
+                ingestion_text=ingestion_text,
+                recommendation_type="Workflow",
+            )
+            debug("Workflow recommendation ingested successfully")
     except Exception as e:
         debug(f"Error ingesting workflow recommendation: {e}")
 

@@ -1,14 +1,11 @@
 """Celery tasks for extraction operations."""
 
+from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
-from typing import Dict, Any, List
-from collections import defaultdict
-from app.utilities.config import settings
-
+from typing import Any, Dict, List
 
 from devtools import debug
-from flask import current_app, render_template
 from pypdf import PdfReader, PdfWriter
 
 from app.celery_worker import celery_app
@@ -21,6 +18,7 @@ from app.models import (
     UserModelConfig,
 )
 from app.utilities.analytics_helper import activity_finish
+from app.utilities.config import settings
 from app.utilities.extraction_manager3 import ExtractionManager3
 from app.utilities.semantic_recommender import SemanticRecommender
 
@@ -51,6 +49,7 @@ def normalize_results(results) -> Dict[str, Any]:
         k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
         for k, vals in collected.items()
     }
+
 
 @celery_app.task(
     name="tasks.extraction.run",
@@ -89,9 +88,7 @@ def perform_extraction_task(
 
         # get user model config
         user_id = activity.user_id if activity else None
-        user_model_config = UserModelConfig.objects(
-            user_id=user_id
-        ).first()
+        user_model_config = UserModelConfig.objects(user_id=user_id).first()
         model_name = (
             user_model_config.name
             if user_model_config and user_model_config.name
@@ -166,16 +163,41 @@ def perform_extraction_task(
             for key in keys:
                 ingestion_text += f"- {key}\n"
 
-            # Ingest into semantic recommender
-            persist_directory = Path(root_path) / "chroma_db"
-            recommendation_manager = SemanticRecommender(
-                persist_directory=str(persist_directory)
-            )
-            recommendation_manager.ingest_recommendation_item(
-                identifier=str(search_set.uuid),
-                ingestion_text=ingestion_text,
-                recommendation_type="Extraction",
-            )
+            # Ingest into semantic recommender - use singleton to avoid expensive re-initialization
+            try:
+                from app.blueprints.workflows.routes import get_recommendation_manager
+
+                recommendation_manager = get_recommendation_manager()
+                recommendation_manager.ingest_recommendation_item(
+                    identifier=str(search_set.uuid),
+                    ingestion_text=ingestion_text,
+                    recommendation_type="Extraction",
+                )
+
+                debug(
+                    f"Successfully ingested Extrxtion: {str(search_set.uuid)} with text length {len(ingestion_text)}"
+                )
+
+                # Clear recommendations cache so new extraction appears immediately
+                try:
+                    from app.blueprints.workflows.routes import (
+                        clear_recommendations_cache,
+                    )
+
+                    clear_recommendations_cache()
+                except Exception as cache_error:
+                    debug(f"Error clearing recommendations cache: {cache_error}")
+            except ImportError:
+                # Fallback if singleton not available (shouldn't happen in normal flow)
+                persist_directory = "data/recommendations_vectordb"
+                recommendation_manager = SemanticRecommender(
+                    persist_directory=persist_directory
+                )
+                recommendation_manager.ingest_recommendation_item(
+                    identifier=str(search_set.uuid),
+                    ingestion_text=ingestion_text,
+                    recommendation_type="Extraction",
+                )
         except Exception as e:
             debug(f"Error ingesting extraction recommendation: {e}")
 

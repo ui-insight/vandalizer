@@ -39,9 +39,7 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
 )
-from app.utilities.semantic_recommender import (
-    SemanticRecommender,
-)
+# SemanticRecommender is now accessed via singleton in workflows.routes
 from app.utilities.verification_helpers import user_can_modify_verified
 
 tasks = Blueprint("tasks", __name__)
@@ -676,23 +674,31 @@ def begin_search_sync() -> ResponseReturnValue:
             "activity_id": str(activity.id),
         }
 
-        # Ingest workflow into vector database for future recommendations
-        ingestion_text = "# Documents selected:"
-        for doc in documents:
-            ingestion_text += f"\n{doc.raw_text}"
+        # Ingest extraction into vector database for future recommendations
+        # Use singleton instance to avoid expensive re-initialization
+        try:
+            from app.blueprints.workflows.routes import get_recommendation_manager
+            recommendation_manager = get_recommendation_manager()
+            
+            ingestion_text = "# Documents selected:"
+            for doc in documents:
+                ingestion_text += f"\n{doc.raw_text}"
 
-        persist_directory = "data/recommendations_vectordb"
-        recommendation_manager = SemanticRecommender(
-            persist_directory=persist_directory
-        )
+            debug("BEGINNING EXTRACTION RECOMMENDATION")
 
-        debug("BEGINNING EXTRACTION RECOMMENDATION")
-
-        recommendation_manager.ingest_recommendation_item(
-            identifier=str(search_set.uuid),
-            ingestion_text=ingestion_text,
-            recommendation_type="Extraction",
-        )
+            recommendation_manager.ingest_recommendation_item(
+                identifier=str(search_set.uuid),
+                ingestion_text=ingestion_text,
+                recommendation_type="Extraction",
+            )
+            # Clear recommendations cache so new extraction appears immediately
+            try:
+                from app.blueprints.workflows.routes import clear_recommendations_cache
+                clear_recommendations_cache()
+            except Exception as cache_error:
+                debug(f"Error clearing recommendations cache: {cache_error}")
+        except Exception as e:
+            debug(f"Error ingesting extraction recommendation: {e}")
 
         return jsonify(response)
 
