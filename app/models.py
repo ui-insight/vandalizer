@@ -121,8 +121,8 @@ class WorkflowResult(me.Document):
     start_time = me.DateTimeField(default=datetime.datetime.now)
     status = me.StringField(default="running")
     session_id = me.StringField(required=True, max_length=50)
-    current_step_name = me.StringField(required=False, max_length=200)
-    current_step_detail = me.StringField(required=False, max_length=2000)
+    current_step_name = me.StringField(required=False, max_length=500)
+    current_step_detail = me.StringField(required=False, max_length=50000)
     current_step_preview = me.StringField(required=False)
 
 
@@ -405,8 +405,6 @@ class SmartDocument(me.Document):
             doc_path = (
                 Path(app.root_path) / "static" / "uploads" / self.user_id / self.path
             )
-        else:
-            print("Exists returning path")
         return doc_path
 
     def time_ago_in_words(self) -> str:
