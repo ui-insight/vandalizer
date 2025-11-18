@@ -232,6 +232,7 @@
             </select>
         </label>
         <button class="btn btn-primary" type="submit">Apply</button>
+        <button class="btn" type="button" onclick="downloadReport()">📥 Download PDF Report</button>
     </form>
 </div>
 
@@ -436,5 +437,12 @@
             </tbody>
         </table>
     </div>
+    <script>
+        function downloadReport() {
+            const params = new URLSearchParams(window.location.search);
+            const url = "{{ url_for('admin.download_usage_report') }}?" + params.toString();
+            window.location.href = url;
+        }
+    </script>
 
     {% endblock %}

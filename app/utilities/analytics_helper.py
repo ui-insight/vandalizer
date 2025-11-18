@@ -1,6 +1,8 @@
 import logging
 from datetime import datetime, timezone
 
+from devtools import debug
+
 from app.models import (
     ActivityEvent,
     ActivityStatus,
@@ -112,6 +114,7 @@ def activity_finish(
     if error:
         ev.error = error[:2000]
     ev.save()
+    debug(f"Finishing activity event {ev.id} with status {status.value}")
     
     # Roll up completion metrics
     rollup_event_to_daily_aggregates(ev)
