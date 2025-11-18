@@ -1019,7 +1019,7 @@ class ActivityEvent(me.Document):
 
     # What happened
     type = me.StringField(required=True, choices=[t.value for t in ActivityType])
-    title = me.StringField(default="Activity", max_length=10000)
+    title = me.StringField(default="Activity", max_length=50000)
     status = me.StringField(
         required=True,
         choices=[s.value for s in ActivityStatus],
