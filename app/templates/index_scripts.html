@@ -413,10 +413,14 @@
 
     function setWorkflowActiveLabel(labelText) {
         // Truncate to one line: remove newlines and limit length
-        const normalized = (labelText || "").trim()
+        const cleaned = (labelText || "").trim()
             .replace(/\n/g, " ")  // Replace newlines with spaces
-            .replace(/\s+/g, " ")  // Collapse multiple spaces
-            .substring(0, 100);     // Limit to 100 characters
+            .replace(/\s+/g, " ");  // Collapse multiple spaces
+        
+        // Limit to 70 characters and add "..." if truncated
+        const normalized = cleaned.length > 70 
+            ? cleaned.substring(0, 70) + "..." 
+            : cleaned;
         
         if (!normalized) {
             resetWorkflowActiveStatus();
@@ -4611,11 +4615,89 @@
         const activityId = urlParams.get('activity_id');
         const searchSetUuid = urlParams.get('search_set_uuid');
         
+        // Helper function to display current workflow state
+        function displayWorkflowProgress(data) {
+            if (!data) return;
+            
+            const steps_completed = data.steps_completed || 0;
+            const total_steps = data.total_steps || 0;
+            const status = data.status;
+            const currentStepName = data.current_step_name;
+            const currentStepDetail = data.current_step_detail;
+            const currentStepPreview = data.current_step_preview;
+            const output = data.output;
+            
+            // Ensure workflow panel is visible
+            setSection("Library");
+            $('#search-results-panel').show();
+            
+            // Update active step status
+            if (currentStepName || currentStepDetail) {
+                renderActiveStepStatus(currentStepName, currentStepDetail);
+            }
+            
+            // Update progress info
+            updateWorkflowProgressInfo(steps_completed, total_steps, 0);
+            
+            // Show workflow output section if we have preview or output
+            if (currentStepPreview || output) {
+                const $outputSection = $('.workflow-output-section');
+                const $outputContainer = $('.workflow-output');
+                
+                if ($outputSection.length && $outputContainer.length) {
+                    $outputContainer.removeClass('hidden').addClass('active');
+                    $outputContainer.find('.step-connector').addClass('active');
+                    $('.workflow-loader').hide();
+                    $('.workflow-output-buttons').removeClass('hidden');
+                    
+                    // Display preview if available, otherwise output
+                    const content = currentStepPreview || output;
+                    if (content) {
+                        const html = normalizeWorkflowOutput(content);
+                        if (html) {
+                            $outputSection.removeClass('hidden').show().empty().append(html);
+                            configureWorkflowDownloadButton();
+                        }
+                    }
+                }
+            }
+            
+            // Update workflow steps UI
+            if (steps_completed >= 0 && total_steps > 0) {
+                // Mark completed steps as done
+                for (let i = 0; i <= steps_completed && i < total_steps; i++) {
+                    $('.workflow-step').eq(i).addClass('active');
+                    if (i < steps_completed) {
+                        $('.workflow-step').eq(i).find('.step-connector').addClass('active');
+                    }
+                }
+                // Mark current step
+                if (steps_completed < total_steps) {
+                    $('.workflow-step').eq(steps_completed).addClass('active');
+                    $('.workflow-loader').eq(steps_completed).show();
+                }
+            }
+        }
+        
         // Check for running workflow - try workflow_session_id first, then check activity_id
         if (workflow_session_id && workflowActivityStatus) {
             const status = workflowActivityStatus.toLowerCase();
             if (status === 'running' || status === 'queued') {
                 console.log("Resuming workflow polling for session:", workflow_session_id);
+                
+                // Immediately fetch current status to display progress
+                $.ajax({
+                    url: `/workflows/workflow/status?session_id=${workflow_session_id}`,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(data) {
+                        displayWorkflowProgress(data);
+                    },
+                    error: function(err) {
+                        console.warn("Failed to fetch initial workflow status:", err);
+                    }
+                });
+                
                 if (workflow_interval_id) {
                     clearInterval(workflow_interval_id);
                 }
@@ -4636,8 +4718,34 @@
                         if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued')) {
                             // Get session_id from activity data
                             const sessionId = activity.workflow_session_id;
+                            const workflowId = activity.workflow_id;
                             if (sessionId) {
                                 console.log("Resuming workflow polling for session from activity:", sessionId);
+                                
+                                // If we have a workflow_id, ensure the workflow panel is loaded
+                                let needsWorkflowLoad = false;
+                                if (workflowId && (!current_workflow_id || current_workflow_id === "0" || current_workflow_id !== workflowId)) {
+                                    current_workflow_id = workflowId;
+                                    fetchWorkflow(workflowId);
+                                    needsWorkflowLoad = true;
+                                }
+                                
+                                // Immediately fetch current status to display progress
+                                $.ajax({
+                                    url: `/workflows/workflow/status?session_id=${sessionId}`,
+                                    type: 'GET',
+                                    dataType: 'json',
+                                    success: function(statusData) {
+                                        // Wait a bit for workflow panel to load if we just fetched it
+                                        setTimeout(() => {
+                                            displayWorkflowProgress(statusData);
+                                        }, needsWorkflowLoad ? 500 : 0);
+                                    },
+                                    error: function(err) {
+                                        console.warn("Failed to fetch initial workflow status:", err);
+                                    }
+                                });
+                                
                                 if (workflow_interval_id) {
                                     clearInterval(workflow_interval_id);
                                 }
