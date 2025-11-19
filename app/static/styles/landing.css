@@ -1,10 +1,22 @@
- body {
+body {
             background-color: #0a0a0a !important;
             color: #e5e7eb !important;
             font-family: 'Inter', sans-serif !important;
+            font-size: 18px;
+            line-height: 1.75;
             margin: 0;
             padding: 0;
             overflow-x: hidden;
+        }
+
+.landing-page {
+            font-size: 18px;
+            line-height: 1.75;
+            font-family: inherit;
+        }
+
+.landing-page .font-mono {
+            font-family: inherit !important;
         }
 
         /* Glassmorphism & Glows */
@@ -15,7 +27,7 @@
         }
         
         .glow-text {
-            text-shadow: 0 0 40px rgba(168, 85, 247, 0.4);
+            text-shadow: 0 0 40px rgba(241, 179, 0, 0.4);
         }
 
         .grid-bg {
@@ -23,6 +35,50 @@
             background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
                               linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
             mask-image: radial-gradient(circle at center, black, transparent 80%);
+        }
+
+        /* Tech Wave Animation */
+        .tech-wave > use {
+            animation: move-wave 12s cubic-bezier(.55,.5,.45,.5) infinite;
+        }
+        .tech-wave > use:nth-child(1) {
+            animation-delay: -2s;
+            animation-duration: 11s;
+            opacity: 0.7;
+        }
+        .tech-wave > use:nth-child(2) {
+            animation-delay: -3s;
+            animation-duration: 15s;
+            opacity: 0.5;
+        }
+        .tech-wave > use:nth-child(3) {
+            animation-delay: -4s;
+            animation-duration: 8s;
+            opacity: 0.3;
+        }
+        .tech-wave > use:nth-child(4) {
+            animation-delay: -5s;
+            animation-duration: 20s;
+            opacity: 0.2;
+        }
+        .tech-wave > use:nth-child(5) {
+            animation-delay: -2s;
+            animation-duration: 12s;
+            opacity: 0.4;
+        }
+        .tech-wave > use:nth-child(6) {
+            animation-delay: -6s;
+            animation-duration: 6s;
+            opacity: 0.1;
+        }
+
+        @keyframes move-wave {
+            0% {
+                transform: translate3d(-90px, 0, 0);
+            }
+            100% { 
+                transform: translate3d(85px, 0, 0);
+            }
         }
 
         /* Scrollbar overrides */
