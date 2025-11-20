@@ -662,3 +662,40 @@ button.shadow-button:hover {
   -moz-user-select: text !important;
   -ms-user-select: text !important;
 }
+
+/* Animation for when no matches are found */
+@keyframes selection-no-match {
+
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  10%,
+  30%,
+  50% {
+    transform: translateX(-5px);
+    opacity: 1;
+  }
+
+  20%,
+  40% {
+    transform: translateX(5px);
+    opacity: 1;
+  }
+
+  60% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  80% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+}

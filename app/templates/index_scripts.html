@@ -4978,7 +4978,23 @@
                     showToast(`Found ${response.matches} occurrence${response.matches > 1 ? 's' : ''} of "${searchText}"`);
                 } else {
                     console.log('No matches found for:', searchText);
-                    showToast(`No matches found for "${searchText}"`);
+
+                    // Shake the highlight to indicate no matches
+                    if (currentSelectionSpan) {
+                        // Add a shake animation with fade-out
+                        currentSelectionSpan.style.animation = 'selection-no-match 0.8s ease-out';
+
+                        // Auto-dismiss after animation completes
+                        setTimeout(function () {
+                            if (currentSelectionSpan && currentSelectionSpan.parentNode) {
+                                const parent = currentSelectionSpan.parentNode;
+                                const textNode = document.createTextNode(currentSelectionSpan.textContent);
+                                parent.replaceChild(textNode, currentSelectionSpan);
+                                parent.normalize();
+                                currentSelectionSpan = null;
+                            }
+                        }, 800);
+                    }
 
                     // Clear any existing highlights
                     window.highlightTerms = [];
