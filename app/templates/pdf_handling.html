@@ -1,8 +1,14 @@
 <style>
     @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
     }
+
     .pdf-page-placeholder {
         transition: all 0.3s ease;
     }
@@ -115,7 +121,7 @@
         if (!pdfDoc) return;
 
         // Get estimated page height from first page for better placeholders
-        pdfDoc.getPage(1).then(function(firstPage) {
+        pdfDoc.getPage(1).then(function (firstPage) {
             const cssWidth = pdfContainer.clientWidth;
             const unscaled = firstPage.getViewport({ scale: 1 });
             const scale = cssWidth / unscaled.width;
@@ -185,7 +191,7 @@
 
             // Check if page is in or near viewport
             const isVisible = wrapperBottom >= scrollTop - (viewportHeight * buffer) &&
-                            wrapperTop <= scrollTop + viewportHeight * (1 + buffer);
+                wrapperTop <= scrollTop + viewportHeight * (1 + buffer);
 
             if (isVisible && !renderedPages.has(pageNumber)) {
                 renderedPages.add(pageNumber);
@@ -260,7 +266,7 @@
     function handleScroll() {
         if (!isScrolling) {
             isScrolling = true;
-            requestAnimationFrame(function() {
+            requestAnimationFrame(function () {
                 renderVisiblePages();
                 isScrolling = false;
             });
@@ -291,7 +297,12 @@
         page.getTextContent().then(function (textContent) {
             textContent.items.forEach(function (textItem) {
                 const textString = textItem.str;
-                const phrase = highlightTerms.find(p => textString && textString.includes(p));
+                // Case-insensitive search to match backend behavior
+                const textStringLower = textString ? textString.toLowerCase() : '';
+                const phrase = highlightTerms.find(p => {
+                    const phraseLower = p ? p.toLowerCase() : '';
+                    return textStringLower && textStringLower.includes(phraseLower);
+                });
                 if (phrase === undefined) return;
 
                 // coords
@@ -315,7 +326,7 @@
             });
 
             // Check for highlights after a short delay to allow all pages to render
-            setTimeout(function() {
+            setTimeout(function () {
                 const highlights = document.querySelectorAll('.highlight');
                 if (highlights.length === 0) {
                     $('#semantic-panel').hide();
@@ -325,16 +336,16 @@
                     // Reset to first highlight when new highlights are created
                     window.current_search_item = 0;
                     current_search_item = 0;
-                    
+
                     // Update display and scroll to first highlight
                     if (typeof window.updateHighlightDisplay !== 'undefined') {
                         window.updateHighlightDisplay();
                     }
-                    
+
                     if (needsScroll || window.needsScroll) {
                         needsScroll = false;
                         window.needsScroll = false;
-                        setTimeout(function() {
+                        setTimeout(function () {
                             scrollToHighlight(0);
                         }, 100);
                     }
@@ -349,23 +360,23 @@
         if (highlights.length === 0 || index < 0 || index >= highlights.length) {
             return;
         }
-        
+
         const target = highlights[index];
         if (!target) return;
-        
+
         // Find the scrollable container - the .document element inside .left-panel
         const scrollContainer = document.querySelector('.left-panel .document');
-        
+
         if (scrollContainer) {
             // Get the highlight's position
             const highlightRect = target.getBoundingClientRect();
             const containerRect = scrollContainer.getBoundingClientRect();
             const currentScrollTop = scrollContainer.scrollTop;
-            
+
             // Calculate the highlight's position relative to the container
             const highlightTopRelativeToContainer = highlightRect.top - containerRect.top;
             const targetScrollTop = currentScrollTop + highlightTopRelativeToContainer - 150;
-            
+
             // Scroll the container
             scrollContainer.scrollTo({
                 top: Math.max(0, targetScrollTop),
@@ -385,27 +396,27 @@
     function updateHighlightDisplay() {
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         const currentIndex = window.current_search_item || 0;
-        
+
         // Ensure index is within bounds
         const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
         window.current_search_item = safeIndex;
-        
+
         // Update all highlights to yellow
         highlights.forEach((hl, idx) => {
             hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
             hl.style.opacity = 0.5;
         });
-        
+
         // Update count display
         if ($('#semantic-panel-count').length) {
             $('#semantic-panel-count').text((safeIndex + 1) + " of " + highlights.length);
         }
-        
+
         // Scroll to current highlight - use requestAnimationFrame to ensure DOM is ready
-        requestAnimationFrame(function() {
-            setTimeout(function() {
+        requestAnimationFrame(function () {
+            setTimeout(function () {
                 scrollToHighlight(safeIndex);
             }, 100);
         });
@@ -469,7 +480,7 @@
 
                 renderPDF();
                 window.document_displayed = true;
-            }).catch(function(error) {
+            }).catch(function (error) {
                 console.error("Error loading PDF:", error);
                 pdfContainer.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: #d32f2f;">

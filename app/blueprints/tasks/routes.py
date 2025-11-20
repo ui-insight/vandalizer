@@ -959,3 +959,44 @@ def download_fillable() -> ResponseReturnValue:
         mimetype="text/pdf",
         as_attachment=True,
     )
+
+
+@tasks.route("/search_in_document", methods=["POST"])
+def search_in_document() -> ResponseReturnValue:
+    """Search for text in a document and return match information."""
+    data = request.get_json()
+    search_text = data.get("search_text", "").strip()
+    document_uuid = data.get("document_uuid", "")
+    
+    if not search_text or not document_uuid:
+        return jsonify({"error": "Missing search_text or document_uuid"}), 400
+    
+    # Get the document
+    document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        return jsonify({"error": "Document not found"}), 404
+    
+    # Search for the text in the document's raw_text
+    raw_text = document.raw_text or ""
+    
+    # Count occurrences (case-insensitive)
+    search_text_lower = search_text.lower()
+    raw_text_lower = raw_text.lower()
+    
+    # Find all occurrences
+    matches = 0
+    start = 0
+    while True:
+        pos = raw_text_lower.find(search_text_lower, start)
+        if pos == -1:
+            break
+        matches += 1
+        start = pos + 1
+    
+    response = {
+        "found": matches > 0,
+        "matches": matches,
+        "search_text": search_text
+    }
+    
+    return jsonify(response)
