@@ -182,22 +182,22 @@ if AUTH_MODE == "AZURE":
             return
 
         info = resp.json()
-        user_id = info["id"]
-        user = User.objects(id=user_id).first()
+        user_principal_name = info.get("userPrincipalName")
+        user = User.objects(user_id=user_principal_name).first()
 
         if not user:
             # Create a new user if they don't exist
             # Try to get email from 'mail' field, fallback to 'userPrincipalName'
-            email = info.get("mail") or info.get("userPrincipalName")
+            email = info.get("mail") or user_principal_name
             user = User(
-                user_id=info["userPrincipalName"],
+                user_id=user_principal_name,
                 email=email,
                 name=info["displayName"]
             ).save()
         else:
             # Update existing user's email and name if they're missing
             if not user.email:
-                user.email = info.get("mail") or info.get("userPrincipalName")
+                user.email = info.get("mail") or user_principal_name
             if not user.name:
                 user.name = info["displayName"]
             user.save()
