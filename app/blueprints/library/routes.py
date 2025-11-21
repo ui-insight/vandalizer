@@ -786,6 +786,7 @@ def formatters_share_to_team():
 
     lib = get_or_create_team_library(team)
     add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, obj, kind, user)
     return jsonify({"ok": True})
 
 
