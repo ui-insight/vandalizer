@@ -373,16 +373,44 @@ def main():
     # Initialize report
     report = MigrationReport()
 
-    # Find fallback user
+    # Find fallback user with fallback chain
+    fallback_user = None
+    fallback_method = None
+
+    # Try 1: Specified email in email field (or default jbrunsfeld@uidaho.edu)
     fallback_user = User.objects(email=args.fallback_email).first()
+    if fallback_user:
+        fallback_method = f"email field: {args.fallback_email}"
+
+    # Try 2: Specified email in user_id field
     if not fallback_user:
-        print(f"❌ ERROR: Fallback user {args.fallback_email} not found!")
-        print("   Available users:")
-        for user in User.objects()[:10]:
-            print(f"   - {user.email or user.user_id}")
+        print(f"⚠️  User with email={args.fallback_email} not found, checking user_id field...")
+        fallback_user = User.objects(user_id=args.fallback_email).first()
+        if fallback_user:
+            fallback_method = f"user_id field: {args.fallback_email}"
+
+    # Try 3: User with ID "0"
+    if not fallback_user:
+        print(f"⚠️  User with user_id={args.fallback_email} not found, trying user_id='0'...")
+        fallback_user = User.objects(user_id="0").first()
+        if fallback_user:
+            fallback_method = "user_id='0'"
+
+    # Try 4: First user in database
+    if not fallback_user:
+        print(f"⚠️  User with user_id='0' not found, using first user...")
+        fallback_user = User.objects().first()
+        if fallback_user:
+            fallback_method = "first user in database"
+
+    # Final check
+    if not fallback_user:
+        print(f"❌ ERROR: No users found in database!")
+        print("   Cannot assign orphaned data - database may be empty.")
         sys.exit(1)
 
-    print(f"✅ Found fallback user: {fallback_user.email} (ID: {fallback_user.user_id})")
+    print(f"✅ Found fallback user: {fallback_user.email or fallback_user.user_id} (ID: {fallback_user.user_id})")
+    print(f"   Selection method: {fallback_method}")
 
     # Find orphaned data
     orphaned_ss, orphaned_wf = find_orphaned_data()
