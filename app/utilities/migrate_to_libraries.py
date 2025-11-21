@@ -84,7 +84,7 @@ class MigrationReport:
         if self.orphaned_workflows:
             print(f"\n⚠️  Orphaned Workflows (no owner): {len(self.orphaned_workflows)}")
             for wf in self.orphaned_workflows[:10]:
-                print(f"    - {wf.id}: {wf.title}")
+                print(f"    - {wf.id}: {wf.name}")
             if len(self.orphaned_workflows) > 10:
                 print(f"    ... and {len(self.orphaned_workflows) - 10} more")
 
@@ -131,7 +131,8 @@ def assign_orphaned_to_fallback(orphaned_objects, fallback_user, report, dry_run
         print(f"   [DRY RUN] Would assign to user: {fallback_user.user_id}")
         for obj in orphaned_objects[:5]:
             obj_id = obj.uuid if obj_type == "SearchSet" else obj.id
-            print(f"   [DRY RUN] Would assign: {obj_id} - {obj.title}")
+            obj_name = obj.title if obj_type == "SearchSet" else obj.name
+            print(f"   [DRY RUN] Would assign: {obj_id} - {obj_name}")
         if len(orphaned_objects) > 5:
             print(f"   [DRY RUN] ... and {len(orphaned_objects) - 5} more")
         return
@@ -209,7 +210,7 @@ def backfill_user_library(user, report, dry_run=False):
                 for wf in workflows[:3]:
                     existing = LibraryItem.objects(obj=wf, kind="workflow").first()
                     status = "already exists" if existing else "would create"
-                    print(f"      - {wf.id}: {wf.title} ({status})")
+                    print(f"      - {wf.id}: {wf.name} ({status})")
 
             report.search_sets_migrated += ss_count
             report.workflows_migrated += wf_count
@@ -303,7 +304,7 @@ def verify_migration():
     for wf in Workflow.objects():
         li = LibraryItem.objects(obj=wf).first()
         if not li:
-            orphaned_wf.append(f"{wf.id}: {wf.title}")
+            orphaned_wf.append(f"{wf.id}: {wf.name}")
 
     if orphaned_wf:
         issues.append(f"❌ {len(orphaned_wf)} Workflows not in any library")
