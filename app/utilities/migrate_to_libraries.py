@@ -47,6 +47,8 @@ class MigrationReport:
         self.formatters_migrated = 0
         self.orphaned_search_sets = []
         self.orphaned_workflows = []
+        self.orphaned_prompts = []
+        self.orphaned_formatters = []
         self.errors = []
         self.user_details = defaultdict(lambda: {
             'search_sets': 0,
@@ -88,19 +90,37 @@ class MigrationReport:
             if len(self.orphaned_workflows) > 10:
                 print(f"    ... and {len(self.orphaned_workflows) - 10} more")
 
+        if self.orphaned_prompts:
+            print(f"\n⚠️  Orphaned Prompts (no owner): {len(self.orphaned_prompts)}")
+            for p in self.orphaned_prompts[:10]:
+                display_name = p.title or p.searchphrase[:50]
+                print(f"    - {p.id}: {display_name}")
+            if len(self.orphaned_prompts) > 10:
+                print(f"    ... and {len(self.orphaned_prompts) - 10} more")
+
+        if self.orphaned_formatters:
+            print(f"\n⚠️  Orphaned Formatters (no owner): {len(self.orphaned_formatters)}")
+            for f in self.orphaned_formatters[:10]:
+                display_name = f.title or f.searchphrase[:50]
+                print(f"    - {f.id}: {display_name}")
+            if len(self.orphaned_formatters) > 10:
+                print(f"    ... and {len(self.orphaned_formatters) - 10} more")
+
         if self.errors:
             print(f"\n❌ Errors: {len(self.errors)}")
             for error in self.errors:
                 print(f"    - {error}")
 
-        if not self.errors and not self.orphaned_search_sets and not self.orphaned_workflows:
+        if not self.errors and not self.orphaned_search_sets and not self.orphaned_workflows and not self.orphaned_prompts and not self.orphaned_formatters:
             print(f"\n✅ Migration completed successfully with no issues!")
 
 
 def find_orphaned_data():
-    """Find search_sets and workflows with no owner"""
+    """Find search_sets, workflows, prompts, and formatters with no owner"""
     orphaned_ss = []
     orphaned_wf = []
+    orphaned_prompts = []
+    orphaned_formatters = []
 
     print("\n🔍 Scanning for orphaned data...")
 
@@ -114,24 +134,50 @@ def find_orphaned_data():
         if not owner_id:
             orphaned_wf.append(wf)
 
-    return orphaned_ss, orphaned_wf
+    for p in SearchSetItem.objects(searchtype="prompt"):
+        owner_id = _owner_id_for(p)
+        if not owner_id:
+            orphaned_prompts.append(p)
+
+    for f in SearchSetItem.objects(searchtype="formatter"):
+        owner_id = _owner_id_for(f)
+        if not owner_id:
+            orphaned_formatters.append(f)
+
+    return orphaned_ss, orphaned_wf, orphaned_prompts, orphaned_formatters
 
 
-def assign_orphaned_to_fallback(orphaned_objects, fallback_user, report, dry_run=False):
+def assign_orphaned_to_fallback(orphaned_objects, fallback_user, report, kind, dry_run=False):
     """Assign orphaned objects to fallback user's library"""
     if not orphaned_objects:
         return
 
-    obj_type = "SearchSet" if isinstance(orphaned_objects[0], SearchSet) else "Workflow"
-    kind = "searchset" if obj_type == "SearchSet" else "workflow"
+    # Determine object type for display
+    first_obj = orphaned_objects[0]
+    if isinstance(first_obj, SearchSet):
+        obj_type = "SearchSet"
+    elif isinstance(first_obj, Workflow):
+        obj_type = "Workflow"
+    elif isinstance(first_obj, SearchSetItem):
+        obj_type = "Prompt" if kind == "prompt" else "Formatter"
+    else:
+        obj_type = "Unknown"
 
     print(f"\n📌 Assigning {len(orphaned_objects)} orphaned {obj_type}s to {fallback_user.email}")
 
     if dry_run:
         print(f"   [DRY RUN] Would assign to user: {fallback_user.user_id}")
         for obj in orphaned_objects[:5]:
-            obj_id = obj.uuid if obj_type == "SearchSet" else obj.id
-            obj_name = obj.title if obj_type == "SearchSet" else obj.name
+            # Get ID
+            if isinstance(obj, SearchSet):
+                obj_id = obj.uuid
+                obj_name = obj.title
+            elif isinstance(obj, Workflow):
+                obj_id = obj.id
+                obj_name = obj.name
+            else:  # SearchSetItem
+                obj_id = obj.id
+                obj_name = obj.title or obj.searchphrase[:50]
             print(f"   [DRY RUN] Would assign: {obj_id} - {obj_name}")
         if len(orphaned_objects) > 5:
             print(f"   [DRY RUN] ... and {len(orphaned_objects) - 5} more")
@@ -150,10 +196,15 @@ def assign_orphaned_to_fallback(orphaned_objects, fallback_user, report, dry_run
             # Create library item
             _ensure_library_item(fallback_lib, obj, kind)
 
-            if obj_type == "SearchSet":
+            # Update report
+            if kind == "searchset":
                 report.search_sets_migrated += 1
-            else:
+            elif kind == "workflow":
                 report.workflows_migrated += 1
+            elif kind == "prompt":
+                report.prompts_migrated += 1
+            elif kind == "formatter":
+                report.formatters_migrated += 1
 
             report.user_details[fallback_user.email][f"{kind}s"] += 1
 
@@ -190,12 +241,16 @@ def backfill_user_library(user, report, dry_run=False):
 
         search_sets = SearchSet.objects(user_q)
         workflows = Workflow.objects(user_q)
+        prompts = SearchSetItem.objects(user_q & Q(searchtype="prompt"))
+        formatters = SearchSetItem.objects(user_q & Q(searchtype="formatter"))
 
         ss_count = search_sets.count()
         wf_count = workflows.count()
+        prompt_count = prompts.count()
+        formatter_count = formatters.count()
 
         if dry_run:
-            print(f"   [DRY RUN] Found {ss_count} SearchSets, {wf_count} Workflows")
+            print(f"   [DRY RUN] Found {ss_count} SearchSets, {wf_count} Workflows, {prompt_count} Prompts, {formatter_count} Formatters")
 
             # Sample a few
             if ss_count > 0:
@@ -212,8 +267,26 @@ def backfill_user_library(user, report, dry_run=False):
                     status = "already exists" if existing else "would create"
                     print(f"      - {wf.id}: {wf.name} ({status})")
 
+            if prompt_count > 0:
+                print(f"   [DRY RUN] Sample Prompts:")
+                for p in prompts[:3]:
+                    existing = LibraryItem.objects(obj=p, kind="prompt").first()
+                    status = "already exists" if existing else "would create"
+                    display_name = p.title or p.searchphrase[:50]
+                    print(f"      - {p.id}: {display_name} ({status})")
+
+            if formatter_count > 0:
+                print(f"   [DRY RUN] Sample Formatters:")
+                for f in formatters[:3]:
+                    existing = LibraryItem.objects(obj=f, kind="formatter").first()
+                    status = "already exists" if existing else "would create"
+                    display_name = f.title or f.searchphrase[:50]
+                    print(f"      - {f.id}: {display_name} ({status})")
+
             report.search_sets_migrated += ss_count
             report.workflows_migrated += wf_count
+            report.prompts_migrated += prompt_count
+            report.formatters_migrated += formatter_count
         else:
             # Actually migrate
             items_created = 0
@@ -242,6 +315,30 @@ def backfill_user_library(user, report, dry_run=False):
 
                 _ensure_library_item(lib, wf, "workflow")
                 report.workflows_migrated += 1
+
+            for p in prompts:
+                existing = LibraryItem.objects(obj=p, kind="prompt").first()
+                if existing:
+                    items_existing += 1
+                    report.library_items_existing += 1
+                else:
+                    items_created += 1
+                    report.library_items_created += 1
+
+                _ensure_library_item(lib, p, "prompt")
+                report.prompts_migrated += 1
+
+            for f in formatters:
+                existing = LibraryItem.objects(obj=f, kind="formatter").first()
+                if existing:
+                    items_existing += 1
+                    report.library_items_existing += 1
+                else:
+                    items_created += 1
+                    report.library_items_created += 1
+
+                _ensure_library_item(lib, f, "formatter")
+                report.formatters_migrated += 1
 
             print(f"   ✅ Created {items_created} new items, {items_existing} already existed")
 
@@ -414,19 +511,27 @@ def main():
     print(f"   Selection method: {fallback_method}")
 
     # Find orphaned data
-    orphaned_ss, orphaned_wf = find_orphaned_data()
+    orphaned_ss, orphaned_wf, orphaned_prompts, orphaned_formatters = find_orphaned_data()
     report.orphaned_search_sets = orphaned_ss
     report.orphaned_workflows = orphaned_wf
+    report.orphaned_prompts = orphaned_prompts
+    report.orphaned_formatters = orphaned_formatters
 
     print(f"   Found {len(orphaned_ss)} orphaned SearchSets")
     print(f"   Found {len(orphaned_wf)} orphaned Workflows")
+    print(f"   Found {len(orphaned_prompts)} orphaned Prompts")
+    print(f"   Found {len(orphaned_formatters)} orphaned Formatters")
 
     # Handle orphaned data first
-    if orphaned_ss or orphaned_wf:
+    if orphaned_ss or orphaned_wf or orphaned_prompts or orphaned_formatters:
         if orphaned_ss:
-            assign_orphaned_to_fallback(orphaned_ss, fallback_user, report, dry_run=args.dry_run)
+            assign_orphaned_to_fallback(orphaned_ss, fallback_user, report, "searchset", dry_run=args.dry_run)
         if orphaned_wf:
-            assign_orphaned_to_fallback(orphaned_wf, fallback_user, report, dry_run=args.dry_run)
+            assign_orphaned_to_fallback(orphaned_wf, fallback_user, report, "workflow", dry_run=args.dry_run)
+        if orphaned_prompts:
+            assign_orphaned_to_fallback(orphaned_prompts, fallback_user, report, "prompt", dry_run=args.dry_run)
+        if orphaned_formatters:
+            assign_orphaned_to_fallback(orphaned_formatters, fallback_user, report, "formatter", dry_run=args.dry_run)
 
     # Process all users
     print(f"\n{'='*70}")
