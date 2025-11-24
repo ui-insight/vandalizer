@@ -33,12 +33,13 @@ from app.models import (
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
-from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.extraction_tasks import normalize_results, perform_extraction_task
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
 )
+
 # SemanticRecommender is now accessed via singleton in workflows.routes
 from app.utilities.verification_helpers import user_can_modify_verified
 
@@ -70,7 +71,9 @@ def _verified_edit_forbidden_response():
 
 
 def _can_edit_search_set(search_set: SearchSet | None) -> bool:
-    return bool(search_set and user_can_modify_verified(_active_user_or_none(), search_set))
+    return bool(
+        search_set and user_can_modify_verified(_active_user_or_none(), search_set)
+    )
 
 
 def _render_extraction_panel(search_set: SearchSet, **context):
@@ -137,7 +140,9 @@ def update_model() -> ResponseReturnValue:
     top_p = data.get("top_p", 0.9)
 
     user = current_user
-    if not getattr(user, "is_authenticated", False) or not getattr(user, "user_id", None):
+    if not getattr(user, "is_authenticated", False) or not getattr(
+        user, "user_id", None
+    ):
         return jsonify({"error": "login required"}), 401
 
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
@@ -581,7 +586,7 @@ def begin_search_sync() -> ResponseReturnValue:
         # activity.documents_touched = (len(document_uuids),)
         activity.save()
 
-        em = ExtractionManager3()
+        em = ExtractionManagerNonTyped()
         em.root_path = current_app.root_path
         # get current model
         user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
@@ -589,7 +594,7 @@ def begin_search_sync() -> ResponseReturnValue:
         if user_config:
             model_name = user_config.name
 
-        results = em.extract(keys, document_uuids, model_name)
+        results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:
@@ -678,8 +683,9 @@ def begin_search_sync() -> ResponseReturnValue:
         # Use singleton instance to avoid expensive re-initialization
         try:
             from app.blueprints.workflows.routes import get_recommendation_manager
+
             recommendation_manager = get_recommendation_manager()
-            
+
             ingestion_text = "# Documents selected:"
             for doc in documents:
                 ingestion_text += f"\n{doc.raw_text}"
@@ -694,6 +700,7 @@ def begin_search_sync() -> ResponseReturnValue:
             # Clear recommendations cache so new extraction appears immediately
             try:
                 from app.blueprints.workflows.routes import clear_recommendations_cache
+
                 clear_recommendations_cache()
             except Exception as cache_error:
                 debug(f"Error clearing recommendations cache: {cache_error}")
@@ -733,7 +740,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
     if user_model_config is not None:
         model = user_model_config.name
 
-    em = ExtractionManager3()
+    em = ExtractionManagerNonTyped()
     em.root_path = current_app.root_path
 
     keys = em.build_from_documents(document_uuids, model)
