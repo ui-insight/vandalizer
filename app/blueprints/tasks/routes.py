@@ -594,7 +594,7 @@ def begin_search_sync() -> ResponseReturnValue:
         if user_config:
             model_name = user_config.name
 
-        results = em.extract(keys, document_uuids, model_name)
+        results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:

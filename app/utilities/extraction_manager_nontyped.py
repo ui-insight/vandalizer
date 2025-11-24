@@ -47,7 +47,7 @@ class ExtractionManagerNonTyped:
             return json.loads(output.strip())
         return None
 
-    def extract(self, extract_keys, document_uuids, full_text=None):
+    def extract(self, extract_keys, document_uuids, model=None, full_text=None):
         # if extract_keys is string convert to list by splitting on comma
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
@@ -56,6 +56,10 @@ class ExtractionManagerNonTyped:
         
         # Clean up keys
         fields_to_extract = [k.strip() for k in fields_to_extract]
+
+        # Use provided model or fall back to settings
+        if model is None:
+            model = settings.base_model
 
         time.time()
         openai.api_key = OPENAI_API_KEY
@@ -66,15 +70,15 @@ class ExtractionManagerNonTyped:
             for document_uuid in document_uuids:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
                 doc_text = doc.raw_text
-                result = self._extract_nontyped(doc_text, fields_to_extract)
+                result = self._extract_nontyped(doc_text, fields_to_extract, model)
                 extraction.extend(result)
         else:
             doc_text = full_text
-            extraction = self._extract_nontyped(doc_text, fields_to_extract)
+            extraction = self._extract_nontyped(doc_text, fields_to_extract, model)
 
         return extraction
 
-    def _extract_nontyped(self, text: str, keys: list[str]) -> list:
+    def _extract_nontyped(self, text: str, keys: list[str], model_name: str) -> list:
         # Create a dynamic Pydantic model where all fields are Optional[str]
         # This avoids type inference issues and forces the LLM to return strings
         field_definitions = {key: (Optional[str], None) for key in keys}
@@ -85,7 +89,7 @@ class ExtractionManagerNonTyped:
         class ExtractionModel(BaseModel):
             entities: List[DynamicEntity]
 
-        model = get_agent_model(settings.base_model)
+        model = get_agent_model(model_name)
         
         system_prompt = (
             "You are a precise entity extraction assistant. Extract the requested information from the text. "
@@ -110,7 +114,7 @@ class ExtractionManagerNonTyped:
             result = agent.run_sync(prompt)
             
             # Convert back to list of dicts
-            entities = result.data.entities
+            entities = result.output.entities
             
             # Convert Pydantic models to dicts
             raw_entities = [entity.model_dump() for entity in entities]
