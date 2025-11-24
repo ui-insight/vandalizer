@@ -55,6 +55,11 @@ def login() -> ResponseReturnValue:
             flash("Invalid email or password.", "danger")
             return redirect(url_for("auth.index"))
 
+    # For Azure mode, check if user is already logged in via Flask-Login
+    # This prevents redirect loops after OAuth callback
+    if current_user.is_authenticated:
+        return redirect(url_for("home.index"))
+    
     if not azure.authorized:
         return redirect(url_for("azure.login"))
     return redirect(url_for("home.index"))
