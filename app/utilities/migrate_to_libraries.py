@@ -238,6 +238,10 @@ def backfill_user_library(user, report, dry_run=False):
         # Count user's objects
         from mongoengine.queryset.visitor import Q
         user_q = Q(created_by_user_id=user.user_id) | Q(user_id=user.user_id)
+        
+        # Also check for user.email in case objects were created with email as user_id
+        if user.email:
+            user_q = user_q | Q(created_by_user_id=user.email) | Q(user_id=user.email)
 
         search_sets = SearchSet.objects(user_q)
         workflows = Workflow.objects(user_q)

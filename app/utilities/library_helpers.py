@@ -383,9 +383,27 @@ def _owner_id_for(obj) -> str | None:
     """
     Decide which field reflects 'ownership' for backfill.
     Prefer created_by_user_id when present; otherwise user_id.
+    
+    Also normalizes user IDs by checking if the ID exists as a User,
+    and if not, tries to find a matching user by email.
     """
     uid = getattr(obj, "created_by_user_id", None) or getattr(obj, "user_id", None)
-    return uid or None
+    if not uid:
+        return None
+    
+    # Check if this user_id exists in the User collection
+    user = User.objects(user_id=uid).first()
+    if user:
+        return uid
+    
+    # If not found, try to find user by email (in case uid is an email)
+    user_by_email = User.objects(email=uid).first()
+    if user_by_email:
+        # Return the actual user_id from the User object
+        return user_by_email.user_id
+    
+    # If still not found, return the original uid (might be orphaned)
+    return uid
 
 
 def _ensure_library_item(lib: Library, obj, kind: str) -> LibraryItem:
@@ -438,7 +456,14 @@ def backfill_personal_library(user: User) -> Library:
 
     # Find objects "owned" by the user
     # Ownership rule: created_by_user_id == user.user_id OR user_id == user.user_id
-    user_q = Q(created_by_user_id=user.user_id) | Q(user_id=user.user_id)
+    # Also check for user.email in case objects were created with email as user_id
+    user_q = (
+        Q(created_by_user_id=user.user_id) | Q(user_id=user.user_id)
+    )
+    
+    # If user has an email, also check for that
+    if user.email:
+        user_q = user_q | Q(created_by_user_id=user.email) | Q(user_id=user.email)
 
     # SearchSets
     for ss in SearchSet.objects(user_q):
