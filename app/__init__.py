@@ -184,22 +184,35 @@ if AUTH_MODE == "AZURE":
 
         info = resp.json()
         user_principal_name = info.get("userPrincipalName")
+        email = info.get("mail") or user_principal_name
+        
+        # First, try to find user by user_id (might be email or UUID)
         user = User.objects(user_id=user_principal_name).first()
+        
+        # If not found by user_id, try to find by email to avoid creating duplicates
+        if not user and email:
+            user = User.objects(email=email).first()
+            
+            # If found by email, just update the email/name but KEEP the original user_id
+            # This preserves associations with SearchSets, Workflows, etc.
+            if user:
+                app.logger.info(
+                    f"Found existing user by email {email} with user_id={user.user_id}"
+                )
 
         if not user:
             # Create a new user if they don't exist
-            # Try to get email from 'mail' field, fallback to 'userPrincipalName'
-            email = info.get("mail") or user_principal_name
+            app.logger.info(f"Creating new user for {email}")
             user = User(
                 user_id=user_principal_name,
                 email=email,
                 name=info["displayName"]
             ).save()
         else:
-            # Update existing user's email and name if they're missing
-            if not user.email:
-                user.email = info.get("mail") or user_principal_name
-            if not user.name:
+            # Update existing user's email and name if they're missing or changed
+            if not user.email or user.email != email:
+                user.email = email
+            if not user.name or user.name != info["displayName"]:
                 user.name = info["displayName"]
             user.save()
 
