@@ -11,6 +11,17 @@ services:
       - "27018:27017"
     networks:
       - vandalizer
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8000:8000"
+    networks:
+      - vandalizer
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
   celery:
     build:
       context: .
@@ -18,10 +29,14 @@ services:
     depends_on:
       - redis
       - mongo
+      - chromadb
     env_file: .env
     environment:
       - REDIS_HOST=redis
       - MONGO_HOST=mongodb://mongo:27017
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - USE_CHROMA_SERVER=true
     networks:
       - vandalizer
     volumes:
@@ -33,16 +48,20 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "5000:5000"
     depends_on:
       - redis
       - mongo
+      - chromadb
       - celery
     env_file: .env
     environment:
       - REDIS_HOST=redis
       - MONGO_HOST=mongodb://mongo:27017
       - FLASK_ENV=development
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - USE_CHROMA_SERVER=true
     networks:
       - vandalizer
     volumes:
@@ -55,3 +74,7 @@ networks:
       driver: default
       config:
         - subnet: 10.20.0.0/24
+
+volumes:
+  chroma-data:
+    driver: local

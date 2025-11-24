@@ -1,0 +1,145 @@
+:root{ --rail-w: 220px; }
+
+/* Rail frame (unchanged) */
+.app-rail{
+  position: fixed; top: 69px; right: 0; bottom: 0;
+  width: var(--rail-w);
+  background:#EEEEEE; color:#111; display:flex; flex-direction:column;
+  z-index:650; border-left:1px solid #d8d8d8;
+}
+
+/* Header centered with icon + label */
+.rail-header{
+  padding: 17px 12px; border-bottom: 1px solid #ddd;
+}
+.rail-header-center{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-weight: 800; letter-spacing:.02em; text-transform:none;
+}
+.rail-header-center i{ font-size: 14px; }
+.rail-header-center span{ font-size: 13px; }
+
+/* Section wrapper */
+.rail-section{ padding: 8px; overflow:auto; }
+
+/* List: single-line, compact */
+.run-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+
+.run-item{
+  display:flex; align-items:center; justify-content:flex-start;
+  gap:8px; padding:6px 8px; border-radius:8px; cursor:pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.run-item:hover{
+  background:#f0f2f5;
+  box-shadow:0 1px 3px rgb(15 23 42 / 0.12);
+}
+.run-item.is-running{
+  position:relative;
+  background:linear-gradient(90deg, #ffe08a 0%, #f1b300 50%, #ffe08a 100%);
+  background-size:200% 100%;
+  animation:rail-shimmer 1.6s linear infinite;
+}
+.run-item.is-running:hover{
+  box-shadow:0 1px 3px rgb(15 23 42 / 0.12);
+}
+/* active run item */
+.run-item.active{ background:#e4edff; border:1px solid #0050d7; }
+.run-item.active:hover{ box-shadow:0 1px 3px rgb(0 0 0 / 0.1); }
+.run-item.active.is-running{
+  background:linear-gradient(90deg, #ffd168 0%, #f1b300 50%, #ffd168 100%);
+}
+
+.run-left{ display:flex; align-items:center; gap:8px; min-width:0; }
+.run-actions{
+  margin-left:auto;
+  display:flex; align-items:center; gap:8px;
+}
+.run-right{ display:flex; align-items:center; gap:6px; }
+
+.run-type-icon{ color:#333; width:16px; text-align:center; }
+.run-state-icon{ opacity:.9; }
+
+.run-delete{
+  display:flex; align-items:center;
+  background:transparent; border:none; padding:0;
+  opacity:0; pointer-events:none;
+  color:#7a7f87;
+  transition: opacity 0.2s ease, color 0.2s ease;
+  cursor:pointer;
+}
+.run-item:hover .run-delete,
+.run-item:focus-within .run-delete{
+  opacity:1; pointer-events:auto;
+}
+.run-delete:hover{
+  color:#444;
+}
+.run-delete i{ color:inherit; }
+
+.run-title{ font-size:12px; color:#111; }
+.truncate{
+  display:inline-block; max-width: 200px; /* adjust if needed */
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* Status chips (text-only, compact) */
+.run-meta{ font-size:11px; color:#0050d7; font-weight:700; }
+.run-meta.done{ color:#1a7f37; }
+.run-meta.failed{ color:#b3261e; }
+
+/* Layout reservation (kept from prior version) */
+.main-panel{ position:relative; width:100%; }
+.right-panel{ float:right; width:40%; margin-right:var(--rail-w); position:relative; }
+.left-panel{ float:left; width:calc(60% - var(--rail-w)); }
+
+body .main-panel .header{ position:fixed; left:0; right:calc(40% + var(--rail-w)); width:auto !important; z-index:400; }
+body .left-panel .semantic-panel{ left:30px; right:calc(40% + var(--rail-w) + 30px); width:auto; }
+
+.right-panel .bottom-toolbar, .floating-bottom-toolbar{ right:var(--rail-w); width:40%; }
+
+@media (max-width:1200px){
+  .left-panel{ min-width:520px; }
+  .right-panel{ width:calc(100% - var(--rail-w) - 520px); }
+}
+
+@keyframes rail-shimmer{
+  0%{ background-position:0% 50%; }
+  100%{ background-position:200% 50%; }
+}
+
+/* One-time completion shimmer effect */
+.run-item.shimmer{
+  position:relative;
+  overflow:hidden;
+}
+.run-item.shimmer::after{
+  content:"";
+  position:absolute;
+  top:0;
+  left:-100%;
+  width:100%;
+  height:100%;
+  background:linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,255,255,0.6),
+    transparent
+  );
+  animation:completion-shimmer 1.5s ease-in-out;
+}
+@keyframes completion-shimmer{
+  0%{ left:-100%; }
+  100%{ left:100%; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .run-item.is-running{
+    animation:none;
+    background:#f1b300;
+    background-position:0 0;
+  }
+  .run-item.shimmer::after{
+    animation:none;
+  }
+}

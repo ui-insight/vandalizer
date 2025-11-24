@@ -58,8 +58,12 @@ Upload Compliance:
 #         # filter
 
 models = [
-    {"name": "openai/gpt-4.1", "tag": "Cloud", "external": True},
-    {"name": "qwen3-32k:32b", "tag": "Private", "external": False},
+    {
+        "name": "gpt-oss-32k:120b",
+        "tag": "University of Idaho - Private",
+        "external": False,
+    },
+    {"name": "openai/gpt-5", "tag": "Cloud", "external": True},
 ]
 
 max_length = 120000 * 4  # 120K tokens, assuming 4 characters per token on average
@@ -113,11 +117,18 @@ class Settings(BaseSettings):
     # the model type to use, either openai or insight server (ollama)
     # model_type = "insight" or "openai"
     model_type: str = Field(
-        default="openai", description="Type of the model to use (openai or insight)."
+        default="gpt-oss-32k:120b",
+        description="The specific model to use for LLM tasks.",
+    )
+
+    secure_model: str = Field(
+        default="gpt-oss-32k:120b",
+        description="Type of the model to use (openai or insight).",
     )
 
     base_model: str = Field(
-        default="openai/gpt-4.1", description="The specific model to use for LLM tasks."
+        default="gpt-oss-32k:120b",
+        description="Type of the model to use (openai or insight).",
     )
     models: list[ModelType] = Field(
         default=models,
@@ -137,6 +148,28 @@ class Settings(BaseSettings):
 
     openai_api_key: str
     redis_host: str
+
+    # Environment configuration
+    environment: str = Field(
+        default="development",
+        description="Application environment: development, staging, or production",
+    )
+
+    # ChromaDB configuration
+    chroma_host: str = Field(
+        default="localhost",
+        description="ChromaDB server host for staging/production",
+    )
+
+    chroma_port: int = Field(
+        default=8000,
+        description="ChromaDB server port for staging/production",
+    )
+
+    use_chroma_server: bool = Field(
+        default=False,
+        description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
+    )
 
 
 settings = Settings()

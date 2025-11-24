@@ -15,7 +15,9 @@ from dotenv import load_dotenv
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
+from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
+from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
@@ -49,16 +51,16 @@ def celery_init_app(app: Flask) -> Celery:
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_mapping(
-        CELERY=dict(
-            broker_url=f"redis://{REDIS_HOST}:6379/0",
-            result_backend=f"redis://{REDIS_HOST}:6379/1",
-            task_default_queue="default",
-            task_routes={
+        CELERY={
+            "broker_url": f"redis://{REDIS_HOST}:6379/0",
+            "result_backend": f"redis://{REDIS_HOST}:6379/1",
+            "task_default_queue": "default",
+            "task_routes": {
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
             },
-        ),
+        }
     )
     app.config.from_prefixed_env()
     celery_init_app(app)
@@ -104,21 +106,38 @@ app.config.from_object(config_class)
 
 
 Bootstrap(app)  # flask-bootstrap
-Mail(app)
+mail = Mail(app)
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
 
+from app.models import User
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = "auth.login"  # Redirect here if @login_required fails
+
+
+@login_manager.user_loader
+def load_user(user_id: str | None = None) -> User | None:
+    """Loads user from DB for session management."""
+    id = user_id if user_id else current_user.get_id()
+    return User.objects(user_id=id).first()
+
+
 # Setup blueprints
+from .blueprints.activity.routes import activity  # noqa: E402
 from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
 from .blueprints.files.routes import files  # noqa: E402
 from .blueprints.home.routes import home  # noqa: E402
+from .blueprints.library.routes import library  # noqa: E402
 from .blueprints.office.routes import office  # noqa: E402
 from .blueprints.spaces.routes import spaces  # noqa: E402
 from .blueprints.tasks.routes import tasks  # noqa: E402
+from .blueprints.team.routes import teams  # noqa: E402
 from .blueprints.workflows.routes import workflows  # noqa: E402
 
 app.register_blueprint(auth)
@@ -130,15 +149,70 @@ app.register_blueprint(feedback, url_prefix="/feedback")
 app.register_blueprint(tasks, url_prefix="/tasks")
 app.register_blueprint(office, url_prefix="/office")
 app.register_blueprint(admin, url_prefix="/admin")
+app.register_blueprint(library, url_prefix="/library")
+app.register_blueprint(teams, url_prefix="/teams")
+app.register_blueprint(activity, url_prefix="/activity")
 
-# OAuth
-blueprint = make_azure_blueprint(
-    client_id=app.config["CLIENT_ID"],
-    client_secret=app.config["CLIENT_SECRET"],
-    tenant=app.config["TENANT_NAME"],
-)
+# --- 4. CONDITIONAL AUTHENTICATION SETUP ---
+AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
+app.logger.info(f"Authentication mode set to: {AUTH_MODE}")
 
-app.register_blueprint(blueprint, url_prefix="/login")
+if AUTH_MODE == "AZURE":
+    # --- Azure AD / Flask-Dance Mode ---
+    blueprint = make_azure_blueprint(
+        client_id=app.config["CLIENT_ID"],
+        client_secret=app.config["CLIENT_SECRET"],
+        tenant=app.config["TENANT_NAME"],
+    )
+
+    app.register_blueprint(blueprint, url_prefix="/login")
+
+    @oauth_authorized.connect_via(blueprint)
+    def azure_logged_in(blueprint, token):
+        """Creates or loads a user after successful Azure login."""
+        if not token:
+            app.logger.warning("Failed to fetch token from Azure.")
+            return
+
+        resp = blueprint.session.get("/v1.0/me")
+        if not resp.ok:
+            app.logger.warning(
+                f"Failed to fetch user info from Azure Graph: {resp.text}"
+            )
+            return
+
+        info = resp.json()
+        user_principal_name = info.get("userPrincipalName")
+        user = User.objects(user_id=user_principal_name).first()
+
+        if not user:
+            # Create a new user if they don't exist
+            # Try to get email from 'mail' field, fallback to 'userPrincipalName'
+            email = info.get("mail") or user_principal_name
+            user = User(
+                user_id=user_principal_name,
+                email=email,
+                name=info["displayName"]
+            ).save()
+        else:
+            # Update existing user's email and name if they're missing
+            if not user.email:
+                user.email = info.get("mail") or user_principal_name
+            if not user.name:
+                user.name = info["displayName"]
+            user.save()
+
+        login_user(user)  # This is the critical step to create the user session
+
+elif AUTH_MODE == "LOCAL":
+    # Point the login view to the local blueprint's login function
+    login_manager.login_view = "auth.login"
+
+else:
+    raise ValueError(f"Invalid AUTH_MODE: '{AUTH_MODE}'. Must be 'AZURE' or 'LOCAL'.")
+
+
+app.config["AUTH_MODE"] = AUTH_MODE
 
 
 with app.app_context():

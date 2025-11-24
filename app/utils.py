@@ -35,7 +35,6 @@ def ingest_semantics(document, user_id) -> None:
     # semantics = SemanticIngest()
     # semantics.ingest(document=document)
     with DocumentManager() as document_manager:
-
         document_path = document.absolute_path
 
         document_manager.add_document(
