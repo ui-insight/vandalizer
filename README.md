@@ -26,6 +26,25 @@ Before deploying to each environment, update the configuration by:
 2. Setting the `OPENAI_API_KEY` environment variable appropriately for the deployment.
 3. Restarting the Flask and Celery services. Restart Celery by running `./run_celery.sh start`
 4. To see the logs run `./run_celery.sh logs`. For a specific queues run `./run_celery.sh logs <queue_name>`.
+5. Installing `Pandoc` with `pdflatex` for Docx to PDF conversion:
+- 5.a MacOS: 
+```bash
+brew install --cask mactex
+brew install pandoc
+```
+
+- 5.b Debian/Ubuntu: 
+```bash
+sudo apt-get update 
+sudo apt-get install pandoc texlive-latex
+```
+
+- 5.c Rocky Linux/CentOS:
+
+```bash
+sudo dnf update 
+sudo dnf install pandoc texlive-latex
+```
 
 
 ## Installation

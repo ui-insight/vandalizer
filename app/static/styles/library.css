@@ -1,0 +1,206 @@
+/* Left nav list styles */
+    .section-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 20px 0;
+    }
+
+    .section-item {
+        padding: 7.5px 20px 7.5px 15px;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 16px;
+        border-left: 3px solid transparent;
+    }
+
+    .section-item:hover {
+        background-color: #f5f5f5;
+    }
+
+    .section-item.active {
+        font-weight: 700;
+        color: #000;
+         background-color: #dadada;
+        /* No border or background for this style */
+    }
+
+    /* Scope tab and card styles */
+    .scope-tab.active {
+        border-bottom: 4px solid #f1b300;
+    }
+
+    .library-card {
+        border: 1px solid #eee;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+    }
+
+    .library-card .meta {
+        color: #00000090;
+        font-size: 12px;
+    }
+
+    .library-card .title {
+        font-weight: 600;
+    }
+
+.library-badge {
+        font-size: 11px;
+        padding: 3px 6px;
+        border-radius: 999px;
+        background: #f2f2f2;
+        margin-right: 6px;
+    }
+
+.library-badge--pending {
+        background: #e8f0fe;
+        color: #1a4fb0;
+    }
+
+.library-badge--warning {
+        background: #fff4e5;
+        color: #8a4b16;
+    }
+
+.library-badge--success {
+        background: #e6f4ea;
+        color: #1a7f37;
+    }
+
+.verification-modal__content {
+        max-width: 760px;
+        width: 92%;
+        background: #fff;
+        padding: 24px;
+        border-radius: 12px;
+        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.18);
+    }
+
+.verification-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 10px;
+    }
+
+.verification-modal__status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+.verification-modal__status-text {
+        font-size: 13px;
+        color: #3b3b3b;
+    }
+
+.verification-form__section {
+        border: 1px solid #e4e4e4;
+        border-radius: 10px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+    }
+
+.verification-form__section legend {
+        font-weight: 600;
+        font-size: 14px;
+        padding: 0 4px;
+    }
+
+.verification-form__field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        margin-bottom: 12px;
+        font-size: 13px;
+    }
+
+.verification-form__field input,
+.verification-form__field textarea,
+.verification-form__field select {
+        padding: 8px 10px;
+        border: 1px solid #d0d0d0;
+        border-radius: 6px;
+        font-size: 13px;
+        width: 100%;
+    }
+
+.verification-form__field textarea {
+        resize: vertical;
+        min-height: 60px;
+    }
+
+.verification-form__field--inline {
+        display: flex;
+        gap: 12px;
+    }
+
+.verification-form__field--inline label {
+        flex: 1 1 0;
+    }
+
+.verification-modal__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+.verification-modal__error {
+        margin-top: 10px;
+        font-size: 13px;
+        color: #b3261e;
+    }
+
+.verification-form.is-loading input,
+.verification-form.is-loading textarea,
+.verification-form.is-loading select {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
+.verification-card__header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+
+.verification-card__title {
+        font-weight: 600;
+        font-size: 15px;
+        margin-left: 6px;
+    }
+
+.verification-card__submitted {
+        font-size: 12px;
+        color: #666;
+    }
+
+.verification-card__summary {
+        font-size: 13px;
+        color: #222;
+        margin: 8px 0;
+    }
+
+.verification-card__meta {
+        font-size: 12px;
+        color: #555;
+        margin-bottom: 10px;
+    }
+
+.verification-card__actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+.verification-card__right {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }

@@ -206,11 +206,14 @@ function processFile(file) {
 
         console.log(`Uploaded ${completedUploads} of ${pendingUploads}`);
         if (completedUploads === pendingUploads) {
+          // Preserve existing URL parameters when redirecting after upload
+          const url = new URL(window.location.href);
           if (pendingUploads === 1 && result.uuid) {
-            window.location.href = `/home?docid=${result.uuid}`;
+            url.searchParams.set('docid', result.uuid);
           } else {
-            window.location.href = "/home";
+            url.searchParams.delete('docid');
           }
+          window.location.href = url.toString();
         }
       },
       error: xhr => {

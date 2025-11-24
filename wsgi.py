@@ -5,7 +5,11 @@ import os
 
 python_home = "/html/ospai/venv/"
 
-os.environ["APP_ENV"] = "dev"
+os.environ["APP_ENV"] = "testing"
+os.environ["FLASK_ENV"] = "Testing"
+os.environ["REDIS_HOST"] = "localhost"
+os.environ["CHROMA_TELEMETRY_ENABLED"] = "false"
+
 
 import site
 import sys
@@ -20,3 +24,6 @@ site_packages = python_home + f"/lib/python{python_version}/site-packages"
 site.addsitedir(site_packages)
 
 # Import our create_app function from our package
+
+from app import app as application
+

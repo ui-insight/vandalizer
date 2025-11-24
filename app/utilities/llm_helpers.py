@@ -2,9 +2,7 @@
 
 import re
 
-# from langfuse.decorators import observe
 import tiktoken
-from devtools import debug
 
 
 def remove_base64_images(text: str, replacement="") -> str:

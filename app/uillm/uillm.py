@@ -13,7 +13,7 @@ from jsonschema import SchemaError, ValidationError, validate
 # -----------------------------------------------------------------------------
 
 
-def format_content(content, _type, fmt='jpeg', isStructured=False):
+def format_content(content, _type, fmt="jpeg", is_structured=False):
     """
     Formats the content into a dictionary suitable for posting to the LLM endpoint.
 
@@ -31,7 +31,7 @@ def format_content(content, _type, fmt='jpeg', isStructured=False):
         content_dict = {"type": _type, "text": content}
     elif _type == "image_url":
         image_content = get_image_from_source(content)
-        if isStructured:
+        if is_structured:
             content_dict = image_content
         else:
             content_dict = {
@@ -39,7 +39,7 @@ def format_content(content, _type, fmt='jpeg', isStructured=False):
                 "image_url": {"url": f"data:image/{fmt};base64,{image_content}"},
             }
     elif _type == "image_base64":
-        if isStructured:
+        if is_structured:
             content_dict = f"data:image/{fmt};base64,{content}"
         else:
             content_dict = {
@@ -114,7 +114,7 @@ def handle_output_from_chat_api(response, model):
             if content is None:
                 print("Failed on output:", output)
         except (KeyError, json.JSONDecodeError) as e:
-            print("Invalid JSON format")
+            print(f"Invalid JSON format: {e}")
             print(response.text)
             content = ""
     else:
@@ -145,7 +145,7 @@ def handle_structured_output(response, model):
             if content is None:
                 print("Failed on output:", output)
         except (KeyError, json.JSONDecodeError) as e:
-            print("Invalid JSON format")
+            print(f"Invalid JSON format {e}")
             print(response.text)
             content = ""
     else:
@@ -347,7 +347,7 @@ class UILLM:
                 for item, ct, fmt in zip(content, content_type, content_format):
                     if ct in ["image_url", "image_base64"]:
                         # Assume format_content returns the properly formatted image data
-                        images.append(format_content(item, ct, fmt, isStructured=True))
+                        images.append(format_content(item, ct, fmt, is_structured=True))
                     else:
                         extra_texts.append(str(item))
                 if images:
@@ -388,7 +388,7 @@ class UILLM:
                 )
                 # Build the message content with the prompt and any additional content
                 message_content = [{"type": "text", "text": question}] + [
-                    format_content(item, ct, isStructured=False)
+                    format_content(item, ct, is_structured=False)
                     for item, ct in zip(content, content_type)
                 ]
                 messages.append({"role": "user", "content": message_content})
@@ -529,7 +529,6 @@ class UILLM:
             return UILLM.display_models(filtered_data)
         elif display == "list":
             return UILLM.display_models_list(filtered_data)
-        
 
     @staticmethod
     def list_vision(display="pretty", verbose=False):
@@ -560,9 +559,9 @@ class UILLM:
             "mistralai",  # mistral/pixtral proxy
             "llama3.2-vision",  # Meta Llama 3.2 vision variant
             "microsoft",  # Microsoft’s Phi‑4
-            "openai", #openai proxies
-            "llava", # llava vision models
-            "google", #google-gemini proxies
+            "openai",  # openai proxies
+            "llava",  # llava vision models
+            "google",  # google-gemini proxies
         ]
 
         # Filter for reasoning models
