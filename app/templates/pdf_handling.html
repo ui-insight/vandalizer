@@ -1,9 +1,30 @@
+<style>
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    .pdf-page-placeholder {
+        transition: all 0.3s ease;
+    }
+</style>
+
 <script>
     $('#semantic-panel').hide();
-    var highlightTerms = [];
+    // Make highlightTerms globally accessible so extraction result clicks can update it
+    if (typeof window.highlightTerms === 'undefined') {
+        window.highlightTerms = [];
+    }
+    // Make current_search_item globally accessible for navigation
+    if (typeof window.current_search_item === 'undefined') {
+        window.current_search_item = 0;
+    }
+    // Make needsScroll globally accessible
+    if (typeof window.needsScroll === 'undefined') {
+        window.needsScroll = true;
+    }
     var searchTerm = "";
-    var current_search_item = 0;
-    needsScroll = true;
+    var current_search_item = window.current_search_item;
+    var needsScroll = window.needsScroll;
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/javascript/pdf/pdf.worker.js';
     window.document_displayed = false;
 
@@ -69,20 +90,188 @@
             renderTask.promise.then(function () {
                 pageRendering = false;
                 // pass overlay instead of the wrapper/canvas for highlight placement
-                highlightText(page, highlightTerms, viewport, overlay);
+                // Use global highlightTerms to ensure we have the latest value
+                highlightText(page, window.highlightTerms || [], viewport, overlay);
             });
         });
     }
 
+    // Track which pages have been rendered
+    var renderedPages = new Set();
+    var pageWrappers = []; // Store page wrapper divs
+
     function renderPDF() {
         pdfContainer.innerHTML = '';
+        window.current_search_item = 0;
         current_search_item = 0;
-        needsScroll = false;
+        // Preserve needsScroll flag if it was set externally (e.g., from extraction result click)
+        if (typeof window.needsScroll === 'undefined' || !window.needsScroll) {
+            window.needsScroll = false;
+        }
+        needsScroll = window.needsScroll;
+        renderedPages.clear();
+        pageWrappers = [];
+
         if (!pdfDoc) return;
 
-        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
-            renderPage(pageNumber);
+        // Get estimated page height from first page for better placeholders
+        pdfDoc.getPage(1).then(function(firstPage) {
+            const cssWidth = pdfContainer.clientWidth;
+            const unscaled = firstPage.getViewport({ scale: 1 });
+            const scale = cssWidth / unscaled.width;
+            const estimatedHeight = Math.floor(unscaled.height * scale);
+
+            // Create placeholder divs for all pages (lightweight)
+            for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'pdf-page-placeholder';
+                wrapper.setAttribute('data-page-number', pageNumber);
+                wrapper.style.minHeight = estimatedHeight + 'px'; // Use actual page height
+                wrapper.style.width = '100%';
+                wrapper.style.backgroundColor = '#f5f5f5';
+                wrapper.style.border = '1px solid #e0e0e0';
+                wrapper.style.marginBottom = '10px';
+                wrapper.style.position = 'relative';
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.justifyContent = 'center';
+
+                // Add loading spinner (only for pages beyond the first few)
+                const spinner = document.createElement('div');
+                spinner.className = 'pdf-loading-spinner';
+                if (pageNumber > 3) {
+                    spinner.innerHTML = `
+                        <div style="text-align: center; color: #999; font-size: 13px;">
+                            <div style="border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 0.8s linear infinite; margin: 0 auto 8px;"></div>
+                            <div>Page ${pageNumber}</div>
+                        </div>
+                    `;
+                } else {
+                    // First few pages just show a subtle indicator
+                    spinner.innerHTML = `
+                        <div style="text-align: center; color: #bbb; font-size: 12px;">
+                            Page ${pageNumber}
+                        </div>
+                    `;
+                }
+                wrapper.appendChild(spinner);
+                pdfContainer.appendChild(wrapper);
+                pageWrappers[pageNumber - 1] = wrapper;
+            }
+
+            // Render initial visible pages immediately (no delay)
+            renderVisiblePages();
+        });
+    }
+
+    // Render only pages that are visible or near the viewport
+    function renderVisiblePages() {
+        if (!pdfDoc) return;
+
+        const scrollContainer = document.querySelector('.left-panel') || window;
+        const scrollTop = scrollContainer === window ? window.scrollY : scrollContainer.scrollTop;
+        const viewportHeight = scrollContainer === window ? window.innerHeight : scrollContainer.clientHeight;
+        const containerTop = pdfContainer.offsetTop;
+
+        // Buffer: render 3 pages above and below for smoother scrolling
+        // On initial load (scrollTop ~= 0), render more pages for better UX
+        const isInitialLoad = scrollTop < 100;
+        const buffer = isInitialLoad ? 5 : 3; // Render first ~5-6 pages immediately
+
+        pageWrappers.forEach((wrapper, index) => {
+            const pageNumber = index + 1;
+            const wrapperTop = wrapper.offsetTop - containerTop;
+            const wrapperBottom = wrapperTop + wrapper.offsetHeight;
+
+            // Check if page is in or near viewport
+            const isVisible = wrapperBottom >= scrollTop - (viewportHeight * buffer) &&
+                            wrapperTop <= scrollTop + viewportHeight * (1 + buffer);
+
+            if (isVisible && !renderedPages.has(pageNumber)) {
+                renderedPages.add(pageNumber);
+                renderPageLazy(pageNumber, wrapper);
+            }
+        });
+    }
+
+    // Lazy render a single page into its placeholder
+    function renderPageLazy(num, wrapper) {
+        pdfDoc.getPage(num).then(function (page) {
+            // Clear placeholder content and styling
+            wrapper.innerHTML = '';
+            wrapper.className = 'pdf-page';
+            wrapper.style.backgroundColor = 'transparent';
+            wrapper.style.border = 'none';
+            wrapper.style.display = 'block';
+            wrapper.style.alignItems = '';
+            wrapper.style.justifyContent = '';
+
+            // Calculate scale
+            const cssWidth = pdfContainer.clientWidth;
+            const unscaled = page.getViewport({ scale: 1 });
+            const horizontalPadding = 0;
+            const targetWidth = Math.max(0, cssWidth - horizontalPadding * 2);
+            const scale = targetWidth / unscaled.width;
+
+            wrapper.style.width = Math.floor(unscaled.width * scale) + 'px';
+            wrapper.style.position = 'relative';
+            wrapper.style.minHeight = 'auto'; // Remove placeholder height
+            wrapper.style.marginBottom = '0'; // Remove placeholder margin
+
+            // Create canvas and overlay
+            const canvas = document.createElement('canvas');
+            canvas.className = 'pdf-canvas';
+            const overlay = document.createElement('div');
+            overlay.className = 'overlay-layer';
+
+            wrapper.appendChild(canvas);
+            wrapper.appendChild(overlay);
+
+            // HiDPI rendering
+            const dpr = window.devicePixelRatio || 1;
+            const viewport = page.getViewport({ scale: scale });
+            canvas.width = Math.floor(viewport.width * dpr);
+            canvas.height = Math.floor(viewport.height * dpr);
+            canvas.style.width = Math.floor(viewport.width) + 'px';
+            canvas.style.height = Math.floor(viewport.height) + 'px';
+
+            overlay.style.width = canvas.style.width;
+            overlay.style.height = canvas.style.height;
+
+            const ctx = canvas.getContext('2d');
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport,
+                transform: [dpr, 0, 0, dpr, 0, 0]
+            };
+
+            const renderTask = page.render(renderContext);
+            renderTask.promise.then(function () {
+                // Use global highlightTerms to ensure we have the latest value
+                highlightText(page, window.highlightTerms || [], viewport, overlay);
+            });
+        });
+    }
+
+    // Add scroll listener for lazy loading with optimized debouncing
+    var scrollTimer;
+    var isScrolling = false;
+
+    function handleScroll() {
+        if (!isScrolling) {
+            isScrolling = true;
+            requestAnimationFrame(function() {
+                renderVisiblePages();
+                isScrolling = false;
+            });
         }
+    }
+
+    var scrollContainer = document.querySelector('.left-panel');
+    if (scrollContainer) {
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    } else {
+        window.addEventListener('scroll', handleScroll, { passive: true });
     }
 
     // rerender on resize so pages reflow & gaps don’t appear on some screens
@@ -125,25 +314,106 @@
                 overlayEl.appendChild(highlight);
             });
 
-            const highlights = $('.highlight');
-            if (highlights.length === 0) {
-                $('#semantic-panel').hide();
-            } else {
-                $('#semantic-panel').show();
-                $('#semantic-panel-term').text(searchTerm);
-                $('#semantic-panel-count').text((current_search_item + 1) + " of " + highlights.length);
-
-                if (needsScroll) {
-                    needsScroll = false;
-                    const $scrollHost = $('.left-panel');
-                    const $target = $(highlights[current_search_item]);
-                    const delta = $target.offset().top - $scrollHost.offset().top + $scrollHost.scrollTop() - 40;
-                    $scrollHost.animate({ scrollTop: delta }, 600);
+            // Check for highlights after a short delay to allow all pages to render
+            setTimeout(function() {
+                const highlights = document.querySelectorAll('.highlight');
+                if (highlights.length === 0) {
+                    $('#semantic-panel').hide();
+                } else {
+                    $('#semantic-panel').show();
+                    $('#semantic-panel-term').text(searchTerm);
+                    // Reset to first highlight when new highlights are created
+                    window.current_search_item = 0;
+                    current_search_item = 0;
+                    
+                    // Update display and scroll to first highlight
+                    if (typeof window.updateHighlightDisplay !== 'undefined') {
+                        window.updateHighlightDisplay();
+                    }
+                    
+                    if (needsScroll || window.needsScroll) {
+                        needsScroll = false;
+                        window.needsScroll = false;
+                        setTimeout(function() {
+                            scrollToHighlight(0);
+                        }, 100);
+                    }
                 }
-            }
+            }, 100);
         });
     }
 
+    // Scroll to a specific highlight by index
+    function scrollToHighlight(index) {
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0 || index < 0 || index >= highlights.length) {
+            return;
+        }
+        
+        const target = highlights[index];
+        if (!target) return;
+        
+        // Find the scrollable container - the .document element inside .left-panel
+        const scrollContainer = document.querySelector('.left-panel .document');
+        
+        if (scrollContainer) {
+            // Get the highlight's position
+            const highlightRect = target.getBoundingClientRect();
+            const containerRect = scrollContainer.getBoundingClientRect();
+            const currentScrollTop = scrollContainer.scrollTop;
+            
+            // Calculate the highlight's position relative to the container
+            const highlightTopRelativeToContainer = highlightRect.top - containerRect.top;
+            const targetScrollTop = currentScrollTop + highlightTopRelativeToContainer - 150;
+            
+            // Scroll the container
+            scrollContainer.scrollTo({
+                top: Math.max(0, targetScrollTop),
+                behavior: 'smooth'
+            });
+        } else {
+            // Fallback: use scrollIntoView
+            target.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'nearest'
+            });
+        }
+    }
+
+    // Update highlight display and scroll to current highlight
+    function updateHighlightDisplay() {
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        const currentIndex = window.current_search_item || 0;
+        
+        // Ensure index is within bounds
+        const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
+        window.current_search_item = safeIndex;
+        
+        // Update all highlights to yellow
+        highlights.forEach((hl, idx) => {
+            hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
+            hl.style.opacity = 0.5;
+        });
+        
+        // Update count display
+        if ($('#semantic-panel-count').length) {
+            $('#semantic-panel-count').text((safeIndex + 1) + " of " + highlights.length);
+        }
+        
+        // Scroll to current highlight - use requestAnimationFrame to ensure DOM is ready
+        requestAnimationFrame(function() {
+            setTimeout(function() {
+                scrollToHighlight(safeIndex);
+            }, 100);
+        });
+    }
+
+    // Make functions globally accessible
+    window.scrollToHighlight = scrollToHighlight;
+    window.updateHighlightDisplay = updateHighlightDisplay;
 
     function documentExists(url, callback) {
         $.ajax({
@@ -177,8 +447,21 @@
         console.log("extension: " + extension);
 
         if (extension == "pdf") {
-            // check if the pdfPath is valid path on the server
-            console.log("pdf file exists");
+            // If PDF is already loaded, just re-render with new highlights
+            if (pdfDoc && window.document_displayed) {
+                console.log("PDF already loaded, re-rendering with highlights");
+                renderPDF();
+                return;
+            }
+
+            // Show loading message
+            pdfContainer.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #666;">
+                    <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                    <div style="font-size: 16px; font-weight: 500;">Loading PDF...</div>
+                    <div style="font-size: 13px; color: #999; margin-top: 8px;">Please wait while we prepare your document</div>
+                </div>
+            `;
 
             console.log("pdf path: " + documentPath);
             pdfjsLib.getDocument(documentPath).promise.then(function (pdfDoc_) {
@@ -186,6 +469,14 @@
 
                 renderPDF();
                 window.document_displayed = true;
+            }).catch(function(error) {
+                console.error("Error loading PDF:", error);
+                pdfContainer.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #d32f2f;">
+                        <div style="font-size: 16px; font-weight: 500;">Failed to load PDF</div>
+                        <div style="font-size: 13px; color: #999; margin-top: 8px;">Please try refreshing the page</div>
+                    </div>
+                `;
             });
         } else if (extension == "html") {
             var iframe = document.createElement('iframe');
@@ -204,20 +495,6 @@
         iframe.width = "100%";
         iframe.height = "100%";
         pdfContainer.appendChild(iframe);
-    }
-
-    function renderPDF() {
-        pdfContainer.innerHTML = '';
-        current_search_item = 0;
-        needsScroll = false;
-
-        if (pdfDoc == null) {
-            return;
-        }
-
-        for (let pageNumber = 1; pageNumber <= pdfDoc.numPages; pageNumber++) {
-            renderPage(pageNumber);
-        }
     }
 
 </script>

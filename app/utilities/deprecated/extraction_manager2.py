@@ -14,7 +14,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 class ExtractionManager2:
     root_path = ""
 
-    def getPrompt(self, context, features):
+    def get_prompt(self, context, features):
         return (
             """Your job is to extract a list of entities from document(s). These are the entities you need to extract, no more. Entities:
         """
@@ -43,10 +43,7 @@ class ExtractionManager2:
             doc_text = full_text
         time.time()
 
-        prompt = self.getPrompt(doc_text, extract_keys)
-        # model = "gpt-3.5-turbo-0125"
-        # if len(prompt) > 50000:
-        #    model = "gpt-4-turbo"
+        prompt = self.get_prompt(doc_text, extract_keys)
         model = "gpt-4o"
 
         time.time()

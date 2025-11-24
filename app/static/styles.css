@@ -15,6 +15,16 @@ body {
     flex-direction: column; */
 }
 
+/* Allow scrolling on landing page only */
+body:has(.front-page-header) {
+    min-height: 100vh;
+    height: auto;
+    overflow: auto;
+    font-family: 'Inter', 'Public Sans', sans-serif;
+    font-size: 18px;
+    line-height: 1.75;
+}
+
 
 a {
     color: #f1b300;
@@ -199,11 +209,12 @@ footer .footer-poweredby {
 .hero-content {
     background: #191919;
     padding: 4rem;
-    -webkit-box-shadow: -0.7rem 0 0 #f1b300;
-    box-shadow: -0.7rem 0 0 #f1b300;
+    border-radius: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: -0.7rem 0 0 #f1b300, 0 24px 40px rgba(0, 0, 0, 0.35);
 }
 
-.hero-content a:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
+.hero-content a.action-button:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
     -webkit-box-shadow: none;
     box-shadow: none;
     background: none;
@@ -212,7 +223,7 @@ footer .footer-poweredby {
     border-bottom: 0.1em solid #f1b300;
 }
 
-.hero-content a, .hero-content  button {
+.hero-content a.action-button, .hero-content  button {
     display: inline-block;
     width: 100%;
     color: #191919;
@@ -643,8 +654,8 @@ tr {
   }
   
   .hero {
-    background: url("images/wallpaper.png");
-    height: 920px;
+    /* background: url("images/wallpaper_dimmed.png"); */
+    
     background-size: cover;
     background-position: center;
     position: relative;
@@ -652,8 +663,8 @@ tr {
   
   .hero-group {
     margin: 0 auto;
-    max-width: 600px;  
-    padding: 150px 50px;
+    max-width: 600px;
+    padding: 50px 50px 50px 50px;
     text-align: center;
   }
   
@@ -674,8 +685,9 @@ tr {
   .hero p {
     margin: 22px 0;
     color: rgba(255,255,255,0.8);
-    font-size: 30px;
-    line-height: 1.5;
+    font-size: 18px;
+    line-height: 1.75;
+    font-family: inherit;
     opacity: 0;
     animation: hero-animation 3s 0.2s forwards cubic-bezier(0.2, 0.8, 0.2, 1);
   }
@@ -684,7 +696,7 @@ tr {
   
   @media (max-width: 640px) {
     .hero-group {
-      padding: 100px 20px;
+      padding: 100px 20px 200px 20px;
     }
     
     .hero h1 {
@@ -711,7 +723,7 @@ tr {
   .hero svg {
     position: absolute;
     left: 0;
-    bottom: -2px; 
+    bottom: -15px; 
     z-index: 50;
   }
   
@@ -924,8 +936,12 @@ tr {
     flex-grow: 1;
 }
 
+.file-link i {
+    color: rgb(206, 206, 206);
+}
+
 .fa-file.invalid {
-    color: red;
+    color: rgba(255, 0, 0, 0.351);
 }
 
 .file-name {
@@ -1227,7 +1243,6 @@ textarea {
 
     .token-warning {
         position: relative;
-        z-index: 1000;
     }
 
     .token-warning .tooltiptext {
@@ -1408,7 +1423,7 @@ think:hover > * {
   display: inline;              /* or block, depending on your markup */
 }
 
-//* 1) Positioning context */
+/* 1) Positioning context */
 .btn.shimmer,
 .btn-primary.shimmer {
   position: relative;
@@ -1445,3 +1460,59 @@ think:hover > * {
   0%   { transform: translateX(-100%) skewX(-20deg); }
   100% { transform: translateX(100%)  skewX(-20deg); }
 }
+
+.bootstrapless-button {
+  background: none;
+  border: none;
+}
+
+
+.vandalizer-checkbox {
+  appearance: none; /* Remove default OS checkbox */
+  -webkit-appearance: none; /* For Safari */
+  -moz-appearance: none;
+
+  width: 15px;
+  height: 15px;
+  border: 2px solid #888;
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+}
+
+.vandalizer-checkbox:checked {
+  background-color: #ffffff; /* green when checked */
+  border-color: #c6c6c6;
+  color: black;
+}
+
+.vandalizer-checkbox:checked::after {
+  content: "✓";
+  color: rgb(0, 0, 0);
+  display: block;
+  text-align: center;
+  font-size: 12px;
+  line-height: 12px;
+}
+.local-login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 45px;
+      width: 100%;
+    }
+.local-login-form input,
+.local-login-form button {
+    padding: 12px 15px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 13px;
+}
+    .local-login-form button {
+      background-color: #f1b300; /* Vandal Gold */
+      color: #000;
+      font-weight: bold;
+      border: none;
+      cursor: pointer;
+      text-transform: uppercase;
+    }

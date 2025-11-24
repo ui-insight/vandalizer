@@ -7,7 +7,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "chardet",
-    "chromadb",
+    "chromadb==1.0.0",
     "datasets",
     "gunicorn",
     "devtools",
@@ -21,9 +21,6 @@ dependencies = [
     "wtforms",
     "httpx",
     "itsdangerous",
-    "langchain",
-    "langchain_chroma",
-    "langchain_community",
     "langchain_openai",
     "langchain_redis",
     "langchain_text_splitters",
@@ -38,7 +35,7 @@ dependencies = [
     "openpyxl",
     "pandas",
     "pydantic",
-    "pydantic-ai==0.6.2",
+    "pydantic-ai==1.9.1",
     "pymongo",
     "pymupdf",
     "pymupdf4llm",
@@ -58,11 +55,12 @@ dependencies = [
     "pytesseract",
     "pdf2image",
     "beautifulsoup4>=4.13.4",
-    "markitdown[all]>=0.1.2",
+    "markitdown[all]==0.1.2",
     "jsonschema",
     "markdown>=3.8.2",
     "flower>=2.0.1",
     "xhtml2pdf>=0.2.15",
+    "sentence_transformers"
 ]
 
 

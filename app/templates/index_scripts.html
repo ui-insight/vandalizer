@@ -13,11 +13,163 @@
     var steps_completed = 0;
     var total_steps = 1;
     var workflow_interval_id = null;
+    var workflowActiveMessageIntervalId = null;
+    var workflowActiveLabel = "";
+    var workflowActiveTemplateIndex = 0;
+
+    var recommendationRequests = new Set();
+
+    let workflowActivitySnapshot = {{ workflow_activity_snapshot | tojson | safe }};
+    const workflowActivityStatus = {{ workflow_activity_status | tojson | safe }};
+    const workflowActivityId = {{ workflow_activity_id | tojson | safe }};
+    if (
+        workflowActivitySnapshot &&
+        typeof workflowActivitySnapshot === "object" &&
+        Object.keys(workflowActivitySnapshot).length === 0
+    ) {
+        workflowActivitySnapshot = null;
+    }
+    window.__workflowSnapshot = workflowActivitySnapshot;
+    if (workflowActivitySnapshot && workflowActivitySnapshot.session_id) {
+        workflow_session_id = workflowActivitySnapshot.session_id;
+    }
+
+    const workflowActiveMessageTemplates = [
+        (label) => `Working on ${label}`,
+        (label) => `Analyzing ${label}`,
+        (label) => `Organizing ${label}`,
+        (label) => `Finalizing ${label}`,
+    ];
 
 
     let animationStepIndex = 0;
     let runStepResolve = null;
     let animationInProgress = false;
+
+    var conversationId = null;
+    var activity_id = null;
+
+    var pendingActivityActivation = null;
+
+    function clearRailActiveState() {
+        document.querySelectorAll("#run-list li.run-item.active").forEach(function (li) {
+            li.classList.remove("active");
+        });
+    }
+
+    // Add a new activity to the top of the app rail
+    function addActivityToRail(activityId, activityData) {
+        if (!activityId) return;
+        
+        const ul = document.getElementById("run-list");
+        if (!ul) return;
+        
+        // Check if activity already exists
+        const existing = ul.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (existing) {
+            // If it exists, just update it and move to top
+            ul.insertBefore(existing, ul.children[2]);
+            return existing;
+        }
+        
+        // Use liForActivity from _app_rail.html if available
+        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity 
+            ? window.liForActivity 
+            : null;
+        
+        if (!liForActivityFn) {
+            console.warn("liForActivity function not available");
+            return null;
+        }
+        
+        // Create the activity item
+        const li = liForActivityFn(activityData);
+        if (!li) {
+            console.warn("Failed to create activity item", activityData);
+            return null;
+        }
+        
+        // Insert at the top (after "New chat" and spacer, which are indices 0 and 1)
+        if (ul.children.length > 2) {
+            ul.insertBefore(li, ul.children[2]);
+        } else {
+            ul.appendChild(li);
+        }
+        
+        return li;
+    }
+    
+    function setActiveRailActivity(activityId, options) {
+        if (!activityId) return;
+
+        const opts = Object.assign({ running: false, promote: false }, options || {});
+        const ul = document.getElementById("run-list");
+        if (!ul) return;
+
+        clearRailActiveState();
+
+        let li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
+        
+        // If activity doesn't exist and we have promote option, try to fetch and add it
+        if (!li && opts.promote) {
+            // Fetch activity data from server
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activityData = data.activity;
+                        li = addActivityToRail(activityId, activityData);
+                        if (li) {
+                            li.classList.add("active");
+                            if (opts.running) {
+                                li.classList.add("is-running");
+                            }
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to fetch activity for rail:", err);
+                });
+            return;
+        }
+        
+        if (!li) return;
+        
+        // Move to top if promote is true
+        if (opts.promote && ul.children.length > 2) {
+            ul.insertBefore(li, ul.children[2]);
+        }
+
+        li.classList.add("active");
+        if (opts.running) {
+            li.classList.add("is-running");
+        }
+    }
+
+    function fulfillPendingActivityActivation() {
+        if (!pendingActivityActivation) {
+            return;
+        }
+        const ul = document.getElementById("run-list");
+        if (!ul) {
+            return;
+        }
+        const candidate = ul.querySelector(`li.run-item[data-run-id='${pendingActivityActivation.activityId}']`);
+        if (candidate) {
+            const opts = pendingActivityActivation.options || {};
+            pendingActivityActivation = null;
+            setActiveRailActivity(candidate.dataset.runId, opts);
+        }
+    }
+
+
+    const activity = {{ activity.to_json() | safe if activity else 'null' }};
+    console.log("activity", activity);
 
     {% if (documents != None) and documents | length > 0 %}
     var documentPath = '/static/uploads/{{ selected_document.path }}';
@@ -29,16 +181,22 @@
     window.document_displayed = false;
 
     const docLoaderProgressHandler = new ProgressLoader('.loading-event-progress-container');
-    docLoaderProgressHandler.show();
-    docLoaderProgressHandler.showDefaultMessage()
+    if (activity == null) {
+        docLoaderProgressHandler.show();
+        docLoaderProgressHandler.showDefaultMessage()
+    } else {
+        console.log("Activity not null")
+    }
 
 
     {% if (documents != None) and documents | length > 0 %}
+    // prettier-ignore
     var documentData = {
-        id: "{{ documents[0].id|safe }}",
-        title: "{{ documents[0].title|safe }}",
-        raw_text: {{ documents[0].raw_text| tojson | safe }}
+        id: "{{ documents[0].pk }}",
+        title: {{ documents[0].title | tojson }},
+    raw_text: '{{ documents[0].raw_text | tojson }}',
     };
+
     {% else %}
     const documentData = null;
     {% endif %}
@@ -53,6 +211,412 @@
     "{{document.uuid}}",
         {% endfor %}
     ];
+
+    const chatConversation = {{ chat_conversation | tojson | safe if chat_conversation else 'null' }};
+
+
+    // Helper function to add a one-time shimmer effect to an activity item
+    function shimmerActivityItem(activityId) {
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) return;
+        
+        // Add shimmer class
+        activityItem.classList.add('shimmer');
+        
+        // Remove shimmer after animation completes (typically 1-2 seconds)
+        setTimeout(() => {
+            activityItem.classList.remove('shimmer');
+        }, 2000);
+    }
+    
+    // Helper function to update activity item status in the app rail
+    function updateActivityItemStatus(activityId, status) {
+        if (!activityId || !status) return;
+        
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) {
+            console.warn("Activity item not found for:", activityId);
+            return;
+        }
+        
+        // Normalize status to lowercase for comparison
+        const normalizedStatus = String(status).toLowerCase();
+        const isProgress = normalizedStatus === "running" || normalizedStatus === "queued";
+        
+        // Check if it's an automation run by looking at the type icon
+        const typeIcon = activityItem.querySelector('.run-type-icon');
+        const isAutomationRun = typeIcon && (
+            typeIcon.classList.contains('fa-list-check') || // search_set_run
+            typeIcon.classList.contains('fa-diagram-project') // workflow_run
+        );
+        
+        // Update is-running class
+        const wasRunning = activityItem.classList.contains("is-running");
+        if (isProgress && isAutomationRun) {
+            activityItem.classList.add("is-running");
+        } else {
+            activityItem.classList.remove("is-running");
+            
+            // If it was running and now completed, add shimmer effect
+            if (wasRunning && (normalizedStatus === "completed" || normalizedStatus === "failed" || normalizedStatus === "canceled")) {
+                shimmerActivityItem(activityId);
+            }
+        }
+        
+        // Update status icon
+        const runActions = activityItem.querySelector('.run-actions');
+        if (!runActions) return;
+        
+        // Remove existing status icon (look for .run-right that contains .run-state-icon)
+        const existingRight = runActions.querySelector('.run-right');
+        if (existingRight && existingRight.querySelector('.run-state-icon')) {
+            existingRight.remove();
+        }
+        
+        // Add new status icon if needed
+        if (status === "failed") {
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'run-right';
+            iconSpan.innerHTML = '<i class="fa-solid fa-triangle-exclamation run-state-icon" aria-label="Failed"></i>';
+            runActions.insertBefore(iconSpan, runActions.firstChild);
+        } else if (status === "canceled") {
+            const iconSpan = document.createElement('span');
+            iconSpan.className = 'run-right';
+            iconSpan.innerHTML = '<i class="fa-solid fa-circle-minus run-state-icon" aria-label="Canceled"></i>';
+            runActions.insertBefore(iconSpan, runActions.firstChild);
+        }
+    }
+
+    function toHtml(markdown) {
+        const outputText = markdown.replace(/^```(html|json|markdown)?\s*|\s*```$/g, '');
+        let rawText = window.marked.parse(outputText, {
+            gfm: true,
+            breaks: false,
+        });
+        return rawText;
+    }
+
+    function hasWorkflowOutput(snapshot) {
+        if (!snapshot || typeof snapshot !== "object") {
+            return false;
+        }
+        if (snapshot.output || snapshot.final_output || snapshot.finalOutput) {
+            return true;
+        }
+        if (Array.isArray(snapshot.history) && snapshot.history.length > 0) {
+            return snapshot.history.some((step) => step && step.output);
+        }
+        return false;
+    }
+
+    function normalizeWorkflowOutput(response) {
+        if (response == null) {
+            return null;
+        }
+
+        let content = response;
+
+        if (Array.isArray(content)) {
+            if (content.length === 1 && typeof content[0] === "string") {
+                content = content[0];
+            } else {
+                content = JSON.stringify(content, null, 2);
+            }
+        } else if (typeof content === "object") {
+            try {
+                content = JSON.stringify(content, null, 2);
+            } catch (err) {
+                console.warn("Unable to serialize workflow output, falling back to string", err);
+                content = String(content);
+            }
+        }
+
+        if (typeof content !== "string") {
+            return null;
+        }
+
+        const outputText = content.replace(/^```(html|json|markdown)?\s*|\s*```$/g, "").trim();
+        return window.marked.parse(outputText, {
+            gfm: true,
+            breaks: true,
+        });
+    }
+
+    function formatWorkflowElapsed(seconds) {
+        const safeSeconds = Math.max(Number(seconds) || 0, 0);
+        const mins = Math.floor(safeSeconds / 60);
+        const secs = safeSeconds % 60;
+        return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function updateWorkflowProgressInfo(stepsCompleted = 0, totalSteps = null, elapsedSeconds = 0, options = {}) {
+        const info = $(".workflow-output-attachment-info");
+        if (!info.length) {
+            return;
+        }
+        const completed = Math.max(Number(stepsCompleted) || 0, 0);
+        let stepsLabel = `${completed} steps completed`;
+        if (typeof totalSteps === "number" && totalSteps >= 0) {
+            stepsLabel = `${completed} / ${totalSteps} steps completed`;
+        }
+        const opts = Object.assign({ trailingLabel: null }, options || {});
+        const trailing = opts.trailingLabel || `${formatWorkflowElapsed(elapsedSeconds)} elapsed`;
+        info.html(`<span>${stepsLabel} </span><span><i>${trailing}</i></span>`);
+    }
+
+    function resetWorkflowActiveStatus() {
+        if (workflowActiveMessageIntervalId) {
+            clearInterval(workflowActiveMessageIntervalId);
+            workflowActiveMessageIntervalId = null;
+        }
+        workflowActiveLabel = "";
+        workflowActiveTemplateIndex = 0;
+        const container = $(".workflow-active-step-status");
+        if (container.length) {
+            container.addClass("hidden");
+        }
+        $("#workflow-active-step-label").removeClass("shimmer").text("");
+    }
+
+    function ensureWorkflowActiveMessageCycle() {
+        if (workflowActiveMessageIntervalId) {
+            return;
+        }
+        // Cycle through messages every 4 seconds (nice interval between 3-5 seconds)
+        workflowActiveMessageIntervalId = setInterval(() => {
+            if (!workflowActiveLabel) {
+                resetWorkflowActiveStatus();
+                return;
+            }
+            workflowActiveTemplateIndex =
+                (workflowActiveTemplateIndex + 1) % workflowActiveMessageTemplates.length;
+            renderWorkflowActiveMessage();
+        }, 4000);
+    }
+
+    function renderWorkflowActiveMessage() {
+        const container = $(".workflow-active-step-status");
+        if (!container.length) {
+            return;
+        }
+        if (!workflowActiveLabel) {
+            container.addClass("hidden");
+            $("#workflow-active-step-label").removeClass("shimmer").text("");
+            return;
+        }
+        const template = workflowActiveMessageTemplates[workflowActiveTemplateIndex] || ((label) => label);
+        const message =
+            typeof template === "function" ? template(workflowActiveLabel) : `${template} ${workflowActiveLabel}`;
+        container.removeClass("hidden");
+        $("#workflow-active-step-label").addClass("shimmer").text(message);
+    }
+
+    function setWorkflowActiveLabel(labelText) {
+        // Truncate to one line: remove newlines and limit length
+        const cleaned = (labelText || "").trim()
+            .replace(/\n/g, " ")  // Replace newlines with spaces
+            .replace(/\s+/g, " ");  // Collapse multiple spaces
+        
+        // Limit to 70 characters and add "..." if truncated
+        const normalized = cleaned.length > 70 
+            ? cleaned.substring(0, 70) + "..." 
+            : cleaned;
+        
+        if (!normalized) {
+            resetWorkflowActiveStatus();
+            return;
+        }
+        
+        // Only update if the label actually changed to prevent spamming
+        if (workflowActiveLabel === normalized) {
+            return;
+        }
+        
+        workflowActiveLabel = normalized;
+        workflowActiveTemplateIndex = 0;
+        renderWorkflowActiveMessage();
+        ensureWorkflowActiveMessageCycle();
+    }
+
+    function hydrateWorkflowSnapshot(snapshot) {
+        if (!hasWorkflowOutput(snapshot)) {
+            return;
+        }
+
+        const $outputContainer = $(".workflow-output");
+        if ($outputContainer.length === 0) {
+            return;
+        }
+
+        if (workflowActivityId) {
+            $(".add-step").hide();
+        }
+
+        const $outputSection = $(".workflow-output-section");
+        if ($outputSection.length === 0) {
+            return;
+        }
+
+        const response =
+            snapshot.output ??
+            snapshot.final_output ??
+            snapshot.finalOutput ??
+            (() => {
+                if (Array.isArray(snapshot.history) && snapshot.history.length > 0) {
+                    const lastStep = [...snapshot.history].reverse().find((step) => step && step.output);
+                    return lastStep ? lastStep.output : null;
+                }
+                return null;
+            })();
+
+        const html = normalizeWorkflowOutput(response);
+        if (!html) {
+            return;
+        }
+
+        if (snapshot.session_id) {
+            workflow_session_id = snapshot.session_id;
+        }
+
+        $outputContainer.removeClass("hidden").addClass("active");
+        $outputContainer.find(".step-connector").addClass("active");
+        $(".workflow-loader").hide();
+
+        $outputSection.show().empty().append(html);
+        configureWorkflowDownloadButton();
+        $(".workflow-output-buttons").removeClass("hidden");
+
+        const stepsCompleted =
+            snapshot.steps_completed ?? snapshot.stepsCompleted ?? snapshot.num_steps_completed;
+        const stepsTotal = snapshot.steps_total ?? snapshot.stepsTotal ?? snapshot.num_steps_total;
+        const status = snapshot.status ?? workflowActivityStatus;
+
+        if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
+            const completed = Math.max(stepsCompleted, 0);
+            let statusLabel = status || "Completed";
+            if (typeof statusLabel === "string" && statusLabel.length > 0) {
+                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+            }
+            updateWorkflowProgressInfo(completed, stepsTotal, 0, { trailingLabel: statusLabel });
+        } else if (status) {
+            const label = status.charAt(0).toUpperCase() + status.slice(1);
+            updateWorkflowProgressInfo(0, null, 0, { trailingLabel: label });
+        } else {
+            updateWorkflowProgressInfo(0, null, 0, { trailingLabel: "Workflow complete" });
+        }
+    }
+
+    function createDocumentAttachment(attachment) {
+        const content_preview = attachment.content ? attachment.content.slice(0, 500) : '';
+
+        const preview = `<div style="font-size: 0.85em; color: #666; margin-top: 5px; padding: 5px; background: white; border-radius: 3px; max-height: 60px; overflow: hidden;">${escapeHtml(content_preview)}</div>`;
+        const content_length = attachment.content.length;
+
+        return `
+        <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
+            <i class="fa fa-file"></i> Added document: <strong>${attachment.filename}</strong>
+            <button class="btn btn-sm btn-link" onclick="removeChatAttachment('${attachment.id}', this)" 
+                    style="float: right; padding: 0; color: #999;" title="Remove">
+                <i class="fa fa-times"></i>
+            </button>
+            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                Content loaded (${content_length} chars)
+            </div>
+            ${preview}
+        </div>
+     `
+    }
+
+    function createUrlAttachment(attachment) {
+        const link = attachment.url;
+        // limited to first 500 characters
+        const content_preview = attachment.content ? attachment.content.slice(0, 500) : '';
+        return `
+
+        <div class="system-message" style="padding: 10px; margin: 10px 0; background: #f0f0f0; border-radius: 5px;">
+            <i class="fa fa-link"></i> Added link: <a href="${link}" target="_blank">${attachment.title || link}</a>
+            <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                Content loaded (${content_preview ? content_preview.length + ' chars' : '0 chars'})
+            </div>
+        </div>
+     `
+    }
+
+    /**
+     * Remove attachment from chat
+     */
+    async function removeChatAttachment(attachmentId, buttonElement) {
+        if (!confirm('Remove this attachment?')) return;
+
+        try {
+            const response = await fetch(`/chat/remove_document/${attachmentId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Remove from UI
+                $(buttonElement).closest('.system-message').fadeOut(300, function () {
+                    $(this).remove();
+                });
+                console.log('Attachment removed successfully');
+            } else {
+                alert('Failed to remove attachment. Please try again.');
+            }
+        } catch (error) {
+            console.error('Error removing attachment:', error);
+            alert('Error removing attachment. Please try again.');
+        }
+    }
+
+    // "[Link attached: pydantic_ai.run - Pydantic AI]
+    // URL: https://ai.pydantic.dev/api/run/#pydantic_ai.run.AgentRun]"
+    // "📎 File attached: Test_test_test.docx (14 characters)"
+
+    console.log("chatConversation: ", chatConversation);
+
+    if (!chatConversation || (chatConversation && chatConversation.messages.length === 0)) {
+        // Clear chat history if "New Conversation" is chosen
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+    } else {
+        $('.loading-event-progress-container')[0].style.display = 'none';
+        // Clear previous messages
+        $("#chat-panel .message-you, #chat-panel .message-response-body").parent().remove();
+        // Add each message to chat panel in order
+        for (const msg of chatConversation.messages) {
+            let msgHtml = "";
+            if (msg.role === "user") {
+                // if the msg start with '[Link attached: url_attachment.title]' is a link message
+                if (msg.message.startsWith('[Link attached')) {
+                    const attachment = chatConversation.url_attachments.find(att => msg.message.startsWith(`[Link attached: ${att.title}]`));
+                    console.log("link attachment: ", attachment);
+                    msgHtml = createUrlAttachment(attachment);
+                }
+                else if (msg.message.startsWith('📎 File attached')) {
+                    const attachment = chatConversation.file_attachments.find(att => msg.message.startsWith(`📎 File attached: ${att.filename}`));
+                    console.log("file attachment: ", attachment);
+                    msgHtml = createDocumentAttachment(attachment);
+                }
+                else {
+                    msgHtml = `<p><div class='message-you message-response-body'>${toHtml(msg.message)}</div></p>`;
+                }
+            } else {
+                // Wrap assistant message with response ID for feedback buttons
+                const responseId = "response-" + new Date().getTime() + "-" + Math.random().toString(36).substr(2, 9);
+                const $responseDiv = $(`<div class='message-response message-response-body' id='${responseId}'></div>`);
+                $responseDiv.html(toHtml(msg.message));
+                $responseDiv.append(createFeedbackButtons());
+                msgHtml = $("<p>").append($responseDiv);
+            }
+            // Only add feedback buttons to assistant responses, not user messages or attachments
+            if (msg.role !== "user") {
+                $("#chat-panel").append(msgHtml);
+            } else {
+                $("#chat-panel").append(msgHtml);
+            }
+        }
+        // Scroll to bottom
+        $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+    }
 
     function dismissReleasePanel() {
         // Set a cookie 'release_seen' to the current release version.
@@ -80,6 +644,19 @@
     function removeDocIdAndGo() {
         const url = new URL(window.location.href);
         url.searchParams.delete('docid');
+        url.searchParams.delete('docids');
+        url.searchParams.delete('search_set_uuid');
+        url.searchParams.delete('workflow_id');
+        url.searchParams.delete('workflow_step_id');
+        url.searchParams.delete('activity_id');
+        url.searchParams.delete('section');
+
+        const panel = document.getElementById('search-results-panel');
+        if (panel) {
+            panel.style.display = "none";
+            panel.innerHTML = "";
+        }
+
         window.location.href = url.toString();
     }
 
@@ -128,6 +705,79 @@
         $('#model-modal').hide();
     });
 
+    function showChatInputModal() {
+        $('#chat-input-modal').show();
+        $('#chatinput').focus();
+    }
+
+    $('#close-chat-input-modal').on('click', function () {
+        $('#chat-input-modal').hide();
+    });
+
+    // click or keydown on submit button
+    $('#submitChatInputBtn').on('click', function (e) {
+        const link = $('#chat-input-link').val().trim();
+        console.log("Submitting link: " + link);
+
+        // Get current conversation UUID
+        const url_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+        console.log("adding link activity_id", url_activity_id);
+
+
+        // Disable button during submission
+        $(this).prop('disabled', true);
+
+        $.ajax({
+            url: '/home/chat/add_link',
+            type: 'POST',
+            data: JSON.stringify({
+                link: link,
+                current_activity_id: url_activity_id,
+                current_space_id: current_space_id,
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (response) {
+                // check if there is an activity_id in the url
+                if (window.location.href.includes("activity_id=")) {
+                    // Clear input and close modal
+                    $('#chat-input-link').val('');
+                    $('#chat-input-modal').hide();
+
+                    // Scroll to bottom
+                    $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                    const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                    window.location.href = `/home?activity_id=${current_activity_id}&section=Assistant`;
+                }
+                else {
+                    // If no conversation existed, we now have one
+                    // reload the page to load it
+                    // set the location /home?activity_id=${response.activity_id}=Assistant
+                    console.log("Response", response);
+                    console.log("conversation id", response.conversation_uuid);
+                    if (response.activity_id) {
+                        window.location.href = `/home?activity_id=${response.activity_id}&section=Assistant`;
+                    }
+                }
+
+                // save the conversation id
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.error("Error adding link:", thrownError);
+                let errorMessage = "Failed to add the link. Please try again.";
+                if (xhr.responseJSON && xhr.responseJSON.error) {
+                    errorMessage = xhr.responseJSON.error;
+                }
+                alert(errorMessage);
+            },
+            complete: function () {
+                // Re-enable button
+                $('#submitChatInputBtn').prop('disabled', false);
+            }
+        });
+    });
+
     function showRawText() {
         // Get the current document
         if (documentData) {
@@ -150,30 +800,51 @@
     });
 
     function setSection(sectionName) {
-        // Use the tabTitle variable as needed
-        let href = window.location.href;
-        const qs = new URLSearchParams(href.split("?")[1]);
-        qs.delete("section");
-        qs.append("section", sectionName);
-        const newQs = qs.toString();
-        const newhref = `/home?${newQs}`;
-        window.history.pushState({}, "", newhref);
+        $(".search-results-panel").hide();
+        $(".tab-content").hide();
+        $("#tasks-panel").hide();
+
+        // Preserve the current URL params (docid, activity, etc.) while switching sections
+        const url = new URL(window.location.href);
+        url.searchParams.set("section", sectionName);
+        window.history.pushState({}, "", url.toString());
 
         const tabMenu = document.querySelector(".tab-menu");
         const tabMenuItems = tabMenu.querySelectorAll("li");
 
         tabMenuItems.forEach((item) => item.classList.remove("active"));
+        const libraryShouldBeActive = sectionName == "Library" || sectionName == "Workflows";
         tabMenuItems.forEach((item) => {
             if (item.innerText === "Assistant") {
                 if (sectionName == "Tasks" || sectionName == "Assistant") {
                     item.classList.add("active");
                 }
             } else {
-                if (sectionName == "Workflows") {
+                if (libraryShouldBeActive) {
                     item.classList.add("active");
                 }
             }
         });
+
+        if (sectionName == "Assistant") {
+            $("#chat-panel").show();
+            $("#bottom-toolbar-chat").show();
+        } else if (sectionName == "Workflows") {
+            $("#workflows-panel").show();
+            if ($("#search-results-panel").children().length > 0) {
+                $("#search-results-panel").show();
+            }
+            if (window.__workflowSnapshot && workflowActivityId) {
+                $(".add-step").hide();
+            }
+        }
+        else if (sectionName == "Library") {
+            $("#library-panel").show();
+            // If the search-results-panel has content (like an extraction panel), show it
+            if ($("#search-results-panel").children().length > 0) {
+                $("#search-results-panel").show();
+            }
+        }
 
         cleanup();
     }
@@ -193,71 +864,144 @@
         stopSpinningJoe();
     }
 
+    function shouldFetchRecommendations() {
+        // Only fetch recommendations if we're in the Assistant tab AND there's an active chat
+
+        // Check if we're in the Assistant section by checking both URL and visible state
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSection = urlParams.get('section');
+
+        // Also check if chat panel is visible (more reliable for direct file opens)
+        const chatPanelVisible = $('#chat-panel').is(':visible');
+        const isInAssistantTab = urlSection === 'Assistant' || chatPanelVisible;
+
+        if (!isInAssistantTab) {
+            return false;
+        }
+
+        // Check if there's an active chat conversation with messages
+        // Either from initial page load (chatConversation) or from current session (conversationId)
+        const hasInitialChat = chatConversation && chatConversation.messages && chatConversation.messages.length > 0;
+        const hasActiveConversation = conversationId !== null;
+
+        if (!hasInitialChat && !hasActiveConversation) {
+            return false;
+        }
+
+        return true;
+    }
+
+    // Debounce timer for recommendations
+    var recommendationsTimer = null;
+    var currentRecommendationRequest = null;
+    var recommendationsCache = {}; // Cache recommendations by document UUIDs
+
     function getWorkflowRecommendations(uuids) {
-        docLoaderProgressHandler.showRecommendationMessage();
-        $.ajax({
-            url: '/workflows/workflow/recommendations',
-            type: 'POST',
-            contentType: 'application/json; charset=utf-8',
-            data: JSON.stringify({ uuids, space: $('#current-space-id')[0].innerHTML, limit: 5 }),
-            dataType: 'json',
-            success: function (msg) {
+        // Cancel any pending recommendation requests
+        clearTimeout(recommendationsTimer);
+        if (currentRecommendationRequest) {
+            currentRecommendationRequest.abort();
+        }
 
-                const recommendations = msg.templates;
+        // Create cache key from sorted UUIDs
+        const cacheKey = [...uuids].sort().join(',');
 
-
-                const are_documents_valid = msg.are_documents_valid;
-                if (!are_documents_valid) {
-                    docLoaderProgressHandler.showSecurityFailureMessage();
-                } else {
-                    docLoaderProgressHandler.fastHide();
-                }
-
-                // Update the UI with the recommendations
-                $('#recommendations-panel').empty();
-                if (recommendations.length > 0) {
-                    recommendations.forEach(rec => {
-                        $('#recommendations-panel').append(`${rec}`);
-                    });
-                } else {
-                    $('#recommendations-panel').append('<li>No recommendations available</li>');
-                }
-
-                $('#recommendation-task-card').on('click', function (e) {
-                    e.preventDefault();
-                    $("#tasks-panel").show();
-                    setSection("Tasks");
-                });
-
-                $('#recommendation-create-workflow-card').on('click', function (e) {
-                    e.preventDefault();
-                    setSection("Workflows");
-                    location.reload();
-
-                });
-
-                $('.workflow-recommendation-item').off("click").on("click", function () {
-                    let uuid = $(this).attr("data-uuid");
-
-                    console.log("here1")
-                    console.log(document_uuids);
-                    setSection("Workflows");
-                    fetchWorkflow(uuid);
-                });
-
-                $('.extraction-recommendation-item').off("click").on("click", function () {
-                    let uuid = $(this).attr("data-uuid");
-                    console.log(uuid);
-                    // $("#tasks-panel").show();
-                    // setSection("Tasks");
-                    search_set_add_uuid = uuid;
-                    updateSearchSetPanel(uuid);
-                    performExtraction(uuid);
-                });
-            },
-            error: function (xhr, status, err) {
-                console.error('Error fetching workflow recommendations:', status, err);
+        // Check cache first (with shorter TTL - 30 seconds to match server)
+        const cachedData = recommendationsCache[cacheKey];
+        if (cachedData && cachedData.timestamp) {
+            const ageSeconds = (Date.now() - cachedData.timestamp) / 1000;
+            if (ageSeconds < 30) {  // 30 second cache TTL
+                console.log('Using cached recommendations');
+                updateRecommendationsUI(cachedData.templates, cachedData.are_documents_valid);
+                return;
+            } else {
+                // Remove stale cache entry
+                delete recommendationsCache[cacheKey];
             }
+        }
+
+        // Debounce: wait 300ms before making the request
+        // This prevents hammering the server during rapid document selection changes
+        recommendationsTimer = setTimeout(function () {
+            docLoaderProgressHandler.showRecommendationMessage();
+
+            currentRecommendationRequest = $.ajax({
+                url: '/workflows/workflow/recommendations',
+                type: 'POST',
+                contentType: 'application/json; charset=utf-8',
+                data: JSON.stringify({ uuids, space: $('#current-space-id')[0].innerHTML, limit: 5 }),
+                dataType: 'json',
+                timeout: 10000, // 10 second timeout to prevent blocking
+                success: function (msg) {
+                    currentRecommendationRequest = null;
+
+                    // Cache the results for future use (with timestamp)
+                    recommendationsCache[cacheKey] = {
+                        templates: msg.templates,
+                        are_documents_valid: msg.are_documents_valid,
+                        timestamp: Date.now()
+                    };
+
+                    updateRecommendationsUI(msg.templates, msg.are_documents_valid);
+                },
+                error: function (xhr, status, err) {
+                    currentRecommendationRequest = null;
+                    docLoaderProgressHandler.fastHide();
+
+                    // Don't log aborted requests (user changed selection)
+                    if (status === 'timeout') {
+                        console.warn('Recommendations request timed out - consider optimizing ChromaDB');
+                        $('#recommendations-panel').empty();
+                        $('#recommendations-panel').append('<li>Recommendations timed out. Try selecting fewer documents.</li>');
+                    } else if (status !== 'abort') {
+                        console.error('Error fetching workflow recommendations:', status, err);
+                    }
+                }
+            });
+        }, 300); // 300ms debounce delay
+    }
+
+    // Separate UI update function for recommendations (used by both cache and AJAX)
+    function updateRecommendationsUI(recommendations, are_documents_valid) {
+        if (!are_documents_valid) {
+            docLoaderProgressHandler.showSecurityFailureMessage();
+        } else {
+            docLoaderProgressHandler.fastHide();
+        }
+
+        // Update the UI with the recommendations
+        $('#recommendations-panel').empty();
+        if (recommendations && recommendations.length > 0) {
+            recommendations.forEach(rec => {
+                $('#recommendations-panel').append(`${rec}`);
+            });
+        } else {
+            $('#recommendations-panel').append('<li>No recommendations available</li>');
+        }
+
+        // Attach event handlers
+        $('#recommendation-task-card').on('click', function (e) {
+            e.preventDefault();
+            setSection("Library");
+            $("#newTaskModal").show();
+        });
+
+        $('#recommendation-create-workflow-card').on('click', function (e) {
+            e.preventDefault();
+            setSection("Library");
+            $("#newWorkflowModal").show();
+        });
+
+        $('.workflow-recommendation-item').off("click").on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            fetchWorkflow(uuid);
+        });
+
+        $('.extraction-recommendation-item').off("click").on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            console.log(uuid);
+            search_set_add_uuid = uuid;
+            updateSearchSetPanel(uuid);
         });
     }
 
@@ -287,12 +1031,12 @@
                 console.log(modelTag);
                 // add the model tag to the model-text-icon div
                 if (modelSecurity) {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-unlock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-cloud-arrow-up' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     // Clear any existing tags before appending the new one
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 } else {
-                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span><i class='fa-solid fa-chevron-down' style='margin-left: 4px;'></i></div>";
+                    const tagElement = "<div id='model-tag'><i class='fa-solid fa-lock' style='margin-right: 5px;'></i><span>" + modelName + "</span></div>";
                     $('#model-text-icon').find('#model-tag').remove();
                     $('#model-text-icon').append(tagElement);
                 }
@@ -303,7 +1047,7 @@
 
                 models.forEach(m => {
                     const isExternal = !!m.external;            // external → unlocked icon
-                    const iconClass = isExternal ? 'fa-unlock' : 'fa-lock';
+                    const iconClass = isExternal ? 'fa-cloud-arrow-up' : 'fa-lock';
                     const isSelected = m.name === newModel;
 
                     const $li = $('<li>', {
@@ -319,18 +1063,6 @@
 
                     $modelSelect.append($li);
                 });
-
-                // optional: selection handler
-                // $modelSelect.on('click keydown', 'li.model-option', function (e) {
-                //     if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) {
-                //         const name = $(this).data('value');
-                //         // update UI selection state
-                //         $(this).attr('aria-checked', 'true').addClass('selected')
-                //             .siblings().attr('aria-checked', 'false').removeClass('selected');
-                //         // your function to switch models:
-                //         // setModel(name);
-                //     }
-                // });
 
             },
             error: function (xhr, status, err) {
@@ -379,6 +1111,18 @@
             }
         }
 
+        var docContainer = $('.document-container');
+        const isDocumentOpen = docContainer.length > 0;
+        const canRequestRecommendations = shouldFetchRecommendations() || isDocumentOpen;
+
+        if (isDocumentOpen) {
+            var activeDocUuid = docContainer.data('doc-uuid');
+            var docProcessing = docContainer.data('processing');
+            if (activeDocUuid && !docProcessing && !uuids.includes(activeDocUuid)) {
+                uuids.push(activeDocUuid);
+            }
+        }
+
         totalDocs += uuids.length;
         document_uuids = uuids;
 
@@ -386,22 +1130,25 @@
 
         filterAvailableModels(uuids);
 
-        console.log("CHECKING");
-        var docContainer = $('.document-container');
-        if (docContainer.length > 0) {
+        if (isDocumentOpen) {
             var docUuid = docContainer.data('doc-uuid');
             var isProcessing = docContainer.data('processing');
             if (totalDocs > 0 && !isProcessingFile && !isProcessing) {
-                getWorkflowRecommendations(uuids);
+                if (canRequestRecommendations) {
+                    getWorkflowRecommendations(uuids);
+                }
             }
         } else {
-            console.log("CHECKING TOTAL DOCS");
             if (totalDocs > 0) {
-                getWorkflowRecommendations(uuids);
+                if (canRequestRecommendations) {
+                    getWorkflowRecommendations(uuids);
+                }
             } else {
                 $('#recommendations-panel').empty();
-                docLoaderProgressHandler.show();
-                docLoaderProgressHandler.showDefaultMessage();
+                if (activity == null) {
+                    docLoaderProgressHandler.show();
+                    docLoaderProgressHandler.showDefaultMessage();
+                }
             }
         }
 
@@ -534,7 +1281,10 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                location.reload();
+                // Preserve existing URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', 'Library');
+                location.href = url.toString();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -565,7 +1315,75 @@
         });
     }
 
+    function libraryScopeIsTeam() {
+        return !!(window.LibraryState && window.LibraryState.scope === 'team');
+    }
+
+    function removeFromTeamLibrary(kind, uuid, onSuccess, onError) {
+        $.ajax({
+            url: '/library/team/remove',
+            type: 'POST',
+            data: JSON.stringify({
+                kind: kind,
+                uuid: uuid,
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (msg) {
+                if (typeof showToast === 'function') {
+                    showToast('Removed from team library');
+                }
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (window.LibraryState) {
+                    LibraryState.scope = 'team';
+                    try {
+                        if (typeof updateURL === 'function') {
+                            updateURL({ mode: "push" });
+                        }
+                    } catch (err) {
+                        console.warn('updateURL failed', err);
+                    }
+                    if (typeof window.updateKindFilterAppearance === 'function') {
+                        window.updateKindFilterAppearance();
+                    }
+                    if (typeof refreshResults === 'function') {
+                        refreshResults();
+                    }
+                } else {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    url.searchParams.set('scope', 'team');
+                    window.location.href = url.toString();
+                }
+                const panel = $("#search-results-panel");
+                if (panel.length) {
+                    panel.hide().empty();
+                }
+                if (typeof onSuccess === 'function') {
+                    onSuccess(msg);
+                }
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                if (typeof showToast === 'function') {
+                    showToast('Failed to update team library');
+                }
+                if (typeof onError === 'function') {
+                    onError(xhr);
+                }
+            }
+        });
+    }
+
     function deleteSearchSet(uuid) {
+        if (libraryScopeIsTeam()) {
+            removeFromTeamLibrary('extraction', uuid);
+            return;
+        }
         $.ajax({
             url: '/tasks/delete_search_set',
             type: 'POST',
@@ -576,7 +1394,10 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                location.href = "/home?section=Tasks"
+                // Preserve existing URL parameters
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', 'Library');
+                location.href = url.toString();
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -585,7 +1406,11 @@
         });
     }
 
-    function deleteSearchSetItem(uuid) {
+    function deleteSearchSetItem(uuid, kind) {
+        if (kind && libraryScopeIsTeam()) {
+            removeFromTeamLibrary(kind, uuid);
+            return;
+        }
         $.ajax({
             url: '/tasks/delete_search_set_item',
             type: 'POST',
@@ -852,6 +1677,14 @@
                     $('#raw-text-icon').show();
                     isProcessingFile = false;
 
+                    if (docUuid) {
+                        document_uuids = [docUuid];
+                        if (!recommendationRequests.has(docUuid) && shouldFetchRecommendations()) {
+                            recommendationRequests.add(docUuid);
+                            getWorkflowRecommendations([docUuid]);
+                        }
+                    }
+
                     if (processingFileOriginalText) {
                         $('.processing-file-text-question-holder').text(processingFileOriginalText);
                         $('.message-response, .message-you').remove();
@@ -892,9 +1725,7 @@
                     clearTimeout(pollTimeout);
                     isProcessingFile = false;
                 } else {
-                    // Some other error — you can choose to retry or stop
                     console.error("Error polling status:", status, error);
-                    // Example: retry once after 10 seconds
                     pollTimeout = setTimeout(() => pollStatus(docUuid), 10000);
                 }
             }
@@ -904,6 +1735,25 @@
 
     $(document).ready(function () {
         var docContainer = $('.document-container');
+
+        // Show extraction panel on page load if we're in Library section and it has content
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentSection = urlParams.get('section');
+        const activeExtraction = urlParams.get('search_set_uuid');
+        if (activeExtraction) {
+            search_set_add_uuid = activeExtraction;
+        }
+        if (currentSection === 'Library') {
+            const searchResultsPanel = $('#search-results-panel');
+            if (searchResultsPanel.children().length > 0) {
+                searchResultsPanel.show();
+                addResultListeners();
+                const runButton = $("#run-term-button");
+                if (runButton.length && !runButton.attr("data-uuid") && activeExtraction) {
+                    runButton.attr("data-uuid", activeExtraction);
+                }
+            }
+        }
 
         // Stop polling when the user navigates away from the page
         window.addEventListener('beforeunload', function () {
@@ -935,13 +1785,12 @@
             }
         }
 
-        // call this function to refresh the document selection on load
-        updateDocumentSelections();
+        // Note: updateDocumentSelections() is called via setTimeout after setSection()
+        // at the end of this script to ensure DOM is fully updated
 
         $('.tasks-btn').on('click', function (e) {
             e.preventDefault();
             $("#tasks-panel").show();
-            setSection("Tasks");
         });
 
         $('.tasks-close-button').off('click').on('click', function (e) {
@@ -994,7 +1843,13 @@
             } else if (selectedOption == "Logout") {
                 window.location.href = "/logout";
             } else {
-                window.location.href = "/home?space_id=" + selectedOption;
+                // Preserve section when switching spaces
+                const url = new URL(window.location.href);
+                url.searchParams.set('space_id', selectedOption);
+                // Clear document-specific parameters when switching spaces
+                url.searchParams.delete('docid');
+                url.searchParams.delete('folder_id');
+                window.location.href = url.toString();
             }
         });
 
@@ -1181,6 +2036,19 @@
             dataType: 'json',
             async: true,
             success: function (data) {
+                // Preserve workflow_id, workflow_step_id, and section in URL to keep modal open after reload
+                const url = new URL(window.location.href);
+                if (current_workflow_id && current_workflow_id != "0") {
+                    url.searchParams.set('workflow_id', current_workflow_id);
+                }
+                if (workflow_step_id && workflow_step_id != 0) {
+                    url.searchParams.set('workflow_step_id', workflow_step_id);
+                }
+                // Only set section to Workflows if we have a valid workflow_id
+                if (current_workflow_id && current_workflow_id != "0") {
+                    url.searchParams.set('section', 'Library');
+                }
+                window.history.replaceState(null, '', url.toString());
                 location.reload();
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -1301,9 +2169,20 @@
 
 
 
-    $('.workflow-item').on("click", function () {
-        let uuid = $(this).attr("data-uuid");
+    $(document).on("click", ".workflow-item", function (e) {
+        // Don't run workflow if clicking on a button or menu item
+        if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+            return;
+        }
 
+        // Don't run workflow if in Verified tab and item is in verification
+        let verificationStatus = $(this).attr("data-verification-status");
+        let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+        if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+            return;
+        }
+
+        let uuid = $(this).attr("data-uuid");
         console.log("here1")
         console.log(document_uuids);
         fetchWorkflow(uuid);
@@ -1311,6 +2190,11 @@
 
     function addWorkflowListeners() {
         console.log("Add workflow listeners");
+        const urlParams = new URLSearchParams(window.location.search);
+        const directDocId = urlParams.get('docid');
+        if (directDocId && !document_uuids.includes(directDocId)) {
+            document_uuids.push(directDocId);
+        }
         updateDocumentSelections();
 
         $('#workflow-close-button').off("click").on("click", function () {
@@ -1364,13 +2248,12 @@
             $('.workflow-output').fadeOut();
         });
 
-        $('#download-popup-menu').off('click').on('click', function (e) {
-            e.stopPropagation();
-        });
+        configureWorkflowDownloadButton();
+        wireWorkflowDownloadOptions();
     }
 
     function fetchWorkflow(workflow_uuid) {
-        showScanning();
+        setSection("Library");
         if (workflow_uuid == null || workflow_uuid == "") { return }
         current_workflow_id = workflow_uuid;
 
@@ -1388,20 +2271,16 @@
             success: function (data) {
                 console.log("here2")
                 console.log(document_uuids);
-
-                hideWorking();
-                stopScanning();
                 $('#search-results-panel').show();
                 $('#search-results-panel').empty();
                 $(data.template).hide().appendTo('#search-results-panel').fadeIn();
                 addWorkflowListeners();
 
                 // Update the browser URL with the current_workflow_id without refreshing the page
-                const newUrl = `${window.location.origin}${window.location.pathname}?workflow_id=${current_workflow_id}&section=Workflows`;
                 const url = new URL(window.location.href);
                 url.searchParams.delete('workflow_id');
                 url.searchParams.set('workflow_id', current_workflow_id)
-                url.searchParams.set('section', "Workflows");
+                url.searchParams.set('section', "Library");
 
                 window.history.replaceState(null, '', url.toString());
             },
@@ -1520,17 +2399,44 @@
 
 
     function resetWorkflowButton() {
-        $('.run-workflow')[0].textContent = "RUN";
-        $('.run-workflow')[0].style = ""
-        $('.run-workflow').removeClass('shimmer');
+        const $runButton = $('.run-workflow');
+        if ($runButton.length > 0) {
+            $runButton[0].textContent = "RUN";
+            $runButton[0].style = "";
+            $runButton.removeClass('shimmer');
+        }
         $('.workflow-step').removeClass('active');
         $('.step-connector').removeClass('active');
         $('.workflow-loader').hide();
+        resetWorkflowActiveStatus();
         stopScanning();
     }
 
+    function prepareWorkflowOutputPanel() {
+        const $outputContainer = $(".workflow-output");
+        if ($outputContainer.length === 0) {
+            return;
+        }
+
+        hideDownloadPopupMenu();
+        $outputContainer.removeClass("hidden");
+
+        const $section = $(".workflow-output-section");
+        if ($section.length) {
+            $section.addClass("hidden").empty();
+        }
+        $(".workflow-output-buttons").addClass("hidden");
+        resetWorkflowActiveStatus();
+        setWorkflowActiveLabel("the workflow");
+        updateWorkflowProgressInfo(0, null, 0);
+    }
+
+    function hasWorkflowDocumentsSelected() {
+        return Array.isArray(document_uuids) && document_uuids.length > 0;
+    }
+
     function runWorkflow(download = false) {
-        if (document_uuids == "") {
+        if (!hasWorkflowDocumentsSelected()) {
             showToast("Select a document to run workflow");
             return;
         }
@@ -1561,14 +2467,14 @@
             space_id: current_space_id,
             document_uuids: document_uuids,
             session_id: session_id,
+            current_space_id: current_space_id
         });
 
         console.log(data);
 
         $('.workflow-output').removeClass('active');
         $('.add-step').hide();
-        $('.workflow-output-section').hide();
-        $('.workflow-output').removeClass('hidden');
+        prepareWorkflowOutputPanel();
         $('.workflow-output').fadeIn();
 
         workflow_interval_id = pollWorkflowStatus(session_id);
@@ -1589,6 +2495,15 @@
             success: function (data) {
                 console.log("Workflow run response:", data);
 
+                // Track the activity without leaving the page
+                if (data.activity_id) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('activity_id', data.activity_id);
+                    window.history.replaceState({}, "", url.toString());
+                    activity_id = data.activity_id;
+                    setActiveRailActivity(data.activity_id, { promote: true, running: true });
+                }
+
                 if (download) {
                     downloadWorkflow(session_id)
                 }
@@ -1603,6 +2518,98 @@
                 }
             }
         });
+    }
+
+    function waitForWorkflowStepTest(taskId, handlers) {
+        const options = Object.assign(
+            {
+                interval: 2000,
+                maxAttempts: 180,
+            },
+            handlers || {}
+        );
+        let attempts = 0;
+        let done = false;
+        let timer = null;
+
+        function cleanup() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+        }
+
+        function fail(payload) {
+            if (done) {
+                return;
+            }
+            done = true;
+            cleanup();
+            if (typeof options.onError === "function") {
+                options.onError(payload || { error: "Workflow test failed." });
+            }
+        }
+
+        function handleSuccess(payload) {
+            if (done) {
+                return;
+            }
+            done = true;
+            cleanup();
+            if (typeof options.onComplete === "function") {
+                options.onComplete(payload);
+            }
+        }
+
+        function poll() {
+            $.ajax({
+                url: `/workflows/workflow/step/status/${encodeURIComponent(taskId)}`,
+                type: "GET",
+                dataType: "json",
+                success: function (res) {
+                    const state = (res.state || "").toUpperCase();
+                    if (state === "SUCCESS") {
+                        handleSuccess(res);
+                        return;
+                    }
+                    if (state === "FAILURE" || res.error) {
+                        fail(res);
+                        return;
+                    }
+                    attempts += 1;
+                    if (attempts >= options.maxAttempts) {
+                        fail({ error: "Timed out waiting for workflow test." });
+                    }
+                },
+                error: function (xhr, status, err) {
+                    attempts += 1;
+                    if (attempts >= options.maxAttempts) {
+                        fail({
+                            error:
+                                xhr?.responseJSON?.error ||
+                                err ||
+                                "Unable to retrieve workflow test status.",
+                        });
+                    }
+                },
+            });
+        }
+
+        poll();
+        timer = setInterval(poll, options.interval);
+        return () => {
+            cleanup();
+        };
+    }
+
+    function handleWorkflowStepTestResponse(response, handlers) {
+        if (response && response.task_id && !Object.prototype.hasOwnProperty.call(response, "output")) {
+            waitForWorkflowStepTest(response.task_id, handlers);
+            return;
+        }
+        if (typeof handlers.onComplete === "function") {
+            handlers.onComplete(response);
+        }
     }
 
     // If there is a workflow in the browser href
@@ -1642,26 +2649,39 @@
 
     function updateWorkflowStatus() {
         // Update the UI with current elapsed time
-        $('.workflow-output-attachment-info').html(`
-                  <span>${steps_completed} / ${total_steps} tasks completed</span>
-                  <span><i>${workflow_elapsed_time} seconds elapsed</i></span>
-              `);
+        updateWorkflowProgressInfo(steps_completed, total_steps, workflow_elapsed_time);
+    }
+
+    function renderActiveStepStatus(stepName, detail) {
+        const baseLabel = (detail || stepName || '').trim();
+        if (!baseLabel) {
+            resetWorkflowActiveStatus();
+            return;
+        }
+        setWorkflowActiveLabel(baseLabel);
     }
 
 
 
-
     function performWorkflowStatus(session_id, workflow_time) {
+        // This function is called by pollWorkflowStatus to check workflow status
 
         $.ajax({
             url: `/workflows/workflow/status?session_id=${session_id}`,
             type: 'GET',
             dataType: 'json',
             success: function (data) {
+                if (data.session_id) {
+                    workflow_session_id = data.session_id;
+                }
                 //const { steps_completed, total_steps, status } = data;
                 let steps_completed = data.steps_completed;
                 let total_steps = data.total_steps;
                 let status = data.status;
+                const currentStepName = data.current_step_name;
+                const currentStepDetail = data.current_step_detail;
+
+                renderActiveStepStatus(currentStepName, currentStepDetail);
 
                 if (steps_completed >= total_steps) {
                     if (workflow_interval_id) {
@@ -1685,21 +2705,41 @@
                     active_step = steps_completed + 1;
                 }
 
-                const minutes = Math.floor(workflow_time / 60);
-                const seconds = workflow_time % 60;
+                updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time);
 
-                // Update steps completed and time elapsed
-                $('.workflow-output-attachment-info').html(`
-                      <span>${steps_completed} / ${total_steps} steps completed</span>
-                      <span><i>${minutes}m ${seconds}s elapsed</i></span>
-                  `);
+                // Update activity status in app rail on every poll
+                const activityId = data.activity_id;
+                if (activityId) {
+                    updateActivityItemStatus(activityId, status);
+                }
 
                 // Check if the workflow is completed or has failed
                 if (status === 'completed' || status === 'failed') {
-                    console.log("Workflow completed or failed");
+                    console.log("Workflow completed or failed", { activityId, status });
                     if (workflow_interval_id) {
                         clearInterval(workflow_interval_id);
+                        workflow_interval_id = null;
                     }
+                    
+                    // Ensure activity status is updated (in case updateActivityItemStatus didn't catch it)
+                    if (activityId) {
+                        updateActivityItemStatus(activityId, status);
+                    }
+                    
+                    resetWorkflowActiveStatus();
+                    const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
+                    updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
+                        trailingLabel: trailingLabel,
+                    });
+
+                    window.__workflowSnapshot = {
+                        output: data.output ?? null,
+                        steps_completed: steps_completed,
+                        steps_total: total_steps,
+                        status: status,
+                        session_id: workflow_session_id,
+                    };
+
                     if (status === 'failed') {
                         showToast("Workflow failed");
                     } else {
@@ -1710,31 +2750,31 @@
                         resetWorkflowButton();
                         // show the results
 
-                        let workflow_response = data.output;
-                        console.log("workflow response:", data.output);
+                        const workflow_response = data.output;
+                        console.log("workflow response:", workflow_response);
 
-                        if (Array.isArray(workflow_response) && workflow_response.length === 1 && typeof workflow_response[0] === 'string') {
-                            // Just use the HTML string directly
-                            workflow_response = workflow_response[0];
-                        } else {
-                            // Otherwise stringify the object
-                            workflow_response = JSON.stringify(workflow_response, null, 2);
+                        const snapshotPayload = workflow_response ?? "";
+                        window.__workflowSnapshot = {
+                            output: snapshotPayload,
+                            steps_completed: steps_completed,
+                            steps_total: total_steps,
+                            status: status,
+                            session_id: workflow_session_id,
+                        };
+
+                        const html = normalizeWorkflowOutput(snapshotPayload);
+                        if (!html) {
+                            return;
                         }
-                        // Clean up the text
-                        let outputText = workflow_response
-                            .replace(/^```(html|json|markdown)?\\s*|\\s*```$/g, '')
-                            .trim();
 
-                        outputText = window.marked.parse(outputText, {
-                            gfm: true,
-                            breaks: true,
-                        });
-
-                        $('.workflow-output-section').empty();
-                        $('.workflow-output-section').show();
+                        const $outputSection = $('.workflow-output-section');
+                        $outputSection.removeClass('hidden').empty().show();
                         $('.workflow-output-buttons').removeClass('hidden');
-                        $('.workflow-output-section').append(`${outputText}`);
-                        $('.workflow-container').animate({ scrollTop: $('.workflow-container')[0].scrollHeight }, 'slow');
+                        $outputSection.append(html);
+                        const $workflowContainer = $('.workflow-container');
+                        if ($workflowContainer.length > 0) {
+                            $workflowContainer.animate({ scrollTop: $workflowContainer[0].scrollHeight }, 'slow');
+                        }
                         $('.workflow-step').removeClass('active');
                         // Add 'active' class to the nth $('.workflow-step') element (0-based index)
                         $('.workflow-output').addClass('active');
@@ -1750,58 +2790,7 @@
                     $('.workflow-step').eq(active_step).removeClass('active');
                     $('.workflow-output').addClass('active');
 
-                    $('#downloadWorkflowBtn').on('click', function (e) {
-                        e.stopPropagation();
-                        const $btn = $(this);
-                        const $popup = $('#download-popup-menu');
-
-                        // 1) move it so it's not clipped by any parent
-                        $('body').append($popup);
-
-                        // 2) show invisibly to get its dimensions
-                        $popup.css({
-                            position: 'absolute',
-                            visibility: 'hidden',
-                            display: 'block'
-                        });
-                        const popupW = $popup.outerWidth();
-                        const popupH = $popup.outerHeight();
-
-                        // 3) figure out where the button is on the page
-                        const btnOff = $btn.offset();
-
-                        // 4) calculate your top/left
-                        let left = btnOff.left;               // align left edges
-                        let top = btnOff.top - popupH - 10; // sit 10px above the button
-
-                        // 5) keep it inside the viewport
-                        const winW = $(window).width();
-                        if (left + popupW > winW) left = winW - popupW - 5;
-
-                        // 6) show it for real
-                        $popup.css({
-                            visibility: 'visible',
-                            top: `${top}px`,
-                            left: `${left}px`,
-                            opacity: 0
-                        }).animate({ opacity: 1 }, 200);
-
-
-                        $('#download-pdf-option').off('click').on("click", function () {
-                            console.log("here");
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('pdf');
-
-                        });
-                        $('#download-csv-option').off('click').on("click", function () {
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('csv');
-                        });
-                        $('#download-text-option').off('click').on("click", function () {
-                            hideDownloadPopupMenu();
-                            downloadWorkflowOutput('txt');
-                        });
-                    });
+                    configureWorkflowDownloadButton();
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -1815,6 +2804,103 @@
                 showToast("Error polling workflow status");
             }
         });
+    }
+
+    function showWorkflowDownloadMenu($btn) {
+        const $popup = $('#download-popup-menu');
+        if ($popup.length === 0) {
+            return;
+        }
+
+        if ($popup.is(':visible')) {
+            hideDownloadPopupMenu();
+            return;
+        }
+
+        $('body').append($popup);
+
+        $popup.css({
+            position: 'absolute',
+            visibility: 'hidden',
+            display: 'block'
+        });
+
+        const popupWidth = $popup.outerWidth();
+        const popupHeight = $popup.outerHeight();
+        const offset = $btn.offset();
+
+        let left = offset.left;
+        let top = offset.top - popupHeight - 10;
+
+        const viewportWidth = $(window).width();
+        if (left + popupWidth > viewportWidth) {
+            left = viewportWidth - popupWidth - 5;
+        }
+
+        $popup.css({
+            visibility: 'visible',
+            top: `${top}px`,
+            left: `${left}px`,
+            opacity: 0
+        }).animate({ opacity: 1 }, 200);
+    }
+
+    function configureWorkflowDownloadButton() {
+        const $btn = $('#downloadWorkflowBtn');
+        if ($btn.length === 0) {
+            return;
+        }
+
+        $btn.off('click.workflow-download').on('click.workflow-download', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!workflow_session_id) {
+                if (typeof showToast === 'function') {
+                    showToast('No downloadable workflow result available yet.');
+                }
+                return;
+            }
+
+            showWorkflowDownloadMenu($(this));
+        });
+    }
+
+    function wireWorkflowDownloadOptions() {
+        const $popup = $('#download-popup-menu');
+        if ($popup.length === 0) {
+            return;
+        }
+
+        $(document)
+            .off('click.workflow-dl-pdf')
+            .on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download PDF option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('pdf');
+            });
+
+        $(document)
+            .off('click.workflow-dl-csv')
+            .on('click.workflow-dl-csv', '#download-csv-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download CSV option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('csv');
+            });
+
+        $(document)
+            .off('click.workflow-dl-txt')
+            .on('click.workflow-dl-txt', '#download-text-option', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log("Download Text option clicked");
+                hideDownloadPopupMenu();
+                downloadWorkflowOutput('txt');
+            });
     }
 
     function downloadWorkflow(session_id) {
@@ -1851,21 +2937,21 @@
     //            e.stopPropagation();
     //        });
 
-    $(document).on('click', '#download-pdf-option', function (e) {
+    $(document).off('click.workflow-dl-pdf').on('click.workflow-dl-pdf', '#download-pdf-option', function (e) {
         e.stopPropagation();
         console.log("Download PDF option clicked");
         hideDownloadPopupMenu();
         downloadWorkflowOutput('pdf');
     });
 
-    $(document).on('click', '#download-csv-option', function (e) {
+    $(document).off('click.workflow-dl-csv').on('click.workflow-dl-csv', '#download-csv-option', function (e) {
         e.stopPropagation();
         console.log("Download CSV option clicked");
         hideDownloadPopupMenu();
         downloadWorkflowOutput('csv');
     });
 
-    $(document).on('click', '#download-text-option', function (e) {
+    $(document).off('click.workflow-dl-txt').on('click.workflow-dl-txt', '#download-text-option', function (e) {
         e.stopPropagation();
         console.log("Download Text option clicked");
         hideDownloadPopupMenu();
@@ -1874,8 +2960,15 @@
 
     function downloadWorkflowOutput(format) {
         console.log("Downloading workflow output in format:", format);
-        // Go to the server to download the file in the specified format
-        location.href = `/workflows/download?session_id=${workflow_session_id}&format=${format} `; // Redirect to the download URL
+        if (!workflow_session_id) {
+            if (typeof showToast === "function") {
+                showToast("No downloadable workflow result available yet.");
+            }
+            return;
+        }
+        const encodedSession = encodeURIComponent(workflow_session_id);
+        const encodedFormat = encodeURIComponent(format);
+        location.href = `/workflows/download?session_id=${encodedSession}&format=${encodedFormat}`;
     }
 
     function hideDownloadPopupMenu() {
@@ -1926,32 +3019,10 @@
 
     tabMenuItems.forEach((item) => {
         item.addEventListener("click", function () {
-            tabMenuItems.forEach((item) => item.classList.remove("active"));
+            tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
-            $(".search-results-panel").hide();
-            $(".tab-content").hide();
-            $(".bottom-toolbar").hide();
-            var tabTitle = $(this).text();
+            const tabTitle = $(this).text().trim();
             setSection(tabTitle);
-            $("#tasks-panel").hide();
-
-            if (tabTitle == "Extract") {
-                $("#extraction-panel").show();
-                $("#bottom-toolbar-extraction").show();
-            } else if (tabTitle == "Prompt") {
-                $("#prompt-panel").show();
-                $("#bottom-toolbar-prompt").show();
-            } else if (tabTitle == "Assistant") {
-                $("#chat-panel").show();
-                $("#bottom-toolbar-chat").show();
-            } else if (tabTitle == "Workflows") {
-                $("#workflows-panel").show();
-                $("#bottom-toolbar-add-workflows").show();
-            } else if (tabTitle == "Tasks") {
-                $("#chat-panel").show();
-                $("#tasks-panel").show();
-                $("#bottom-toolbar-tasks").show();
-            }
         });
     });
 
@@ -1974,6 +3045,8 @@
 
     $(".add-new_workflow-button").on("click", function () {
         $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
 
         $("#newWorkflowBtn")
             .off("click")
@@ -2009,6 +3082,7 @@
     $(".add-formatter-task-btn")
         .off("click")
         .on("click", function () {
+            console.log("here");
             newTaskType = "formatter";
             $("#newTaskModal").show();
             $("#add-task-container").hide();
@@ -2068,7 +3142,11 @@
             dataType: "json",
             async: true,
             success: function (data) {
-                location.href = data.reroute;
+                fetchWorkflow(data.uuid);
+                // Refresh the library to show the new workflow
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2092,9 +3170,11 @@
             async: true,
             success: function (msg) {
                 searchTerm = term;
-                highlightTerms = [term];
-                documents = msg.results.documents[0];
-                highlightTerms = documents;
+                if (typeof window !== 'undefined') {
+                    window.highlightTerms = [term];
+                    documents = msg.results.documents[0];
+                    window.highlightTerms = documents;
+                }
 
                 renderDocument();
                 setTimeout(function () {
@@ -2108,57 +3188,86 @@
         });
     }
 
-    $(".set-item").on("click", function () {
+    $(document).on("click", ".set-item", function (e) {
+        // Don't run extraction if clicking on a button or menu item
+        if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+            return;
+        }
+
+        // Don't run extraction if in Verified tab and item is in verification
+        let verificationStatus = $(this).attr("data-verification-status");
+        let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+        if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+            return;
+        }
         let uuid = $(this).attr("data-uuid");
         let datatitle = $(this).attr("data-title");
-        //performSearch(uuid, datatitle);
         search_set_add_uuid = uuid;
         updateSearchSetPanel(uuid);
-        //performExtraction(uuid);
     });
 
-    $(".prompt-item").on("click", function () {
-        let uuid = $(this).attr("data-uuid");
-        let datatitle = $(this).attr("data-title");
-
-        if (document_uuids != "") {
-            $("#tasks-panel").hide();
-
-            let data = JSON.stringify({
-                uuid: uuid,
-            });
-
-            $.ajax({
-                url: "/tasks/fetch_search_set_item",
-                type: "POST",
-                data: data,
-                contentType: "application/json; charset=utf-8",
-                dataType: "json",
-                async: true,
-                success: function (data) {
-                    performChat(
-                        document_uuids,
-                        data.prompt,
-                        folder_uuid,
-                        "",
-                        (display_question = datatitle),
-                    );
-                },
-                error: function (xhr, ajaxOptions, thrownError) {
-                    console.log(xhr.status);
-                    console.log(thrownError);
-                },
-            });
-
+    // Delegated event handlers for copy and download buttons
+    $(document).on("click", ".copy-btn", function () {
+        // Find the closest message-response-body container
+        const $messageBody = $(this).closest('.message-response-body');
+        if ($messageBody.length === 0) {
+            console.error("Could not find message-response-body");
             return;
-        } else {
-            showToast("Select a document to chat");
         }
+        // Clone and remove feedback buttons before getting HTML
+        const $clone = $messageBody.clone();
+        $clone.find(".feedback-buttons").remove();
+        const responseHtml = $clone.html().trim();
+        copyRichTextToClipboard(responseHtml);
     });
 
+    $(document).on("click", ".download-btn", function () {
+        // Find the closest message-response-body container
+        const $messageBody = $(this).closest('.message-response-body');
+        if ($messageBody.length === 0) {
+            console.error("Could not find message-response-body");
+            return;
+        }
+        const $body = $messageBody.clone();
 
+        // Remove the feedback row(s) just for the download payload
+        $body.find(".feedback-buttons").remove();
 
+        // (Optional) If your popup menu ever gets injected inside the body, strip it too
+        $body.find("#chat-model-popup-menu").remove();
+        const responseHtml = $body.html().trim();
+        attachChatDownloadUI(this, responseHtml);
+    });
 
+    function beginPrompt(uuid, item_title) {
+        $("#tasks-panel").hide();
+
+        let data = JSON.stringify({
+            uuid: uuid,
+        });
+
+        $.ajax({
+            url: "/tasks/fetch_search_set_item",
+            type: "POST",
+            data: data,
+            contentType: "application/json; charset=utf-8",
+            dataType: "json",
+            async: true,
+            success: function (data) {
+                performChat(
+                    document_uuids,
+                    data.prompt,
+                    folder_uuid,
+                    "",
+                    (display_question = item_title),
+                );
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            },
+        });
+    }
 
 
     function performExtraction(search_set_uuid) {
@@ -2194,18 +3303,31 @@
             dataType: "json",
             async: true,
             success: function (data) {
-                console.log("Got some data!");
+                console.log("Extraction task started!");
                 console.log(data);
-                hideWorking();
-                stopScanning();
-                $("#search-results-panel").show();
-                $("#search-results-panel").empty();
-                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-                addResultListeners();
-                if ($('#run-term-button').length > 0) {
-                    $('#run-term-button')[0].textContent = "RUN";
+
+                if (data.status === "queued" && data.activity_id) {
+                    // Mark task as running in app rail
+                    setActiveRailActivity(data.activity_id, { promote: true, running: true });
+
+                    // Update URL immediately
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', "Library");
+                    url.searchParams.set('search_set_uuid', search_set_uuid);
+                    url.searchParams.set('activity_id', data.activity_id);
+                    window.history.replaceState(null, '', url.toString());
+
+                    // Show loading message
+                    $("#search-results-panel").show();
+                    $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+
+                    // Poll for completion
+                    pollExtractionStatus(data.activity_id, search_set_uuid);
+                } else {
+                    hideWorking();
+                    stopScanning();
+                    showToast("Error starting extraction: " + (data.message || "Unknown error"));
                 }
-                $('#run-term-button').removeClass('shimmer');
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2245,12 +3367,33 @@
                 dataType: "json",
                 async: true,
                 success: function (data) {
-                    hideWorking();
-                    stopScanning();
-                    $("#search-results-panel").show();
-                    $("#search-results-panel").empty();
-                    $(data.template).hide().appendTo("#search-results-panel").fadeIn();
-                    addResultListeners();
+                    console.log("Extraction task started!");
+                    console.log(data);
+
+                    if (data.status === "queued" && data.activity_id) {
+                        // Mark task as running in app rail
+                        const activityItem = document.querySelector(`li.run-item[data-run-id='${data.activity_id}']`);
+                        if (activityItem) {
+                            activityItem.classList.add('is-running');
+                        }
+
+                        // Update URL immediately
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', data.activity_id);
+                        window.history.replaceState(null, '', url.toString());
+
+                        // Show loading message
+                        $("#search-results-panel").show();
+                        $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+
+                        // Poll for completion
+                        const search_set_uuid = data.search_set_uuid || new URLSearchParams(window.location.search).get('search_set_uuid');
+                        pollExtractionStatus(data.activity_id, search_set_uuid);
+                    } else {
+                        hideWorking();
+                        stopScanning();
+                        showToast("Error starting extraction: " + (data.message || "Unknown error"));
+                    }
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -2271,12 +3414,25 @@
         });
 
         $("#run-term-button").on("click", function () {
-            let uuid = $(this).attr("data-uuid");
+            let uuid = $(this).attr("data-uuid") || search_set_add_uuid;
+            if (!uuid) {
+                showToast("Select an extraction to run.");
+                return;
+            }
             performExtraction(uuid);
         });
 
         $("#set-close-button").on("click", function () {
-            location.reload();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('search_set_uuid');
+            url.searchParams.delete('activity_id');
+            url.searchParams.set('section', 'Library');
+            search_set_add_uuid = "";
+            $("#search-results-panel").fadeOut(function () {
+                $(this).empty();
+            });
+            // Redirect to library to show updated extraction
+            location.href = url.toString();
         });
         $(".semantic-entry").on("click", function () {
             searchTerm = $(this).attr("data-title");
@@ -2318,8 +3474,14 @@
         });
 
         $("#build-extraction-from-document-btn").on("click", function () {
-            let uuid = $(this).attr("data-uuid");
-            buildExtractionFromDocument(uuid);
+            const $button = $(this);
+            if ($button.data("loading")) {
+                return;
+            }
+
+            const uuid = $button.attr("data-uuid");
+            setBuildExtractionButtonLoading($button, true);
+            buildExtractionFromDocument(uuid, $button);
         });
 
         $("#build-extraction-from-fillable-pdf-btn").on("click", function () {
@@ -2455,16 +3617,33 @@
 
         $(".extraction-result").on("click", function () {
             // get text content
-            searchTerm = $(this).text();
-            highlightTerms = [searchTerm];
+            const searchTerm = $(this).text();
+            // Update global highlightTerms so PDF highlighting can use it
+            if (typeof window !== 'undefined') {
+                window.highlightTerms = [searchTerm];
+                // Reset to first highlight
+                window.current_search_item = 0;
+                // Set flag to scroll to first highlight after rendering
+                window.needsScroll = true;
+            }
 
             showToast("Copied to clipboard");
             navigator.clipboard.writeText(searchTerm);
 
-            renderDocument();
-            setTimeout(function () {
-                nextHighlight();
-            }, 500);
+            // Re-render PDF with highlights
+            if (typeof renderDocument !== 'undefined') {
+                renderDocument();
+                // Wait for PDF to render, then scroll to first highlight
+                setTimeout(function () {
+                    if (typeof window.updateHighlightDisplay !== 'undefined') {
+                        window.updateHighlightDisplay();
+                    } else if (typeof nextHighlight !== 'undefined') {
+                        // Fallback to old method
+                        window.current_search_item = 0;
+                        nextHighlight();
+                    }
+                }, 1000);
+            }
         });
     }
 
@@ -2472,6 +3651,7 @@
         console.log("Performing search");
         console.log(set_uuid);
         console.log(document_uuids);
+        setSection("Library");
         $.ajax({
             url: "/tasks/search_results",
             type: "POST",
@@ -2488,7 +3668,13 @@
                 $("#search-results-panel").empty();
                 $(data.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
-                performExtraction(set_uuid);
+                search_set_add_uuid = set_uuid;
+
+                // Update URL to maintain Library section context
+                const url = new URL(window.location.href);
+                url.searchParams.set('section', "Library");
+                url.searchParams.set('search_set_uuid', set_uuid);
+                window.history.replaceState(null, '', url.toString());
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2555,7 +3741,47 @@
         });
     }
 
-    function buildExtractionFromDocument(uuid) {
+    function setBuildExtractionButtonLoading($button, isLoading) {
+        if (!$button || $button.length === 0) {
+            return;
+        }
+
+        const $iconContainer = $button.find(".add-task-icon-container");
+        const $title = $button.find(".add-task-title");
+
+        if (isLoading) {
+            $button.data("loading", true);
+            $button.attr("aria-disabled", "true");
+            $button.css("pointer-events", "none");
+
+            if (!$button.data("original-icon")) {
+                $button.data("original-icon", $iconContainer.html());
+            }
+            if (!$button.data("original-title")) {
+                $button.data("original-title", $title.text());
+            }
+
+            $iconContainer.html(
+                '<i class="fa-solid fa-spinner fa-spin" style="font-size: 24px; color: #252c32;"></i>'
+            );
+            $title.text("Building...");
+        } else {
+            $button.data("loading", false);
+            $button.removeAttr("aria-disabled");
+            $button.css("pointer-events", "");
+
+            const originalIcon = $button.data("original-icon");
+            const originalTitle = $button.data("original-title");
+            if (originalIcon) {
+                $iconContainer.html(originalIcon);
+            }
+            if (originalTitle) {
+                $title.text(originalTitle);
+            }
+        }
+    }
+
+    function buildExtractionFromDocument(uuid, $trigger) {
         showScanning();
         showWorking();
         $.ajax({
@@ -2571,6 +3797,11 @@
             success: function (msg) {
                 if (msg.complete == false) {
                     showToast(msg.error);
+                    stopScanning();
+                    hideWorking();
+                    if ($trigger) {
+                        setBuildExtractionButtonLoading($trigger, false);
+                    }
                     return;
                 }
 
@@ -2581,10 +3812,18 @@
                 $("#search-results-panel").empty();
                 $(msg.template).hide().appendTo("#search-results-panel").fadeIn();
                 addResultListeners();
+                if ($trigger) {
+                    setBuildExtractionButtonLoading($trigger, false);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
                 console.log(thrownError);
+                stopScanning();
+                hideWorking();
+                if ($trigger) {
+                    setBuildExtractionButtonLoading($trigger, false);
+                }
             },
         });
     }
@@ -2598,6 +3837,80 @@
     $("#add-search-set-button").on("click", function () {
         addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
+
+    function pollExtractionStatus(activity_id, search_set_uuid) {
+        let pollCount = 0;
+        const maxPolls = 120; // 2 minutes max (120 * 1000ms)
+
+        const intervalId = setInterval(function () {
+            pollCount++;
+
+            $.ajax({
+                url: `/tasks/extraction_status/${activity_id}`,
+                type: "GET",
+                dataType: "json",
+                success: function (response) {
+                    console.log("Extraction status:", response.status);
+
+                    // Update activity status in app rail
+                    updateActivityItemStatus(activity_id, response.status);
+                    
+                    if (response.status === "completed") {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+
+                        // Display results
+                        $("#search-results-panel").empty();
+                        $(response.template).hide().appendTo("#search-results-panel").fadeIn();
+                        addResultListeners();
+                        search_set_add_uuid = search_set_uuid;
+
+                        if ($('#run-term-button').length > 0) {
+                            $('#run-term-button')[0].textContent = "RUN";
+                        }
+                        $('#run-term-button').removeClass('shimmer');
+
+                        showToast("Extraction completed!");
+
+                    } else if (response.status === "failed") {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+                        
+                        // Update activity status in app rail
+                        updateActivityItemStatus(activity_id, response.status);
+
+                        $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Extraction failed: " + (response.error || "Unknown error") + "</div>");
+
+                        if ($('#run-term-button').length > 0) {
+                            $('#run-term-button')[0].textContent = "RUN";
+                        }
+                        $('#run-term-button').removeClass('shimmer');
+
+                        showToast("Extraction failed");
+                    } else if (pollCount >= maxPolls) {
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+                        $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction is taking longer than expected. Check back later.</div>");
+                        showToast("Extraction timeout");
+                    }
+                    // Otherwise keep polling (status is "queued" or "running")
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log("Error polling extraction status:", xhr.status, thrownError);
+                    if (pollCount >= 5) {
+                        // After 5 failed attempts, give up
+                        clearInterval(intervalId);
+                        hideWorking();
+                        stopScanning();
+                        $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error checking extraction status</div>");
+                    }
+                }
+            });
+        }, 1000); // Poll every second
+    }
 
     function addSearchSet(title, category) {
         $.ajax({
@@ -2614,6 +3927,10 @@
             success: function (msg) {
                 search_set_add_uuid = msg.uuid;
                 updateSearchSetPanel(msg.uuid);
+                // Refresh library to show the new extraction
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2639,12 +3956,23 @@
     });
 
     function nextHighlight() {
-        current_search_item += 1;
-        if (current_search_item >= highlights.length) {
-            current_search_item = 0;
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        if (typeof window.current_search_item === 'undefined') {
+            window.current_search_item = 0;
+        }
+        
+        window.current_search_item += 1;
+        if (window.current_search_item >= highlights.length) {
+            window.current_search_item = 0;
         }
 
-        updateHighlights();
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+        } else {
+            updateHighlights();
+        }
     }
 
     $("#prev-semantic-button").on("click", function (e) {
@@ -2659,31 +3987,65 @@
     });
 
     function previousHighlight() {
-        current_search_item -= 1;
-        if (current_search_item == -1) {
-            current_search_item = highlights.length - 1;
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        if (typeof window.current_search_item === 'undefined') {
+            window.current_search_item = 0;
+        }
+        
+        window.current_search_item -= 1;
+        if (window.current_search_item < 0) {
+            window.current_search_item = highlights.length - 1;
         }
 
-        updateHighlights();
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+        } else {
+            updateHighlights();
+        }
     }
 
     function updateHighlights() {
-        highlights = $(".highlight");
-
-        highlights[current_search_item].scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "nearest",
-        });
-        $("#semantic-panel-count").text(
-            current_search_item + 1 + " of " + highlights.length,
-        );
-        for (var i = 0; i < highlights.length; i++) {
-            highlights[i].style.backgroundColor = "yellow";
-            highlights[i].style.opacity = 0.5;
+        // Use the global updateHighlightDisplay function if available
+        if (typeof window.updateHighlightDisplay !== 'undefined') {
+            window.updateHighlightDisplay();
+            return;
         }
-
-        highlights[current_search_item].style.backgroundColor = "red";
+        
+        // Fallback implementation
+        const highlights = document.querySelectorAll('.highlight');
+        if (highlights.length === 0) return;
+        
+        const currentIndex = window.current_search_item || 0;
+        const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
+        window.current_search_item = safeIndex;
+        
+        // Update all highlights
+        highlights.forEach((hl, idx) => {
+            hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
+            hl.style.opacity = 0.5;
+        });
+        
+        // Update count
+        $("#semantic-panel-count").text((safeIndex + 1) + " of " + highlights.length);
+        
+        // Scroll to current highlight using the global function if available
+        if (typeof window.scrollToHighlight !== 'undefined') {
+            setTimeout(function() {
+                window.scrollToHighlight(safeIndex);
+            }, 50);
+        } else {
+            // Fallback: use scrollIntoView
+            const target = highlights[safeIndex];
+            if (target) {
+                target.scrollIntoView({
+                    behavior: "smooth",
+                    block: "center",
+                    inline: "nearest",
+                });
+            }
+        }
     }
 
     function getRating() {
@@ -2712,10 +4074,6 @@
         return searchTermDictionary;
     }
 
-    // document.addEventListener('DOMContentLoaded', () => {
-    //     const rail = document.getElementById('app-rail');
-    //     const railToggle = document.getElementById('rail-toggle');
-    //     const dockLeftToggle = document.getElementById('dock-left-toggle');
 
     //     // helper to apply CSS variable for left offsets
     //     const setRailVar = (px) => document.documentElement.style.setProperty('--rail-w', px);
@@ -2805,7 +4163,6 @@
     // Click handler for the tasks link
     $("#tasks-link").on("click", function (e) {
         e.preventDefault();
-        setSection("Tasks");
         $("#tasks-panel").show();
     });
 
@@ -2828,6 +4185,11 @@
         additional_context = "",
         display_question = ""
     ) {
+
+        const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+
+
+        $('#recommendations-panel').empty();
         $("#send-chat-button").prop("disabled", true);
         $(".chat-card-container").hide();
 
@@ -2851,19 +4213,38 @@
 
         $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "slow");
 
+
         fetch("/home/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json; charset=utf-8" },
             body: JSON.stringify({
                 document_uuids: document_uuids,
-                message: question + " " + additional_context,
+                message: question + "\n" + additional_context,
+                activity_id: current_activity_id,
+                current_space_id: current_space_id,
                 folder_uuid: folder_uuid,
             }),
         })
             .then((response) => {
+                // Check if this is a new activity (no current_activity_id was sent)
+                if (!current_activity_id) {
+                    const newActivityId = response.headers.get("X-Activity-ID");
+                    if (newActivityId) {
+                        // Add new activity to rail
+                        setActiveRailActivity(newActivityId, { promote: true, running: true });
+                        // Update URL
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', newActivityId);
+                        url.searchParams.set('section', 'Assistant');
+                        window.history.replaceState({}, '', url);
+                    }
+                }
+                
                 if (!response.body) throw new Error("No response body");
+
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+
                 let markdownBuffer = "";
                 let thinkingBuffer = "";
                 let questionText = question + " " + additional_context;
@@ -2924,25 +4305,22 @@
                                 $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
                             }
 
-                            $(".copy-btn").on("click", function () {
-                                let responseHtml = $(this).closest('[id^="response"]').find(".message-response-body").html().trim();
-                                copyRichTextToClipboard(responseHtml);
-                            });
-                            $(".download-btn").on("click", function () {
-                                const $body = $(this)
-                                    .closest('[id^="response"]')
-                                    .find(".message-response-body")
-                                    .first()
-                                    .clone();
+                            // Note: Copy and download button handlers are handled by delegated event handlers
+                            // Update URL with activity_id if not present (without page reload)
+                            const currentUrl = new URL(window.location.href);
+                            const hasActivityId = currentUrl.searchParams.has('activity_id');
+                            console.log("message finished activity_id", activity_id);
+                            if (!hasActivityId && activity_id) {
+                                currentUrl.searchParams.set('activity_id', activity_id);
+                                currentUrl.searchParams.set('section', 'Assistant');
+                                window.history.replaceState({}, '', currentUrl);
+                                // Set the activity as active in the rail
+                                setActiveRailActivity(activity_id, { promote: true, running: false });
+                            } else if (activity_id) {
+                                // If activity_id was already in URL, still mark it as active
+                                setActiveRailActivity(activity_id, { promote: false, running: false });
+                            }
 
-                                // Remove the feedback row(s) just for the download payload
-                                $body.find(".feedback-buttons").remove();
-
-                                // (Optional) If your popup menu ever gets injected inside the body, strip it too
-                                $body.find("#chat-model-popup-menu").remove();
-                                const responseHtml = $body.html().trim();
-                                attachChatDownloadUI(this, responseHtml);
-                            });
                             return;
                         }
 
@@ -2972,6 +4350,8 @@
                                         const $thinkingPanel = $("#" + responseId + " .thinking-panel");
                                         $thinkingPanel.show();
                                         $thinkingPanel.find(".thinking-content").text(thinkingBuffer);
+                                    } else if (data.kind === "meta" && data.conversation_uuid) {
+                                        conversationId = data.conversation_uuid;
                                     }
                                 } catch (e) {
                                     console.error("Error parsing JSON:", e, "Line:", line);
@@ -3067,6 +4447,7 @@
 
         const copyBtn = makeLinkBtn("Copy", "copy-btn");
         const downloadBtn = makeLinkBtn("Download", "download-btn");
+
 
         feedbackDiv.appendChild(copyBtn);
         feedbackDiv.appendChild(downloadBtn);
@@ -3213,4 +4594,264 @@
             }
         }
     }
+
+    section = "{{ section }}"
+    console.log("Section is: " + section)
+    setSection(section);
+
+    // Trigger recommendations check after section is set (important for direct file opens)
+    // Use setTimeout to ensure DOM is fully updated after setSection
+    setTimeout(function () {
+        updateDocumentSelections();
+    }, 100);
+
+    if (window.__workflowSnapshot && hasWorkflowOutput(window.__workflowSnapshot)) {
+        hydrateWorkflowSnapshot(window.__workflowSnapshot);
+    }
+
+    // Resume polling for running activities on page load
+    function resumePollingForRunningActivities() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const activityId = urlParams.get('activity_id');
+        const searchSetUuid = urlParams.get('search_set_uuid');
+        
+        // Helper function to display current workflow state
+        function displayWorkflowProgress(data) {
+            if (!data) return;
+            
+            const steps_completed = data.steps_completed || 0;
+            const total_steps = data.total_steps || 0;
+            const status = data.status;
+            const currentStepName = data.current_step_name;
+            const currentStepDetail = data.current_step_detail;
+            const currentStepPreview = data.current_step_preview;
+            const output = data.output;
+            
+            // Ensure workflow panel is visible
+            setSection("Library");
+            $('#search-results-panel').show();
+            
+            // Update active step status
+            if (currentStepName || currentStepDetail) {
+                renderActiveStepStatus(currentStepName, currentStepDetail);
+            }
+            
+            // Update progress info
+            updateWorkflowProgressInfo(steps_completed, total_steps, 0);
+            
+            // Show workflow output section if we have preview or output
+            if (currentStepPreview || output) {
+                const $outputSection = $('.workflow-output-section');
+                const $outputContainer = $('.workflow-output');
+                
+                if ($outputSection.length && $outputContainer.length) {
+                    $outputContainer.removeClass('hidden').addClass('active');
+                    $outputContainer.find('.step-connector').addClass('active');
+                    $('.workflow-loader').hide();
+                    $('.workflow-output-buttons').removeClass('hidden');
+                    
+                    // Display preview if available, otherwise output
+                    const content = currentStepPreview || output;
+                    if (content) {
+                        const html = normalizeWorkflowOutput(content);
+                        if (html) {
+                            $outputSection.removeClass('hidden').show().empty().append(html);
+                            configureWorkflowDownloadButton();
+                        }
+                    }
+                }
+            }
+            
+            // Update workflow steps UI
+            if (steps_completed >= 0 && total_steps > 0) {
+                // Mark completed steps as done
+                for (let i = 0; i <= steps_completed && i < total_steps; i++) {
+                    $('.workflow-step').eq(i).addClass('active');
+                    if (i < steps_completed) {
+                        $('.workflow-step').eq(i).find('.step-connector').addClass('active');
+                    }
+                }
+                // Mark current step
+                if (steps_completed < total_steps) {
+                    $('.workflow-step').eq(steps_completed).addClass('active');
+                    $('.workflow-loader').eq(steps_completed).show();
+                }
+            }
+        }
+        
+        // Check for running workflow - try workflow_session_id first, then check activity_id
+        if (workflow_session_id && workflowActivityStatus) {
+            const status = workflowActivityStatus.toLowerCase();
+            if (status === 'running' || status === 'queued') {
+                console.log("Resuming workflow polling for session:", workflow_session_id);
+                
+                // Immediately fetch current status to display progress
+                $.ajax({
+                    url: `/workflows/workflow/status?session_id=${workflow_session_id}`,
+                    type: 'GET',
+                    dataType: 'json',
+                    success: function(data) {
+                        displayWorkflowProgress(data);
+                    },
+                    error: function(err) {
+                        console.warn("Failed to fetch initial workflow status:", err);
+                    }
+                });
+                
+                if (workflow_interval_id) {
+                    clearInterval(workflow_interval_id);
+                }
+                workflow_interval_id = pollWorkflowStatus(workflow_session_id);
+                beginSpinningJoe();
+                showScanning();
+            }
+        } else if (activityId) {
+            // Check if this activity is a running workflow
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) return;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activity = data.activity;
+                        if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued')) {
+                            // Get session_id from activity data
+                            const sessionId = activity.workflow_session_id;
+                            const workflowId = activity.workflow_id;
+                            if (sessionId) {
+                                console.log("Resuming workflow polling for session from activity:", sessionId);
+                                
+                                // If we have a workflow_id, ensure the workflow panel is loaded
+                                let needsWorkflowLoad = false;
+                                if (workflowId && (!current_workflow_id || current_workflow_id === "0" || current_workflow_id !== workflowId)) {
+                                    current_workflow_id = workflowId;
+                                    fetchWorkflow(workflowId);
+                                    needsWorkflowLoad = true;
+                                }
+                                
+                                // Immediately fetch current status to display progress
+                                $.ajax({
+                                    url: `/workflows/workflow/status?session_id=${sessionId}`,
+                                    type: 'GET',
+                                    dataType: 'json',
+                                    success: function(statusData) {
+                                        // Wait a bit for workflow panel to load if we just fetched it
+                                        setTimeout(() => {
+                                            displayWorkflowProgress(statusData);
+                                        }, needsWorkflowLoad ? 500 : 0);
+                                    },
+                                    error: function(err) {
+                                        console.warn("Failed to fetch initial workflow status:", err);
+                                    }
+                                });
+                                
+                                if (workflow_interval_id) {
+                                    clearInterval(workflow_interval_id);
+                                }
+                                workflow_session_id = sessionId;
+                                workflow_interval_id = pollWorkflowStatus(sessionId);
+                                beginSpinningJoe();
+                                showScanning();
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.warn("Failed to check workflow activity:", err));
+        }
+        
+        // Check for running extraction
+        if (activityId && searchSetUuid) {
+            // Fetch activity to check status
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) return;
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activity = data.activity;
+                        const status = (activity.status || '').toLowerCase();
+                        if (status === 'running' || status === 'queued') {
+                            console.log("Resuming extraction polling for activity:", activityId);
+                            // Show loading state
+                            showWorking();
+                            showScanning();
+                            $("#search-results-panel").show();
+                            $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                            // Resume polling
+                            pollExtractionStatus(activityId, searchSetUuid);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to check activity status for polling resume:", err);
+                });
+        }
+        
+        // Also check all activities in the rail for running ones
+        const runList = document.getElementById("run-list");
+        if (runList) {
+            const runningItems = runList.querySelectorAll('li.run-item.is-running');
+            runningItems.forEach(item => {
+                const itemActivityId = item.dataset.runId;
+                if (!itemActivityId) return;
+                
+                // Check if it's an extraction (has search_set_uuid in URL or we can fetch it)
+                const typeIcon = item.querySelector('.run-type-icon');
+                if (typeIcon && typeIcon.classList.contains('fa-list-check')) {
+                    // It's an extraction - check if we're already polling
+                    // We'll fetch the activity to get search_set_uuid
+                    fetch(`/activity/runs/${itemActivityId}/data`)
+                        .then(response => {
+                            if (!response.ok) return;
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data && data.activity) {
+                                const activity = data.activity;
+                                if (activity.search_set_uuid && (activity.status === 'running' || activity.status === 'queued')) {
+                                    // Only resume if we're not already polling this one
+                                    if (itemActivityId !== activityId) {
+                                        console.log("Resuming extraction polling for activity in rail:", itemActivityId);
+                                        pollExtractionStatus(itemActivityId, activity.search_set_uuid);
+                                    }
+                                }
+                            }
+                        })
+                        .catch(err => console.warn("Failed to resume polling for activity:", err));
+                } else if (typeIcon && typeIcon.classList.contains('fa-diagram-project')) {
+                    // It's a workflow - fetch activity to get session_id
+                    fetch(`/activity/runs/${itemActivityId}/data`)
+                        .then(response => {
+                            if (!response.ok) return;
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data && data.activity) {
+                                const activity = data.activity;
+                                if (activity.type === 'workflow_run' && (activity.status === 'running' || activity.status === 'queued')) {
+                                    const sessionId = activity.workflow_session_id;
+                                    if (sessionId && sessionId !== workflow_session_id) {
+                                        // Only resume if we're not already polling this one
+                                        console.log("Resuming workflow polling for activity in rail:", itemActivityId);
+                                        if (workflow_interval_id) {
+                                            clearInterval(workflow_interval_id);
+                                        }
+                                        workflow_session_id = sessionId;
+                                        workflow_interval_id = pollWorkflowStatus(sessionId);
+                                        beginSpinningJoe();
+                                        showScanning();
+                                    }
+                                }
+                            }
+                        })
+                        .catch(err => console.warn("Failed to resume workflow polling for activity:", err));
+                }
+            });
+        }
+    }
+    
+    // Resume polling after a short delay to ensure DOM is ready
+    setTimeout(resumePollingForRunningActivities, 500);
 </script>

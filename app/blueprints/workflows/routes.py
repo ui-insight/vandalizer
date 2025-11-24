@@ -1,12 +1,12 @@
 """Handle workflow routes."""
 
 import asyncio
+import datetime
 import io
 import json
 import os
 import uuid
 from itertools import chain
-from pathlib import Path
 
 import pypandoc
 from bson import ObjectId
@@ -20,12 +20,15 @@ from flask import (
     render_template,
     request,
     send_file,
-    session,
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from celery.result import AsyncResult
+from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app.celery_worker import celery_app
+from app.blueprints.home.routes import _get_teams, markdown_or_html_to_pdf_bytes
 from app.models import (
     SearchSet,
     SearchSetItem,
@@ -40,10 +43,12 @@ from app.models import (
     WorkflowStepTask,
 )
 from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import ActivityType, activity_start
 from app.utilities.config import settings
 from app.utilities.document_helpers import save_excel_to_html
-from app.utilities.markdown_helpers import (
-    generate_pdf_from_html,
+from app.utilities.library_helpers import (
+    _get_or_create_personal_library,
+    add_object_to_library,
 )
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
@@ -52,33 +57,95 @@ from app.utilities.workflow import (
     execute_task_step_test,
     execute_workflow_task,
 )
-from app.utils import load_user
+
+# Singleton instance for recommendations to avoid repeated initialization
+_recommendation_manager_instance = None
+
+def get_recommendation_manager():
+    """Get or create singleton SemanticRecommender instance."""
+    global _recommendation_manager_instance
+    if _recommendation_manager_instance is None:
+        persist_directory = "data/recommendations_vectordb"
+        _recommendation_manager_instance = SemanticRecommender(
+            persist_directory=persist_directory,
+        )
+    return _recommendation_manager_instance
+
+def clear_recommendations_cache():
+    """Clear the recommendations cache to force fresh results."""
+    global _recommendations_cache
+    _recommendations_cache.clear()
+    debug("Recommendations cache cleared")
+
+# Server-side cache for recommendations (TTL: 30 seconds - reduced for faster updates)
+_CACHE_TTL_SECONDS = 30
+_recommendations_cache = {}
+from app.utilities.verification_helpers import user_can_modify_verified
 
 workflows = Blueprint("workflows", __name__)
 
 WORKFLOW_NOT_FOUND_MESSAGE = "Workflow not found"
 
 
+def _workflow_user_or_none():
+    try:
+        if current_user.is_authenticated:
+            return current_user
+    except Exception:
+        return None
+    return None
+
+
+def _verified_workflow_forbidden():
+    return (
+        jsonify(
+            {
+                "error": "forbidden",
+                "message": "Verified workflows can only be modified by examiners.",
+            }
+        ),
+        403,
+    )
+
+
+def _workflow_is_editable(workflow: Workflow | None) -> bool:
+    return bool(workflow and user_can_modify_verified(_workflow_user_or_none(), workflow))
+
+
+def _workflow_for_step(step: WorkflowStep | None) -> Workflow | None:
+    if not step:
+        return None
+    return Workflow.objects(steps=step).first()
+
+
+def _workflow_for_task(task: WorkflowStepTask | None) -> Workflow | None:
+    if not task:
+        return None
+    step = WorkflowStep.objects(tasks=task).first()
+    return _workflow_for_step(step)
+
+
+@login_required
 @workflows.route("/create_workflow", methods=["POST"])
 def add_workflow() -> ResponseReturnValue:
     """Create a new workflow."""
-    user = load_user()
+    user = current_user
+    user_id = user.get_id()
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow = Workflow(
         name=workflow_data["name"],
         description=workflow_data["description"],
-        user_id=session["user_id"],
+        user_id=current_user.user_id,
     )
     workflow.save()
+
+    library = _get_or_create_personal_library(user.user_id)
+    add_object_to_library(workflow, library=library, added_by_user_id=user.user_id)
     return jsonify(
         {
-            "reroute": url_for(
-                "home.index",
-                section="Workflows",
-                workflow_id=str(workflow.id),
-            ),
+            "uuid": str(workflow.id),
         },
     )
 
@@ -88,8 +155,12 @@ def edit_workflow() -> ResponseReturnValue:
     """Edit an existing prompt."""
     data = request.get_json()
     uuid = data["uuid"]
-    load_user()
     workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     template = render_template(
         "workflows/edit_workflow.html",
@@ -102,50 +173,72 @@ def edit_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/delete_workflow", methods=["POST"])
 def delete_workflow() -> ResponseReturnValue:
     """Delete a workflow by ID."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     data = request.get_json()
     uuid = data["uuid"]
     print(uuid)
     workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     WorkflowResult.objects(workflow=workflow).delete()
     workflow.delete()
     return {"success": True}
 
 
+@login_required
 @workflows.route("/update_workflow", methods=["POST"])
 def update_workflow() -> ResponseReturnValue:
     """Update a workflow by ID."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow.name = workflow_data["name"]
     workflow.description = workflow_data["description"]
     workflow.save()
     return {"success": True}
 
 
+@login_required
 @workflows.route("/workflow/run", methods=["POST"])
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
-    user = load_user()
+    user = current_user
+    user_id = user.get_id()
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     session_id = workflow_data["session_id"]
-    document_uuids = workflow_data["document_uuids"]
+    current_space_id = workflow_data.get("current_space_id", "None")
+    document_uuids = workflow_data.get("document_uuids") or []
 
-    user_id = load_user().user_id
+    if not document_uuids:
+        return (
+            jsonify(
+                {"status": "error", "message": "Select a document before running."}
+            ),
+            400,
+        )
 
     workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
@@ -173,7 +266,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name
@@ -183,41 +276,72 @@ def run_workflow() -> ResponseReturnValue:
     workflow_trigger_step_id = str(document_trigger_step.id)
     print("Running workflow", workflow_id, workflow_result_id, workflow_trigger_step_id)
 
+    current_team, my_teams = _get_teams(user)
+
+    # Check if there's an existing completed activity for this workflow
+    # If so, reuse it instead of creating a new one
+    from app.models import ActivityEvent
+
+    existing_activity = (
+        ActivityEvent.objects(
+            type=ActivityType.WORKFLOW_RUN,
+            user_id=user_id,
+            workflow=workflow,
+            status="completed",
+        )
+        .order_by("-started_at")
+        .first()
+    )
+
+    if existing_activity:
+        # Reuse the existing activity with new results
+        activity = existing_activity
+        activity.workflow_result = workflow_result
+        activity.status = "queued"
+        activity.started_at = datetime.datetime.now(datetime.timezone.utc)
+        activity.last_updated_at = datetime.datetime.now(datetime.timezone.utc)
+        activity.finished_at = None
+        activity.error = None
+        activity.steps_completed = 0
+        activity.result_snapshot = None
+        activity.save()
+    else:
+        # Create a new activity for first-time run
+        activity = activity_start(
+            type=ActivityType.WORKFLOW_RUN,
+            user_id=user_id,
+            title=workflow.name,
+            team_id=current_team.uuid,
+            space=current_space_id,
+            workflow=workflow,
+            workflow_result=workflow_result,
+        )
+
     async_result = execute_workflow_task.delay(
         workflow_result_id=workflow_result_id,
         workflow_id=workflow_id,
         workflow_trigger_step_id=workflow_trigger_step_id,
         model=model,
     )
-    # Ingest workflow into vector database for future recommendations
-    ingestion_text = ""
-    ingestion_text += "# Documents selected:"
-
-    for doc in docs:
-        ingestion_text += f"\n{doc.raw_text}"
-
-    persist_directory = Path("data/recommendations_vectordb")
-    recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
-    recommendation_manager.ingest_recommendation_item(
-        identifier=workflow_id,
-        ingestion_text=ingestion_text,
-        recommendation_type="Workflow",
-    )
+    # Note: Workflow recommendation ingestion now happens asynchronously
+    # in the execute_workflow_task Celery task
     return jsonify(
         {
             "status": "accepted",
             "workflow_result_id": workflow_result_id,
             "task_id": async_result.id,
+            "activity_id": str(activity.id),
         },
     ), 202
 
 
+@login_required
 @workflows.route("/workflow/recommendations", methods=["POST"])
 def get_workflow_recommendations_sync() -> ResponseReturnValue:
     """Get workflow recommendations synchronously (for immediate results)."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     request_data = request.get_json()
     document_uuids = request_data.get("uuids", [])
@@ -226,96 +350,121 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
     if not document_uuids:
         return jsonify({"recommendations": []}), 200
 
-    try:
-        # Load documents
-        documents = []
-        for uuid in document_uuids:
-            doc = SmartDocument.objects(uuid=uuid).first()
-            if doc:
-                documents.append(doc)
+    # Create cache key from sorted UUIDs
+    cache_key = ",".join(sorted(document_uuids))
 
-        if not documents:
-            return jsonify(
-                {"recommendations": [], "message": "No valid documents found"}
-            ), 200
+    # Check server-side cache first
+    now = datetime.datetime.now()
+    if cache_key in _recommendations_cache:
+        cached_data, cached_time = _recommendations_cache[cache_key]
+        age_seconds = (now - cached_time).total_seconds()
 
-        are_documents_valid = True
-        for document in documents:
-            if not document.valid:
-                are_documents_valid = False
+        if age_seconds < _CACHE_TTL_SECONDS:
+            debug(f"Using server-side cache (age: {age_seconds:.1f}s)")
+            return jsonify(cached_data), 200
 
-        persist_directory = Path("data/recommendations_vectordb")
-        recommendation_manager = SemanticRecommender(
-            persist_directory=persist_directory,
-        )
+    # try:
+    # Load documents - use __in for batch query instead of loop
+    documents = list(SmartDocument.objects(uuid__in=document_uuids))
 
-        # Get recommendations
-        recommendations = recommendation_manager.search_recommendations(
-            selected_documents=documents,
-            limit=limit,
-        )
-
-        templates = []
-
-        recommended_workflows = []
-        for recommendation in recommendations:
-            identifier = recommendation["identifier"]
-            recommendation_type = recommendation["recommendation_type"]
-            if recommendation_type == "Workflow":
-                workflow = Workflow.objects(id=identifier).first()
-                if workflow and (workflow not in recommended_workflows):
-                    recommended_workflows.append(workflow)
-
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-workflow.html",
-                        workflow=workflow,
-                        user=user,
-                    )
-                    templates.append(template)
-            elif recommendation_type == "Extraction":
-                search_set = SearchSet.objects(uuid=identifier).first()
-                if search_set and (search_set not in recommended_workflows):
-                    recommended_workflows.append(search_set)
-                    template = render_template(
-                        "toolpanel/recommendations/recommendation-extraction.html",
-                        search_set=search_set,
-                    )
-                    templates.append(template)
-        if len(templates) == 0:
-            template = render_template(
-                "toolpanel/recommendations/recommendations-none.html",
-            )
-            templates.append(template)
-        else:
-            templates = [
-                render_template(
-                    "toolpanel/recommendations/recommendation-title.html",
-                )
-            ] + templates
-
-        print(recommendations)
+    if not documents:
         return jsonify(
-            {"templates": templates, "are_documents_valid": are_documents_valid}
+            {"recommendations": [], "message": "No valid documents found"}
         ), 200
 
-    except Exception as e:
-        print(e)
-        return jsonify({"error": str(e), "recommendations": []}), 500
+    are_documents_valid = True
+    for document in documents:
+        if not document.valid:
+            are_documents_valid = False
+
+    # Use singleton instance to avoid re-initialization overhead
+    recommendation_manager = get_recommendation_manager()
+
+    # Get recommendations
+    recommendations = recommendation_manager.search_recommendations(
+        selected_documents=documents,
+        limit=limit,
+    )
+
+    templates = []
+
+    recommended_workflows = []
+    for recommendation in recommendations:
+        identifier = recommendation["identifier"]
+        recommendation_type = recommendation["recommendation_type"]
+        if recommendation_type == "Workflow":
+            workflow = Workflow.objects(id=identifier).first()
+            if workflow and (workflow not in recommended_workflows):
+                recommended_workflows.append(workflow)
+
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-workflow.html",
+                    workflow=workflow,
+                    user=user,
+                )
+                templates.append(template)
+        elif recommendation_type == "Extraction":
+            search_set = SearchSet.objects(uuid=identifier).first()
+            if search_set and (search_set not in recommended_workflows):
+                recommended_workflows.append(search_set)
+                template = render_template(
+                    "toolpanel/recommendations/recommendation-extraction.html",
+                    search_set=search_set,
+                )
+                templates.append(template)
+    if len(templates) == 0:
+        template = render_template(
+            "toolpanel/recommendations/recommendations-none.html",
+        )
+        templates.append(template)
+    else:
+        templates = [
+            render_template(
+                "toolpanel/recommendations/recommendation-title.html",
+            )
+        ] + templates
+
+    print(recommendations)
+
+    # Prepare response
+    response_data = {"templates": templates, "are_documents_valid": are_documents_valid}
+
+    # Cache the response (store both data and timestamp)
+    _recommendations_cache[cache_key] = (response_data, now)
+
+    # Clean up old cache entries (simple LRU: keep only last 100 entries)
+    if len(_recommendations_cache) > 100:
+        # Remove oldest entries
+        sorted_cache = sorted(_recommendations_cache.items(), key=lambda x: x[1][1])
+        for old_key, _ in sorted_cache[:20]:  # Remove 20 oldest
+            del _recommendations_cache[old_key]
+
+    return jsonify(response_data), 200
+
+    # except Exception as e:
+    #     print(e)
+    #     return jsonify({"error": str(e), "recommendations": []}), 500
 
 
+@login_required
 @workflows.route("/workflow/step/test", methods=["POST"])
 def test_workflow_step() -> ResponseReturnValue:
     """Run a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     task_name = workflow_data["task_name"]
     task_data = workflow_data["task_data"]
-    document_uuids = workflow_data["document_uuids"]
+    document_uuids = workflow_data.get("document_uuids") or []
+    if not document_uuids:
+        return (
+            jsonify({"error": "Select a document before testing this step."}),
+            400,
+        )
 
-    user_id = load_user().user_id
+    user_id = user.get_id()
     print(workflow_data)
     docs = [SmartDocument.objects(uuid=x).first() for x in document_uuids]
     document_trigger_step = WorkflowStep(
@@ -324,7 +473,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config = UserModelConfig.objects(user_id=user_id).first()
     model = settings.base_model
     if model_config:
         model = model_config.name
@@ -337,13 +486,11 @@ def test_workflow_step() -> ResponseReturnValue:
         task_data=task_data,
         document_trigger_step_id=str(document_trigger_step.id),
     )
-    workflow_output = async_result.get(timeout=600)
-    if workflow_output is None:
-        return jsonify({"error": "Workflow execution failed"})
 
-    debug(workflow_output)
-
-    return {"output": workflow_output}
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
 
 
 # @MARK: ~~ Run integration
@@ -370,6 +517,8 @@ def run_workflow_integrated() -> ResponseReturnValue:
     workflow = Workflow.objects(id=workflow_id).first()
     if not workflow:
         return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    user_id = current_user.get_id()
 
     # **4. Handle File Uploads**
     uploaded_files = request.files.getlist("file")
@@ -407,7 +556,9 @@ def run_workflow_integrated() -> ResponseReturnValue:
         # **Optional: Handle File Conversion**
         if extension == "docx":
             pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+            # SHENEMAN
             pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
+            pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path, extra_args="--pdf-engine=xelatex")
             extension = "pdf"
         elif extension in ["xlsx", "xls"]:
             html_path = os.path.join(upload_dir, f"{uid}.html")
@@ -421,7 +572,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
             path=f"{user.id}/{uid}.{extension}",
             extension=extension,
             uuid=uid,
-            user_id=user.user_id,
+            user_id=user_id,
             space="None",
         )
         document.save()
@@ -482,12 +633,48 @@ def workflow_status() -> ResponseReturnValue:
         final_output = workflow_result.final_output.get("output", None)
     debug("Workflow result", final_output)
 
+    # Get the associated activity
+    activity = None
+    activity_id = None
+    from app.models import ActivityEvent
+
+    activity = ActivityEvent.objects(workflow_result=workflow_result).first()
+    if activity:
+        activity_id = str(activity.id)
+
     response = {
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
         "output": final_output,
         "status": workflow_result.status,
+        "activity_id": activity_id,
+        "current_step_name": workflow_result.current_step_name,
+        "current_step_detail": workflow_result.current_step_detail,
+        "current_step_preview": workflow_result.current_step_preview,
     }
+
+    return jsonify(response)
+
+
+@login_required
+@workflows.route("/workflow/step/status/<task_id>", methods=["GET"])
+def workflow_step_test_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of a workflow step test Celery task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {
+        "task_id": task_id,
+        "state": state,
+    }
+
+    if result.successful():
+        response["output"] = result.result
+    elif result.failed():
+        err = result.result
+        response["error"] = str(err)
 
     return jsonify(response)
 
@@ -519,6 +706,7 @@ def workflow_status() -> ResponseReturnValue:
 
 
 ## @MARK: Download
+@login_required
 @workflows.route("/download", methods=["GET"])
 def workflow_download() -> ResponseReturnValue:
     session_id = request.args.get("session_id")
@@ -532,9 +720,26 @@ def workflow_download() -> ResponseReturnValue:
     if not workflow_result:
         return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
 
-    # 2) pull the final output payload
-    final_output = list(workflow_result.steps_output.values())[-1]["output"]
-    raw_json = json.dumps(final_output, indent=2)
+    # 2) pull the final output payload (prefer the stored final_output field, fall back to last step)
+    final_payload = workflow_result.final_output or {}
+    final_output = final_payload.get("output")
+    if final_output is None:
+        steps_outputs = list(workflow_result.steps_output.values())
+        if steps_outputs:
+            final_output = steps_outputs[-1].get("output")
+
+    if isinstance(final_output, (list, dict)):
+        raw_json = json.dumps(final_output, indent=2, default=str)
+        final_output_str = raw_json
+    elif final_output is None:
+        raw_json = ""
+        final_output_str = ""
+    else:
+        raw_json = final_output
+        final_output_str = final_output
+
+    if not raw_json:
+        raw_json = "No workflow output was produced."
     print(raw_json)
     # 3) ask the LLM to format
     #    tailor the prompt to each format
@@ -549,32 +754,46 @@ def workflow_download() -> ResponseReturnValue:
         # you might ask for a simple text layout or markdown-to-PDF
         prompt = (
             "Lay out the following HTML data into a well-structured document that I can export as a PDF. "
-            "Please format your entire response using Markdown.\n\n"
+            "Please format your entire response using HTML.\n\n"
+            "IMPORTANT STYLING RULES:\n"
+            "- Use ONLY inline styles with concrete color values (e.g., color: #333, background: #f5f5f5)\n"
+            "- DO NOT use CSS variables like var(--anything)\n"
+            "- DO NOT use CSS functions except rgb() and rgba()\n"
+            "- Use simple, standard HTML tags: h1-h6, p, ul, ol, li, table, strong, em\n"
+            "- Keep styling minimal and use hex colors or named colors (black, white, gray, etc.)\n\n"
             "Use headings, paragraphs, bullet points, and bold text as appropriate to create a clear and readable layout. "
-            "Do not include any of your own commentary or descriptions outside of the Markdown output.\n\n"
-            f"Here is the HTML data:\n\n{raw_json}"
+            "Do not include any of your own commentary or descriptions outside of the HTML output.\n\n"
+            f"Here is the data to format:\n\n{raw_json}"
         )
     else:  # txt
         prompt = (
-            "Pretty-print the following HTML document into a well-formatted text document. Strip out all html tags. Just give me clean, indented text.\n\n"
-            "Do not include any description of your own or commentary, just return what we are going to output.\n\n"
+            "Convert the following HTML document into plain text format. "
+            "Strip out all HTML tags and formatting. "
+            "Do NOT use markdown syntax (no *, #, or other markdown formatting). "
+            "Return only clean, readable plain text with proper line breaks and indentation.\n\n"
+            "Do not include any description of your own or commentary, just return the plain text output.\n\n"
             f"{raw_json}"
         )
 
-    user = load_user()
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = settings.base_model
-    chat_agent = create_chat_agent(model)
-    # get current event loop
-    # if there is no current loop, create a new one
-    formatted = asyncio.run(chat_agent.run(prompt))
-    formatted = formatted.output
+    user = current_user
 
-    # Remove the tick marks before and after blocks
-    formatted = formatted.strip("`").strip()
+    if fmt == "pdf":
+        formatted = final_output_str
+    else:
+        model_config = UserModelConfig.objects(user_id=user.user_id).first()
+        if model_config:
+            model = model_config.name
+        else:
+            model = settings.base_model
+
+        chat_agent = create_chat_agent(model)
+        # get current event loop
+        # if there is no current loop, create a new one
+        formatted = asyncio.run(chat_agent.run(prompt))
+        formatted = formatted.output
+
+        # Remove the tick marks before and after blocks
+        formatted = formatted.strip("`").strip()
 
     # 4) package it up
     buf = io.BytesIO()
@@ -589,7 +808,7 @@ def workflow_download() -> ResponseReturnValue:
             download_name="workflow_output.csv",
         )
     elif fmt == "pdf":
-        buf = generate_pdf_from_html(formatted)
+        buf = markdown_or_html_to_pdf_bytes(formatted, input_format="markdown")
         return send_file(
             buf,
             mimetype="application/pdf",
@@ -609,10 +828,11 @@ def workflow_download() -> ResponseReturnValue:
 
 
 ## @MARK: ~~ Integrate
+@login_required
 @workflows.route("/integrate", methods=["POST"])
 def workflow_integrate() -> ResponseReturnValue:
     """Integrate a workflow template."""
-    user = load_user()
+    user = current_user
     data = request.get_json()
     workflow_id = data.get("workflow_id")
 
@@ -633,10 +853,12 @@ def fetch_workflow() -> ResponseReturnValue:
     data = request.get_json()
     workflow_id = data["workflow_uuid"]
     workflow = Workflow.objects(id=workflow_id).first()
+    can_customize = _workflow_is_editable(workflow)
 
     template = render_template(
         "workflows/workflow.html",
         workflow=workflow,
+        can_customize_workflow=can_customize,
     )
 
     response = {
@@ -646,15 +868,22 @@ def fetch_workflow() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/update_title", methods=["POST"])
 def update_workflow_title() -> ResponseReturnValue:
     """Update the title of a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["uuid"]
     workflow = Workflow.objects(id=ObjectId(workflow_id)).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow.name = workflow_data["title"]
     workflow.save()
 
@@ -663,15 +892,22 @@ def update_workflow_title() -> ResponseReturnValue:
 
 
 ## MARK: Workflow steps
+@login_required
 @workflows.route("/add_workflow_step", methods=["POST"])
 def add_workflow_step() -> ResponseReturnValue:
     """Add a new step to a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     step_title = workflow_step_data["title"]
 
     workflow_step = WorkflowStep(name=step_title)
@@ -690,16 +926,23 @@ def add_workflow_step() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/edit_step", methods=["POST"])
 def edit_workflow_step() -> ResponseReturnValue:
     """Edit a step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
     template = render_template(
         "workflows/workflow_steps/edit_workflow_step_modal.html",
@@ -712,15 +955,26 @@ def edit_workflow_step() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/update_title", methods=["POST"])
 def update_workflow_step_title() -> ResponseReturnValue:
     """Update the title of a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+    if not workflow_step:
+        return jsonify({"error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(workflow_step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step.name = workflow_step_data["title"]
     workflow_step.save()
 
@@ -728,16 +982,23 @@ def update_workflow_step_title() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/add_task", methods=["POST"])
 def add_workflow_add_task() -> ResponseReturnValue:
     """Add a task to a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_id = workflow_step_data["workflow_id"]
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
     template = render_template(
         "workflows/workflow_steps/new_workflow_task_modal.html",
@@ -750,15 +1011,26 @@ def add_workflow_add_task() -> ResponseReturnValue:
     return jsonify(response)
 
 
+@login_required
 @workflows.route("/step/add_step_task", methods=["POST"])
 def add_workflow_step_task() -> ResponseReturnValue:
     """Add a task to a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_step_data = request.get_json()
     workflow_step_id = workflow_step_data["workflow_step_id"]
     workflow_step = WorkflowStep.objects(id=workflow_step_id).first()
+    if not workflow_step:
+        return jsonify({"error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(workflow_step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     task_name = workflow_step_data["task_name"]
     task_data = workflow_step_data["task_data"]
     workflow_step_task = WorkflowStepTask(name=task_name, data=task_data)
@@ -768,18 +1040,26 @@ def add_workflow_step_task() -> ResponseReturnValue:
     return jsonify({"complete": True})
 
 
+@login_required
 @workflows.route("/delete_step", methods=["POST"])
 def delete_workflow_step() -> ResponseReturnValue:
     """Delete a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     workflow_step_id = workflow_data["workflow_step_id"]
     step = WorkflowStep.objects(id=workflow_step_id).first()
     if not step:
         return jsonify({"success": False, "error": "Step not found"}), 404
+
+    workflow = _workflow_for_step(step)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     # Delete all associated WorkflowStepTasks
     for task in step.tasks:
@@ -794,12 +1074,13 @@ def delete_workflow_step() -> ResponseReturnValue:
     return jsonify({"success": True})
 
 
+@login_required
 @workflows.route("/delete_step_task", methods=["POST"])
 def delete_workflow_step_task() -> ResponseReturnValue:
     """Delete a specific task in a workflow step."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
 
     workflow_data = request.get_json()
     print(workflow_data)
@@ -807,6 +1088,13 @@ def delete_workflow_step_task() -> ResponseReturnValue:
     task = WorkflowStepTask.objects(id=workflow_task_id).first()
     if not task:
         return jsonify({"success": False, "error": "Step not found"}), 404
+
+    workflow = _workflow_for_task(task)
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
 
     # Remove references to the step in any Workflow
     WorkflowStep.objects(tasks=task).update(pull__tasks=task)
@@ -817,17 +1105,24 @@ def delete_workflow_step_task() -> ResponseReturnValue:
     return jsonify({"success": True})
 
 
+@login_required
 @workflows.route("/update_workflow_step", methods=["POST"])
 def update_workflow_step() -> ResponseReturnValue:
     """Update a specific step in a workflow."""
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     workflow_data = request.get_json()
     workflow_id = workflow_data["workflow_id"]
     step_index = workflow_data["step_index"]
     step = workflow_data["step"]
     workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
     if step_index < len(workflow.steps):
         error = "Step index out of range"
         return jsonify({"error": error})
@@ -941,21 +1236,24 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
 
 
 ## @MARK: ~~ Attachments
+@login_required
 @workflows.route("/add_attachment", methods=["GET", "POST"])
 def workflow_add_attachment() -> ResponseReturnValue:
     """Handle the addition of attachments to a workflow step."""
+    user = current_user
+    user_id = user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
         data = json.loads(data_str)  # Retrieve query parameters, if any
         workflow_id = data.get("workflow_uuid")
         space_id = data.get("space_id")
-        user = load_user()
+        user = current_user
 
         workflow = Workflow.objects(id=workflow_id).first()
         current_space = Space.objects(uuid=space_id).first()
         files = SmartDocument.objects(
-            user_id=user.user_id,
+            user_id=user_id,
             space=current_space.uuid,
         )
 
@@ -986,6 +1284,7 @@ def workflow_add_attachment() -> ResponseReturnValue:
 @workflows.route("/add_prompt_step", methods=["GET", "POST"])
 def workflow_add_prompt_step() -> ResponseReturnValue:
     """Add a prompt step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1005,7 +1304,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
             workflow_task = WorkflowStepTask.objects(id=workflow_task_id).first()
 
         prompts = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=user_id,
             space_id=current_space.uuid,
             searchtype="prompt",
         ).all()
@@ -1072,6 +1371,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
 @workflows.route("/add_formatter_step", methods=["GET", "POST"])
 def workflow_add_format_step() -> ResponseReturnValue:
     """Add a formatter step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1091,7 +1391,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         current_space = Space.objects(uuid=space_id).first()
         formatters = SearchSetItem.objects(
-            user_id=load_user().user_id,
+            user_id=user_id,
             space_id=current_space.uuid,
             searchtype="formatter",
         ).all()
@@ -1159,6 +1459,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
 @workflows.route("/add_document_step", methods=["GET", "POST"])
 def workflow_add_document_step() -> ResponseReturnValue:
     """Add a document step to the workflow."""
+    user_id = current_user.get_id()
     if request.method == "GET":
         # Handle GET request - retrieve and return the template
         data_str = next(iter(request.args.keys()))  # Get the JSON string key
@@ -1175,7 +1476,7 @@ def workflow_add_document_step() -> ResponseReturnValue:
             set_type="document",
         ).all()
         user_extraction_sets = SearchSet.objects(
-            user_id=workflow.user_id,
+            user_id=user_id,
             space=current_space.uuid,
             is_global=False,
             set_type="extraction",
@@ -1204,13 +1505,15 @@ def workflow_add_document_step() -> ResponseReturnValue:
     return None
 
 
+@login_required
 @workflows.route("/duplicate/<workflow_id>")
 def duplicate_workflow(workflow_id):
-    user = load_user()
+    user = current_user
     if user is None:
-        return redirect(url_for("login"))
+        return redirect(url_for("auth.login"))
     # 1) Load original
     orig = Workflow.objects(id=workflow_id).first()
+    user_id = user.get_id()
     if not orig:
         return
         # abort(404, "Workflow not found")
@@ -1239,7 +1542,7 @@ def duplicate_workflow(workflow_id):
     dup_wf = Workflow(
         name=orig.name,
         description=orig.description,
-        user_id=user.user_id,
+        user_id=user_id,
         space=Space.objects()[0].uuid,  # or however you track the user’s active space
         steps=new_steps,
         attachments=new_atts,

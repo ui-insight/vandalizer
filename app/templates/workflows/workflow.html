@@ -1,3 +1,4 @@
+{% set can_customize_workflow = can_customize_workflow if can_customize_workflow is defined else True %}
 <div class="workflow-container">
     <div>
         <p style="font-size: 24px; font-weight: 600;">
@@ -14,6 +15,11 @@
             </span>
         </p>
     </div>
+    {% if not can_customize_workflow %}
+    <div style="margin: 8px 0 16px; font-size: 12px; color: #a16c2d;">
+        Verified workflows are view-only unless you are an examiner. Clone the workflow to make changes.
+    </div>
+    {% endif %}
     <div class="trigger">Trigger</div>
 
     <div class="workflow-step active">
@@ -35,7 +41,7 @@
 
     <div class="workflow-step">
         <div class=" step-connector top"></div>
-        <div class="step-content edit-workflow-step-btn" data-step-id="{{ step.id }}"
+        <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}" data-step-id="{{ step.id }}"
             data-step-type="{{ step.name|lower }}">
             <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
                 {{ loop.index }}
@@ -58,9 +64,11 @@
     <div class="step-connection-line"></div>
     {% endfor %}
 
+    {% if can_customize_workflow %}
     <div class="add-step">
         <button id="add-workflow-step-btn">+ ADD STEP</button>
     </div>
+    {% endif %}
 
 
     <div class="workflow-step workflow-output hidden">
@@ -74,8 +82,11 @@
 
                 <span>View output</span>
 
-                <span class="workflow-output-attachment-info"><span>Preparing</span> <span> <i> 1 second
-                            elapsed</i></span></span>
+                <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s elapsed</i></span></span>
+                <div class="workflow-active-step-status hidden" style="margin-top:8px;">
+                    <div id="workflow-active-step-label" class="workflow-progress-label"></div>
+                    <div id="workflow-active-step-preview" class="workflow-progress-detail"></div>
+                </div>
                 <a id="closeWorkflowOutputBtn"
                     style="position: absolute; right: 30px; color: #88888899; cursor: pointer;"><i
                         class="fa-solid fa-circle-xmark"></i></a>
@@ -85,7 +96,6 @@
         </div>
         <div class="workflow-output-section"></div>
         <div class="workflow-output-buttons hidden">
-            <button id="share-workflow-btn" class="workflow-output-button btn btn-secondary">Share Workflow</button>
             <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
         </div>
 
@@ -93,35 +103,15 @@
     </div>
     <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
         <ul>
-            <li id="download-pdf-option">PDF</li>
-            <li id="download-csv-option">CSV</li>
-            <li id="download-text-option">Text</li>
+            <li id="download-pdf-option">Download as PDF</li>
+            <li id="download-csv-option">Download as CSV</li>
+            <li id="download-text-option">Download as Text</li>
         </ul>
     </div>
 
 
 
     <script>
-
-        document
-            .getElementById("share-workflow-btn")
-            .addEventListener("click", () => {
-                const btn = event.currentTarget;
-                // Build the “duplicate” URL
-                const url = `${window.location.origin}/workflows/duplicate/` + "{{ workflow.id }}";
-                // Copy to clipboard
-                navigator.clipboard.writeText(url)
-                    .then(() => {
-                        // optional: user feedback
-                        btn.textContent = "Link Copied!";
-                        showToast("Link Copied! Share it to others! 🚀");
-                        setTimeout(() => btn.textContent = "Share Workflow", 2000);
-                    })
-                    .catch(err => {
-                        console.error("Failed to copy link", err);
-                        alert("Couldn’t copy link to clipboard.");
-                    });
-            });
 
         $('#editWorkflowTitleBtn').on("click", function (e) {
             e.preventDefault();

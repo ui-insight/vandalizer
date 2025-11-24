@@ -13,7 +13,7 @@ import chromadb
 from chromadb.config import Settings
 from devtools import debug
 from dotenv import load_dotenv
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 
 from app import app
@@ -27,9 +27,7 @@ from app.models import (
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.extraction_manager_nontyped import ExtractionManager3
-from app.utilities.openai_interface import (
-    OpenAIInterface,
-)
+from app.utilities.chat_manager import ChatManager
 
 load_dotenv()
 
@@ -103,36 +101,55 @@ def format_llm_output(text: str) -> str:
     return text.strip()
 
 
-def llm_chat_model(model, prompt, data=None, docs=None):
+def llm_chat_model(
+    model,
+    prompt,
+    data=None,
+    docs=None,
+    progress_callback=None,
+    include_next_step=True,
+):
     if docs is None:
         docs = []
-    open_ai_interface = OpenAIInterface()
+    chat_manager = ChatManager()
     output = None
     debug(model)
     if len(docs) == 0:
         full_text = json.dumps(data)
         output_prompt = f"""Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot. Only show the markdown output and add no text before it.\n\nInstruction: {prompt}\n\n {full_text}"""
-        chat_agent = create_chat_agent(model)
-        result = chat_agent.run_sync(output_prompt)
-        output = result.output
+
+        def _on_chunk(text):
+            if progress_callback:
+                progress_callback(text)
+
+        output = chat_manager.stream_prompt(
+            model=model,
+            prompt=output_prompt,
+            progress_callback=_on_chunk,
+            include_next_step=include_next_step,
+        )
         debug(f"Output from chat agent: {output}")
-        # output = format_llm_output(output).strip()
 
     else:
-        output = open_ai_interface.ask_question_to_documents(
+        output = chat_manager.ask_question_to_documents(
             model=model,
             root_path=app.root_path,
             documents=docs,
             question=prompt,
+            include_next_step=include_next_step,
         )
         output = output.get("answer", "")
         debug(f"Output from chat agent: {output}")
-        # output = format_llm_output(output)
-        debug(output)
+        if progress_callback:
+            progress_callback(output)
     return output
 
 
-def data_extraction_model(model, keys, documents=[], full_text=None):
+def data_extraction_model(
+    model, keys, documents=None, full_text=None, progress_callback=None
+):
+    if documents is None:
+        documents = []
     output = None
     extraction_manager = ExtractionManager3()
     document_uuids = []
@@ -143,14 +160,58 @@ def data_extraction_model(model, keys, documents=[], full_text=None):
             document_uuids.append(doc)
         else:
             document_uuids.append(doc.uuid)
-    output = extraction_manager.extract(keys, document_uuids, full_text=full_text)
+    output = extraction_manager.extract(
+        keys, document_uuids, model, full_text=full_text
+    )
 
     debug(output)
-    prompt = "Format the extracted data as a nicely formatted markdown with the extracted data as bullet points. Show only the extracted data in the output and no other text. Do not include any explanations or additional text.\n\n"
-    prompt += json.dumps(output, indent=4)
-    chat_agent = create_chat_agent(model)
-    result = chat_agent.run_sync(prompt)
-    return result.output
+    formatted_output = format_extraction_results(output)
+    extraction_payload = {
+        "raw": output,
+        "formatted": formatted_output,
+    }
+    if progress_callback:
+        progress_callback(extraction_payload)
+    return extraction_payload
+
+
+def format_extraction_results(data):
+    """
+    Convert extraction JSON results into a markdown bullet list without invoking an LLM.
+    """
+    if data is None:
+        return ""
+
+    if isinstance(data, dict):
+        items = [data]
+    elif isinstance(data, list):
+        items = data
+    else:
+        return str(data)
+
+    block_lines = []
+    for idx, item in enumerate(items, start=1):
+        if isinstance(item, dict):
+            if len(items) > 1:
+                block_lines.append(f"#### Result {idx}")
+            for key, value in item.items():
+                value_str = _stringify_extraction_value(value)
+                block_lines.append(f"- **{key}**: {value_str}")
+            block_lines.append("")  # spacing
+        else:
+            block_lines.append(f"- {item}")
+
+    return "\n".join(line for line in block_lines if line is not None)
+
+
+def _stringify_extraction_value(value):
+    if value is None:
+        return "N/A"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_stringify_extraction_value(v) for v in value if v is not None)
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2)
+    return str(value)
 
 
 def format_model(model, formatting_prompt, text):
@@ -161,7 +222,6 @@ CRITICAL:
 - The bullet points should be in a list format.
 """
 
-    # prompt = f"{formatting_prompt}\n\n {text}"
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_agent = create_chat_agent(model)
     response = chat_agent.run_sync(prompt)
@@ -186,6 +246,7 @@ class Node:
         self.inputs = {}
         self.outputs = {}
         self.tasks = []
+        self.progress_reporter = None
 
     def process(self, inputs) -> NoReturn:
         raise NotImplementedError
@@ -193,6 +254,10 @@ class Node:
     def __repr__(self) -> str:
         node_class = self.__class__.__name__
         return f"""{node_class}(name={self.name}, inputs={self.inputs}, outputs={self.outputs})"""
+
+    def report_progress(self, detail=None, preview=None):
+        if self.progress_reporter:
+            self.progress_reporter(detail, preview)
 
 
 class MultiTaskNode(Node):
@@ -248,16 +313,8 @@ class DocumentNode(Node):
         self.docs = data.get("docs", [])
         self.attachments = []  # data.get("attachments", [])
         self.pdf_paths = []
-        user_id = data.get("user_id", "0")
-
-        # self.filename = data.get("filename", "")
-        # self.content = ""
         self.docs_uuids = []
         self.content = ""
-        # for doc in self.attachments:
-        #     if doc is None:
-        #         continue
-        #     self.docs_uuids.append(doc.uuid)
 
         for doc in self.docs:
             if doc is None:
@@ -269,8 +326,6 @@ class DocumentNode(Node):
         debug(self.docs_uuids)
 
     def process(self, inputs=None):
-        # data = inputs.get("data", None)
-
         return {"step_name": self.name, "output": self.docs_uuids, "input": None}
 
 
@@ -285,6 +340,7 @@ class FormatNode(Node):
 
         data = inputs.get("output", None)
         prev_step_name = inputs.get("step_name", None)
+        self.report_progress(f"Formatter: {formatting_prompt}")
         text = None
         if prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
@@ -324,12 +380,27 @@ class ExtractionNode(Node):
 
         step_input = None
         docs_uuids = []
-        user_id = self.user_id
         extraction_response = None
+        self.report_progress("Extraction running")
+
+        def _on_progress(preview):
+            if isinstance(preview, dict):
+                preview_text = preview.get("formatted") or format_extraction_results(
+                    preview.get("raw")
+                )
+            else:
+                preview_text = preview
+            self.report_progress("Extraction running", preview_text)
+
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             step_input = docs_uuids
-            extraction_response = data_extraction_model(self.model, keys, docs_uuids)
+            extraction_response = data_extraction_model(
+                self.model,
+                keys,
+                docs_uuids,
+                progress_callback=_on_progress,
+            )
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output", None)
             if isinstance(step_input, dict):
@@ -341,6 +412,7 @@ class ExtractionNode(Node):
                 keys,
                 docs_uuids,
                 full_text=step_input,
+                progress_callback=_on_progress,
             )
         elif prev_step_name in {"Extraction", "Formatter"}:
             step_input = inputs.get("output", None)
@@ -349,10 +421,17 @@ class ExtractionNode(Node):
                 keys,
                 docs_uuids,
                 full_text=step_input,
+                progress_callback=_on_progress,
             )
 
+        formatted_output = (
+            extraction_response.get("formatted")
+            if isinstance(extraction_response, dict)
+            else extraction_response
+        )
+
         return {
-            "output": extraction_response,
+            "output": formatted_output,
             "input": step_input,
             "step_name": self.name,
         }
@@ -373,6 +452,11 @@ class PromptNode(Node):
         prev_step_name = inputs.get("step_name", None)
         debug("Prompt", inputs, prompt)
         chat_response = None
+        self.report_progress(f"Prompt: {prompt}")
+
+        def _on_stream_update(preview):
+            self.report_progress(f"Prompt: {prompt}", preview)
+
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             docs = []
@@ -381,7 +465,13 @@ class PromptNode(Node):
                 if doc is not None:
                     docs.append(doc)
 
-            chat_response = llm_chat_model(model=self.model, docs=docs, prompt=prompt)
+            chat_response = llm_chat_model(
+                model=self.model,
+                docs=docs,
+                prompt=prompt,
+                include_next_step=False,
+                progress_callback=_on_stream_update,
+            )
         else:
             data = inputs.get("output", None)
 
@@ -390,6 +480,8 @@ class PromptNode(Node):
                 docs=[],
                 prompt=prompt,
                 data=data,
+                progress_callback=_on_stream_update,
+                include_next_step=False,
             )
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
@@ -413,6 +505,7 @@ class WorkflowEngine:
         self.graph = graphlib.TopologicalSorter()
         self.graph_built = False
         self.max_workers = multiprocessing.cpu_count()
+        self._last_progress_snapshot = None
 
     def add_node(self, node) -> None:
         self.graph.add(node)
@@ -434,8 +527,13 @@ class WorkflowEngine:
         latest_output = None
         for idx, node in enumerate(nodes):
             debug(node)
+            if workflow_result:
+                self._report_progress(
+                    workflow_result,
+                    node.name,
+                    detail=f"Starting {node.name}",
+                )
 
-            node_outputs = []
             if idx == 0:
                 output = node.process({})
                 debug(output)
@@ -443,43 +541,23 @@ class WorkflowEngine:
             else:
                 debug(node)
                 debug(latest_output)
-                # output = node.process(latest_output)
-                for task in node.tasks:
-                    process_node = None
 
-                    if task.name == "Extraction":
-                        process_node = ExtractionNode(
-                            data=task.data,
+                if workflow_result and isinstance(node, MultiTaskNode):
+                    for task in node.tasks:
+                        task.progress_reporter = (
+                            lambda detail=None,
+                            preview=None,
+                            step=node.name,
+                            task_name=task.name: self._report_progress(
+                                workflow_result,
+                                step,
+                                detail=detail or task_name,
+                                preview=preview,
+                            )
                         )
-                    elif task.name == "Prompt":
-                        process_node = PromptNode(
-                            data=task.data,
-                        )
-                    elif task.name == "Formatter":
-                        process_node = FormatNode(
-                            data=task.data,
-                        )
-                    else:
-                        process_node = Node(task.name)
 
-                    output = process_node.process(latest_output)
-                    debug(output)
-                    task_output = output.get("output", "")
-                    # add the input and the step_name to the output
-                    node_output = output.get("output", "")
-                    if isinstance(task_output, list):
-                        node_outputs.extend(node_output)
-                    else:
-                        node_outputs.append(node_output)
-
-                # combine the outputs
-                debug(node_outputs)
-                latest_output = {
-                    "output": node_outputs,
-                    "input": output.get("input", ""),
-                    "step_name": output.get("step_name", ""),
-                }
-                # debug(latest_output)
+                output = node.process(latest_output)
+                latest_output = output
 
             if workflow_result:
                 step_name = sanitize_step_name(node.name)
@@ -503,7 +581,81 @@ class WorkflowEngine:
         if workflow_result:
             workflow_result.status = "completed"
             workflow_result.save()
-        return latest_output.get("output"), data
+            self._report_progress(
+                workflow_result,
+                None,
+                detail="Workflow completed",
+                preview=None,
+            )
+            workflow_result.save()
+            self._report_progress(
+                workflow_result,
+                None,
+                detail="Workflow completed",
+                preview=None,
+            )
+        final_value = self._format_final_output(latest_output.get("output"))
+        return final_value, data
+
+    def _format_final_output(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            formatted_items = [
+                self._format_final_output(item)
+                if isinstance(item, (list, dict))
+                else self._normalize_text(str(item))
+                for item in value
+            ]
+            formatted_items = [item for item in formatted_items if item]
+            if not formatted_items:
+                return ""
+            if len(formatted_items) == 1:
+                return formatted_items[0]
+            blocks = []
+            for idx, item in enumerate(formatted_items, start=1):
+                stripped = item.lstrip()
+                if stripped.startswith("#"):
+                    blocks.append(item)
+                else:
+                    blocks.append(f"### Result {idx}\n{item}")
+            return "\n\n".join(blocks)
+        if isinstance(value, dict):
+            try:
+                return json.dumps(value, indent=2)
+            except Exception:
+                return str(value)
+        return self._normalize_text(str(value))
+
+    @staticmethod
+    def _normalize_text(text):
+        if not isinstance(text, str):
+            text = str(text)
+        return text.replace("\\n", "\n").replace("\\t", "\t")
+
+    def _report_progress(self, workflow_result, step_name, detail=None, preview=None):
+        if not workflow_result:
+            return
+
+        update_ops = {}
+        if step_name is not None:
+            workflow_result.current_step_name = step_name
+            update_ops["set__current_step_name"] = step_name
+        if detail is not None:
+            workflow_result.current_step_detail = detail
+            update_ops["set__current_step_detail"] = detail
+        if preview is not None:
+            workflow_result.current_step_preview = preview
+            update_ops["set__current_step_preview"] = preview
+        elif (
+            preview is None
+            and "set__current_step_preview" not in update_ops
+            and detail in {"Workflow completed", None}
+        ):
+            update_ops["unset__current_step_preview"] = 1
+
+        if update_ops:
+            WorkflowResult.objects(id=workflow_result.id).update_one(**update_ops)
 
 
 def build_workflow_engine(steps, workflow, model, user_id=None):
@@ -511,7 +663,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
     nodes = []
 
     for idx, step in enumerate(steps):
-        # node_id = uuid4().hex
         node = None
         debug(step.name, step.data)
         if step.name == "Document":  # this the trigger step
@@ -643,12 +794,93 @@ def execute_workflow_task(
 
     final_output, data = engine.execute(workflow_result)
     debug(final_output)
-    workflow_result.final_output = dict(output=final_output, data=data)
+    workflow_result.final_output = {"output": final_output, "data": data}
     workflow_result.status = "completed"
     workflow_result.save()
     print(
         f"Workflow execution finished for Result ID: {workflow_result_id}. Status: {workflow_result.status}"
     )
+
+    # Ingest workflow into vector database for future recommendations (async)
+    docs = workflow_trigger_step.data.get("docs", [])
+
+    try:
+        ingestion_text = "# Documents selected:"
+        for doc in docs:
+            if hasattr(doc, "raw_text"):
+                ingestion_text += f"\n{doc.raw_text}"
+
+        # Use singleton instance to avoid expensive re-initialization
+        try:
+            from app.blueprints.workflows.routes import get_recommendation_manager
+
+            recommendation_manager = get_recommendation_manager()
+            recommendation_manager.ingest_recommendation_item(
+                identifier=workflow_id,
+                ingestion_text=ingestion_text,
+                recommendation_type="Workflow",
+            )
+            debug("Workflow recommendation ingested successfully")
+            # Clear recommendations cache so new workflow appears immediately
+            try:
+                from app.blueprints.workflows.routes import clear_recommendations_cache
+
+                clear_recommendations_cache()
+            except Exception as cache_error:
+                debug(f"Error clearing recommendations cache: {cache_error}")
+        except ImportError:
+            # Fallback if singleton not available (shouldn't happen in normal flow)
+            persist_directory = "data/recommendations_vectordb"
+            recommendation_manager = SemanticRecommender(
+                persist_directory=persist_directory
+            )
+            recommendation_manager.ingest_recommendation_item(
+                identifier=workflow_id,
+                ingestion_text=ingestion_text,
+                recommendation_type="Workflow",
+            )
+            debug("Workflow recommendation ingested successfully")
+    except Exception as e:
+        debug(f"Error ingesting workflow recommendation: {e}")
+
+    # Update the activity status to completed
+    activity = ActivityEvent.objects(workflow_result=workflow_result).first()
+    if activity:
+        snapshot = dict(activity.result_snapshot or {})
+
+        snapshot_output = final_output
+        try:
+            json.dumps(snapshot_output)
+        except TypeError:
+            snapshot_output = str(snapshot_output)
+
+        document_uuids: list[str] = []
+        for doc in docs or []:
+            if doc is None:
+                continue
+            if hasattr(doc, "uuid"):
+                document_uuids.append(doc.uuid)
+            elif isinstance(doc, str):
+                document_uuids.append(doc)
+
+        snapshot.update(
+            {
+                "output": snapshot_output,
+                "history": data,
+                "steps_total": workflow_result.num_steps_total,
+                "steps_completed": workflow_result.num_steps_completed,
+                "status": workflow_result.status,
+                "workflow_result_id": workflow_result_id,
+                "document_uuids": document_uuids,
+                "session_id": workflow_result.session_id,
+            },
+        )
+
+        if document_uuids:
+            activity.documents_touched = len(set(document_uuids))
+
+        activity.result_snapshot = snapshot
+        activity_finish(activity, status=ActivityStatus.COMPLETED)
 
     return {
         "status": "completed",
@@ -662,7 +894,6 @@ def execute_workflow_task(
 @celery_app.task(bind=True, name="tasks.workflow.execution_step_test")
 def execute_task_step_test(self, task_name, task_data, document_trigger_step_id):
     process_node = None
-    latest_output = None
     workflow_trigger_step = WorkflowStep.objects(id=document_trigger_step_id).first()
     engine = WorkflowEngine()
     nodes = []
@@ -709,7 +940,7 @@ def execute_task_step_test(self, task_name, task_data, document_trigger_step_id)
             continue
         engine.connect(nodes[idx - 1], nodes[idx])
 
-    final_output, data = engine.execute()
+    final_output, _ = engine.execute()
     print(final_output)
 
     return final_output

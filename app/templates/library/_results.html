@@ -1,0 +1,586 @@
+{# expects:
+- scope: 'verified' | 'team' | 'mine' (for badges/labels if you want)
+- filters: { type: 'all'|'workflows'|'tasks', kinds: [...] }
+- workflows, extraction_sets, prompts, formatters
+#}
+
+{% set _type = filters.type if filters and filters.type else 'workflows' %}
+{% set _kinds = filters.kinds if filters and filters.kinds else ['extract','prompt','format'] %}
+{% set verification_map = verification_requests if verification_requests else {} %}
+{% set can_edit_verified = can_edit_verified if can_edit_verified is defined else False %}
+
+{% if _type in ['all','workflows'] %}
+<div style="margin: 6px 0 12px 0; font-size:14px; font-weight:700;">Workflows</div>
+{% if workflows|length == 0 %}
+<div class="library-card">
+    <div class="meta">No workflows found.</div>
+</div>
+{% endif %}
+{% for workflow in workflows %}
+{% set wf_key = 'workflow:' ~ (workflow.id|string) %}
+{% set wf_verification = verification_map.get(wf_key) %}
+{% set wf_status = wf_verification.status if wf_verification else '' %}
+{% set wf_request_uuid = wf_verification.uuid if wf_verification else '' %}
+{% set wf_verified = workflow.verified %}
+{% set wf_can_submit = (scope != 'verified') and (not wf_verified or (wf_verification and wf_status != 'approved')) %}
+{% set wf_is_verified = (wf_status == 'approved') or wf_verified %}
+{% set wf_in_verification = wf_status in ['submitted', 'in_review'] %}
+{% set wf_can_edit = can_edit_verified or (not wf_is_verified and not (scope == 'verified' and wf_in_verification)) %}
+{% if wf_verification %}
+    {% if wf_status in ['submitted', 'in_review'] %}
+        {% set wf_submit_label = 'Edit verification submission' %}
+    {% elif wf_status == 'rejected' %}
+        {% set wf_submit_label = 'Resubmit for verification' %}
+    {% else %}
+        {% set wf_submit_label = 'Submit to be verified' %}
+    {% endif %}
+{% else %}
+    {% set wf_submit_label = 'Submit to be verified' %}
+{% endif %}
+{% set wf_menu_has_items = (scope == 'mine') or wf_can_submit %}
+<div class="library-card workflow-item"
+     data-kind="workflow"
+     data-uuid="{{ workflow.id }}"
+     data-title="{{ workflow.name }}"
+     data-verification-status="{{ wf_status }}"
+     data-verification-request="{{ wf_request_uuid }}">
+    <div style="display:flex; align-items:flex-start;">
+        <span style="margin-right:10px; font-size:14px;"><i class="fa-solid fa-diagram-project"></i></span>
+        <div style="flex:1;">
+            <div style="float:right; display:flex; align-items:center; gap:10px;">
+                {% if scope != 'verified' and wf_menu_has_items %}
+                <div class="menu-anchor">
+                    <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false"
+                        id="wfMenuBtn-{{ workflow.id }}" data-menu="#wf-menu-{{ workflow.id }}">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                    </button>
+                    <div id="wf-menu-{{ workflow.id }}" class="menu menu-right" role="menu" hidden>
+                        {% if scope == 'mine' %}
+                        <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="workflow"
+                            data-uuid="{{ workflow.id }}">
+                            <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                        </a>
+                        {% endif %}
+                        {% if wf_can_submit %}
+                        <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="workflow"
+                            data-uuid="{{ workflow.id }}" data-verification-status="{{ wf_status }}"
+                            data-has-request="{{ 1 if wf_verification else 0 }}">
+                            <i class="fa-solid fa-shield-halved" style="width:18px;"></i> {{ wf_submit_label }}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% if wf_can_edit %}
+                <button type="button" class="btn btn-secondary edit-workflow-button" data-uuid="{{ workflow.id }}">
+                    <i class="fa-regular fa-pen-to-square"></i>
+                </button>
+                {% endif %}
+            </div>
+            <div class="title"><b>{{ workflow.name }}</b></div>
+            {% if workflow.description %}
+            <div class="meta">{{ workflow.description }}</div>
+            {% endif %}
+            <div style="margin-top:8px;">
+                {% if wf_status == 'approved' or workflow.verified %}
+                    <span class="library-badge">Verified</span>
+                {% elif wf_status in ['submitted', 'in_review'] %}
+                    <span class="library-badge library-badge--pending">In Verification</span>
+                {% elif wf_status == 'rejected' %}
+                    <span class="library-badge library-badge--warning">Changes Requested</span>
+                {% endif %}
+                {% if scope=='team' %}<span class="library-badge">Team</span>{% endif %}
+                {% if scope=='mine' %}<span class="library-badge">Mine</span>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if _type in ['all','tasks'] %}
+{% if 'extract' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Extract</div>
+{% if extraction_sets|length == 0 %}
+<div class="library-card">
+    <div class="meta">No extract tasks found.</div>
+</div>
+{% endif %}
+{% for s in extraction_sets %}
+{% set ex_key = 'searchset:' ~ s.uuid %}
+{% set ex_verification = verification_map.get(ex_key) %}
+{% set ex_status = ex_verification.status if ex_verification else '' %}
+{% set ex_request_uuid = ex_verification.uuid if ex_verification else '' %}
+{% set ex_verified = s.verified %}
+{% set ex_can_submit = (scope != 'verified') and (not ex_verified or (ex_verification and ex_status != 'approved')) %}
+{% set ex_is_verified = (ex_status == 'approved') or ex_verified %}
+{% set ex_in_verification = ex_status in ['submitted', 'in_review'] %}
+{% set ex_can_edit = can_edit_verified or (not ex_is_verified and not (scope == 'verified' and ex_in_verification)) %}
+{% if ex_verification %}
+    {% if ex_status in ['submitted', 'in_review'] %}
+        {% set ex_submit_label = 'Edit verification submission' %}
+    {% elif ex_status == 'rejected' %}
+        {% set ex_submit_label = 'Resubmit for verification' %}
+    {% else %}
+        {% set ex_submit_label = 'Submit to be verified' %}
+    {% endif %}
+{% else %}
+    {% set ex_submit_label = 'Submit to be verified' %}
+{% endif %}
+{% set ex_menu_has_items = (scope == 'mine') or ex_can_submit %}
+<div class="library-card set-item"
+     data-kind="extraction"
+     data-uuid="{{ s.uuid }}"
+     data-title="{{ s.title }}"
+     data-verification-status="{{ ex_status }}"
+     data-verification-request="{{ ex_request_uuid }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-solid fa-filter"></i></span>
+        <div style="flex:1;">
+            <div style="float:right; display:flex; align-items:center; gap:10px;">
+                {% if scope != 'verified' and ex_menu_has_items %}
+                <div class="menu-anchor">
+                    <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false"
+                        id="exMenuBtn-{{ s.uuid }}" data-menu="#ex-menu-{{ s.uuid }}">
+                        <i class="fa-solid fa-arrow-up-from-bracket"></i>
+                    </button>
+                    <div id="ex-menu-{{ s.uuid }}" class="menu menu-right" role="menu" hidden>
+                        {% if scope == 'mine' %}
+                        <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="extraction"
+                            data-uuid="{{ s.uuid }}">
+                            <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                        </a>
+                        {% endif %}
+                        {% if ex_can_submit %}
+                        <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="extraction"
+                            data-uuid="{{ s.uuid }}" data-verification-status="{{ ex_status }}"
+                            data-has-request="{{ 1 if ex_verification else 0 }}">
+                            <i class="fa-solid fa-shield-halved" style="width:18px;"></i> {{ ex_submit_label }}
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% if ex_can_edit %}
+                <button type="button" class="btn btn-secondary edit-extraction-button" data-uuid="{{ s.uuid }}"
+                    style="margin-left:0;"><i class="fa-regular fa-pen-to-square"></i></button>
+                {% endif %}
+            </div>
+            <div class="title">
+                {% if s.is_global %}<i class="fa-solid fa-globe" style="margin-right:4px;"></i>{% endif %}
+                {{ s.title }}
+            </div>
+            <div class="meta">
+                <span style="padding-top: 5px;">{% if s.item_count() == 0 %}
+                    <i style="color:#00000077; ">setup</i>{%
+                    else %}{{
+                    s.item_count() }} items{%
+                    endif %}
+                </span>
+                <div style="margin-top:8px;">
+                    {% if ex_status == 'approved' or ex_verified %}
+                        <span class="library-badge">Verified</span>
+                    {% elif ex_status in ['submitted', 'in_review'] %}
+                        <span class="library-badge library-badge--pending">In Verification</span>
+                    {% elif ex_status == 'rejected' %}
+                        <span class="library-badge library-badge--warning">Changes Requested</span>
+                    {% endif %}
+                    {% if scope=='team' %}<span class="library-badge">Team</span>{% endif %}
+                    {% if scope=='mine' %}<span class="library-badge">Mine</span>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if 'prompt' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Prompt</div>
+{% if prompts|length == 0 %}
+<div class="library-card">
+    <div class="meta">No prompt tasks found.</div>
+</div>
+{% endif %}
+{% for p in prompts %}
+{% set pr_key = 'prompt:' ~ (p.id|string) %}
+{% set pr_verification = verification_map.get(pr_key) %}
+{% set pr_status = pr_verification.status if pr_verification else '' %}
+{% set pr_request_uuid = pr_verification.uuid if pr_verification else '' %}
+{% set pr_verified = pr_status == 'approved' %}
+{% set pr_can_submit = (scope != 'verified') and (not pr_verified or (pr_verification and pr_status != 'approved')) %}
+{% set pr_in_verification = pr_status in ['submitted', 'in_review'] %}
+{% set pr_can_edit = can_edit_verified or (not pr_verified and not (scope == 'verified' and pr_in_verification)) %}
+{% if pr_verification %}
+    {% if pr_status in ['submitted', 'in_review'] %}
+        {% set pr_submit_label = 'Edit verification submission' %}
+    {% elif pr_status == 'rejected' %}
+        {% set pr_submit_label = 'Resubmit for verification' %}
+    {% else %}
+        {% set pr_submit_label = 'Submit to be verified' %}
+    {% endif %}
+{% else %}
+    {% set pr_submit_label = 'Submit to be verified' %}
+{% endif %}
+{% set pr_menu_has_items = (scope == 'mine') or pr_can_submit %}
+<div class="library-card prompt-item"
+     data-kind="prompt"
+     data-uuid="{{ p.id }}"
+     data-title="{{ p.title }}"
+     data-verification-status="{{ pr_status }}"
+     data-verification-request="{{ pr_request_uuid }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-regular fa-message"></i></span>
+        <div style="flex:1;">
+            <div class="title">{{ p.title }}</div>
+            <div class="meta" style="margin-top:8px;">
+                {% if pr_status == 'approved' %}
+                    <span class="library-badge">Verified</span>
+                {% elif pr_status in ['submitted', 'in_review'] %}
+                    <span class="library-badge library-badge--pending">In Verification</span>
+                {% elif pr_status == 'rejected' %}
+                    <span class="library-badge library-badge--warning">Changes Requested</span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if scope != 'verified' and pr_menu_has_items %}
+        <div class="menu-anchor" style="float:right;">
+            <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false" id="prMenuBtn-{{ p.id }}"
+                data-menu="#pr-menu-{{ p.id }}" style="margin-left:10px">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
+
+            <div id="pr-menu-{{ p.id }}" class="menu menu-right" role="menu" hidden>
+                {% if scope == 'mine' %}
+                <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="prompt"
+                    data-uuid="{{ p.id }}">
+                    <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                </a>
+                {% endif %}
+                {% if pr_can_submit %}
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="prompt"
+                    data-uuid="{{ p.id }}" data-verification-status="{{ pr_status }}"
+                    data-has-request="{{ 1 if pr_verification else 0 }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> {{ pr_submit_label }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if pr_can_edit %}
+        <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ p.id }}" data-type="prompt"
+            style="margin-left:10px">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% endfor %}
+{% endif %}
+
+{% if 'format' in _kinds %}
+<div style="margin:18px 0 8px 0; font-size:14px; font-weight:700;">Format</div>
+{% if formatters|length == 0 %}
+<div class="library-card">
+    <div class="meta">No format tasks found.</div>
+</div>
+{% endif %}
+{% for f in formatters %}
+{% set fm_key = 'formatter:' ~ (f.id|string) %}
+{% set fm_verification = verification_map.get(fm_key) %}
+{% set fm_status = fm_verification.status if fm_verification else '' %}
+{% set fm_request_uuid = fm_verification.uuid if fm_verification else '' %}
+{% set fm_verified = fm_status == 'approved' %}
+{% set fm_can_submit = (scope != 'verified') and (not fm_verified or (fm_verification and fm_status != 'approved')) %}
+{% set fm_is_verified = (fm_status == 'approved') or fm_verified %}
+{% set fm_in_verification = fm_status in ['submitted', 'in_review'] %}
+{% set fm_can_edit = can_edit_verified or (not fm_is_verified and not (scope == 'verified' and fm_in_verification)) %}
+{% if fm_verification %}
+    {% if fm_status in ['submitted', 'in_review'] %}
+        {% set fm_submit_label = 'Edit verification submission' %}
+    {% elif fm_status == 'rejected' %}
+        {% set fm_submit_label = 'Resubmit for verification' %}
+    {% else %}
+        {% set fm_submit_label = 'Submit to be verified' %}
+    {% endif %}
+{% else %}
+    {% set fm_submit_label = 'Submit to be verified' %}
+{% endif %}
+{% set fm_menu_has_items = (scope == 'mine') or fm_can_submit %}
+<div class="library-card prompt-item"
+     data-kind="formatter"
+     data-uuid="{{ f.id }}"
+     data-title="{{ f.title }}"
+     data-verification-status="{{ fm_status }}"
+     data-verification-request="{{ fm_request_uuid }}">
+    <div style="display:flex; align-items:center;">
+        <span style="margin-right:10px;"><i class="fa-solid fa-i-cursor"></i></span>
+        <div style="flex:1;">
+            <div class="title">{{ f.title }}</div>
+        </div>
+
+        {% if scope != 'verified' and fm_menu_has_items %}
+        <div class="menu-anchor" style="float:right;">
+            <button class="btn btn-secondary" aria-haspopup="true" aria-expanded="false" id="fmMenuBtn-{{ f.id }}"
+                data-menu="#fm-menu-{{ f.id }}" style="margin-left:10px">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i>
+            </button>
+
+            <div id="fm-menu-{{ f.id }}" class="menu menu-right" role="menu" hidden>
+                {% if scope == 'mine' %}
+                <a class="menu-item action-share-team" role="menuitem" href="#" data-kind="formatter"
+                    data-uuid="{{ f.id }}">
+                    <i class="fa-solid fa-users" style="width:18px;"></i> Share with my team
+                </a>
+                {% endif %}
+                {% if fm_can_submit %}
+                <a class="menu-item action-submit-verified" role="menuitem" href="#" data-kind="formatter"
+                    data-uuid="{{ f.id }}" data-verification-status="{{ fm_status }}"
+                    data-has-request="{{ 1 if fm_verification else 0 }}">
+                    <i class="fa-solid fa-shield-halved" style="width:18px;"></i> {{ fm_submit_label }}
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if fm_can_edit %}
+        <button type="submit" class="btn btn-secondary edit-prompt-button" data-uuid="{{ f.id }}" data-type="formatter"
+            style="margin-left:10px">
+            <i class="fa-regular fa-pen-to-square"></i>
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="meta" style="margin-top:8px;">
+        {% if fm_status == 'approved' %}
+            <span class="library-badge">Verified</span>
+        {% elif fm_status in ['submitted', 'in_review'] %}
+            <span class="library-badge library-badge--pending">In Verification</span>
+        {% elif fm_status == 'rejected' %}
+            <span class="library-badge library-badge--warning">Changes Requested</span>
+        {% endif %}
+    </div>
+</div>
+
+{% endfor %}
+{% endif %}
+{% endif %}
+
+
+<script>
+    window.initializeLibraryResults = function initializeLibraryResults() {
+        $(".edit-workflow-button").off("click").on("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("here");
+            $("#add-task-container").hide();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                uuid: uuid,
+            });
+
+            $.ajax({
+                url: '/workflows/edit',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    $("#search-results-panel").show();
+                    $("#search-results-panel").empty();
+                    $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $(".edit-prompt-button").off("click").on("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log("here");
+            $("#add-task-container").hide();
+            let uuid = $(this).attr("data-uuid");
+            const data = JSON.stringify({
+                uuid: uuid,
+            });
+
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    console.log(data.template);
+                    $("#search-results-panel").show();
+                    $("#search-results-panel").empty();
+                    $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        $(".edit-extraction-button").off("click").on("click", function () {
+            let uuid = $(this).attr("data-uuid");
+            let datatitle = $(this).attr("data-title");
+            search_set_add_uuid = uuid;
+            updateSearchSetPanel(uuid);
+        });
+
+
+        $(".prompt-item").off("click").on("click", function (e) {
+            // Don't run prompt if clicking on a button or menu item
+            if ($(e.target).closest('button, .menu, .menu-anchor, .menu-item').length > 0) {
+                return;
+            }
+
+            // Don't run prompt if in Verified tab and item is in verification
+            let verificationStatus = $(this).attr("data-verification-status");
+            let isVerifiedScope = $('.scope-tab.active[data-scope="verified"]').length > 0;
+            if (isVerifiedScope && (verificationStatus === 'submitted' || verificationStatus === 'in_review')) {
+                return;
+            }
+
+            let uuid = $(this).attr("data-uuid");
+            let datatitle = $(this).attr("data-title");
+            setSection("Assistant");
+            console.log("We got the click!");
+            beginPrompt(uuid, datatitle);
+
+        });
+    };
+
+    if (typeof window.initializeLibraryResults === 'function') {
+        window.initializeLibraryResults();
+    }
+
+    // Generic POST helper
+    function postJSON(url, payload, onDone) {
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                if (onDone) onDone(data);
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    }
+
+    // Map kind -> endpoints (expose globally so other scripts can reuse)
+    window.LIBRARY_SHARE_ENDPOINTS = window.LIBRARY_SHARE_ENDPOINTS || {
+        workflow: '/library/workflows/share_to_team',
+        extraction: '/library/extractions/share_to_team',
+        prompt: '/library/prompts/share_to_team',
+        formatter: '/library/formatters/share_to_team'
+    };
+    window.LIBRARY_VERIFY_ENDPOINTS = window.LIBRARY_VERIFY_ENDPOINTS || {
+        workflow: '/library/workflows/submit_for_verification',
+        extraction: '/library/extractions/submit_for_verification',
+        prompt: '/library/prompts/submit_for_verification',
+        formatter: '/library/formatters/submit_for_verification'
+    };
+    const SHARE_ENDPOINTS = window.LIBRARY_SHARE_ENDPOINTS;
+
+    // Share with my team
+    $(document).off('click', '.action-share-team').on('click', '.action-share-team', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const kind = $(this).data('kind');
+        const uuid = $(this).data('uuid');
+        const url = SHARE_ENDPOINTS[kind];
+        if (!url) return;
+        const $menu = $(this).closest('.menu');
+        if ($menu.length) {
+            $menu.attr('hidden', true);
+            const menuId = $menu.attr('id');
+            if (menuId) {
+                $(`[data-menu="#${menuId}"]`).attr('aria-expanded', 'false');
+            }
+        }
+        postJSON(url, { uuid }, function () {
+            const toastMessage = 'Shared with your team!';
+            if (typeof showToast === 'function') {
+                showToast(toastMessage);
+            }
+
+            if (typeof setSection === 'function') {
+                setSection('Library');
+            }
+
+            const activateTeamScope = () => {
+                LibraryState.scope = "team";
+                try {
+                    updateURL({ mode: "push" });
+                } catch (err) {
+                    console.warn("updateURL failed", err);
+                }
+                $('.scope-tab').removeClass('active');
+                $('.scope-tab[data-scope="team"]').addClass('active');
+                if (typeof window.updateKindFilterAppearance === 'function') {
+                    window.updateKindFilterAppearance();
+                }
+                if (typeof refreshResults === "function") {
+                    refreshResults();
+                }
+            };
+
+            if (window.LibraryState) {
+                activateTeamScope();
+            } else {
+                const urlObj = new URL(window.location.href);
+                urlObj.searchParams.set('section', 'Library');
+                urlObj.searchParams.set('scope', 'team');
+                window.location.href = urlObj.toString();
+            }
+        });
+    });
+
+    // Submit to be verified
+    $(document).off('click', '.action-submit-verified').on('click', '.action-submit-verified', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        const kind = $(this).data('kind');
+        const uuid = $(this).data('uuid');
+        const $menu = $(this).closest('.menu');
+        if ($menu.length) {
+            $menu.attr('hidden', true);
+            const menuId = $menu.attr('id');
+            if (menuId) {
+                $(`[data-menu="#${menuId}"]`).attr('aria-expanded', 'false');
+            }
+        }
+        if (typeof openVerificationModal === "function") {
+            openVerificationModal({
+                kind,
+                uuid,
+                trigger: this,
+                status: $(this).data('verification-status') || '',
+                hasRequest: $(this).data('has-request'),
+            });
+        }
+    });
+
+
+</script>

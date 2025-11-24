@@ -126,7 +126,7 @@
 
         $('.delete-task-btn').off("click").on("click", function (e) {
             e.preventDefault();
-            e.stopPropagation();   // ← prevent the parent “.edit‐workflow‐step‐task‐btn” from seeing this click
+            e.stopPropagation();   // ← prevent the parent ".edit‐workflow‐step‐task‐btn" from seeing this click
 
             console.log("clicked");
             let workflow_task_id = $(this).attr("data-task-id");
@@ -143,7 +143,12 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    location.reload();
+                    // Remove the deleted task from the DOM
+                    $('.workflow-step[data-task-id="' + workflow_task_id + '"]').remove();
+                    // Optionally show a toast notification
+                    if (typeof showToast === 'function') {
+                        showToast('Task deleted successfully');
+                    }
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);
@@ -187,8 +192,11 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
+                    // Close modal and ensure workflow stays in view
+                    $('#workflowEditStepModal').remove();
                     const url = new URL(window.location.href);
                     url.searchParams.delete('workflow_step_id');
+                    // Preserve workflow_id to stay on workflow edit view
                     window.history.replaceState(null, '', url.toString());
                     location.reload();
                 },

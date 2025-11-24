@@ -1,8 +1,14 @@
+{% set can_edit_extraction = can_edit_extraction if can_edit_extraction is defined else True %}
 <div class="search-results-content">
     <h2 class="search-results-header ">
-        <span id="extractionTitle">{{ search_set.title }}<i class="fa-regular fa-pen-to-square"
+        <span id="extractionTitle">
+            {{ search_set.title }}
+            {% if can_edit_extraction %}
+            <i class="fa-regular fa-pen-to-square"
                 id="editExtractionTitleBtn"
-                style="margin-left: 15px; font-size: 16px; color: #adadad99; cursor: pointer; font-weight: 200;"></i></span>
+                style="margin-left: 15px; font-size: 16px; color: #adadad99; cursor: pointer; font-weight: 200;"></i>
+            {% endif %}
+        </span>
         <input id="extractionTitleInput" type="text" style="display: none; font-size: 24px;" />
         <span style="float: right; font-size: 1em; color: #191919;">
             <a id="set-close-button">
@@ -10,6 +16,11 @@
             </a>
         </span>
     </h2>
+    {% if not can_edit_extraction %}
+    <div style="margin: 8px 0 0; font-size: 12px; color: #a16c2d;">
+        Verified extractions are view-only unless you are an examiner.
+    </div>
+    {% endif %}
 
     <!-- Description -->
     <hr>
@@ -56,32 +67,24 @@
                             item.searchphrase }}</p>
 
 
+                        {% if can_edit_extraction %}
                         <a class="delete-set-item-button" data-uuid="{{ item.id }}"
                             style="float: right; font-size: 1em; color: #adadad99;">
                             <i class="fa-solid fa-circle-xmark"></i>
                         </a>
+                        {% endif %}
                     </div>
                 </div>
-
-                {% if results == null and documents != None and documents|length > 0 %}
-                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
-                    data-title="{{ search_set.title }}">
-                    <div class="set-content ">
-                        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">processing</p>
+                {% if results is defined and results is not none %}
+                    {% set result_value = results[item.searchphrase|trim] %}
+                    {% if result_value is not none %}
+                    <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
+                        data-title="{{ search_set.title }}">
+                        <div class="set-content ">
+                            <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ result_value }}</p>
+                        </div>
                     </div>
-                </div>
-                {% endif %}
-                {% if results != null %}
-                {% if results[item.searchphrase|trim] != null %}
-                <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
-                    data-title="{{ search_set.title }}">
-                    <div class="set-content ">
-
-                        <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{
-                            results[item.searchphrase|trim] }}</p>
-                    </div>
-                </div>
-                {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
 
@@ -94,41 +97,56 @@
         <p><i class="fa-solid fa-box-archive"
                 style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
         <div class="extraction-tools-panel-content">
-
-
-            {% if search_set.extraction_items()|length == 0 %}
-            <a class="content-btn" id="build-extraction-from-document-btn" data-uuid="{{ search_set.uuid }}">
-                <div class="add-task">
-                    <div class="add-task-icon-container">
-                        <i class="fa-regular fa-file" style="font-size: 24px; color: #252c32;"></i>
-                    </div>
-                    <div class="add-task-content">
-                        <div class="add-task-title">From Document</div>
-                        <div class="add-task-description">Build an extraction set out of your selected document with AI
-                        </div>
-                    </div>
-                </div>
-            </a>
-
-
-            <div class="dimmed">
-                <a class="content-btn">
+            {% if can_edit_extraction %}
+                {% if search_set.extraction_items()|length == 0 %}
+                <a class="content-btn" id="build-extraction-from-document-btn" data-uuid="{{ search_set.uuid }}">
                     <div class="add-task">
                         <div class="add-task-icon-container">
-                            <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #54bbb6;"></i>
+                            <i class="fa-regular fa-file" style="font-size: 24px; color: #252c32;"></i>
                         </div>
                         <div class="add-task-content">
-                            <div class="add-task-title">Fillable PDF</div>
-                            <div class="add-task-description">Build an extraction set from a fillable pdf</div>
-
-
+                            <div class="add-task-title">From Document</div>
+                            <div class="add-task-description">Build an extraction set out of your selected document with AI
+                            </div>
                         </div>
                     </div>
                 </a>
-            </div>
-            {% endif %}
 
-            <input type="file" style="display: none;" id="fillable-pdf-input" name="fillable-pdf-input" accept=".pdf" />
+
+                <div class="dimmed">
+                    <a class="content-btn">
+                        <div class="add-task">
+                            <div class="add-task-icon-container">
+                                <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #54bbb6;"></i>
+                            </div>
+                            <div class="add-task-content">
+                                <div class="add-task-title">Fillable PDF</div>
+                                <div class="add-task-description">Build an extraction set from a fillable pdf</div>
+
+
+                            </div>
+                        </div>
+                    </a>
+                </div>
+                {% endif %}
+
+                <input type="file" style="display: none;" id="fillable-pdf-input" name="fillable-pdf-input" accept=".pdf" />
+                <a class="content-btn" id="delete-extraction-set" data-uuid="{{ search_set.uuid }}">
+                    <div class="add-task">
+                        <div class="add-task-icon-container">
+                            <i class="fa-solid fa-delete-left" style="font-size: 24px; color: #bb7354;"></i>
+                        </div>
+                        <div class="add-task-content">
+                            <div class="add-task-title">Delete</div>
+                            <div class="add-task-description">Delete this extraction set</div>
+                        </div>
+                    </div>
+                </a>
+            {% else %}
+                <div style="font-size: 13px; color: #666;">
+                    Editing tools are disabled for verified extractions.
+                </div>
+            {% endif %}
             <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
                 <div class="add-task">
                     <div class="add-task-icon-container">
@@ -137,17 +155,6 @@
                     <div class="add-task-content">
                         <div class="add-task-title">Clone</div>
                         <div class="add-task-description">Make a duplicate copy of the extraction set</div>
-                    </div>
-                </div>
-            </a>
-            <a class="content-btn" id="delete-extraction-set" data-uuid="{{ search_set.uuid }}">
-                <div class="add-task">
-                    <div class="add-task-icon-container">
-                        <i class="fa-solid fa-delete-left" style="font-size: 24px; color: #bb7354;"></i>
-                    </div>
-                    <div class="add-task-content">
-                        <div class="add-task-title">Delete</div>
-                        <div class="add-task-description">Delete this extraction set</div>
                     </div>
                 </div>
             </a>
