@@ -12,7 +12,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from flask_dance.contrib.azure import azure
-from flask_login import login_user
+from flask_login import current_user, login_user
 from mongoengine.errors import NotUniqueError
 
 from app import load_user
