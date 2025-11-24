@@ -26,7 +26,7 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
-from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.extraction_manager_nontyped import ExtractionManager3
 from app.utilities.openai_interface import (
     OpenAIInterface,
 )
