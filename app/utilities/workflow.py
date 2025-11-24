@@ -13,8 +13,8 @@ import chromadb
 from chromadb.config import Settings
 from devtools import debug
 from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
 
 from app import app
 from app.celery_worker import celery_app
@@ -25,16 +25,9 @@ from app.models import (
     WorkflowResult,
     WorkflowStep,
 )
-
-from app.utilities.semantic_recommender import SemanticRecommender
 from app.utilities.agents import create_chat_agent
-from app.utilities.chat_manager import (
-    ChatManager,
-)
-from app.utilities.extraction_manager3 import ExtractionManager3
-
-from app.utilities.analytics_helper import activity_finish
-from app.models import ActivityEvent, ActivityStatus
+from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
+from app.utilities.chat_manager import ChatManager
 
 load_dotenv()
 
@@ -124,6 +117,7 @@ def llm_chat_model(
     if len(docs) == 0:
         full_text = json.dumps(data)
         output_prompt = f"""Follow the instruction and output your answer as a nicely formatted markdown to display in a web interface chat bot. Only show the markdown output and add no text before it.\n\nInstruction: {prompt}\n\n {full_text}"""
+
         def _on_chunk(text):
             if progress_callback:
                 progress_callback(text)
@@ -151,11 +145,13 @@ def llm_chat_model(
     return output
 
 
-def data_extraction_model(model, keys, documents=None, full_text=None, progress_callback=None):
+def data_extraction_model(
+    model, keys, documents=None, full_text=None, progress_callback=None
+):
     if documents is None:
         documents = []
     output = None
-    extraction_manager = ExtractionManager3()
+    extraction_manager = ExtractionManagerNonTyped()
     document_uuids = []
     for doc in documents:
         if doc is None:
@@ -164,7 +160,9 @@ def data_extraction_model(model, keys, documents=None, full_text=None, progress_
             document_uuids.append(doc)
         else:
             document_uuids.append(doc.uuid)
-    output = extraction_manager.extract(keys, document_uuids, model, full_text=full_text)
+    output = extraction_manager.extract(
+        keys, document_uuids, model, full_text=full_text
+    )
 
     debug(output)
     formatted_output = format_extraction_results(output)
@@ -387,7 +385,9 @@ class ExtractionNode(Node):
 
         def _on_progress(preview):
             if isinstance(preview, dict):
-                preview_text = preview.get("formatted") or format_extraction_results(preview.get("raw"))
+                preview_text = preview.get("formatted") or format_extraction_results(
+                    preview.get("raw")
+                )
             else:
                 preview_text = preview
             self.report_progress("Extraction running", preview_text)
@@ -424,7 +424,11 @@ class ExtractionNode(Node):
                 progress_callback=_on_progress,
             )
 
-        formatted_output = extraction_response.get("formatted") if isinstance(extraction_response, dict) else extraction_response
+        formatted_output = (
+            extraction_response.get("formatted")
+            if isinstance(extraction_response, dict)
+            else extraction_response
+        )
 
         return {
             "output": formatted_output,
@@ -452,6 +456,7 @@ class PromptNode(Node):
 
         def _on_stream_update(preview):
             self.report_progress(f"Prompt: {prompt}", preview)
+
         if prev_step_name == "Document":
             docs_uuids = inputs.get("output", None)
             docs = []
@@ -540,7 +545,10 @@ class WorkflowEngine:
                 if workflow_result and isinstance(node, MultiTaskNode):
                     for task in node.tasks:
                         task.progress_reporter = (
-                            lambda detail=None, preview=None, step=node.name, task_name=task.name: self._report_progress(
+                            lambda detail=None,
+                            preview=None,
+                            step=node.name,
+                            task_name=task.name: self._report_progress(
                                 workflow_result,
                                 step,
                                 detail=detail or task_name,
@@ -594,7 +602,9 @@ class WorkflowEngine:
             return ""
         if isinstance(value, list):
             formatted_items = [
-                self._format_final_output(item) if isinstance(item, (list, dict)) else self._normalize_text(str(item))
+                self._format_final_output(item)
+                if isinstance(item, (list, dict))
+                else self._normalize_text(str(item))
                 for item in value
             ]
             formatted_items = [item for item in formatted_items if item]
@@ -637,11 +647,16 @@ class WorkflowEngine:
         if preview is not None:
             workflow_result.current_step_preview = preview
             update_ops["set__current_step_preview"] = preview
-        elif preview is None and "set__current_step_preview" not in update_ops and detail in {"Workflow completed", None}:
+        elif (
+            preview is None
+            and "set__current_step_preview" not in update_ops
+            and detail in {"Workflow completed", None}
+        ):
             update_ops["unset__current_step_preview"] = 1
 
         if update_ops:
             WorkflowResult.objects(id=workflow_result.id).update_one(**update_ops)
+
 
 def build_workflow_engine(steps, workflow, model, user_id=None):
     engine = WorkflowEngine()
@@ -790,15 +805,15 @@ def execute_workflow_task(
     docs = workflow_trigger_step.data.get("docs", [])
 
     try:
-
         ingestion_text = "# Documents selected:"
         for doc in docs:
-            if hasattr(doc, 'raw_text'):
+            if hasattr(doc, "raw_text"):
                 ingestion_text += f"\n{doc.raw_text}"
 
         # Use singleton instance to avoid expensive re-initialization
         try:
             from app.blueprints.workflows.routes import get_recommendation_manager
+
             recommendation_manager = get_recommendation_manager()
             recommendation_manager.ingest_recommendation_item(
                 identifier=workflow_id,
@@ -809,13 +824,16 @@ def execute_workflow_task(
             # Clear recommendations cache so new workflow appears immediately
             try:
                 from app.blueprints.workflows.routes import clear_recommendations_cache
+
                 clear_recommendations_cache()
             except Exception as cache_error:
                 debug(f"Error clearing recommendations cache: {cache_error}")
         except ImportError:
             # Fallback if singleton not available (shouldn't happen in normal flow)
             persist_directory = "data/recommendations_vectordb"
-            recommendation_manager = SemanticRecommender(persist_directory=persist_directory)
+            recommendation_manager = SemanticRecommender(
+                persist_directory=persist_directory
+            )
             recommendation_manager.ingest_recommendation_item(
                 identifier=workflow_id,
                 ingestion_text=ingestion_text,
