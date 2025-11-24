@@ -1508,6 +1508,13 @@ think:hover > * {
     border: 1px solid #ccc;
     font-size: 13px;
 }
+.local-login-form input {
+    background-color: #ffffff;
+    color: #000000;
+}
+.local-login-form input::placeholder {
+    color: #999999;
+}
     .local-login-form button {
       background-color: #f1b300; /* Vandal Gold */
       color: #000;
