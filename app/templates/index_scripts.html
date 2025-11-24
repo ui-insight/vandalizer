@@ -60,10 +60,10 @@
     // Add a new activity to the top of the app rail
     function addActivityToRail(activityId, activityData) {
         if (!activityId) return;
-        
+
         const ul = document.getElementById("run-list");
         if (!ul) return;
-        
+
         // Check if activity already exists
         const existing = ul.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (existing) {
@@ -71,34 +71,34 @@
             ul.insertBefore(existing, ul.children[2]);
             return existing;
         }
-        
+
         // Use liForActivity from _app_rail.html if available
-        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity 
-            ? window.liForActivity 
+        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity
+            ? window.liForActivity
             : null;
-        
+
         if (!liForActivityFn) {
             console.warn("liForActivity function not available");
             return null;
         }
-        
+
         // Create the activity item
         const li = liForActivityFn(activityData);
         if (!li) {
             console.warn("Failed to create activity item", activityData);
             return null;
         }
-        
+
         // Insert at the top (after "New chat" and spacer, which are indices 0 and 1)
         if (ul.children.length > 2) {
             ul.insertBefore(li, ul.children[2]);
         } else {
             ul.appendChild(li);
         }
-        
+
         return li;
     }
-    
+
     function setActiveRailActivity(activityId, options) {
         if (!activityId) return;
 
@@ -109,7 +109,7 @@
         clearRailActiveState();
 
         let li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-        
+
         // If activity doesn't exist and we have promote option, try to fetch and add it
         if (!li && opts.promote) {
             // Fetch activity data from server
@@ -137,9 +137,9 @@
                 });
             return;
         }
-        
+
         if (!li) return;
-        
+
         // Move to top if promote is true
         if (opts.promote && ul.children.length > 2) {
             ul.insertBefore(li, ul.children[2]);
@@ -219,60 +219,60 @@
     function shimmerActivityItem(activityId) {
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) return;
-        
+
         // Add shimmer class
         activityItem.classList.add('shimmer');
-        
+
         // Remove shimmer after animation completes (typically 1-2 seconds)
         setTimeout(() => {
             activityItem.classList.remove('shimmer');
         }, 2000);
     }
-    
+
     // Helper function to update activity item status in the app rail
     function updateActivityItemStatus(activityId, status) {
         if (!activityId || !status) return;
-        
+
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) {
             console.warn("Activity item not found for:", activityId);
             return;
         }
-        
+
         // Normalize status to lowercase for comparison
         const normalizedStatus = String(status).toLowerCase();
         const isProgress = normalizedStatus === "running" || normalizedStatus === "queued";
-        
+
         // Check if it's an automation run by looking at the type icon
         const typeIcon = activityItem.querySelector('.run-type-icon');
         const isAutomationRun = typeIcon && (
             typeIcon.classList.contains('fa-list-check') || // search_set_run
             typeIcon.classList.contains('fa-diagram-project') // workflow_run
         );
-        
+
         // Update is-running class
         const wasRunning = activityItem.classList.contains("is-running");
         if (isProgress && isAutomationRun) {
             activityItem.classList.add("is-running");
         } else {
             activityItem.classList.remove("is-running");
-            
+
             // If it was running and now completed, add shimmer effect
             if (wasRunning && (normalizedStatus === "completed" || normalizedStatus === "failed" || normalizedStatus === "canceled")) {
                 shimmerActivityItem(activityId);
             }
         }
-        
+
         // Update status icon
         const runActions = activityItem.querySelector('.run-actions');
         if (!runActions) return;
-        
+
         // Remove existing status icon (look for .run-right that contains .run-state-icon)
         const existingRight = runActions.querySelector('.run-right');
         if (existingRight && existingRight.querySelector('.run-state-icon')) {
             existingRight.remove();
         }
-        
+
         // Add new status icon if needed
         if (status === "failed") {
             const iconSpan = document.createElement('span');
@@ -416,22 +416,22 @@
         const cleaned = (labelText || "").trim()
             .replace(/\n/g, " ")  // Replace newlines with spaces
             .replace(/\s+/g, " ");  // Collapse multiple spaces
-        
+
         // Limit to 70 characters and add "..." if truncated
-        const normalized = cleaned.length > 70 
-            ? cleaned.substring(0, 70) + "..." 
+        const normalized = cleaned.length > 70
+            ? cleaned.substring(0, 70) + "..."
             : cleaned;
-        
+
         if (!normalized) {
             resetWorkflowActiveStatus();
             return;
         }
-        
+
         // Only update if the label actually changed to prevent spamming
         if (workflowActiveLabel === normalized) {
             return;
         }
-        
+
         workflowActiveLabel = normalized;
         workflowActiveTemplateIndex = 0;
         renderWorkflowActiveMessage();
@@ -2720,12 +2720,12 @@
                         clearInterval(workflow_interval_id);
                         workflow_interval_id = null;
                     }
-                    
+
                     // Ensure activity status is updated (in case updateActivityItemStatus didn't catch it)
                     if (activityId) {
                         updateActivityItemStatus(activityId, status);
                     }
-                    
+
                     resetWorkflowActiveStatus();
                     const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
                     updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
@@ -3854,7 +3854,7 @@
 
                     // Update activity status in app rail
                     updateActivityItemStatus(activity_id, response.status);
-                    
+
                     if (response.status === "completed") {
                         clearInterval(intervalId);
                         hideWorking();
@@ -3877,7 +3877,7 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
-                        
+
                         // Update activity status in app rail
                         updateActivityItemStatus(activity_id, response.status);
 
@@ -3958,11 +3958,11 @@
     function nextHighlight() {
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         if (typeof window.current_search_item === 'undefined') {
             window.current_search_item = 0;
         }
-        
+
         window.current_search_item += 1;
         if (window.current_search_item >= highlights.length) {
             window.current_search_item = 0;
@@ -3989,11 +3989,11 @@
     function previousHighlight() {
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         if (typeof window.current_search_item === 'undefined') {
             window.current_search_item = 0;
         }
-        
+
         window.current_search_item -= 1;
         if (window.current_search_item < 0) {
             window.current_search_item = highlights.length - 1;
@@ -4012,27 +4012,27 @@
             window.updateHighlightDisplay();
             return;
         }
-        
+
         // Fallback implementation
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         const currentIndex = window.current_search_item || 0;
         const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
         window.current_search_item = safeIndex;
-        
+
         // Update all highlights
         highlights.forEach((hl, idx) => {
             hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
             hl.style.opacity = 0.5;
         });
-        
+
         // Update count
         $("#semantic-panel-count").text((safeIndex + 1) + " of " + highlights.length);
-        
+
         // Scroll to current highlight using the global function if available
         if (typeof window.scrollToHighlight !== 'undefined') {
-            setTimeout(function() {
+            setTimeout(function () {
                 window.scrollToHighlight(safeIndex);
             }, 50);
         } else {
@@ -4239,7 +4239,7 @@
                         window.history.replaceState({}, '', url);
                     }
                 }
-                
+
                 if (!response.body) throw new Error("No response body");
 
                 const reader = response.body.getReader();
@@ -4614,11 +4614,11 @@
         const urlParams = new URLSearchParams(window.location.search);
         const activityId = urlParams.get('activity_id');
         const searchSetUuid = urlParams.get('search_set_uuid');
-        
+
         // Helper function to display current workflow state
         function displayWorkflowProgress(data) {
             if (!data) return;
-            
+
             const steps_completed = data.steps_completed || 0;
             const total_steps = data.total_steps || 0;
             const status = data.status;
@@ -4626,30 +4626,30 @@
             const currentStepDetail = data.current_step_detail;
             const currentStepPreview = data.current_step_preview;
             const output = data.output;
-            
+
             // Ensure workflow panel is visible
             setSection("Library");
             $('#search-results-panel').show();
-            
+
             // Update active step status
             if (currentStepName || currentStepDetail) {
                 renderActiveStepStatus(currentStepName, currentStepDetail);
             }
-            
+
             // Update progress info
             updateWorkflowProgressInfo(steps_completed, total_steps, 0);
-            
+
             // Show workflow output section if we have preview or output
             if (currentStepPreview || output) {
                 const $outputSection = $('.workflow-output-section');
                 const $outputContainer = $('.workflow-output');
-                
+
                 if ($outputSection.length && $outputContainer.length) {
                     $outputContainer.removeClass('hidden').addClass('active');
                     $outputContainer.find('.step-connector').addClass('active');
                     $('.workflow-loader').hide();
                     $('.workflow-output-buttons').removeClass('hidden');
-                    
+
                     // Display preview if available, otherwise output
                     const content = currentStepPreview || output;
                     if (content) {
@@ -4661,7 +4661,7 @@
                     }
                 }
             }
-            
+
             // Update workflow steps UI
             if (steps_completed >= 0 && total_steps > 0) {
                 // Mark completed steps as done
@@ -4678,26 +4678,26 @@
                 }
             }
         }
-        
+
         // Check for running workflow - try workflow_session_id first, then check activity_id
         if (workflow_session_id && workflowActivityStatus) {
             const status = workflowActivityStatus.toLowerCase();
             if (status === 'running' || status === 'queued') {
                 console.log("Resuming workflow polling for session:", workflow_session_id);
-                
+
                 // Immediately fetch current status to display progress
                 $.ajax({
                     url: `/workflows/workflow/status?session_id=${workflow_session_id}`,
                     type: 'GET',
                     dataType: 'json',
-                    success: function(data) {
+                    success: function (data) {
                         displayWorkflowProgress(data);
                     },
-                    error: function(err) {
+                    error: function (err) {
                         console.warn("Failed to fetch initial workflow status:", err);
                     }
                 });
-                
+
                 if (workflow_interval_id) {
                     clearInterval(workflow_interval_id);
                 }
@@ -4721,7 +4721,7 @@
                             const workflowId = activity.workflow_id;
                             if (sessionId) {
                                 console.log("Resuming workflow polling for session from activity:", sessionId);
-                                
+
                                 // If we have a workflow_id, ensure the workflow panel is loaded
                                 let needsWorkflowLoad = false;
                                 if (workflowId && (!current_workflow_id || current_workflow_id === "0" || current_workflow_id !== workflowId)) {
@@ -4729,23 +4729,23 @@
                                     fetchWorkflow(workflowId);
                                     needsWorkflowLoad = true;
                                 }
-                                
+
                                 // Immediately fetch current status to display progress
                                 $.ajax({
                                     url: `/workflows/workflow/status?session_id=${sessionId}`,
                                     type: 'GET',
                                     dataType: 'json',
-                                    success: function(statusData) {
+                                    success: function (statusData) {
                                         // Wait a bit for workflow panel to load if we just fetched it
                                         setTimeout(() => {
                                             displayWorkflowProgress(statusData);
                                         }, needsWorkflowLoad ? 500 : 0);
                                     },
-                                    error: function(err) {
+                                    error: function (err) {
                                         console.warn("Failed to fetch initial workflow status:", err);
                                     }
                                 });
-                                
+
                                 if (workflow_interval_id) {
                                     clearInterval(workflow_interval_id);
                                 }
@@ -4759,7 +4759,7 @@
                 })
                 .catch(err => console.warn("Failed to check workflow activity:", err));
         }
-        
+
         // Check for running extraction
         if (activityId && searchSetUuid) {
             // Fetch activity to check status
@@ -4788,7 +4788,7 @@
                     console.warn("Failed to check activity status for polling resume:", err);
                 });
         }
-        
+
         // Also check all activities in the rail for running ones
         const runList = document.getElementById("run-list");
         if (runList) {
@@ -4796,7 +4796,7 @@
             runningItems.forEach(item => {
                 const itemActivityId = item.dataset.runId;
                 if (!itemActivityId) return;
-                
+
                 // Check if it's an extraction (has search_set_uuid in URL or we can fetch it)
                 const typeIcon = item.querySelector('.run-type-icon');
                 if (typeIcon && typeIcon.classList.contains('fa-list-check')) {
@@ -4851,7 +4851,185 @@
             });
         }
     }
-    
+
     // Resume polling after a short delay to ensure DOM is ready
     setTimeout(resumePollingForRunningActivities, 500);
+
+    // ==========================================
+    // Text Selection Search Feature
+    // ==========================================
+
+    let currentSelectionSpan = null;
+
+    // Handle text selection in the right panel
+    $(document).on('mouseup', '.right-panel', function (e) {
+        // Don't interfere with buttons or links
+        if ($(e.target).is('button, a, i, input, textarea')) {
+            return;
+        }
+
+        // Check if a document is loaded
+        if (!documentPath || !window.document_displayed) {
+            return;
+        }
+
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        // Remove previous selection highlight if it exists
+        if (currentSelectionSpan) {
+            const parent = currentSelectionSpan.parentNode;
+            const textNode = document.createTextNode(currentSelectionSpan.textContent);
+            parent.replaceChild(textNode, currentSelectionSpan);
+            parent.normalize(); // Merge adjacent text nodes
+            currentSelectionSpan = null;
+        }
+
+        // Only proceed if text is selected and it's substantial enough
+        if (selectedText.length > 0 && selectedText.length < 500) {
+            try {
+                const range = selection.getRangeAt(0);
+
+                // Check if selection is within right panel
+                const rightPanel = document.querySelector('.right-panel');
+                if (!rightPanel.contains(range.commonAncestorContainer)) {
+                    return;
+                }
+
+                // Create a span to wrap the selected text
+                const span = document.createElement('span');
+                span.className = 'selected-text-highlight';
+                span.setAttribute('data-search-text', selectedText);
+                span.title = 'Searching in document...';
+
+                // Wrap the selection
+                try {
+                    range.surroundContents(span);
+                    currentSelectionSpan = span;
+
+                    // Clear the selection to show the highlight
+                    selection.removeAllRanges();
+                } catch (err) {
+                    // If surroundContents fails (e.g., selection spans multiple elements),
+                    // extract contents and wrap them
+                    console.log('Selection spans multiple elements, using alternative method');
+                    const fragment = range.extractContents();
+                    span.appendChild(fragment);
+                    range.insertNode(span);
+                    currentSelectionSpan = span;
+                    selection.removeAllRanges();
+                }
+
+                // Automatically trigger search
+                performDocumentSearch(selectedText);
+            } catch (err) {
+                console.error('Error wrapping selection:', err);
+            }
+        }
+    });
+
+    // Function to perform document search
+    function performDocumentSearch(searchText) {
+        if (!searchText || !documentPath) {
+            return;
+        }
+
+        console.log('Searching for text in document:', searchText);
+
+        // Get the current document UUID
+        const docContainer = document.querySelector('.document-container');
+        if (!docContainer) {
+            console.error('No document container found');
+            return;
+        }
+
+        const docUuid = docContainer.getAttribute('data-doc-uuid');
+        if (!docUuid) {
+            console.error('No document UUID found');
+            return;
+        }
+
+        // Call backend to search for text in document
+        $.ajax({
+            url: '/tasks/search_in_document',
+            type: 'POST',
+            data: JSON.stringify({
+                search_text: searchText,
+                document_uuid: docUuid
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (response) {
+                if (response.found && response.matches > 0) {
+                    console.log(`Found ${response.matches} matches for "${searchText}"`);
+
+                    // Update global highlight terms
+                    window.highlightTerms = [searchText];
+                    searchTerm = searchText;
+
+                    // Set flag to scroll to first highlight
+                    window.needsScroll = true;
+                    needsScroll = true;
+
+                    // Re-render the PDF with highlights
+                    renderPDF();
+
+                    // Show a brief toast notification
+                    showToast(`Found ${response.matches} occurrence${response.matches > 1 ? 's' : ''} of "${searchText}"`);
+                } else {
+                    console.log('No matches found for:', searchText);
+
+                    // Shake the highlight to indicate no matches
+                    if (currentSelectionSpan) {
+                        // Add a shake animation with fade-out
+                        currentSelectionSpan.style.animation = 'selection-no-match 0.8s ease-out';
+
+                        // Auto-dismiss after animation completes
+                        setTimeout(function () {
+                            if (currentSelectionSpan && currentSelectionSpan.parentNode) {
+                                const parent = currentSelectionSpan.parentNode;
+                                const textNode = document.createTextNode(currentSelectionSpan.textContent);
+                                parent.replaceChild(textNode, currentSelectionSpan);
+                                parent.normalize();
+                                currentSelectionSpan = null;
+                            }
+                        }, 800);
+                    }
+
+                    // Clear any existing highlights
+                    window.highlightTerms = [];
+                    $('#semantic-panel').hide();
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('Error searching document:', error);
+                showToast('Error searching document');
+            }
+        });
+    }
+
+    // Handle click on selected text to re-search in document
+    $(document).on('click', '.selected-text-highlight', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const searchText = $(this).attr('data-search-text') || $(this).text().trim();
+        if (searchText) {
+            performDocumentSearch(searchText);
+        }
+    });
+
+    // Clear selection highlight when clicking elsewhere
+    $(document).on('mousedown', function (e) {
+        if (currentSelectionSpan && !$(e.target).closest('.selected-text-highlight').length) {
+            const parent = currentSelectionSpan.parentNode;
+            if (parent) {
+                const textNode = document.createTextNode(currentSelectionSpan.textContent);
+                parent.replaceChild(textNode, currentSelectionSpan);
+                parent.normalize();
+            }
+            currentSelectionSpan = null;
+        }
+    });
+
 </script>
