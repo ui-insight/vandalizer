@@ -98,7 +98,7 @@ def perform_extraction_task(
         # Perform extraction
         em = ExtractionManagerNonTyped()
         em.root_path = root_path
-        results = em.extract(keys, document_uuids, model_name)
+        results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
 
         if len(results) == 1:
