@@ -1,0 +1,274 @@
+<div class="bottom-toolbar" id="bottom-toolbar-chat">
+    <div id="add-item-panel">
+
+        <div class="ask-question-container">
+            <div class="ask-question">
+                <div class="chat-input-wrapper" onclick="document.getElementById('chatinput').focus();">
+                    <div id="chatinput" contenteditable="true" translate="no" enterkeyhint="enter" tabindex="0"
+                        class="ProseMirror break-words is-editor-empty"
+                        data-placeholder="Ask anything about this document…">
+                    </div>
+                </div>
+
+                <div class="chat-controls-toolbar">
+                    <div class="menu-anchor">
+                        <a href="#" id="chat-add-link" class="btn btn-secondary" aria-haspopup="true"
+                            aria-expanded="false" data-menu="#chat-add-menu">
+                            <i class="fa-solid fa-plus" style="padding-right:5px; font-weight:700;"></i>Add
+                        </a>
+
+                        <div id="chat-add-menu" class="menu menu-up" role="menu" hidden>
+                            <a class="menu-item" role="menuitem" data-action="add-document">
+                                <i class="fa-solid fa-file-circle-plus" style="width:18px;"></i>
+                                Add Document
+                            </a>
+                            <a class="menu-item" role="menuitem" data-action="add-website">
+                                <i class="fa-solid fa-globe" style="width:18px;"></i>
+                                Add Website
+                            </a>
+                        </div>
+                    </div>
+
+
+
+
+
+                    <!-- pinned model selector - populated from javascript -->
+                    <a href="javascript:void(0);" id="model-text-icon">
+                    </a>
+                    <div id="chat-model-popup-menu" class="file-popup-menu" style="display: none;">
+                        <ul id="chat-model-popup-menu-options">
+                            <li id="download-pdf-option-chat">PDF</li>
+                            <li id="download-csv-option-chat">CSV</li>
+                            <li id="download-text-option-chat">Text</li>
+                        </ul>
+                    </div>
+
+                    <div style="flex-grow: 1;"></div>
+                    <button class="btn btn-primary" id="send-chat-button" disabled>
+                        <span style="font-size: 1.2em;">
+                            <i class="fa-solid fa-paper-plane"></i>
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    /**
+     * Show file picker and upload documents to chat
+     */
+    function showChatDocumentUpload() {
+        let currentActivity = {{ activity.to_json() | safe if activity else 'null' }};
+        console.log("Current activity:", currentActivity);
+        let conversationId = currentActivity && currentActivity.conversation_id ? currentActivity.conversation_id : null;
+
+        // Create a hidden file input
+        console.log("show document upload");
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.multiple = true;
+        fileInput.accept = '.pdf,.doc,.docx,.txt,.csv,.json,.xml,.html,.xlsx,.xls,.md'; // Adjust as needed
+
+        fileInput.onchange = function (event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            // Show loading indicator
+            $('.loading-event-progress-container').show();
+
+            // Prepare form data
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            console.log("Uploading files to conversation:", conversationId);
+            // Get current conversation UUID
+
+            const activity_id = new URLSearchParams(window.location.search).get('activity_id');
+    
+            formData.append('current_activity_id', activity_id);
+            formData.append('current_space_id', '{{ current_space_id }}');
+
+            // Upload files
+            $.ajax({
+                url: '/chat/add_document',
+                type: 'POST',
+                data: formData,
+                processData: false,  // Important: Don't process the data
+                contentType: false,  // Important: Let jQuery set the content type
+                dataType: 'json',
+                success: function (response) {
+                    // Update conversation UUID if it's a new conversation
+
+                    // Show confirmation in chat for each uploaded file
+
+
+                    // check if there is a current activity id in the url
+                    if(window.location.href.includes('activity_id=')) {
+                        // Scroll to bottom
+                        $("#chat-panel").animate({ scrollTop: $("#chat-panel")[0].scrollHeight }, "fast");
+                        const current_activity_id = new URLSearchParams(window.location.search).get('activity_id');
+                        // Preserve existing URL parameters
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('activity_id', current_activity_id);
+                        url.searchParams.set('section', 'Assistant');
+                        window.location.href = url.toString();
+                    } else {
+                        // Show success message
+                        console.log(`Successfully uploaded ${response.attachments.length} document(s)`);
+                        if(response.activity_id) {
+                            // Preserve existing URL parameters
+                            const url = new URL(window.location.href);
+                            url.searchParams.set('activity_id', response.activity_id);
+                            url.searchParams.set('section', 'Assistant');
+                            window.location.href = url.toString();
+                        }
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.error("Error uploading documents:", thrownError);
+                    let errorMessage = "Failed to upload documents. Please try again.";
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errorMessage = xhr.responseJSON.error;
+                    }
+                    alert(errorMessage);
+                },
+                complete: function () {
+                    // Hide loading indicator
+                    $('.loading-event-progress-container').hide();
+                }
+            });
+        };
+
+        // Trigger file picker
+        fileInput.click();
+    }
+
+    /**
+     * Helper function to escape HTML
+     */
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    /**
+     * Remove attachment from chat
+     */
+    function removeChatAttachment(attachmentId, buttonElement) {
+        if (!confirm('Remove this attachment?')) return;
+
+        $.ajax({
+            url: `/chat/remove_document/${attachmentId}`,
+            type: 'DELETE',
+            dataType: 'json',
+            success: function (response) {
+                // Remove from UI
+                $(buttonElement).closest('.system-message').fadeOut(300, function () {
+                    $(this).remove();
+                });
+                console.log('Attachment removed successfully');
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.error("Error removing attachment:", thrownError);
+                alert("Failed to remove attachment. Please try again.");
+            }
+        });
+    }
+    /**
+     * Display uploaded attachments in the chat UI
+     */
+    function displayChatAttachments(attachments) {
+        // Find or create attachments container
+        let attachmentsContainer = document.getElementById('chat-attachments-container');
+
+        if (!attachmentsContainer) {
+            attachmentsContainer = document.createElement('div');
+            attachmentsContainer.id = 'chat-attachments-container';
+            attachmentsContainer.className = 'chat-attachments-container';
+
+            // Insert before chat input
+            const chatInputWrapper = document.querySelector('.chat-input-wrapper');
+            if (chatInputWrapper) {
+                chatInputWrapper.parentNode.insertBefore(attachmentsContainer, chatInputWrapper);
+            }
+        }
+
+        // Add each attachment
+        attachments.forEach(attachment => {
+            const attachmentEl = document.createElement('div');
+            attachmentEl.className = 'chat-attachment-item';
+            attachmentEl.innerHTML = `
+            <i class="fa-solid fa-file"></i>
+            <span class="attachment-filename">${attachment.filename}</span>
+            <button class="remove-attachment" onclick="removeChatAttachment('${attachment.id}', this)" title="Remove">
+                <i class="fa-solid fa-times"></i>
+            </button>
+        `;
+            attachmentsContainer.appendChild(attachmentEl);
+        });
+    }
+
+    /**
+     * Remove attachment from chat
+     */
+    async function removeChatAttachment(attachmentId, buttonElement) {
+        if (!confirm('Remove this attachment?')) return;
+
+        try {
+            const response = await fetch(`/chat/remove_document/${attachmentId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                // Remove from UI
+                buttonElement.closest('.chat-attachment-item').remove();
+                showNotification('Attachment removed', 'success');
+            } else {
+                showNotification('Failed to remove attachment', 'error');
+            }
+        } catch (error) {
+            console.error('Error removing attachment:', error);
+            showNotification('Error removing attachment', 'error');
+        }
+    }
+
+    /**
+     * Helper function to show notifications
+     */
+    function showNotification(message, type = 'info') {
+        // Implement based on your notification system
+        console.log(`[${type.toUpperCase()}] ${message}`);
+        // You might use toast notifications, alerts, etc.
+    }
+
+    /**
+     * Helper functions for loading indicator
+     */
+    function showLoadingIndicator(message = 'Loading...') {
+        const indicator = document.querySelector('.loading-event-progress-container');
+        if (indicator) {
+            indicator.style.display = 'block';
+            const textEl = indicator.querySelector('.loading-text');
+            if (textEl) textEl.textContent = message;
+        }
+    }
+
+    function hideLoadingIndicator() {
+        const indicator = document.querySelector('.loading-event-progress-container');
+        if (indicator) {
+            indicator.style.display = 'none';
+        }
+    }
+
+</script>

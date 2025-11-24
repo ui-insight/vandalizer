@@ -149,3 +149,46 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* Chat attachments styling */
+.chat-attachments-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0;
+    margin-bottom: 8px;
+}
+
+.chat-attachment-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #f0f0f0;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.chat-attachment-item i.fa-file {
+    color: #666;
+}
+
+.attachment-filename {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.remove-attachment {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 4px;
+    color: #999;
+    font-size: 1.1em;
+}
+
+.remove-attachment:hover {
+    color: #d32f2f;
+}

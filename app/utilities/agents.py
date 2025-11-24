@@ -23,11 +23,11 @@ from pydantic_ai.providers.openrouter import OpenRouterProvider
 from app.models import SmartDocument
 from app.utilities.config import settings
 from app.utilities.document_manager import DocumentManager
-from app.utilities.llm_helpers import remove_code_markers
 
 load_dotenv()
 
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # Standard cache
 # cache ttl is 1 month
@@ -39,6 +39,90 @@ if langfuse_enabled:
     from langfuse import Langfuse
 
     langfuse = Langfuse()
+
+
+# Cache dictionaries for agents to prevent context leaks
+# These MUST be defined before any agent creation functions are called
+_chat_agent_cache = {}
+_rag_agent_cache = {}
+_prompt_agent_cache = {}
+_upload_agent_cache = {}
+_extraction_agent_cache = {}
+
+DEFAULT_CHAT_SYSTEM_PROMPT = """You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+
+Your communication style:
+- Warm and approachable while maintaining professionalism
+- Concise but thorough - prioritize clarity over length
+- Personalized to the user's tone and level of formality
+- Balances helpfulness with respect for user autonomy
+
+When responding:
+1. Address the user's specific question or need first
+2. Provide relevant context or background when helpful
+3. If uncertain, acknowledge limitations rather than guessing
+4. For complex topics, break information into digestible segments
+5. Use natural, conversational language (contractions, varied sentence structure)
+6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+
+Content guidelines:
+- Cite sources for factual claims when possible
+- Present balanced perspectives on nuanced topics
+- Avoid unnecessary jargon unless the conversation indicates technical expertise
+- Respect privacy and security best practices
+
+Next-Step Guidance
+- Only ask clarifying questions when strictly necessary to proceed or prevent errors.
+- End with one short, action-oriented “next step?” line only when appropriate.
+- The next step must be tailored, concrete, valuable, and ≤ 16 words, phrased as a question.
+- If confidence is low, prefer a quick validation step.
+- If an action depends on missing input, ask for the single most critical item.
+- You may offer at most one lightweight alternative in parentheses.
+
+Allowed forms (pick exactly one):
+1) "Want me to <do X>?"
+2) "Next step: <single concrete action>?"
+3) "Should we <validate/compare/prioritize> next?"
+4) "Do you want <A> (or <B>)?"
+
+Anti-patterns (never do):
+- Don’t restate your whole answer in the next step.
+- Don’t propose multi-step plans; keep it to one step.
+- Don’t ask vague things like "Need anything else?"
+"""
+
+DEFAULT_CHAT_SYSTEM_PROMPT_NO_NEXT = """You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
+
+Your communication style:
+- Warm and approachable while maintaining professionalism
+- Concise but thorough - prioritize clarity over length
+- Personalized to the user's tone and level of formality
+- Balances helpfulness with respect for user autonomy
+
+When responding:
+1. Address the user's specific question or need first
+2. Provide relevant context or background when helpful
+3. If uncertain, acknowledge limitations rather than guessing
+4. For complex topics, break information into digestible segments
+5. Use natural, conversational language (contractions, varied sentence structure)
+6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
+
+Content guidelines:
+- Cite sources for factual claims when possible
+- Present balanced perspectives on nuanced topics
+- Avoid unnecessary jargon unless the conversation indicates technical expertise
+- Respect privacy and security best practices
+
+Keep responses focused on the user’s question with no forced next-step suggestion.
+"""
+
+
+def get_default_system_prompt(include_next_step: bool = True) -> str:
+    return (
+        DEFAULT_CHAT_SYSTEM_PROMPT
+        if include_next_step
+        else DEFAULT_CHAT_SYSTEM_PROMPT_NO_NEXT
+    )
 
 
 class InsightAIProvider(OpenRouterProvider):
@@ -72,6 +156,16 @@ def get_agent_model(agent_model):
     )
 
 
+# Cache dictionaries for agents to prevent context leaks
+# These MUST be defined before any agent creation functions are called
+_chat_agent_cache = {}
+_rag_agent_cache = {}
+_prompt_agent_cache = {}
+_upload_agent_cache = {}
+_extraction_agent_cache = {}
+_secure_agent_cache = {}
+
+
 @dataclass
 class RagDeps:
     doc_manager: DocumentManager
@@ -80,12 +174,15 @@ class RagDeps:
 
 
 def create_rag_agent(agent_model):
-    model = get_agent_model(agent_model)
+    """Create or retrieve a cached RAG agent to prevent context leaks."""
+    cache_key = f"rag_{agent_model}"
 
-    return Agent(
-        model,
-        deps_type=RagDeps,
-        system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
+    if cache_key not in _rag_agent_cache:
+        model = get_agent_model(agent_model)
+        _rag_agent_cache[cache_key] = Agent(
+            model,
+            deps_type=RagDeps,
+            system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation.
 
     When responding to queries:
     1. Carefully analyze the retrieved context documents for relevance to the query
@@ -104,50 +201,49 @@ def create_rag_agent(agent_model):
     - If retrieved context is insufficient, clearly state "Based on the provided context, I cannot fully answer this question" and explain what information is missing
 
     Never fabricate information beyond what is provided in the context. If the retrieved context doesn't contain the necessary information, acknowledge the limitations of your knowledge and suggest what additional information might be needed.""",
-    )
-
-
-def create_chat_agent(agent_model, system_prompt=None):
-    model = get_agent_model(agent_model)
-    if system_prompt is not None:
-        return Agent(
-            model,
-            system_prompt=system_prompt,
         )
-    print(model)
-    return Agent(
-        model,
-        system_prompt="""You are an engaging conversational assistant designed to provide helpful, informative, and friendly responses.
 
-    Your communication style:
-    - Warm and approachable while maintaining professionalism
-    - Concise but thorough - prioritize clarity over length
-    - Personalized to the user's tone and level of formality
-    - Balances helpfulness with respect for user autonomy
+    return _rag_agent_cache[cache_key]
 
-    When responding:
-    1. Address the user's specific question or need first
-    2. Provide relevant context or background when helpful
-    3. If uncertain, acknowledge limitations rather than guessing
-    4. For complex topics, break information into digestible segments
-    5. Use natural, conversational language (contractions, varied sentence structure)
-    6. When appropriate, ask thoughtful follow-up questions to clarify or deepen the conversation
 
-    Content guidelines:
-    - Cite sources for factual claims when possible
-    - Present balanced perspectives on nuanced topics
-    - Avoid unnecessary jargon unless the conversation indicates technical expertise
-    - Respect privacy and security best practices
+def create_chat_agent(agent_model, system_prompt=None, include_next_step=True):
+    """Create or retrieve a cached chat agent to prevent context leaks.
 
-    Remember that your goal is to be genuinely helpful while creating an engaging, natural conversation that adapts to the user's needs and communication style.""",
+    Args:
+        agent_model: The model name to use
+        system_prompt: Optional custom system prompt
+        include_next_step: Whether the default prompt should ask for next steps
+
+    Returns:
+        Cached Agent instance
+    """
+    prompt_to_use = (
+        system_prompt
+        if system_prompt is not None
+        else get_default_system_prompt(include_next_step=include_next_step)
     )
+    cache_key = f"{agent_model}_{hash(prompt_to_use)}"
+
+    # Return cached agent if available
+    if cache_key not in _chat_agent_cache:
+        model = get_agent_model(agent_model)
+        _chat_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt=prompt_to_use,
+        )
+
+    return _chat_agent_cache[cache_key]
 
 
 def create_prompt_agent(agent_model):
-    model = get_agent_model(agent_model)
-    return Agent(
-        model,
-        system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
+    """Create or retrieve a cached prompt agent to prevent context leaks."""
+    cache_key = f"prompt_{agent_model}"
+
+    if cache_key not in _prompt_agent_cache:
+        model = get_agent_model(agent_model)
+        _prompt_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are a specialized prompt engineer focused on retrieval augmentation. Your task is to convert user questions into optimal search prompts for querying vector databases.
 
     When generating search prompts:
     1. Extract key entities, overview, main points, ideas, project details, concepts, and relationships from the user's question
@@ -166,7 +262,9 @@ def create_prompt_agent(agent_model):
     - Include special operators or syntax unless specified
 
     Your output should be the search prompt only, with no additional text.""",
-    )
+        )
+
+    return _prompt_agent_cache[cache_key]
 
 
 class UploadResult(BaseModel):
@@ -175,12 +273,33 @@ class UploadResult(BaseModel):
 
 
 def create_upload_agent(agent_model):
-    model = get_agent_model(agent_model)
-    return Agent(
-        model,
-        system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
-        output_type=UploadResult,
-    )
+    """Create or retrieve a cached upload agent to prevent context leaks."""
+    cache_key = f"upload_{agent_model}"
+
+    if cache_key not in _upload_agent_cache:
+        model = get_agent_model(agent_model)
+        _upload_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+            output_type=UploadResult,
+        )
+
+    return _upload_agent_cache[cache_key]
+
+
+def create_secure_agent(agent_model):
+    """Create or retrieve a cached upload agent to prevent context leaks."""
+    cache_key = f"upload_{agent_model}"
+
+    if cache_key not in _secure_agent_cache:
+        model = get_agent_model(agent_model)
+        _secure_agent_cache[cache_key] = Agent(
+            model,
+            system_prompt="""You are an expert in document management and processing. Your task is to assist users in uploading and ensuring their documents are valid and ready for processing. You will provide feedback on the document's validity, summarize its content, and ensure it meets the necessary criteria for further processing. If the document is invalid, you will provide specific feedback on what needs to be corrected or improved. Your responses should be clear, concise, and actionable.""",
+            output_type=UploadResult,
+        )
+
+    return _secure_agent_cache[cache_key]
 
 
 upload_agent = create_upload_agent(settings.base_model)
@@ -188,6 +307,8 @@ upload_agent = create_upload_agent(settings.base_model)
 rag_agent = create_rag_agent(settings.base_model)
 
 prompt_agent = create_prompt_agent(settings.base_model)
+
+secure_agent = create_secure_agent(settings.secure_model)
 
 
 @rag_agent.tool
@@ -257,91 +378,17 @@ def retrieve(
     return content
 
 
-@dataclass
-class FieldInferenceDeps:
-    extraction_context: Optional[str]
-    keys: list[str]
+def create_field_inference_agent(agent_model, keys, context, prompt_context=None):
+    model = get_agent_model(agent_model)
+    system_prompt = create_field_inference_system_prompt(keys, context)
+    return Agent(
+        model,
+        system_prompt=system_prompt,
+        retries=3,
+    )
 
 
 model = get_agent_model(settings.base_model)
-
-field_inference_agent = Agent(
-    model,
-    retries=3,
-    deps_type=FieldInferenceDeps,
-    system_prompt="You are a data modeling expert. Infer appropriate data types for fields based on their names and context. Return only valid json.",
-)
-
-
-@field_inference_agent.system_prompt
-def field_inference_system_prompt(context: RunContext[FieldInferenceDeps]) -> str:
-    keys = context.deps.keys
-    prompt_context = context.deps.extraction_context
-    return f"""Given these field names{" and prompt_context" if prompt_context else ""}:
-
-Field names:
-{json.dumps(keys, indent=2)}
-
-{f"Context: {context}" if context else ""}
-
-For each field, determine the most appropriate data type and description from these options:
-- Optional[str]
-- Optional[int]
-- Optional[float]
-- Optional[bool]
-- Optional[List[str]]
-- Optional[List[int]]
-- Optional[List[float]]
-
- CRITICAL:
-1. Always make ALL fields Optional by default, as they might not appear in every document
-2. Treat monetary values as strings, not floats.
-3. Preserve ALL original formatting of numbers, including:
-   - Keep ALL commas in numbers (e.g., "1,234,567")
-   - Keep ALL currency symbols (e.g., "$1,234.56")
-   - Keep ALL decimal places exactly as found
-   - DO NOT convert formatted numbers into plain numbers
-4. Extract values exactly as they appear in the text, without any modifications
-
-Return a json object where keys are field names and values are the recommended type names and descriptions exactly as shown above. Do not convert floating numbers to integers and vice versa, or change the number of decimal places, or change numbers locale encoding. Preserve commas and other punctuation in the extracted text and numbers.
-Consider making fields Optional if they might not always be present."""
-
-
-type_mapping = {
-    "str": (str, ...),
-    "int": (int, ...),
-    "float": (float, ...),
-    "bool": (bool, ...),
-    "List[str]": (list[str], ...),
-    "List[int]": (list[int], ...),
-    "List[float]": (list[float], ...),
-    "Dict[str, str]": (dict[str, str], ...),
-    "Optional[str]": (str, None),
-    "Optional[int]": (int, None),
-    "Optional[float]": (float, None),
-    "Optional[bool]": (bool, None),
-    "Optional[List[str]]": (list[str], None),
-    "Optional[List[int]]": (list[int], None),
-    "Optional[List[float]]": (list[float], None),
-}
-
-reverse_type_mapping = {
-    (str, ...): "str",
-    (int, ...): "int",
-    (float, ...): "float",
-    (bool, ...): "bool",
-    (list[str], ...): "List[str]",
-    (list[int], ...): "List[int]",
-    (list[float], ...): "List[float]",
-    (Optional[str], None): "Optional[str]",
-    (Optional[int], None): "Optional[int]",
-    (Optional[float], None): "Optional[float]",
-    (dict[str, str], ...): "Dict[str, str]",
-    (str, None): "Optional[str]",
-    (int, None): "Optional[int]",
-    (float, None): "Optional[float]",
-    (bool, None): "Optional[bool]",
-}
 
 
 def get_cache_key(key: str, context: str) -> str:
@@ -374,185 +421,120 @@ def extraction_system_prompt(
 ):
     text = context.deps.text
     fields = context.deps.fields
-    field_descriptions = [
-        f"- {field}: {field_type[0]}" for field, field_type in fields.items()
-    ]
+    field_descriptions = [f"- {field}" for field in fields.keys()]
     field_str = "\n".join(field_descriptions)
 
-    multiple_entity_instruction = (
-        "\n\nImportant: Extract ALL relevant entities from the text only if it is present. "
-        "Return a JSON array of objects, where each object represents a distinct entity. "
-        "If no multiple entities are found, return a single-item array."
-    )
-
     system_prompt = (
-        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. Be as faithful as possible during extraction and do not modify the extracted items. Do not integer to float and vice versa, or change the number of decimal places. Preserve commas and other punctuation in the extracted text and numbers. Extract all relevant entities from the text only if they are present. Return the extracted items in valid JSON format."
-        'CRITICAL: Your response MUST be valid JSON with this exact format: {"entities": [...]}'
-        "Each entity should be a complete object with all requested fields (use null for missing values)."
+        "You are a precise entity extraction assistant. Extract only the requested information in a single execution. "
+        "Be as faithful as possible during extraction and do not modify the extracted items. "
+        "\n\nTYPE SELECTION GUIDELINES:\n"
+        "- Use strings for text, dates, monetary values, and formatted numbers\n"
+        "- Use integers for whole numbers without decimals\n"
+        "- Use floats for decimal numbers\n"
+        "- Use booleans for true/false values\n"
+        "- Use lists when multiple values are present for a field\n"
+        "- Preserve ALL original formatting (commas, currency symbols, decimal places)\n"
+        "- DO NOT convert between types or modify formatting\n"
+        "\nCRITICAL: Your response MUST be valid JSON as a single object with the requested fields.\n"
+        "IMPORTANT RULES:\n"
+        "1. Set field values to null if the information is not found in the text\n"
+        "2. Only include a field with a non-null value if you find that information in the text\n"
+        "3. Do NOT make up or infer information that isn't explicitly stated\n"
+        "4. Choose the most appropriate data type for each field based on the actual value found\n"
+        "5. Return a flat JSON object with the field names as keys"
     )
 
     return (
         f"""
 {system_prompt}
+
 Extract the following information from the text below only if it is present:
 
 {field_str}
 
-Return the information in JSON format and be as precise as possible{multiple_entity_instruction}
+Return the information as a JSON object with these exact field names as keys.
+Set a field to null only if that information is not present in the text.
 
 Text:
 {text}""",
     )
 
 
-def filter_empty_entities(result: dict) -> list:
-    """Filter out empty entities from the list.
-
-    Args:
-        result: The result dictionary containing entities
-
-    Returns:
-        Filtered list of entities
-
-    """
-    raw_entities = result.get("entities", [])
-
-    def is_non_empty(e: dict) -> bool:
-        if not isinstance(e, dict) or not e:
-            return False
-        return any(v not in (None, "", [], {}) for v in e.values())
-
-    return [e for e in raw_entities if is_non_empty(e)]
-
-
 # @observe()
 def extract_entities_with_agent(
     text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
-) -> list:
+) -> dict:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
     Args:
         text: Input text to extract information from
         keys: List of fields to extract
+        context: Optional context for extraction
+        model_name: Model to use for extraction
 
     Returns:
-        A JSON object with extracted entities
-
+        A dictionary with extracted field values
     """
-    # check if previous extraction exists in cache
-
     # ensure keys are a list of strings, otherwise split on comma
     if isinstance(keys, str):
         keys = [k.strip() for k in keys.split(",")]
     else:
         keys = [k.strip() for k in keys]
 
-    # Individual field type caching
-    inferred_fields = {}
-    uncached_keys = []
+    # Set all fields to Any type - let the model decide appropriate types
+    inferred_fields = {key: (Any, None) for key in keys}
 
-    # Check cache for each individual key
-    for key in keys:
-        key_cache_key = get_cache_key(key, context)
-        cached = cache.lookup(key_cache_key, "field_inference")
-        if cached:
-            inferred_fields[key] = type_mapping.get(cached[0], (Any, ...))
-        else:
-            uncached_keys.append(key)
+    debug(f"Fields for extraction: {inferred_fields}")
 
-    # Process uncached keys in a single batch if any
-    if uncached_keys:
-        field_inference_deps = FieldInferenceDeps(
-            extraction_context=context,
-            keys=uncached_keys,
+    # Create a cache key based on model name and field names only
+    field_signature = frozenset(keys)
+    cache_key = f"{model_name}_{hash(field_signature)}"
+
+    # Reuse cached agent if available to prevent context leaks
+    if cache_key not in _extraction_agent_cache:
+        # Create dynamic model with UNIQUE name based on fields hash
+        unique_model_name = f"ExtractionResult_{abs(hash(field_signature))}"
+
+        # Create a single model directly (not wrapped in "entities" array)
+        extraction_model = create_model(unique_model_name, **inferred_fields)
+
+        model = get_agent_model(model_name)
+        _extraction_agent_cache[cache_key] = Agent(
+            model,
+            deps_type=ExtractionDeps,
+            output_type=extraction_model,
+            output_retries=3,
+            retries=3,
         )
 
-        result = field_inference_agent.run_sync(
-            "Infer the types of the keys",
-            deps=field_inference_deps,
-        )
-
-        new_fields = result.output
-
-        if isinstance(new_fields, str):
-            new_fields = remove_code_markers(result.output)
-            debug(new_fields)
-
-        if isinstance(new_fields, str):
-            try:
-                new_fields = json.loads(new_fields)
-            except json.JSONDecodeError:
-                new_fields = {}
-                # Handle the case where JSON parsing fails
-                debug(
-                    "Failed to parse field inference response as JSON.",
-                    new_fields,
-                    field_inference_deps,
-                )
-
-        elif isinstance(new_fields, dict):
-            # Cache newly inferred fields individually
-            for key, field_type in new_fields.items():
-                key_cache_key = get_cache_key(key, context)
-                type_str = reverse_type_mapping.get(field_type, "Any")
-                cache.update(key_cache_key, "field_inference", [type_str])
-        else:
-            # Handle the case where the response is not a dict
-            debug(
-                "Unexpected field inference response format.",
-                new_fields,
-                field_inference_deps,
-            )
-            new_fields = {}
-
-        if isinstance(new_fields, dict):
-            for key_name, key_type in new_fields.items():
-                if key_name not in inferred_fields:
-                    inferred_fields[key_name] = type_mapping.get(key_type, (Any, ...))
-
-    debug(inferred_fields)
-
-    # Proceed with entity extraction
-    dynamic_model = create_model("DynamicEntity", **inferred_fields)
-    extraction_model = create_model(
-        "ExtractionModel",
-        entities=(list[dynamic_model], ...),
-    )
-
-    model = get_agent_model(model_name)
-    extractor_agent = Agent(
-        model,
-        deps_type=ExtractionDeps,
-        output_type=extraction_model,
-        output_retries=3,
-        retries=3,
-    )
+    extractor_agent = _extraction_agent_cache[cache_key]
 
     extractor_deps = ExtractionDeps(
         extraction_context=context,
         fields=inferred_fields,
         text=text,
     )
+
     try:
         # Run the agent synchronously
         extraction = extractor_agent.run_sync(text, deps=extractor_deps)
         debug(extraction.output)
 
         result = extraction.output.model_dump_json(indent=2)
-        debug(result)
 
         result = json.loads(result)
-        filtered_entities = []
-        # cache the result if it is not empty
-        if result and "entities" in result and len(result["entities"]) > 0:
-            filtered_entities = filter_empty_entities(
-                result,
-            )
-        return filtered_entities
+        debug(result)
+
+        # Filter out None/empty values
+        # filtered_result = {k: v for k, v in result.items() if v not in (None, "", [], {})}
+
+        # return filtered_result
+        return result
+
     except AssertionError as e:
         # Extract the dictionary from the error message
         error_msg = str(e)
-        debug(e)
+        debug(f"AssertionError during extraction: {e}")
         if error_msg.startswith("Expected code to be unreachable, but got: "):
             try:
                 # Try to parse the dictionary from the error message
@@ -560,12 +542,16 @@ def extract_entities_with_agent(
                     "Expected code to be unreachable, but got: ",
                     "",
                 )
-                # This may be incomplete JSON due to truncation in the error message
-                # You might need a more robust approach to reconstruct it
                 entity = json.loads(entity_str)
                 debug(entity)
-                return [entity]
-            except:
+                # Filter out None values
+                return {k: v for k, v in entity.items() if v not in (None, "", [], {})}
+            except Exception as parse_error:
+                debug(f"Failed to parse error message: {parse_error}")
                 pass
-        # If we can't recover, return empty results
-        return []
+        # If we can't recover, return empty dict
+        return {}
+
+    except Exception as e:
+        debug(f"Unexpected error during extraction: {e}")
+        return {}
