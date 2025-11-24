@@ -20,12 +20,13 @@ from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
 
-CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "3.0.0"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.3.01:
-- Over 20 bug fixes and tweaks
-- Restored elegant formatting
-- Improved workflow speed and performance
+Introducing Vandalizer 3.0:
+- Collaborative folders, collaborative libraries
+- Verified libraries full of verified tasks
+- The activity feed, showing history of what you've run
+- Fast and more stable everything
 """
 
 # Load environment variables from .env file
