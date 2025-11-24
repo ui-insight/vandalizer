@@ -33,7 +33,7 @@ from app.models import (
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import settings
-from app.utilities.extraction_manager_nontyped import ExtractionManager3
+from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.extraction_tasks import normalize_results, perform_extraction_task
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
@@ -586,7 +586,7 @@ def begin_search_sync() -> ResponseReturnValue:
         # activity.documents_touched = (len(document_uuids),)
         activity.save()
 
-        em = ExtractionManager3()
+        em = ExtractionManagerNonTyped()
         em.root_path = current_app.root_path
         # get current model
         user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
@@ -740,7 +740,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
     if user_model_config is not None:
         model = user_model_config.name
 
-    em = ExtractionManager3()
+    em = ExtractionManagerNonTyped()
     em.root_path = current_app.root_path
 
     keys = em.build_from_documents(document_uuids, model)

@@ -19,7 +19,7 @@ from app.models import (
 )
 from app.utilities.analytics_helper import activity_finish
 from app.utilities.config import settings
-from app.utilities.extraction_manager3 import ExtractionManager3
+from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.semantic_recommender import SemanticRecommender
 
 
@@ -96,7 +96,7 @@ def perform_extraction_task(
         )
 
         # Perform extraction
-        em = ExtractionManager3()
+        em = ExtractionManagerNonTyped()
         em.root_path = root_path
         results = em.extract(keys, document_uuids, model_name)
         raw_results = deepcopy(results)

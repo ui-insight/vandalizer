@@ -13,7 +13,7 @@ from devtools import debug
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 
-class ExtractionManager3:
+class ExtractionManagerNonTyped:
     root_path = ""
 
     def build_from_documents(self, document_uuids, model):

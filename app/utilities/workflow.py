@@ -26,7 +26,7 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
-from app.utilities.extraction_manager_nontyped import ExtractionManager3
+from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.chat_manager import ChatManager
 
 load_dotenv()
@@ -151,7 +151,7 @@ def data_extraction_model(
     if documents is None:
         documents = []
     output = None
-    extraction_manager = ExtractionManager3()
+    extraction_manager = ExtractionManagerNonTyped()
     document_uuids = []
     for doc in documents:
         if doc is None:
