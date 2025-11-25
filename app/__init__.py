@@ -183,37 +183,77 @@ if AUTH_MODE == "AZURE":
             return
 
         info = resp.json()
+        
+        # Use Azure 'id' (UUID) as user_id to match original behavior
+        azure_id = info.get("id")
+        if not azure_id:
+            app.logger.warning("No 'id' field in Azure user info")
+            return
+            
         user_principal_name = info.get("userPrincipalName")
         email = info.get("mail") or user_principal_name
+        display_name = info.get("displayName", "")
         
-        # First, try to find user by user_id (might be email or UUID)
-        user = User.objects(user_id=user_principal_name).first()
+        # First, try to find user by Azure ID (UUID)
+        user = User.objects(user_id=azure_id).first()
         
-        # If not found by user_id, try to find by email to avoid creating duplicates
+        # If not found by Azure ID, try to find by email to avoid creating duplicates
         if not user and email:
             user = User.objects(email=email).first()
             
-            # If found by email, just update the email/name but KEEP the original user_id
-            # This preserves associations with SearchSets, Workflows, etc.
-            if user:
-                app.logger.info(
-                    f"Found existing user by email {email} with user_id={user.user_id}"
-                )
+            # If found by email, check if we need to migrate from email-based user_id to Azure ID
+            if user and user.user_id != azure_id:
+                old_user_id = user.user_id
+                
+                # Check if the old user_id looks like an email (contains @)
+                # This indicates it was created with the old system
+                if "@" in old_user_id:
+                    app.logger.info(
+                        f"Migrating user from email-based user_id '{old_user_id}' to Azure ID '{azure_id}'"
+                    )
+                    
+                    # Import models here to avoid circular imports
+                    from app.models import SearchSet, Workflow, SearchSetItem
+                    
+                    # Update all SearchSets owned by this user
+                    SearchSet.objects(user_id=old_user_id).update(set__user_id=azure_id)
+                    SearchSet.objects(created_by_user_id=old_user_id).update(set__created_by_user_id=azure_id)
+                    
+                    # Update all Workflows owned by this user
+                    Workflow.objects(user_id=old_user_id).update(set__user_id=azure_id)
+                    Workflow.objects(created_by_user_id=old_user_id).update(set__created_by_user_id=azure_id)
+                    
+                    # Update all SearchSetItems (prompts/formatters) owned by this user
+                    SearchSetItem.objects(user_id=old_user_id).update(set__user_id=azure_id)
+                    SearchSetItem.objects(created_by_user_id=old_user_id).update(set__created_by_user_id=azure_id)
+                    
+                    # Update the user's user_id
+                    user.user_id = azure_id
+                    user.save()
+                    
+                    app.logger.info(
+                        f"Successfully migrated user {email} from '{old_user_id}' to '{azure_id}'"
+                    )
+                else:
+                    # User has a UUID that's different from Azure ID - keep it
+                    app.logger.info(
+                        f"Found existing user by email {email} with user_id={user.user_id} (keeping existing UUID)"
+                    )
 
         if not user:
-            # Create a new user if they don't exist
-            app.logger.info(f"Creating new user for {email}")
+            # Create a new user with Azure ID as user_id
+            app.logger.info(f"Creating new user for {email} with Azure ID {azure_id}")
             user = User(
-                user_id=user_principal_name,
+                user_id=azure_id,
                 email=email,
-                name=info["displayName"]
+                name=display_name
             ).save()
         else:
             # Update existing user's email and name if they're missing or changed
             if not user.email or user.email != email:
                 user.email = email
-            if not user.name or user.name != info["displayName"]:
-                user.name = info["displayName"]
+            if not user.name or user.name != display_name:
+                user.name = display_name
             user.save()
 
         login_user(user)  # This is the critical step to create the user session
