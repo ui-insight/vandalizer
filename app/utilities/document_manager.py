@@ -98,10 +98,8 @@ def perform_extraction_and_update(document_uuid, extension):
     #extra_args = ["-V", "geometry:margin=2cm"]
     extra_args = ["--pdf-engine=xelatex", "-V", "geometry:margin=2cm"]
 
-
     pdf_path = absolute_path.with_suffix(".pdf")
-    document.path = str(Path(document.path).with_suffix(".pdf"))
-    document.save()
+
     try:
         if extension in ["xlsx", "xls"]:
             # Convert to HTML
@@ -114,12 +112,16 @@ def perform_extraction_and_update(document_uuid, extension):
             document.path = str(Path(document.path).with_suffix(".html"))
             document.raw_text = raw_text
         elif extension in ["docx", "doc"]:
+            # Convert docx to PDF using pypandoc
             pypandoc.convert_file(
                 absolute_path, "pdf", outputfile=pdf_path, extra_args=extra_args
             )
+            # Extract text from the ORIGINAL docx file (not the PDF)
             raw_text = pypandoc.convert_file(absolute_path, "markdown")
             raw_text = remove_images_from_markdown(raw_text)
             document.raw_text = raw_text
+            # NOW change the document path to PDF (after text extraction is done)
+            document.path = str(Path(document.path).with_suffix(".pdf"))
         else:  # pdf and others
             raw_text = extract_text_from_doc(document.absolute_path, doc=document)
             document.raw_text = raw_text
