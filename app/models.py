@@ -47,6 +47,72 @@ class UserModelConfig(me.Document):
     available_models = me.ListField(me.DictField(), required=False, default=[])
 
 
+class SystemConfig(me.Document):
+    """System-wide configuration model. Only accessible to system administrators."""
+
+    # OCR Configuration
+    ocr_endpoint = me.StringField(
+        default="https://processpdf.insight.uidaho.edu",
+        max_length=500
+    )
+
+    # LLM Configuration
+    llm_endpoint = me.StringField(
+        default="https://mindrouter-api.nkn.uidaho.edu/v1",
+        max_length=500
+    )
+
+    # Available models configuration
+    # Each model is a dict with keys: name, tag, external
+    available_models = me.ListField(me.DictField(), default=[
+        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False},
+        {"name": "openai/gpt-5", "tag": "Cloud", "external": True}
+    ])
+
+    # UI Configuration
+    highlight_color = me.StringField(
+        default="#eab308",  # Vandal gold/yellow (Tailwind yellow-500)
+        max_length=50
+    )
+
+    # Authentication Configuration
+    # List of enabled authentication methods
+    auth_methods = me.ListField(me.StringField(), default=["password"])
+
+    # OAuth/SAML provider configurations
+    # Each provider is a dict with keys:
+    # - provider: "azure" | "saml" | "google" | "github" | etc.
+    # - enabled: bool
+    # - display_name: str (e.g., "Sign in with Azure")
+    # - client_id: str
+    # - client_secret: str (encrypted in production)
+    # - tenant_id: str (Azure-specific)
+    # - redirect_uri: str
+    # - metadata_url: str (SAML-specific)
+    # - entity_id: str (SAML-specific)
+    # - authorization_endpoint: str (custom OAuth)
+    # - token_endpoint: str (custom OAuth)
+    # - userinfo_endpoint: str (custom OAuth)
+    oauth_providers = me.ListField(me.DictField(), default=[])
+
+    # Metadata
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_by = me.StringField(max_length=200)
+
+    meta = {
+        "collection": "system_config",
+        "indexes": []
+    }
+
+    @classmethod
+    def get_config(cls):
+        """Get or create the singleton system configuration."""
+        config = cls.objects.first()
+        if not config:
+            config = cls().save()
+        return config
+
+
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
 

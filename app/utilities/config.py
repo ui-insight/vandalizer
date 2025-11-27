@@ -171,5 +171,103 @@ class Settings(BaseSettings):
         description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override with database config if available
+        self._load_from_db()
+
+    def _load_from_db(self):
+        """Load configuration from database SystemConfig if available."""
+        try:
+            from app.models import SystemConfig
+            db_config = SystemConfig.get_config()
+            if db_config:
+                # Override LLM endpoint
+                if db_config.llm_endpoint:
+                    self.insight_endpoint = db_config.llm_endpoint
+
+                # Override available models
+                if db_config.available_models:
+                    self.models = [
+                        ModelType(**model) for model in db_config.available_models
+                    ]
+        except Exception as e:
+            # Silently fail if database is not available or SystemConfig doesn't exist
+            # This allows the app to start even if MongoDB is not yet initialized
+            pass
+
 
 settings = Settings()
+
+
+def get_ocr_endpoint() -> str:
+    """Get OCR endpoint from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.ocr_endpoint:
+            return db_config.ocr_endpoint
+    except Exception:
+        pass
+    return "https://processpdf.insight.uidaho.edu"
+
+
+def get_highlight_color() -> str:
+    """Get UI highlight color from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.highlight_color:
+            return db_config.highlight_color
+    except Exception:
+        pass
+    return "#eab308"  # Vandal gold/yellow
+
+
+def get_auth_methods() -> list[str]:
+    """Get enabled authentication methods from database config."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.auth_methods:
+            return db_config.auth_methods
+    except Exception:
+        pass
+    return ["password"]
+
+
+def get_oauth_providers(enabled_only: bool = True) -> list[dict]:
+    """Get OAuth/SAML providers from database config.
+
+    Args:
+        enabled_only: If True, only return enabled providers
+
+    Returns:
+        List of provider configurations
+    """
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.oauth_providers:
+            if enabled_only:
+                return [p for p in db_config.oauth_providers if p.get("enabled", True)]
+            return db_config.oauth_providers
+    except Exception:
+        pass
+    return []
+
+
+def get_oauth_provider_by_type(provider_type: str) -> dict | None:
+    """Get a specific OAuth provider configuration by type.
+
+    Args:
+        provider_type: The provider type (azure, saml, google, etc.)
+
+    Returns:
+        Provider configuration dict or None if not found
+    """
+    providers = get_oauth_providers(enabled_only=True)
+    for provider in providers:
+        if provider.get("provider") == provider_type:
+            return provider
+    return None
