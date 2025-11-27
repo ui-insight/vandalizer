@@ -1,4 +1,5 @@
 # admin_routes.py (or wherever your Flask routes live)
+import json
 import secrets
 from datetime import datetime, time, timedelta, timezone
 from devtools import debug
@@ -18,6 +19,7 @@ from app.models import (
     ActivityEvent,
     DailyUsageAggregate,
     Space,
+    SystemConfig,
     Team,
     TeamInvite,
     TeamMembership,
@@ -309,3 +311,246 @@ def admin_teams_invite():
 
     # TODO: send mail
     return redirect(url_for("admin.admin_teams"))
+
+
+@admin.route("/config", methods=["GET"])
+def admin_config():
+    """System configuration page - only accessible to system administrators."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+    return render_template(
+        "admin/config.html",
+        config=config,
+        is_admin=True,
+        current_user_name=user.name
+    )
+
+
+@admin.route("/config/update", methods=["POST"])
+def admin_config_update():
+    """Update system configuration - only accessible to system administrators."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    # Update OCR endpoint
+    ocr_endpoint = request.form.get("ocr_endpoint", "").strip()
+    if ocr_endpoint:
+        config.ocr_endpoint = ocr_endpoint
+
+    # Update LLM endpoint
+    llm_endpoint = request.form.get("llm_endpoint", "").strip()
+    if llm_endpoint:
+        config.llm_endpoint = llm_endpoint
+
+    # Update highlight color
+    highlight_color = request.form.get("highlight_color", "").strip()
+    if highlight_color:
+        config.highlight_color = highlight_color
+
+    # Update available models from JSON
+    models_json = request.form.get("models_json", "").strip()
+    if models_json:
+        try:
+            models = json.loads(models_json)
+            config.available_models = models
+        except json.JSONDecodeError:
+            return jsonify({"error": "Invalid JSON for models"}), 400
+
+    # Update metadata
+    config.updated_at = datetime.now(timezone.utc)
+    config.updated_by = user.user_id
+    config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/add_model", methods=["POST"])
+def admin_config_add_model():
+    """Add a new model to the configuration."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    model_name = request.form.get("model_name", "").strip()
+    model_tag = request.form.get("model_tag", "").strip()
+    model_external = request.form.get("model_external") == "on"
+
+    if not model_name or not model_tag:
+        return jsonify({"error": "Model name and tag are required"}), 400
+
+    # Add new model
+    new_model = {
+        "name": model_name,
+        "tag": model_tag,
+        "external": model_external
+    }
+
+    if not config.available_models:
+        config.available_models = []
+
+    config.available_models.append(new_model)
+    config.updated_at = datetime.now(timezone.utc)
+    config.updated_by = user.user_id
+    config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/remove_model/<int:index>", methods=["POST"])
+def admin_config_remove_model(index):
+    """Remove a model from the configuration."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    if 0 <= index < len(config.available_models):
+        config.available_models.pop(index)
+        config.updated_at = datetime.now(timezone.utc)
+        config.updated_by = user.user_id
+        config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/auth/update_methods", methods=["POST"])
+def admin_config_update_auth_methods():
+    """Update enabled authentication methods."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    # Get selected auth methods from checkboxes
+    password_enabled = request.form.get("auth_password") == "on"
+    oauth_enabled = request.form.get("auth_oauth") == "on"
+
+    auth_methods = []
+    if password_enabled:
+        auth_methods.append("password")
+    if oauth_enabled:
+        auth_methods.append("oauth")
+
+    # Ensure at least one method is enabled
+    if not auth_methods:
+        return jsonify({"error": "At least one authentication method must be enabled"}), 400
+
+    config.auth_methods = auth_methods
+    config.updated_at = datetime.now(timezone.utc)
+    config.updated_by = user.user_id
+    config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/auth/add_provider", methods=["POST"])
+def admin_config_add_oauth_provider():
+    """Add a new OAuth/SAML provider."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    provider_type = request.form.get("provider_type", "").strip()
+    display_name = request.form.get("display_name", "").strip()
+    client_id = request.form.get("client_id", "").strip()
+    client_secret = request.form.get("client_secret", "").strip()
+    redirect_uri = request.form.get("redirect_uri", "").strip()
+
+    if not all([provider_type, display_name, client_id, redirect_uri]):
+        return jsonify({"error": "Provider type, display name, client ID, and redirect URI are required"}), 400
+
+    new_provider = {
+        "provider": provider_type,
+        "enabled": True,
+        "display_name": display_name,
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "redirect_uri": redirect_uri,
+    }
+
+    # Add provider-specific fields
+    if provider_type == "azure":
+        tenant_id = request.form.get("tenant_id", "").strip()
+        if tenant_id:
+            new_provider["tenant_id"] = tenant_id
+        # Azure well-known endpoints
+        new_provider["authority"] = f"https://login.microsoftonline.com/{tenant_id}" if tenant_id else ""
+
+    elif provider_type == "saml":
+        metadata_url = request.form.get("metadata_url", "").strip()
+        entity_id = request.form.get("entity_id", "").strip()
+        if metadata_url:
+            new_provider["metadata_url"] = metadata_url
+        if entity_id:
+            new_provider["entity_id"] = entity_id
+
+    else:
+        # Custom OAuth provider
+        authorization_endpoint = request.form.get("authorization_endpoint", "").strip()
+        token_endpoint = request.form.get("token_endpoint", "").strip()
+        userinfo_endpoint = request.form.get("userinfo_endpoint", "").strip()
+
+        if authorization_endpoint:
+            new_provider["authorization_endpoint"] = authorization_endpoint
+        if token_endpoint:
+            new_provider["token_endpoint"] = token_endpoint
+        if userinfo_endpoint:
+            new_provider["userinfo_endpoint"] = userinfo_endpoint
+
+    if not config.oauth_providers:
+        config.oauth_providers = []
+
+    config.oauth_providers.append(new_provider)
+    config.updated_at = datetime.now(timezone.utc)
+    config.updated_by = user.user_id
+    config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/auth/remove_provider/<int:index>", methods=["POST"])
+def admin_config_remove_oauth_provider(index):
+    """Remove an OAuth/SAML provider."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    if 0 <= index < len(config.oauth_providers):
+        config.oauth_providers.pop(index)
+        config.updated_at = datetime.now(timezone.utc)
+        config.updated_by = user.user_id
+        config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/auth/toggle_provider/<int:index>", methods=["POST"])
+def admin_config_toggle_oauth_provider(index):
+    """Toggle OAuth/SAML provider enabled status."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    if 0 <= index < len(config.oauth_providers):
+        config.oauth_providers[index]["enabled"] = not config.oauth_providers[index].get("enabled", True)
+        config.updated_at = datetime.now(timezone.utc)
+        config.updated_by = user.user_id
+        config.save()
+
+    return redirect(url_for("admin.admin_config"))

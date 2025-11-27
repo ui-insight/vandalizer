@@ -6,14 +6,18 @@ from PyPDF2 import PdfReader
 
 warnings.simplefilter("always", UserWarning)
 
-# for dev
-# HOST_URL = 'http://processpdf.nkn.uidaho.edu'
+# Default OCR endpoint - can be overridden by system configuration
+DEFAULT_HOST_URL = "https://processpdf.insight.uidaho.edu"
 
-# for local
-# HOST_URL = 'http://localhost:5019'
+def get_host_url() -> str:
+    """Get OCR endpoint from system configuration or use default."""
+    try:
+        from app.utilities.config import get_ocr_endpoint
+        return get_ocr_endpoint()
+    except Exception:
+        return DEFAULT_HOST_URL
 
-# for prod
-HOST_URL = "https://processpdf.insight.uidaho.edu"
+HOST_URL = get_host_url()
 
 valid_vlm_methods = [
     "gemma3-64k:27b",
