@@ -6,7 +6,7 @@ from typing import Optional, Any, List
 from pydantic import create_model, BaseModel
 from pydantic_ai import Agent
 from app.utilities.agents import get_agent_model, create_chat_agent
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name
 from app.models import SmartDocument
 from devtools import debug
 
@@ -35,7 +35,9 @@ class ExtractionManagerNonTyped:
 
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
-        chat_agent = create_chat_agent(settings.base_model, system_prompt=system_prompt)
+        chat_agent = create_chat_agent(
+            get_default_model_name(), system_prompt=system_prompt
+        )
         result = chat_agent.run_sync(prompt)
         output = result.output
         debug(output)
@@ -59,7 +61,7 @@ class ExtractionManagerNonTyped:
 
         # Use provided model or fall back to settings
         if model is None:
-            model = settings.base_model
+            model = get_default_model_name()
 
         time.time()
         openai.api_key = OPENAI_API_KEY

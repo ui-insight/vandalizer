@@ -110,7 +110,7 @@
           </p>
 
           {% block hero_auth %}
-          {% if AUTH_MODE == 'LOCAL' %}
+          {% if password_enabled %}
 
           <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
             {% with messages = get_flashed_messages(with_categories=true) %}
@@ -130,8 +130,10 @@
               account</a>
           </p>
 
-          {% else %}
+          {% elif oauth_enabled %}
           <a class="action-button" href="/login" class="">SIGN IN</a>
+          {% else %}
+          <p class="text-sm text-gray-200">No authentication methods are enabled. Please contact an administrator.</p>
           {% endif %}
           {% endblock %}
         </div>

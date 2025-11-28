@@ -10,13 +10,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.celery_worker import celery_app
 from app.models import SmartDocument
 from app.utilities.agents import create_chat_agent, secure_agent
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name
 from app.utilities.document_readers import extract_text_from_doc
 
 load_dotenv()
 
 
-chat_agent = create_chat_agent(settings.base_model)
+chat_agent = create_chat_agent(get_default_model_name())
 
 
 @celery_app.task(

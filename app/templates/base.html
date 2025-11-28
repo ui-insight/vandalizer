@@ -19,6 +19,25 @@ block head %} {{super()}}
   href="{{url_for('static', filename='fontawesome/css/solid.css')}}?"
 />
 
+<style>
+  :root {
+    --highlight-color: {{ highlight_color|default('#eab308') }};
+  }
+
+  .highlight {
+    background-color: var(--highlight-color) !important;
+  }
+
+  .selected-text-highlight {
+    background: color-mix(in srgb, var(--highlight-color) 70%, transparent);
+    border-radius: 2px;
+  }
+
+  .selected-text-highlight:hover {
+    background: color-mix(in srgb, var(--highlight-color) 85%, transparent);
+  }
+</style>
+
 {% endblock %} {% block scripts %} {{super()}}
 
 <script

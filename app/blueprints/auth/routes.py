@@ -17,6 +17,7 @@ from mongoengine.errors import NotUniqueError
 
 from app import load_user
 from app.models import TeamInvite, TeamMembership, User
+from app.utilities.config import get_auth_methods
 
 auth = Blueprint("auth", __name__)
 
@@ -29,18 +30,31 @@ def index() -> ResponseReturnValue:
     if user is not None:
         return redirect(url_for("home.index"))
 
-    return render_template("landing.html", AUTH_MODE=current_app.config["AUTH_MODE"])
+    methods = get_auth_methods()
+    return render_template(
+        "landing.html",
+        AUTH_MODE=current_app.config["AUTH_MODE"],
+        password_enabled="password" in methods,
+        oauth_enabled="oauth" in methods,
+    )
 
 
 @auth.route("/login", methods=["GET", "POST"])
 def login() -> ResponseReturnValue:
     """Handle the login process. Redirect to Azure login if not authorized."""
-    # Bypass Azure login in dev/local environments
+    methods = get_auth_methods()
+    password_enabled = "password" in methods
+    oauth_enabled = "oauth" in methods
 
-    auth_mode = current_app.config.get("AUTH_MODE")
-    print(f"Logging in with {auth_mode}")
+    if request.method == "GET":
+        if oauth_enabled and not password_enabled:
+            if "azure" in current_app.blueprints:
+                return redirect(url_for("azure.login"))
+            flash("OAuth is enabled but no provider is configured.", "danger")
+            return redirect(url_for("auth.index"))
+        return redirect(url_for("auth.index"))
 
-    if auth_mode == "LOCAL":
+    if password_enabled:
         email = request.form.get("email")
         password = request.form.get("password")
 
@@ -55,14 +69,24 @@ def login() -> ResponseReturnValue:
             flash("Invalid email or password.", "danger")
             return redirect(url_for("auth.index"))
 
-    if not azure.authorized:
-        return redirect(url_for("azure.login"))
-    return redirect(url_for("home.index"))
+    if oauth_enabled:
+        if "azure" not in current_app.blueprints:
+            flash("OAuth is enabled but no provider is configured.", "danger")
+            return redirect(url_for("auth.index"))
+        if not azure.authorized:
+            return redirect(url_for("azure.login"))
+        return redirect(url_for("home.index"))
+
+    flash("No authentication methods are enabled. Contact an administrator.", "danger")
+    return redirect(url_for("auth.index"))
 
 
 @auth.route("/register", methods=["GET", "POST"])
 def register():
     """Handles user registration."""
+    if "password" not in get_auth_methods():
+        flash("Password registration is disabled. Please use the configured SSO provider.", "warning")
+        return redirect(url_for("auth.index"))
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()

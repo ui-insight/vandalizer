@@ -21,7 +21,7 @@
 
 
 .highlight {
-  background-color: yellow;
+  background-color: var(--highlight-color, yellow);
   position: absolute;
 }
 
@@ -55,7 +55,7 @@
 
 .filter-icon {
     font-size: 1em;
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
     margin-right: 10px;
 }
 
@@ -67,7 +67,7 @@
 
 .delete-set-item-button {
     font-size: 1em;
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
     margin-left: 10px;
 }
 

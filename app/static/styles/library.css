@@ -26,7 +26,7 @@
 
     /* Scope tab and card styles */
     .scope-tab.active {
-        border-bottom: 4px solid #f1b300;
+        border-bottom: 4px solid var(--highlight-color, #f1b300);
     }
 
     .library-card {

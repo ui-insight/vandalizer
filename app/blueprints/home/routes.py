@@ -62,7 +62,7 @@ from app.utilities.analytics_helper import (
     activity_start,
 )
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name, settings
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
@@ -704,7 +704,7 @@ def chat() -> ResponseReturnValue:
     if model_config:
         model = model_config.name
     else:
-        model = settings.base_model
+        model = get_default_model_name()
 
     def generate():
         for chunk in ChatManager().ask_question_to_documents_stream(
@@ -1216,7 +1216,7 @@ def chat_download() -> ResponseReturnValue:
     if model_config:
         model = model_config.name
     else:
-        model = settings.base_model
+        model = get_default_model_name()
 
     if fmt == "pdf":
         formatted = final_output

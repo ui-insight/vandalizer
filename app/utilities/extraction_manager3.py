@@ -7,7 +7,7 @@ from devtools import debug
 
 from app.models import SmartDocument
 from app.utilities.agents import create_chat_agent, extract_entities_with_agent
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
@@ -35,7 +35,7 @@ class ExtractionManager3:
         system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
 
         if not model:
-            model = settings.base_model
+            model = get_default_model_name()
 
         chat_agent = create_chat_agent(model, system_prompt=system_prompt)
         result = chat_agent.run_sync(prompt)
@@ -62,7 +62,7 @@ class ExtractionManager3:
         time.time()
         extraction = []
         if not model:
-            model = settings.base_model
+            model = get_default_model_name()
 
         if full_text is None:
             for document_uuid in document_uuids:

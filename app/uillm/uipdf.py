@@ -9,6 +9,7 @@ warnings.simplefilter("always", UserWarning)
 # Default OCR endpoint - can be overridden by system configuration
 DEFAULT_HOST_URL = "https://processpdf.insight.uidaho.edu"
 
+
 def get_host_url() -> str:
     """Get OCR endpoint from system configuration or use default."""
     try:
@@ -16,8 +17,6 @@ def get_host_url() -> str:
         return get_ocr_endpoint()
     except Exception:
         return DEFAULT_HOST_URL
-
-HOST_URL = get_host_url()
 
 valid_vlm_methods = [
     "gemma3-64k:27b",
@@ -177,14 +176,15 @@ class UIPDF:
             raise ValueError(f"Invalid method: {method}")
 
         params["tool_type"] = _type
+        host_url = get_host_url()
         if webhook_url:
             params["webhook_url"] = webhook_url
-            endpoint = f"{HOST_URL}/api/v1/start-job"
+            endpoint = f"{host_url}/api/v1/start-job"
         else:
             if _type == "ocr":
-                endpoint = f"{HOST_URL}/api/v1/ExtractPDF"
+                endpoint = f"{host_url}/api/v1/ExtractPDF"
             elif _type == "vlm":
-                endpoint = f"{HOST_URL}/api/v1/AIExtractPDF"
+                endpoint = f"{host_url}/api/v1/AIExtractPDF"
 
         try:
             response = requests.post(url=endpoint, params=params, files=file)
@@ -248,11 +248,12 @@ class UIPDF:
             "vlm_name": method,
             "pages_to_extract": str(only_these_pages),
         }
+        host_url = get_host_url()
         if webhook_url:
             params["webhook_url"] = webhook_url
-            endpoint = f"{HOST_URL}/api/v1/start-job"
+            endpoint = f"{host_url}/api/v1/start-job"
         else:
-            endpoint = f"{HOST_URL}/api/v1/AIExtractPDF"
+            endpoint = f"{host_url}/api/v1/AIExtractPDF"
 
         try:
             with open(file_path, "rb") as pdf_file:
@@ -359,7 +360,7 @@ class UIPDF:
             raise ValueError(f"Invalid method: {method}")
 
         params["tool_type"] = _type
-        endpoint = f"{HOST_URL}/api/v1/ExtractTable"
+        endpoint = f"{get_host_url()}/api/v1/ExtractTable"
 
         try:
             response = requests.post(url=endpoint, params=params, files=file)
