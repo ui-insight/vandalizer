@@ -33,6 +33,7 @@ a {
 
 .btn-primary {
     background-color: var(--highlight-color, #f1b300);
+    color: var(--highlight-text-color, #191919);
 }
 
 .navbar-default {
@@ -95,7 +96,7 @@ a.btn-frontpage-cta:hover {
     border-color : var(--highlight-color, #f1b300);
     background-color: var(--highlight-color, #f1b300);
     border-width: 2px;
-    color: #fff;
+    color: var(--highlight-text-color, #fff);
 
 }
 
@@ -1039,7 +1040,7 @@ tr {
     line-height: 1;
     font-weight: 700;
     text-transform: uppercase;
-    color: #191919;
+    color: var(--highlight-text-color, #191919);
     padding: 0.65em;
     outline-offset: 3px;
 }
@@ -1114,7 +1115,11 @@ textarea {
     overflow: hidden;
     padding: 2rem;
     /* border-radius: 12px; */
-    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    background: linear-gradient(
+        135deg,
+        var(--highlight-complement, #6a11cb),
+        color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
+    );
     color: #fff;
     font-family: 'Montserrat', sans-serif;
     text-align: center;

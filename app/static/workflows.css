@@ -139,6 +139,7 @@
     padding: 0.65em;
     outline-offset: 3px;
     margin-top: -15px;
+    color: var(--highlight-text-color, #191919);
   }
   
   .add-step button:hover {

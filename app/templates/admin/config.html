@@ -378,8 +378,8 @@
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <input type="color" id="highlight_color" name="highlight_color" value="{{ config.highlight_color }}"
                            style="width: 80px; height: 40px; padding: 2px; cursor: pointer;">
-                    <input type="text" id="highlight_color_hex" value="{{ config.highlight_color }}"
-                           style="width: 120px;" readonly>
+                    <input type="text" id="highlight_color_hex" name="highlight_color_hex" value="{{ config.highlight_color }}"
+                           style="width: 120px;" placeholder="#eab308">
                 </div>
             </div>
         </div>
@@ -662,5 +662,30 @@
             displayNameInput.placeholder = placeholders[providerType];
         }
     }
+</script>
+<script>
+    // Keep color input and hex text in sync and allow manual hex entry
+    (function () {
+        const colorInput = document.getElementById('highlight_color');
+        const hexInput = document.getElementById('highlight_color_hex');
+        if (!colorInput || !hexInput) return;
+
+        // when picking from the color input
+        colorInput.addEventListener('input', () => {
+            hexInput.value = colorInput.value;
+        });
+
+        // when typing hex, normalize and reflect into color input
+        hexInput.addEventListener('input', () => {
+            let val = hexInput.value.trim();
+            if (!val.startsWith('#')) {
+                val = '#' + val;
+            }
+            // basic validation for 4 or 7 length (#RGB or #RRGGBB)
+            if (val.length === 4 || val.length === 7) {
+                colorInput.value = val;
+            }
+        });
+    })();
 </script>
 {% endblock %}
