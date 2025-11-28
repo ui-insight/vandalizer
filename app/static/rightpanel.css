@@ -126,6 +126,7 @@ button.shadow-button {
   font-weight: 700;
   background-color: var(--highlight-color, #f1b300);
   color: var(--highlight-text-color, #191919);
+  border-radius: var(--ui-radius, 12px);
   transition: 1s;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
@@ -191,7 +192,8 @@ button.shadow-button:hover {
 .segmented-control {
   display: flex;
   border: 1px solid #ddd;
-  border-radius: 5px;
+  border-radius: var(--ui-radius, 12px);
+  overflow: hidden;
 }
 
 .segmented-control input[type="radio"] {
@@ -206,6 +208,7 @@ button.shadow-button:hover {
   cursor: pointer;
   background: white;
   margin-bottom: 0px;
+  border-radius: var(--ui-radius, 12px);
 }
 
 .segmented-control input[type="radio"]:checked+label {
@@ -215,11 +218,11 @@ button.shadow-button:hover {
 }
 
 .segmented-control label:first-of-type {
-  border-radius: 5px 0 0 5px;
+  border-radius: var(--ui-radius, 12px) 0 0 var(--ui-radius, 12px);
 }
 
 .segmented-control label:last-of-type {
-  border-radius: 0 5px 5px 0;
+  border-radius: 0 var(--ui-radius, 12px) var(--ui-radius, 12px) 0;
 }
 
 .ask-question-container {
@@ -228,6 +231,7 @@ button.shadow-button:hover {
   z-index: 100;
   padding: 6px;
   background-color: #19191913;
+  border-radius: var(--ui-radius, 12px);
 }
 
 .input-container {
@@ -252,6 +256,8 @@ button.shadow-button:hover {
   border-width: 0px;
   background-color: white;
   border: 1px solid #d3d3d3;
+  border-radius: var(--ui-radius, 12px);
+  overflow: hidden;
 }
 
 .ask-question .search-button {
@@ -262,7 +268,7 @@ button.shadow-button:hover {
   width: 40px;
   border-width: 0px;
   background-color: transparent;
-  border-radius: 6px;
+  border-radius: var(--ui-radius, 12px);
   box-shadow: 1 1px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
   font-weight: 600;
@@ -279,6 +285,7 @@ button.shadow-button:hover {
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   font-size: 12px;
   font-weight: 600;
+  border-radius: var(--ui-radius, 12px);
 }
 
 .ask-question .add-button {
@@ -331,6 +338,7 @@ button.shadow-button:hover {
   overflow: scroll;
   height: calc(100vh - 120px);
 }
+
 
 .tasks-panel::-webkit-scrollbar {
   display: none;
@@ -386,6 +394,8 @@ button.shadow-button:hover {
 .action-buttons {
   display: flex;
   justify-content: space-between;
+  border-radius: var(--ui-radius, 12px);
+  overflow: hidden;
 }
 
 .action-button {
@@ -393,7 +403,7 @@ button.shadow-button:hover {
   color: white;
   border: none;
   padding: 10px 15px;
-  border-radius: 8px;
+  border-radius: var(--ui-radius, 12px);
   font-size: 0.9em;
   cursor: pointer;
   flex: 1;
@@ -414,6 +424,7 @@ button.shadow-button:hover {
   padding: 15px;
   border-width: 0px;
   border: 1px solid #d3d3d3;
+  border-radius: var(--ui-radius, 12px);
 }
 
 .informationmodal textarea {
@@ -421,7 +432,7 @@ button.shadow-button:hover {
   height: 100%;
   padding: 15px;
   border-width: 0px;
-  border-radius: 6px;
+  border-radius: var(--ui-radius, 12px);
   border: 1px solid #d3d3d3;
 }
 
@@ -495,6 +506,8 @@ button.shadow-button:hover {
   height: 40px;
   flex: 1;
   display: flex;
+  border-radius: var(--ui-radius, 12px);
+  overflow: hidden;
 }
 
 .workflow-panel button {
@@ -505,7 +518,7 @@ button.shadow-button:hover {
   background-color: #ffffff;
   color: #191919;
   border: 2px solid #d3d3d386;
-  border-radius: 0px;
+  border-radius: var(--ui-radius, 12px);
   text-decoration: none;
   text-align: center;
   -webkit-transition: all 0.3s ease 0s;
@@ -536,7 +549,7 @@ button.shadow-button:hover {
   background-color: red;
   color: white;
   border: 2px solid #d3d3d386;
-  border-radius: 0px;
+  border-radius: var(--ui-radius, 12px);
   text-decoration: none;
   text-align: center;
   -webkit-transition: all 0.3s ease 0s;

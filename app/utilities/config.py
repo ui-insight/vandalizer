@@ -260,6 +260,30 @@ def get_highlight_color() -> str:
     return "#eab308"  # Vandal gold/yellow
 
 
+def _normalize_radius(value: str) -> str:
+    """Ensure a CSS-friendly radius string (append px if numeric)."""
+    if not value:
+        return "12px"
+    value = value.strip()
+    if value.isdigit():
+        return f"{value}px"
+    if value.replace(".", "", 1).isdigit() and not value.endswith("px"):
+        return f"{value}px"
+    return value
+
+
+def get_ui_radius() -> str:
+    """Get UI radius from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and getattr(db_config, "ui_radius", None):
+            return _normalize_radius(db_config.ui_radius)
+    except Exception:
+        pass
+    return "12px"
+
+
 def get_auth_methods() -> list[str]:
     """Get enabled authentication methods from database config."""
     env = os.getenv("FLASK_ENV", "development").lower()

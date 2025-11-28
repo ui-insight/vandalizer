@@ -353,6 +353,15 @@ def admin_config_update():
     if highlight_color:
         config.highlight_color = highlight_color
 
+    # Update UI radius
+    ui_radius = request.form.get("ui_radius", "").strip()
+    if ui_radius:
+        if ui_radius.isdigit():
+            ui_radius = f"{ui_radius}px"
+        elif ui_radius.replace(".", "", 1).isdigit() and not ui_radius.endswith("px"):
+            ui_radius = f"{ui_radius}px"
+        config.ui_radius = ui_radius
+
     # Update available models from JSON
     models_json = request.form.get("models_json", "").strip()
     if models_json:

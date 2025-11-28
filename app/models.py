@@ -74,6 +74,10 @@ class SystemConfig(me.Document):
         default="#eab308",  # Vandal gold/yellow (Tailwind yellow-500)
         max_length=50
     )
+    ui_radius = me.StringField(
+        default="12px",
+        max_length=50
+    )
 
     # Authentication Configuration
     # List of enabled authentication methods

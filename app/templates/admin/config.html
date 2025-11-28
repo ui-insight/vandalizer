@@ -382,6 +382,21 @@
                            style="width: 120px;" placeholder="#eab308">
                 </div>
             </div>
+
+            <div class="form-group">
+                <label for="ui_radius">
+                    Corner Radius (px)
+                </label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <input type="number" id="ui_radius_number" min="0" max="48" step="1"
+                           value="{{ config.ui_radius|default('12px')|replace('px','') }}"
+                           style="width: 120px;">
+                    <input type="text" id="ui_radius" name="ui_radius"
+                           value="{{ config.ui_radius|default('12px') }}" style="width: 100px;"
+                           placeholder="12px">
+                </div>
+                <p class="metadata">Default: 12px (matches current UI)</p>
+            </div>
         </div>
 
         <div class="save-bar">
@@ -668,6 +683,8 @@
     (function () {
         const colorInput = document.getElementById('highlight_color');
         const hexInput = document.getElementById('highlight_color_hex');
+        const radiusNumber = document.getElementById('ui_radius_number');
+        const radiusInput = document.getElementById('ui_radius');
         if (!colorInput || !hexInput) return;
 
         // when picking from the color input
@@ -686,6 +703,26 @@
                 colorInput.value = val;
             }
         });
+
+        // sync radius numeric and text inputs
+        if (radiusNumber && radiusInput) {
+            const syncRadius = () => {
+                const numVal = radiusNumber.value;
+                if (numVal !== undefined && numVal !== null && numVal !== "") {
+                    radiusInput.value = `${numVal}px`;
+                }
+            };
+            radiusNumber.addEventListener('input', syncRadius);
+            radiusInput.addEventListener('input', () => {
+                const val = radiusInput.value.trim();
+                if (val.endsWith('px')) {
+                    const raw = val.replace('px', '');
+                    if (!Number.isNaN(parseFloat(raw))) {
+                        radiusNumber.value = raw;
+                    }
+                }
+            });
+        }
     })();
 </script>
 {% endblock %}

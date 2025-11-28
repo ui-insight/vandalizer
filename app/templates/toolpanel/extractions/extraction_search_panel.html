@@ -5,18 +5,18 @@
             <!-- Input Field Container -->
             <div class="ask-question" style="flex: 1; display: flex; position: relative;">
                 <input type="text" id="add-search-term-input" placeholder="Add term to extract..." 
-                    style="width: 100%; padding-right: 60px;">
+                    style="width: 100%; padding-right: 60px; border-radius: var(--ui-radius, 12px);">
                 
                 <!-- Add Button hovering over the input's right edge -->
                 <button class="add-button-2 btn btn-primary" id="add-term-button" 
-                    style="position: absolute; right: 0; top: 0; bottom: 0; height: 100%; background-color: #191919; color: white; border-radius: 0;">
+                    style="position: absolute; right: 0; top: 0; bottom: 0; height: 100%; background-color: #191919; color: white; border-radius: var(--ui-radius, 12px);">
                     Add
                 </button>
             </div>
 
             <!-- Run Button aligned next to the input and same width -->
             <button class="btn btn-primary" id="run-term-button" data-uuid="{{ search_set.uuid }}"
-                style="flex: 1; margin-left: 10px; height: 100%; border-radius: 0;">
+                style="flex: 1; margin-left: 10px; height: 100%; border-radius: var(--ui-radius, 12px);">
                 Run
             </button>
         </div>

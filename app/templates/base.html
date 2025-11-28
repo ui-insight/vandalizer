@@ -33,6 +33,7 @@ block head %} {{super()}}
     {% set gc = 255 - g %}
     {% set bc = 255 - b %}
     --highlight-complement: {{ '#{:02x}{:02x}{:02x}'.format(rc, gc, bc) }};
+    --ui-radius: {{ ui_radius|default('12px') }};
   }
 
   .highlight {

@@ -19,7 +19,7 @@ from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
-from app.utilities.config import get_auth_methods, get_highlight_color
+from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -229,6 +229,7 @@ def inject_ui_config():
     """Expose UI/auth configuration to templates."""
     return {
         "highlight_color": get_highlight_color(),
+        "ui_radius": get_ui_radius(),
         "auth_password_enabled": PASSWORD_AUTH_ENABLED,
         "auth_oauth_enabled": OAUTH_AUTH_ENABLED,
     }

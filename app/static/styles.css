@@ -34,6 +34,7 @@ a {
 .btn-primary {
     background-color: var(--highlight-color, #f1b300);
     color: var(--highlight-text-color, #191919);
+    border-radius: var(--ui-radius, 12px);
 }
 
 .navbar-default {
@@ -1028,7 +1029,7 @@ tr {
 
 .btn, .btn-primary {
     background-color: var(--highlight-color, #f1b300);
-    border-radius: 0px;
+    border-radius: var(--ui-radius, 12px);
     text-decoration: none;
     text-align: center;
     border: 2px solid var(--highlight-color, #f1b300);
@@ -1059,7 +1060,7 @@ textarea {
     height: 100%;
     padding: 15px;
     border-width: 0px;
-    border-radius: 0px;
+    border-radius: var(--ui-radius, 12px);
     border: 1px solid #d3d3d3;
 }
 
@@ -1114,7 +1115,7 @@ textarea {
     position: relative;
     overflow: hidden;
     padding: 2rem;
-    /* border-radius: 12px; */
+    border-radius: var(--ui-radius, 12px);
     background: linear-gradient(
         135deg,
         var(--highlight-complement, #6a11cb),
