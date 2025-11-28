@@ -32,7 +32,7 @@ from app.models import (
 )
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name, get_llm_models
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.extraction_tasks import normalize_results, perform_extraction_task
 from app.utilities.library_helpers import (
@@ -90,10 +90,11 @@ def filter_models() -> ResponseReturnValue:
     validation_failed = False
     user = current_user
 
-    settings_models = [m.model_dump() for m in settings.models]
+    settings_models = get_llm_models()
+    default_model = get_default_model_name()
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
     if not model_config:
-        model_config = UserModelConfig(user_id=user.user_id, name=settings.base_model)
+        model_config = UserModelConfig(user_id=user.user_id, name=default_model)
         model_config.available_models = settings_models
         model_config.save()
 
@@ -103,7 +104,7 @@ def filter_models() -> ResponseReturnValue:
     # refresh the  model config
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
 
-    current_model = settings.base_model
+    current_model = default_model
     print(current_model)
     models = settings_models
     if len(uuids) == 0:
@@ -122,7 +123,7 @@ def filter_models() -> ResponseReturnValue:
         current_model = (
             model_config.name
             if model_config.name in model_names
-            else "gpt-oss-32k:120b"
+            else default_model
         )
     elif model_config:
         current_model = model_config.name
@@ -438,7 +439,7 @@ def begin_search() -> ResponseReturnValue:
     debug(f"Searching for search set: {searchset_uuid}")
 
     user_model_config = UserModelConfig.objects(user_id=current_user.get_id()).first()
-    model = settings.base_model
+    model = get_default_model_name()
     if user_model_config is not None:
         model = user_model_config.name
 
@@ -590,7 +591,7 @@ def begin_search_sync() -> ResponseReturnValue:
         em.root_path = current_app.root_path
         # get current model
         user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
-        model_name = settings.base_model
+        model_name = get_default_model_name()
         if user_config:
             model_name = user_config.name
 
@@ -736,7 +737,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
 
     user_id = current_user.get_id()
     user_model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = settings.base_model
+    model = get_default_model_name()
     if user_model_config is not None:
         model = user_model_config.name
 

@@ -19,6 +19,7 @@ from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
+from app.utilities.config import get_auth_methods, get_highlight_color
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -154,20 +155,40 @@ app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
-AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
-app.logger.info(f"Authentication mode set to: {AUTH_MODE}")
+auth_methods = get_auth_methods()
 
-if AUTH_MODE == "AZURE":
-    # --- Azure AD / Flask-Dance Mode ---
-    blueprint = make_azure_blueprint(
-        client_id=app.config["CLIENT_ID"],
-        client_secret=app.config["CLIENT_SECRET"],
-        tenant=app.config["TENANT_NAME"],
-    )
+# In non-production, always allow password auth so devs can't lock themselves out
+if env != "production" and "password" not in auth_methods:
+    app.logger.warning("Enforcing password auth in non-production to avoid lockout.")
+    auth_methods = auth_methods + ["password"]
+PASSWORD_AUTH_ENABLED = "password" in auth_methods
+OAUTH_AUTH_ENABLED = "oauth" in auth_methods
 
-    app.register_blueprint(blueprint, url_prefix="/login")
+app.config["AUTH_PASSWORD_ENABLED"] = PASSWORD_AUTH_ENABLED
+app.config["AUTH_OAUTH_ENABLED"] = OAUTH_AUTH_ENABLED
+app.config["AUTH_MODE"] = (
+    "OAUTH"
+    if OAUTH_AUTH_ENABLED and not PASSWORD_AUTH_ENABLED
+    else "PASSWORD"
+    if PASSWORD_AUTH_ENABLED and not OAUTH_AUTH_ENABLED
+    else "HYBRID"
+)
 
-    @oauth_authorized.connect_via(blueprint)
+azure_blueprint = None
+if OAUTH_AUTH_ENABLED:
+    try:
+        azure_blueprint = make_azure_blueprint(
+            client_id=app.config.get("CLIENT_ID"),
+            client_secret=app.config.get("CLIENT_SECRET"),
+            tenant=app.config.get("TENANT_NAME"),
+        )
+        app.register_blueprint(azure_blueprint, url_prefix="/login")
+    except Exception as e:
+        app.logger.warning(f"OAuth enabled but Azure blueprint could not be registered: {e}")
+
+if azure_blueprint:
+
+    @oauth_authorized.connect_via(azure_blueprint)
     def azure_logged_in(blueprint, token):
         """Creates or loads a user after successful Azure login."""
         if not token:
@@ -186,33 +207,31 @@ if AUTH_MODE == "AZURE":
         user = User.objects(user_id=user_principal_name).first()
 
         if not user:
-            # Create a new user if they don't exist
-            # Try to get email from 'mail' field, fallback to 'userPrincipalName'
             email = info.get("mail") or user_principal_name
             user = User(
-                user_id=user_principal_name,
-                email=email,
-                name=info["displayName"]
+                user_id=user_principal_name, email=email, name=info["displayName"]
             ).save()
         else:
-            # Update existing user's email and name if they're missing
             if not user.email:
                 user.email = info.get("mail") or user_principal_name
             if not user.name:
                 user.name = info["displayName"]
             user.save()
 
-        login_user(user)  # This is the critical step to create the user session
+        login_user(user)
 
-elif AUTH_MODE == "LOCAL":
-    # Point the login view to the local blueprint's login function
-    login_manager.login_view = "auth.login"
-
-else:
-    raise ValueError(f"Invalid AUTH_MODE: '{AUTH_MODE}'. Must be 'AZURE' or 'LOCAL'.")
+# Point the login view to the local blueprint's login function (always available path)
+login_manager.login_view = "auth.login"
 
 
-app.config["AUTH_MODE"] = AUTH_MODE
+@app.context_processor
+def inject_ui_config():
+    """Expose UI/auth configuration to templates."""
+    return {
+        "highlight_color": get_highlight_color(),
+        "auth_password_enabled": PASSWORD_AUTH_ENABLED,
+        "auth_oauth_enabled": OAUTH_AUTH_ENABLED,
+    }
 
 
 with app.app_context():

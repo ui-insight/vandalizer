@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 
+import os
+
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -212,6 +214,40 @@ def get_ocr_endpoint() -> str:
     return "https://processpdf.insight.uidaho.edu"
 
 
+def get_llm_endpoint() -> str:
+    """Get LLM endpoint from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.llm_endpoint:
+            return db_config.llm_endpoint
+    except Exception:
+        pass
+    return settings.insight_endpoint
+
+
+def get_llm_models() -> list[dict]:
+    """Return the current list of LLM models (SystemConfig or defaults)."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.available_models:
+            return db_config.available_models
+    except Exception:
+        pass
+    return [m.model_dump() for m in settings.models]
+
+
+def get_default_model_name() -> str:
+    """Return a sensible default model name based on configured models."""
+    models = get_llm_models()
+    if models:
+        first = models[0]
+        if isinstance(first, dict):
+            return first.get("name") or settings.base_model
+    return settings.base_model
+
+
 def get_highlight_color() -> str:
     """Get UI highlight color from database config or default."""
     try:
@@ -226,13 +262,18 @@ def get_highlight_color() -> str:
 
 def get_auth_methods() -> list[str]:
     """Get enabled authentication methods from database config."""
+    env = os.getenv("FLASK_ENV", "development").lower()
     try:
         from app.models import SystemConfig
         db_config = SystemConfig.get_config()
         if db_config and db_config.auth_methods:
-            return db_config.auth_methods
+            methods = list(db_config.auth_methods)
+            if env != "production" and "password" not in methods:
+                methods.append("password")
+            return methods
     except Exception:
         pass
+    # default: always allow password in non-prod
     return ["password"]
 
 

@@ -290,6 +290,8 @@
         }, 150);
     });
 
+    const HIGHLIGHT_COLOR = "{{ highlight_color|default('#eab308') }}";
+
     // Fix: highlightTerms empty check, and place highlights inside the overlay
     function highlightText(page, highlightTerms, viewport, overlayEl) {
         if (!highlightTerms || highlightTerms.length === 0) return;
@@ -319,8 +321,8 @@
                     top: y + 'px',
                     width: (textItem.width * scale) + 'px',
                     height: (textItem.height * scale) + 'px',
-                    backgroundColor: 'yellow',
-                    opacity: 0.5
+                    backgroundColor: HIGHLIGHT_COLOR,
+                    opacity: 0.45
                 });
                 overlayEl.appendChild(highlight);
             });
@@ -403,10 +405,10 @@
         const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
         window.current_search_item = safeIndex;
 
-        // Update all highlights to yellow
+        // Update all highlights to configured color
         highlights.forEach((hl, idx) => {
-            hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
-            hl.style.opacity = 0.5;
+            hl.style.backgroundColor = HIGHLIGHT_COLOR;
+            hl.style.opacity = idx === safeIndex ? 0.75 : 0.45;
         });
 
         // Update count display

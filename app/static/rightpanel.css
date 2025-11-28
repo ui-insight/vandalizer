@@ -124,7 +124,7 @@ button.shadow-button {
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
   font-size: 20px;
   font-weight: 700;
-  background-color: #f1b300;
+  background-color: var(--highlight-color, #f1b300);
   color: #191919;
   transition: 1s;
   animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -209,9 +209,9 @@ button.shadow-button:hover {
 }
 
 .segmented-control input[type="radio"]:checked+label {
-  background: #f1b300;
+  background: var(--highlight-color, #f1b300);
   color: white;
-  border-bottom: 1px solid #f1b300;
+  border-bottom: 1px solid var(--highlight-color, #f1b300);
 }
 
 .segmented-control label:first-of-type {
@@ -311,7 +311,7 @@ button.shadow-button:hover {
 }
 
 .tab-menu li.active {
-  background-color: #f1b300;
+  background-color: var(--highlight-color, #f1b300);
   color: black;
 }
 

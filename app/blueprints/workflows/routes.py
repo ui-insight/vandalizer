@@ -44,7 +44,7 @@ from app.models import (
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import ActivityType, activity_start
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name, settings
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
@@ -267,7 +267,7 @@ def run_workflow() -> ResponseReturnValue:
     document_trigger_step.save()
 
     model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = settings.base_model
+    model = get_default_model_name()
     if model_config:
         model = model_config.name
 
@@ -474,7 +474,7 @@ def test_workflow_step() -> ResponseReturnValue:
     document_trigger_step.save()
 
     model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = settings.base_model
+    model = get_default_model_name()
     if model_config:
         model = model_config.name
 
@@ -596,7 +596,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
     workflow_trigger_step_id = str(document_trigger_step.id)
 
     model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = settings.base_model
+    model = get_default_model_name()
     if model_config:
         model = model_config.name
 
@@ -784,7 +784,7 @@ def workflow_download() -> ResponseReturnValue:
         if model_config:
             model = model_config.name
         else:
-            model = settings.base_model
+            model = get_default_model_name()
 
         chat_agent = create_chat_agent(model)
         # get current event loop

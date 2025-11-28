@@ -21,7 +21,7 @@ from pydantic_ai.profiles.openai import (
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
 from app.models import SmartDocument
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name, settings
 from app.utilities.document_manager import DocumentManager
 
 load_dotenv()
@@ -302,11 +302,11 @@ def create_secure_agent(agent_model):
     return _secure_agent_cache[cache_key]
 
 
-upload_agent = create_upload_agent(settings.base_model)
+upload_agent = create_upload_agent(get_default_model_name())
 
-rag_agent = create_rag_agent(settings.base_model)
+rag_agent = create_rag_agent(get_default_model_name())
 
-prompt_agent = create_prompt_agent(settings.base_model)
+prompt_agent = create_prompt_agent(get_default_model_name())
 
 secure_agent = create_secure_agent(settings.secure_model)
 
@@ -388,7 +388,7 @@ def create_field_inference_agent(agent_model, keys, context, prompt_context=None
     )
 
 
-model = get_agent_model(settings.base_model)
+model = get_agent_model(get_default_model_name())
 
 
 def get_cache_key(key: str, context: str) -> str:
@@ -412,7 +412,7 @@ def create_extraction_agent(agent_model):
     )
 
 
-extraction_agent = create_extraction_agent(settings.base_model)
+extraction_agent = create_extraction_agent(get_default_model_name())
 
 
 @extraction_agent.system_prompt
@@ -462,7 +462,7 @@ Text:
 
 # @observe()
 def extract_entities_with_agent(
-    text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
+    text: str, keys: list[str], context: str = "", model_name: str | None = None
 ) -> dict:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
@@ -498,7 +498,7 @@ def extract_entities_with_agent(
         # Create a single model directly (not wrapped in "entities" array)
         extraction_model = create_model(unique_model_name, **inferred_fields)
 
-        model = get_agent_model(model_name)
+        model = get_agent_model(model_name or get_default_model_name())
         _extraction_agent_cache[cache_key] = Agent(
             model,
             deps_type=ExtractionDeps,

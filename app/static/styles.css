@@ -27,12 +27,12 @@ body:has(.front-page-header) {
 
 
 a {
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
 }
 
 
 .btn-primary {
-    background-color: #f1b300;
+    background-color: var(--highlight-color, #f1b300);
 }
 
 .navbar-default {
@@ -92,8 +92,8 @@ footer {
 }
 
 a.btn-frontpage-cta:hover {
-    border-color : #f1b300;
-    background-color: #f1b300;
+    border-color : var(--highlight-color, #f1b300);
+    background-color: var(--highlight-color, #f1b300);
     border-width: 2px;
     color: #fff;
 
@@ -211,7 +211,7 @@ footer .footer-poweredby {
     padding: 4rem;
     border-radius: 32px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: -0.7rem 0 0 #f1b300, 0 24px 40px rgba(0, 0, 0, 0.35);
+    box-shadow: -0.7rem 0 0 var(--highlight-color, #f1b300), 0 24px 40px rgba(0, 0, 0, 0.35);
 }
 
 .hero-content a.action-button:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
@@ -220,15 +220,15 @@ footer .footer-poweredby {
     background: none;
     color: white;
     text-decoration: none;
-    border-bottom: 0.1em solid #f1b300;
+    border-bottom: 0.1em solid var(--highlight-color, #f1b300);
 }
 
 .hero-content a.action-button, .hero-content  button {
     display: inline-block;
     width: 100%;
     color: #191919;
-    border: 0.1em solid #f1b300;
-    background: #f1b300;
+    border: 0.1em solid var(--highlight-color, #f1b300);
+    background: var(--highlight-color, #f1b300);
     margin: 1.5rem 0 0;
     padding: .5em 1em .5em;
     font-size: 2rem;
@@ -313,7 +313,7 @@ footer .footer-poweredby {
 
 .btn-primary:hover {
     background-color: white;
-    border-color : #f1b300;
+    border-color : var(--highlight-color, #f1b300);
     color: black;
 }
 
@@ -472,7 +472,7 @@ tr {
 }
 
 .progress-bar {
-    background-color: #f1b300;
+    background-color: var(--highlight-color, #f1b300);
 }
 
 .response-table td, th {
@@ -892,7 +892,7 @@ tr {
 }
 
 .folder.drag-over {
-    border: 2px solid #f1b300; /* Add dashed border when dragging over */
+    border: 2px solid var(--highlight-color, #f1b300); /* Add dashed border when dragging over */
 }
 
 .drag-ghost {
@@ -970,7 +970,7 @@ tr {
 }
 
 .default-tag {
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
     font-size: 0.8em;
     background-color: #eaeaea;
     border-radius: 15px;
@@ -999,7 +999,7 @@ tr {
     margin-bottom: 10px;
     color:white;
     background-color: #191919;
-    border-left: 7px solid #f1b300;
+    border-left: 7px solid var(--highlight-color, #f1b300);
 }
 
 .main-panel .header .row .col {
@@ -1026,11 +1026,11 @@ tr {
   }
 
 .btn, .btn-primary {
-    background-color: #f1b300;
+    background-color: var(--highlight-color, #f1b300);
     border-radius: 0px;
     text-decoration: none;
     text-align: center;
-    border: 2px solid #f1b300;
+    border: 2px solid var(--highlight-color, #f1b300);
     -webkit-transition: all 0.3s ease 0s;
     -moz-transition: all 0.3s ease 0s;
     -o-transition: all 0.3s ease 0s;
@@ -1215,7 +1215,7 @@ textarea {
 .loading-progress-fill {
     width: 0;
     height: 100%;
-    background: #f1b300;
+    background: var(--highlight-color, #f1b300);
     transition: width 2s ease-in-out;
 }
 
@@ -1516,7 +1516,7 @@ think:hover > * {
     color: #999999;
 }
     .local-login-form button {
-      background-color: #f1b300; /* Vandal Gold */
+      background-color: var(--highlight-color, #f1b300); /* Vandal Gold */
       color: #000;
       font-weight: bold;
       border: none;
