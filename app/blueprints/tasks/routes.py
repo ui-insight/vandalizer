@@ -5,6 +5,7 @@ import uuid
 from copy import deepcopy
 from pathlib import Path
 
+import pypandoc
 from devtools import debug
 from flask import (
     Blueprint,
@@ -22,14 +23,17 @@ from flask.typing import ResponseReturnValue
 from flask_login import current_user, login_required
 from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
+from werkzeug.utils import secure_filename
 
 from app.models import (
     ActivityType,
     SearchSet,
     SearchSetItem,
     SmartDocument,
+    User,
     UserModelConfig,
 )
+from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import get_default_model_name, get_llm_models
@@ -502,6 +506,14 @@ def begin_search() -> ResponseReturnValue:
 @tasks.route("/extraction_status/<activity_id>", methods=["GET"])
 def extraction_status(activity_id: str) -> ResponseReturnValue:
     """Check the status of an extraction task."""
+    # Support API key authentication for programmatic access
+    api_key = request.headers.get("x-api-key")
+    if api_key:
+        user = User.objects(id=api_key).first()
+        if user is None:
+            return jsonify({"error": "Invalid API key"}), 401
+    elif not current_user.is_authenticated:
+        return jsonify({"error": "Authentication required"}), 401
     from app.models import ActivityEvent
 
     activity = ActivityEvent.objects(id=activity_id).first()
@@ -514,29 +526,88 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
         "title": activity.title,
     }
 
-    # If completed, include results and rendered template
+    # If completed, include results
     if activity.status == "completed" and activity.result_snapshot:
-        search_set_uuid = activity.result_snapshot.get("search_set_uuid")
-        document_uuids = activity.result_snapshot.get("document_uuids", [])
-        normalized_results = activity.result_snapshot.get("normalized", [])
+        # Handle result_snapshot - it might be a dict or already a dict
+        snapshot = activity.result_snapshot
+        if not isinstance(snapshot, dict):
+            snapshot = dict(snapshot) if snapshot else {}
+        
+        search_set_uuid = snapshot.get("search_set_uuid")
+        document_uuids = snapshot.get("document_uuids", [])
+        normalized_results = snapshot.get("normalized")
+        raw_results = snapshot.get("raw")
+        
+        debug(f"Extraction status - snapshot keys: {list(snapshot.keys()) if isinstance(snapshot, dict) else 'not a dict'}")
+        debug(f"Extraction status - normalized_results from snapshot: {normalized_results}")
+        debug(f"Extraction status - raw_results from snapshot: {raw_results}")
+        
+        # Get keys from search set to ensure all are included
+        keys = []
+        if search_set_uuid:
+            search_set = SearchSet.objects(uuid=search_set_uuid).first()
+            if search_set:
+                items = search_set.items()
+                for item in items:
+                    if item.searchtype == "extraction":
+                        keys.append(item.searchphrase)
+        
+        # If normalized is missing or empty, try to get raw results and normalize them
+        if normalized_results is None or (isinstance(normalized_results, dict) and len(normalized_results) == 0):
+            if raw_results:
+                from app.utilities.extraction_tasks import normalize_results
+                debug(f"Re-normalizing raw_results: {raw_results}")
+                normalized_results = normalize_results(raw_results, expected_keys=keys if keys else None)
+                debug(f"Re-normalized results: {normalized_results}")
+        
+        # normalized_results could be a dict (from normalize_results) or None
+        if normalized_results is None:
+            normalized_results = {}
+        elif not isinstance(normalized_results, dict):
+            # If it's stored as something else, try to convert
+            normalized_results = dict(normalized_results) if normalized_results else {}
+        
+        # Ensure all expected keys are present (even if None)
+        if keys:
+            for key in keys:
+                if key not in normalized_results:
+                    normalized_results[key] = None
+        
+        # If still empty, include raw results for debugging
+        if len(normalized_results) == 0 and raw_results:
+            debug(f"Warning: normalized_results is empty but raw_results exists: {raw_results}")
+            # For API calls, include raw results as fallback
+            if api_key:
+                response["raw_results"] = raw_results
 
-        # Get search set and documents
-        search_set = SearchSet.objects(uuid=search_set_uuid).first()
-        documents = []
-        for doc_uuid in document_uuids:
-            document = SmartDocument.objects(uuid=doc_uuid).first()
-            if document:
-                documents.append(document)
+        # For API calls (x-api-key), only return JSON results
+        # For web UI calls, include the HTML template
+        is_api_call = api_key is not None
+        
+        if not is_api_call:
+            # Get search set and documents for template rendering
+            search_set = SearchSet.objects(uuid=search_set_uuid).first()
+            documents = []
+            for doc_uuid in document_uuids:
+                document = SmartDocument.objects(uuid=doc_uuid).first()
+                if document:
+                    documents.append(document)
 
-        # Render template
-        template = _render_extraction_panel(
-            search_set,
-            results=normalized_results,
-            documents=documents,
-        )
+            # Render template for web UI
+            template = _render_extraction_panel(
+                search_set,
+                results=normalized_results,
+                documents=documents,
+            )
+            response["template"] = template
 
-        response["template"] = template
+        # Always include results in JSON format
         response["results"] = normalized_results
+        
+        # If normalized is empty but raw exists, include raw for debugging/fallback
+        if len(normalized_results) == 0 and raw_results:
+            response["raw_results"] = raw_results
+            response["message"] = "Normalized results are empty. Raw results included for debugging."
 
     elif activity.status == "failed":
         response["error"] = getattr(activity, "error", "Unknown error")
@@ -612,8 +683,8 @@ def begin_search_sync() -> ResponseReturnValue:
             )
             return jsonify({"template": template})
 
-        # Normalize results
-        normalized_results = normalize_results(results)
+        # Normalize results - pass keys to ensure all are included
+        normalized_results = normalize_results(results, expected_keys=keys)
         debug(f"Normalized results: {normalized_results}")
 
         # Handle fillable PDF if configured
@@ -658,7 +729,7 @@ def begin_search_sync() -> ResponseReturnValue:
                 as_attachment=True,
             )
 
-        normalized_results = normalize_results(results)
+        normalized_results = normalize_results(results, expected_keys=keys)
         print(normalize_results)
 
         activity_finish(activity)
@@ -1008,3 +1079,165 @@ def search_in_document() -> ResponseReturnValue:
     }
     
     return jsonify(response)
+
+
+@login_required
+@tasks.route("/integrate", methods=["POST"])
+def extraction_integrate() -> ResponseReturnValue:
+    """Integrate an extraction template."""
+    user = current_user
+    data = request.get_json()
+    search_set_uuid = data.get("search_set_uuid")
+
+    search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    if not search_set:
+        return jsonify({"error": "Extraction not found"}), 404
+
+    # Get base URL from request
+    base_url = request.host_url.rstrip('/')
+    
+    template = render_template(
+        "toolpanel/extractions/extraction_integration.html",
+        search_set=search_set,
+        user=user,
+        base_url=base_url,
+    )
+    response = {"template": template}
+    return jsonify(response)
+
+
+@tasks.route("/run_integrated", methods=["POST"])
+def run_extraction_integrated() -> ResponseReturnValue:
+    """Run the integrated extraction and return the result."""
+    # **1. Authenticate User via API Key**
+    api_key = request.headers.get("x-api-key")
+    if not api_key:
+        return jsonify({"error": "API key is missing"}), 401
+
+    user = User.objects(id=api_key).first()
+    if user is None:
+        return jsonify({"error": "Invalid API key"}), 401
+
+    # **2. Get Search Set UUID**
+    search_set_uuid = request.form.get("search_set_uuid")
+    if not search_set_uuid:
+        return jsonify({"error": "search_set_uuid is required"}), 400
+
+    search_set = SearchSet.objects(uuid=search_set_uuid).first()
+    if not search_set:
+        return jsonify({"error": "Extraction not found"}), 404
+
+    # **3. Handle File Uploads**
+    uploaded_files = request.files.getlist("file")
+    if not uploaded_files:
+        return (
+            jsonify(
+                {
+                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash.",
+                },
+            ),
+            400,
+        )
+
+    document_uuids = []
+
+    for file in uploaded_files:
+        # Secure the filename
+        filename = secure_filename(file.filename)
+        extension = os.path.splitext(filename)[1][1:].lower()
+        uid = uuid.uuid4().hex.upper()
+
+        # Create upload directory if it doesn't exist
+        upload_dir = os.path.join(
+            current_app.root_path,
+            "static",
+            "uploads",
+            str(user.id),
+        )
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+
+        file_path = os.path.join(upload_dir, f"{uid}.{extension}")
+        file.save(file_path)
+
+        # **Optional: Handle File Conversion**
+        final_file_path = file_path
+        if extension == "docx":
+            pdf_path = os.path.join(upload_dir, f"{uid}.pdf")
+            pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path)
+            pypandoc.convert_file(file_path, "pdf", outputfile=pdf_path, extra_args="--pdf-engine=xelatex")
+            final_file_path = pdf_path
+            extension = "pdf"
+        elif extension in ["xlsx", "xls"]:
+            html_path = os.path.join(upload_dir, f"{uid}.html")
+            save_excel_to_html(file_path, html_path)
+            final_file_path = html_path
+            extension = "html"
+
+        # **Extract text from document (OCR if needed)**
+        from app.utilities.document_readers import extract_text_from_doc
+        raw_text = extract_text_from_doc(final_file_path)
+        
+        if not raw_text:
+            raw_text = ""
+        
+        # **Create SmartDocument Object**
+        document = SmartDocument(
+            title=filename,
+            downloadpath=f"{user.id}/{uid}.{extension}",
+            path=f"{user.id}/{uid}.{extension}",
+            extension=extension,
+            uuid=uid,
+            user_id=user.user_id,
+            space="None",
+            raw_text=raw_text,
+        )
+        document.save()
+        document_uuids.append(uid)
+
+    # **4. Get extraction keys**
+    keys = []
+    items = search_set.items()
+    for item in items:
+        if item.searchtype == "extraction":
+            keys.append(item.searchphrase)
+
+    if len(keys) == 0:
+        return jsonify({"error": "No extraction keys found"}), 400
+
+    # **5. Create activity and run extraction**
+    current_team = user.ensure_current_team()
+    activity = activity_start(
+        type=ActivityType.SEARCH_SET_RUN,
+        title=search_set.title if search_set and search_set.title else "Extraction",
+        user_id=user.user_id,
+        team_id=current_team.uuid,
+        search_set_uuid=search_set_uuid,
+    )
+    activity.status = "queued"
+    activity.save()
+
+    # Start async extraction task
+    fillable_pdf_url = (
+        search_set.fillable_pdf_url
+        if search_set and hasattr(search_set, "fillable_pdf_url")
+        else None
+    )
+
+    perform_extraction_task.apply_async(
+        args=[
+            str(activity.id),
+            search_set_uuid,
+            document_uuids,
+            keys,
+            current_app.root_path,
+            fillable_pdf_url,
+        ]
+    )
+
+    # **6. Return the Response**
+    return jsonify({
+        "status": "queued",
+        "activity_id": str(activity.id),
+        "message": "Extraction task started"
+    })

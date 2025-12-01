@@ -1434,6 +1434,14 @@ think:hover > * {
 .btn-primary.shimmer {
   position: relative;
   overflow: hidden;
+  /* Use complementary color gradient like "Let's get started" panel */
+  background: linear-gradient(
+    135deg,
+    var(--highlight-complement, #6a11cb),
+    color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
+  ) !important;
+  background-size: 200% 100%;
+  animation: button-gradient-shimmer 2s linear infinite;
 }
 
 /* 2) The shimmer stripe */
@@ -1460,6 +1468,12 @@ think:hover > * {
   /* animate it */
   animation: button-shimmer 2s infinite;
   -webkit-animation: button-shimmer 2s infinite;  /* Safari */
+}
+
+/* Keyframe for the gradient background animation */
+@keyframes button-gradient-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 /* Keyframe for the button shimmer effect */
 @keyframes button-shimmer {

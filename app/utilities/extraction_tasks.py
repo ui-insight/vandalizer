@@ -22,32 +22,49 @@ from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.semantic_recommender import SemanticRecommender
 
 
-def normalize_results(results) -> Dict[str, Any]:
+def normalize_results(results, expected_keys: List[str] = None) -> Dict[str, Any]:
     """Normalize a list of dicts into a single dict of unique values (comma-joined),
-    or return the dict as-is. Non-list/dict inputs yield {}."""
+    or return the dict as-is. Non-list/dict inputs yield {}.
+    
+    Args:
+        results: The extraction results (dict or list of dicts)
+        expected_keys: Optional list of keys that should be present in the output.
+                      If provided, all keys will be included even if None/empty.
+    """
+    normalized = {}
+    
     if isinstance(results, dict):
-        return results
-    if not isinstance(results, list):
-        return {}
+        normalized = results.copy()
+    elif isinstance(results, list):
+        collected: Dict[str, List[Any]] = defaultdict(list)
+        seen: Dict[str, set] = defaultdict(set)
 
-    collected: Dict[str, List[Any]] = defaultdict(list)
-    seen: Dict[str, set] = defaultdict(set)
-
-    for item in results:
-        if not isinstance(item, dict):
-            continue
-        for k, v in item.items():
-            if v in (None, "", [], {}):
+        for item in results:
+            if not isinstance(item, dict):
                 continue
-            if v in seen[k]:
-                continue
-            seen[k].add(v)
-            collected[k].append(v)
+            for k, v in item.items():
+                # Skip empty values when collecting, but we'll include all keys later
+                if v in (None, "", [], {}):
+                    continue
+                if v in seen[k]:
+                    continue
+                seen[k].add(v)
+                collected[k].append(v)
 
-    return {
-        k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
-        for k, vals in collected.items()
-    }
+        normalized = {
+            k: vals[0] if len(vals) == 1 else ", ".join(map(str, vals))
+            for k, vals in collected.items()
+        }
+    else:
+        normalized = {}
+    
+    # If expected_keys is provided, ensure all keys are present
+    if expected_keys:
+        for key in expected_keys:
+            if key not in normalized:
+                normalized[key] = None
+    
+    return normalized
 
 
 @celery_app.task(
@@ -102,10 +119,14 @@ def perform_extraction_task(
         results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
 
+        debug(f"Raw extraction results from em.extract: {results}")
+        debug(f"Type of results: {type(results)}, Length: {len(results) if isinstance(results, (list, dict)) else 'N/A'}")
+
         if len(results) == 1:
             results = results[0]
+            debug(f"After single-item conversion: {results}, Type: {type(results)}")
 
-        debug(results)
+        debug(f"Results before normalization: {results}")
 
         # Get search set and documents
         search_set = SearchSet.objects(uuid=searchset_uuid).first()
@@ -118,10 +139,19 @@ def perform_extraction_task(
         # Handle fillable PDF if present
         if fillable_pdf_url and fillable_pdf_url != "":
             bindings = {}
-            for key in results:
-                search_set_item = SearchSetItem.objects(searchphrase=key).first()
-                if search_set_item and search_set_item.pdf_binding:
-                    bindings[search_set_item.pdf_binding] = results[key]
+            # results might be a dict or list, handle both
+            if isinstance(results, dict):
+                for key in results:
+                    search_set_item = SearchSetItem.objects(searchphrase=key).first()
+                    if search_set_item and search_set_item.pdf_binding:
+                        bindings[search_set_item.pdf_binding] = results[key]
+            elif isinstance(results, list) and len(results) > 0:
+                # If results is a list, use the first item
+                first_result = results[0] if isinstance(results[0], dict) else {}
+                for key in first_result:
+                    search_set_item = SearchSetItem.objects(searchphrase=key).first()
+                    if search_set_item and search_set_item.pdf_binding:
+                        bindings[search_set_item.pdf_binding] = first_result[key]
 
             pdf_path = Path(root_path) / "static" / "uploads" / fillable_pdf_url
             reader = PdfReader(pdf_path)
@@ -139,9 +169,10 @@ def perform_extraction_task(
             with Path.open(output_pdf_path, "wb") as f:
                 writer.write(f)
 
-        # Normalize and save results
-        normalized_results = normalize_results(results)
-        debug(normalized_results)
+        # Normalize and save results - pass keys to ensure all are included
+        normalized_results = normalize_results(results, expected_keys=keys)
+        debug(f"Normalized results: {normalized_results}")
+        debug(f"Normalized results type: {type(normalized_results)}, Length: {len(normalized_results) if isinstance(normalized_results, dict) else 'N/A'}")
 
         # Finish activity
         if activity:

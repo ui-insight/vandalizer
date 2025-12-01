@@ -2645,6 +2645,33 @@
         });
     }
 
+    function integrateExtraction(search_set_uuid) {
+        let data = JSON.stringify({
+            search_set_uuid: search_set_uuid,
+        });
+
+        $.ajax({
+            url: '/tasks/integrate',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $(data.template).hide().appendTo('.search-results-panel').fadeIn();
+                addResultListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                // If endpoint doesn't exist yet, show a placeholder message
+                if (xhr.status === 404) {
+                    showToast("Extraction integration is coming soon!");
+                }
+            }
+        });
+    }
+
 
 
     function updateWorkflowStatus() {
@@ -3019,9 +3046,42 @@
 
     tabMenuItems.forEach((item) => {
         item.addEventListener("click", function () {
+            const tabTitle = $(this).text().trim();
+            const url = new URL(window.location.href);
+            const currentSection = url.searchParams.get("section") || "";
+            
+            // If clicking Library tab and already on Library, close panels and reset
+            const isLibraryVisible = $("#library-panel").is(":visible");
+            if (tabTitle === "Library" && (currentSection === "Library" || currentSection === "Workflows" || isLibraryVisible)) {
+                // Close any open panels
+                $(".search-results-panel").hide();
+                $("#search-results-panel").empty();
+                
+                // Clear library-related URL params but keep section=Library
+                url.searchParams.delete("search_set_uuid");
+                url.searchParams.delete("workflow_id");
+                url.searchParams.delete("activity_id");
+                url.searchParams.set("section", "Library");
+                window.history.pushState({}, "", url.toString());
+                
+                // Show library panel
+                $(".tab-content").hide();
+                $("#library-panel").show();
+                
+                // Update active tab
+                tabMenuItems.forEach((node) => node.classList.remove("active"));
+                this.classList.add("active");
+                
+                // Refresh library view if there's a refresh function
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
+                return;
+            }
+            
+            // Normal tab switching behavior
             tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
-            const tabTitle = $(this).text().trim();
             setSection(tabTitle);
         });
     });
@@ -3420,6 +3480,16 @@
                 return;
             }
             performExtraction(uuid);
+        });
+
+        $('.integrate-extraction').off("click").on("click", function (e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid") || search_set_add_uuid;
+            if (!uuid) {
+                showToast("Select an extraction to integrate.");
+                return;
+            }
+            integrateExtraction(uuid);
         });
 
         $("#set-close-button").on("click", function () {

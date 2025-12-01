@@ -68,12 +68,12 @@
     pointer-events: none;
     /* and sit in front */
     z-index: 1;
-    /* gradient with a radar like fade */
+    /* gradient with a radar like fade - uses highlight color from system config */
     background:
       linear-gradient(90deg,
         rgba(0,0,0,0),
         rgba(0,0,0,0) 55%,
-        #f1b5002d 56%,
+        color-mix(in srgb, var(--highlight-color, #eab308) 18%, transparent) 56%,
         rgba(0,0,0,0) 57%,
         rgba(0,0,0,0)
       );
