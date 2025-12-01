@@ -63,10 +63,11 @@ class SystemConfig(me.Document):
     )
 
     # Available models configuration
-    # Each model is a dict with keys: name, tag, external
+    # Each model is a dict with keys: name, tag, external, thinking
+    # thinking: bool - whether the model supports thinking mode (default False)
     available_models = me.ListField(me.DictField(), default=[
-        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False},
-        {"name": "openai/gpt-5", "tag": "Cloud", "external": True}
+        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False, "thinking": False},
+        {"name": "openai/gpt-5", "tag": "Cloud", "external": True, "thinking": False}
     ])
 
     # UI Configuration

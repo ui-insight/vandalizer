@@ -391,6 +391,7 @@ def admin_config_add_model():
     model_name = request.form.get("model_name", "").strip()
     model_tag = request.form.get("model_tag", "").strip()
     model_external = request.form.get("model_external") == "on"
+    model_thinking = request.form.get("model_thinking") == "on"
 
     if not model_name or not model_tag:
         return jsonify({"error": "Model name and tag are required"}), 400
@@ -399,7 +400,8 @@ def admin_config_add_model():
     new_model = {
         "name": model_name,
         "tag": model_tag,
-        "external": model_external
+        "external": model_external,
+        "thinking": model_thinking
     }
 
     if not config.available_models:

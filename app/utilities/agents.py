@@ -20,7 +20,7 @@ from pydantic_ai.profiles.openai import (
 )
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from app.models import SmartDocument
+from app.models import SmartDocument, SystemConfig
 from app.utilities.config import get_default_model_name, settings
 from app.utilities.document_manager import DocumentManager
 
@@ -125,8 +125,25 @@ def get_default_system_prompt(include_next_step: bool = True) -> str:
     )
 
 
+def _get_model_config(model_name: str) -> Optional[dict]:
+    """Get model configuration from SystemConfig by model name."""
+    try:
+        config = SystemConfig.get_config()
+        if config and config.available_models:
+            for model in config.available_models:
+                if model.get("name") == model_name:
+                    return model
+    except Exception:
+        pass
+    return None
+
+
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
+
+    def __init__(self, api_key: str, thinking_enabled: bool = False):
+        super().__init__(api_key=api_key)
+        self.thinking_enabled = thinking_enabled
 
     @property
     def base_url(self) -> str:
@@ -136,15 +153,40 @@ class InsightAIProvider(OpenRouterProvider):
         # Special handling for Ollama models, those that do not contain "/" in the name
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            return OpenAIModelProfile(
+            model_profile = OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
+            
+            # Disable thinking if the model doesn't support it
+            # Note: This attempts to prevent pydantic_ai from sending thinking: true
+            # to models that don't support it. If this doesn't work, we may need to
+            # handle it at a different level (e.g., in the model request itself).
+            if not self.thinking_enabled:
+                try:
+                    # Try to disable thinking in the profile
+                    # The exact field name may vary depending on pydantic_ai version
+                    if hasattr(model_profile, 'model_copy'):
+                        model_profile = model_profile.model_copy(update={
+                            "supports_thinking": False
+                        })
+                    elif hasattr(model_profile, 'supports_thinking'):
+                        model_profile.supports_thinking = False
+                except Exception:
+                    # If we can't modify the profile, log and continue
+                    # The model might still work, but thinking may be enabled
+                    debug(f"Could not disable thinking for model {model_name}")
+            
+            return model_profile
 
         # Fallback to parent logic
         return super().model_profile(model_name)
 
 
 def get_agent_model(agent_model):
+    # Get model configuration to check if thinking is enabled
+    model_config = _get_model_config(agent_model)
+    thinking_enabled = model_config.get("thinking", False) if model_config else False
+    
     if "openai" in agent_model:
         model_name = agent_model.split("/")[-1]
         return OpenAIModel(
@@ -152,7 +194,7 @@ def get_agent_model(agent_model):
         )
     return OpenAIModel(
         model_name=agent_model,
-        provider=InsightAIProvider(api_key="no-api-key"),
+        provider=InsightAIProvider(api_key="no-api-key", thinking_enabled=thinking_enabled),
     )
 
 
