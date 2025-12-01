@@ -154,6 +154,11 @@ app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
 
+# Import Celery tasks so they're registered when app starts
+# This ensures tasks are discovered by Celery workers
+with app.app_context():
+    from app.utilities import activity_description  # noqa: F401
+
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
 

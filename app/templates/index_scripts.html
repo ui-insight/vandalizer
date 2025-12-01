@@ -129,6 +129,8 @@
                             if (opts.running) {
                                 li.classList.add("is-running");
                             }
+                            // Check if title should be updated
+                            checkActivityTitleUpdate(activityId, activityData);
                         }
                     }
                 })
@@ -227,6 +229,40 @@
         setTimeout(() => {
             activityItem.classList.remove('shimmer');
         }, 2000);
+    }
+
+    // Helper function to update activity title with shimmer effect
+    function updateActivityTitle(activityId, newTitle) {
+        if (!activityId || !newTitle) return;
+        
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) return;
+
+        const titleElement = activityItem.querySelector('.run-title');
+        if (!titleElement) return;
+
+        const currentTitle = titleElement.textContent.trim();
+        if (currentTitle === newTitle.trim()) return; // No change needed
+
+        // Update title with shimmer effect
+        titleElement.textContent = newTitle;
+        titleElement.setAttribute('title', newTitle);
+        
+        // Add shimmer class to the title element for animation
+        titleElement.style.position = 'relative';
+        titleElement.style.overflow = 'hidden';
+        titleElement.classList.add('title-shimmer');
+        
+        // Remove shimmer after animation
+        setTimeout(() => {
+            titleElement.classList.remove('title-shimmer');
+        }, 2000);
+    }
+
+    // Helper to check and update activity title from polling
+    function checkActivityTitleUpdate(activityId, activityData) {
+        if (!activityId || !activityData || !activityData.title) return;
+        updateActivityTitle(activityId, activityData.title);
     }
 
     // Helper function to update activity item status in the app rail
@@ -3924,6 +3960,10 @@
 
                     // Update activity status in app rail
                     updateActivityItemStatus(activity_id, response.status);
+                    // Check for title updates
+                    if (response.title) {
+                        checkActivityTitleUpdate(activity_id, { title: response.title });
+                    }
 
                     if (response.status === "completed") {
                         clearInterval(intervalId);
