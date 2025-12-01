@@ -125,10 +125,12 @@
 
         // add delete button for deleting the activity
         const displayTitle = safeTitle(a);
+        const isLoadingTitle = !displayTitle && (a.type === "conversation" || a.type === "search_set_run");
+        const loadingText = isLoadingTitle ? '<span class="title-loading" style="opacity: 0.5; font-style: italic;">Generating title...</span>' : displayTitle;
         li.innerHTML = `
       <span class="run-left">
-        <i class="fa-solid ${typeIcon} run-type-icon" title="${displayTitle || "Activity"}"></i>
-        <span class="run-title truncate" title="${tooltip}">${displayTitle || ""}</span>
+        <i class="fa-solid ${typeIcon} run-type-icon" title="${displayTitle || (isLoadingTitle ? "Generating title..." : TYPE_ICON[a.type]?.title || "Activity")}"></i>
+        <span class="run-title truncate" title="${tooltip}">${loadingText}</span>
         
       </span>
       <span class="run-actions">
