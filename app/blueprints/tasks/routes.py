@@ -461,7 +461,7 @@ def begin_search() -> ResponseReturnValue:
         current_team = user.ensure_current_team()
         activity = activity_start(
             type=ActivityType.SEARCH_SET_RUN,
-            title=search_set.title if search_set and search_set.title else "Extraction",
+            title=None,  # Will be auto-generated from document content and extraction set
             user_id=user.get_id(),
             team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
@@ -677,7 +677,7 @@ def begin_search_sync() -> ResponseReturnValue:
         current_team = user.ensure_current_team()
         activity = activity_start(
             type=ActivityType.SEARCH_SET_RUN,
-            title=search_set.title if search_set and search_set.title else "Extraction",
+            title=None,  # Will be auto-generated from document content and extraction set
             user_id=user.get_id(),
             team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
@@ -1237,7 +1237,7 @@ def run_extraction_integrated() -> ResponseReturnValue:
     current_team = user.ensure_current_team()
     activity = activity_start(
         type=ActivityType.SEARCH_SET_RUN,
-        title=search_set.title if search_set and search_set.title else "Extraction",
+        title=None,  # Will be auto-generated from document content and extraction set
         user_id=user.user_id,
         team_id=current_team.uuid,
         search_set_uuid=search_set_uuid,

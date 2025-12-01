@@ -53,7 +53,16 @@
     };
 
     function safeTitle(a) {
-        return a.title && a.title.trim().length ? a.title : (TYPE_ICON[a.type]?.title ?? "Activity");
+        // Don't show fallback title - wait for auto-generated title
+        // Only workflows get fallback since they don't have auto-generated titles
+        if (a.title && a.title.trim().length) {
+            return a.title;
+        }
+        if (a.type === "workflow_run") {
+            return a.workflow?.name || "Workflow";
+        }
+        // Return empty string for chat/extraction until title is generated
+        return "";
     }
 
     function resolveActivityId(activity) {
@@ -114,21 +123,12 @@
         li.dataset.runId = activityId;
         li.onclick = () => openRun(activityId, a);
 
-        let title = a.title;
-        if (!title || title.length === 0) {
-            if (a.type === "workflow_run") {
-                title = a.workflow?.name || "Workflow";
-            } else {
-                title = "Activity";
-            }
-        }
-
-
         // add delete button for deleting the activity
+        const displayTitle = safeTitle(a);
         li.innerHTML = `
       <span class="run-left">
-        <i class="fa-solid ${typeIcon} run-type-icon" title="${a.title || "Activity"}"></i>
-        <span class="run-title truncate" title="${tooltip}">${safeTitle(a)}</span>
+        <i class="fa-solid ${typeIcon} run-type-icon" title="${displayTitle || "Activity"}"></i>
+        <span class="run-title truncate" title="${tooltip}">${displayTitle || ""}</span>
         
       </span>
       <span class="run-actions">
