@@ -138,15 +138,61 @@ def _get_model_config(model_name: str) -> Optional[dict]:
     return None
 
 
+def _get_model_endpoint(model_name: str) -> str:
+    """Get the endpoint URL for a specific model, falling back to default if not set."""
+    model_config = _get_model_config(model_name)
+    if model_config and model_config.get("endpoint"):
+        endpoint = model_config.get("endpoint", "").strip()
+        if endpoint:
+            return endpoint
+    
+    # Fallback to default LLM endpoint
+    from app.utilities.config import get_llm_endpoint
+    return get_llm_endpoint()
+
+
+def _detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
+    """
+    Detect API protocol based on model name and configuration.
+    Returns: "openai", "ollama", or "vllm"
+    """
+    if model_config and model_config.get("api_protocol"):
+        protocol = model_config.get("api_protocol", "").strip().lower()
+        if protocol in ["openai", "ollama", "vllm"]:
+            return protocol
+    
+    # Auto-detect based on model name patterns
+    model_lower = model_name.lower()
+    
+    # OpenAI models typically have "gpt" or "openai/" prefix
+    if "openai/" in model_name or model_name.startswith("gpt-") or "claude" in model_lower:
+        return "openai"
+    
+    # Ollama models typically don't have "/" and are simple names
+    if "/" not in model_name and not model_name.startswith("http"):
+        return "ollama"
+    
+    # VLLM models might have specific patterns
+    if "vllm" in model_lower or model_name.startswith("vllm/"):
+        return "vllm"
+    
+    # Default to OpenAI-compatible for unknown models
+    return "openai"
+
+
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
-    def __init__(self, api_key: str, thinking_enabled: bool = False):
-        super().__init__(api_key=api_key)
+    def __init__(self, api_key: str, thinking_enabled: bool = False, endpoint: Optional[str] = None):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
         self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
 
     @property
     def base_url(self) -> str:
+        if hasattr(self, '_endpoint') and self._endpoint:
+            return self._endpoint
         return "https://mindrouter-api.nkn.uidaho.edu/v1"
 
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
@@ -158,13 +204,8 @@ class InsightAIProvider(OpenRouterProvider):
             ).update(profile)
             
             # Disable thinking if the model doesn't support it
-            # Note: This attempts to prevent pydantic_ai from sending thinking: true
-            # to models that don't support it. If this doesn't work, we may need to
-            # handle it at a different level (e.g., in the model request itself).
             if not self.thinking_enabled:
                 try:
-                    # Try to disable thinking in the profile
-                    # The exact field name may vary depending on pydantic_ai version
                     if hasattr(model_profile, 'model_copy'):
                         model_profile = model_profile.model_copy(update={
                             "supports_thinking": False
@@ -172,8 +213,6 @@ class InsightAIProvider(OpenRouterProvider):
                     elif hasattr(model_profile, 'supports_thinking'):
                         model_profile.supports_thinking = False
                 except Exception:
-                    # If we can't modify the profile, log and continue
-                    # The model might still work, but thinking may be enabled
                     debug(f"Could not disable thinking for model {model_name}")
             
             return model_profile
@@ -182,19 +221,140 @@ class InsightAIProvider(OpenRouterProvider):
         return super().model_profile(model_name)
 
 
+class OllamaProvider(OpenRouterProvider):
+    """Provider for Ollama API-compatible servers."""
+
+    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
+        self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
+
+    @property
+    def base_url(self) -> str:
+        # Ollama typically uses /api/v1 or just /v1
+        if hasattr(self, '_endpoint') and self._endpoint:
+            if not self._endpoint.endswith("/v1") and not self._endpoint.endswith("/api/v1"):
+                if self._endpoint.endswith("/"):
+                    return self._endpoint + "v1"
+                return self._endpoint + "/v1"
+            return self._endpoint
+        return "http://localhost:11434/v1"  # Default Ollama endpoint
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # Ollama models use OpenAI-compatible profile
+        profile = openai_model_profile(model_name)
+        model_profile = OpenAIModelProfile(
+            json_schema_transformer=OpenAIJsonSchemaTransformer
+        ).update(profile)
+        
+        if not self.thinking_enabled:
+            try:
+                if hasattr(model_profile, 'model_copy'):
+                    model_profile = model_profile.model_copy(update={
+                        "supports_thinking": False
+                    })
+                elif hasattr(model_profile, 'supports_thinking'):
+                    model_profile.supports_thinking = False
+            except Exception:
+                debug(f"Could not disable thinking for Ollama model {model_name}")
+        
+        return model_profile
+
+
+class VLLMProvider(OpenRouterProvider):
+    """Provider for VLLM API-compatible servers."""
+
+    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
+        self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
+
+    @property
+    def base_url(self) -> str:
+        # VLLM typically uses /v1
+        if hasattr(self, '_endpoint') and self._endpoint:
+            if not self._endpoint.endswith("/v1"):
+                if self._endpoint.endswith("/"):
+                    return self._endpoint + "v1"
+                return self._endpoint + "/v1"
+            return self._endpoint
+        return "http://localhost:8000/v1"  # Default VLLM endpoint
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # VLLM uses OpenAI-compatible profile
+        # Special handling for models that do not contain "/" in the name
+        if "/" not in model_name:
+            profile = openai_model_profile(model_name)
+            model_profile = OpenAIModelProfile(
+                json_schema_transformer=OpenAIJsonSchemaTransformer
+            ).update(profile)
+            
+            # Disable thinking if the model doesn't support it
+            if not self.thinking_enabled:
+                try:
+                    if hasattr(model_profile, 'model_copy'):
+                        model_profile = model_profile.model_copy(update={
+                            "supports_thinking": False
+                        })
+                    elif hasattr(model_profile, 'supports_thinking'):
+                        model_profile.supports_thinking = False
+                except Exception:
+                    debug(f"Could not disable thinking for VLLM model {model_name}")
+            
+            return model_profile
+
+        # Fallback to parent logic
+        return super().model_profile(model_name)
+
+
 def get_agent_model(agent_model):
-    # Get model configuration to check if thinking is enabled
+    """
+    Get the appropriate model instance based on model configuration.
+    Supports per-model endpoints and API protocols (OpenAI, Ollama, VLLM).
+    """
+    # Get model configuration
     model_config = _get_model_config(agent_model)
     thinking_enabled = model_config.get("thinking", False) if model_config else False
     
-    if "openai" in agent_model:
+    # Handle OpenAI models (external OpenAI API)
+    if "openai" in agent_model and model_config and model_config.get("external", False):
         model_name = agent_model.split("/")[-1]
         return OpenAIModel(
             model_name=model_name,
         )
+    
+    # Get endpoint and protocol for this model
+    endpoint = _get_model_endpoint(agent_model)
+    api_protocol = _detect_api_protocol(agent_model, model_config)
+    
+    debug(f"Using model {agent_model} with endpoint {endpoint} and protocol {api_protocol}")
+    
+    # Create appropriate provider based on protocol
+    if api_protocol == "ollama":
+        provider = OllamaProvider(
+            api_key="no-api-key",
+            endpoint=endpoint,
+            thinking_enabled=thinking_enabled
+        )
+    elif api_protocol == "vllm":
+        provider = VLLMProvider(
+            api_key="no-api-key",
+            endpoint=endpoint,
+            thinking_enabled=thinking_enabled
+        )
+    else:
+        # Default to OpenAI-compatible (InsightAIProvider)
+        provider = InsightAIProvider(
+            api_key="no-api-key",
+            thinking_enabled=thinking_enabled,
+            endpoint=endpoint
+        )
+    
     return OpenAIModel(
         model_name=agent_model,
-        provider=InsightAIProvider(api_key="no-api-key", thinking_enabled=thinking_enabled),
+        provider=provider,
     )
 
 

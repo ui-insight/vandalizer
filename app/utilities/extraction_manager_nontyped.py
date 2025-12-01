@@ -71,8 +71,16 @@ class ExtractionManagerNonTyped:
         if full_text is None:
             for document_uuid in document_uuids:
                 doc = SmartDocument.objects(uuid=document_uuid).first()
+                if not doc:
+                    debug(f"Document not found: {document_uuid}")
+                    continue
                 doc_text = doc.raw_text
+                if not doc_text or len(doc_text.strip()) == 0:
+                    debug(f"Document {document_uuid} has no text content (length: {len(doc_text) if doc_text else 0})")
+                    continue
+                debug(f"Extracting from document {document_uuid}, text length: {len(doc_text)}")
                 result = self._extract_nontyped(doc_text, fields_to_extract, model)
+                debug(f"Extraction result for document {document_uuid}: {result}")
                 extraction.extend(result)
         else:
             doc_text = full_text
@@ -113,19 +121,56 @@ class ExtractionManagerNonTyped:
             fields_str = ", ".join(keys)
             prompt = f"Extract the following fields: {fields_str}\n\nText:\n{text}"
             
+            debug(f"Extraction prompt (first 500 chars): {prompt[:500]}")
+            debug(f"Text length: {len(text)}")
+            debug(f"Keys to extract: {keys}")
+            debug(f"Model name: {model_name}")
+            
             result = agent.run_sync(prompt)
             
+            debug(f"Agent result type: {type(result)}")
+            debug(f"Agent result output type: {type(result.output) if hasattr(result, 'output') else 'no output attr'}")
+            
             # Convert back to list of dicts
+            if not hasattr(result, 'output') or result.output is None:
+                debug("Agent result has no output attribute or output is None")
+                return []
+            
             entities = result.output.entities
+            debug(f"Raw entities from LLM: {entities}")
+            debug(f"Number of entities: {len(entities)}")
+            debug(f"Entity types: {[type(e) for e in entities]}")
             
             # Convert Pydantic models to dicts
-            raw_entities = [entity.model_dump() for entity in entities]
+            raw_entities = []
+            for entity in entities:
+                if hasattr(entity, 'model_dump'):
+                    raw_entities.append(entity.model_dump())
+                elif isinstance(entity, dict):
+                    raw_entities.append(entity)
+                else:
+                    debug(f"Unexpected entity type: {type(entity)}, value: {entity}")
+            
+            debug(f"Raw entities as dicts: {raw_entities}")
             
             # Filter empty entities to match original behavior
-            return self._filter_empty_entities(raw_entities)
+            filtered = self._filter_empty_entities(raw_entities)
+            debug(f"Filtered entities (after removing empty): {filtered}")
+            debug(f"Number of filtered entities: {len(filtered)}")
+            
+            return filtered
             
         except Exception as e:
+            error_msg = str(e)
             debug(f"Extraction failed: {e}")
+            import traceback
+            debug(f"Traceback: {traceback.format_exc()}")
+            
+            # Check if it's a validation error (common with VLLM)
+            if "output validation" in error_msg or "retries" in error_msg.lower():
+                debug("Output validation failed, attempting fallback with raw JSON parsing")
+                return self._extract_fallback_json(text, keys, model_name)
+            
             # Fallback or return empty list
             return []
 
@@ -137,3 +182,69 @@ class ExtractionManagerNonTyped:
             return any(v not in (None, "", [], {}) for v in e.values())
 
         return [e for e in entities if is_non_empty(e)]
+    
+    def _extract_fallback_json(self, text: str, keys: list[str], model_name: str) -> list:
+        """Fallback extraction method that parses raw JSON from LLM response."""
+        try:
+            from app.utilities.agents import create_chat_agent
+            
+            # Create a simpler prompt that asks for JSON directly
+            fields_str = ", ".join([f'"{k}"' for k in keys])
+            prompt = f"""Extract the following fields from the text and return them as a JSON object.
+Return ONLY valid JSON, no markdown, no code blocks, no explanations.
+
+Fields to extract: {fields_str}
+
+Text:
+{text}
+
+Return a JSON object with these exact field names. If a field is not found, use null.
+Example format: {{"Field Name 1": "value", "Field Name 2": null, ...}}
+"""
+            
+            system_prompt = (
+                "You are a precise entity extraction assistant. Extract the requested information from the text. "
+                "Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations. "
+                "If a field is not found, use null."
+            )
+            
+            chat_agent = create_chat_agent(model_name, system_prompt=system_prompt)
+            result = chat_agent.run_sync(prompt)
+            
+            # Parse the JSON response
+            output = result.output
+            debug(f"Fallback extraction raw output: {output}")
+            
+            # Remove markdown code blocks if present
+            if "```json" in output:
+                output = output.split("```json")[1].split("```")[0].strip()
+            elif "```" in output:
+                output = output.split("```")[1].split("```")[0].strip()
+            
+            # Parse JSON
+            try:
+                parsed = json.loads(output.strip())
+                debug(f"Parsed JSON: {parsed}")
+                
+                # Convert to list format expected by the rest of the code
+                if isinstance(parsed, dict):
+                    # Ensure all keys are present
+                    entity = {}
+                    for key in keys:
+                        entity[key] = parsed.get(key, None)
+                    return [entity]
+                elif isinstance(parsed, list):
+                    return parsed
+                else:
+                    debug(f"Unexpected parsed JSON type: {type(parsed)}")
+                    return []
+            except json.JSONDecodeError as je:
+                debug(f"Failed to parse JSON: {je}")
+                debug(f"Output that failed to parse: {output}")
+                return []
+                
+        except Exception as e:
+            debug(f"Fallback extraction also failed: {e}")
+            import traceback
+            debug(f"Fallback traceback: {traceback.format_exc()}")
+            return []

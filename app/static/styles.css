@@ -994,6 +994,7 @@ tr {
     margin-bottom: 15px;
     color: black;
     background-color: #00000008;
+    border-radius: var(--ui-radius, 12px);
 }
 
 .message-you {
@@ -1002,6 +1003,7 @@ tr {
     color:white;
     background-color: #191919;
     border-left: 7px solid var(--highlight-color, #f1b300);
+    border-radius: var(--ui-radius, 12px);
 }
 
 .main-panel .header .row .col {
@@ -1294,13 +1296,13 @@ textarea {
     .gradient-border {
     display: inline-block;
     padding: 2px;                   /* thickness of the border */
-    /* border-radius: 12px;            rounds outer edge */
+    border-radius: var(--ui-radius, 12px);            /* rounds outer edge */
     background: linear-gradient(
       45deg,
-      #6a11cb,
-      #2575fc,
-      #ff00cc,
-      #00ffd1
+      var(--highlight-complement, #6a11cb),
+      var(--highlight-color, #f1b300),
+      var(--highlight-complement, #6a11cb),
+      color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
     );
     background-size: 400% 400%;
     animation:
@@ -1329,7 +1331,7 @@ textarea {
     display: flex;
     align-items: center;
     background: #fff;
-    /* border-radius: 10px; */
+    border-radius: calc(var(--ui-radius, 12px) - 2px); /* Slightly less than outer to account for border padding */
     padding: 15px 30px 15px 15px;
     width: 100%;
     box-sizing: border-box;

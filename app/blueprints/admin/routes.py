@@ -392,16 +392,24 @@ def admin_config_add_model():
     model_tag = request.form.get("model_tag", "").strip()
     model_external = request.form.get("model_external") == "on"
     model_thinking = request.form.get("model_thinking") == "on"
+    model_endpoint = request.form.get("model_endpoint", "").strip()
+    model_api_protocol = request.form.get("model_api_protocol", "").strip().lower()
 
     if not model_name or not model_tag:
         return jsonify({"error": "Model name and tag are required"}), 400
+
+    # Validate API protocol
+    if model_api_protocol and model_api_protocol not in ["openai", "ollama", "vllm"]:
+        return jsonify({"error": "API protocol must be 'openai', 'ollama', or 'vllm'"}), 400
 
     # Add new model
     new_model = {
         "name": model_name,
         "tag": model_tag,
         "external": model_external,
-        "thinking": model_thinking
+        "thinking": model_thinking,
+        "endpoint": model_endpoint,
+        "api_protocol": model_api_protocol
     }
 
     if not config.available_models:

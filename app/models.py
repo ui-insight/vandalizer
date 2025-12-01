@@ -63,11 +63,13 @@ class SystemConfig(me.Document):
     )
 
     # Available models configuration
-    # Each model is a dict with keys: name, tag, external, thinking
+    # Each model is a dict with keys: name, tag, external, thinking, endpoint, api_protocol
     # thinking: bool - whether the model supports thinking mode (default False)
+    # endpoint: str - API endpoint URL for this specific model (optional, falls back to llm_endpoint)
+    # api_protocol: str - API protocol to use: "openai", "ollama", or "vllm" (default: auto-detect)
     available_models = me.ListField(me.DictField(), default=[
-        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False, "thinking": False},
-        {"name": "openai/gpt-5", "tag": "Cloud", "external": True, "thinking": False}
+        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False, "thinking": False, "endpoint": "", "api_protocol": ""},
+        {"name": "openai/gpt-5", "tag": "Cloud", "external": True, "thinking": False, "endpoint": "", "api_protocol": ""}
     ])
 
     # UI Configuration

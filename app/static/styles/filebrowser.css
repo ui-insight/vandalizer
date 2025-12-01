@@ -142,7 +142,7 @@
     margin-right: 60px;
     margin-top: 30px;
     background-color: white;
-    border-radius: 16px;
+    border-radius: var(--ui-radius, 12px);
     
     box-shadow: 0 0 29px 4px rgb(211, 211, 211);
 }
