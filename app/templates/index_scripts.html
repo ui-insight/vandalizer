@@ -242,10 +242,12 @@
         if (!titleElement) return;
 
         const currentTitle = titleElement.textContent.trim();
-        if (currentTitle === newTitle.trim()) return; // No change needed
+        // Check if we're replacing loading text or existing title
+        const isReplacingLoading = currentTitle.includes("Generating title");
+        if (!isReplacingLoading && currentTitle === newTitle.trim()) return; // No change needed
 
         // Update title with shimmer effect
-        titleElement.textContent = newTitle;
+        titleElement.innerHTML = newTitle; // Use innerHTML to replace any HTML (like loading text)
         titleElement.setAttribute('title', newTitle);
         
         // Add shimmer class to the title element for animation

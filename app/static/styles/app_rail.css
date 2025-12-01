@@ -40,9 +40,25 @@
   background:linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%);
   background-size:200% 100%;
   animation:rail-shimmer 8s linear infinite;
+  color:#fff;
 }
 .run-item.is-running:hover{
   box-shadow:0 1px 3px rgb(15 23 42 / 0.12);
+}
+.run-item.is-running .run-title{
+  color:#fff;
+}
+.run-item.is-running .run-type-icon{
+  color:#fff;
+}
+.run-item.is-running .run-meta{
+  color:#fff;
+}
+.run-item.is-running .run-delete{
+  color:#fff;
+}
+.run-item.is-running .run-state-icon{
+  color:#fff;
 }
 /* active run item */
 .run-item.active{ background:#e4edff; border:1px solid #0050d7; }
@@ -51,6 +67,22 @@
   background:linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%);
   background-size:200% 100%;
   animation:rail-shimmer 8s linear infinite;
+  color:#fff;
+}
+.run-item.active.is-running .run-title{
+  color:#fff;
+}
+.run-item.active.is-running .run-type-icon{
+  color:#fff;
+}
+.run-item.active.is-running .run-meta{
+  color:#fff;
+}
+.run-item.active.is-running .run-delete{
+  color:#fff;
+}
+.run-item.active.is-running .run-state-icon{
+  color:#fff;
 }
 
 .run-left{ display:flex; align-items:flex-start; gap:8px; min-width:0; flex:1; }
