@@ -184,6 +184,15 @@ def perform_extraction_task(
                 "search_set_uuid": searchset_uuid,
             }
             activity.save()
+            
+            # Trigger description generation now that we have results
+            # This will generate a better title based on actual extraction results
+            try:
+                from app.utilities.activity_description import generate_activity_description_task
+                debug(f"Triggering description generation for completed extraction {activity.id}")
+                generate_activity_description_task.delay(str(activity.id), activity.type, document_uuids)
+            except Exception as e:
+                debug(f"Error triggering description generation after extraction: {e}")
 
         # Ingest extraction into vector database for recommendations
         try:

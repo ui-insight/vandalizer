@@ -668,11 +668,12 @@ def chat() -> ResponseReturnValue:
         conversation.generate_title()
         activity = activity_start(
             type=ActivityType.CONVERSATION,
-            title=title,
+            title=None,  # Will be auto-generated from document content
             user_id=user_id,
             team_id=user.ensure_current_team().uuid,
             conversation_id=conversation.uuid,
             space=current_space_id,
+            document_uuids=document_uuids,
         )
 
     else:

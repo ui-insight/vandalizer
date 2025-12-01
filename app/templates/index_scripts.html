@@ -264,6 +264,49 @@
         if (!activityId || !activityData || !activityData.title) return;
         updateActivityTitle(activityId, activityData.title);
     }
+    
+    // Poll chat activity title updates
+    function pollChatActivityTitle(activityId) {
+        if (!activityId) return;
+        
+        let pollCount = 0;
+        const maxPolls = 30; // Poll for up to 30 seconds (30 * 1000ms)
+        const pollInterval = 2000; // Poll every 2 seconds
+        
+        const intervalId = setInterval(function() {
+            pollCount++;
+            
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activityData = data.activity;
+                        // Check for title updates
+                        if (activityData.title) {
+                            checkActivityTitleUpdate(activityId, activityData);
+                        }
+                        
+                        // Stop polling if we've gotten a title update or max polls reached
+                        // Also stop if activity is completed (title generation should be done)
+                        if (activityData.status === "completed" || pollCount >= maxPolls) {
+                            clearInterval(intervalId);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to poll chat activity title:", err);
+                    if (pollCount >= 5) {
+                        // After 5 failed attempts, give up
+                        clearInterval(intervalId);
+                    }
+                });
+        }, pollInterval);
+    }
 
     // Helper function to update activity item status in the app rail
     function updateActivityItemStatus(activityId, status) {
@@ -4484,7 +4527,13 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                         url.searchParams.set('activity_id', newActivityId);
                         url.searchParams.set('section', 'Assistant');
                         window.history.replaceState({}, '', url);
+                        
+                        // Start polling for title updates
+                        pollChatActivityTitle(newActivityId);
                     }
+                } else {
+                    // Poll for title updates on existing activity too
+                    pollChatActivityTitle(current_activity_id);
                 }
 
                 if (!response.body) throw new Error("No response body");
