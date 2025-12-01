@@ -465,6 +465,7 @@ def begin_search() -> ResponseReturnValue:
             user_id=user.get_id(),
             team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
+            document_uuids=document_uuids,
         )
         activity.status = "queued"
         activity.save()
@@ -654,6 +655,7 @@ def begin_search_sync() -> ResponseReturnValue:
             user_id=user.get_id(),
             team_id=current_team.uuid,
             search_set_uuid=searchset_uuid,
+            document_uuids=document_uuids,
         )
         # activity.documents_touched = (len(document_uuids),)
         activity.save()
@@ -1213,6 +1215,7 @@ def run_extraction_integrated() -> ResponseReturnValue:
         user_id=user.user_id,
         team_id=current_team.uuid,
         search_set_uuid=search_set_uuid,
+        document_uuids=document_uuids,
     )
     activity.status = "queued"
     activity.save()

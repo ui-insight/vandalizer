@@ -315,6 +315,7 @@ def run_workflow() -> ResponseReturnValue:
             space=current_space_id,
             workflow=workflow,
             workflow_result=workflow_result,
+            document_uuids=document_uuids,
         )
 
     async_result = execute_workflow_task.delay(
