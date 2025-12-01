@@ -52,12 +52,23 @@
 
     .form-group input[type="text"],
     .form-group input[type="url"],
-    .form-group input[type="color"] {
+    .form-group input[type="color"],
+    .form-group select {
         width: 100%;
         padding: 10px 12px;
         border: 1px solid #d1d5db;
         border-radius: 8px;
         font-size: 14px;
+        background: white;
+    }
+    
+    .form-group select {
+        cursor: pointer;
+    }
+    
+    .form-group small {
+        display: block;
+        margin-top: 4px;
     }
 
     .form-group input:focus {
@@ -156,12 +167,21 @@
 
     .add-model-form {
         display: grid;
-        grid-template-columns: 2fr 2fr auto auto;
+        grid-template-columns: repeat(2, 1fr);
         gap: 12px;
-        align-items: end;
+        align-items: start;
         margin-top: 16px;
         padding-top: 16px;
         border-top: 1px solid #e5e7eb;
+    }
+    
+    .add-model-form .form-group:last-of-type,
+    .add-model-form button {
+        grid-column: 1 / -1;
+    }
+    
+    .add-model-form button {
+        justify-self: start;
     }
 
     .checkbox-group {
@@ -597,6 +617,16 @@
                         {% endif %}
                     </div>
                     <div class="model-tag">{{ model.tag }}</div>
+                    {% if model.get("endpoint") %}
+                    <div class="model-endpoint" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                        Endpoint: {{ model.endpoint }}
+                    </div>
+                    {% endif %}
+                    {% if model.get("api_protocol") %}
+                    <div class="model-protocol" style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                        Protocol: {{ model.api_protocol|upper }}
+                    </div>
+                    {% endif %}
                 </div>
                 <form method="POST" action="/admin/config/remove_model/{{ loop.index0 }}" style="margin: 0;">
                     <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;"
@@ -619,6 +649,22 @@
                 <div class="form-group" style="margin: 0;">
                     <label for="model_tag">Tag/Description</label>
                     <input type="text" id="model_tag" name="model_tag" placeholder="University of Idaho - Private" required>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="model_endpoint">API Endpoint (optional)</label>
+                    <input type="url" id="model_endpoint" name="model_endpoint" 
+                           placeholder="https://api.example.com/v1 (leave empty to use default)">
+                    <small style="color: #6b7280; font-size: 12px;">If empty, uses the default LLM endpoint</small>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="model_api_protocol">API Protocol</label>
+                    <select id="model_api_protocol" name="model_api_protocol">
+                        <option value="">Auto-detect</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="ollama">Ollama</option>
+                        <option value="vllm">VLLM</option>
+                    </select>
+                    <small style="color: #6b7280; font-size: 12px;">Protocol will be auto-detected if not specified</small>
                 </div>
                 <div class="form-group" style="margin: 0;">
                     <div class="checkbox-group">

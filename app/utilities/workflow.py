@@ -19,6 +19,8 @@ from langchain_openai import OpenAIEmbeddings
 from app import app
 from app.celery_worker import celery_app
 from app.models import (
+    ActivityEvent,
+    ActivityStatus,
     SearchSet,
     SmartDocument,
     Workflow,
@@ -26,6 +28,7 @@ from app.models import (
     WorkflowStep,
 )
 from app.utilities.agents import create_chat_agent
+from app.utilities.analytics_helper import activity_finish
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.chat_manager import ChatManager
 

@@ -3413,9 +3413,8 @@
                     url.searchParams.set('activity_id', data.activity_id);
                     window.history.replaceState(null, '', url.toString());
 
-                    // Show loading message
-                    $("#search-results-panel").show();
-                    $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                    // Show overlay on top of extraction panel
+                    showExtractionOverlay();
 
                     // Poll for completion
                     pollExtractionStatus(data.activity_id, search_set_uuid);
@@ -3478,9 +3477,8 @@
                         url.searchParams.set('activity_id', data.activity_id);
                         window.history.replaceState(null, '', url.toString());
 
-                        // Show loading message
-                        $("#search-results-panel").show();
-                        $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                        // Show overlay on top of extraction panel
+                        showExtractionOverlay();
 
                         // Poll for completion
                         const search_set_uuid = data.search_set_uuid || new URLSearchParams(window.location.search).get('search_set_uuid');
@@ -3941,8 +3939,56 @@
     });
 
     $("#add-search-set-button").on("click", function () {
-        addSearchSet($("#add-search-set-input")[0].value, "extraction");
+addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
+
+    function showExtractionOverlay() {
+        const panel = $("#search-results-panel");
+        if (panel.length === 0) return;
+        
+        // Ensure panel is visible
+        panel.show();
+        
+        // Add overlay class to prevent scrolling
+        panel.addClass("has-overlay");
+        
+        // Find the content body where search terms are displayed
+        const contentBody = panel.find(".search-results-content-body");
+        
+        // Check if overlay already exists
+        let overlay = panel.find(".extraction-loading-overlay");
+        if (overlay.length === 0) {
+            overlay = $('<div class="extraction-loading-overlay"><div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style="margin-top: 20px; font-size: 16px; font-weight: 700; color: #333;">Running extraction...</p></div>');
+            // Append to content body to cover search terms section, leaving bottom toolbar visible
+            if (contentBody.length > 0) {
+                contentBody.css("position", "relative");
+                contentBody.prepend(overlay);
+            } else {
+                // Fallback: append to panel but position to leave bottom toolbar visible
+                overlay.css("bottom", "120px");
+                panel.append(overlay);
+            }
+        } else {
+            overlay.removeClass("hidden");
+        }
+    }
+
+    function hideExtractionOverlay() {
+        const panel = $("#search-results-panel");
+        // Remove overlay from panel
+        const overlay = panel.find(".extraction-loading-overlay");
+        overlay.remove();
+        
+        // Also remove from content body if it exists there
+        const contentBody = panel.find(".search-results-content-body");
+        if (contentBody.length > 0) {
+            contentBody.find(".extraction-loading-overlay").remove();
+        }
+        
+        panel.removeClass("has-overlay");
+        console.log("Extraction overlay removed");
+        console.log("Remaining overlays:", panel.find(".extraction-loading-overlay").length);
+    }
 
     function pollExtractionStatus(activity_id, search_set_uuid) {
         let pollCount = 0;
@@ -3957,6 +4003,7 @@
                 dataType: "json",
                 success: function (response) {
                     console.log("Extraction status:", response.status);
+                    console.log("Extraction status response:", response);
 
                     // Update activity status in app rail
                     updateActivityItemStatus(activity_id, response.status);
@@ -3970,11 +4017,93 @@
                         hideWorking();
                         stopScanning();
 
-                        // Display results
+                        // Hide overlay and display results
+                        hideExtractionOverlay();
                         $("#search-results-panel").empty();
-                        $(response.template).hide().appendTo("#search-results-panel").fadeIn();
-                        addResultListeners();
-                        search_set_add_uuid = search_set_uuid;
+                        
+                        // Check if template exists in response
+                        console.log("Checking for template in response...");
+                        console.log("response.template exists:", "template" in response);
+                        console.log("response.template value:", response.template ? "present" : "missing");
+                        console.log("response.template type:", typeof response.template);
+                        console.log("response.template length:", response.template ? response.template.length : "N/A");
+                        
+                        if (response.template && response.template.length > 0) {
+                            console.log("Template found, length:", response.template.length);
+                            try {
+                                // Ensure overlay is completely removed first
+                                hideExtractionOverlay();
+                                
+                                // Wait a moment to ensure overlay is removed
+                                setTimeout(function() {
+                                    // Make sure panel is visible and remove any overlay remnants
+                                    const $panel = $("#search-results-panel");
+                                    
+                                    // Remove all overlays from panel and content body
+                                    $panel.find(".extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
+                                    $panel.removeClass("has-overlay");
+                                    
+                                    // Make sure panel is visible
+                                    $panel.show();
+                                    $panel.css("display", "block");
+                                    $panel.css("visibility", "visible");
+                                    $panel.css("opacity", "1");
+                                    
+                                    console.log("Panel display:", $panel.css("display"));
+                                    console.log("Panel visibility:", $panel.css("visibility"));
+                                    console.log("Panel z-index:", $panel.css("z-index"));
+                                    console.log("Panel height:", $panel.height());
+                                    
+                                    // Clear and append template
+                                    const $template = $(response.template);
+                                    $panel.empty();
+                                    
+                                    console.log("Appending template to panel...");
+                                    console.log("Template HTML preview (first 500 chars):", response.template.substring(0, 500));
+                                    
+                                    // Append template without hiding it first - just show it directly
+                                    $template.appendTo($panel);
+                                    
+                                    // Double-check no overlays remain anywhere in the panel
+                                    $panel.find(".extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content .extraction-loading-overlay").remove();
+                                    
+                                    // Remove overlay class
+                                    $panel.removeClass("has-overlay");
+                                    
+                                    console.log("Template appended");
+                                    console.log("Panel content length:", $panel.html().length);
+                                    console.log("Panel is visible:", $panel.is(":visible"));
+                                    console.log("Panel display:", $panel.css("display"));
+                                    console.log("Panel offset:", $panel.offset());
+                                    console.log("Panel dimensions:", { width: $panel.width(), height: $panel.height() });
+                                    console.log("First child element:", $panel.children().first().prop("tagName"));
+                                    console.log("Overlays remaining:", $panel.find(".extraction-loading-overlay").length);
+                                    
+                                    // Force scroll to top of panel
+                                    $panel.scrollTop(0);
+                                    
+                                    // Ensure panel is visible
+                                    $panel.show();
+                                    $panel.css("display", "block");
+                                    
+                                    addResultListeners();
+                                    search_set_add_uuid = search_set_uuid;
+                                    console.log("Template successfully displayed");
+                                }, 100);
+                            } catch (e) {
+                                console.error("Error appending template:", e);
+                                console.error("Error stack:", e.stack);
+                                $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error displaying template: " + e.message + "</div>");
+                            }
+                        } else {
+                            console.error("No template in extraction status response");
+                            console.error("Full response:", JSON.stringify(response, null, 2));
+                            console.error("Template error:", response.template_error);
+                            $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction completed, but results could not be displayed. Error: " + (response.template_error || "Template not provided") + "</div>");
+                        }
 
                         if ($('#run-term-button').length > 0) {
                             $('#run-term-button')[0].textContent = "RUN";
@@ -3988,9 +4117,13 @@
                         hideWorking();
                         stopScanning();
 
+                        // Hide overlay and show error
+                        hideExtractionOverlay();
+
                         // Update activity status in app rail
                         updateActivityItemStatus(activity_id, response.status);
 
+                        // Show error message - replace content since extraction failed
                         $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Extraction failed: " + (response.error || "Unknown error") + "</div>");
 
                         if ($('#run-term-button').length > 0) {
@@ -4003,6 +4136,8 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
+                        // Hide overlay and show timeout message
+                        hideExtractionOverlay();
                         $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction is taking longer than expected. Check back later.</div>");
                         showToast("Extraction timeout");
                     }
@@ -4015,6 +4150,8 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
+                        // Hide overlay and show error
+                        hideExtractionOverlay();
                         $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error checking extraction status</div>");
                     }
                 }
@@ -4888,7 +5025,8 @@
                             showWorking();
                             showScanning();
                             $("#search-results-panel").show();
-                            $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                            // Show overlay on top of extraction panel
+                            showExtractionOverlay();
                             // Resume polling
                             pollExtractionStatus(activityId, searchSetUuid);
                         }

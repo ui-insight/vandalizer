@@ -190,7 +190,12 @@ def perform_extraction_task(
             ingestion_text = ""
             ingestion_text += "# Documents selected:"
             for document in documents:
+                # Include document title and first part of raw_text for better semantic matching
                 ingestion_text += f"\n- {document.title}"
+                if document.raw_text:
+                    # Include first 500 chars of document text for semantic matching
+                    text_preview = document.raw_text[:500] if len(document.raw_text) > 500 else document.raw_text
+                    ingestion_text += f"\n{document.raw_text[:500]}"
             ingestion_text += "\n\n# Extraction performed:\n"
             for key in keys:
                 ingestion_text += f"- {key}\n"

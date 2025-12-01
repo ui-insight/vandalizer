@@ -390,9 +390,12 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
     templates = []
 
     recommended_workflows = []
+    recommended_extractions = []  # Separate list for extractions to avoid type confusion
     for recommendation in recommendations:
         identifier = recommendation["identifier"]
         recommendation_type = recommendation["recommendation_type"]
+        debug(f"Processing recommendation: type={recommendation_type}, identifier={identifier}")
+        
         if recommendation_type == "Workflow":
             workflow = Workflow.objects(id=identifier).first()
             if workflow and (workflow not in recommended_workflows):
@@ -404,15 +407,29 @@ def get_workflow_recommendations_sync() -> ResponseReturnValue:
                     user=user,
                 )
                 templates.append(template)
+                debug(f"Added workflow recommendation: {workflow.id}")
         elif recommendation_type == "Extraction":
+            debug(f"Processing Extraction recommendation with identifier: {identifier}")
             search_set = SearchSet.objects(uuid=identifier).first()
-            if search_set and (search_set not in recommended_workflows):
-                recommended_workflows.append(search_set)
-                template = render_template(
-                    "toolpanel/recommendations/recommendation-extraction.html",
-                    search_set=search_set,
-                )
-                templates.append(template)
+            debug(f"SearchSet lookup result: {search_set.uuid if search_set else 'None'}")
+            if search_set and (search_set not in recommended_extractions):
+                recommended_extractions.append(search_set)
+                try:
+                    template = render_template(
+                        "toolpanel/recommendations/recommendation-extraction.html",
+                        search_set=search_set,
+                    )
+                    templates.append(template)
+                    debug(f"Successfully rendered extraction recommendation template for {identifier}")
+                except Exception as e:
+                    debug(f"Error rendering extraction recommendation template: {e}")
+                    import traceback
+                    debug(f"Traceback: {traceback.format_exc()}")
+            else:
+                if not search_set:
+                    debug(f"SearchSet not found for identifier: {identifier}")
+                else:
+                    debug(f"SearchSet {identifier} already in recommended_extractions list")
     if len(templates) == 0:
         template = render_template(
             "toolpanel/recommendations/recommendations-none.html",

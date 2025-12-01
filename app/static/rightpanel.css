@@ -10,6 +10,42 @@
   overflow: scroll;
 }
 
+.search-results-panel.has-overlay {
+  overflow: hidden;
+}
+
+.extraction-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 499; /* Below bottom toolbar (z-index 500) so Run button stays visible */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 40px 20px;
+  padding-top: 60px;
+  text-align: center;
+}
+
+/* When overlay is in content body, position it to cover search terms but leave bottom toolbar visible */
+.search-results-content-body .extraction-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.extraction-loading-overlay.hidden {
+  display: none;
+}
+
 .search-results-panel hr {
   margin-top: 15px;
   margin-bottom: 15px;
@@ -162,7 +198,7 @@ button.shadow-button:hover {
   margin-right: 60px;
   margin-top: 30px;
   background-color: white;
-  border-radius: 16px;
+  border-radius: var(--ui-radius, 12px);
 
   box-shadow: 0 0 29px 4px rgb(211, 211, 211);
 }

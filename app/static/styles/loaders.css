@@ -12,6 +12,35 @@
     background: #ababab;
     animation: lds-grid 1.2s linear infinite;
   }
+  
+  /* Extraction overlay specific styling with gradient colors */
+  .extraction-loading-overlay .lds-grid div {
+    background: var(--highlight-color, #f1b300);
+    animation: lds-grid-extraction 1.2s linear infinite;
+  }
+  
+  @keyframes lds-grid-extraction {
+    0% {
+      opacity: 1;
+      background: var(--highlight-color, #f1b300);
+    }
+    25% {
+      opacity: 0.8;
+      background: color-mix(in srgb, var(--highlight-color, #f1b300) 80%, transparent);
+    }
+    50% {
+      opacity: 0.5;
+      background: color-mix(in srgb, var(--highlight-complement, #6a11cb) 50%, transparent);
+    }
+    75% {
+      opacity: 0.8;
+      background: color-mix(in srgb, var(--highlight-color, #f1b300) 80%, transparent);
+    }
+    100% {
+      opacity: 1;
+      background: var(--highlight-color, #f1b300);
+    }
+  }
   .lds-grid div:nth-child(1) {
     top: 8px;
     left: 8px;

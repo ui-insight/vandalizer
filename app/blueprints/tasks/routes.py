@@ -509,6 +509,8 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
     """Check the status of an extraction task."""
     # Support API key authentication for programmatic access
     api_key = request.headers.get("x-api-key")
+    is_api_call = api_key is not None and api_key != ""
+    
     if api_key:
         user = User.objects(id=api_key).first()
         if user is None:
@@ -539,12 +541,15 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
         normalized_results = snapshot.get("normalized")
         raw_results = snapshot.get("raw")
         
+        debug(f"Extraction status - is_api_call: {is_api_call}")
         debug(f"Extraction status - snapshot keys: {list(snapshot.keys()) if isinstance(snapshot, dict) else 'not a dict'}")
+        debug(f"Extraction status - search_set_uuid: {search_set_uuid}")
         debug(f"Extraction status - normalized_results from snapshot: {normalized_results}")
         debug(f"Extraction status - raw_results from snapshot: {raw_results}")
         
         # Get keys from search set to ensure all are included
         keys = []
+        search_set = None  # Initialize for reuse
         if search_set_uuid:
             search_set = SearchSet.objects(uuid=search_set_uuid).first()
             if search_set:
@@ -583,24 +588,45 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
 
         # For API calls (x-api-key), only return JSON results
         # For web UI calls, include the HTML template
-        is_api_call = api_key is not None
+        # is_api_call already set above
         
         if not is_api_call:
-            # Get search set and documents for template rendering
-            search_set = SearchSet.objects(uuid=search_set_uuid).first()
-            documents = []
-            for doc_uuid in document_uuids:
-                document = SmartDocument.objects(uuid=doc_uuid).first()
-                if document:
-                    documents.append(document)
+            debug(f"Not an API call, rendering template. search_set_uuid: {search_set_uuid}")
+            # Use the search_set we already found, or look it up again if needed
+            if not search_set and search_set_uuid:
+                search_set = SearchSet.objects(uuid=search_set_uuid).first()
+                debug(f"Looked up search_set: {search_set.uuid if search_set else 'None'}")
+            
+            if search_set:
+                documents = []
+                for doc_uuid in document_uuids:
+                    document = SmartDocument.objects(uuid=doc_uuid).first()
+                    if document:
+                        documents.append(document)
+                debug(f"Found {len(documents)} documents for template rendering")
 
-            # Render template for web UI
-            template = _render_extraction_panel(
-                search_set,
-                results=normalized_results,
-                documents=documents,
-            )
-            response["template"] = template
+                # Render template for web UI
+                try:
+                    debug(f"Rendering extraction panel template for search_set: {search_set.uuid}")
+                    template = _render_extraction_panel(
+                        search_set,
+                        results=normalized_results,
+                        documents=documents,
+                    )
+                    response["template"] = template
+                    debug(f"Template rendered successfully, length: {len(template) if template else 0}")
+                except Exception as e:
+                    debug(f"Error rendering extraction panel template: {e}")
+                    import traceback
+                    debug(f"Traceback: {traceback.format_exc()}")
+                    response["template"] = None
+                    response["template_error"] = str(e)
+            else:
+                debug(f"Search set not found for uuid: {search_set_uuid}")
+                response["template"] = None
+                response["template_error"] = f"Search set not found for uuid: {search_set_uuid}"
+        else:
+            debug(f"API call detected, skipping template rendering")
 
         # Always include results in JSON format
         response["results"] = normalized_results

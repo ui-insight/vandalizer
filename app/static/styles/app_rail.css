@@ -38,7 +38,7 @@
   position:relative;
   background:linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%);
   background-size:200% 100%;
-  animation:rail-shimmer 1.6s linear infinite;
+  animation:rail-shimmer 8s linear infinite;
 }
 .run-item.is-running:hover{
   box-shadow:0 1px 3px rgb(15 23 42 / 0.12);
@@ -49,7 +49,7 @@
 .run-item.active.is-running{
   background:linear-gradient(90deg, var(--highlight-complement, #6a11cb) 0%, var(--highlight-color, #f1b300) 50%, var(--highlight-complement, #6a11cb) 100%);
   background-size:200% 100%;
-  animation:rail-shimmer 1.6s linear infinite;
+  animation:rail-shimmer 8s linear infinite;
 }
 
 .run-left{ display:flex; align-items:center; gap:8px; min-width:0; }
@@ -106,8 +106,8 @@ body .left-panel .semantic-panel{ left:30px; right:calc(40% + var(--rail-w) + 30
 }
 
 @keyframes rail-shimmer{
-  0%{ background-position:0% 50%; }
-  100%{ background-position:200% 50%; }
+  0%{ background-position:200% 50%; }
+  100%{ background-position:-200% 50%; }
 }
 
 /* One-time completion shimmer effect */
