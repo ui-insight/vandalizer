@@ -686,6 +686,21 @@ def chat() -> ResponseReturnValue:
                 uuid=activity.conversation_id,
                 user_id=user_id,
             ).first()
+            # If conversation doesn't exist, create a new one and update the activity
+            if not conversation:
+                conversation = ChatConversation(
+                    title=title,
+                    uuid=str(uuid.uuid4()),
+                    user_id=user_id,
+                )
+                conversation.save()
+                conversation.generate_title()
+                activity.conversation_id = conversation.uuid
+                activity.save()
+
+    # Ensure conversation exists before proceeding
+    if not conversation:
+        return jsonify({"error": "Failed to create or retrieve conversation"}), 500
 
     debug(activity)
     debug(conversation)
