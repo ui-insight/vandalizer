@@ -1,300 +1,345 @@
 <!-- Rename Modal Structure -->
 <div id="newWorkflowStepTaskModal" class="workflow-overlay" style="display:none;">
-    <div class="workflow-modal-content"> 
-      <div class="add-task-container" id="add-task-container" style="height: 100%;">
-        <h2 class="workflow-modal-header">
-            Add a step
-            <a class="closeWorkflowAddStepTaskBtn" style="float:right; color: #88888899; cursor: pointer;"><i class="fa-solid fa-circle-xmark"></i></a>
-        </h2>
+    <div class="workflow-modal-content">
+        <div class="add-task-container" id="add-task-container" style="height: 100%;">
+            <h2 class="workflow-modal-header">
+                Add a step
+                <a class="closeWorkflowAddStepTaskBtn" style="float:right; color: #88888899; cursor: pointer;"><i
+                        class="fa-solid fa-circle-xmark"></i></a>
+            </h2>
 
-        <hr>
-        <h3 class="workflow-modal-subtitle">Increase the power of the workflow</h3>
-        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
-        
-        <div class="add-workflow-step-container">
-            <div class="left-column">
-                <ul class="section-list">
-                    <li class="section-item add-step-all-section active"><i class="fa-solid fa-box-archive" style="margin-right: 10px;"></i>All</li>
-                    <li class="section-item add-step-text-section"><i class="fa-solid fa-text-height" style="margin-right: 10px;"></i>Text</li>
-                    <li class="section-item add-step-files-section"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Files</li>
-                    <li class="section-item add-step-web-section"><i class="fa-solid fa-globe"  style="margin-right: 10px;"></i>Web & Code</li>
-                </ul>
-            </div>
+            <hr>
+            <h3 class="workflow-modal-subtitle">Increase the power of the workflow</h3>
+            <hr style="padding-bottom: 0px; margin-bottom: 0px;">
 
-            <div class="right-column">
-                <!-- All Section -->
-                <div class="add-workflow-step-all-section">
-                    <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-box-archive" style="margin-right: 10px;"></i>All</h3>
-                    <a class="content-btn">
-                        <div class="add-task add-extraction-step-btn">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
-                            </div>
-                        
-                            <div class="add-task-content">
-                                <div class="add-task-title">Extractions</div>
-                                <div class="add-task-description">Extract information from text</div>
-                            </div>
-                        </div>
-                    </a>
-                
-                    <a class="content-btn add-prompt-step-btn">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                        <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Prompts</div>
-                            <div class="add-task-description">Ask questions, build to-do lists, summarize, and synthesize</div>
-                        </div>
-                        </div>
-                    </a>
-
-                    <a class="content-btn add-format-step-btn">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Format</div>
-                            <div class="add-task-description">Format your data, transform data, reshape information</div>
-                        </div>
-                        </div>
-                    </a>
-
-                    <div class="dimmed">
-                    <a class="content-btn ">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Add Document</div>
-                            <div class="add-task-description">Insert a document or multiple documents into the workflow</div>
-                        </div>
-                        </div>
-                    </a>
-                    </div>
-                </div>
-                 <!-- Text Section -->
-                 <div class="add-workflow-step-text-section" style="display: none;">
-                    <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-text-height" style="margin-right: 10px;"></i>Text</h3>
-                    <a class="content-btn">
-                        <div class="add-task add-extraction-step-btn">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
-                            </div>
-                        
-                            <div class="add-task-content">
-                                <div class="add-task-title">Extractions</div>
-                                <div class="add-task-description">Extract information from text</div>
-                            </div>
-                        </div>
-                    </a>
-                
-                    <a class="content-btn add-prompt-step-btn">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                        <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Prompts</div>
-                            <div class="add-task-description">Ask questions, build to-do lists, summarize, and synthesize</div>
-                        </div>
-                        </div>
-                    </a>
-
-                    <a class="content-btn add-format-step-btn">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Format</div>
-                            <div class="add-task-description">Format your data, transform data, reshape information</div>
-                        </div>
-                        </div>
-                    </a>
-                </div>
-                <!-- Files Section -->
-                <div class="add-workflow-step-files-section" style="display: none;">
-                    <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Files</h3>
-                    <div class="dimmed">
-                    <a class="content-btn">
-                        <div class="add-task">
-                            <div class="add-task-icon-container">
-                                <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
-                        </div>
-                        <div class="add-task-content">
-                            <div class="add-task-title">Add Document</div>
-                            <div class="add-task-description">Insert a document or multiple documents into the workflow</div>
-                        </div>
-                        </div>
-                    </a>
-                    </div>
-                
-                    <div class="dimmed">
-                        <a class="content-btn">
-                            <div class="add-task">
-                                <div class="add-task-icon-container">
-                                    <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
-                            </div>
-                            <div class="add-task-content">
-                                <div class="add-task-title">Add Website</div>
-                                <div class="add-task-description">Use the text from a website as input <i><b>COMING SOON</b></i></div>
-                            </div>
-                            </div>
-                        </a>
-                    </div>
-
-                    <div class="dimmed">
-                        <a class="content-btn">
-                            <div class="add-task">
-                                <div class="add-task-icon-container">
-                                    <i class="fa-regular fa-file-circle-plus"  style="font-size: 24px; color: #191919;"></i>
-                            </div>
-                            <div class="add-task-content">
-                                <div class="add-task-title">Describe Image</div>
-                                <div class="add-task-description">Describe an image using AI <i><b>COMING SOON</b></i></div>
-                            </div>
-                            </div>
-                        </a>
-                    </div>
+            <div class="add-workflow-step-container">
+                <div class="left-column">
+                    <ul class="section-list">
+                        <li class="section-item add-step-all-section active"><i class="fa-solid fa-box-archive"
+                                style="margin-right: 10px;"></i>All</li>
+                        <li class="section-item add-step-text-section"><i class="fa-solid fa-text-height"
+                                style="margin-right: 10px;"></i>Text</li>
+                        <li class="section-item add-step-files-section"><i class="fa-regular fa-file"
+                                style="margin-right: 10px;"></i>Files</li>
+                        <li class="section-item add-step-web-section"><i class="fa-solid fa-globe"
+                                style="margin-right: 10px;"></i>Web & Code</li>
+                    </ul>
                 </div>
 
-                <!-- Web and code Section -->
-                <div class="add-workflow-step-web-section " style="display: none;">
-                    <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file" style="margin-right: 10px;"></i>Web & Code</h3>
-                    <div class="dimmed">
-                        <a class="content-btn">
-                            <div class="add-task">
-                                <div class="add-task-icon-container">
-                                    <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                            </div>
-                            <div class="add-task-content">
-                                <div class="add-task-title">Code Node</div>
-                                <div class="add-task-description">Runs a snippet of python <i><b>COMING SOON</b></i></div>
-                            </div>
-                            </div>
-                        </a>
-                    </div>
-
-                    <div class="dimmed">
+                <div class="right-column">
+                    <!-- All Section -->
+                    <div class="add-workflow-step-all-section">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-box-archive"
+                                style="margin-right: 10px;"></i>All</h3>
                         <a class="content-btn">
                             <div class="add-task add-extraction-step-btn">
                                 <div class="add-task-icon-container">
                                     <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
                                 </div>
-                            
+
                                 <div class="add-task-content">
-                                    <div class="add-task-title">Crawler Node</div>
-                                    <div class="add-task-description">Searches Google with a query, looking for information you desire. <i><b>COMING SOON</b></i></div>
+                                    <div class="add-task-title">Extractions</div>
+                                    <div class="add-task-description">Extract information from text</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a class="content-btn add-prompt-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Prompts</div>
+                                    <div class="add-task-description">Ask questions, build to-do lists, summarize, and
+                                        synthesize</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a class="content-btn add-format-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Format</div>
+                                    <div class="add-task-description">Format your data, transform data, reshape
+                                        information</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a class="content-btn add-browser-automation-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-globe" style="font-size: 24px; color: #3B82F6;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Browser Automation</div>
+                                    <div class="add-task-description">Automate interactions with web pages</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <div class="dimmed">
+                            <a class="content-btn ">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-file-circle-plus"
+                                            style="font-size: 24px; color: #191919;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Add Document</div>
+                                        <div class="add-task-description">Insert a document or multiple documents into
+                                            the workflow</div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                    <!-- Text Section -->
+                    <div class="add-workflow-step-text-section" style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-text-height"
+                                style="margin-right: 10px;"></i>Text</h3>
+                        <a class="content-btn">
+                            <div class="add-task add-extraction-step-btn">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
+                                </div>
+
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Extractions</div>
+                                    <div class="add-task-description">Extract information from text</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a class="content-btn add-prompt-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Prompts</div>
+                                    <div class="add-task-description">Ask questions, build to-do lists, summarize, and
+                                        synthesize</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a class="content-btn add-format-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Format</div>
+                                    <div class="add-task-description">Format your data, transform data, reshape
+                                        information</div>
                                 </div>
                             </div>
                         </a>
                     </div>
-                
-                    <div class="dimmed">
-                        <a class="content-btn">
-                            <div class="add-task">
-                                <div class="add-task-icon-container">
-                            <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
-                            </div>
-                            <div class="add-task-content">
-                                <div class="add-task-title">Research Node</div>
-                                <div class="add-task-description">Searches a website for specific information <i><b>COMING SOON</b></i></div>
-                            </div>
-                            </div>
-                        </a>
+                    <!-- Files Section -->
+                    <div class="add-workflow-step-files-section" style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file"
+                                style="margin-right: 10px;"></i>Files</h3>
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-file-circle-plus"
+                                            style="font-size: 24px; color: #191919;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Add Document</div>
+                                        <div class="add-task-description">Insert a document or multiple documents into
+                                            the workflow</div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-file-circle-plus"
+                                            style="font-size: 24px; color: #191919;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Add Website</div>
+                                        <div class="add-task-description">Use the text from a website as input
+                                            <i><b>COMING SOON</b></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-file-circle-plus"
+                                            style="font-size: 24px; color: #191919;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Describe Image</div>
+                                        <div class="add-task-description">Describe an image using AI <i><b>COMING
+                                                    SOON</b></i></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
                     </div>
 
-                    <div class="dimmed">
-                        <a class="content-btn">
-                            <div class="add-task">
-                                <div class="add-task-icon-container">
-                                    <i class="fa-regular fa-outdent"  style="font-size: 24px; color: #5DBB54;"></i>
-                            </div>
-                            <div class="add-task-content">
-                                <div class="add-task-title">API Node</div>
-                                <div class="add-task-description">Makes an API request, including the information in your workflow <i><b>COMING SOON</b></i></div>
-                            </div>
-                            </div>
-                        </a>
+                    <!-- Web and code Section -->
+                    <div class="add-workflow-step-web-section " style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-regular fa-file"
+                                style="margin-right: 10px;"></i>Web & Code</h3>
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Code Node</div>
+                                        <div class="add-task-description">Runs a snippet of python <i><b>COMING
+                                                    SOON</b></i></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task add-extraction-step-btn">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-filter" style="font-size: 24px; color: #D44C4C;"></i>
+                                    </div>
+
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Crawler Node</div>
+                                        <div class="add-task-description">Searches Google with a query, looking for
+                                            information you desire. <i><b>COMING SOON</b></i></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-solid fa-i-cursor" style="font-size: 24px; color: #70B5D2;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">Research Node</div>
+                                        <div class="add-task-description">Searches a website for specific information
+                                            <i><b>COMING SOON</b></i>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+
+                        <div class="dimmed">
+                            <a class="content-btn">
+                                <div class="add-task">
+                                    <div class="add-task-icon-container">
+                                        <i class="fa-regular fa-outdent" style="font-size: 24px; color: #5DBB54;"></i>
+                                    </div>
+                                    <div class="add-task-content">
+                                        <div class="add-task-title">API Node</div>
+                                        <div class="add-task-description">Makes an API request, including the
+                                            information in your workflow <i><b>COMING SOON</b></i></div>
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
-            </div>
+        </div>
+
+        <script>
+            $('.add-step-all-section').off('click').on('click', function (e) {
+                e.preventDefault();
+                $(".add-workflow-step-all-section").show();
+                $(".add-workflow-step-text-section").hide();
+                $(".add-workflow-step-files-section").hide();
+                $(".add-workflow-step-web-section").hide();
+                $('.section-item').removeClass('active');
+                $(this).addClass('active');
+            });
+
+            $('.add-step-text-section').off('click').on('click', function (e) {
+                e.preventDefault();
+                $(".add-workflow-step-all-section").hide();
+                $(".add-workflow-step-text-section").show();
+                $(".add-workflow-step-files-section").hide();
+                $(".add-workflow-step-web-section").hide();
+                $('.section-item').removeClass('active');
+                $(this).addClass('active');
+            });
+
+            $('.add-step-files-section').off('click').on('click', function (e) {
+                e.preventDefault();
+                $(".add-workflow-step-all-section").hide();
+                $(".add-workflow-step-text-section").hide();
+                $(".add-workflow-step-files-section").show();
+                $(".add-workflow-step-web-section").hide();
+                $('.section-item').removeClass('active');
+                $(this).addClass('active');
+            });
+
+            $('.add-step-web-section').off('click').on('click', function (e) {
+                e.preventDefault();
+                $(".add-workflow-step-all-section").hide();
+                $(".add-workflow-step-text-section").hide();
+                $(".add-workflow-step-files-section").hide();
+                $(".add-workflow-step-web-section").show();
+                $('.section-item').removeClass('active');
+                $(this).addClass('active');
+            });
+
+
+            $('.add-extraction-step-btn').on("click", function (e) {
+                e.preventDefault();  // Prevent default behavior, if needed
+                console.log("Add Extraction");
+                workflowAddStepTaskType("extraction", "{{ workflow_step_id }}");
+            });
+
+            $('.add-prompt-step-btn').on("click", function (e) {
+                e.preventDefault();  // Prevent default behavior, if needed
+                workflowAddStepTaskType("prompt", "{{ workflow_step_id }}");
+            });
+
+            $('.add-format-step-btn').on("click", function (e) {
+                e.preventDefault();  // Prevent default behavior, if needed
+                console.log("Add Format");
+                workflowAddStepTaskType("formatter", "{{ workflow_step_id }}");
+            });
+
+            $('.add-document-step-btn').on("click", function (e) {
+                e.preventDefault();  // Prevent default behavior, if needed
+                console.log("Add Document");
+                workflowAddStepTaskType("document", "{{ workflow_step_id }}");
+            });
+
+            $('.add-browser-automation-step-btn').on("click", function (e) {
+                e.preventDefault();
+                console.log("Add Browser Automation");
+                workflowAddStepTaskType("browser_automation", "{{ workflow_step_id }}");
+            });
+
+            $('.closeWorkflowAddStepTaskBtn').off("click").on("click", function () {
+                $('#newWorkflowStepTaskModal').remove();
+                const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
+                history.pushState({ path: newUrl }, '', newUrl);
+            });
+        </script>
     </div>
-
-    <script>
-        $('.add-step-all-section').off('click').on('click', function(e) {
-            e.preventDefault();
-            $(".add-workflow-step-all-section").show();
-            $(".add-workflow-step-text-section").hide();
-            $(".add-workflow-step-files-section").hide();
-            $(".add-workflow-step-web-section").hide();
-            $('.section-item').removeClass('active');
-            $(this).addClass('active');
-        });
-
-        $('.add-step-text-section').off('click').on('click', function(e) {
-            e.preventDefault();
-            $(".add-workflow-step-all-section").hide();
-            $(".add-workflow-step-text-section").show();
-            $(".add-workflow-step-files-section").hide();
-            $(".add-workflow-step-web-section").hide();
-            $('.section-item').removeClass('active');
-            $(this).addClass('active');
-        });
-
-        $('.add-step-files-section').off('click').on('click', function(e) {
-            e.preventDefault();
-            $(".add-workflow-step-all-section").hide();
-            $(".add-workflow-step-text-section").hide();
-            $(".add-workflow-step-files-section").show();
-            $(".add-workflow-step-web-section").hide();
-            $('.section-item').removeClass('active');
-            $(this).addClass('active');
-        });
-
-        $('.add-step-web-section').off('click').on('click', function(e) {
-            e.preventDefault();
-            $(".add-workflow-step-all-section").hide();
-            $(".add-workflow-step-text-section").hide();
-            $(".add-workflow-step-files-section").hide();
-            $(".add-workflow-step-web-section").show();
-            $('.section-item').removeClass('active');
-            $(this).addClass('active');
-        });
-
-
-        $('.add-extraction-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Extraction");
-            workflowAddStepTaskType("extraction", "{{ workflow_step_id }}");
-        });
-
-        $('.add-prompt-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            workflowAddStepTaskType("prompt", "{{ workflow_step_id }}");
-        });
-
-        $('.add-format-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Format");
-            workflowAddStepTaskType("formatter", "{{ workflow_step_id }}");
-        });
-
-        $('.add-document-step-btn').on("click", function (e) {
-            e.preventDefault();  // Prevent default behavior, if needed
-            console.log("Add Document");
-            workflowAddStepTaskType("document", "{{ workflow_step_id }}");
-        });
-
-        $('.closeWorkflowAddStepTaskBtn').off("click").on("click", function () {
-            $('#newWorkflowStepTaskModal').remove();
-            const newUrl = `${window.location.origin}${window.location.pathname}?section=Workflows`;
-            history.pushState({ path: newUrl }, '', newUrl);
-        });
-    </script>
-  </div>

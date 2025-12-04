@@ -1,0 +1,253 @@
+<div id="" class="workflow-overlay workflowAddBrowserAutomationModal" style="display: block;">
+    <div class="workflow-modal-content" style="max-width: 700px;">
+        <!-- Header -->
+        <h2 class="workflow-modal-header">
+            {% if is_editing %} Update Browser Automation {% else %} Add Browser Automation {% endif %}
+            <a class="closeAddBrowserAutomationToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i
+                    class="fa-solid fa-circle-xmark"></i></a>
+        </h2>
+
+        <!-- Description -->
+        <hr>
+        <h3 class="workflow-modal-subtitle">Automate web page interactions using a Chrome extension</h3>
+        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
+
+        <!-- Body -->
+        <div class="workflow-content-body" style="max-height: 400px; overflow-y: auto;">
+            <div class="section" style="margin-bottom: 20px;">
+                <p class="workflow-label" style="padding-top: 10px;">Target Website:</p>
+                <input type="url" id="browser-automation-url" placeholder="https://example.com" class="input-field"
+                    value="{{ workflow_task.data['actions'][0]['config']['url'] if is_editing and workflow_task.data.get('actions') else '' }}">
+            </div>
+
+            <div class="section" style="margin-bottom: 20px;">
+                <p class="workflow-label">Allowed Domains (comma-separated, leave empty for all):</p>
+                <input type="text" id="browser-automation-domains" placeholder="example.com, subdomain.example.com"
+                    class="input-field"
+                    value="{{ workflow_task.data['allowed_domains']|join(', ') if is_editing and workflow_task.data.get('allowed_domains') else '' }}">
+            </div>
+
+            <div class="section" style="margin-bottom: 20px;">
+                <p class="workflow-label">Actions:</p>
+                <div id="browser-automation-actions"
+                    style="background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 60px;">
+                    <p class="text-muted" style="margin: 0;">No actions configured yet. Add actions below.</p>
+                </div>
+
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="navigate">
+                        <i class="fa-solid fa-arrow-right"></i> Navigate
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn"
+                        data-action="ensure_login">
+                        <i class="fa-solid fa-shield-halved"></i> Require Login
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="fill_form">
+                        <i class="fa-solid fa-keyboard"></i> Fill Form
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="click">
+                        <i class="fa-solid fa-hand-pointer"></i> Click
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="extract">
+                        <i class="fa-solid fa-download"></i> Extract Data
+                    </button>
+                </div>
+            </div>
+
+            <div class="section" style="margin-bottom: 20px;">
+                <p class="workflow-label">Output Settings:</p>
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                    <input type="checkbox" id="browser-automation-summarize" checked>
+                    <label for="browser-automation-summarize">Generate natural language summary</label>
+                </div>
+                <textarea id="browser-automation-summary-prompt" class="input-field" rows="2"
+                    placeholder="Based on the extracted data, provide a summary that...">{{ workflow_task.data['summarization']['prompt_template'] if is_editing and workflow_task.data.get('summarization') else '' }}</textarea>
+            </div>
+        </div>
+
+        <!-- Bottom Toolbar -->
+        <div class="bottom-toolbar">
+            <div>
+                <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
+                    <button id="confirmBrowser_automationStepBtn" class="btn btn-primary" style="flex-grow: 1;">
+                        {% if is_editing %}
+                        Update
+                        {% else %}
+                        Add Browser Automation
+                        {% endif %}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        let browserAutomationActions = [];
+        let browserAutomationActionId = 0;
+
+        function renderBrowserAutomationActions() {
+            const container = $('#browser-automation-actions');
+            container.empty();
+
+            if (browserAutomationActions.length === 0) {
+                container.html('<p class="text-muted" style="margin: 0;">No actions configured yet. Add actions below.</p>');
+                return;
+            }
+
+            browserAutomationActions.forEach((action, index) => {
+                const actionHtml = `
+                    <div class="action-item" style="background: white; padding: 8px; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #3B82F6;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <strong>${index + 1}. ${getActionLabel(action.type)}</strong>
+                            <button class="btn btn-sm btn-outline-danger remove-action-btn" data-index="${index}">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                        ${getActionConfigHtml(action, index)}
+                    </div>
+                `;
+                container.append(actionHtml);
+            });
+
+            // Add event listeners for remove buttons
+            $('.remove-action-btn').off('click').on('click', function () {
+                const idx = $(this).data('index');
+                browserAutomationActions.splice(idx, 1);
+                renderBrowserAutomationActions();
+            });
+        }
+
+        function getActionLabel(type) {
+            const labels = {
+                'navigate': 'Navigate',
+                'ensure_login': 'Require Login',
+                'fill_form': 'Fill Form',
+                'click': 'Click Element',
+                'extract': 'Extract Data'
+            };
+            return labels[type] || type;
+        }
+
+        function getActionConfigHtml(action, index) {
+            switch (action.type) {
+                case 'navigate':
+                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="url" 
+                            placeholder="URL to navigate to" value="${action.config.url || ''}" style="margin-top: 8px;">`;
+                case 'ensure_login':
+                    return `<textarea class="input-field action-config" data-index="${index}" data-key="instruction_to_user" 
+                            placeholder="Instructions for user (e.g., 'Please log in to your account')" 
+                            style="margin-top: 8px;">${action.config.instruction_to_user || ''}</textarea>`;
+                case 'fill_form':
+                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="fields_csv" 
+                            placeholder="selector=value, selector2=value2" value="" style="margin-top: 8px;">`;
+                case 'click':
+                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="selector" 
+                            placeholder="CSS selector (e.g., button[type='submit'])" value="${action.config.locator?.value || ''}" style="margin-top: 8px;">`;
+                case 'extract':
+                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="fields_csv" 
+                            placeholder="name=selector, email=.email-field" value="" style="margin-top: 8px;">`;
+                default:
+                    return '';
+            }
+        }
+
+        // Add action button handler
+        $('.add-action-btn').off('click').on('click', function () {
+            const actionType = $(this).data('action');
+            const action = {
+                action_id: `action-${browserAutomationActionId++}`,
+                type: actionType,
+                config: {}
+            };
+            browserAutomationActions.push(action);
+            renderBrowserAutomationActions();
+        });
+
+        // Handle config input changes
+        $(document).on('input', '.action-config', function () {
+            const index = $(this).data('index');
+            const key = $(this).data('key');
+            const value = $(this).val();
+
+            if (key === 'url') {
+                browserAutomationActions[index].config.url = value;
+            } else if (key === 'instruction_to_user') {
+                browserAutomationActions[index].config.instruction_to_user = value;
+            } else if (key === 'selector') {
+                browserAutomationActions[index].config.locator = { strategy: 'css', value: value };
+            }
+        });
+
+        // Close button
+        $('.closeAddBrowserAutomationToWorkflowBtn').on("click", function (e) {
+            e.preventDefault();
+            $('.workflowAddBrowserAutomationModal').remove();
+        });
+
+        // Confirm button - matches the naming convention expected by workflowAddStepTaskType
+        $('#confirmBrowser_automationStepBtn').off("click").on("click", function (e) {
+            e.preventDefault();
+
+            // Build actions array including initial navigate if URL provided
+            let actions = [];
+            const initialUrl = $('#browser-automation-url').val();
+            if (initialUrl) {
+                actions.push({
+                    action_id: 'action-initial',
+                    type: 'navigate',
+                    config: { url: initialUrl }
+                });
+            }
+            actions = actions.concat(browserAutomationActions);
+
+            const allowedDomains = $('#browser-automation-domains').val()
+                .split(',')
+                .map(d => d.trim())
+                .filter(d => d.length > 0);
+
+            const summarizationEnabled = $('#browser-automation-summarize').is(':checked');
+            const summaryPrompt = $('#browser-automation-summary-prompt').val();
+
+            const stepData = {
+                workflow_uuid: current_workflow_id,
+                workflow_step_id: '{{ workflow_step_id }}',
+                actions: actions,
+                summarization: {
+                    enabled: summarizationEnabled,
+                    prompt_template: summaryPrompt
+                },
+                allowed_domains: allowedDomains,
+                model: 'claude-sonnet-4-5',
+                timeout_seconds: 300
+            };
+
+            $.ajax({
+                url: '/workflows/add_browser_automation_step',
+                type: 'POST',
+                data: JSON.stringify(stepData),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    if (data.success) {
+                        const url = new URL(window.location.href);
+                        if (current_workflow_id && current_workflow_id != "0") {
+                            url.searchParams.set('workflow_id', current_workflow_id);
+                            url.searchParams.set('section', 'Library');
+                        }
+                        window.history.replaceState(null, '', url.toString());
+                        location.reload();
+                    } else {
+                        showToast('Error saving step: ' + (data.error || 'Unknown error'));
+                    }
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.error(xhr.status, thrownError);
+                    showToast('Failed to save browser automation step');
+                }
+            });
+        });
+
+        // Initialize
+        renderBrowserAutomationActions();
+    </script>
+</div>

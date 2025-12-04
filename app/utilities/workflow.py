@@ -31,6 +31,7 @@ from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import activity_finish
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.chat_manager import ChatManager
+from app.utilities.browser_automation import BrowserAutomationService
 
 load_dotenv()
 
@@ -440,6 +441,222 @@ class ExtractionNode(Node):
         }
 
 
+
+class BrowserAutomationNode(Node):
+    """
+    Node for browser automation within workflows.
+    Executes web interactions via Chrome extension.
+    """
+
+    def __init__(self, data):
+        super().__init__("BrowserAutomation")
+        self.data = data
+        self.model = data.get("model", "claude-sonnet-4-5")
+        self.actions = data.get("actions", [])
+        self.summarization = data.get("summarization", {})
+        self.allowed_domains = data.get("allowed_domains", [])
+        self.timeout_seconds = data.get("timeout_seconds", 300)
+        self.user_id = data.get("user_id")
+        self.workflow_result_id = data.get("workflow_result_id")
+
+    def process(self, inputs):
+        """
+        Execute browser automation workflow.
+
+        Flow:
+        1. Create browser session
+        2. Start session (open/attach to tab)
+        3. Execute each action in sequence
+        4. Handle user login pauses
+        5. Extract final data
+        6. Optionally summarize with LLM
+        7. Clean up session
+        """
+        
+        # If we are resuming from a user action (like login), inputs might contain state
+        # But for now we assume linear execution or that the engine handles resume logic
+        
+        service = BrowserAutomationService.get_instance()
+
+        # Create session
+        session = service.create_session(
+            user_id=self.user_id,
+            workflow_result_id=self.workflow_result_id,
+            allowed_domains=self.allowed_domains
+        )
+
+        try:
+            # Start browser session
+            self.report_progress("Connecting to browser extension...")
+            service.start_session(session.session_id)
+
+            # Execute actions sequentially
+            extracted_data = {}
+            for i, action in enumerate(self.actions):
+                self.report_progress(
+                    f"Step {i+1}/{len(self.actions)}: {action['type']}...",
+                    preview=self._get_action_preview(action)
+                )
+
+                result = self._execute_action(service, session, action, inputs)
+
+                # If extraction, store data
+                if action["type"] == "extract":
+                    if isinstance(result, dict) and "structured_data" in result:
+                        extracted_data.update(result["structured_data"])
+                    else:
+                        extracted_data.update(result or {})
+
+                # If login required, wait for user
+                if action["type"] == "ensure_login":
+                    self._wait_for_user_login(service, session, action)
+
+            # Summarize results if configured
+            final_output = extracted_data
+            if self.summarization.get("enabled"):
+                self.report_progress("Generating summary...")
+                final_output = self._summarize_results(extracted_data, inputs)
+
+            # Clean up
+            service.end_session(session.session_id, close_tab=False)
+
+            return {
+                "output": final_output,
+                "input": self._format_input(inputs),
+                "step_name": self.name
+            }
+
+        except Exception as e:
+            service.end_session(session.session_id, close_tab=False)
+            # Re-raise or return error
+            raise e
+
+    def _execute_action(self, service, session, action, inputs):
+        """Execute a single action and return results"""
+
+        # Interpolate variables from previous steps
+        action_with_values = self._interpolate_variables(action, inputs)
+
+        return service.execute_action(session.session_id, action_with_values)
+
+    def _wait_for_user_login(self, service, session, action):
+        """Pause execution and wait for user to complete login"""
+
+        # Update workflow result with special status
+        # Note: In a real async system, we would suspend execution here.
+        # For this implementation, we are simulating the wait or assuming the service handles it.
+        # Since we are in a thread/worker, blocking might be okay for short periods,
+        # but for user interaction we need a better mechanism (suspend/resume).
+        # For MVP, we will block and poll or rely on the service to block.
+        
+        self.report_progress(
+            "Waiting for user login...",
+            detail=action.get("instruction_to_user", "Please log in"),
+            # In a real implementation, we'd pass a flag to the UI to show the button
+            # requires_user_action=True 
+        )
+
+        # Block until login confirmed
+        service.wait_for_user_login(
+            session.session_id,
+            action.get("detection_rules"),
+            action.get("instruction_to_user")
+        )
+        
+        # Wait for the session to become active again (user clicked "I'm logged in")
+        import time
+        while True:
+            s = service.get_session(session.session_id)
+            if s.state == SessionState.ACTIVE or s.state == SessionState.COMPLETED:
+                break
+            if s.state == SessionState.FAILED:
+                raise Exception("Session failed during login wait")
+            time.sleep(1)
+
+    def _summarize_results(self, extracted_data, inputs):
+        """Use LLM to generate natural language summary"""
+
+        prompt = self.summarization.get("prompt_template", "Summarize the following data:")
+        context = {
+            "extracted_data": json.dumps(extracted_data, indent=2),
+            "original_input": inputs
+        }
+        
+        # Simple string formatting
+        formatted_prompt = prompt
+        try:
+            formatted_prompt = prompt.format(**context)
+        except:
+            formatted_prompt = f"{prompt}\n\nData: {json.dumps(extracted_data)}"
+
+        chat_manager = ChatManager()
+        
+        def _on_chunk(text):
+            self.report_progress("Generating summary...", preview=text)
+
+        summary = chat_manager.stream_prompt(
+            model=self.model,
+            prompt=formatted_prompt,
+            progress_callback=_on_chunk,
+            include_next_step=False
+        )
+
+        return {
+            "raw_data": extracted_data,
+            "summary": summary
+        }
+
+    def _interpolate_variables(self, action, inputs):
+        """Replace template variables like {{previous_step.field}} with actual values"""
+
+        action_json = json.dumps(action)
+
+        # Simple template replacement
+        # Supports: {{previous_step.field_name}} or {{field_name}}
+        pattern = r'\{\{([^}]+)\}\}'
+
+        def replace_var(match):
+            var_path = match.group(1).strip()
+            parts = var_path.split('.')
+            
+            # Try to find value in inputs
+            # inputs usually has structure: {"output": ..., "input": ...} or is the output of prev step
+            
+            value = inputs
+            
+            # If inputs has "output" key (from previous node), use that as base
+            if isinstance(inputs, dict) and "output" in inputs:
+                # Check if we want the whole output or a field
+                if len(parts) == 1 and parts[0] == "previous_step":
+                    return str(inputs["output"])
+                
+                # Try to traverse
+                current = inputs["output"]
+                found = True
+                for part in parts:
+                    if part == "previous_step": 
+                        continue
+                    if isinstance(current, dict) and part in current:
+                        current = current[part]
+                    else:
+                        found = False
+                        break
+                
+                if found:
+                    return str(current)
+
+            return match.group(0)
+
+        interpolated = re.sub(pattern, replace_var, action_json)
+        return json.loads(interpolated)
+        
+    def _get_action_preview(self, action):
+        return f"Action: {action['type']}"
+
+    def _format_input(self, inputs):
+        return str(inputs)
+
+
 class PromptNode(Node):
     def __init__(self, data) -> None:
         super().__init__("Prompt")
@@ -661,7 +878,7 @@ class WorkflowEngine:
             WorkflowResult.objects(id=workflow_result.id).update_one(**update_ops)
 
 
-def build_workflow_engine(steps, workflow, model, user_id=None):
+def build_workflow_engine(steps, workflow, model, user_id=None, workflow_result=None):
     engine = WorkflowEngine()
     nodes = []
 
@@ -702,6 +919,16 @@ def build_workflow_engine(steps, workflow, model, user_id=None):
                     task.data["user_id"] = user_id
                     task.data["model"] = model
                     node = FormatNode(
+                        data=task.data,
+                    )
+                    tasks.append(node)
+                elif task.name == "BrowserAutomation":
+                    task.data["user_id"] = user_id
+                    task.data["model"] = model
+                    if workflow_result:
+                        task.data["workflow_result_id"] = str(workflow_result.id)
+                    
+                    node = BrowserAutomationNode(
                         data=task.data,
                     )
                     tasks.append(node)
@@ -793,7 +1020,7 @@ def execute_workflow_task(
 
     debug(steps)
 
-    engine = build_workflow_engine(steps, workflow, model, user_id=workflow.user_id)
+    engine = build_workflow_engine(steps, workflow, model, user_id=workflow.user_id, workflow_result=workflow_result)
 
     final_output, data = engine.execute(workflow_result)
     debug(final_output)

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Vandalizer Browser Automation</title>
+    <link rel="stylesheet" href="popup.css">
+</head>
+
+<body>
+    <div class="popup-container">
+        <header>
+            <h1>Vandalizer</h1>
+            <p class="subtitle">Browser Automation</p>
+        </header>
+
+        <div id="connection-status" class="status-section">
+            <div class="status-indicator" id="status-dot"></div>
+            <span id="status-text">Disconnected</span>
+        </div>
+
+        <div id="setup-section">
+            <h3>Setup</h3>
+            <form id="setup-form">
+                <label for="backend-url">Backend URL:</label>
+                <input type="text" id="backend-url" placeholder="http://localhost:5000" />
+
+                <label for="user-token">User Token:</label>
+                <input type="text" id="user-token" placeholder="Your auth token" />
+
+                <button type="submit">Connect</button>
+            </form>
+        </div>
+
+        <div id="active-section" style="display: none;">
+            <h3>Active Sessions</h3>
+            <div id="sessions-list">
+                <p class="no-sessions">No active sessions</p>
+            </div>
+
+            <button id="disconnect-btn" class="secondary">Disconnect</button>
+        </div>
+
+        <footer>
+            <p class="version">v1.0.0</p>
+        </footer>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+
+</html>

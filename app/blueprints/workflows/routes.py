@@ -810,6 +810,36 @@ def workflow_download() -> ResponseReturnValue:
         formatted = asyncio.run(chat_agent.run(prompt))
         formatted = formatted.output
 
+    if fmt == "csv":
+        # return as a downloadable CSV file
+        return (
+            formatted,
+            200,
+            {
+                "Content-Type": "text/csv",
+                "Content-Disposition": f"attachment; filename=workflow_output_{session_id}.csv",
+            },
+        )
+    elif fmt == "pdf":
+        # Convert HTML to PDF bytes
+        pdf_bytes = markdown_or_html_to_pdf_bytes(formatted)
+        return send_file(
+            io.BytesIO(pdf_bytes),
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=f"workflow_output_{session_id}.pdf",
+        )
+    else:
+        # return as a downloadable text file
+        return (
+            formatted,
+            200,
+            {
+                "Content-Type": "text/plain",
+                "Content-Disposition": f"attachment; filename=workflow_output_{session_id}.txt",
+            },
+        )
+
         # Remove the tick marks before and after blocks
         formatted = formatted.strip("`").strip()
 
@@ -1570,3 +1600,95 @@ def duplicate_workflow(workflow_id):
 
     flash("Workflow duplicated into your space!", "success")
     return redirect(url_for("home.index", sesction="Workflows"))
+
+@login_required
+@workflows.route("/add_browser_automation_step", methods=["GET", "POST"])
+def add_browser_automation_step() -> ResponseReturnValue:
+    """Add a browser automation step to a workflow."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    if request.method == "GET":
+        # Handle GET request - return the template
+        data_str = next(iter(request.args.keys()))  # Get the JSON string key
+        data = json.loads(data_str)
+        workflow_id = data.get("workflow_uuid")
+        workflow_step_id = data.get("workflow_step_id")
+        is_editing = data.get("is_editing") or False
+        workflow_task_id = data.get("workflow_task_id", "")
+        workflow_task = None
+
+        if is_editing and workflow_task_id:
+            workflow_task = WorkflowStepTask.objects(
+                id=ObjectId(workflow_task_id),
+            ).first()
+
+        workflow = Workflow.objects(id=workflow_id).first()
+
+        template = render_template(
+            "workflows/workflow_steps/workflow_add_browser_automation_modal.html",
+            workflow=workflow,
+            workflow_step_id=workflow_step_id,
+            is_editing=is_editing,
+            workflow_task_id=workflow_task_id,
+            workflow_task=workflow_task,
+        )
+        response = {"template": template}
+        return jsonify(response)
+
+    if request.method == "POST":
+        # Handle POST request - save the step configuration
+        data = request.get_json()
+        workflow_step_id = data.get("workflow_step_id")
+        actions = data.get("actions", [])
+        summarization = data.get("summarization", {})
+        allowed_domains = data.get("allowed_domains", [])
+        model = data.get("model", "claude-sonnet-4-5")
+        timeout_seconds = data.get("timeout_seconds", 300)
+
+        # Find the workflow step
+        if workflow_step_id and workflow_step_id != '{{ workflow_step.id }}':
+            step = WorkflowStep.objects(id=workflow_step_id).first()
+            if not step:
+                return jsonify({"success": False, "error": "Step not found"}), 404
+        else:
+            step = None
+
+        # Create the task
+        task = WorkflowStepTask(
+            name="BrowserAutomation",
+            data={
+                "actions": actions,
+                "summarization": summarization,
+                "allowed_domains": allowed_domains,
+                "model": model,
+                "timeout_seconds": timeout_seconds
+            }
+        )
+        task.save()
+
+        # If we have a step ID, add the task to it
+        if step:
+            if step.tasks is None:
+                step.tasks = []
+            step.tasks.append(task)
+            step.save()
+            return jsonify({"success": True})
+
+        # If no step ID, create a new step
+        workflow_id = data.get("workflow_id") or data.get("workflow_uuid")
+        if workflow_id:
+            workflow = Workflow.objects(id=workflow_id).first()
+            if workflow:
+                step = WorkflowStep(name="Browser Automation Step")
+                step.tasks = [task]
+                step.save()
+                workflow.steps.append(step)
+                workflow.save()
+                return jsonify({"success": True, "step_id": str(step.id)})
+
+        return jsonify({"success": False, "error": "Could not save step"}), 400
+
+    return jsonify({"error": "Method not allowed"}), 405
+
