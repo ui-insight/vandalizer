@@ -17,6 +17,8 @@ from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_dance.consumer import oauth_authorized
 from flask_dance.contrib.azure import make_azure_blueprint
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user, login_user
 from flask_mail import Mail
 from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
@@ -109,6 +111,15 @@ app.config.from_object(config_class)
 Bootstrap(app)  # flask-bootstrap
 mail = Mail(app)
 
+# Set up rate limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    storage_uri=f"redis://{REDIS_HOST}:6379/2",
+    default_limits=["200 per day", "50 per hour"],
+    strategy="fixed-window",
+)
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
@@ -121,10 +132,18 @@ login_manager.login_view = "auth.login"  # Redirect here if @login_required fail
 
 
 @login_manager.user_loader
-def load_user(user_id: str | None = None) -> User | None:
-    """Loads user from DB for session management."""
-    id = user_id if user_id else current_user.get_id()
-    return User.objects(user_id=id).first()
+def _load_user_by_id(user_id: str) -> User | None:
+    """Loads user from DB for session management (used by flask_login)."""
+    if not user_id:
+        return None
+    return User.objects(user_id=user_id).first()
+
+
+def load_user() -> User | None:
+    """Get the current logged-in user."""
+    if current_user.is_authenticated:
+        return current_user._get_current_object()
+    return None
 
 
 # Setup blueprints
@@ -237,6 +256,30 @@ def inject_ui_config():
         "ui_radius": get_ui_radius(),
         "auth_password_enabled": PASSWORD_AUTH_ENABLED,
         "auth_oauth_enabled": OAUTH_AUTH_ENABLED,
+    }
+
+
+@app.context_processor
+def inject_team_context():
+    """Provide current_team and my_teams to all templates safely."""
+    from app.models import Team, TeamMembership
+
+    if current_user.is_authenticated:
+        try:
+            current_team = current_user.ensure_current_team()
+            my_teams = TeamMembership.objects(user_id=current_user.get_id())
+            return {
+                "current_team": current_team,
+                "my_teams": my_teams,
+            }
+        except Exception:
+            # If there's any error, return empty values
+            pass
+
+    # Not authenticated or error occurred
+    return {
+        "current_team": None,
+        "my_teams": [],
     }
 
 

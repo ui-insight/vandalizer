@@ -25,6 +25,8 @@ from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 from werkzeug.utils import secure_filename
 
+from app.utilities.security import validate_json_request
+
 from app.models import (
     ActivityType,
     SearchSet,
@@ -88,6 +90,7 @@ def _render_extraction_panel(search_set: SearchSet, **context):
 
 @login_required
 @tasks.route("/model/filter", methods=["POST"])
+@validate_json_request()
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])
