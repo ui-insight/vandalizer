@@ -3,7 +3,6 @@ import json
 import logging
 from enum import Enum
 from datetime import datetime
-from app.utilities.workflow import Node
 
 logger = logging.getLogger(__name__)
 
