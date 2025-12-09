@@ -1,5 +1,7 @@
 # admin_routes.py (or wherever your Flask routes live)
 import secrets
+import csv
+import io
 from datetime import datetime, time, timedelta, timezone
 from devtools import debug
 import asyncio
@@ -324,8 +326,11 @@ def admin_teams_invite():
 
 @admin.route("/usage/download", methods=["GET"])
 def download_usage_report():
-    """Generate and download a PDF report of usage statistics."""
+    """Generate and download a report of usage statistics (PDF or CSV)."""
     # get_admin_user()  # enable when ready
+    
+    # 1. Parse Arguments
+    fmt = request.args.get("format", "pdf")
     
     end_default = datetime.now(timezone.utc)
     start_default = end_default - timedelta(days=30)
@@ -338,6 +343,75 @@ def download_usage_report():
 
     start_floor, end_exclusive = day_bounds(start, end)
 
+    # ---------------------------------------------------------
+    # CSV GENERATION (Raw Data Export)
+    # ---------------------------------------------------------
+    if fmt == "csv":
+        # For CSV, we usually want the raw event list, not the aggregated HTML report
+        # We query the events based on the filters
+        ev_q = ActivityEvent.objects(
+            started_at__gte=start_floor, 
+            started_at__lt=end_exclusive
+        )
+        if user_id:
+            ev_q = ev_q.filter(user_id=user_id)
+        if team_id:
+            ev_q = ev_q.filter(team_id=team_id)
+        if space_id:
+            ev_q = ev_q.filter(space=space_id)
+        
+        # Determine filename
+        filename = f"usage_export_{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}.csv"
+        
+        # Create CSV in memory
+        output = io.StringIO()
+        writer = csv.writer(output)
+        
+        # Headers
+        headers = [
+            "Started At", "Type", "Status", "User ID", "Team ID", "Space", 
+            "Duration (ms)", "Tokens In", "Tokens Out", "Docs Touched", 
+            "Workflow/Details", "Steps Completed"
+        ]
+        writer.writerow(headers)
+        
+        # Fetch all records (streaming is better for large sets, but this is simple)
+        events = ev_q.order_by("-started_at")
+        
+        for ev in events:
+            # Calculate duration
+            duration_ms = 0
+            if ev.finished_at and ev.started_at:
+                duration_ms = int((ev.finished_at - ev.started_at).total_seconds() * 1000)
+            
+            # Formatting details
+            details = _format_event_details(ev)
+            
+            writer.writerow([
+                ev.started_at.isoformat(),
+                ev.type,
+                ev.status,
+                ev.user_id,
+                ev.team_id or "",
+                ev.space or "",
+                duration_ms,
+                ev.tokens_input or 0,
+                ev.tokens_output or 0,
+                ev.documents_touched or 0,
+                details,
+                ev.steps_completed or 0
+            ])
+            
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+
+    # ---------------------------------------------------------
+    # PDF GENERATION (Aggregated Report) - Existing Logic
+    # ---------------------------------------------------------
+    
     # Determine scope
     scope = "global"
     if user_id:
@@ -407,7 +481,7 @@ def download_usage_report():
     ]
     top_teams = list(DailyUsageAggregate._get_collection().aggregate(top_teams_pipeline))
 
-    # Get recent events
+    # Get recent events (For PDF, we limit to 20 to keep page size manageable)
     ev_q = ActivityEvent.objects(started_at__gte=start_floor, started_at__lt=end_exclusive)
     if user_id:
         ev_q = ev_q.filter(user_id=user_id)
@@ -537,7 +611,6 @@ Generate a complete HTML document with inline CSS. Use simple table-based layout
         debug(f"PDF generation error: {e}")
         # Return the HTML for debugging
         return Response(formatted_html, mimetype="text/html")
-
 
 def _format_event_details(ev: ActivityEvent) -> str:
     """Format event details for the report."""
