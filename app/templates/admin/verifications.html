@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Admin · Verifications | Vandalizer{% endblock %}
+
+{% macro render_request_card(req, show_actions) %}
+<div class="card" style="margin-bottom: 16px; border-left: 4px solid {% if req.status == 'submitted' or req.status == 'in_review' %}#ffc107{% elif req.status == 'approved' %}#28a745{% else %}#dc3545{% endif %};">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-8">
+                <h5 class="card-title">
+                    {% if req.item_kind == 'workflow' %}<i class="fa-solid fa-share-nodes text-muted"></i>{% endif %}
+                    {% if req.item_kind == 'searchset' %}<i class="fa-solid fa-magnifying-glass text-muted"></i>{% endif %}
+                    {{ req.item_title }}
+                    <small class="text-muted" style="font-size: 0.6em;">{{ req.item_kind|upper }}</small>
+                </h5>
+                <h6 class="card-subtitle mb-2 text-muted">
+                    Submitted by <strong>{{ req.submitter_name }}</strong> 
+                    {% if req.team %}({{ req.team.name }}){% endif %}
+                    on {{ req.created_at.strftime('%Y-%m-%d %H:%M') }}
+                </h6>
+                <p class="card-text" style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 0.95em;">
+                    {{ req.summary or "No summary provided." }}
+                </p>
+                
+                <div>
+                    <span class="badge badge-light border">ID: {{ req.item_identifier }}</span>
+                    {% if req.status == 'approved' %}
+                        <span class="badge badge-success">Approved</span>
+                    {% elif req.status == 'rejected' %}
+                        <span class="badge badge-danger">Rejected</span>
+                    {% else %}
+                        <span class="badge badge-warning">Pending Review</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-md-4 text-right" style="display: flex; flex-direction: column; gap: 8px; justify-content: center;">
+                
+                <button type="button" class="btn btn-sm btn-info view-details-btn" 
+                        data-toggle="modal" data-target="#detailsModal"
+                        data-json='{{ req.to_public_dict()|tojson }}'>
+                    <i class="fa-solid fa-eye"></i> View Details
+                </button>
+
+                {% if show_actions %}
+                <div style="border-top: 1px solid #eee; margin: 8px 0;"></div>
+                <div class="btn-group" role="group" style="justify-content: flex-end;">
+                    <form method="POST" action="{{ url_for('admin.admin_verifications_action') }}" style="display:inline;">
+                        <input type="hidden" name="request_uuid" value="{{ req.uuid }}">
+                        <input type="hidden" name="action" value="rejected">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Reject this submission?');">
+                            <i class="fa-solid fa-ban"></i> Reject
+                        </button>
+                    </form>
+                    <form method="POST" action="{{ url_for('admin.admin_verifications_action') }}" style="display:inline; margin-left: 5px;">
+                        <input type="hidden" name="request_uuid" value="{{ req.uuid }}">
+                        <input type="hidden" name="action" value="approved">
+                        <button type="submit" class="btn btn-sm btn-success" onclick="return confirm('Approve and verify globally?');">
+                            <i class="fa-solid fa-check"></i> Approve
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="container" style="padding:20px">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px;">
+        <h3>Verification Requests</h3>
+    </div>
+
+    <ul class="nav nav-tabs" id="verificationTabs" role="tablist" style="margin-bottom: 20px;">
+        <li class="nav-item">
+            <a class="nav-link active" id="pending-tab" data-toggle="tab" href="#pending" role="tab">
+                Pending <span class="badge badge-primary">{{ pending|length }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="history-tab" data-toggle="tab" href="#history" role="tab">History</a>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="verificationTabContent">
+        
+        <div class="tab-pane fade show active" id="pending" role="tabpanel">
+            {% if pending|length == 0 %}
+                <div class="alert alert-light" role="alert">No pending verification requests.</div>
+            {% else %}
+                {% for req in pending %}
+                    {# Now the macro is defined, so this call will work #}
+                    {{ render_request_card(req, show_actions=True) }}
+                {% endfor %}
+            {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="history" role="tabpanel">
+            {% if history|length == 0 %}
+                <div class="alert alert-light" role="alert">No recent history.</div>
+            {% else %}
+                {% for req in history %}
+                    {{ render_request_card(req, show_actions=False) }}
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="detailsModal" tabindex="-1" role="dialog" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Submission Details</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        <table class="table table-bordered">
+            <tbody>
+                <tr><th style="width: 150px;">Title</th><td id="modal-title"></td></tr>
+                <tr><th>Kind</th><td id="modal-kind"></td></tr>
+                <tr><th>Identifier</th><td id="modal-id"></td></tr>
+                <tr><th>Submitter</th><td id="modal-submitter"></td></tr>
+                <tr><th>Description</th><td id="modal-desc" style="white-space: pre-wrap;"></td></tr>
+                <tr><th>Instructions</th><td id="modal-instructions" style="white-space: pre-wrap;"></td></tr>
+            </tbody>
+        </table>
+        
+        <h6>Example Inputs</h6>
+        <pre id="modal-inputs" style="background:#f4f4f4; padding:10px; border-radius:4px;"></pre>
+        
+        <h6>Expected Outputs</h6>
+        <pre id="modal-outputs" style="background:#f4f4f4; padding:10px; border-radius:4px;"></pre>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select all buttons with the class 'view-details-btn'
+        var buttons = document.querySelectorAll('.view-details-btn');
+
+        buttons.forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                // Get the JSON data from the data attribute
+                // We use 'getAttribute' to ensure we get the raw string
+                var jsonData = this.getAttribute('data-json');
+                
+                if (jsonData) {
+                    var data = JSON.parse(jsonData);
+
+                    // Helper to safely set text content
+                    function setText(id, text) {
+                        var el = document.getElementById(id);
+                        if (el) el.innerText = text || '';
+                    }
+
+                    setText('modal-title', data.item_title);
+                    setText('modal-kind', data.item_kind);
+                    setText('modal-id', data.item_identifier);
+                    
+                    var submitterInfo = data.submitter_name + (data.submitter_org ? ' (' + data.submitter_org + ')' : '');
+                    setText('modal-submitter', submitterInfo);
+                    
+                    setText('modal-desc', data.description);
+                    setText('modal-instructions', data.run_instructions);
+                    
+                    setText('modal-inputs', (data.example_inputs || []).join('\n'));
+                    setText('modal-outputs', (data.expected_outputs || []).join('\n'));
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
+

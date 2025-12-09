@@ -320,6 +320,7 @@ function formatCategoryLabel(category) {
 
     function submitVerificationForm(e) {
         e.preventDefault();
+        console.log('Submitting verification form', e, verificationModalState);
         if (!verificationModalState.submitUrl) {
             $('#verification-error').text('This item cannot be verified at the moment.').show();
             return;

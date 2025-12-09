@@ -10,7 +10,7 @@ from mongoengine.errors import DoesNotExist
 from flask_mail import Message
 
 from app import load_user, mail
-from app.models import (  # adjust import path if needed
+from app.models import (
     Library,
     LibraryItem,
     LibraryScope,
@@ -29,6 +29,9 @@ from app.utilities.library_helpers import (
     get_or_create_verified_library,
     sync_verification_flags_for_object,
 )
+from app.utilities.verification_tasks import execute_global_verification
+from app.utilities.verification_helpers import calculate_workflow_hash
+
 
 library = Blueprint("library", __name__)
 
@@ -43,8 +46,6 @@ MAX_LIBRARY_FORMATTERS = 60
 # -----------------------------
 def _current_user_id() -> str:
     # Replace with your auth/session lookup
-    # e.g. return session["user_id"]
-    # For now, assume a dev user:
     return "dev-user-1"
 
 
@@ -62,11 +63,6 @@ def _current_team_for_user(user: User | None) -> Team | None:
 # Kind / object resolvers
 # -----------------------------
 def _resolve_obj(kind: str, uuid_or_id: str):
-    """
-    kind: 'workflow' | 'extraction' | 'prompt' | 'formatter'
-    uuid_or_id: for workflows = .id; search sets = .uuid; search set items (prompt/formatter) = .id
-    Returns (obj, normalized_kind) or (None, None)
-    """
     k = (kind or "").strip().lower()
     if k in ("workflow", "workflows"):
         obj = Workflow.objects(id=uuid_or_id).first()
@@ -150,7 +146,7 @@ def _notify_examiners_of_submission(
     try:
         msg = Message(subject=subject, recipients=recipients, body=body)
         mail.send(msg)
-    except Exception as exc:  # pragma: no cover - best-effort notification
+    except Exception as exc:
         print(f"Failed to send verification notification: {exc}")
 
 
@@ -193,7 +189,7 @@ def _notify_team_of_share(
     try:
         msg = Message(subject=subject, recipients=list(recipients), body=body)
         mail.send(msg)
-    except Exception as exc:  # pragma: no cover - best-effort notification
+    except Exception as exc:
         print(f"Failed to notify team of share: {exc}")
 
 
@@ -244,7 +240,7 @@ def _notify_submitter_of_status_change(
     try:
         msg = Message(subject=subject, recipients=[recipient], body=body)
         mail.send(msg)
-    except Exception as exc:  # pragma: no cover - best-effort notification
+    except Exception as exc:
         print(f"Failed to notify submitter of status change: {exc}")
 
 
@@ -340,16 +336,11 @@ def _get_or_none_library(
 
 
 def _resolve_scope(scope_str: str) -> LibraryScope:
-    """
-    Maps UI 'scope' querystrings to your enum.
-    UI accepts: 'team' | 'mine' | 'verified'
-    """
     scope_str = (scope_str or "").lower()
     if scope_str in ("mine", "personal"):
         return LibraryScope.PERSONAL
     if scope_str == "verified":
         return LibraryScope.VERIFIED
-    # default to team
     return LibraryScope.TEAM
 
 
@@ -357,31 +348,19 @@ def _resolve_scope(scope_str: str) -> LibraryScope:
 # Data building for template
 # -----------------------------
 def _build_results_for_template(filters: dict) -> dict:
-    """
-    Returns the dict expected by _results.html:
-    - workflows
-    - extraction_sets
-    - prompts
-    - formatters
-    - scope
-    - filters
-    """
     scope_in = filters.get("scope") or "team"
     item_type = filters.get("type") or "workflows"
     kinds = filters.get("kinds") or []
     query = (filters.get("q") or "").strip().lower()
 
-    # Resolve library by scope
     user = load_user()
     can_edit_verified = bool(user and user.is_examiner)
     team = _current_team_for_user(user)
     lib_scope = _resolve_scope(scope_in)
     lib = _get_or_none_library(lib_scope, user=user, team=team)
 
-    # If there is no library yet, present empty lists gracefully
     lib_items: list[LibraryItem] = list(lib.items) if lib else []
 
-    # Determine which categories we need to collect & cap counts to avoid massive payloads
     needs_workflows = item_type in ("workflows", "all")
     needs_tasks = item_type in ("tasks", "all")
     wants_extract = needs_tasks and (not kinds or "extract" in kinds)
@@ -402,7 +381,6 @@ def _build_results_for_template(filters: dict) -> dict:
     }
     gathered = {k: 0 for k in needs_map}
 
-    # --- Separate polymorphic objects (bounded)
     workflow_objs: list[Workflow] = []
     searchset_objs: list[SearchSet] = []
     prompt_objs: list[SearchSetItem] = []
@@ -411,9 +389,7 @@ def _build_results_for_template(filters: dict) -> dict:
 
     for li in lib_items:
         try:
-            obj = (
-                li.obj
-            )  # <-- this may raise DoesNotExist if the target doc was deleted
+            obj = li.obj
         except DoesNotExist:
             li.delete()
             continue
@@ -421,14 +397,12 @@ def _build_results_for_template(filters: dict) -> dict:
         if not needs_map.get(li.kind, False):
             continue
         if gathered[li.kind] >= limits.get(li.kind, 0):
-            # Already have enough of this type
             continue
 
         identifier = _verification_identifier(li.kind, obj)
         if identifier:
             verification_keys[f"{li.kind}:{identifier}"] = (li.kind, identifier)
 
-        # li.kind is "workflow" or "searchset"
         if li.kind == "workflow" and obj and isinstance(obj, Workflow):
             workflow_objs.append(obj)
             gathered["workflow"] += 1
@@ -464,20 +438,14 @@ def _build_results_for_template(filters: dict) -> dict:
         key: req.to_public_dict() for key, req in verification_docs.items()
     }
 
-    # --- Apply 'type' and 'kinds'
-    # type: 'workflows' | 'tasks' | 'all'
-    # kinds only affect tasks; in our data model 'extract' maps to SearchSet.set_type == 'extraction'
-    # (If you later add Prompt/Formatter collections, wire them similarly.)
     workflows = []
     extraction_sets = []
-    prompts = []  # placeholders; not defined in provided model
-    formatters = []  # placeholders; not defined in provided model
+    prompts = []
+    formatters = []
 
-    # Filter workflows
     if item_type in ("workflows", "all"):
         workflows = workflow_objs
 
-    # Filter task sets (SearchSet) by kind
     if item_type in ("tasks", "all"):
         if wants_extract:
             extraction_sets = [
@@ -494,7 +462,6 @@ def _build_results_for_template(filters: dict) -> dict:
                 if (s.searchtype or "").lower() == "formatter"
             ]
 
-    # --- Text search
     if query:
         if workflows:
             workflows = [
@@ -512,7 +479,6 @@ def _build_results_for_template(filters: dict) -> dict:
         if formatters:
             formatters = [s for s in formatters if query in (s.title or "").lower()]
 
-    # --- Sort (optional niceties)
     workflows.sort(
         key=lambda w: (w.verified is False, (w.updated_at or w.created_at)),
         reverse=True,
@@ -521,7 +487,6 @@ def _build_results_for_template(filters: dict) -> dict:
         key=lambda s: (s.verified is False, (s.created_at)), reverse=True
     )
 
-    # Assemble context for template
     context = {
         "workflows": workflows,
         "extraction_sets": extraction_sets,
@@ -533,7 +498,6 @@ def _build_results_for_template(filters: dict) -> dict:
             "kinds": kinds,
             "q": query,
         },
-        # expose simple scope used in badges in your _results.html
         "scope": "team"
         if lib_scope == LibraryScope.TEAM
         else ("mine" if lib_scope == LibraryScope.PERSONAL else "verified"),
@@ -547,15 +511,10 @@ def _build_results_for_template(filters: dict) -> dict:
 # -----------------------------
 @library.route("/")
 def library_page():
-    """
-    Renders the main library page.
-    Initial state is determined by URL query parameters.
-    """
     user = load_user()
     can_verify = bool(user and user.is_examiner)
-    # Get initial state from URL or set defaults
-    scope = request.args.get("scope", "team")  # 'team' | 'mine' | 'verified'
-    item_type = request.args.get("type", "workflows")  # 'workflows' | 'tasks' | 'all'
+    scope = request.args.get("scope", "team")
+    item_type = request.args.get("type", "workflows")
     kinds_str = request.args.get("kinds", "extract,prompt,format")
     kinds = [k for k in kinds_str.split(",") if k] if kinds_str else []
     query = request.args.get("q", "")
@@ -564,7 +523,7 @@ def library_page():
         scope = "team"
 
     return render_template(
-        "index.html",  # your main page template
+        "index.html",
         scope=scope,
         item_type=item_type,
         kinds=kinds,
@@ -576,10 +535,6 @@ def library_page():
 
 @library.route("/filter", methods=["POST"])
 def filter_library_items():
-    """
-    AJAX endpoint to fetch filtered results.
-    Returns rendered HTML as a JSON object.
-    """
     filters = request.get_json() or {}
     ctx = _build_results_for_template(filters)
     rendered_html = render_template("library/_results.html", **ctx)
@@ -678,7 +633,6 @@ def workflows_share_to_team():
     if not team:
         return jsonify({"error": "no team"}), 400
 
-    # ensure membership
     if not TeamMembership.objects(team=team, user_id=user.user_id).first():
         return jsonify({"error": "forbidden"}), 403
 
@@ -694,21 +648,17 @@ def workflows_share_to_team():
     _notify_team_of_share(team, obj, kind, user)
 
     # Move attached documents to team's shared folder
-    from app.models import SmartDocument, SmartFolder, WorkflowAttachment
+    from app.models import SmartDocument
 
-    # Get team's shared folder (use the workflow's space)
     space_id = obj.space if hasattr(obj, 'space') and obj.space else None
     if space_id:
         shared_folder = team.ensure_shared_folder(space_id=space_id)
-
-        # Move all attached documents
         if hasattr(obj, 'attachments') and obj.attachments:
             for attachment_ref in obj.attachments:
                 if attachment_ref and hasattr(attachment_ref, 'attachment'):
                     doc_uuid = attachment_ref.attachment
                     doc = SmartDocument.objects(uuid=doc_uuid).first()
                     if doc:
-                        # Update document's folder to team's shared folder
                         doc.folder = shared_folder.uuid
                         doc.save()
 
@@ -862,6 +812,11 @@ def formatters_submit_for_verification():
 
 @library.route("/verification/<request_uuid>/status", methods=["POST"])
 def update_verification_status(request_uuid: str):
+    """
+    Updates the status of a verification request.
+    If APPROVED, dispatches a task to the dedicated verification queue
+    to perform the library synchronization serially.
+    """
     user = load_user()
     if not user or not user.is_examiner:
         return jsonify({"error": "forbidden"}), 403
@@ -883,24 +838,29 @@ def update_verification_status(request_uuid: str):
 
     new_status = status_map[status_str]
     previous_status = req.status
+
+    # --- CRITICAL CHANGE: Offload APPROVAL to Singleton Queue ---
+    if new_status == VerificationStatus.APPROVED:
+        # Import inside function to avoid circular imports
+        from app.celery_worker import execute_global_verification
+        
+        # We do NOT save the APPROVED status here. We leave it as SUBMITTED/IN_REVIEW
+        # and let the serial worker update it after verification checks.
+        execute_global_verification.apply_async(
+            args=[req.uuid, user.user_id],
+            queue='verification_node'  # Explicitly target the singleton queue
+        )
+        # Inform UI it is queued
+        return jsonify({"ok": True, "status": "queued_for_verification"})
+    
+    # --- For REJECTED / IN_REVIEW, proceed synchronously ---
     req.status = new_status
     req.save()
 
     obj, kind = _resolve_obj(req.item_kind, req.item_identifier)
     li = req.library_item
-    now = datetime.now(timezone.utc)
-
-    if new_status == VerificationStatus.APPROVED:
-        if hasattr(obj, "verified"):
-            setattr(obj, "verified", True)
-            obj.save()
-            sync_verification_flags_for_object(obj, user.user_id)
-        if li:
-            li.verified = True
-            li.verified_at = now
-            li.verified_by_user_id = user.user_id
-            li.save()
-    elif new_status == VerificationStatus.REJECTED:
+    
+    if new_status == VerificationStatus.REJECTED:
         if hasattr(obj, "verified"):
             setattr(obj, "verified", False)
             obj.save()
@@ -957,6 +917,18 @@ def _submit_for_verification_route(kind: str):
             item_title=_object_title(normalized_kind, obj) or (form.get("item_title") or ""),
         )
 
+    # --- Hash Calculation ---
+    if normalized_kind == 'workflow':
+        # Enforce strict server-side hashing for workflows
+        request_doc.item_version_hash = calculate_workflow_hash(obj)
+    else:
+        # Fallback for other types
+        request_doc.item_version_hash = (
+            form.get("item_version_hash")
+            or request_doc.item_version_hash
+            or _default_version_hash(obj)
+        )
+
     request_doc.submitter_user_id = user.user_id
     request_doc.submitter_name = (
         form.get("submitter_name")
@@ -980,11 +952,7 @@ def _submit_for_verification_route(kind: str):
         or request_doc.item_title
         or _object_title(normalized_kind, obj)
     )
-    request_doc.item_version_hash = (
-        form.get("item_version_hash")
-        or request_doc.item_version_hash
-        or _default_version_hash(obj)
-    )
+    
     request_doc.category = form.get("category") or request_doc.category or _default_category_for_kind(normalized_kind)
     request_doc.summary = (form.get("summary") or "").strip()
     request_doc.description = (form.get("description") or "").strip()

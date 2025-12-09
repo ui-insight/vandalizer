@@ -1,10 +1,19 @@
 """Helpers for working with verified objects and examiner permissions."""
 
 from __future__ import annotations
+from devtools import debug
 
 from typing import Optional, Tuple
 
 from flask_login import AnonymousUserMixin
+
+import hashlib
+import json
+import datetime
+from app.models import (
+    Workflow, VerificationRequest, VerificationStatus, 
+    Library, LibraryItem, LibraryScope
+)
 
 from app.models import (
     SearchSet,
@@ -71,3 +80,86 @@ def user_can_modify_verified(user, obj) -> bool:
         return False
 
     return bool(getattr(user, "is_examiner", False))
+
+
+def calculate_workflow_hash(workflow: Workflow) -> str:
+    # (Hash calculation logic remains the same)
+    data_to_hash = {
+        "steps": [json.loads(step.to_json()) for step in workflow.steps],
+        "attachments": [str(att.id) for att in workflow.attachments],
+        "name": workflow.name
+    }
+    dump = json.dumps(data_to_hash, sort_keys=True)
+    return hashlib.sha256(dump.encode()).hexdigest()
+
+def process_verification_approval(request_uuid: str, approver_user_id: str):
+    """
+    The atomic logic to finalize verification.
+    """
+    try:
+        req = VerificationRequest.objects(uuid=request_uuid).first()
+        
+        # === FIX STARTS HERE ===
+        # Allow 'IN_REVIEW' because the admin route sets this status 
+        # right before dispatching the Celery task.
+        allowed_statuses = [VerificationStatus.SUBMITTED, VerificationStatus.IN_REVIEW]
+        
+        if not req or req.status not in allowed_statuses:
+            current_status = req.status.value if req and req.status else "None"
+            return {"success": False, "error": f"Invalid request state: {current_status}"}
+        # === FIX ENDS HERE ===
+
+        # 1. Fetch the actual Workflow
+        workflow = Workflow.objects(id=req.item_identifier).first()
+        if not workflow:
+            return {"success": False, "error": "Workflow no longer exists"}
+
+        # 2. Check Integrity
+        current_hash = calculate_workflow_hash(workflow)
+        # Handle cases where item_version_hash might be None (legacy data)
+        if req.item_version_hash and current_hash != req.item_version_hash:
+            req.status = VerificationStatus.REJECTED
+            req.evaluation_notes = "Hash mismatch: Workflow was modified after submission."
+            req.save()
+            return {"success": False, "error": "Hash mismatch - Workflow modified during review"}
+
+        # 3. Update Request Status to APPROVED
+        req.status = VerificationStatus.APPROVED
+        req.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        req.save()
+
+        # 4. Update Workflow Status
+        workflow.verified = True
+        workflow.save()
+
+        # 5. Add to Global Verified Library
+        verified_lib = Library.objects(scope=LibraryScope.VERIFIED).first()
+        if not verified_lib:
+            verified_lib = Library(
+                scope=LibraryScope.VERIFIED, 
+                title="Global Verified Library"
+            ).save()
+
+        existing_item = LibraryItem.objects(
+            obj=workflow, 
+            kind='workflow', 
+            verified=True
+        ).first()
+
+        if not existing_item:
+            item = LibraryItem(
+                obj=workflow,
+                kind='workflow',
+                added_by_user_id=req.submitter_user_id,
+                verified=True,
+                verified_at=datetime.datetime.now(datetime.timezone.utc),
+                verified_by_user_id=approver_user_id,
+                note=req.summary
+            ).save()
+            verified_lib.update(push__items=item)
+        
+        return {"success": True}
+
+    except Exception as e:
+        print(f"Verification Logic Error: {e}")
+        return {"success": False, "error": str(e)}

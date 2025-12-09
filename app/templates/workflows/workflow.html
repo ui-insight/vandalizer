@@ -3,10 +3,19 @@
     <div>
         <p style="font-size: 24px; font-weight: 600;">
             <span id="workflowTitle">{{ workflow.name }}</span>
-
-
             <input id="workflowTitleInput" type="text" style="display: none; font-size: 24px;" />
 
+            {% if workflow.verified %}
+                <span title="This workflow is verified" style="color: #28a745; margin-left: 10px; font-size: 0.8em;">
+                    <i class="fa-solid fa-certificate"></i> Verified
+                </span>
+            {% else %}
+                 {% if can_customize_workflow %}
+                <button id="btn-trigger-library-verification" class="btn btn-sm btn-outline-secondary" style="margin-left: 10px; font-size: 12px;">
+                    <i class="fa-solid fa-shield-halved"></i> Submit for Verification
+                </button>
+                {% endif %}
+            {% endif %}
 
             <span id="workflow-close-button" style="float: right; font-size: 1em; color: #191919;">
                 <a>
@@ -15,11 +24,13 @@
             </span>
         </p>
     </div>
+
     {% if not can_customize_workflow %}
     <div style="margin: 8px 0 16px; font-size: 12px; color: #a16c2d;">
         Verified workflows are view-only unless you are an examiner. Clone the workflow to make changes.
     </div>
     {% endif %}
+
     <div class="trigger">Trigger</div>
 
     <div class="workflow-step active">
@@ -37,8 +48,6 @@
     <div class="step-connection-line"></div>
 
     {% for step in workflow.steps %}
-
-
     <div class="workflow-step">
         <div class=" step-connector top"></div>
         <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}" data-step-id="{{ step.id }}"
@@ -51,7 +60,6 @@
                 <span class="item-info">
                     {{ step.tasks|length }} tasks
                 </span>
-
             </div>
 
             <span class="workflow-loader" style="display: none;"></span>
@@ -70,7 +78,6 @@
     </div>
     {% endif %}
 
-
     <div class="workflow-step workflow-output hidden">
         <div class="step-connector top"></div>
 
@@ -79,9 +86,7 @@
                 <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
             </div>
             <div class="step-header">
-
                 <span>View output</span>
-
                 <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s elapsed</i></span></span>
                 <div class="workflow-active-step-status hidden" style="margin-top:8px;">
                     <div id="workflow-active-step-label" class="workflow-progress-label"></div>
@@ -90,17 +95,14 @@
                 <a id="closeWorkflowOutputBtn"
                     style="position: absolute; right: 30px; color: #88888899; cursor: pointer;"><i
                         class="fa-solid fa-circle-xmark"></i></a>
-
             </div>
-
         </div>
         <div class="workflow-output-section"></div>
         <div class="workflow-output-buttons hidden">
             <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
         </div>
-
-
     </div>
+
     <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
         <ul>
             <li id="download-pdf-option">Download as PDF</li>
@@ -109,10 +111,23 @@
         </ul>
     </div>
 
-
-
     <script>
+        // --- Logic to Trigger Global Library Verification ---
+        $('#btn-trigger-library-verification').on('click', function() {
+            // We call the function defined in the library-panel script.
+            // This initializes the state (submitUrl, uuid, etc) so the library modal works correctly.
+            if (typeof window.openVerificationModal === 'function') {
+                window.openVerificationModal({
+                    kind: 'workflow',
+                    uuid: "{{ workflow.id }}"
+                });
+            } else {
+                alert("Library panel is not loaded.");
+                console.error("window.openVerificationModal is not defined. Ensure workflows_bottom_panel is loaded.");
+            }
+        });
 
+        // --- Existing Title Logic ---
         $('#editWorkflowTitleBtn').on("click", function (e) {
             e.preventDefault();
             $('#workflowTitle').hide();
@@ -134,10 +149,7 @@
         function updateWorkflowTitle() {
             const newTitle = $('#workflowTitleInput').val().trim();
             if (newTitle) {
-                // Update title text
                 $('#workflowTitle').text(newTitle).show();
-
-                // Send new title to the server
                 const data = JSON.stringify({ title: newTitle, uuid: "{{ workflow.id }}" });
                 $.ajax({
                     url: `/workflows/update_title`,
@@ -155,9 +167,6 @@
             }
             $('#workflowTitleInput').hide();
         }
-
-
-
     </script>
 
     {% include "workflows/workflows_bottom_panel.html" %}

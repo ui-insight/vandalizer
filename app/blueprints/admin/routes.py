@@ -28,12 +28,18 @@ from app.models import (
     TeamInvite,
     TeamMembership,
     User,
-    UserModelConfig
+    UserModelConfig,
+    VerificationRequest,
+    VerificationStatus,
+    Workflow,
+    SearchSet,
+    SearchSetItem,
 )
 from app import load_user
 from app.utilities.markdown_helpers import generate_pdf_from_html
 from app.utilities.agents import create_chat_agent
 from app.utilities.config import settings
+from app.utilities.verification_tasks import execute_global_verification
 
 admin = Blueprint("admin", __name__)
 
@@ -629,3 +635,98 @@ def _format_event_details(ev: ActivityEvent) -> str:
         model = ev.meta_summary.get("model", "") if ev.meta_summary else ""
         return f"{model} · {ev.message_count or 0} msgs"
     return ""
+
+@admin.route("/verifications", methods=["GET"])
+def admin_verifications():
+    """List verification requests for admins/examiners."""
+    user = load_user()
+    if not user.is_admin and not getattr(user, 'is_examiner', False):
+        abort(403)
+
+    # Get pending requests (Submitted or In Review)
+    pending_statuses = [
+        VerificationStatus.SUBMITTED.value,
+        VerificationStatus.IN_REVIEW.value
+    ]
+    pending = VerificationRequest.objects(status__in=pending_statuses).order_by("-updated_at")
+
+    # Get history (Approved or Rejected), limited to last 50
+    history_statuses = [
+        VerificationStatus.APPROVED.value,
+        VerificationStatus.REJECTED.value
+    ]
+    history = VerificationRequest.objects(status__in=history_statuses).order_by("-updated_at").limit(50)
+
+    return render_template(
+        "admin/verifications.html",
+        pending=pending,
+        history=history,
+        current_user_name=user.name
+    )
+
+@admin.route("/verifications/action", methods=["POST"])
+def admin_verifications_action():
+    """Handle Approve/Reject actions from the admin dashboard."""
+    user = load_user()
+    if not user.is_admin and not getattr(user, 'is_examiner', False):
+        abort(403)
+
+    request_uuid = request.form.get("request_uuid")
+    action = request.form.get("action") # 'approved' or 'rejected'
+
+    req = VerificationRequest.objects(uuid=request_uuid).first()
+    if not req:
+        # Flash message could go here
+        return redirect(url_for("admin.admin_verifications"))
+
+    previous_status = req.status
+    
+    if action == "approved":
+        
+        req.status = VerificationStatus.IN_REVIEW # Mark as being processed
+        req.save()
+        
+        execute_global_verification.apply_async(
+            args=[req.uuid, user.user_id],
+            queue='verification'
+        )
+        
+    elif action == "rejected":
+        # === SYNCHRONOUS REJECTION FLOW ===
+        new_status = VerificationStatus.REJECTED
+        req.status = new_status
+        req.save()
+
+        # Resolve object to sync flags
+        # (Replicating simple resolution logic to avoid circular imports of private library methods)
+        obj = None
+        if req.item_kind == 'workflow':
+            obj = Workflow.objects(id=req.item_identifier).first()
+        elif req.item_kind == 'searchset': # extractions
+            obj = SearchSet.objects(uuid=req.item_identifier).first()
+        elif req.item_kind in ['prompt', 'formatter']:
+            obj = SearchSetItem.objects(id=req.item_identifier).first()
+
+        li = req.library_item
+
+        # Sync Flags
+        if obj and hasattr(obj, "verified"):
+            setattr(obj, "verified", False)
+            obj.save()
+            # If you have the helper available: sync_verification_flags_for_object(obj, None)
+        
+        if li:
+            li.verified = False
+            li.verified_at = None
+            li.verified_by_user_id = None
+            li.save()
+            # Update note on library item
+            import json
+            payload = req.to_public_dict()
+            li.note = json.dumps(payload)
+            li.save()
+
+        # Notify
+        # _notify_submitter_of_status_change(req, previous_status, new_status, user)
+
+    return redirect(url_for("admin.admin_verifications"))

@@ -60,6 +60,8 @@ def create_app() -> Flask:
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
+                # add verification queue
+                "tasks.verification.*": {"queue": "verification"},
             },
         }
     )

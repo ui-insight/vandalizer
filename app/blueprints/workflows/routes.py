@@ -41,6 +41,8 @@ from app.models import (
     WorkflowResult,
     WorkflowStep,
     WorkflowStepTask,
+    VerificationRequest,
+    VerificationStatus,
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import ActivityType, activity_start
@@ -57,6 +59,7 @@ from app.utilities.workflow import (
     execute_task_step_test,
     execute_workflow_task,
 )
+from app.utilities.verification_tasks import execute_global_verification
 
 # Singleton instance for recommendations to avoid repeated initialization
 _recommendation_manager_instance = None
@@ -1552,3 +1555,6 @@ def duplicate_workflow(workflow_id):
 
     flash("Workflow duplicated into your space!", "success")
     return redirect(url_for("home.index", sesction="Workflows"))
+
+
+
