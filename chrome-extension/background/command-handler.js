@@ -155,6 +155,24 @@ export class CommandHandler {
             // Just a placeholder to acknowledge the command
             // The actual monitoring logic would be in content script or background loop
             return { success: true };
+        },
+
+        get_page_state: async (sessionId, payload) => {
+            const session = this.sessionManager.getSession(sessionId);
+
+            // Execute script to get HTML
+            const [result] = await chrome.scripting.executeScript({
+                target: { tabId: session.tabId },
+                func: () => {
+                    return {
+                        html: document.documentElement.outerHTML,
+                        url: window.location.href,
+                        title: document.title
+                    };
+                }
+            });
+
+            return result.result;
         }
     };
 

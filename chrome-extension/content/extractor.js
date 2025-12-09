@@ -2,12 +2,15 @@ class DataExtractor {
     extract(extractionSpec) {
         const { mode, fields, table_spec } = extractionSpec;
 
-        if (mode === 'simple') {
+        // Default to 'simple' mode if not specified
+        const extractionMode = mode || (fields ? 'simple' : 'table');
+
+        if (extractionMode === 'simple') {
             return this.extractSimple(fields);
-        } else if (mode === 'table') {
+        } else if (extractionMode === 'table') {
             return this.extractTable(table_spec);
         } else {
-            throw new Error(`Unknown extraction mode: ${mode}`);
+            throw new Error(`Unknown extraction mode: ${extractionMode}`);
         }
     }
 
@@ -17,12 +20,18 @@ class DataExtractor {
         for (const field of fields) {
             const { name, locator, attribute } = field;
 
+            console.log(`[Extractor] Attempting to find element with locator:`, locator);
             const element = new DOMActions().findElement(locator);
 
             if (!element) {
+                console.warn(`[Extractor] Element not found for field "${name}" with selector:`, locator.value);
+                console.log(`[Extractor] Page URL: ${window.location.href}`);
+                console.log(`[Extractor] Page title: ${document.title}`);
                 data[name] = null;
                 continue;
             }
+
+            console.log(`[Extractor] Found element for field "${name}":`, element);
 
             // Extract requested attribute
             switch (attribute) {
@@ -42,6 +51,8 @@ class DataExtractor {
                     // Custom attribute
                     data[name] = element.getAttribute(attribute);
             }
+
+            console.log(`[Extractor] Extracted "${name}":`, data[name]?.substring(0, 100) + '...');
         }
 
         return { structured_data: data, metadata: { fields_extracted: fields.length } };

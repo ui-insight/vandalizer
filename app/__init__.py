@@ -109,6 +109,14 @@ app.config.from_object(config_class)
 Bootstrap(app)  # flask-bootstrap
 mail = Mail(app)
 
+# Initialize Flask-SocketIO for WebSocket support (browser automation)
+from flask_socketio import SocketIO
+# Use Redis as message queue to enable cross-process communication (Flask <-> Celery workers)
+# This allows Celery workers to emit Socket.IO messages to clients connected to Flask app
+redis_url = app.config.get('REDIS_URL', 'redis://localhost:6379')
+socketio = SocketIO(app, cors_allowed_origins="*", message_queue=redis_url)
+print(f"[SocketIO] Initialized with Redis message queue: {redis_url}")
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")

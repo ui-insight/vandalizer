@@ -30,6 +30,8 @@ function getDefaultConfigForAction(actionType) {
             return { condition_type: 'element_present', condition_value: '', timeout_ms: 5000 };
         case 'extract':
             return { extraction_spec: { mode: 'simple', fields: [] } };
+        case 'smart_action':
+            return { instruction: '' };
         default:
             return {};
     }
@@ -84,7 +86,8 @@ function getActionIcon(type) {
         fill_form: '<i class="bi bi-input-cursor-text"></i>',
         click: '<i class="bi bi-cursor"></i>',
         wait_for: '<i class="bi bi-hourglass"></i>',
-        extract: '<i class="bi bi-download"></i>'
+        extract: '<i class="bi bi-download"></i>',
+        smart_action: '<i class="bi bi-stars"></i>'
     };
     return icons[type] || '';
 }
@@ -96,7 +99,8 @@ function getActionLabel(type) {
         fill_form: 'Fill Form',
         click: 'Click',
         wait_for: 'Wait For',
-        extract: 'Extract Data'
+        extract: 'Extract Data',
+        smart_action: 'Smart Action (LLM)'
     };
     return labels[type] || type;
 }
@@ -176,6 +180,17 @@ function renderActionConfig(action) {
                 </div>
             `;
 
+        case 'smart_action':
+            return `
+                <div class="form-group">
+                    <label>Instruction</label>
+                    <textarea class="form-control" rows="2"
+                              placeholder="e.g. Click the login button"
+                              onchange="updateActionConfig('${action.action_id}', 'instruction', this.value)"
+                    >${action.config.instruction || ''}</textarea>
+                </div>
+            `;
+
         default:
             return '<p class="text-muted mb-0">No additional configuration needed</p>';
     }
@@ -243,6 +258,8 @@ function updateActionConfig(actionId, key, value) {
         action.config.detection_rules.url_pattern = value;
     } else if (key === 'instruction_to_user') {
         action.config.instruction_to_user = value;
+    } else if (key === 'instruction') {
+        action.config.instruction = value;
     }
 
     renderActions();

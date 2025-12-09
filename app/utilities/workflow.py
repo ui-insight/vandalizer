@@ -304,8 +304,15 @@ class MultiTaskNode(Node):
                 continue
             elif isinstance(result_output, str):
                 output["output"].append(result_output)
-            else:
+            elif isinstance(result_output, dict):
+                # If output is a dict, append it as-is (don't extend with keys)
+                output["output"].append(result_output)
+            elif isinstance(result_output, list):
+                # If output is a list, extend the output list
                 output["output"].extend(result_output)
+            else:
+                # For other types, append them
+                output["output"].append(result_output)
 
         debug(output)
         return output
@@ -453,7 +460,6 @@ class BrowserAutomationNode(Node):
         self.data = data
         self.model = data.get("model", "claude-sonnet-4-5")
         self.actions = data.get("actions", [])
-        self.summarization = data.get("summarization", {})
         self.allowed_domains = data.get("allowed_domains", [])
         self.timeout_seconds = data.get("timeout_seconds", 300)
         self.user_id = data.get("user_id")
@@ -468,9 +474,8 @@ class BrowserAutomationNode(Node):
         2. Start session (open/attach to tab)
         3. Execute each action in sequence
         4. Handle user login pauses
-        5. Extract final data
-        6. Optionally summarize with LLM
-        7. Clean up session
+        5. Extract and return data
+        6. Clean up session
         """
         
         # If we are resuming from a user action (like login), inputs might contain state
@@ -500,28 +505,33 @@ class BrowserAutomationNode(Node):
 
                 result = self._execute_action(service, session, action, inputs)
 
-                # If extraction, store data
-                if action["type"] == "extract":
-                    if isinstance(result, dict) and "structured_data" in result:
-                        extracted_data.update(result["structured_data"])
-                    else:
-                        extracted_data.update(result or {})
+                # If the result contains extracted data, store it
+                # This handles both explicit extract actions and smart actions that perform extraction
+                if isinstance(result, dict) and "structured_data" in result:
+                    print(f"[BrowserAutomationNode] Result contains structured_data: {result['structured_data']}")
+                    extracted_data.update(result["structured_data"])
+                elif action["type"] == "extract" and result:
+                    # Legacy handling for extract actions that don't use structured_data wrapper
+                    print(f"[BrowserAutomationNode] Extract action without wrapper, storing entire result: {result}")
+                    extracted_data.update(result or {})
 
                 # If login required, wait for user
                 if action["type"] == "ensure_login":
                     self._wait_for_user_login(service, session, action)
-
-            # Summarize results if configured
-            final_output = extracted_data
-            if self.summarization.get("enabled"):
-                self.report_progress("Generating summary...")
-                final_output = self._summarize_results(extracted_data, inputs)
+                
+                # If smart action
+                if action["type"] == "smart_action":
+                    # The service handles the LLM logic and execution
+                    # We just pass the instruction
+                    # Note: execute_smart_action calls execute_action internally, so it returns the result
+                    pass 
 
             # Clean up
             service.end_session(session.session_id, close_tab=False)
 
+            # Return the raw extracted data without additional LLM summarization
             return {
-                "output": final_output,
+                "output": extracted_data,
                 "input": self._format_input(inputs),
                 "step_name": self.name
             }
@@ -536,6 +546,13 @@ class BrowserAutomationNode(Node):
 
         # Interpolate variables from previous steps
         action_with_values = self._interpolate_variables(action, inputs)
+
+        if action_with_values["type"] == "smart_action":
+            return service.execute_smart_action(
+                session.session_id, 
+                action_with_values["config"]["instruction"],
+                model=self.model
+            )
 
         return service.execute_action(session.session_id, action_with_values)
 
@@ -572,39 +589,6 @@ class BrowserAutomationNode(Node):
             if s.state == SessionState.FAILED:
                 raise Exception("Session failed during login wait")
             time.sleep(1)
-
-    def _summarize_results(self, extracted_data, inputs):
-        """Use LLM to generate natural language summary"""
-
-        prompt = self.summarization.get("prompt_template", "Summarize the following data:")
-        context = {
-            "extracted_data": json.dumps(extracted_data, indent=2),
-            "original_input": inputs
-        }
-        
-        # Simple string formatting
-        formatted_prompt = prompt
-        try:
-            formatted_prompt = prompt.format(**context)
-        except:
-            formatted_prompt = f"{prompt}\n\nData: {json.dumps(extracted_data)}"
-
-        chat_manager = ChatManager()
-        
-        def _on_chunk(text):
-            self.report_progress("Generating summary...", preview=text)
-
-        summary = chat_manager.stream_prompt(
-            model=self.model,
-            prompt=formatted_prompt,
-            progress_callback=_on_chunk,
-            include_next_step=False
-        )
-
-        return {
-            "raw_data": extracted_data,
-            "summary": summary
-        }
 
     def _interpolate_variables(self, action, inputs):
         """Replace template variables like {{previous_step.field}} with actual values"""
@@ -821,6 +805,10 @@ class WorkflowEngine:
         if value is None:
             return ""
         if isinstance(value, list):
+            # If list contains a single dict, format it directly
+            if len(value) == 1 and isinstance(value[0], dict):
+                return self._format_final_output(value[0])
+
             formatted_items = [
                 self._format_final_output(item)
                 if isinstance(item, (list, dict))

@@ -2,7 +2,10 @@ class DOMActions {
     findElement(locator) {
         const { strategy, value } = locator;
 
-        switch (strategy) {
+        // Default to CSS selector if strategy not specified
+        const locatorStrategy = strategy || 'css';
+
+        switch (locatorStrategy) {
             case 'css':
                 return document.querySelector(value);
 
@@ -27,7 +30,7 @@ class DOMActions {
                 return this.findBySemantic(value);
 
             default:
-                throw new Error(`Unknown locator strategy: ${strategy}`);
+                throw new Error(`Unknown locator strategy: ${locatorStrategy}`);
         }
     }
 

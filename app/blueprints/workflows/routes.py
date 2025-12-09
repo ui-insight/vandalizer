@@ -1641,11 +1641,17 @@ def add_browser_automation_step() -> ResponseReturnValue:
         # Handle POST request - save the step configuration
         data = request.get_json()
         workflow_step_id = data.get("workflow_step_id")
+        workflow_task_id = data.get("workflow_task_id")
         actions = data.get("actions", [])
         summarization = data.get("summarization", {})
         allowed_domains = data.get("allowed_domains", [])
         model = data.get("model", "claude-sonnet-4-5")
         timeout_seconds = data.get("timeout_seconds", 300)
+
+        # Debug logging
+        print(f"[Browser Automation Save] Received {len(actions)} actions")
+        print(f"[Browser Automation Save] Actions: {actions}")
+        print(f"[Browser Automation Save] Task ID: {workflow_task_id}")
 
         # Find the workflow step
         if workflow_step_id and workflow_step_id != '{{ workflow_step.id }}':
@@ -1655,16 +1661,28 @@ def add_browser_automation_step() -> ResponseReturnValue:
         else:
             step = None
 
-        # Create the task
+        task_data = {
+            "actions": actions,
+            "summarization": summarization,
+            "allowed_domains": allowed_domains,
+            "model": model,
+            "timeout_seconds": timeout_seconds
+        }
+
+        if workflow_task_id and workflow_task_id != '{{ workflow_task_id }}':
+            # Update existing task
+            task = WorkflowStepTask.objects(id=ObjectId(workflow_task_id)).first()
+            if task:
+                task.data = task_data
+                task.save()
+                return jsonify({"success": True})
+            else:
+                return jsonify({"success": False, "error": "Task not found"}), 404
+        
+        # Create new task
         task = WorkflowStepTask(
             name="BrowserAutomation",
-            data={
-                "actions": actions,
-                "summarization": summarization,
-                "allowed_domains": allowed_domains,
-                "model": model,
-                "timeout_seconds": timeout_seconds
-            }
+            data=task_data
         )
         task.save()
 
