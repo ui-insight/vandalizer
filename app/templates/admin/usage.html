@@ -231,7 +231,13 @@
                 {% endfor %}
             </select>
         </label>
-        <button class="btn btn-primary" type="submit">Apply</button>
+        <div style="border-left: 1px solid #ddd; height: 30px; margin: 0 5px;"></div>
+        
+        <select id="download-format" style="width: auto;">
+            <option value="pdf">PDF Report</option>
+            <option value="csv">CSV Export (Raw Data)</option>
+        </select>
+        <button class="btn" type="button" onclick="downloadReport()">📥 Download</button>
     </form>
 </div>
 
@@ -436,5 +442,17 @@
             </tbody>
         </table>
     </div>
+    <script>
+     function downloadReport() {
+        const params = new URLSearchParams(window.location.search);
+        
+        // Get the selected format
+        const format = document.getElementById('download-format').value;
+        params.set('format', format);
+
+        const url = "{{ url_for('admin.download_usage_report') }}?" + params.toString();
+        window.location.href = url;
+     }
+    </script>
 
     {% endblock %}
