@@ -51,6 +51,10 @@
                     <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="extract">
                         <i class="fa-solid fa-download"></i> Extract Data
                     </button>
+                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn"
+                        data-action="smart_action">
+                        <i class="fa-solid fa-stars"></i> Smart Action (LLM)
+                    </button>
                 </div>
             </div>
 
@@ -122,7 +126,8 @@
                 'ensure_login': 'Require Login',
                 'fill_form': 'Fill Form',
                 'click': 'Click Element',
-                'extract': 'Extract Data'
+                'extract': 'Extract Data',
+                'smart_action': 'Smart Action (LLM)'
             };
             return labels[type] || type;
         }
@@ -145,13 +150,17 @@
                 case 'extract':
                     return `<input type="text" class="input-field action-config" data-index="${index}" data-key="fields_csv" 
                             placeholder="name=selector, email=.email-field" value="" style="margin-top: 8px;">`;
+                case 'smart_action':
+                    return `<textarea class="input-field action-config" data-index="${index}" data-key="instruction" 
+                            placeholder="Instruction (e.g. 'Click the login button')" 
+                            style="margin-top: 8px;">${action.config.instruction || ''}</textarea>`;
                 default:
                     return '';
             }
         }
 
-        // Add action button handler
-        $('.add-action-btn').off('click').on('click', function () {
+        // Add action button handler - use event delegation for dynamically loaded content
+        $(document).on('click', '.add-action-btn', function () {
             const actionType = $(this).data('action');
             const action = {
                 action_id: `action-${browserAutomationActionId++}`,
@@ -174,17 +183,19 @@
                 browserAutomationActions[index].config.instruction_to_user = value;
             } else if (key === 'selector') {
                 browserAutomationActions[index].config.locator = { strategy: 'css', value: value };
+            } else if (key === 'instruction') {
+                browserAutomationActions[index].config.instruction = value;
             }
         });
 
-        // Close button
-        $('.closeAddBrowserAutomationToWorkflowBtn').on("click", function (e) {
+        // Close button - use event delegation
+        $(document).on("click", '.closeAddBrowserAutomationToWorkflowBtn', function (e) {
             e.preventDefault();
             $('.workflowAddBrowserAutomationModal').remove();
         });
 
-        // Confirm button - matches the naming convention expected by workflowAddStepTaskType
-        $('#confirmBrowser_automationStepBtn').off("click").on("click", function (e) {
+        // Confirm button - use event delegation for dynamically loaded content
+        $(document).on("click", '#confirmBrowser_automationStepBtn', function (e) {
             e.preventDefault();
 
             // Build actions array including initial navigate if URL provided
@@ -210,6 +221,7 @@
             const stepData = {
                 workflow_uuid: current_workflow_id,
                 workflow_step_id: '{{ workflow_step_id }}',
+                workflow_task_id: '{{ workflow_task_id }}',
                 actions: actions,
                 summarization: {
                     enabled: summarizationEnabled,
@@ -248,6 +260,34 @@
         });
 
         // Initialize
+        {% if is_editing and workflow_task %}
+        try {
+            const taskData = {{ workflow_task.data | tojson
+        }};
+        if (taskData.actions) {
+            // Filter out the initial navigation if it was separated in UI
+            browserAutomationActions = taskData.actions.filter(a => a.action_id !== 'action-initial');
+
+            // Set initial URL if present
+            const initialAction = taskData.actions.find(a => a.action_id === 'action-initial');
+            if (initialAction && initialAction.config.url) {
+                $('#browser-automation-url').val(initialAction.config.url);
+            }
+        }
+
+        if (taskData.allowed_domains) {
+            $('#browser-automation-domains').val(taskData.allowed_domains.join(', '));
+        }
+
+        if (taskData.summarization) {
+            $('#browser-automation-summarize').prop('checked', taskData.summarization.enabled);
+            $('#browser-automation-summary-prompt').val(taskData.summarization.prompt_template);
+        }
+        } catch (e) {
+            console.error("Error parsing existing task data", e);
+        }
+        {% endif %}
+
         renderBrowserAutomationActions();
     </script>
 </div>

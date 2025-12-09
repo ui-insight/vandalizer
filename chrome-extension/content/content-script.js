@@ -131,9 +131,13 @@ class BrowserAutomationContent {
     }
 
     async extractData(data) {
+        console.log('[ContentScript] extractData received:', JSON.stringify(data, null, 2));
         const { extraction_spec } = data;
 
-        return this.extractor.extract(extraction_spec);
+        const result = this.extractor.extract(extraction_spec);
+        console.log('[ContentScript] extractData result:', JSON.stringify(result, null, 2));
+
+        return result;
     }
 
     async scrollPage(data) {

@@ -1323,3 +1323,46 @@ def serve_fonts(filename):
             mimetype="font/ttf",
         )
     return send_from_directory(WEBFONTS_DIR, filename)
+
+
+# API Token Management Routes
+@home.route("/settings")
+@login_required
+def user_settings():
+    """User settings page including API token management."""
+    user = load_user()
+    return render_template("settings.html", user=user)
+
+
+@home.route("/settings/generate_api_token", methods=["POST"])
+@login_required
+def generate_api_token():
+    """Generate a new API token for the current user."""
+    from app.models import User
+    from flask import flash
+    
+    user = User.objects(user_id=load_user().user_id).first()
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for("home.user_settings"))
+    
+    token = user.generate_api_token()
+    flash(f"API token generated! Copy it now (it won't be shown again): {token}", "success")
+    return redirect(url_for("home.user_settings"))
+
+
+@home.route("/settings/revoke_api_token", methods=["POST"])
+@login_required  
+def revoke_api_token():
+    """Revoke the current user's API token."""
+    from app.models import User
+    from flask import flash
+    
+    user = User.objects(user_id=load_user().user_id).first()
+    if not user:
+        flash("User not found", "danger")
+        return redirect(url_for("home.user_settings"))
+    
+    user.clear_api_token()
+    flash("API token revoked successfully", "info")
+    return redirect(url_for("home.user_settings"))

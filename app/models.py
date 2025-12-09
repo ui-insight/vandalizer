@@ -296,6 +296,13 @@ class User(me.Document):
         "Team", required=False, reverse_delete_rule=me.NULLIFY
     )
 
+    # API Token for Chrome Extension and API access
+    api_token = me.StringField(max_length=200, unique=True, sparse=True)
+    api_token_created_at = me.DateTimeField()
+
+    # Browser Automation WebSocket Session (for cross-process communication)
+    browser_automation_session_id = me.StringField(max_length=200, sparse=True)
+
     @property
     def current_team_uuid(self) -> str | None:
         return getattr(self.current_team, "uuid", None)
@@ -318,6 +325,20 @@ class User(me.Document):
     def check_password(self, password):
         """Check a hashed password."""
         return check_password_hash(self.password_hash, password)
+
+    def generate_api_token(self):
+        """Generate a new API token for this user."""
+        import secrets
+        self.api_token = secrets.token_urlsafe(32)
+        self.api_token_created_at = datetime.datetime.now(timezone.utc)
+        self.save()
+        return self.api_token
+
+    def clear_api_token(self):
+        """Revoke the API token."""
+        self.api_token = None
+        self.api_token_created_at = None
+        self.save()
 
     def _membership_for(self, team: "Team | None" = None) -> "TeamMembership | None":
         """

@@ -1,23 +1,16 @@
+// Load Socket.IO client library from CDN
+// IMPORTANT: This MUST be at the top of the file
+importScripts('https://cdn.socket.io/4.8.1/socket.io.min.js');
+
 import { SessionManager } from './session-manager.js';
 import { CommandHandler } from './command-handler.js';
-
-// For ES6 modules in service workers, we need to use dynamic import
-// Socket.IO will be available globally as 'io'
-const socketIOPath = chrome.runtime.getURL('lib/socket.io.min.js');
-self.importScripts = self.importScripts || (() => {});
-try {
-    // Try to load Socket.IO
-    self.importScripts(socketIOPath);
-} catch (e) {
-    console.error('[BrowserAutomation] Failed to load Socket.IO:', e);
-}
 
 class BrowserAutomationBackground {
     constructor() {
         this.socket = null;  // Changed from wsConnection to socket
         this.sessionManager = new SessionManager();
         this.commandHandler = new CommandHandler(this.sessionManager);
-        this.heartbeatInterval = null;
+        this.reconnectInterval = null;
         this.backendUrl = null;
         this.userToken = null;
 
@@ -53,73 +46,103 @@ class BrowserAutomationBackground {
     async initialize() {
         // Load configuration from storage
         const config = await chrome.storage.local.get(['backendUrl', 'userToken']);
+        // Changed default from ws://localhost:5000 to http://localhost:5003
         this.backendUrl = config.backendUrl || 'http://localhost:5003';
         this.userToken = config.userToken;
 
         if (this.userToken) {
             this.connectToBackend();
+        } else {
+            console.warn('[BrowserAutomation] No user token found. Please configure the extension.');
         }
     }
 
     connectToBackend() {
-        if (this.wsConnection?.readyState === WebSocket.OPEN) {
+        if (this.socket?.connected) {
             return; // Already connected
         }
 
-        this.wsConnection = new WebSocket(`${this.backendUrl}/browser_automation/websocket/connect`);
+        console.log(`[BrowserAutomation] Connecting to ${this.backendUrl}/browser_automation...`);
 
-        this.wsConnection.onopen = () => {
-            console.log('[BrowserAutomation] Connected to backend');
-
-            // Send authentication
-            this.sendToBackend({
-                type: 'auth',
+        // Create Socket.IO connection
+        this.socket = io(`${this.backendUrl}/browser_automation`, {
+            auth: {
                 token: this.userToken
-            });
+            },
+            transports: ['websocket', 'polling'],
+            reconnection: true,
+            reconnectionDelay: 5000,
+            reconnectionAttempts: Infinity
+        });
 
-            // Start heartbeat
+        // Connection opened
+        this.socket.on('connect', () => {
+            console.log('[BrowserAutomation] Socket connected, waiting for authentication...');
+        });
+
+        // Authentication successful
+        this.socket.on('connected', (data) => {
+            console.log('[BrowserAutomation] ✅ Authenticated as:', data.user_id);
+            // Start heartbeat after successful authentication
             this.startHeartbeat();
-        };
+        });
 
-        this.wsConnection.onmessage = (event) => {
-            const message = JSON.parse(event.data);
+        // Handle commands from backend
+        this.socket.on('command', (message) => {
             this.handleBackendMessage(message);
-        };
+        });
 
-        this.wsConnection.onerror = (error) => {
-            console.error('[BrowserAutomation] WebSocket error:', error);
-        };
+        // Heartbeat acknowledgment
+        this.socket.on('heartbeat_ack', (data) => {
+            // Heartbeat received, connection is alive
+        });
 
-        this.wsConnection.onclose = () => {
-            console.log('[BrowserAutomation] Disconnected from backend');
-            this.scheduleReconnect();
-        };
-    }
-
-    scheduleReconnect() {
-        if (this.reconnectInterval) return;
-
-        this.reconnectInterval = setInterval(() => {
-            if (this.wsConnection?.readyState !== WebSocket.OPEN) {
-                this.connectToBackend();
-            } else {
-                clearInterval(this.reconnectInterval);
-                this.reconnectInterval = null;
+        // Connection error
+        this.socket.on('connect_error', (error) => {
+            console.error('[BrowserAutomation] ❌ Connection error:', error.message);
+            if (error.message.includes('Invalid token')) {
+                console.error('[BrowserAutomation] Please check your API token in extension settings');
             }
-        }, 5000);
+        });
+
+        // Disconnected
+        this.socket.on('disconnect', (reason) => {
+            console.log('[BrowserAutomation] Disconnected:', reason);
+            // Socket.IO will automatically reconnect
+        });
+
+        // Reconnection attempt
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            console.log(`[BrowserAutomation] Reconnection attempt #${attemptNumber}...`);
+        });
+
+        // Reconnected
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log(`[BrowserAutomation] ✅ Reconnected after ${attemptNumber} attempts`);
+        });
     }
 
     startHeartbeat() {
-        setInterval(() => {
-            if (this.wsConnection?.readyState === WebSocket.OPEN) {
-                this.sendToBackend({ type: 'heartbeat', timestamp: Date.now() });
+        // Clear any existing heartbeat
+        if (this.heartbeatInterval) {
+            clearInterval(this.heartbeatInterval);
+        }
+
+        this.heartbeatInterval = setInterval(() => {
+            if (this.socket?.connected) {
+                this.sendToBackend({
+                    type: 'heartbeat',
+                    timestamp: Date.now()
+                });
             }
         }, 30000); // Every 30 seconds
     }
 
     sendToBackend(message) {
-        if (this.wsConnection?.readyState === WebSocket.OPEN) {
-            this.wsConnection.send(JSON.stringify(message));
+        if (this.socket?.connected) {
+            this.socket.emit('message', message);
+        } else {
+            console.warn('[BrowserAutomation] Cannot send message: Not connected');
         }
     }
 
@@ -184,17 +207,21 @@ class BrowserAutomationBackground {
 
             case 'connect_to_backend':
                 this.initialize();
+                sendResponse({ success: true });
                 break;
 
             case 'disconnect_from_backend':
-                if (this.wsConnection) {
-                    this.wsConnection.close();
+                if (this.socket) {
+                    this.socket.disconnect();
                 }
+                sendResponse({ success: true });
                 break;
 
             case 'get_connection_status':
                 sendResponse({
-                    connected: this.wsConnection?.readyState === WebSocket.OPEN
+                    connected: this.socket?.connected || false,
+                    backendUrl: this.backendUrl,
+                    hasToken: !!this.userToken
                 });
                 break;
 

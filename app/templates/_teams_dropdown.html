@@ -24,6 +24,10 @@
             <i class="fa-solid fa-gear" style="width:18px;"></i> Manage teams
         </a>
 
+        <a class="menu-item" role="menuitem" href="{{ url_for('home.user_settings') }}">
+            <i class="fa-solid fa-id-card" style="width:18px;"></i> My Account
+        </a>
+
         {% if current_user.is_admin_current_team %}
         <!-- <hr class="menu-divider">
 
