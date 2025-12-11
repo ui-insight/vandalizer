@@ -201,14 +201,53 @@ app.config["AUTH_MODE"] = (
 azure_blueprint = None
 if OAUTH_AUTH_ENABLED:
     try:
-        azure_blueprint = make_azure_blueprint(
-            client_id=app.config.get("CLIENT_ID"),
-            client_secret=app.config.get("CLIENT_SECRET"),
-            tenant=app.config.get("TENANT_NAME"),
-        )
-        app.register_blueprint(azure_blueprint, url_prefix="/login")
+        # Try to get Azure config from database first
+        from app.utilities.config import get_oauth_provider_by_type
+        azure_config = get_oauth_provider_by_type("azure")
+
+        if azure_config:
+            # Check if provider is enabled
+            if not azure_config.get("enabled", True):
+                app.logger.info("Azure OAuth provider found but is disabled")
+            else:
+                # Use database config
+                # Note: admin panel saves as "tenant_id", blueprint expects "tenant"
+                client_id = azure_config.get("client_id")
+                client_secret = azure_config.get("client_secret")
+                tenant = azure_config.get("tenant_id") or azure_config.get("tenant")
+
+                if not client_id or not client_secret or not tenant:
+                    app.logger.error(f"Azure config incomplete - client_id: {bool(client_id)}, client_secret: {bool(client_secret)}, tenant: {bool(tenant)}")
+                else:
+                    azure_blueprint = make_azure_blueprint(
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        tenant=tenant,
+                    )
+                    app.logger.info(f"Azure blueprint configured from database")
+        else:
+            # Fall back to environment/config file
+            client_id = app.config.get("CLIENT_ID")
+            client_secret = app.config.get("CLIENT_SECRET")
+            tenant = app.config.get("TENANT_NAME")
+
+            if client_id and client_secret and tenant:
+                azure_blueprint = make_azure_blueprint(
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    tenant=tenant,
+                )
+                app.logger.info("Azure blueprint configured from app config")
+            else:
+                app.logger.warning("OAuth enabled but Azure config not found in database or app config")
+
+        if azure_blueprint:
+            app.register_blueprint(azure_blueprint, url_prefix="/login")
+            app.logger.info("Azure blueprint registered successfully")
     except Exception as e:
-        app.logger.warning(f"OAuth enabled but Azure blueprint could not be registered: {e}")
+        app.logger.error(f"OAuth enabled but Azure blueprint could not be registered: {e}")
+        import traceback
+        app.logger.error(traceback.format_exc())
 
 if azure_blueprint:
 
