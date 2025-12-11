@@ -17,7 +17,7 @@ from mongoengine.errors import NotUniqueError
 
 from app import load_user
 from app.models import TeamInvite, TeamMembership, User
-from app.utilities.config import get_auth_methods
+from app.utilities.config import get_auth_methods, get_oauth_provider_by_type
 
 auth = Blueprint("auth", __name__)
 
@@ -31,11 +31,19 @@ def index() -> ResponseReturnValue:
         return redirect(url_for("home.index"))
 
     methods = get_auth_methods()
+    azure_provider = (
+        get_oauth_provider_by_type("azure") if "oauth" in methods else None
+    )
     return render_template(
         "landing.html",
         AUTH_MODE=current_app.config["AUTH_MODE"],
         password_enabled="password" in methods,
         oauth_enabled="oauth" in methods,
+        azure_configured=azure_provider is not None,
+        azure_label=(azure_provider or {}).get("display_name", "Sign in with Azure"),
+        azure_enabled=(
+            "oauth" in methods and azure_provider is not None and "azure" in current_app.blueprints
+        ),
     )
 
 
