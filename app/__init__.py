@@ -15,13 +15,12 @@ from dotenv import load_dotenv
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
-from flask_dance.consumer import oauth_authorized
-from flask_dance.contrib.azure import make_azure_blueprint
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from flask_login import LoginManager, current_user, login_user
+from flask_login import LoginManager, current_user
 from flask_mail import Mail
 from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
+from app.oauth import configure_azure_blueprint
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -126,6 +125,12 @@ app.logger = logging.getLogger("app_logger")
 
 from app.models import User
 
+# Connect to MongoDB early so config reads work before first request
+me.connect(
+    app.config["MONGO_DB"],
+    host=os.getenv("MONGO_HOST", "mongodb://localhost:27017/").lower(),
+)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "auth.login"  # Redirect here if @login_required fails
@@ -181,10 +186,10 @@ with app.app_context():
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
 
-# In non-production, always allow password auth so devs can't lock themselves out
-if env != "production" and "password" not in auth_methods:
-    app.logger.warning("Enforcing password auth in non-production to avoid lockout.")
-    auth_methods = auth_methods + ["password"]
+# In non-production, if nothing is configured at all, enable password to avoid lockout
+if env != "production" and not auth_methods:
+    app.logger.warning("No auth methods configured; enabling password auth in non-production to avoid lockout.")
+    auth_methods = ["password"]
 PASSWORD_AUTH_ENABLED = "password" in auth_methods
 OAUTH_AUTH_ENABLED = "oauth" in auth_methods
 
@@ -198,94 +203,8 @@ app.config["AUTH_MODE"] = (
     else "HYBRID"
 )
 
-azure_blueprint = None
-if OAUTH_AUTH_ENABLED:
-    try:
-        # Try to get Azure config from database first
-        from app.utilities.config import get_oauth_provider_by_type
-        azure_config = get_oauth_provider_by_type("azure")
-
-        if azure_config:
-            # Check if provider is enabled
-            if not azure_config.get("enabled", True):
-                app.logger.info("Azure OAuth provider found but is disabled")
-            else:
-                # Use database config
-                # Note: admin panel saves as "tenant_id", blueprint expects "tenant"
-                client_id = azure_config.get("client_id")
-                client_secret = azure_config.get("client_secret")
-                tenant = azure_config.get("tenant_id") or azure_config.get("tenant")
-                redirect_url = azure_config.get("redirect_uri")
-
-                if not client_id or not client_secret or not tenant:
-                    app.logger.error(f"Azure config incomplete - client_id: {bool(client_id)}, client_secret: {bool(client_secret)}, tenant: {bool(tenant)}")
-                else:
-                    azure_blueprint = make_azure_blueprint(
-                        client_id=client_id,
-                        client_secret=client_secret,
-                        tenant=tenant,
-                        redirect_url=redirect_url or None,
-                    )
-                    app.logger.info(f"Azure blueprint configured from database")
-        else:
-            # Fall back to environment/config file
-            client_id = app.config.get("CLIENT_ID")
-            client_secret = app.config.get("CLIENT_SECRET")
-            tenant = app.config.get("TENANT_NAME")
-            redirect_url = app.config.get("AZURE_REDIRECT_URI")
-
-            if client_id and client_secret and tenant:
-                azure_blueprint = make_azure_blueprint(
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    tenant=tenant,
-                    redirect_url=redirect_url or None,
-                )
-                app.logger.info("Azure blueprint configured from app config")
-            else:
-                app.logger.warning("OAuth enabled but Azure config not found in database or app config")
-
-        if azure_blueprint:
-            app.register_blueprint(azure_blueprint, url_prefix="/login")
-            app.logger.info("Azure blueprint registered successfully")
-    except Exception as e:
-        app.logger.error(f"OAuth enabled but Azure blueprint could not be registered: {e}")
-        import traceback
-        app.logger.error(traceback.format_exc())
-
-if azure_blueprint:
-
-    @oauth_authorized.connect_via(azure_blueprint)
-    def azure_logged_in(blueprint, token):
-        """Creates or loads a user after successful Azure login."""
-        if not token:
-            app.logger.warning("Failed to fetch token from Azure.")
-            return
-
-        resp = blueprint.session.get("/v1.0/me")
-        if not resp.ok:
-            app.logger.warning(
-                f"Failed to fetch user info from Azure Graph: {resp.text}"
-            )
-            return
-
-        info = resp.json()
-        user_principal_name = info.get("userPrincipalName")
-        user = User.objects(user_id=user_principal_name).first()
-
-        if not user:
-            email = info.get("mail") or user_principal_name
-            user = User(
-                user_id=user_principal_name, email=email, name=info["displayName"]
-            ).save()
-        else:
-            if not user.email:
-                user.email = info.get("mail") or user_principal_name
-            if not user.name:
-                user.name = info["displayName"]
-            user.save()
-
-        login_user(user)
+# Ensure Azure OAuth blueprint is registered/configured from DB if present
+configure_azure_blueprint(app)
 
 # Point the login view to the local blueprint's login function (always available path)
 login_manager.login_view = "auth.login"
@@ -341,9 +260,3 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
-
-
-me.connect(
-    app.config["MONGO_DB"],
-    host=os.getenv("MONGO_HOST", "mongodb://localhost:27017/").lower(),
-)

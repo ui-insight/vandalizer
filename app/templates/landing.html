@@ -123,11 +123,19 @@
           {% if oauth_enabled %}
           <div class="mb-6">
             {% if azure_enabled %}
-            <a class="action-button" href="{{ url_for('auth.login', provider='azure') }}">{{ azure_label }}</a>
+            <a class="action-button" href="{{ url_for('azure.login') }}">{{ azure_label }}</a>
             {% elif azure_configured %}
             <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>{{ azure_label }}</button>
+            {% if azure_disabled_reason %}
+            <p class="text-sm text-gray-200 mt-2">{{ azure_disabled_reason }}</p>
+            {% elif not azure_config_complete %}
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but required fields are missing: {{ azure_missing_fields|join(', ') }}.</p>
+            {% elif not azure_blueprint_registered %}
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Restart the server after saving the provider settings.</p>
+            {% else %}
             <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Please verify the client ID,
               secret, and tenant are valid.</p>
+            {% endif %}
             {% else %}
             <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>Azure sign-in unavailable</button>
             <p class="text-sm text-gray-200 mt-2">Add and enable the Azure provider in System Configuration to allow SSO.</p>

@@ -290,15 +290,15 @@ def get_auth_methods() -> list[str]:
     try:
         from app.models import SystemConfig
         db_config = SystemConfig.get_config()
-        if db_config and db_config.auth_methods:
+        if db_config and db_config.auth_methods is not None:
             methods = list(db_config.auth_methods)
-            if env != "production" and "password" not in methods:
-                methods.append("password")
-            return methods
+            # If nothing is configured at all, fall back to password in non-prod to avoid lockout
+            if methods or env == "production":
+                return methods
     except Exception:
         pass
-    # default: always allow password in non-prod
-    return ["password"]
+    # Default/fallback: allow password in non-prod to avoid lockout when no config is present
+    return [] if env == "production" else ["password"]
 
 
 def get_oauth_providers(enabled_only: bool = True) -> list[dict]:
