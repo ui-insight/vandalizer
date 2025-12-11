@@ -45,10 +45,18 @@ def login() -> ResponseReturnValue:
     methods = get_auth_methods()
     password_enabled = "password" in methods
     oauth_enabled = "oauth" in methods
+    azure_available = "azure" in current_app.blueprints
+    provider = request.args.get("provider")
 
     if request.method == "GET":
+        if provider == "azure" and oauth_enabled:
+            if azure_available:
+                return redirect(url_for("azure.login"))
+            flash("OAuth is enabled but no provider is configured.", "danger")
+            return redirect(url_for("auth.index"))
+
         if oauth_enabled and not password_enabled:
-            if "azure" in current_app.blueprints:
+            if azure_available:
                 return redirect(url_for("azure.login"))
             flash("OAuth is enabled but no provider is configured.", "danger")
             return redirect(url_for("auth.index"))

@@ -110,6 +110,12 @@
           </p>
 
           {% block hero_auth %}
+          {% if oauth_enabled %}
+          <div class="mb-6">
+            <a class="action-button" href="{{ url_for('auth.login', provider='azure') }}">SIGN IN WITH AZURE</a>
+          </div>
+          {% endif %}
+
           {% if password_enabled %}
 
           <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
@@ -130,9 +136,7 @@
               account</a>
           </p>
 
-          {% elif oauth_enabled %}
-          <a class="action-button" href="/login" class="">SIGN IN</a>
-          {% else %}
+          {% elif not oauth_enabled %}
           <p class="text-sm text-gray-200">No authentication methods are enabled. Please contact an administrator.</p>
           {% endif %}
           {% endblock %}
