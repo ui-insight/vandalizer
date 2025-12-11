@@ -110,22 +110,34 @@
           </p>
 
           {% block hero_auth %}
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="mb-6 space-y-2">
+            {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+          {% endwith %}
+
           {% if oauth_enabled %}
           <div class="mb-6">
-            <a class="action-button" href="{{ url_for('auth.login', provider='azure') }}">SIGN IN WITH AZURE</a>
+            {% if azure_enabled %}
+            <a class="action-button" href="{{ url_for('auth.login', provider='azure') }}">{{ azure_label }}</a>
+            {% elif azure_configured %}
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>{{ azure_label }}</button>
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Please verify the client ID,
+              secret, and tenant are valid.</p>
+            {% else %}
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>Azure sign-in unavailable</button>
+            <p class="text-sm text-gray-200 mt-2">Add and enable the Azure provider in System Configuration to allow SSO.</p>
+            {% endif %}
           </div>
           {% endif %}
 
           {% if password_enabled %}
 
           <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-            {% for category, message in messages %}
-            <div class="alert alert-{{ category }}">{{ message }}</div>
-            {% endfor %}
-            {% endif %}
-            {% endwith %}
             <input type="email" name="email" placeholder="Email Address" required />
             <input type="password" name="password" placeholder="Password" required />
             <button type="submit">SIGN IN</button>
