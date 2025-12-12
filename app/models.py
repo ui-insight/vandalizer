@@ -320,10 +320,16 @@ class User(me.Document):
 
     def set_password(self, password):
         """Create a hashed password."""
+        if password is None or not isinstance(password, str):
+            raise ValueError("Password must be a non-empty string")
+        if len(password) == 0:
+            raise ValueError("Password cannot be empty")
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         """Check a hashed password."""
+        if password is None or not isinstance(password, str):
+            return False
         return check_password_hash(self.password_hash, password)
 
     def generate_api_token(self):

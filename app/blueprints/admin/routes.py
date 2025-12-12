@@ -13,7 +13,7 @@ from flask import (
     request,
     url_for,
 )
-from flask_login import current_user
+from flask_login import current_user, login_required
 
 from app.models import (
     ActivityEvent,
@@ -262,8 +262,9 @@ def usage_dashboard():
     )
 
 @admin.route("/teams", methods=["GET"])
+@login_required
 def admin_teams():
-    user = load_user()
+    user = current_user
     if not user.is_admin:
         abort(403)
     teams = Team.objects.order_by("name")

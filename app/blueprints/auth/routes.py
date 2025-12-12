@@ -16,8 +16,9 @@ from flask_login import login_user
 from mongoengine.errors import NotUniqueError
 
 from app import load_user
+from app.oauth import configure_azure_blueprint
 from app.models import TeamInvite, TeamMembership, User
-from app.utilities.config import get_auth_methods
+from app.utilities.config import get_auth_methods, get_oauth_provider_by_type
 
 auth = Blueprint("auth", __name__)
 
@@ -31,11 +32,51 @@ def index() -> ResponseReturnValue:
         return redirect(url_for("home.index"))
 
     methods = get_auth_methods()
+    oauth_enabled = "oauth" in methods
+    registered_blueprint = None
+    if oauth_enabled:
+        registered_blueprint = configure_azure_blueprint(current_app)
+
+    azure_provider = get_oauth_provider_by_type("azure") if oauth_enabled else None
+    azure_missing_fields: list[str] = []
+    azure_config_complete = False
+    if azure_provider:
+        if not azure_provider.get("client_id"):
+            azure_missing_fields.append("client_id")
+        if not azure_provider.get("client_secret"):
+            azure_missing_fields.append("client_secret")
+        if not (azure_provider.get("tenant_id") or azure_provider.get("tenant")):
+            azure_missing_fields.append("tenant_id")
+        azure_config_complete = not azure_missing_fields
+
+    azure_blueprint_registered = registered_blueprint is not None or "azure" in current_app.blueprints
+    azure_enabled = (
+        oauth_enabled
+        and azure_provider is not None
+        and azure_config_complete
+        and azure_blueprint_registered
+    )
+    azure_disabled_reason = None
+    if oauth_enabled and azure_provider and not azure_enabled:
+        if not azure_config_complete:
+            azure_disabled_reason = f"Azure config missing: {', '.join(azure_missing_fields)}."
+        elif current_app.config.get("AZURE_BLUEPRINT_SKIPPED"):
+            azure_disabled_reason = "Azure sign-in is configured but the OAuth blueprint was not registered before first request. Restart the server to apply changes."
+        elif not azure_blueprint_registered:
+            azure_disabled_reason = "Azure sign-in is configured but the Azure OAuth blueprint is not active."
+
     return render_template(
         "landing.html",
         AUTH_MODE=current_app.config["AUTH_MODE"],
         password_enabled="password" in methods,
         oauth_enabled="oauth" in methods,
+        azure_configured=azure_provider is not None,
+        azure_label=(azure_provider or {}).get("display_name", "Sign in with Azure"),
+        azure_enabled=azure_enabled,
+        azure_missing_fields=azure_missing_fields,
+        azure_config_complete=azure_config_complete,
+        azure_blueprint_registered=azure_blueprint_registered,
+        azure_disabled_reason=azure_disabled_reason,
     )
 
 
@@ -45,10 +86,20 @@ def login() -> ResponseReturnValue:
     methods = get_auth_methods()
     password_enabled = "password" in methods
     oauth_enabled = "oauth" in methods
+    azure_available = False
+    if oauth_enabled:
+        azure_available = configure_azure_blueprint(current_app) is not None or "azure" in current_app.blueprints
+    provider = request.args.get("provider")
 
     if request.method == "GET":
+        if provider == "azure" and oauth_enabled:
+            if azure_available:
+                return redirect(url_for("azure.login"))
+            flash("OAuth is enabled but no provider is configured.", "danger")
+            return redirect(url_for("auth.index"))
+
         if oauth_enabled and not password_enabled:
-            if "azure" in current_app.blueprints:
+            if azure_available:
                 return redirect(url_for("azure.login"))
             flash("OAuth is enabled but no provider is configured.", "danger")
             return redirect(url_for("auth.index"))

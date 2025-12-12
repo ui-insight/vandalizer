@@ -30,12 +30,13 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
-from flask_login import login_required
+from flask_login import current_user, login_required
 from markupsafe import escape
 from mongoengine.queryset.visitor import Q
 from werkzeug.utils import secure_filename
 
 from app import CURRENT_RELEASE_VERSION, RELEASE_NOTES, app, load_user
+from app.utilities.security import validate_json_request
 from app.models import (
     ActivityEvent,
     ActivityStatus,
@@ -633,6 +634,8 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 
 
 @home.route("/chat", methods=["POST"])
+@login_required
+@validate_json_request()
 def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
@@ -648,7 +651,7 @@ def chat() -> ResponseReturnValue:
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
     documents = []
-    user = load_user()
+    user = current_user
     user_id = user.get_id()
 
     current_team, my_teams = _get_teams(user)

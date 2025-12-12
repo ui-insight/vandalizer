@@ -6,10 +6,12 @@ import json
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, url_for
+from flask_login import login_required
 from mongoengine.errors import DoesNotExist
 from flask_mail import Message
 
 from app import load_user, mail
+from app.utilities.security import validate_json_request
 from app.models import (  # adjust import path if needed
     Library,
     LibraryItem,
@@ -575,6 +577,8 @@ def library_page():
 
 
 @library.route("/filter", methods=["POST"])
+@login_required
+@validate_json_request()
 def filter_library_items():
     """
     AJAX endpoint to fetch filtered results.
