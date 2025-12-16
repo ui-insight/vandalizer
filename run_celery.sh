@@ -124,6 +124,13 @@ start_queue_workers() {
     local pid_file="$PID_DIR/${worker_name}.pid"
     local log_file="$LOG_DIR/${worker_name}.log"
 
+    # Enable Beat ONLY for the first worker of the 'default' queue
+    BEAT_FLAG=""
+    if [[ "$queue_name" == "default" && "$i" == "1" ]]; then
+       BEAT_FLAG="-B"
+       print_color "$GREEN" "  (Enabling Scheduler/Beat on this worker)"
+    fi
+
     # Start the worker in the background
     nohup celery -A "$CELERY_APP" worker \
       --hostname="${worker_name}@%h" \
@@ -131,6 +138,7 @@ start_queue_workers() {
       --loglevel="$LOG_LEVEL" \
       --pool="$pool_type" \
       --concurrency="$concurrency" \
+      $BEAT_FLAG \
       >"$log_file" 2>&1 &
 
     # Save the PID

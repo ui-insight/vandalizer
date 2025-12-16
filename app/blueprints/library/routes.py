@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import requests
+
+import os
 import json
 from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, jsonify, render_template, request, url_for, current_app
 from flask_login import login_required
 from mongoengine.errors import DoesNotExist
 from flask_mail import Message
@@ -1023,6 +1026,40 @@ def _submit_for_verification_route(kind: str):
 
     _notify_examiners_of_submission(team, request_doc, user)
 
+    # After saving locally, check if we need to push to Prod
+    is_main = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
+    main_url = os.getenv("MAIN_SERVER_URL")
+    sync_key = os.getenv("SYNC_API_KEY")
+
+    if not is_main and main_url and sync_key:
+        try:
+            # Prepare data to send to Prod
+            # We must send the object itself because Prod might not have it yet
+            obj_json = json.loads(obj.to_json())
+            
+            forward_payload = {
+                "origin_instance": "Instance", # You could make this specific per server
+                "item_kind": normalized_kind,
+                "normalized_kind": normalized_kind,
+                "item_identifier": identifier,
+                "submitter_name": user.name or user.user_id,
+                "item_title": request_doc.item_title,
+                "description": request_doc.description,
+                "object_data": obj_json
+            }
+            
+            # Send async or sync? For now, do it synchronously with a short timeout
+            # ideally this should be a celery task to avoid blocking UI
+            requests.post(
+                f"{main_url}/library/api/sync/receive_request",
+                json=forward_payload,
+                headers={"X-Sync-Key": sync_key},
+                timeout=5
+            )
+        except Exception as e:
+            # Log error but don't fail the user's local submission
+            current_app.logger.error(f"Failed to forward verification to Prod: {e}")
+
     response_payload = request_doc.to_public_dict()
     return jsonify(
         {
@@ -1033,3 +1070,116 @@ def _submit_for_verification_route(kind: str):
             "redirect_url": url_for("home.index", scope="mine"),
         }
     )
+
+# -----------------------------
+# SYNC: Server-to-Server APIs
+# -----------------------------
+
+@library.route("/api/sync/verified", methods=["GET"])
+def api_sync_verified_items():
+    is_main_server = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
+    # Only allow this on the main server
+    if not is_main_server:
+        return jsonify({"error": "forbidden"}), 403
+    auth_header = request.headers.get("X-Sync-Key")
+    if auth_header != os.getenv("SYNC_API_KEY"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    # Fetch global verified library
+    lib = _get_or_none_library(LibraryScope.VERIFIED, user=None, team=None)
+    if not lib:
+        return jsonify({"items": []})
+
+    export_data = []
+    for li in lib.items:
+        try:
+            # Resolve the actual object (Workflow, SearchSet, etc)
+            obj = li.obj 
+            if not obj: continue
+            
+            # Serialize the object data
+            obj_data = json.loads(obj.to_json())
+            
+            export_data.append({
+                "kind": li.kind,
+                "uuid": _verification_identifier(li.kind, obj),
+                "data": obj_data,
+                "verified_at": li.verified_at.isoformat() if li.verified_at else None,
+                "tags": li.tags
+            })
+        except DoesNotExist:
+            continue
+
+    return jsonify({"items": export_data})
+
+
+@library.route("/api/sync/receive_request", methods=["POST"])
+def api_receive_verification_request():
+    is_main_server = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
+    # Only allow this on the main server
+    if not is_main_server:
+        return jsonify({"error": "forbidden"}), 403
+    auth_header = request.headers.get("X-Sync-Key")
+    if auth_header != os.getenv("SYNC_API_KEY"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json(force=True)
+    
+    kind = payload.get("item_kind")
+    identifier = payload.get("item_identifier")
+    obj_data = payload.get("object_data")
+    
+    # 1. Ensure the Object exists on Prod (Create/Update it)
+    # We must reconstruct the object so the VerificationRequest can link to it
+    obj, _ = _resolve_obj(kind, identifier)
+    
+    if not obj and obj_data:
+        # Import the object from the payload
+        from app.models import Workflow, SearchSet, SearchSetItem
+        
+        ModelMap = {
+            "workflow": Workflow,
+            "extraction": SearchSet, # mapped from 'searchset' logic
+            "searchset": SearchSet,
+            "prompt": SearchSetItem,
+            "formatter": SearchSetItem
+        }
+        
+        ModelClass = ModelMap.get(kind) or ModelMap.get(payload.get("normalized_kind"))
+        
+        if ModelClass:
+            try:
+                # Create object using the ID from the instance to maintain consistency
+                obj = ModelClass.from_json(json.dumps(obj_data))
+                obj.id = identifier if kind in ['workflow', 'prompt', 'formatter'] else obj.id
+                if kind == 'searchset': obj.uuid = identifier
+                obj.save()
+            except Exception as e:
+                current_app.logger.error(f"Sync Create Error: {e}")
+                # Proceeding anyway, though linkage might fail
+
+    # 2. Check if Request already exists
+    existing = VerificationRequest.objects(
+        item_kind=kind, item_identifier=identifier
+    ).first()
+    
+    if existing:
+        return jsonify({"status": "exists", "uuid": existing.uuid})
+
+    # 3. Create Verification Request
+    req = VerificationRequest(
+        item_kind=kind,
+        item_identifier=identifier,
+        submitter_user_id="remote_sync",
+        submitter_name=f"{payload.get('submitter_name')} ({payload.get('origin_instance')})",
+        item_title=payload.get("item_title"),
+        status=VerificationStatus.SUBMITTED,
+        description=payload.get("description"),
+        # Map other fields as needed
+    )
+    req.save()
+    
+    # Notify Prod Examiners
+    _notify_examiners_of_submission(None, req, User(name="Instance Sync"))
+    
+    return jsonify({"ok": True, "uuid": req.uuid})

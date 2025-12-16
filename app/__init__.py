@@ -6,6 +6,7 @@ import logging
 # Error Logging
 import os
 from datetime import timedelta
+from celery.schedules import crontab
 
 import mongoengine as me
 import rollbar
@@ -62,6 +63,13 @@ def create_app() -> Flask:
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
+            },
+            "beat_schedule": {
+                "sync-prod-library-every-15m": {
+                    "task": "tasks.sync.pull_verified_items",
+                    # Run every 1 mins
+                    "schedule": crontab(minute="*/1"),
+                },
             },
         }
     )
@@ -177,6 +185,7 @@ app.register_blueprint(activity, url_prefix="/activity")
 # This ensures tasks are discovered by Celery workers
 with app.app_context():
     from app.utilities import activity_description  # noqa: F401
+    from app.tasks import sync  # noqa: F401
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
