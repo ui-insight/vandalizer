@@ -224,6 +224,11 @@
   background:#999;
 }
 
+body.modal-open .panel-resizer,
+body.opened .panel-resizer{
+  display:none;
+}
+
 body .main-panel .header{
   position:fixed;
   left:0;
@@ -242,7 +247,6 @@ body .left-panel .semantic-panel{
 .right-panel .bottom-toolbar, .floating-bottom-toolbar{
   right:var(--rail-w);
   width:40%;
-  transition: right 0.3s ease, width 0.3s ease;
 }
 
 @media (max-width:1200px){
