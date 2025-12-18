@@ -660,12 +660,21 @@ def workflow_status() -> ResponseReturnValue:
     if activity:
         activity_id = str(activity.id)
 
+    started_at = activity.started_at.isoformat() if activity and activity.started_at else None
+    finished_at = activity.finished_at.isoformat() if activity and activity.finished_at else None
+    duration_seconds = None
+    if activity and activity.started_at and activity.finished_at:
+        duration_seconds = (activity.finished_at - activity.started_at).total_seconds()
+
     response = {
         "steps_completed": workflow_result.num_steps_completed,
         "total_steps": workflow_result.num_steps_total,
         "output": final_output,
         "status": workflow_result.status,
         "activity_id": activity_id,
+        "started_at": started_at,
+        "finished_at": finished_at,
+        "duration_seconds": duration_seconds,
         "current_step_name": workflow_result.current_step_name,
         "current_step_detail": workflow_result.current_step_detail,
         "current_step_preview": workflow_result.current_step_preview,

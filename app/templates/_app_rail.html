@@ -1,8 +1,13 @@
 <div class="app-rail" id="app-rail" aria-expanded="true">
     <div class="rail-header">
-        <div class="rail-header-center">
-            <i class="fa-solid fa-bolt"></i>
-            <span style="font-size: 14px; font-weight: 700;">Activity</span>
+        <div class="rail-header-content">
+            <div class="rail-header-left">
+                <i class="fa-solid fa-bolt"></i>
+                <span class="rail-activity-text">Activity</span>
+            </div>
+            <button type="button" class="rail-dock-toggle" id="rail-dock-toggle" title="Dock rail" aria-label="Dock rail">
+                <i class="fa-regular fa-square-caret-right"></i>
+            </button>
         </div>
     </div>
 
@@ -240,4 +245,57 @@
         window.liForActivity = liForActivity;
         window.resolveActivityId = resolveActivityId;
     }
+
+    // Dock/undock functionality
+    const rail = document.getElementById('app-rail');
+    const railToggle = document.getElementById('rail-dock-toggle');
+    const railToggleIcon = railToggle.querySelector('i');
+
+    // Helper to apply CSS variable for rail width
+    const setRailVar = (px) => document.documentElement.style.setProperty('--rail-w', px);
+
+    // Restore rail docked state from localStorage
+    const isDocked = localStorage.getItem('railDocked') === '1';
+    if (isDocked) {
+        rail.classList.add('docked');
+        setRailVar('64px');
+        railToggle.title = 'Undock rail';
+        railToggle.setAttribute('aria-label', 'Undock rail');
+        railToggleIcon.className = 'fa-regular fa-square-caret-left';
+    } else {
+        rail.classList.remove('docked');
+        setRailVar('220px');
+        railToggle.title = 'Dock rail';
+        railToggle.setAttribute('aria-label', 'Dock rail');
+        railToggleIcon.className = 'fa-regular fa-square-caret-right';
+    }
+
+    // Note: Panel resizer position is now set in index_scripts.html during initialization
+
+    // Toggle dock/undock on button click
+    railToggle.addEventListener('click', () => {
+        const willBeDocked = !rail.classList.contains('docked');
+        rail.classList.toggle('docked', willBeDocked);
+        setRailVar(willBeDocked ? '64px' : '220px');
+        localStorage.setItem('railDocked', willBeDocked ? '1' : '0');
+
+        // Update button title, aria-label, and icon
+        if (willBeDocked) {
+            railToggle.title = 'Undock rail';
+            railToggle.setAttribute('aria-label', 'Undock rail');
+            railToggleIcon.className = 'fa-regular fa-square-caret-left';
+        } else {
+            railToggle.title = 'Dock rail';
+            railToggle.setAttribute('aria-label', 'Dock rail');
+            railToggleIcon.className = 'fa-regular fa-square-caret-right';
+        }
+
+        // Update panel resizer position immediately based on saved percentages
+        // This allows the resizer to smoothly transition along with the panels
+        if (typeof window.updatePanelResizerPositionFromPercentages === 'function') {
+            requestAnimationFrame(() => {
+                window.updatePanelResizerPositionFromPercentages();
+            });
+        }
+    });
 </script>
