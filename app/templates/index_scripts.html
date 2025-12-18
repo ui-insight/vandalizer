@@ -5437,4 +5437,150 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
         }
     });
 
+    // Panel resizer drag functionality
+    (function() {
+        const resizer = document.getElementById('panel-resizer');
+        const leftPanel = document.querySelector('.left-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        const header = document.querySelector('.main-panel .header');
+        const semanticPanel = document.querySelector('.left-panel .semantic-panel');
+        const bottomToolbar = document.querySelector('.right-panel .bottom-toolbar');
+        const floatingToolbar = document.querySelector('.floating-bottom-toolbar');
+
+        if (!resizer || !leftPanel || !rightPanel) return;
+
+        let isDragging = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+
+        // Get current rail width
+        function getRailWidth() {
+            const railW = getComputedStyle(document.documentElement).getPropertyValue('--rail-w');
+            return parseFloat(railW) || 220;
+        }
+
+        // Update all dependent elements with new percentages
+        function updateDependentElements(rightPercent) {
+            if (header) {
+                header.style.right = `calc(${rightPercent}% + var(--rail-w))`;
+            }
+            if (semanticPanel) {
+                semanticPanel.style.right = `calc(${rightPercent}% + var(--rail-w) + 30px)`;
+            }
+            if (bottomToolbar) {
+                bottomToolbar.style.width = `${rightPercent}%`;
+            }
+            if (floatingToolbar) {
+                floatingToolbar.style.width = `${rightPercent}%`;
+            }
+        }
+
+        // Calculate initial position based on panel widths
+        function updateResizerPosition() {
+            const leftWidth = leftPanel.offsetWidth;
+            resizer.style.left = leftWidth + 'px';
+        }
+
+        // Disable transition initially
+        resizer.style.transition = 'none';
+
+        // Check for saved panel widths first
+        const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+        const savedRightPercent = localStorage.getItem('panelRightPercent');
+
+        if (savedLeftPercent && savedRightPercent) {
+            // Apply saved widths before setting position
+            leftPanel.style.width = `calc(${savedLeftPercent}% - var(--rail-w))`;
+            rightPanel.style.width = `${savedRightPercent}%`;
+            updateDependentElements(savedRightPercent);
+        }
+
+        // Set initial position without animation
+        updateResizerPosition();
+
+        // Enable transition after initial position is set
+        requestAnimationFrame(() => {
+            resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+        });
+
+        resizer.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            startX = e.clientX;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            // Disable transition during drag for instant feedback
+            resizer.style.transition = 'background 0.2s ease';
+
+            // Get starting widths
+            startLeftWidth = leftPanel.offsetWidth;
+            startRightWidth = rightPanel.offsetWidth;
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - startX;
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            // Calculate new widths in pixels
+            const newLeftWidth = startLeftWidth + deltaX;
+            const newRightWidth = startRightWidth - deltaX;
+
+            // Calculate total available width for both panels
+            const totalAvailable = windowWidth - railWidth;
+
+            // Enforce minimum widths (30% of available space each)
+            const minWidth = totalAvailable * 0.3;
+
+            if (newLeftWidth >= minWidth && newRightWidth >= minWidth) {
+                // Calculate percentages relative to window width
+                // Left panel uses: calc(X% - var(--rail-w))
+                // So: newLeftWidth = (leftPercent/100) * windowWidth - railWidth
+                // Therefore: leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100
+                const leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100;
+                const rightPercent = (newRightWidth / windowWidth) * 100;
+
+                // Apply new widths
+                leftPanel.style.width = `calc(${leftPercent}% - var(--rail-w))`;
+                rightPanel.style.width = `${rightPercent}%`;
+
+                // Update resizer position
+                resizer.style.left = newLeftWidth + 'px';
+
+                // Update all dependent elements
+                updateDependentElements(rightPercent);
+
+                // Save to localStorage
+                localStorage.setItem('panelLeftPercent', leftPercent);
+                localStorage.setItem('panelRightPercent', rightPercent);
+            }
+        });
+
+        document.addEventListener('mouseup', function() {
+            if (isDragging) {
+                isDragging = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+
+                // Re-enable transition after drag
+                resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+            }
+        });
+
+        // Update resizer position on window resize
+        window.addEventListener('resize', updateResizerPosition);
+
+        // Make updateResizerPosition available globally for rail dock/undock
+        if (typeof window !== 'undefined') {
+            window.updatePanelResizerPosition = updateResizerPosition;
+        }
+    })();
+
 </script>

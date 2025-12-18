@@ -198,6 +198,22 @@
 .right-panel{ float:right; width:40%; margin-right:var(--rail-w); position:relative; }
 .left-panel{ float:left; width:calc(60% - var(--rail-w)); }
 
+/* Panel resizer */
+.panel-resizer{
+  position:fixed;
+  top:69px;
+  bottom:0;
+  width:4px;
+  background:#d8d8d8;
+  cursor:col-resize;
+  z-index:600;
+  transition: background 0.2s ease, left 0.3s ease;
+}
+.panel-resizer:hover,
+.panel-resizer.dragging{
+  background:#999;
+}
+
 body .main-panel .header{ position:fixed; left:0; right:calc(40% + var(--rail-w)); width:auto !important; z-index:400; }
 body .left-panel .semantic-panel{ left:30px; right:calc(40% + var(--rail-w) + 30px); width:auto; }
 
