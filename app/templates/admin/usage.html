@@ -1,239 +1,52 @@
-{% extends "base.html" %}
-{% block title %}Admin | Usage & Activity{% endblock %}
+{% extends "admin/layout.html" %}
 
-{% block styles %}
-{{ super() }}
-<style>
-    body {
-        background: #f7f8fa;
-        /* very light grey background */
-        color: #222;
-        /* dark text for readability */
-        font-family: "Public Sans", Arial, sans-serif;
-    }
-
-    .filters {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 12px;
-        align-items: center;
-        margin: 15px;
-    }
-
-    .filters label {
-        font-size: 13px;
-        color: #555;
-    }
-
-    .filters input,
-    .filters select {
-        background: #fff;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 8px 10px;
-    }
-
-    .filters button.btn {
-        background: #2563eb;
-        color: #fff;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 14px;
-        cursor: pointer;
-    }
-
-    .filters button.btn:hover {
-        background: #1e4ecb;
-    }
-
-    /* KPI cards */
-    .kpi-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 12px;
-        margin: 15px;
-    }
-
-    .kpi-card {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        padding: 16px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
-    }
-
-    .kpi-label {
-        font-size: 12px;
-        color: #6b7280;
-        margin-bottom: 4px;
-        text-transform: uppercase;
-        letter-spacing: .04em;
-    }
-
-    .kpi-value {
-        font-size: 24px;
-        font-weight: 700;
-    }
-
-    /* Panels */
-    .panel {
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        margin: 15px;
-        padding: 16px;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
-    }
-
-    .panel h3 {
-        margin: 0 0 10px 0;
-        font-size: 18px;
-        font-weight: 600;
-    }
-
-    /* Tables */
-    .twocol {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-    }
-
-    .styled-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .styled-table th,
-    .styled-table td {
-        padding: 10px;
-        border-bottom: 1px solid #e5e7eb;
-    }
-
-    .styled-table thead th {
-        font-size: 12px;
-        text-transform: uppercase;
-        color: #6b7280;
-        background: #f9fafb;
-    }
-
-    .styled-table tbody tr:nth-child(even) {
-        background: #f9fafb;
-    }
-
-    /* Badges/Chips */
-    .chip {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 999px;
-        font-size: 12px;
-        background: #f1f5f9;
-        color: #374151;
-    }
-
-    .chip.ok {
-        background: #dcfce7;
-        color: #166534;
-    }
-
-    .chip.warn {
-        background: #fef9c3;
-        color: #92400e;
-    }
-
-    .chip.err {
-        background: #fee2e2;
-        color: #991b1b;
-    }
-
-    .chip.run {
-        background: #dbeafe;
-        color: #1e40af;
-    }
-
-    .type-pill {
-        padding: 2px 6px;
-        border-radius: 6px;
-        background: #f3f4f6;
-        font-size: 12px;
-    }
-
-    .mono {
-        font-family: ui-monospace, SFMono-Regular, monospace;
-    }
-
-    .row-muted {
-        opacity: .8;
-    }
-
-    /* Spinner for running state */
-    .spinner {
-        display: inline-block;
-        width: 14px;
-        height: 14px;
-        border: 2px solid #3b82f6;
-        border-top-color: transparent;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-    }
-
-    @keyframes spin {
-        to {
-            transform: rotate(360deg);
-        }
-    }
-
-    @media (max-width:1200px) {
-        .kpi-grid {
-            grid-template-columns: repeat(2, 1fr);
-        }
-
-        .twocol {
-            grid-template-columns: 1fr;
-        }
-    }
-</style>
-
-
+{% block admin_title %}
+{% if context_team %}
+Usage: {{ context_team.name }}
+{% elif context_user %}
+Usage: {{ context_user.name or context_user.email }}
+{% else %}
+Usage Overview
+{% endif %}
 {% endblock %}
 
-{% block content %}
-
+{% block admin_actions %}
 <div class="filters">
-    <form method="get" action="{{ url_for('admin.usage_dashboard') }}">
-        <label>Start:
-            <input type="date" name="start" value="{{ start.strftime('%Y-%m-%d') }}">
+    <form method="get" action="{{ url_for('admin.usage_dashboard') }}" class="d-flex align-items-center"
+        style="gap: 10px;">
+        <label class="mb-0">Start:
+            <input type="date" name="start" value="{{ start.strftime('%Y-%m-%d') }}"
+                class="form-control form-control-sm d-inline-block w-auto">
         </label>
-        <label>End:
-            <input type="date" name="end" value="{{ end.strftime('%Y-%m-%d') }}">
+        <label class="mb-0">End:
+            <input type="date" name="end" value="{{ end.strftime('%Y-%m-%d') }}"
+                class="form-control form-control-sm d-inline-block w-auto">
         </label>
-        <label>User:
-            <select name="user_id">
-                <option value="">All</option>
+        <label class="mb-0">
+            <select name="user_id" class="form-select form-select-sm">
+                <option value="">All Users</option>
                 {% for uid in all_users %}
                 <option value="{{ uid }}" {% if user_id==uid %}selected{% endif %}>{{ uid }}</option>
                 {% endfor %}
             </select>
         </label>
-        <label>Team:
-            <select name="team_id">
-                <option value="">All</option>
+        <label class="mb-0">
+            <select name="team_id" class="form-select form-select-sm" {% if not is_sys_admin %}disabled{% endif %}>
+                <option value="">All Teams</option>
                 {% for t in all_teams %}
                 <option value="{{ t.id }}" {% if team_id==t.id|string %}selected{% endif %}>{{ t.name }}</option>
                 {% endfor %}
             </select>
+            {% if not is_sys_admin %}
+            <input type="hidden" name="team_id" value="{{ team_id }}">
+            {% endif %}
         </label>
-        <label>Space:
-            <select name="space_id">
-                <option value="">All</option>
-                {% for s in all_spaces %}
-                <option value="{{ s.uuid }}" {% if space_id==s.uuid %}selected{% endif %}>{{ s.title }} ({{ s.uuid }})
-                </option>
-                {% endfor %}
-            </select>
-        </label>
-        <button class="btn btn-primary" type="submit">Apply</button>
+        <button class="btn btn-primary btn-sm" type="submit">Apply</button>
     </form>
 </div>
+{% endblock %}
+
+{% block admin_content %}
 
 <div class="kpi-grid">
     <div class="kpi-card">
@@ -255,6 +68,22 @@
     <div class="kpi-card">
         <div class="kpi-label">Workflows Failed</div>
         <div class="kpi-value">{{ kpi.wf_failed }}</div>
+    </div>
+</div>
+
+
+
+
+
+<div class="panel">
+    <h3>Trends</h3>
+    <div class="kpi-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="chart-container">
+            <canvas id="chartWorkflows"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="chartTokens"></canvas>
+        </div>
     </div>
 </div>
 
@@ -318,6 +147,7 @@
     <div class="panel">
         <h3>Leaders (Workflows Completed)</h3>
         <div class="twocol">
+            {% if not context_user %}
             <table class="styled-table">
                 <thead>
                     <tr>
@@ -328,7 +158,9 @@
                 <tbody>
                     {% for u in top_users %}
                     <tr>
-                        <td>{{ u._id }}</td>
+                        <td><a
+                                href="{{ url_for('admin.usage_dashboard', user_id=u._id, start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d')) }}">{{
+                                u._id }}</a></td>
                         <td>{{ u.completed }}</td>
                     </tr>
                     {% endfor %}
@@ -339,7 +171,9 @@
                     {% endif %}
                 </tbody>
             </table>
+            {% endif %}
 
+            {% if not context_team and not context_user %}
             <table class="styled-table">
                 <thead>
                     <tr>
@@ -350,13 +184,71 @@
                 <tbody>
                     {% for t in top_teams %}
                     <tr>
-                        <td>{{ t._id }}</td>
+                        <td>
+                            {% if is_sys_admin %}
+                            <a
+                                href="{{ url_for('admin.usage_dashboard', team_id=t._id, start=start.strftime('%Y-%m-%d'), end=end.strftime('%Y-%m-%d')) }}">{{
+                                t.name }}</a>
+                            {% else %}
+                            {{ t.name }}
+                            {% endif %}
+                        </td>
                         <td>{{ t.completed }}</td>
                     </tr>
                     {% endfor %}
                     {% if top_teams|length == 0 %}
                     <tr>
                         <td colspan="2"><i>No team data in range.</i></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <h3>Popular Activity</h3>
+        <div class="twocol">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Top Workflows</th>
+                        <th>Runs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for w in top_workflows %}
+                    <tr>
+                        <td>{{ w._id or '(Unnamed)' }}</td>
+                        <td>{{ w.count }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if top_workflows|length == 0 %}
+                    <tr>
+                        <td colspan="2"><i>No workflows.</i></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Top Search Tasks</th>
+                        <th>Runs</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in top_tasks %}
+                    <tr>
+                        <td>{{ t.title }}</td>
+                        <td>{{ t.count }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% if top_tasks|length == 0 %}
+                    <tr>
+                        <td colspan="2"><i>No search tasks.</i></td>
                     </tr>
                     {% endif %}
                 </tbody>
@@ -437,4 +329,74 @@
         </table>
     </div>
 
+    {% endblock %}
+
+    {% block scripts %}
+    {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Global chart config
+        Chart.defaults.font.family = '"Public Sans", sans-serif';
+        Chart.defaults.color = '#6b7280';
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Data from backend
+            const dates = {{ chart_data.dates | tojson
+        }};
+        const workflows = {{ chart_data.workflows | tojson }};
+        const tokens = {{ chart_data.tokens | tojson }};
+
+        // Workflow Chart
+        new Chart(document.getElementById('chartWorkflows'), {
+            type: 'line',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Workflows Completed',
+                    data: workflows,
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    fill: true,
+                    tension: 0.3
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Workflows Completed' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        // Token Chart
+        new Chart(document.getElementById('chartTokens'), {
+            type: 'bar',
+            data: {
+                labels: dates,
+                datasets: [{
+                    label: 'Total Tokens',
+                    data: tokens,
+                    backgroundColor: '#eab308'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    title: { display: true, text: 'Token Usage' }
+                },
+                scales: {
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+    });
+    </script>
     {% endblock %}

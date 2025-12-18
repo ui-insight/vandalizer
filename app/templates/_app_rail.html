@@ -270,6 +270,11 @@
         railToggleIcon.className = 'fa-regular fa-square-caret-right';
     }
 
+    // Update panel resizer position after initial rail state is set
+    if (typeof window.updatePanelResizerPosition === 'function') {
+        setTimeout(window.updatePanelResizerPosition, 100);
+    }
+
     // Toggle dock/undock on button click
     railToggle.addEventListener('click', () => {
         const willBeDocked = !rail.classList.contains('docked');
@@ -286,6 +291,14 @@
             railToggle.title = 'Dock rail';
             railToggle.setAttribute('aria-label', 'Dock rail');
             railToggleIcon.className = 'fa-regular fa-square-caret-right';
+        }
+
+        // Update panel resizer position immediately - CSS will animate it smoothly
+        if (typeof window.updatePanelResizerPosition === 'function') {
+            // Use requestAnimationFrame to update after DOM settles
+            requestAnimationFrame(() => {
+                window.updatePanelResizerPosition();
+            });
         }
     });
 </script>
