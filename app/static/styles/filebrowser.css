@@ -82,7 +82,7 @@
     position: fixed;
     bottom: 0;
     padding: 15px;
-    right: 0;
+    right: var(--rail-w);
     width: 40%;
     height: 80px;
     background-color: white;

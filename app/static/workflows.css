@@ -78,29 +78,66 @@
 }
 
 .step-connector {
-  width: 30px;
-  height: 30px;
+  border-radius: var(--ui-radius, 12px);
+  width: 32px;
+  height: 16px;
   position: absolute;
-  left: calc(50% - 15px);
+  left: calc(50% - 16px);
+  background-color: white;
+  z-index: 10;
+  box-sizing: border-box;
+  /* Center the dot */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The central dot */
+.step-connector::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: block;
 }
 
 .step-connector.bottom {
-  bottom: -15px;
-  background-image: url('/static/images/step-connector-bottom.png');
+  bottom: -16px;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  border: 2px solid #e0e0e0;
+  border-top: 0;
+}
+
+.step-connector.bottom::after {
+  /* Nudge up towards the base */
+  transform: translateY(-3px);
 }
 
 .step-connector.top {
-  top: -15px;
-  background-image: url('/static/images/step-connector-top.png');
+  top: -16px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border: 2px solid #e0e0e0;
+  border-bottom: 0;
+}
+
+.step-connector.top::after {
+  /* Nudge down towards the base */
+  transform: translateY(3px);
 }
 
 /* Active states */
+.step-connector.active::after {
+  background-color: var(--highlight-color, #f1b300);
+}
 .step-connector.bottom.active {
-  background-image: url('/static/images/step-connector-bottom-active.png');
+  border-color: var(--highlight-color, #f1b300);
 }
 
 .step-connector.top.active {
-  background-image: url('/static/images/step-connector-top-active.png');
+  border-color: var(--highlight-color, #f1b300);
 }
 
 .step-connection-line {

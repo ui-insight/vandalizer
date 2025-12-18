@@ -1249,8 +1249,21 @@ class DailyUsageAggregate(me.Document):
 
     meta = {
         "indexes": [
-            {"fields": ["date", "scope", "user_id"], "unique": True, "sparse": True},
-            {"fields": ["date", "scope", "team_id"], "unique": True, "sparse": True},
+            {
+                "fields": ["date", "scope", "user_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "user"},
+            },
+            {
+                "fields": ["date", "scope", "team_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "team"},
+            },
+            {
+                "fields": ["date", "scope"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "global"},
+            },
             {"fields": ["-date", "scope"]},
         ]
     }
