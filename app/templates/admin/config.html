@@ -1,21 +1,10 @@
-{% extends "base.html" %}
-{% block title %}Admin · System Configuration | Vandalizer{% endblock %}
+{% extends "admin/layout.html" %}
+
+{% block admin_title %}System Configuration{% endblock %}
 
 {% block styles %}
 {{ super() }}
 <style>
-    body {
-        background: #f7f8fa;
-        color: #222;
-        font-family: "Public Sans", Arial, sans-serif;
-    }
-
-    .config-container {
-        max-width: 1200px;
-        margin: 20px auto;
-        padding: 0 20px;
-    }
-
     .config-section {
         background: #fff;
         border: 1px solid #e5e7eb;
@@ -61,11 +50,11 @@
         font-size: 14px;
         background: white;
     }
-    
+
     .form-group select {
         cursor: pointer;
     }
-    
+
     .form-group small {
         display: block;
         margin-top: 4px;
@@ -75,43 +64,6 @@
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    }
-
-    .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s;
-    }
-
-    .btn-primary {
-        background: #3b82f6;
-        color: white;
-    }
-
-    .btn-primary:hover {
-        background: #2563eb;
-    }
-
-    .btn-secondary {
-        background: #6b7280;
-        color: white;
-    }
-
-    .btn-secondary:hover {
-        background: #4b5563;
-    }
-
-    .btn-danger {
-        background: #ef4444;
-        color: white;
-    }
-
-    .btn-danger:hover {
-        background: #dc2626;
     }
 
     .model-list {
@@ -174,12 +126,12 @@
         padding-top: 16px;
         border-top: 1px solid #e5e7eb;
     }
-    
+
     .add-model-form .form-group:last-of-type,
     .add-model-form button {
         grid-column: 1 / -1;
     }
-    
+
     .add-model-form button {
         justify-self: start;
     }
@@ -347,341 +299,342 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="config-container">
-    <h1 style="margin-bottom: 8px;">System Configuration</h1>
-    <p style="color: #6b7280; margin-bottom: 24px;">Configure system-wide settings. Only system administrators can access this page.</p>
+{% block admin_content %}
+<p style="color: #6b7280; margin-bottom: 24px;">Configure system-wide settings. Only system administrators can access
+    this page.</p>
 
-    <form method="POST" action="/admin/config/update">
+<form method="POST" action="/admin/config/update">
 
-        <!-- OCR Configuration -->
-        <div class="config-section">
-            <h2>OCR Configuration</h2>
-            <p>Configure the endpoint for Optical Character Recognition (OCR) services.</p>
-
-            <div class="form-group">
-                <label for="ocr_endpoint">OCR Endpoint URL</label>
-                <input type="url" id="ocr_endpoint" name="ocr_endpoint" value="{{ config.ocr_endpoint }}"
-                       placeholder="https://processpdf.insight.uidaho.edu" required>
-            </div>
-
-            {% if config.updated_at %}
-            <div class="metadata">
-                Last updated: {{ config.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
-                {% if config.updated_by %}by {{ config.updated_by }}{% endif %}
-            </div>
-            {% endif %}
-        </div>
-
-        <!-- LLM Configuration -->
-        <div class="config-section">
-            <h2>LLM Configuration</h2>
-            <p>Configure the Large Language Model endpoint and available models.</p>
-
-            <div class="form-group">
-                <label for="llm_endpoint">LLM Endpoint URL</label>
-                <input type="url" id="llm_endpoint" name="llm_endpoint" value="{{ config.llm_endpoint }}"
-                       placeholder="https://mindrouter-api.nkn.uidaho.edu/v1" required>
-            </div>
-        </div>
-
-        <!-- UI Configuration -->
-        <div class="config-section">
-            <h2>UI Configuration</h2>
-            <p>Customize the appearance of the interface.</p>
-
-            <div class="form-group">
-                <label for="highlight_color">
-                    Highlight Color (Vandal Gold)
-                    <span class="color-preview" style="background-color: {{ config.highlight_color }};"></span>
-                </label>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="color" id="highlight_color" name="highlight_color" value="{{ config.highlight_color }}"
-                           style="width: 80px; height: 40px; padding: 2px; cursor: pointer;">
-                    <input type="text" id="highlight_color_hex" name="highlight_color_hex" value="{{ config.highlight_color }}"
-                           style="width: 120px;" placeholder="#eab308">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label for="ui_radius">
-                    Corner Radius (px)
-                </label>
-                <div style="display: flex; gap: 12px; align-items: center;">
-                    <input type="number" id="ui_radius_number" min="0" max="48" step="1"
-                           value="{{ config.ui_radius|default('12px')|replace('px','') }}"
-                           style="width: 120px;">
-                    <input type="text" id="ui_radius" name="ui_radius"
-                           value="{{ config.ui_radius|default('12px') }}" style="width: 100px;"
-                           placeholder="12px">
-                </div>
-                <p class="metadata">Default: 12px (matches current UI)</p>
-            </div>
-        </div>
-
-        <div class="save-bar">
-            <button type="submit" class="btn btn-primary">Save Configuration</button>
-        </div>
-    </form>
-
-    <!-- Authentication Configuration -->
+    <!-- OCR Configuration -->
     <div class="config-section">
-        <h2>Authentication Configuration</h2>
-        <p>Configure authentication methods and OAuth/SAML providers.</p>
+        <h2>OCR Configuration</h2>
+        <p>Configure the endpoint for Optical Character Recognition (OCR) services.</p>
 
-        <!-- Authentication Methods -->
-        <form method="POST" action="/admin/config/auth/update_methods">
-            <div class="form-group">
-                <label>Enabled Authentication Methods</label>
-                <div style="display: flex; gap: 20px; margin-top: 8px;">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="auth_password" name="auth_password"
-                               {% if 'password' in config.auth_methods %}checked{% endif %}>
-                        <label for="auth_password" style="margin: 0;">Username/Password</label>
-                    </div>
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="auth_oauth" name="auth_oauth"
-                               {% if 'oauth' in config.auth_methods %}checked{% endif %}>
-                        <label for="auth_oauth" style="margin: 0;">OAuth/SAML</label>
-                    </div>
-                </div>
-            </div>
-            <button type="submit" class="btn btn-secondary">Update Auth Methods</button>
-        </form>
+        <div class="form-group mb-0">
+            <label for="ocr_endpoint">OCR Endpoint URL</label>
+            <input type="url" id="ocr_endpoint" name="ocr_endpoint" value="{{ config.ocr_endpoint }}"
+                placeholder="https://processpdf.insight.uidaho.edu" required>
+        </div>
 
-        <!-- OAuth/SAML Providers -->
-        <div style="margin-top: 24px;">
-            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">OAuth & SAML Providers</h3>
+        {% if config.updated_at %}
+        <div class="metadata">
+            Last updated: {{ config.updated_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}
+            {% if config.updated_by %}by {{ config.updated_by }}{% endif %}
+        </div>
+        {% endif %}
+    </div>
 
-            {% if config.oauth_providers and config.oauth_providers|length > 0 %}
-            <ul class="provider-list">
-                {% for provider in config.oauth_providers %}
-                <li class="provider-item">
-                    <div class="provider-header">
-                        <div>
-                            <div class="provider-title">
-                                {{ provider.display_name }}
-                                <span class="model-badge {% if provider.enabled %}badge-enabled{% else %}badge-disabled{% endif %}">
-                                    {% if provider.enabled %}Enabled{% else %}Disabled{% endif %}
-                                </span>
-                            </div>
-                            <div class="provider-type">{{ provider.provider }}</div>
-                        </div>
-                        <div class="provider-actions">
-                            <form method="POST" action="/admin/config/auth/toggle_provider/{{ loop.index0 }}" style="margin: 0;">
-                                <button type="submit" class="btn btn-toggle btn-sm">
-                                    {% if provider.enabled %}Disable{% else %}Enable{% endif %}
-                                </button>
-                            </form>
-                            <form method="POST" action="/admin/config/auth/remove_provider/{{ loop.index0 }}" style="margin: 0;">
-                                <button type="submit" class="btn btn-danger btn-sm"
-                                        onclick="return confirm('Remove this provider?');">Remove</button>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="provider-details">
-                        <div class="provider-detail"><strong>Client ID:</strong> {{ provider.client_id[:20] }}...</div>
-                        <div class="provider-detail"><strong>Redirect URI:</strong> {{ provider.redirect_uri }}</div>
-                        {% if provider.tenant_id %}
-                        <div class="provider-detail"><strong>Tenant ID:</strong> {{ provider.tenant_id }}</div>
-                        {% endif %}
-                        {% if provider.metadata_url %}
-                        <div class="provider-detail"><strong>Metadata URL:</strong> {{ provider.metadata_url[:40] }}...</div>
-                        {% endif %}
-                        {% if provider.entity_id %}
-                        <div class="provider-detail"><strong>Entity ID:</strong> {{ provider.entity_id }}</div>
-                        {% endif %}
-                    </div>
-                </li>
-                {% endfor %}
-            </ul>
-            {% else %}
-            <p style="color: #9ca3af; font-style: italic; margin-bottom: 16px;">No OAuth/SAML providers configured.</p>
-            {% endif %}
+    <!-- LLM Configuration -->
+    <div class="config-section">
+        <h2>LLM Configuration</h2>
+        <p>Configure the Large Language Model endpoint and available models.</p>
 
-            <!-- Add New Provider Form -->
-            <div class="add-provider-form">
-                <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">Add New Provider</h4>
-                <form method="POST" action="/admin/config/auth/add_provider" id="addProviderForm">
-                    <div class="form-row">
-                        <div class="form-group" style="margin: 0;">
-                            <label for="provider_type">Provider Type</label>
-                            <select id="provider_type" name="provider_type" required onchange="updateProviderFields()">
-                                <option value="">Select provider...</option>
-                                <option value="azure">Azure AD / Entra ID</option>
-                                <option value="saml">SAML 2.0</option>
-                                <option value="google">Google OAuth</option>
-                                <option value="github">GitHub OAuth</option>
-                                <option value="okta">Okta</option>
-                                <option value="custom">Custom OAuth 2.0</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin: 0;">
-                            <label for="display_name">Display Name</label>
-                            <input type="text" id="display_name" name="display_name" placeholder="Sign in with Azure" required>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group" style="margin: 0;">
-                            <label for="client_id">Client ID / Application ID</label>
-                            <input type="text" id="client_id" name="client_id" placeholder="abc123..." required>
-                        </div>
-                        <div class="form-group" style="margin: 0;">
-                            <label for="client_secret">Client Secret</label>
-                            <input type="password" id="client_secret" name="client_secret" placeholder="••••••••">
-                        </div>
-                    </div>
-
-                    <div class="form-row-full">
-                        <div class="form-group" style="margin: 0;">
-                            <label for="redirect_uri">Redirect URI</label>
-                            <input type="url" id="redirect_uri" name="redirect_uri"
-                                   placeholder="https://yourapp.example.com/auth/callback" required>
-                        </div>
-                    </div>
-
-                    <!-- Azure-specific fields -->
-                    <div id="azure-fields" class="provider-specific-fields">
-                        <div class="form-row-full">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="tenant_id">Tenant ID</label>
-                                <input type="text" id="tenant_id" name="tenant_id"
-                                       placeholder="common, organizations, or your tenant ID">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- SAML-specific fields -->
-                    <div id="saml-fields" class="provider-specific-fields">
-                        <div class="form-row">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="metadata_url">Metadata URL</label>
-                                <input type="url" id="metadata_url" name="metadata_url"
-                                       placeholder="https://idp.example.com/metadata">
-                            </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label for="entity_id">Entity ID</label>
-                                <input type="text" id="entity_id" name="entity_id"
-                                       placeholder="urn:example:sp">
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Custom OAuth fields -->
-                    <div id="custom-fields" class="provider-specific-fields">
-                        <div class="form-row-full">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="authorization_endpoint">Authorization Endpoint</label>
-                                <input type="url" id="authorization_endpoint" name="authorization_endpoint"
-                                       placeholder="https://provider.com/oauth/authorize">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group" style="margin: 0;">
-                                <label for="token_endpoint">Token Endpoint</label>
-                                <input type="url" id="token_endpoint" name="token_endpoint"
-                                       placeholder="https://provider.com/oauth/token">
-                            </div>
-                            <div class="form-group" style="margin: 0;">
-                                <label for="userinfo_endpoint">User Info Endpoint</label>
-                                <input type="url" id="userinfo_endpoint" name="userinfo_endpoint"
-                                       placeholder="https://provider.com/oauth/userinfo">
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Add Provider</button>
-                </form>
-            </div>
+        <div class="form-group mb-0">
+            <label for="llm_endpoint">LLM Endpoint URL</label>
+            <input type="url" id="llm_endpoint" name="llm_endpoint" value="{{ config.llm_endpoint }}"
+                placeholder="https://mindrouter-api.nkn.uidaho.edu/v1" required>
         </div>
     </div>
 
-    <!-- Available Models -->
+    <!-- UI Configuration -->
     <div class="config-section">
-        <h2>Available Models</h2>
-        <p>Manage the list of LLM models available to users.</p>
+        <h2>UI Configuration</h2>
+        <p>Customize the appearance of the interface.</p>
 
-        {% if config.available_models and config.available_models|length > 0 %}
-        <ul class="model-list">
-            {% for model in config.available_models %}
-            <li class="model-item">
-                <div class="model-info">
-                    <div class="model-name">
-                        {{ model.name }}
-                        <span class="model-badge {% if model.external %}badge-external{% else %}badge-internal{% endif %}">
-                            {% if model.external %}External{% else %}Private{% endif %}
-                        </span>
-                        {% if model.get("thinking") %}
-                        <span class="model-badge" style="background: #dbeafe; color: #1e40af; margin-left: 8px;">Thinking</span>
-                        {% endif %}
+        <div class="form-group">
+            <label for="highlight_color">
+                Highlight Color (Vandal Gold)
+                <span class="color-preview" style="background-color: {{ config.highlight_color }};"></span>
+            </label>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <input type="color" id="highlight_color" name="highlight_color" value="{{ config.highlight_color }}"
+                    style="width: 80px; height: 40px; padding: 2px; cursor: pointer;">
+                <input type="text" id="highlight_color_hex" name="highlight_color_hex"
+                    value="{{ config.highlight_color }}" style="width: 120px;" placeholder="#eab308">
+            </div>
+        </div>
+
+        <div class="form-group mb-0">
+            <label for="ui_radius">
+                Corner Radius (px)
+            </label>
+            <div style="display: flex; gap: 12px; align-items: center;">
+                <input type="number" id="ui_radius_number" min="0" max="48" step="1"
+                    value="{{ config.ui_radius|default('12px')|replace('px','') }}" style="width: 120px;">
+                <input type="text" id="ui_radius" name="ui_radius" value="{{ config.ui_radius|default('12px') }}"
+                    style="width: 100px;" placeholder="12px">
+            </div>
+            <p class="metadata" style="margin-bottom: 0;">Default: 12px (matches current UI)</p>
+        </div>
+    </div>
+
+    <div class="save-bar">
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </div>
+</form>
+
+<!-- Authentication Configuration -->
+<div class="config-section">
+    <h2>Authentication Configuration</h2>
+    <p>Configure authentication methods and OAuth/SAML providers.</p>
+
+    <!-- Authentication Methods -->
+    <form method="POST" action="/admin/config/auth/update_methods">
+        <div class="form-group">
+            <label>Enabled Authentication Methods</label>
+            <div style="display: flex; gap: 20px; margin-top: 8px;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="auth_password" name="auth_password" {% if 'password' in
+                        config.auth_methods %}checked{% endif %}>
+                    <label for="auth_password" style="margin: 0;">Username/Password</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="auth_oauth" name="auth_oauth" {% if 'oauth' in config.auth_methods
+                        %}checked{% endif %}>
+                    <label for="auth_oauth" style="margin: 0;">OAuth/SAML</label>
+                </div>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-secondary">Update Auth Methods</button>
+    </form>
+
+    <!-- OAuth/SAML Providers -->
+    <div style="margin-top: 24px;">
+        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">OAuth & SAML Providers</h3>
+
+        {% if config.oauth_providers and config.oauth_providers|length > 0 %}
+        <ul class="provider-list">
+            {% for provider in config.oauth_providers %}
+            <li class="provider-item">
+                <div class="provider-header">
+                    <div>
+                        <div class="provider-title">
+                            {{ provider.display_name }}
+                            <span
+                                class="model-badge {% if provider.enabled %}badge-enabled{% else %}badge-disabled{% endif %}">
+                                {% if provider.enabled %}Enabled{% else %}Disabled{% endif %}
+                            </span>
+                        </div>
+                        <div class="provider-type">{{ provider.provider }}</div>
                     </div>
-                    <div class="model-tag">{{ model.tag }}</div>
-                    {% if model.get("endpoint") %}
-                    <div class="model-endpoint" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
-                        Endpoint: {{ model.endpoint }}
+                    <div class="provider-actions">
+                        <form method="POST" action="/admin/config/auth/toggle_provider/{{ loop.index0 }}"
+                            style="margin: 0;">
+                            <button type="submit" class="btn btn-toggle btn-sm">
+                                {% if provider.enabled %}Disable{% else %}Enable{% endif %}
+                            </button>
+                        </form>
+                        <form method="POST" action="/admin/config/auth/remove_provider/{{ loop.index0 }}"
+                            style="margin: 0;">
+                            <button type="submit" class="btn btn-danger btn-sm"
+                                onclick="return confirm('Remove this provider?');">Remove</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="provider-details">
+                    <div class="provider-detail"><strong>Client ID:</strong> {{ provider.client_id[:20] }}...</div>
+                    <div class="provider-detail"><strong>Redirect URI:</strong> {{ provider.redirect_uri }}</div>
+                    {% if provider.tenant_id %}
+                    <div class="provider-detail"><strong>Tenant ID:</strong> {{ provider.tenant_id }}</div>
+                    {% endif %}
+                    {% if provider.metadata_url %}
+                    <div class="provider-detail"><strong>Metadata URL:</strong> {{ provider.metadata_url[:40] }}...
                     </div>
                     {% endif %}
-                    {% if model.get("api_protocol") %}
-                    <div class="model-protocol" style="font-size: 11px; color: #6b7280; margin-top: 2px;">
-                        Protocol: {{ model.api_protocol|upper }}
-                    </div>
+                    {% if provider.entity_id %}
+                    <div class="provider-detail"><strong>Entity ID:</strong> {{ provider.entity_id }}</div>
                     {% endif %}
                 </div>
-                <form method="POST" action="/admin/config/remove_model/{{ loop.index0 }}" style="margin: 0;">
-                    <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;"
-                            onclick="return confirm('Remove this model?');">Remove</button>
-                </form>
             </li>
             {% endfor %}
         </ul>
         {% else %}
-        <p style="color: #9ca3af; font-style: italic;">No models configured yet.</p>
+        <p style="color: #9ca3af; font-style: italic; margin-bottom: 16px;">No OAuth/SAML providers configured.</p>
         {% endif %}
 
-        <!-- Add New Model Form -->
-        <form method="POST" action="/admin/config/add_model">
-            <div class="add-model-form">
-                <div class="form-group" style="margin: 0;">
-                    <label for="model_name">Model Name</label>
-                    <input type="text" id="model_name" name="model_name" placeholder="gpt-oss-32k:120b" required>
-                </div>
-                <div class="form-group" style="margin: 0;">
-                    <label for="model_tag">Tag/Description</label>
-                    <input type="text" id="model_tag" name="model_tag" placeholder="University of Idaho - Private" required>
-                </div>
-                <div class="form-group" style="margin: 0;">
-                    <label for="model_endpoint">API Endpoint (optional)</label>
-                    <input type="url" id="model_endpoint" name="model_endpoint" 
-                           placeholder="https://api.example.com/v1 (leave empty to use default)">
-                    <small style="color: #6b7280; font-size: 12px;">If empty, uses the default LLM endpoint</small>
-                </div>
-                <div class="form-group" style="margin: 0;">
-                    <label for="model_api_protocol">API Protocol</label>
-                    <select id="model_api_protocol" name="model_api_protocol">
-                        <option value="">Auto-detect</option>
-                        <option value="openai">OpenAI</option>
-                        <option value="ollama">Ollama</option>
-                        <option value="vllm">VLLM</option>
-                    </select>
-                    <small style="color: #6b7280; font-size: 12px;">Protocol will be auto-detected if not specified</small>
-                </div>
-                <div class="form-group" style="margin: 0;">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model_external" name="model_external">
-                        <label for="model_external" style="margin: 0;">External</label>
+        <!-- Add New Provider Form -->
+        <div class="add-provider-form">
+            <h4 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">Add New Provider</h4>
+            <form method="POST" action="/admin/config/auth/add_provider" id="addProviderForm">
+                <div class="form-row">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="provider_type">Provider Type</label>
+                        <select id="provider_type" name="provider_type" required onchange="updateProviderFields()">
+                            <option value="">Select provider...</option>
+                            <option value="azure">Azure AD / Entra ID</option>
+                            <option value="saml">SAML 2.0</option>
+                            <option value="google">Google OAuth</option>
+                            <option value="github">GitHub OAuth</option>
+                            <option value="okta">Okta</option>
+                            <option value="custom">Custom OAuth 2.0</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="display_name">Display Name</label>
+                        <input type="text" id="display_name" name="display_name" placeholder="Sign in with Azure"
+                            required>
                     </div>
                 </div>
-                <div class="form-group" style="margin: 0;">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="model_thinking" name="model_thinking">
-                        <label for="model_thinking" style="margin: 0;">Supports Thinking</label>
+
+                <div class="form-row">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="client_id">Client ID / Application ID</label>
+                        <input type="text" id="client_id" name="client_id" placeholder="abc123..." required>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                        <label for="client_secret">Client Secret</label>
+                        <input type="password" id="client_secret" name="client_secret" placeholder="••••••••">
                     </div>
                 </div>
-                <button type="submit" class="btn btn-secondary">Add Model</button>
-            </div>
-        </form>
+
+                <div class="form-row-full">
+                    <div class="form-group" style="margin: 0;">
+                        <label for="redirect_uri">Redirect URI</label>
+                        <input type="url" id="redirect_uri" name="redirect_uri"
+                            placeholder="https://yourapp.example.com/auth/callback" required>
+                    </div>
+                </div>
+
+                <!-- Azure-specific fields -->
+                <div id="azure-fields" class="provider-specific-fields">
+                    <div class="form-row-full">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="tenant_id">Tenant ID</label>
+                            <input type="text" id="tenant_id" name="tenant_id"
+                                placeholder="common, organizations, or your tenant ID">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SAML-specific fields -->
+                <div id="saml-fields" class="provider-specific-fields">
+                    <div class="form-row">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="metadata_url">Metadata URL</label>
+                            <input type="url" id="metadata_url" name="metadata_url"
+                                placeholder="https://idp.example.com/metadata">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="entity_id">Entity ID</label>
+                            <input type="text" id="entity_id" name="entity_id" placeholder="urn:example:sp">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Custom OAuth fields -->
+                <div id="custom-fields" class="provider-specific-fields">
+                    <div class="form-row-full">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="authorization_endpoint">Authorization Endpoint</label>
+                            <input type="url" id="authorization_endpoint" name="authorization_endpoint"
+                                placeholder="https://provider.com/oauth/authorize">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="margin: 0;">
+                            <label for="token_endpoint">Token Endpoint</label>
+                            <input type="url" id="token_endpoint" name="token_endpoint"
+                                placeholder="https://provider.com/oauth/token">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label for="userinfo_endpoint">User Info Endpoint</label>
+                            <input type="url" id="userinfo_endpoint" name="userinfo_endpoint"
+                                placeholder="https://provider.com/oauth/userinfo">
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="margin-top: 12px;">Add Provider</button>
+            </form>
+        </div>
     </div>
+</div>
+
+<!-- Available Models -->
+<div class="config-section">
+    <h2>Available Models</h2>
+    <p>Manage the list of LLM models available to users.</p>
+
+    {% if config.available_models and config.available_models|length > 0 %}
+    <ul class="model-list">
+        {% for model in config.available_models %}
+        <li class="model-item">
+            <div class="model-info">
+                <div class="model-name">
+                    {{ model.name }}
+                    <span class="model-badge {% if model.external %}badge-external{% else %}badge-internal{% endif %}">
+                        {% if model.external %}External{% else %}Private{% endif %}
+                    </span>
+                    {% if model.get("thinking") %}
+                    <span class="model-badge"
+                        style="background: #dbeafe; color: #1e40af; margin-left: 8px;">Thinking</span>
+                    {% endif %}
+                </div>
+                <div class="model-tag">{{ model.tag }}</div>
+                {% if model.get("endpoint") %}
+                <div class="model-endpoint" style="font-size: 11px; color: #6b7280; margin-top: 4px;">
+                    Endpoint: {{ model.endpoint }}
+                </div>
+                {% endif %}
+                {% if model.get("api_protocol") %}
+                <div class="model-protocol" style="font-size: 11px; color: #6b7280; margin-top: 2px;">
+                    Protocol: {{ model.api_protocol|upper }}
+                </div>
+                {% endif %}
+            </div>
+            <form method="POST" action="/admin/config/remove_model/{{ loop.index0 }}" style="margin: 0;">
+                <button type="submit" class="btn btn-danger" style="padding: 6px 12px; font-size: 12px;"
+                    onclick="return confirm('Remove this model?');">Remove</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color: #9ca3af; font-style: italic;">No models configured yet.</p>
+    {% endif %}
+
+    <!-- Add New Model Form -->
+    <form method="POST" action="/admin/config/add_model">
+        <div class="add-model-form">
+            <div class="form-group" style="margin: 0;">
+                <label for="model_name">Model Name</label>
+                <input type="text" id="model_name" name="model_name" placeholder="gpt-oss-32k:120b" required>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label for="model_tag">Tag/Description</label>
+                <input type="text" id="model_tag" name="model_tag" placeholder="University of Idaho - Private" required>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label for="model_endpoint">API Endpoint (optional)</label>
+                <input type="url" id="model_endpoint" name="model_endpoint"
+                    placeholder="https://api.example.com/v1 (leave empty to use default)">
+                <small style="color: #6b7280; font-size: 12px;">If empty, uses the default LLM endpoint</small>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label for="model_api_protocol">API Protocol</label>
+                <select id="model_api_protocol" name="model_api_protocol">
+                    <option value="">Auto-detect</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="vllm">VLLM</option>
+                </select>
+                <small style="color: #6b7280; font-size: 12px;">Protocol will be auto-detected if not specified</small>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="model_external" name="model_external">
+                    <label for="model_external" style="margin: 0;">External</label>
+                </div>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="model_thinking" name="model_thinking">
+                    <label for="model_thinking" style="margin: 0;">Supports Thinking</label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-secondary">Add Model</button>
+        </div>
+    </form>
 </div>
 
 <script>
@@ -691,7 +644,7 @@
     const colorPreview = document.querySelector('.color-preview');
 
     if (colorInput) {
-        colorInput.addEventListener('input', function() {
+        colorInput.addEventListener('input', function () {
             colorHex.value = this.value;
             colorPreview.style.backgroundColor = this.value;
         });

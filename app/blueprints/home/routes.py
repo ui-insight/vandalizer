@@ -276,6 +276,18 @@ def index() -> ResponseReturnValue:
                         snapshot["status"] = workflow_result.status
                     if workflow_result.session_id and "session_id" not in snapshot:
                         snapshot["session_id"] = workflow_result.session_id
+                    if activity.started_at and "started_at" not in snapshot:
+                        snapshot["started_at"] = activity.started_at.isoformat()
+                    if activity.finished_at and "finished_at" not in snapshot:
+                        snapshot["finished_at"] = activity.finished_at.isoformat()
+                    if (
+                        activity.started_at
+                        and activity.finished_at
+                        and "duration_seconds" not in snapshot
+                    ):
+                        snapshot["duration_seconds"] = (
+                            activity.finished_at - activity.started_at
+                        ).total_seconds()
                     workflow_activity_snapshot = snapshot or None
 
                     stored_doc_uuids = snapshot.get("document_uuids") or []
