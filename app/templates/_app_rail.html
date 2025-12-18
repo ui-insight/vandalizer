@@ -270,10 +270,7 @@
         railToggleIcon.className = 'fa-regular fa-square-caret-right';
     }
 
-    // Update panel resizer position after initial rail state is set
-    if (typeof window.updatePanelResizerPosition === 'function') {
-        setTimeout(window.updatePanelResizerPosition, 100);
-    }
+    // Note: Panel resizer position is now set in index_scripts.html during initialization
 
     // Toggle dock/undock on button click
     railToggle.addEventListener('click', () => {
@@ -293,11 +290,11 @@
             railToggleIcon.className = 'fa-regular fa-square-caret-right';
         }
 
-        // Update panel resizer position immediately - CSS will animate it smoothly
-        if (typeof window.updatePanelResizerPosition === 'function') {
-            // Use requestAnimationFrame to update after DOM settles
+        // Update panel resizer position immediately based on saved percentages
+        // This allows the resizer to smoothly transition along with the panels
+        if (typeof window.updatePanelResizerPositionFromPercentages === 'function') {
             requestAnimationFrame(() => {
-                window.updatePanelResizerPosition();
+                window.updatePanelResizerPositionFromPercentages();
             });
         }
     });

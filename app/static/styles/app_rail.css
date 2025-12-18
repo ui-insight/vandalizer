@@ -195,8 +195,18 @@
 
 /* Layout reservation (kept from prior version) */
 .main-panel{ position:relative; width:100%; }
-.right-panel{ float:right; width:40%; margin-right:var(--rail-w); position:relative; }
-.left-panel{ float:left; width:calc(60% - var(--rail-w)); }
+.right-panel{
+  float:right;
+  width:40%;
+  margin-right:var(--rail-w);
+  position:relative;
+  transition: width 0.3s ease, margin-right 0.3s ease;
+}
+.left-panel{
+  float:left;
+  width:calc(60% - var(--rail-w));
+  transition: width 0.3s ease;
+}
 
 /* Panel resizer */
 .panel-resizer{
@@ -214,10 +224,26 @@
   background:#999;
 }
 
-body .main-panel .header{ position:fixed; left:0; right:calc(40% + var(--rail-w)); width:auto !important; z-index:400; }
-body .left-panel .semantic-panel{ left:30px; right:calc(40% + var(--rail-w) + 30px); width:auto; }
+body .main-panel .header{
+  position:fixed;
+  left:0;
+  right:calc(40% + var(--rail-w));
+  width:auto !important;
+  z-index:400;
+  transition: right 0.3s ease;
+}
+body .left-panel .semantic-panel{
+  left:30px;
+  right:calc(40% + var(--rail-w) + 30px);
+  width:auto;
+  transition: right 0.3s ease;
+}
 
-.right-panel .bottom-toolbar, .floating-bottom-toolbar{ right:var(--rail-w); width:40%; }
+.right-panel .bottom-toolbar, .floating-bottom-toolbar{
+  right:var(--rail-w);
+  width:40%;
+  transition: right 0.3s ease, width 0.3s ease;
+}
 
 @media (max-width:1200px){
   .left-panel{ min-width:520px; }

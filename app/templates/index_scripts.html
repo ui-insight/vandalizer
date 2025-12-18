@@ -5482,8 +5482,31 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             resizer.style.left = leftWidth + 'px';
         }
 
-        // Disable transition initially
+        // Calculate target position based on percentages (for rail dock/undock)
+        function updateResizerPositionFromPercentages() {
+            const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            if (savedLeftPercent) {
+                // Calculate the actual left panel width: (leftPercent% of window) - rail width
+                const targetLeftWidth = (parseFloat(savedLeftPercent) / 100 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            } else {
+                // Use default 60/40 split
+                const targetLeftWidth = (0.6 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            }
+        }
+
+        // Disable transitions initially to prevent animation on page load
         resizer.style.transition = 'none';
+        leftPanel.style.transition = 'none';
+        rightPanel.style.transition = 'none';
+        if (header) header.style.transition = 'none';
+        if (semanticPanel) semanticPanel.style.transition = 'none';
+        if (bottomToolbar) bottomToolbar.style.transition = 'none';
+        if (floatingToolbar) floatingToolbar.style.transition = 'none';
 
         // Check for saved panel widths first
         const savedLeftPercent = localStorage.getItem('panelLeftPercent');
@@ -5499,9 +5522,15 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
         // Set initial position without animation
         updateResizerPosition();
 
-        // Enable transition after initial position is set
+        // Enable transitions after initial position is set
         requestAnimationFrame(() => {
             resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+            leftPanel.style.transition = 'width 0.3s ease';
+            rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+            if (header) header.style.transition = 'right 0.3s ease';
+            if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+            if (bottomToolbar) bottomToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
+            if (floatingToolbar) floatingToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
         });
 
         resizer.addEventListener('mousedown', function(e) {
@@ -5511,8 +5540,14 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
 
-            // Disable transition during drag for instant feedback
+            // Disable transitions during drag for instant feedback
             resizer.style.transition = 'background 0.2s ease';
+            leftPanel.style.transition = 'none';
+            rightPanel.style.transition = 'none';
+            if (header) header.style.transition = 'none';
+            if (semanticPanel) semanticPanel.style.transition = 'none';
+            if (bottomToolbar) bottomToolbar.style.transition = 'none';
+            if (floatingToolbar) floatingToolbar.style.transition = 'none';
 
             // Get starting widths
             startLeftWidth = leftPanel.offsetWidth;
@@ -5569,17 +5604,24 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                 document.body.style.cursor = '';
                 document.body.style.userSelect = '';
 
-                // Re-enable transition after drag
+                // Re-enable transitions after drag
                 resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+                leftPanel.style.transition = 'width 0.3s ease';
+                rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+                if (header) header.style.transition = 'right 0.3s ease';
+                if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+                if (bottomToolbar) bottomToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
+                if (floatingToolbar) floatingToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
             }
         });
 
         // Update resizer position on window resize
         window.addEventListener('resize', updateResizerPosition);
 
-        // Make updateResizerPosition available globally for rail dock/undock
+        // Make functions available globally
         if (typeof window !== 'undefined') {
             window.updatePanelResizerPosition = updateResizerPosition;
+            window.updatePanelResizerPositionFromPercentages = updateResizerPositionFromPercentages;
         }
     })();
 
