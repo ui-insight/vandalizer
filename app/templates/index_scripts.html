@@ -127,7 +127,9 @@
                         li = addActivityToRail(activityId, activityData);
                         if (li) {
                             li.classList.add("active");
-                            if (opts.running) {
+                            // Check type before applying running state
+                            const isAutomation = activityData.type === 'search_set_run' || activityData.type === 'workflow_run';
+                            if (opts.running && isAutomation) {
                                 li.classList.add("is-running");
                             }
                             // Check if title should be updated
@@ -149,7 +151,15 @@
         }
 
         li.classList.add("active");
-        if (opts.running) {
+
+        // Check if automation run based on icon class
+        const typeIcon = li.querySelector('.run-type-icon');
+        const isAutomationRun = typeIcon && (
+            typeIcon.classList.contains('fa-list-check') || // search_set_run
+            typeIcon.classList.contains('fa-diagram-project') // workflow_run
+        );
+
+        if (opts.running && isAutomationRun) {
             li.classList.add("is-running");
         }
     }
@@ -235,7 +245,7 @@
     // Helper function to update activity title with shimmer effect
     function updateActivityTitle(activityId, newTitle) {
         if (!activityId || !newTitle) return;
-        
+
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) return;
 
@@ -250,12 +260,12 @@
         // Update title with shimmer effect
         titleElement.innerHTML = newTitle; // Use innerHTML to replace any HTML (like loading text)
         titleElement.setAttribute('title', newTitle);
-        
+
         // Add shimmer class to the title element for animation
         titleElement.style.position = 'relative';
         titleElement.style.overflow = 'hidden';
         titleElement.classList.add('title-shimmer');
-        
+
         // Remove shimmer after animation
         setTimeout(() => {
             titleElement.classList.remove('title-shimmer');
@@ -267,18 +277,18 @@
         if (!activityId || !activityData || !activityData.title) return;
         updateActivityTitle(activityId, activityData.title);
     }
-    
+
     // Poll chat activity title updates
     function pollChatActivityTitle(activityId) {
         if (!activityId) return;
-        
+
         let pollCount = 0;
         const maxPolls = 30; // Poll for up to 30 seconds (30 * 1000ms)
         const pollInterval = 2000; // Poll every 2 seconds
-        
-        const intervalId = setInterval(function() {
+
+        const intervalId = setInterval(function () {
             pollCount++;
-            
+
             fetch(`/activity/runs/${activityId}/data`)
                 .then(response => {
                     if (!response.ok) {
@@ -293,10 +303,11 @@
                         if (activityData.title) {
                             checkActivityTitleUpdate(activityId, activityData);
                         }
-                        
-                        // Stop polling if we've gotten a title update or max polls reached
-                        // Also stop if activity is completed (title generation should be done)
-                        if (activityData.status === "completed" || pollCount >= maxPolls) {
+
+                        // Stop polling once we have a real title, or we timed out.
+                        // Do NOT stop just because the activity completed: title generation
+                        // is async and can land after completion.
+                        if ((activityData.title && String(activityData.title).trim().length > 0) || pollCount >= maxPolls) {
                             clearInterval(intervalId);
                         }
                     }
@@ -995,6 +1006,10 @@
             if ($("#search-results-panel").children().length > 0) {
                 $("#search-results-panel").show();
             }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.syncBottomToolbarsToPanels === 'function') {
+            window.syncBottomToolbarsToPanels();
         }
 
         cleanup();
@@ -3213,36 +3228,36 @@
             const tabTitle = $(this).text().trim();
             const url = new URL(window.location.href);
             const currentSection = url.searchParams.get("section") || "";
-            
+
             // If clicking Library tab and already on Library, close panels and reset
             const isLibraryVisible = $("#library-panel").is(":visible");
             if (tabTitle === "Library" && (currentSection === "Library" || currentSection === "Workflows" || isLibraryVisible)) {
                 // Close any open panels
                 $(".search-results-panel").hide();
                 $("#search-results-panel").empty();
-                
+
                 // Clear library-related URL params but keep section=Library
                 url.searchParams.delete("search_set_uuid");
                 url.searchParams.delete("workflow_id");
                 url.searchParams.delete("activity_id");
                 url.searchParams.set("section", "Library");
                 window.history.pushState({}, "", url.toString());
-                
+
                 // Show library panel
                 $(".tab-content").hide();
                 $("#library-panel").show();
-                
+
                 // Update active tab
                 tabMenuItems.forEach((node) => node.classList.remove("active"));
                 this.classList.add("active");
-                
+
                 // Refresh library view if there's a refresh function
                 if (typeof refreshResults === 'function') {
                     refreshResults();
                 }
                 return;
             }
-            
+
             // Normal tab switching behavior
             tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
@@ -4067,22 +4082,22 @@
     });
 
     $("#add-search-set-button").on("click", function () {
-addSearchSet($("#add-search-set-input")[0].value, "extraction");
+        addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 
     function showExtractionOverlay() {
         const panel = $("#search-results-panel");
         if (panel.length === 0) return;
-        
+
         // Ensure panel is visible
         panel.show();
-        
+
         // Add overlay class to prevent scrolling
         panel.addClass("has-overlay");
-        
+
         // Find the content body where search terms are displayed
         const contentBody = panel.find(".search-results-content-body");
-        
+
         // Check if overlay already exists
         let overlay = panel.find(".extraction-loading-overlay");
         if (overlay.length === 0) {
@@ -4106,13 +4121,13 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
         // Remove overlay from panel
         const overlay = panel.find(".extraction-loading-overlay");
         overlay.remove();
-        
+
         // Also remove from content body if it exists there
         const contentBody = panel.find(".search-results-content-body");
         if (contentBody.length > 0) {
             contentBody.find(".extraction-loading-overlay").remove();
         }
-        
+
         panel.removeClass("has-overlay");
         console.log("Extraction overlay removed");
         console.log("Remaining overlays:", panel.find(".extraction-loading-overlay").length);
@@ -4148,59 +4163,59 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                         // Hide overlay and display results
                         hideExtractionOverlay();
                         $("#search-results-panel").empty();
-                        
+
                         // Check if template exists in response
                         console.log("Checking for template in response...");
                         console.log("response.template exists:", "template" in response);
                         console.log("response.template value:", response.template ? "present" : "missing");
                         console.log("response.template type:", typeof response.template);
                         console.log("response.template length:", response.template ? response.template.length : "N/A");
-                        
+
                         if (response.template && response.template.length > 0) {
                             console.log("Template found, length:", response.template.length);
                             try {
                                 // Ensure overlay is completely removed first
                                 hideExtractionOverlay();
-                                
+
                                 // Wait a moment to ensure overlay is removed
-                                setTimeout(function() {
+                                setTimeout(function () {
                                     // Make sure panel is visible and remove any overlay remnants
                                     const $panel = $("#search-results-panel");
-                                    
+
                                     // Remove all overlays from panel and content body
                                     $panel.find(".extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
                                     $panel.removeClass("has-overlay");
-                                    
+
                                     // Make sure panel is visible
                                     $panel.show();
                                     $panel.css("display", "block");
                                     $panel.css("visibility", "visible");
                                     $panel.css("opacity", "1");
-                                    
+
                                     console.log("Panel display:", $panel.css("display"));
                                     console.log("Panel visibility:", $panel.css("visibility"));
                                     console.log("Panel z-index:", $panel.css("z-index"));
                                     console.log("Panel height:", $panel.height());
-                                    
+
                                     // Clear and append template
                                     const $template = $(response.template);
                                     $panel.empty();
-                                    
+
                                     console.log("Appending template to panel...");
                                     console.log("Template HTML preview (first 500 chars):", response.template.substring(0, 500));
-                                    
+
                                     // Append template without hiding it first - just show it directly
                                     $template.appendTo($panel);
-                                    
+
                                     // Double-check no overlays remain anywhere in the panel
                                     $panel.find(".extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content .extraction-loading-overlay").remove();
-                                    
+
                                     // Remove overlay class
                                     $panel.removeClass("has-overlay");
-                                    
+
                                     console.log("Template appended");
                                     console.log("Panel content length:", $panel.html().length);
                                     console.log("Panel is visible:", $panel.is(":visible"));
@@ -4209,14 +4224,14 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                                     console.log("Panel dimensions:", { width: $panel.width(), height: $panel.height() });
                                     console.log("First child element:", $panel.children().first().prop("tagName"));
                                     console.log("Overlays remaining:", $panel.find(".extraction-loading-overlay").length);
-                                    
+
                                     // Force scroll to top of panel
                                     $panel.scrollTop(0);
-                                    
+
                                     // Ensure panel is visible
                                     $panel.show();
                                     $panel.css("display", "block");
-                                    
+
                                     addResultListeners();
                                     search_set_add_uuid = search_set_uuid;
                                     console.log("Template successfully displayed");
@@ -4612,7 +4627,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                         url.searchParams.set('activity_id', newActivityId);
                         url.searchParams.set('section', 'Assistant');
                         window.history.replaceState({}, '', url);
-                        
+
                         // Start polling for title updates
                         pollChatActivityTitle(newActivityId);
                     }
@@ -5438,14 +5453,12 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 
     // Panel resizer drag functionality
-    (function() {
+    (function () {
         const resizer = document.getElementById('panel-resizer');
         const leftPanel = document.querySelector('.left-panel');
         const rightPanel = document.querySelector('.right-panel');
         const header = document.querySelector('.main-panel .header');
         const semanticPanel = document.querySelector('.left-panel .semantic-panel');
-        const bottomToolbar = document.querySelector('.right-panel .bottom-toolbar');
-        const floatingToolbar = document.querySelector('.floating-bottom-toolbar');
 
         if (!resizer || !leftPanel || !rightPanel) return;
 
@@ -5460,6 +5473,28 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             return parseFloat(railW) || 220;
         }
 
+        function updateBottomToolbars() {
+            const railWidth = Math.max(getRailWidth(), 0);
+            const leftEdge = Math.max(leftPanel.getBoundingClientRect().width, 0);
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.left = `${leftEdge}px`;
+                    toolbar.style.right = `${railWidth}px`;
+                    toolbar.style.width = 'auto';
+                });
+        }
+
+        let bottomToolbarUpdateScheduled = false;
+        function scheduleBottomToolbarUpdate() {
+            if (bottomToolbarUpdateScheduled) return;
+            bottomToolbarUpdateScheduled = true;
+            requestAnimationFrame(() => {
+                bottomToolbarUpdateScheduled = false;
+                updateBottomToolbars();
+            });
+        }
+
         // Update all dependent elements with new percentages
         function updateDependentElements(rightPercent) {
             if (header) {
@@ -5468,12 +5503,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             if (semanticPanel) {
                 semanticPanel.style.right = `calc(${rightPercent}% + var(--rail-w) + 30px)`;
             }
-            if (bottomToolbar) {
-                bottomToolbar.style.width = `${rightPercent}%`;
-            }
-            if (floatingToolbar) {
-                floatingToolbar.style.width = `${rightPercent}%`;
-            }
+            updateBottomToolbars();
         }
 
         // Calculate initial position based on panel widths
@@ -5505,8 +5535,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
         rightPanel.style.transition = 'none';
         if (header) header.style.transition = 'none';
         if (semanticPanel) semanticPanel.style.transition = 'none';
-        if (bottomToolbar) bottomToolbar.style.transition = 'none';
-        if (floatingToolbar) floatingToolbar.style.transition = 'none';
+        updateBottomToolbars();
 
         // Check for saved panel widths first
         const savedLeftPercent = localStorage.getItem('panelLeftPercent');
@@ -5517,6 +5546,8 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             leftPanel.style.width = `calc(${savedLeftPercent}% - var(--rail-w))`;
             rightPanel.style.width = `${savedRightPercent}%`;
             updateDependentElements(savedRightPercent);
+        } else {
+            updateBottomToolbars();
         }
 
         // Set initial position without animation
@@ -5529,11 +5560,9 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
             if (header) header.style.transition = 'right 0.3s ease';
             if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
-            if (bottomToolbar) bottomToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
-            if (floatingToolbar) floatingToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
         });
 
-        resizer.addEventListener('mousedown', function(e) {
+        resizer.addEventListener('mousedown', function (e) {
             isDragging = true;
             startX = e.clientX;
             resizer.classList.add('dragging');
@@ -5546,8 +5575,11 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             rightPanel.style.transition = 'none';
             if (header) header.style.transition = 'none';
             if (semanticPanel) semanticPanel.style.transition = 'none';
-            if (bottomToolbar) bottomToolbar.style.transition = 'none';
-            if (floatingToolbar) floatingToolbar.style.transition = 'none';
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.transition = 'none';
+                });
 
             // Get starting widths
             startLeftWidth = leftPanel.offsetWidth;
@@ -5556,7 +5588,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             e.preventDefault();
         });
 
-        document.addEventListener('mousemove', function(e) {
+        document.addEventListener('mousemove', function (e) {
             if (!isDragging) return;
 
             const deltaX = e.clientX - startX;
@@ -5597,7 +5629,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             }
         });
 
-        document.addEventListener('mouseup', function() {
+        document.addEventListener('mouseup', function () {
             if (isDragging) {
                 isDragging = false;
                 resizer.classList.remove('dragging');
@@ -5610,19 +5642,63 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                 rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
                 if (header) header.style.transition = 'right 0.3s ease';
                 if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
-                if (bottomToolbar) bottomToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
-                if (floatingToolbar) floatingToolbar.style.transition = 'right 0.3s ease, width 0.3s ease';
+                updateBottomToolbars();
             }
         });
 
         // Update resizer position on window resize
-        window.addEventListener('resize', updateResizerPosition);
+        window.addEventListener('resize', function () {
+            updateResizerPosition();
+            scheduleBottomToolbarUpdate();
+        });
 
         // Make functions available globally
         if (typeof window !== 'undefined') {
             window.updatePanelResizerPosition = updateResizerPosition;
             window.updatePanelResizerPositionFromPercentages = updateResizerPositionFromPercentages;
+            window.syncBottomToolbarsToPanels = scheduleBottomToolbarUpdate;
         }
+
+        // Keep toolbars synced when panels/layout change (e.g., showing a toolbar later)
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(scheduleBottomToolbarUpdate);
+            ro.observe(leftPanel);
+            ro.observe(rightPanel);
+        }
+        const mo = new MutationObserver(scheduleBottomToolbarUpdate);
+        mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+    })();
+
+    // Keep panel-resizer hidden while custom .modal overlays are visible
+    (function () {
+        function anyModalVisible() {
+            return Array.from(document.querySelectorAll('.modal')).some((modal) => {
+                return window.getComputedStyle(modal).display !== 'none';
+            });
+        }
+
+        function updateModalOpenState() {
+            document.body.classList.toggle('modal-open', anyModalVisible());
+        }
+
+        updateModalOpenState();
+
+        const observer = new MutationObserver(updateModalOpenState);
+        observer.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+        });
+
+        window.addEventListener('keydown', function () {
+            // Some modals close on ESC; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
+        window.addEventListener('click', function () {
+            // Some modals close on outside click; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
     })();
 
 </script>

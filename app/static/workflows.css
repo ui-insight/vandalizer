@@ -1,206 +1,242 @@
-
-  .workflow-container {
-    background-color: #F0F2F8;
-    width: 100%;
-    height: 100%;
-    padding: 30px 30px 150px 30px;
-    background-image:
+.workflow-container {
+  background-color: #F0F2F8;
+  width: 100%;
+  height: 100%;
+  padding: 30px 30px 150px 30px;
+  background-image:
     linear-gradient(45deg, #EAECF2 25%, transparent 25%),
     linear-gradient(-45deg, #EAECF2 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, #EAECF2 75%),
     linear-gradient(-45deg, transparent 75%, #EAECF2 75%);
-    background-size: 30px 30px;
-    background-position: 0 0, 0 15px, 15px -15px, -15px 0;
-    border: 1px solid #2f2f2fc2;
-    overflow: scroll;
-  }
-  
-  .trigger {
-    background-color: #404040;
-    color: white;
-    padding: 5px 10px 5px 10px;
-    text-align: center;
-    font-weight: 400;
-    font-size: 12px;
-    width: 120px;
-    margin: 22px auto 0px auto;
-  }
+  background-size: 30px 30px;
+  background-position: 0 0, 0 15px, 15px -15px, -15px 0;
+  border: 1px solid #2f2f2fc2;
+  overflow: scroll;
+}
 
-  .workflow-add-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: white;
-    background-color: #191919;
-    border: 2px #191919 solid;
-    padding: 15px;
-    position: relative;
-    cursor: pointer;
-    border-radius: var(--ui-radius, 12px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-  }
-  
-  .workflow-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background-color: white;
-    padding: 15px;
-    margin-bottom: 15px;
-    position: relative;
-    border-radius: var(--ui-radius, 12px);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
-  }
+.trigger {
+  background-color: #404040;
+  color: white;
+  padding: 5px 10px 5px 10px;
+  text-align: center;
+  font-weight: 400;
+  font-size: 12px;
+  width: 120px;
+  margin: 22px auto 0px auto;
+}
 
-  .workflow-add-step:hover {
-    background-color: white;
-    color: #191919;
-  }
-  
-  .workflow-step.active {
-    border: 2px solid var(--highlight-color, #f1b300);
-  }
-  
-  .step-content {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    padding-right: 15px;
-  }
-  
-  .step-header {
-    display: flex;
-    flex-direction: column;
-    flex: 1;
-  }
-  
-  .step-header span:first-child {
-    font-weight: bold;
-  }
-  
-  .step-connector {
-    width: 30px;
-    height: 30px;
-    position: absolute;
-    left: calc(50% - 15px);
-  }
+.workflow-add-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: white;
+  background-color: #191919;
+  border: 2px #191919 solid;
+  padding: 15px;
+  position: relative;
+  cursor: pointer;
+  border-radius: var(--ui-radius, 12px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
 
-  .step-connector.bottom {
-    bottom: -15px;
-    background-image: url('/static/images/step-connector-bottom.png');
-  }
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: white;
+  padding: 15px;
+  margin-bottom: 15px;
+  position: relative;
+  border-radius: var(--ui-radius, 12px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.05);
+}
 
-  .step-connector.top {
-    top: -15px;
-    background-image: url('/static/images/step-connector-top.png');
-  }
+.workflow-add-step:hover {
+  background-color: white;
+  color: #191919;
+}
 
-  /* Active states */
+.workflow-step.active {
+  border: 2px solid var(--highlight-color, #f1b300);
+}
+
+.step-content {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding-right: 15px;
+}
+
+.step-header {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.step-header span:first-child {
+  font-weight: bold;
+}
+
+.step-connector {
+  width: 32px;
+  height: 16px;
+  position: absolute;
+  left: calc(50% - 16px);
+  background-color: white;
+  z-index: 10;
+  box-sizing: border-box;
+  /* Center the dot */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The central dot */
+.step-connector::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: block;
+}
+
+.step-connector.bottom {
+  bottom: -16px;
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
+  border: 2px solid #e0e0e0;
+  border-top: 0;
+}
+
+.step-connector.bottom::after {
+  /* Nudge up towards the base */
+  transform: translateY(-3px);
+}
+
+.step-connector.top {
+  top: -16px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  border: 2px solid #e0e0e0;
+  border-bottom: 0;
+}
+
+.step-connector.top::after {
+  /* Nudge down towards the base */
+  transform: translateY(3px);
+}
+
+/* Active states */
+.step-connector.active::after {
+  background-color: var(--highlight-color, #f1b300);
+}
+
 .step-connector.bottom.active {
-  background-image: url('/static/images/step-connector-bottom-active.png');
+  border-color: var(--highlight-color, #f1b300);
 }
 
 .step-connector.top.active {
-  background-image: url('/static/images/step-connector-top-active.png');
+  border-color: var(--highlight-color, #f1b300);
 }
-  
-  .step-connection-line {
-    width: 2px;
-    background-color: #bcbcbc;
-    height: 20px;
-    margin: 10px auto;
-  }
-  
-  .attachment-info,
-  .item-info,
-  .output-info {
-    color: #888;
-    font-size: 0.9em;
-  }
 
-  .edit-workflow-step-btn {
-    cursor: pointer;
-  }
+.step-connection-line {
+  width: 2px;
+  background-color: #bcbcbc;
+  height: 20px;
+  margin: 10px auto;
+}
 
-  .step-icon img {
-    width: 30px;
-    height: 30px;
-    
-  }
-  
-  .add-step {
-    text-align: center;
-    margin: 15px 0;
-  }
-  
-  .add-step button {
-    cursor: pointer;
-    background-color: var(--highlight-color, #f1b300);
-    border: 2px solid var(--highlight-color, #f1b300);
-    font-size: 1.15rem;
-    line-height: 1;
-    font-weight: 700;
-    padding: 0.65em;
-    outline-offset: 3px;
-    margin-top: -15px;
-    color: var(--highlight-text-color, #191919);
-    border-radius: var(--ui-radius, 12px);
-  }
-  
-  .add-step button:hover {
-    background-color: white;
-  }
+.attachment-info,
+.item-info,
+.output-info {
+  color: #888;
+  font-size: 0.9em;
+}
 
-  .workflow-modal-content {
-    background-color: #fff;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    height: 100%;
-    overflow: scroll;
-    padding-bottom: 200px;
+.edit-workflow-step-btn {
+  cursor: pointer;
+}
+
+.step-icon img {
+  width: 30px;
+  height: 30px;
+
+}
+
+.add-step {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.add-step button {
+  cursor: pointer;
+  background-color: var(--highlight-color, #f1b300);
+  border: 2px solid var(--highlight-color, #f1b300);
+  font-size: 1.15rem;
+  line-height: 1;
+  font-weight: 700;
+  padding: 0.65em;
+  outline-offset: 3px;
+  margin-top: -15px;
+  color: var(--highlight-text-color, #191919);
+  border-radius: var(--ui-radius, 12px);
+}
+
+.add-step button:hover {
+  background-color: white;
+}
+
+.workflow-modal-content {
+  background-color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  overflow: scroll;
+  padding-bottom: 200px;
 }
 
 .workflow-tab-container {
-    display: flex;
-    border-bottom: 1px solid #ddddddbb;
-    margin-bottom: 15px;
+  display: flex;
+  border-bottom: 1px solid #ddddddbb;
+  margin-bottom: 15px;
 }
 
 .workflow-tab-btn {
-    flex: 1;
-    padding: 10px;
-    font-size: 16px;
-    text-align: center;
-    background: #f9f9f9;
-    cursor: pointer;
-    border: none;
-    border-bottom: 2px solid transparent;
-    transition: 0.3s;
-    border-radius: var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0;
+  flex: 1;
+  padding: 10px;
+  font-size: 16px;
+  text-align: center;
+  background: #f9f9f9;
+  cursor: pointer;
+  border: none;
+  border-bottom: 2px solid transparent;
+  transition: 0.3s;
+  border-radius: var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0;
 }
 
 .workflow-tab-btn:hover {
-    background-color: white;
+  background-color: white;
 }
 
 .workflow-tab-btn.active {
   border-bottom: 2px solid var(--highlight-color, #f1b300);
-    font-weight: bold;
+  font-weight: bold;
 }
 
 .workflow-label {
-    display: block;
-    margin-bottom: 8px;
-    font-weight: bold;
-    font-size: 14px;
-    color: #555;
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 14px;
+  color: #555;
 }
 
 .workflow-input-field {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 16px;
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 16px;
 }
 
 #fileSearch {
@@ -247,21 +283,22 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
 }
 
 .workflow-modal-header {
-  margin-top: 0; 
-  text-align: left; 
-  font-size: 20px; 
+  margin-top: 0;
+  text-align: left;
+  font-size: 20px;
   font-weight: 600;
   padding: 20px 30px 5px 30px;
 }
 
 .workflow-modal-subtitle {
-  font-size: 16px; 
+  font-size: 16px;
   font-weight: 400;
   color: #888;
   padding: 0px 30px;
@@ -370,14 +407,16 @@
   margin-bottom: 20px;
 }
 
-.quickstart-code, .run-response {
+.quickstart-code,
+.run-response {
   background-color: #f9f9f9;
   padding: 10px;
   margin-bottom: 10px;
   font-family: monospace;
 }
 
-.quickstart-code, .run-response pre {
+.quickstart-code,
+.run-response pre {
   overflow-x: auto;
 }
 
@@ -393,13 +432,18 @@ h4 {
 }
 
 .workflow-step-editable-title {
-  border: none; /* Remove any default border */
-  border-bottom: 1px solid transparent; /* Ensures spacing alignment */
+  border: none;
+  /* Remove any default border */
+  border-bottom: 1px solid transparent;
+  /* Ensures spacing alignment */
   background-image: radial-gradient(#cccccc99 50%, transparent 50%);
-  background-size: 15px 4px; /* Dots 5px wide with 1px spacing vertically */
-  background-repeat: repeat-x; /* Repeat the pattern horizontally */
-  background-position: bottom; 
-  padding-bottom: 10px; /* Adds some space between the text and the underline */
+  background-size: 15px 4px;
+  /* Dots 5px wide with 1px spacing vertically */
+  background-repeat: repeat-x;
+  /* Repeat the pattern horizontally */
+  background-position: bottom;
+  padding-bottom: 10px;
+  /* Adds some space between the text and the underline */
 }
 
 .workflow-output-section {
@@ -410,11 +454,11 @@ h4 {
 }
 
 .workflow-output-buttons {
-    padding: 0px;
-    margin: 15px 0px 0px 0px;
-    display: flex;
-    justify-content: right;
-    gap: 15px;
+  padding: 0px;
+  margin: 15px 0px 0px 0px;
+  display: flex;
+  justify-content: right;
+  gap: 15px;
 }
 
 .workflow-output-button {
@@ -441,12 +485,10 @@ h4 {
   left: -150%;
   width: 140%;
   height: 100%;
-  background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0),
-    rgba(255, 255, 255, 0.6),
-    rgba(255, 255, 255, 0)
-  );
+  background: linear-gradient(120deg,
+      rgba(255, 255, 255, 0),
+      rgba(255, 255, 255, 0.6),
+      rgba(255, 255, 255, 0));
   animation: workflow-progress-shimmer 1.8s ease-in-out infinite;
   pointer-events: none;
 }
@@ -461,6 +503,7 @@ h4 {
   0% {
     left: -150%;
   }
+
   100% {
     left: 150%;
   }

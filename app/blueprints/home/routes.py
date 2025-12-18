@@ -651,7 +651,8 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
-    message = data["message"]
+    raw_message = data["message"]
+    message = raw_message
     activity_id = data.get("activity_id", None)
     current_space_id = data.get("current_space_id", None)
     # get activity if it exists
@@ -690,6 +691,19 @@ def chat() -> ResponseReturnValue:
             space=current_space_id,
             document_uuids=document_uuids,
         )
+        # If this chat isn't tied to any documents, we won't run the LLM-based
+        # activity description job. In that case, set a simple safe title
+        # immediately so the app rail doesn't stay stuck on "Generating title…".
+        if (not document_uuids) and (not activity.title):
+            first_line = (raw_message or "").strip().splitlines()[0] if raw_message else ""
+            words = [w for w in first_line.split() if w]
+            short = " ".join(words[:8]).strip()
+            if not short:
+                short = "Chat"
+            if len(short) > 80:
+                short = short[:77].rstrip() + "..."
+            activity.title = escape(short)
+            activity.save()
 
     else:
         activity = ActivityEvent.objects(id=activity_id).first()
