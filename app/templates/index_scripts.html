@@ -8,6 +8,7 @@
     var current_space_id = "{{ current_space_id }}"
     var workflow_elapsed_time = 0;
     var workflow_session_id = "";
+    var workflow_start_time_ms = null;
 
     var workflow_time = 0;
     var steps_completed = 0;
@@ -425,9 +426,57 @@
 
     function formatWorkflowElapsed(seconds) {
         const safeSeconds = Math.max(Number(seconds) || 0, 0);
-        const mins = Math.floor(safeSeconds / 60);
-        const secs = safeSeconds % 60;
+        const totalSeconds = Math.floor(safeSeconds);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
         return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function parseIsoTimeToMs(value) {
+        if (typeof value !== "string" || !value.trim()) {
+            return null;
+        }
+        const ms = Date.parse(value);
+        return Number.isFinite(ms) ? ms : null;
+    }
+
+    function resolveWorkflowDurationSeconds(payload, fallbackSeconds = 0) {
+        const durationSeconds = payload && typeof payload.duration_seconds === "number"
+            ? payload.duration_seconds
+            : null;
+        if (typeof durationSeconds === "number" && durationSeconds >= 0) {
+            return durationSeconds;
+        }
+
+        const startedMs = parseIsoTimeToMs(payload?.started_at);
+        const finishedMs = parseIsoTimeToMs(payload?.finished_at);
+        if (startedMs != null && finishedMs != null && finishedMs >= startedMs) {
+            return (finishedMs - startedMs) / 1000;
+        }
+
+        if (typeof workflow_start_time_ms === "number") {
+            const now = Date.now();
+            if (Number.isFinite(now) && now >= workflow_start_time_ms) {
+                return (now - workflow_start_time_ms) / 1000;
+            }
+        }
+
+        return Math.max(Number(fallbackSeconds) || 0, 0);
+    }
+
+    function formatWorkflowCompletionLabel(status, durationSeconds) {
+        const normalized = (status || "").toString().toLowerCase();
+        const base =
+            normalized === "failed"
+                ? "Failed"
+                : normalized === "canceled"
+                    ? "Canceled"
+                    : "Completed";
+        const seconds = Math.max(Number(durationSeconds) || 0, 0);
+        if (seconds <= 0) {
+            return base;
+        }
+        return `${base} in ${formatWorkflowElapsed(seconds)}`;
     }
 
     function updateWorkflowProgressInfo(stepsCompleted = 0, totalSteps = null, elapsedSeconds = 0, options = {}) {
@@ -574,11 +623,32 @@
 
         if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
             const completed = Math.max(stepsCompleted, 0);
-            let statusLabel = status || "Completed";
-            if (typeof statusLabel === "string" && statusLabel.length > 0) {
-                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+            const normalizedStatus = (status || "").toString().toLowerCase();
+            const startedMs = parseIsoTimeToMs(snapshot.started_at);
+            const finishedMs = parseIsoTimeToMs(snapshot.finished_at);
+            const durationSeconds =
+                typeof snapshot.duration_seconds === "number"
+                    ? snapshot.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(completed, stepsTotal, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+                return;
             }
-            updateWorkflowProgressInfo(completed, stepsTotal, 0, { trailingLabel: statusLabel });
+
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
+            updateWorkflowProgressInfo(completed, stepsTotal, elapsedSeconds);
         } else if (status) {
             const label = status.charAt(0).toUpperCase() + status.slice(1);
             updateWorkflowProgressInfo(0, null, 0, { trailingLabel: label });
@@ -2537,6 +2607,7 @@
         let session_id = generateSessionId();
         workflow_session_id = session_id;
         active_step = 0;
+        workflow_start_time_ms = Date.now();
 
         // Start the timer before making the API call
         $('.workflow-output-buttons').addClass('hidden');
@@ -2835,7 +2906,8 @@
                     }
 
                     resetWorkflowActiveStatus();
-                    const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
+                    const durationSeconds = resolveWorkflowDurationSeconds(data, workflow_time);
+                    const trailingLabel = formatWorkflowCompletionLabel(status, durationSeconds);
                     updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
                         trailingLabel: trailingLabel,
                     });
@@ -2846,6 +2918,9 @@
                         steps_total: total_steps,
                         status: status,
                         session_id: workflow_session_id,
+                        started_at: data.started_at ?? null,
+                        finished_at: data.finished_at ?? null,
+                        duration_seconds: data.duration_seconds ?? null,
                     };
 
                     if (status === 'failed') {
@@ -2868,6 +2943,9 @@
                             steps_total: total_steps,
                             status: status,
                             session_id: workflow_session_id,
+                            started_at: data.started_at ?? null,
+                            finished_at: data.finished_at ?? null,
+                            duration_seconds: data.duration_seconds ?? null,
                         };
 
                         const html = normalizeWorkflowOutput(snapshotPayload);
@@ -3016,13 +3094,18 @@
     }
 
     function pollWorkflowStatus(session_id) {
-        let startTime = Date.now(); // Capture start time to calculate elapsed time
         const pollInterval = 1000; // Poll every second
+        if (typeof workflow_start_time_ms !== "number") {
+            workflow_start_time_ms = Date.now();
+        }
         workflow_elapsed_time = 0;
 
         let intervalId = setInterval(() => {
-            workflow_elapsed_time += 1;
-
+            const now = Date.now();
+            workflow_elapsed_time = Math.max(
+                Math.floor((now - workflow_start_time_ms) / 1000),
+                0,
+            );
             performWorkflowStatus(session_id, workflow_elapsed_time);
         }, pollInterval);
 
@@ -4920,10 +5003,23 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             const steps_completed = data.steps_completed || 0;
             const total_steps = data.total_steps || 0;
             const status = data.status;
+            const normalizedStatus = (status || "").toString().toLowerCase();
             const currentStepName = data.current_step_name;
             const currentStepDetail = data.current_step_detail;
             const currentStepPreview = data.current_step_preview;
             const output = data.output;
+            const startedMs = parseIsoTimeToMs(data.started_at);
+            const finishedMs = parseIsoTimeToMs(data.finished_at);
+            const durationSeconds =
+                typeof data.duration_seconds === "number"
+                    ? data.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
 
             // Ensure workflow panel is visible
             setSection("Library");
@@ -4935,7 +5031,17 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             }
 
             // Update progress info
-            updateWorkflowProgressInfo(steps_completed, total_steps, 0);
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(steps_completed, total_steps, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+            } else {
+                updateWorkflowProgressInfo(steps_completed, total_steps, elapsedSeconds);
+            }
 
             // Show workflow output section if we have preview or output
             if (currentStepPreview || output) {
