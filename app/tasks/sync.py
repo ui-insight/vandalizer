@@ -19,12 +19,13 @@ def pull_verified_items():
 
     url = os.getenv("MAIN_SERVER_URL")
     key = os.getenv("SYNC_API_KEY")
+    instance_name = os.getenv("INSTANCE_NAME", "Unknown Instance")
     if not url: return "No Main URL configured"
 
     try:
         resp = requests.get(
             f"{url}/library/api/sync/verified",
-            headers={"X-Sync-Key": key},
+            headers={"X-Sync-Key": key, "X-Instance-Name": instance_name},
             timeout=30
         )
         if resp.status_code != 200:

@@ -1033,6 +1033,7 @@ def _submit_for_verification_route(kind: str):
     is_main = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
     main_url = os.getenv("MAIN_SERVER_URL")
     sync_key = os.getenv("SYNC_API_KEY")
+    instance_name = os.getenv("INSTANCE_NAME", "Instance")
 
     if not is_main and main_url and sync_key:
         try:
@@ -1056,7 +1057,7 @@ def _submit_for_verification_route(kind: str):
             requests.post(
                 f"{main_url}/library/api/sync/receive_request",
                 json=forward_payload,
-                headers={"X-Sync-Key": sync_key},
+                headers={"X-Sync-Key": sync_key, "X-Instance-Name": instance_name},
                 timeout=5
             )
         except Exception as e:
@@ -1123,6 +1124,7 @@ def api_receive_verification_request():
     if not is_main_server:
         return jsonify({"error": "forbidden"}), 403
     auth_header = request.headers.get("X-Sync-Key")
+    instance_name = request.headers.get("X-Instance-Name", "Unknown")
     if auth_header != os.getenv("SYNC_API_KEY"):
         return jsonify({"error": "unauthorized"}), 401
 
@@ -1132,7 +1134,7 @@ def api_receive_verification_request():
     identifier = payload.get("item_identifier")
     obj_data = payload.get("object_data")
     
-    # 1. Ensure the Object exists on Prod (Create/Update it)
+    # Ensure the Object exists on Prod (Create/Update it)
     # We must reconstruct the object so the VerificationRequest can link to it
     obj, _ = _resolve_obj(kind, identifier)
     
@@ -1161,7 +1163,7 @@ def api_receive_verification_request():
                 current_app.logger.error(f"Sync Create Error: {e}")
                 # Proceeding anyway, though linkage might fail
 
-    # 2. Check if Request already exists
+    # Check if Request already exists
     existing = VerificationRequest.objects(
         item_kind=kind, item_identifier=identifier
     ).first()
@@ -1169,7 +1171,7 @@ def api_receive_verification_request():
     if existing:
         return jsonify({"status": "exists", "uuid": existing.uuid})
 
-    # 3. Create Verification Request
+    # Create Verification Request
     req = VerificationRequest(
         item_kind=kind,
         item_identifier=identifier,
@@ -1183,6 +1185,6 @@ def api_receive_verification_request():
     req.save()
     
     # Notify Prod Examiners
-    _notify_examiners_of_submission(None, req, User(name="Instance Sync"))
+    _notify_examiners_of_submission(None, req, User(name=instance_name))
     
     return jsonify({"ok": True, "uuid": req.uuid})

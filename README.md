@@ -92,6 +92,10 @@ The following environment variables must be set:
 - `REDIS_BROKER_URL`, `REDIS_RESULT_BACKEND`: Redis connection URLs for Celery (optional, override defaults)
 - `ROLLBAR_ACCESS_TOKEN`: Rollbar API token
 - `MAIL_SERVER`, `MAIL_PORT`, `MAIL_DEFAULT_SENDER`: Mail server settings if different from defaults
+- `IS_MAIN_SERVER`: boolean for wether this vandalizer instance is the prod or not
+- `SYNC_API_KEY`: API key for authenticating instances requests to the main server
+- `MAIN_SERVER_URL`: the url of the main server
+- `INSTANCE_NAME`: the name of the current vandalizer instance
 
 ## Testing
 
