@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import requests
+from app import limiter
 
 import os
 import json
@@ -582,6 +583,8 @@ def library_page():
 @library.route("/filter", methods=["POST"])
 @login_required
 @validate_json_request()
+# @limiter.limit("60 per minute")
+@limiter.exempt
 def filter_library_items():
     """
     AJAX endpoint to fetch filtered results.

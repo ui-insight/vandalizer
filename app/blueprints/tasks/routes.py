@@ -5,6 +5,8 @@ import uuid
 from copy import deepcopy
 from pathlib import Path
 
+from app import limiter
+
 import pypandoc
 from devtools import debug
 from flask import (
@@ -91,6 +93,7 @@ def _render_extraction_panel(search_set: SearchSet, **context):
 @login_required
 @tasks.route("/model/filter", methods=["POST"])
 @validate_json_request()
+@limiter.exempt
 def filter_models() -> ResponseReturnValue:
     data = request.get_json()
     uuids = data.get("uuids", [])

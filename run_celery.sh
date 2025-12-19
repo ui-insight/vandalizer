@@ -65,6 +65,18 @@ find_pids() {
   fi
 }
 
+# If INSTANCE_NAME env var is set (e.g., "prod" or "dev"), use a subdirectory.
+INSTANCE_SUBDIR="${INSTANCE_NAME:-main}"
+
+# Use absolute paths with instance subdirectory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LOG_DIR="$SCRIPT_DIR/logs/$INSTANCE_SUBDIR"
+PID_DIR="$SCRIPT_DIR/pids/$INSTANCE_SUBDIR"
+
+echo "Instance: $INSTANCE_SUBDIR"
+echo "Logs: $LOG_DIR"
+echo "Pids: $PID_DIR"
+
 # Create directories
 mkdir -p "$LOG_DIR" "$PID_DIR"
 

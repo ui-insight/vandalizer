@@ -25,15 +25,15 @@ echo -e "${BLUE}=================================================${NC}"
 # 1. Start PROD Server (The "Main" Server)
 # ---------------------------------------------------------
 echo -e "${GREEN}[PROD] Starting Main Server on Port $PROD_PORT...${NC}"
-echo -e "       DB: vandalizer_prod"
+echo -e "       Env: production"
+echo -e "       DB:  osp (from ProductionConfig)"
 
-# We use subshell (...) to isolate environment variables for this process
 (
   export FLASK_APP=run.py
-  export FLASK_ENV=development
+  # Using 'production' loads ProductionConfig -> MONGO_DB = "osp"
+  export FLASK_ENV=production
   export PORT=$PROD_PORT
-  export MONGO_DB=vandalizer_prod
-  export FLASK_MONGO_DB=vandalizer_prod  # Redundant safety for config loading
+  
   export IS_MAIN_SERVER=true
   export SYNC_API_KEY=$SYNC_KEY
   
@@ -46,15 +46,17 @@ PROD_PID=$!
 # 2. Start DEV Instance (The "Client" Instance)
 # ---------------------------------------------------------
 echo -e "${GREEN}[DEV]  Starting Dev Instance on Port $DEV_PORT...${NC}"
-echo -e "       DB: vandalizer_dev"
+echo -e "       Env: testing"
+echo -e "       DB:  osp-staging (from TestingConfig)"
 echo -e "       Pointing to: http://localhost:$PROD_PORT"
 
 (
   export FLASK_APP=run.py
-  export FLASK_ENV=development
+  # Using 'testing' loads TestingConfig -> MONGO_DB = "osp-staging"
+  # This ensures data isolation from the Prod server
+  export FLASK_ENV=testing
   export PORT=$DEV_PORT
-  export MONGO_DB=vandalizer_dev
-  export FLASK_MONGO_DB=vandalizer_dev
+  
   export IS_MAIN_SERVER=false
   export MAIN_SERVER_URL=http://localhost:$PROD_PORT
   export SYNC_API_KEY=$SYNC_KEY
@@ -81,18 +83,6 @@ if ps -p $DEV_PID > /dev/null; then
 else
    echo -e "${RED}✗ DEV Server failed to start. Check logs/dev_server.log${NC}"
 fi
-
-echo -e "\n${BLUE}=== Test Instructions ===${NC}"
-echo "1. Go to DEV (http://localhost:$DEV_PORT) and create a Workflow."
-echo "2. Click 'Submit for Verification'."
-echo "3. Go to PROD (http://localhost:$PROD_PORT), login as Admin."
-echo "4. Go to Library -> Verification Queue. You should see the request."
-echo "5. Approve the request on PROD."
-echo -e "\n${YELLOW}=== Triggering Sync Manually ===${NC}"
-echo "Since we are not running full Celery workers in this script,"
-echo "run this command in a NEW terminal to force the DEV server to pull approved items:"
-echo -e "${GREEN}export MONGO_DB=vandalizer_dev; export IS_MAIN_SERVER=false; export MAIN_SERVER_URL=http://localhost:$PROD_PORT; export SYNC_API_KEY=$SYNC_KEY; flask --app vandalizer/run.py shell -c 'from app.tasks.sync import pull_verified_items; print(pull_verified_items())'${NC}"
-echo -e "\n(Press Ctrl+C to stop servers)"
 
 # Wait for user to exit
 wait

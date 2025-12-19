@@ -54,10 +54,19 @@ def celery_init_app(app: Flask) -> Celery:
 # Use app factory pattern
 def create_app() -> Flask:
     app = Flask(__name__)
+
+    # default Redis URLs
+    default_broker = f"redis://{REDIS_HOST}:6379/0"
+    default_backend = f"redis://{REDIS_HOST}:6379/1"
+
+    # allow override via environment variable 
+    celery_broker = os.getenv("CELERY_BROKER_URL", default_broker)
+    celery_backend = os.getenv("CELERY_RESULT_BACKEND", default_backend)
+
     app.config.from_mapping(
         CELERY={
-            "broker_url": f"redis://{REDIS_HOST}:6379/0",
-            "result_backend": f"redis://{REDIS_HOST}:6379/1",
+            "broker_url": celery_broker,
+            "result_backend": celery_backend,
             "task_default_queue": "default",
             "task_routes": {
                 "tasks.documents.*": {"queue": "documents"},

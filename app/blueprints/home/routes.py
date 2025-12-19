@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
+from app import limiter
+
 import pypandoc
 from devtools import debug
 from flask import (
@@ -160,6 +162,7 @@ def build_breadcrumbs(
 
 @login_required
 @home.route("/")
+@limiter.exempt
 def index() -> ResponseReturnValue:
     """Primary entry point."""
     user = load_user()
