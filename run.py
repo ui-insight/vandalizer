@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 
 from devtools import debug
@@ -36,6 +39,6 @@ debug(langfuse_enabled)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5003))
-    # Use socketio.run() for WebSocket support
-    socketio.run(app, host="0.0.0.0", port=port, debug=True, allow_unsafe_werkzeug=True)
+    # Use socketio.run() for WebSocket support with eventlet
+    socketio.run(app, host="0.0.0.0", port=port, debug=True)
 # , ssl_context=("certs/cert.pem", "certs/key.pem"))

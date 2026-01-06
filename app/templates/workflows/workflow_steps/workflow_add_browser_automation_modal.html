@@ -1,108 +1,857 @@
 <div id="" class="workflow-overlay workflowAddBrowserAutomationModal" style="display: block;">
-    <div class="workflow-modal-content" style="max-width: 700px;">
+    <div class="workflow-modal-content" style="max-width: 900px;">
         <!-- Header -->
-        <h2 class="workflow-modal-header">
-            {% if is_editing %} Update Browser Automation {% else %} Add Browser Automation {% endif %}
-            <a class="closeAddBrowserAutomationToWorkflowBtn" style="float:right; color: #88888899; cursor: pointer;"><i
-                    class="fa-solid fa-circle-xmark"></i></a>
-        </h2>
-
-        <!-- Description -->
-        <hr>
-        <h3 class="workflow-modal-subtitle">Automate web page interactions using a Chrome extension</h3>
-        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
-
-        <!-- Body -->
-        <div class="workflow-content-body" style="max-height: 400px; overflow-y: auto;">
-            <div class="section" style="margin-bottom: 20px;">
-                <p class="workflow-label" style="padding-top: 10px;">Target Website:</p>
-                <input type="url" id="browser-automation-url" placeholder="https://example.com" class="input-field"
-                    value="{{ workflow_task.data['actions'][0]['config']['url'] if is_editing and workflow_task.data.get('actions') else '' }}">
+        <div class="modern-modal-header">
+            <div>
+                <h2 style="margin: 0; font-size: 24px; color: #1e293b;">
+                    <i class="fa-solid fa-globe" style="color: #3b82f6;"></i>
+                    {% if is_editing %} Update Browser Automation {% else %} Browser Automation {% endif %}
+                </h2>
+                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Automate web interactions by recording or building manually</p>
             </div>
+            <a class="closeAddBrowserAutomationToWorkflowBtn" style="color: #94a3b8; cursor: pointer; font-size: 24px;">
+                <i class="fa-solid fa-xmark"></i>
+            </a>
+        </div>
 
-            <div class="section" style="margin-bottom: 20px;">
-                <p class="workflow-label">Allowed Domains (comma-separated, leave empty for all):</p>
-                <input type="text" id="browser-automation-domains" placeholder="example.com, subdomain.example.com"
-                    class="input-field"
-                    value="{{ workflow_task.data['allowed_domains']|join(', ') if is_editing and workflow_task.data.get('allowed_domains') else '' }}">
-            </div>
+        <!-- Tabs -->
+        <div class="automation-tabs">
+            <button class="tab-button active" data-tab="record">
+                <i class="fa-solid fa-circle-dot"></i> Record Actions
+            </button>
+            <button class="tab-button" data-tab="manual">
+                <i class="fa-solid fa-wrench"></i> Build Manually
+            </button>
+        </div>
 
-            <div class="section" style="margin-bottom: 20px;">
-                <p class="workflow-label">Actions:</p>
-                <div id="browser-automation-actions"
-                    style="background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 60px;">
-                    <p class="text-muted" style="margin: 0;">No actions configured yet. Add actions below.</p>
+        <!-- Tab Content: Record -->
+        <div class="tab-content active" id="tab-record">
+            <div class="recorder-panel">
+                <!-- Connection Status -->
+                <div class="connection-status" id="connection-status">
+                    <div class="status-indicator" id="status-indicator"></div>
+                    <span id="status-text">Checking extension connection...</span>
                 </div>
 
-                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;">
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="navigate">
-                        <i class="fa-solid fa-arrow-right"></i> Navigate
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn"
-                        data-action="ensure_login">
-                        <i class="fa-solid fa-shield-halved"></i> Require Login
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="fill_form">
-                        <i class="fa-solid fa-keyboard"></i> Fill Form
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="click">
-                        <i class="fa-solid fa-hand-pointer"></i> Click
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn" data-action="extract">
-                        <i class="fa-solid fa-download"></i> Extract Data
-                    </button>
-                    <button type="button" class="btn btn-sm btn-outline-primary add-action-btn"
-                        data-action="smart_action">
-                        <i class="fa-solid fa-stars"></i> Smart Action (LLM)
-                    </button>
-                </div>
-            </div>
+                <!-- Recorder Controls -->
+                <div class="recorder-controls">
+                    <div class="recorder-main">
+                        <button id="start-recording-btn" class="btn-record" disabled>
+                            <i class="fa-solid fa-circle"></i>
+                            <span>Start Recording</span>
+                        </button>
+                        <button id="stop-recording-btn" class="btn-stop" style="display: none;">
+                            <i class="fa-solid fa-stop"></i>
+                            <span>Stop Recording</span>
+                        </button>
 
-            <div class="section" style="margin-bottom: 20px;">
-                <p class="workflow-label">Output Settings:</p>
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
-                    <input type="checkbox" id="browser-automation-summarize" checked>
-                    <label for="browser-automation-summarize">Generate natural language summary</label>
+                        <div class="recording-info" id="recording-info" style="display: none;">
+                            <div class="pulse-indicator"></div>
+                            <span id="recording-count">0 actions recorded</span>
+                            <span class="recording-time" id="recording-time">00:00</span>
+                        </div>
+                    </div>
+
+                    <div class="recorder-instructions" id="recorder-instructions">
+                        <h4><i class="fa-solid fa-lightbulb"></i> How to Record</h4>
+                        <ol>
+                            <li>Click "Start Recording" and navigate to your target website</li>
+                            <li>Perform the actions you want to automate (click, type, etc.)</li>
+                            <li>Click "Stop Recording" when done</li>
+                            <li>Label your recorded steps and save as a workflow</li>
+                        </ol>
+                    </div>
+
+                    <!-- Recorded Steps Preview -->
+                    <div class="recorded-steps-preview" id="recorded-steps-preview" style="display: none;">
+                        <h4>Recorded Steps (<span id="preview-count">0</span>)</h4>
+                        <div class="steps-list" id="preview-steps-list"></div>
+                        <button id="use-recording-btn" class="btn btn-primary" style="width: 100%; margin-top: 10px;">
+                            <i class="fa-solid fa-arrow-right"></i> Continue to Labeling
+                        </button>
+                    </div>
                 </div>
-                <textarea id="browser-automation-summary-prompt" class="input-field" rows="2"
-                    placeholder="Based on the extracted data, provide a summary that...">{{ workflow_task.data['summarization']['prompt_template'] if is_editing and workflow_task.data.get('summarization') else '' }}</textarea>
             </div>
         </div>
 
-        <!-- Bottom Toolbar -->
-        <div class="bottom-toolbar">
-            <div>
-                <div style="padding: 0px; margin: 0 auto; display: flex; justify-content: center; gap: 15px;">
-                    <button id="confirmBrowser_automationStepBtn" class="btn btn-primary" style="flex-grow: 1;">
-                        {% if is_editing %}
-                        Update
-                        {% else %}
-                        Add Browser Automation
-                        {% endif %}
-                    </button>
+        <!-- Tab Content: Manual -->
+        <div class="tab-content" id="tab-manual">
+            <div class="manual-panel">
+                <!-- Initial URL -->
+                <div class="form-group-modern">
+                    <label><i class="fa-solid fa-link"></i> Starting URL (Optional)</label>
+                    <input type="url" id="browser-automation-url" placeholder="https://example.com"
+                        value="{{ workflow_task.data['actions'][0]['config']['url'] if is_editing and workflow_task.data.get('actions') else '' }}">
+                    <small>Leave blank if workflow should use current tab</small>
+                </div>
+
+                <!-- Allowed Domains -->
+                <div class="form-group-modern">
+                    <label><i class="fa-solid fa-shield"></i> Allowed Domains</label>
+                    <input type="text" id="browser-automation-domains" placeholder="example.com, subdomain.example.com"
+                        value="{{ workflow_task.data['allowed_domains']|join(', ') if is_editing and workflow_task.data.get('allowed_domains') else '' }}">
+                    <small>Comma-separated. Leave empty to allow all domains</small>
+                </div>
+
+                <!-- Actions Builder -->
+                <div class="form-group-modern">
+                    <label><i class="fa-solid fa-list-check"></i> Actions</label>
+                    <div id="browser-automation-actions" class="actions-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-hand-pointer" style="font-size: 48px; color: #cbd5e1; margin-bottom: 10px;"></i>
+                            <p>No actions configured yet</p>
+                            <small>Add actions using the buttons below</small>
+                        </div>
+                    </div>
+
+                    <div class="action-buttons">
+                        <button type="button" class="action-btn add-action-btn" data-action="navigate">
+                            <i class="fa-solid fa-arrow-right"></i> Navigate
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="ensure_login">
+                            <i class="fa-solid fa-shield-halved"></i> Login Pause
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="fill_form">
+                            <i class="fa-solid fa-keyboard"></i> Fill Form
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="click">
+                            <i class="fa-solid fa-hand-pointer"></i> Click
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="extract">
+                            <i class="fa-solid fa-download"></i> Extract
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="smart_action">
+                            <i class="fa-solid fa-sparkles"></i> Smart Action
+                        </button>
+                        <button type="button" class="action-btn add-action-btn" data-action="assert">
+                            <i class="fa-solid fa-check-circle"></i> Verify
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Output Settings -->
+                <div class="form-group-modern">
+                    <label><i class="fa-solid fa-file-export"></i> Output Options</label>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="browser-automation-summarize" checked>
+                        <label for="browser-automation-summarize">Generate AI summary of results</label>
+                    </div>
+                    <textarea id="browser-automation-summary-prompt" rows="2"
+                        placeholder="Summarize the extracted data focusing on...">{{ workflow_task.data['summarization']['prompt_template'] if is_editing and workflow_task.data.get('summarization') else '' }}</textarea>
                 </div>
             </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="modern-modal-footer">
+            <button class="btn-secondary closeAddBrowserAutomationToWorkflowBtn">
+                <i class="fa-solid fa-xmark"></i> Cancel
+            </button>
+            <button id="confirmBrowser_automationStepBtn" class="btn-primary">
+                <i class="fa-solid fa-check"></i>
+                {% if is_editing %} Update Automation {% else %} Add to Workflow {% endif %}
+            </button>
         </div>
     </div>
+
+    <!-- Styles -->
+    <style>
+        .modern-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 24px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .automation-tabs {
+            display: flex;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+            padding: 0 24px;
+        }
+
+        .tab-button {
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: #64748b;
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-button:hover {
+            color: #3b82f6;
+            background: #f1f5f9;
+        }
+
+        .tab-button.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .tab-button i {
+            margin-right: 6px;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 24px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Recorder Panel */
+        .recorder-panel {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 16px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #94a3b8;
+        }
+
+        .status-indicator.connected {
+            background: #22c55e;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .recorder-controls {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .recorder-main {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-record, .btn-stop {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 28px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-record:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-record:disabled {
+            background: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-stop {
+            background: #475569;
+            color: white;
+        }
+
+        .btn-stop:hover {
+            background: #334155;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(71, 85, 105, 0.4);
+        }
+
+        .recording-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 16px;
+            background: #fef2f2;
+            border: 2px solid #fee2e2;
+            border-radius: 8px;
+            font-weight: 500;
+            color: #dc2626;
+        }
+
+        .pulse-indicator {
+            width: 12px;
+            height: 12px;
+            background: #ef4444;
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+        }
+
+        .recording-time {
+            margin-left: auto;
+            font-family: monospace;
+            font-size: 16px;
+        }
+
+        .recorder-instructions {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .recorder-instructions h4 {
+            margin: 0 0 12px 0;
+            color: #0c4a6e;
+            font-size: 14px;
+        }
+
+        .recorder-instructions ol {
+            margin: 0;
+            padding-left: 20px;
+            color: #075985;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        .recorder-instructions li {
+            margin-bottom: 6px;
+        }
+
+        .recorded-steps-preview {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .recorded-steps-preview h4 {
+            margin: 0 0 12px 0;
+            color: #1e293b;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .steps-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .step-preview-item {
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        /* Manual Panel */
+        .manual-panel {
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .form-group-modern {
+            margin-bottom: 24px;
+        }
+
+        .form-group-modern label {
+            display: block;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group-modern label i {
+            color: #3b82f6;
+            margin-right: 6px;
+        }
+
+        .form-group-modern input[type="url"],
+        .form-group-modern input[type="text"],
+        .form-group-modern textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .form-group-modern input:focus,
+        .form-group-modern textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-group-modern small {
+            display: block;
+            margin-top: 6px;
+            color: #64748b;
+            font-size: 12px;
+        }
+
+        .actions-container {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 120px;
+            margin-bottom: 12px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #64748b;
+        }
+
+        .empty-state p {
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .action-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid #3b82f6;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .action-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .action-item-header strong {
+            color: #1e293b;
+            font-size: 14px;
+        }
+
+        .action-item-remove {
+            background: none;
+            border: none;
+            color: #ef4444;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background 0.2s;
+        }
+
+        .action-item-remove:hover {
+            background: #fef2f2;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .action-btn {
+            padding: 8px 14px;
+            border: 1px solid #cbd5e1;
+            background: white;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            color: #475569;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            background: #f1f5f9;
+            border-color: #3b82f6;
+            color: #3b82f6;
+            transform: translateY(-1px);
+        }
+
+        .action-btn i {
+            margin-right: 6px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            font-weight: 400;
+            cursor: pointer;
+        }
+
+        /* Footer */
+        .modern-modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            padding: 20px 24px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .btn-primary, .btn-secondary {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-size: 14px;
+        }
+
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+        }
+
+        .btn-secondary:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+    </style>
+
     <script>
         let browserAutomationActions = [];
         let browserAutomationActionId = 0;
+        let isRecording = false;
+        let recordingStartTime = null;
+        let recordingTimer = null;
+        let recordedSteps = [];
+        let currentRecordingId = null;
 
+        // Tab switching
+        $(document).on('click', '.tab-button', function() {
+            const tab = $(this).data('tab');
+            $('.tab-button').removeClass('active');
+            $(this).addClass('active');
+            $('.tab-content').removeClass('active');
+            $(`#tab-${tab}`).addClass('active');
+        });
+
+        // Check extension connection
+        function checkExtensionConnection() {
+            // Check if backend has active extension connection
+            $.ajax({
+                url: '/browser_automation/connection/status',
+                method: 'GET',
+                success: function(data) {
+                    if (data.connected) {
+                        $('#status-indicator').addClass('connected');
+                        $('#status-text').text('Extension connected and ready');
+                        $('#start-recording-btn').prop('disabled', false);
+                    } else {
+                        $('#status-text').text('Extension not connected. Please install and connect.');
+                        $('#start-recording-btn').prop('disabled', true);
+                    }
+                },
+                error: function() {
+                    $('#status-text').text('Unable to check connection status');
+                    $('#start-recording-btn').prop('disabled', true);
+                }
+            });
+        }
+
+        // Recording controls
+        $(document).on('click', '#start-recording-btn', function() {
+            startRecording();
+        });
+
+        $(document).on('click', '#stop-recording-btn', function() {
+            stopRecording();
+        });
+
+        function startRecording() {
+            // Call backend to start recording
+            $.ajax({
+                url: '/browser_automation/recording/start',
+                method: 'POST',
+                success: function(data) {
+                    currentRecordingId = data.recording_id;
+                    isRecording = true;
+                    recordingStartTime = Date.now();
+                    recordedSteps = [];
+
+                    // UI updates
+                    $('#start-recording-btn').hide();
+                    $('#stop-recording-btn').show();
+                    $('#recording-info').show();
+                    $('#recorder-instructions').hide();
+
+                    // Start timer
+                    recordingTimer = setInterval(updateRecordingTime, 1000);
+
+                    console.log('[UI] Recording started:', currentRecordingId);
+
+                    // Poll for updates
+                    startPollingRecording();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON || {};
+                    alert('Failed to start recording: ' + (error.message || 'Unknown error'));
+                    console.error('[UI] Failed to start recording:', error);
+                }
+            });
+        }
+
+        let recordingPollInterval = null;
+
+        function startPollingRecording() {
+            // Poll every 2 seconds for recording updates
+            recordingPollInterval = setInterval(() => {
+                if (!isRecording || !currentRecordingId) {
+                    clearInterval(recordingPollInterval);
+                    return;
+                }
+
+                $.ajax({
+                    url: `/browser_automation/api/recording/${currentRecordingId}`,
+                    method: 'GET',
+                    success: function(data) {
+                        recordedSteps = data.steps || [];
+                        updateRecordingCount(recordedSteps.length);
+                    },
+                    error: function() {
+                        console.error('[UI] Failed to fetch recording updates');
+                    }
+                });
+            }, 2000);
+        }
+
+        function stopRecording() {
+            if (!currentRecordingId) {
+                console.error('[UI] No active recording to stop');
+                return;
+            }
+
+            // Call backend to stop recording
+            $.ajax({
+                url: `/browser_automation/recording/${currentRecordingId}/stop`,
+                method: 'POST',
+                success: function(data) {
+                    isRecording = false;
+                    clearInterval(recordingTimer);
+                    clearInterval(recordingPollInterval);
+
+                    // UI updates
+                    $('#stop-recording-btn').hide();
+                    $('#start-recording-btn').show();
+                    $('#recording-info').hide();
+
+                    console.log('[UI] Recording stopped:', data);
+
+                    // Fetch final recording data
+                    fetchRecordingData();
+                },
+                error: function(xhr) {
+                    const error = xhr.responseJSON || {};
+                    alert('Failed to stop recording: ' + (error.message || 'Unknown error'));
+                    console.error('[UI] Failed to stop recording:', error);
+                }
+            });
+        }
+
+        function fetchRecordingData() {
+            if (!currentRecordingId) return;
+
+            console.log('[UI] Fetching recording data for:', currentRecordingId);
+
+            $.ajax({
+                url: `/browser_automation/api/recording/${currentRecordingId}`,
+                method: 'GET',
+                success: function(data) {
+                    console.log('[UI] Received recording data:', data);
+                    recordedSteps = data.steps || [];
+                    console.log('[UI] Recorded steps count:', recordedSteps.length);
+                    console.log('[UI] Recorded steps:', recordedSteps);
+
+                    // Show preview
+                    if (recordedSteps.length > 0) {
+                        renderRecordedStepsPreview();
+                        $('#recorded-steps-preview').show();
+                    } else {
+                        console.warn('[UI] No steps in recording');
+                        alert('No steps were recorded. Please try again.');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('[UI] Failed to fetch recording data:', error);
+                    alert('Failed to fetch recording data');
+                }
+            });
+        }
+
+        function updateRecordingTime() {
+            const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+            const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0');
+            const seconds = (elapsed % 60).toString().padStart(2, '0');
+            $('#recording-time').text(`${minutes}:${seconds}`);
+        }
+
+        function updateRecordingCount(count) {
+            $('#recording-count').text(`${count} action${count !== 1 ? 's' : ''} recorded`);
+        }
+
+        function renderRecordedStepsPreview() {
+            const container = $('#preview-steps-list');
+            container.empty();
+
+            recordedSteps.forEach((step, index) => {
+                const stepHtml = `
+                    <div class="step-preview-item">
+                        <strong>${index + 1}.</strong> ${step.type} - ${step.description || 'Unknown action'}
+                    </div>
+                `;
+                container.append(stepHtml);
+            });
+
+            $('#preview-count').text(recordedSteps.length);
+        }
+
+        $(document).on('click', '#use-recording-btn', function() {
+            console.log('[UI] Continue to Labeling clicked');
+            console.log('[UI] recordedSteps available:', recordedSteps);
+            console.log('[UI] recordedSteps length:', recordedSteps.length);
+
+            // Convert recorded steps to workflow actions
+            browserAutomationActions = recordedSteps.map(step => {
+                const action = {
+                    action_id: `action-${browserAutomationActionId++}`,
+                    type: step.type,
+                    config: {}
+                };
+
+                // Map recorded step data to action config based on type
+                switch (step.type) {
+                    case 'click':
+                        console.log('[UI] Processing click step, target:', step.target);
+                        console.log('[UI] Strategies:', step.target?.strategies);
+                        action.config = {
+                            target_stack: step.target?.strategies || [],
+                            click_type: 'left',
+                            wait_after_ms: 500
+                        };
+                        console.log('[UI] Created config:', action.config);
+                        break;
+
+                    case 'fill_form':
+                        action.config = {
+                            field_mappings: [{
+                                target_stack: step.target?.strategies || [],
+                                value: step.is_sensitive ? '{{VARIABLE}}' : step.value,
+                                field_name: step.field_name
+                            }]
+                        };
+                        break;
+
+                    case 'navigate':
+                        action.config = {
+                            target_url: step.url,
+                            wait_for_load: true
+                        };
+                        break;
+
+                    case 'select':
+                        action.config = {
+                            target_stack: step.target?.strategies || [],
+                            option_text: step.option,
+                            option_value: step.value
+                        };
+                        break;
+
+                    default:
+                        action.config = step.config || {};
+                }
+
+                return action;
+            });
+
+            console.log('[UI] Converted to actions:', browserAutomationActions);
+            console.log('[UI] Action count:', browserAutomationActions.length);
+
+            // Switch to manual tab to show the actions
+            $('.tab-button[data-tab="manual"]').click();
+            renderBrowserAutomationActions();
+        });
+
+
+        // Manual actions rendering
         function renderBrowserAutomationActions() {
             const container = $('#browser-automation-actions');
             container.empty();
 
             if (browserAutomationActions.length === 0) {
-                container.html('<p class="text-muted" style="margin: 0;">No actions configured yet. Add actions below.</p>');
+                container.html(`
+                    <div class="empty-state">
+                        <i class="fa-solid fa-hand-pointer" style="font-size: 48px; color: #cbd5e1; margin-bottom: 10px;"></i>
+                        <p>No actions configured yet</p>
+                        <small>Add actions using the buttons below</small>
+                    </div>
+                `);
                 return;
             }
 
             browserAutomationActions.forEach((action, index) => {
                 const actionHtml = `
-                    <div class="action-item" style="background: white; padding: 8px; margin-bottom: 8px; border-radius: 4px; border-left: 3px solid #3B82F6;">
-                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div class="action-item">
+                        <div class="action-item-header">
                             <strong>${index + 1}. ${getActionLabel(action.type)}</strong>
-                            <button class="btn btn-sm btn-outline-danger remove-action-btn" data-index="${index}">
+                            <button class="action-item-remove remove-action-btn" data-index="${index}">
                                 <i class="fa-solid fa-times"></i>
                             </button>
                         </div>
@@ -123,43 +872,102 @@
         function getActionLabel(type) {
             const labels = {
                 'navigate': 'Navigate',
-                'ensure_login': 'Require Login',
+                'ensure_login': 'Login Pause',
                 'fill_form': 'Fill Form',
                 'click': 'Click Element',
                 'extract': 'Extract Data',
-                'smart_action': 'Smart Action (LLM)'
+                'smart_action': 'Smart Action (AI)',
+                'assert': 'Verify/Assert'
             };
             return labels[type] || type;
         }
 
         function getActionConfigHtml(action, index) {
+            const inputClass = 'form-control action-config';
             switch (action.type) {
                 case 'navigate':
-                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="url" 
-                            placeholder="URL to navigate to" value="${action.config.url || ''}" style="margin-top: 8px;">`;
+                    const navUrl = action.config.target_url || action.config.url || '';
+                    return `<input type="text" class="${inputClass}" data-index="${index}" data-key="url"
+                            placeholder="URL to navigate to" value="${navUrl}" style="margin-top: 8px;">`;
                 case 'ensure_login':
-                    return `<textarea class="input-field action-config" data-index="${index}" data-key="instruction_to_user" 
-                            placeholder="Instructions for user (e.g., 'Please log in to your account')" 
+                    return `<textarea class="${inputClass}" data-index="${index}" data-key="instruction_to_user"
+                            placeholder="Instructions for user (e.g., 'Please log in to your account')"
                             style="margin-top: 8px;">${action.config.instruction_to_user || ''}</textarea>`;
                 case 'fill_form':
-                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="fields_csv" 
-                            placeholder="selector=value, selector2=value2" value="" style="margin-top: 8px;">`;
+                    let fillValue = '';
+                    if (action.config.field_mappings && action.config.field_mappings.length > 0) {
+                        // From recording - show field info
+                        const mapping = action.config.field_mappings[0];
+                        const fieldName = mapping.field_name || 'field';
+                        const value = mapping.value || '';
+                        if (mapping.target_stack && mapping.target_stack.length > 0) {
+                            const strategy = mapping.target_stack[0];
+                            let strategyValue = '';
+                            switch(strategy.type) {
+                                case 'role':
+                                    strategyValue = strategy.role || strategy.name;
+                                    break;
+                                case 'text':
+                                case 'css':
+                                case 'xpath':
+                                    strategyValue = strategy.value;
+                                    break;
+                                default:
+                                    strategyValue = strategy.value || strategy.name || '';
+                            }
+                            fillValue = `${fieldName} (${strategy.type}: ${strategyValue}) = ${value}`;
+                        } else {
+                            fillValue = `${fieldName} = ${value}`;
+                        }
+                    }
+                    return `<input type="text" class="${inputClass}" data-index="${index}" data-key="fields_csv"
+                            placeholder="selector=value, selector2=value2" value="${fillValue}" style="margin-top: 8px;">`;
                 case 'click':
-                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="selector" 
-                            placeholder="CSS selector (e.g., button[type='submit'])" value="${action.config.locator?.value || ''}" style="margin-top: 8px;">`;
+                    // Check if we have a locator or target_stack from recording
+                    console.log('[UI] Rendering click action, config:', action.config);
+                    console.log('[UI] target_stack:', action.config.target_stack);
+                    let clickValue = '';
+                    if (action.config.target_stack && action.config.target_stack.length > 0) {
+                        // From recording - show first strategy as preview
+                        const firstStrategy = action.config.target_stack[0];
+                        console.log('[UI] First strategy:', firstStrategy);
+                        // Extract value based on strategy type
+                        let strategyValue = '';
+                        switch(firstStrategy.type) {
+                            case 'role':
+                                strategyValue = firstStrategy.role || firstStrategy.name;
+                                break;
+                            case 'text':
+                            case 'css':
+                            case 'xpath':
+                                strategyValue = firstStrategy.value;
+                                break;
+                            default:
+                                strategyValue = firstStrategy.value || firstStrategy.name || '';
+                        }
+                        clickValue = `${firstStrategy.type}: ${strategyValue}`;
+                    } else if (action.config.locator?.value) {
+                        clickValue = action.config.locator.value;
+                    }
+                    console.log('[UI] Final clickValue:', clickValue);
+                    return `<input type="text" class="${inputClass}" data-index="${index}" data-key="selector"
+                            placeholder="CSS selector (e.g., button[type='submit'])" value="${clickValue}" style="margin-top: 8px;">`;
                 case 'extract':
-                    return `<input type="text" class="input-field action-config" data-index="${index}" data-key="fields_csv" 
+                    return `<input type="text" class="${inputClass}" data-index="${index}" data-key="fields_csv"
                             placeholder="name=selector, email=.email-field" value="" style="margin-top: 8px;">`;
                 case 'smart_action':
-                    return `<textarea class="input-field action-config" data-index="${index}" data-key="instruction" 
-                            placeholder="Instruction (e.g. 'Click the login button')" 
+                    return `<textarea class="${inputClass}" data-index="${index}" data-key="instruction"
+                            placeholder="Instruction (e.g. 'Click the login button')"
                             style="margin-top: 8px;">${action.config.instruction || ''}</textarea>`;
+                case 'assert':
+                    return `<input type="text" class="${inputClass}" data-index="${index}" data-key="assertion_text"
+                            placeholder="Text that should be present on page" value="${action.config.value || ''}" style="margin-top: 8px;">`;
                 default:
                     return '';
             }
         }
 
-        // Add action button handler - use event delegation for dynamically loaded content
+        // Add action button handler
         $(document).on('click', '.add-action-btn', function () {
             const actionType = $(this).data('action');
             const action = {
@@ -185,20 +993,23 @@
                 browserAutomationActions[index].config.locator = { strategy: 'css', value: value };
             } else if (key === 'instruction') {
                 browserAutomationActions[index].config.instruction = value;
+            } else if (key === 'assertion_text') {
+                browserAutomationActions[index].config.type = 'text_present';
+                browserAutomationActions[index].config.value = value;
             }
         });
 
-        // Close button - use event delegation
+        // Close button
         $(document).on("click", '.closeAddBrowserAutomationToWorkflowBtn', function (e) {
             e.preventDefault();
             $('.workflowAddBrowserAutomationModal').remove();
         });
 
-        // Confirm button - use event delegation for dynamically loaded content
+        // Confirm button
         $(document).on("click", '#confirmBrowser_automationStepBtn', function (e) {
             e.preventDefault();
 
-            // Build actions array including initial navigate if URL provided
+            // Build actions array
             let actions = [];
             const initialUrl = $('#browser-automation-url').val();
             if (initialUrl) {
@@ -260,34 +1071,37 @@
         });
 
         // Initialize
+        checkExtensionConnection();
+
         {% if is_editing and workflow_task %}
         try {
-            const taskData = {{ workflow_task.data | tojson
-        }};
-        if (taskData.actions) {
-            // Filter out the initial navigation if it was separated in UI
-            browserAutomationActions = taskData.actions.filter(a => a.action_id !== 'action-initial');
+            const taskData = {{ workflow_task.data | tojson }};
+            if (taskData.actions) {
+                browserAutomationActions = taskData.actions.filter(a => a.action_id !== 'action-initial');
 
-            // Set initial URL if present
-            const initialAction = taskData.actions.find(a => a.action_id === 'action-initial');
-            if (initialAction && initialAction.config.url) {
-                $('#browser-automation-url').val(initialAction.config.url);
+                const initialAction = taskData.actions.find(a => a.action_id === 'action-initial');
+                if (initialAction && initialAction.config.url) {
+                    $('#browser-automation-url').val(initialAction.config.url);
+                }
             }
-        }
 
-        if (taskData.allowed_domains) {
-            $('#browser-automation-domains').val(taskData.allowed_domains.join(', '));
-        }
+            if (taskData.allowed_domains) {
+                $('#browser-automation-domains').val(taskData.allowed_domains.join(', '));
+            }
 
-        if (taskData.summarization) {
-            $('#browser-automation-summarize').prop('checked', taskData.summarization.enabled);
-            $('#browser-automation-summary-prompt').val(taskData.summarization.prompt_template);
-        }
+            if (taskData.summarization) {
+                $('#browser-automation-summarize').prop('checked', taskData.summarization.enabled);
+                $('#browser-automation-summary-prompt').val(taskData.summarization.prompt_template);
+            }
+
+            // Show manual tab and render
+            $('.tab-button[data-tab="manual"]').click();
+            renderBrowserAutomationActions();
         } catch (e) {
             console.error("Error parsing existing task data", e);
         }
-        {% endif %}
-
+        {% else %}
         renderBrowserAutomationActions();
+        {% endif %}
     </script>
 </div>

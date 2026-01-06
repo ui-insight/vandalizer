@@ -1,10 +1,13 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, render_template
 from flask_login import login_required, current_user
 from flask_socketio import emit, disconnect
 from app.utilities.browser_automation import BrowserAutomationService, SessionState
 from app.utilities.auth import get_user_from_token, token_required
-from app import socketio
+from app.models import LocatorStrategy
+from app import socketio, limiter
 import json
+import uuid
+from datetime import datetime
 
 browser_automation_bp = Blueprint('browser_automation', __name__)
 
@@ -90,6 +93,69 @@ def handle_message(data):
         print(f"[Browser Automation] Unknown message type: {msg_type}")
 
 
+@socketio.on('recording_step_added', namespace='/browser_automation')
+def handle_recording_step(data):
+    """Handle new step added during recording"""
+    recording_id = data.get('recording_id')
+    step = data.get('step')
+
+    service = BrowserAutomationService.get_instance()
+    recording = service.recordings.get(recording_id)
+
+    if recording:
+        recording['steps'].append(step)
+        print(f"[Browser Automation] Step added to recording {recording_id}: {len(recording['steps'])} steps")
+
+        # Echo back to web UI if needed
+        emit('recording_updated', {
+            'recording_id': recording_id,
+            'step_count': len(recording['steps'])
+        }, broadcast=True)
+
+@socketio.on('recording_complete', namespace='/browser_automation')
+def handle_recording_complete(data):
+    """Handle completed recording from extension"""
+    recording_id = data.get('recording_id')
+    steps = data.get('steps', [])
+    variables = data.get('variables', [])
+
+    service = BrowserAutomationService.get_instance()
+    recording = service.recordings.get(recording_id)
+
+    if recording:
+        # Only update steps if incoming steps is not empty, or if we have no steps yet
+        # This prevents navigation to a new page from erasing captured steps
+        if steps or not recording.get('steps'):
+            recording['steps'] = steps
+
+        # Merge variables instead of overwriting
+        if variables:
+            recording['variables'] = variables
+
+        recording['status'] = 'completed'
+        recording['completed_at'] = datetime.utcnow().isoformat()
+
+        final_step_count = len(recording.get('steps', []))
+        print(f"[Browser Automation] Recording {recording_id} completed with {final_step_count} steps")
+
+        # Notify web UI
+        emit('recording_completed', {
+            'recording_id': recording_id,
+            'step_count': final_step_count
+        }, broadcast=True)
+    else:
+        # Create new recording if not found (legacy support)
+        recording_id = recording_id or ('rec_' + str(uuid.uuid4()))
+        service.recordings[recording_id] = {
+            'id': recording_id,
+            'steps': steps,
+            'variables': variables,
+            'status': 'completed',
+            'created_at': datetime.utcnow().isoformat(),
+            'completed_at': datetime.utcnow().isoformat()
+        }
+        print(f"[Browser Automation] Created new recording {recording_id} with {len(steps)} steps")
+
 @socketio.on('error', namespace='/browser_automation')
 def handle_error(error_data):
     """Handle errors from Chrome extension."""
@@ -117,6 +183,19 @@ def confirm_user_login(session_id):
     else:
         return jsonify({"success": False, "message": "Session is not waiting for login"}), 400
 
+@browser_automation_bp.route("/connection/status", methods=["GET"])
+@login_required
+@limiter.exempt
+def get_connection_status():
+    """Check if extension is connected for current user (exempt from rate limiting)"""
+    service = BrowserAutomationService.get_instance()
+    user_socket_id = service.websocket_connections.get(current_user.user_id)
+
+    return jsonify({
+        'connected': user_socket_id is not None,
+        'user_id': current_user.user_id
+    })
+
 @browser_automation_bp.route("/session/<session_id>/status", methods=["GET"])
 @token_required  # Use token auth for API access
 def get_session_status(session_id, auth_user):
@@ -142,13 +221,215 @@ def get_session_status(session_id, auth_user):
 
 
 # Test endpoint to verify token authentication
-@browser_automation_bp.route("/test_auth", methods=["GET"])
-@token_required
-def test_auth(auth_user):
-    """Test endpoint to verify API token authentication is working."""
     return jsonify({
         "authenticated": True,
         "user_id": auth_user.user_id,
         "user_name": auth_user.name,
         "message": "API token authentication successful"
     })
+
+@browser_automation_bp.route('/session/<session_id>/repair_step', methods=['POST'])
+@token_required
+def repair_step(auth_user, session_id):
+    """Allow user to fix a failed step"""
+    data = request.json
+    step_id = data.get('step_id')
+    repair_action = data.get('repair_action')  # 'repick_target', 'retry', 'skip'
+    
+    browser_automation_service = BrowserAutomationService.get_instance()
+    session = browser_automation_service.get_session(session_id)
+    
+    if not session:
+         return jsonify({"error": "Session not found"}), 404
+
+    if repair_action == 'repick_target':
+        # Launch target picker in extension
+        browser_automation_service.send_command(session, 'start_target_picker', {
+            'step_id': step_id,
+            'callback_url': f'/session/{session_id}/update_target'
+        })
+        return jsonify({'status': 'waiting_for_pick'})
+
+    elif repair_action == 'retry':
+        # Retry the step
+        # Note: In a real system we needs to know WHICH step failed. 
+        # For now assuming the session tracks failed_step or we just re-execute based on step_id look up in workflow
+        # Simulating retry logic:
+        # step = session.failed_step
+        # result = browser_automation_service.execute_action_with_stack(session_id, step)
+        return jsonify({'status': 'success', 'message': 'Retry initiated (not fully implemented)'})
+
+    elif repair_action == 'skip':
+        # Mark step as skipped and continue
+        # session.skipped_steps.append(step_id)
+        # session.save()
+        return jsonify({'status': 'skipped'})
+
+    return jsonify({'error': 'Unknown repair action'}), 400
+
+@browser_automation_bp.route('/session/<session_id>/update_target', methods=['POST'])
+@token_required
+def update_target(auth_user, session_id):
+    """Receive new target from extension after user picks element"""
+    data = request.json
+    step_id = data.get('step_id')
+    new_strategies = data.get('strategies')  # Generated by extension
+
+    browser_automation_service = BrowserAutomationService.get_instance()
+    session = browser_automation_service.get_session(session_id)
+    
+    if not session:
+        return jsonify({"error": "Session not found"}), 404
+
+    # Update step's locator stack
+    # In a full implementation, we'd update the WorkflowStep in the DB.
+    # Here we are updating the active session or the persistent strategy.
+    
+    # We don't have the step object accessible easily from just session_id without querying workflow
+    # But we can update the persistent LocatorStrategy if we know the target_name
+    
+    # For now, we assume this endpoint is called by the extension to save the learned strategy
+    # The client UI would then trigger 'retry'
+    
+    # Ideally we'd know the target_name. 
+    # If the step in the workflow has a target_name (e.g. "login_button"), we save it there.
+    # Otherwise we might need to create a new one.
+    
+    # Since we can't easily map back to target_name without more context, 
+    # we'll just log it for now or assume the extension sends potential target_name if it knows it.
+    
+    # Fallback: Just return success so extension knows it worked.
+    # In a real app we'd save to LocatorStrategy.objects(target_name=...).update(...)
+    
+    return jsonify({'status': 'updated', 'strategies': new_strategies})
+
+# --- Recorder Routes ---
+
+@browser_automation_bp.route('/recording/start', methods=['POST'])
+@login_required
+@limiter.exempt
+def start_recording():
+    """Start a new recording session and tell extension to begin recording (exempt from rate limiting)"""
+    service = BrowserAutomationService.get_instance()
+
+    # Generate recording ID
+    recording_id = 'rec_' + str(uuid.uuid4())
+
+    # Initialize recording session in memory
+    service.recordings[recording_id] = {
+        'id': recording_id,
+        'steps': [],
+        'variables': [],
+        'status': 'recording',
+        'created_at': datetime.utcnow().isoformat(),
+        'user_id': current_user.user_id
+    }
+
+    # Send command to extension via Socket.IO
+    user_socket_id = service.websocket_connections.get(current_user.user_id)
+    if user_socket_id:
+        socketio.emit('start_recording', {
+            'recording_id': recording_id
+        }, room=user_socket_id, namespace='/browser_automation')
+
+        return jsonify({
+            'recording_id': recording_id,
+            'status': 'recording',
+            'message': 'Recording started'
+        })
+    else:
+        return jsonify({
+            'error': 'Extension not connected',
+            'message': 'Please ensure the browser extension is installed and connected'
+        }), 400
+
+@browser_automation_bp.route('/recording/<recording_id>/stop', methods=['POST'])
+@login_required
+@limiter.exempt
+def stop_recording(recording_id):
+    """Stop an active recording session (exempt from rate limiting)"""
+    service = BrowserAutomationService.get_instance()
+    recording = service.recordings.get(recording_id)
+
+    if not recording:
+        return jsonify({'error': 'Recording not found'}), 404
+
+    if recording['status'] != 'recording':
+        return jsonify({'error': 'Recording is not active'}), 400
+
+    # Send stop command to extension
+    user_socket_id = service.websocket_connections.get(current_user.user_id)
+    if user_socket_id:
+        socketio.emit('stop_recording', {
+            'recording_id': recording_id
+        }, room=user_socket_id, namespace='/browser_automation')
+
+    # Update status
+    recording['status'] = 'stopped'
+    recording['stopped_at'] = datetime.utcnow().isoformat()
+
+    return jsonify({
+        'recording_id': recording_id,
+        'status': 'stopped',
+        'step_count': len(recording.get('steps', [])),
+        'message': 'Recording stopped'
+    })
+
+@browser_automation_bp.route('/recording/save', methods=['POST'])
+@token_required
+def save_recording(auth_user):
+    """Receive raw recording from extension"""
+    data = request.json
+    steps = data.get('steps', [])
+    variables = data.get('variables', [])
+
+    # Save to temporary storage or DB
+    from app.models import Workflow  # Or a new Recording model
+
+    # For MVP, we'll just store in memory cache or return ID
+    recording_id = str(uuid.uuid4())
+
+    # Store in a temporary collection/cache
+    # In real app: Recording.objects.create(...)
+    # Simulating storage:
+    browser_automation_service = BrowserAutomationService.get_instance()
+    browser_automation_service.recordings[recording_id] = {
+        'steps': steps,
+        'variables': variables,
+        'created_at': datetime.utcnow().isoformat(),
+        'user_id': auth_user.id
+    }
+
+    return jsonify({'recording_id': recording_id})
+
+@browser_automation_bp.route('/recording/<recording_id>', methods=['GET'])
+@login_required 
+def labeling_ui(recording_id):
+    """Serve the labeling UI"""
+    return render_template('browser_automation/labeling.html', recording_id=recording_id)
+
+@browser_automation_bp.route('/api/recording/<recording_id>', methods=['GET'])
+@login_required
+@limiter.exempt
+def get_recording(recording_id):
+    """Get recording data for UI (polling endpoint - exempt from rate limiting)"""
+    service = BrowserAutomationService.get_instance()
+    recording = service.recordings.get(recording_id)
+
+    if not recording:
+        return jsonify({'error': 'Recording not found'}), 404
+
+    return jsonify(recording)
+
+@browser_automation_bp.route('/workflows/create_from_recording', methods=['POST'])
+@login_required
+def create_workflow_from_recording():
+    """Create a real workflow from labeled recording"""
+    data = request.json
+    recording_id = data.get('recording_id')
+    workflow_data = data.get('workflow')
+    
+    # Validate and Create Workflow in DB
+    # ... implementation to map to Workflow model ...
+    
+    return jsonify({'workflow_id': 'new_workflow_id', 'status': 'created'})

@@ -228,3 +228,5 @@ yarl==1.20.0
 zipp==3.21.0
 zstandard==0.23.0
 flask-socketio==5.3.6
+eventlet==0.36.1
+python-engineio==4.9.0

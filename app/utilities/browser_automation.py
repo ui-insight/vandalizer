@@ -8,6 +8,11 @@ logger = logging.getLogger(__name__)
 
 # Import socketio for sending messages to extension
 from app import socketio
+from app.models import LocatorStrategy
+import re
+import uuid
+import os
+import base64
 
 class SessionState(Enum):
     CREATED = "created"
@@ -30,6 +35,10 @@ class BrowserAutomationSession:
         self.pending_commands = {}  # request_id -> command metadata
         self.last_heartbeat = datetime.utcnow()
         self.tab_id = None
+        
+        # Audit Trail
+        self.audit_trail = [] # List of events
+        self.screenshots = [] # List of screenshot metadata
 
     def transition_to(self, new_state, reason=None):
         """Transition session state with validation"""
@@ -55,6 +64,7 @@ class BrowserAutomationService:
         self.sessions = {}  # session_id -> BrowserAutomationSession
         self.websocket_connections = {}  # user_id -> websocket connection
         self.response_futures = {} # request_id -> future/event for async waiting
+        self.recordings = {} # recording_id -> recording data (temporary)
 
     def create_session(self, user_id, workflow_result_id, allowed_domains):
         """Initialize a new browser automation session"""
@@ -110,7 +120,7 @@ class BrowserAutomationService:
         # Special handling for specific actions if needed
         if action_type == "navigate":
             payload = {
-                "url": config.get("url"),
+                "url": config.get("url") or config.get("target_url"),
                 "wait_for": config.get("wait_for")
             }
         elif action_type == "click":
@@ -144,6 +154,301 @@ class BrowserAutomationService:
             }
 
         return self.send_command(session, command_name, payload)
+
+    def execute_action_with_stack(self, session_id: str, action: dict) -> dict:
+        """Execute action using locator stack with fallback"""
+        session = self.get_session(session_id)
+        
+        # Record start
+        self.record_audit_event(session_id, 'action_start', {
+            'action_type': action.get('type'),
+            'description': action.get('description', 'Unknown action')
+        })
+
+        # Build locator stack if target specified
+        if 'target' in action:
+            if isinstance(action['target'], str):
+                # Load from database
+                locator_strategy = LocatorStrategy.objects(target_name=action['target']).first()
+                if not locator_strategy:
+                    # If not found, check if it's just a raw selector string provided as simple target
+                    # For legacy compatibility or ad-hoc actions
+                    action['target_stack'] = [{'type': 'css', 'value': action['target'], 'priority': 1}]
+                else:
+                    action['target_stack'] = locator_strategy.strategies
+            elif isinstance(action['target'], dict) and 'strategies' in action['target']:
+                # Inline locator stack
+                action['target_stack'] = action['target']['strategies']
+            else:
+                # Legacy single locator config or object - convert to stack
+                # If target is dict with 'locator', use it
+                target = action['target']
+                if isinstance(target, dict) and 'locator' in target:
+                     # This matches the structure { target: { locator: {...} } }
+                     action['target_stack'] = [target['locator']] if 'locator' in target else []
+                elif isinstance(target, dict) and 'strategy' in target:
+                     # This matches direct locator object
+                     action['target_stack'] = [target]
+                else:
+                     # Fallback
+                     action['target_stack'] = [{'type': 'css', 'value': str(target), 'priority': 1}]
+
+        # Send to extension with stack
+        # We need to reshape the action for execute_action expectations or call send_command directly
+        # execute_action expects 'config' in some cases or direct keys
+        
+        # Helper to inject stack into payload
+        action_copy = action.copy()
+        if 'target_stack' in action:
+            # Most actions (click, fill) use 'locator' in config. 
+            # We add 'target_stack' to the config.
+            if 'config' not in action_copy:
+                action_copy['config'] = {}
+            action_copy['config']['target_stack'] = action['target_stack']
+            
+            # Also support direct payload structure (smart action)
+            action_copy['target_stack'] = action['target_stack']
+
+        try:
+            result = self.execute_action(session_id, action_copy)
+
+            # Record which strategy succeeded
+            if isinstance(result, dict) and result.get('usedStrategy'):
+                 self._record_strategy_success(action.get('target'), result['usedStrategy'])
+            
+            # Record success
+            self.record_audit_event(session_id, 'action_success', {
+                'action_type': action.get('type'),
+                'result': result
+            })
+            
+            return result
+        except Exception as e:
+            # Record failure
+            self.record_audit_event(session_id, 'action_failure', {
+                'action_type': action.get('type'),
+                'error': str(e)
+            })
+            raise
+
+    def _record_strategy_success(self, target_name: str, strategy: dict):
+        """Update confidence scores based on successful strategy"""
+        if not target_name or not isinstance(target_name, str):
+            return
+
+        locator = LocatorStrategy.objects(target_name=target_name).first()
+        if locator:
+            # Boost priority of successful strategy
+            # Simple re-ranking: Move successful strategy up, others down
+            # Or increment a score. Plan suggests priority manipulation.
+            
+            strategies_updated = False
+            for s in locator.strategies:
+                # Strategy dict comparison
+                if s.get('type') == strategy.get('type') and s.get('value') == strategy.get('value'):
+                    s['priority'] = max(1, s.get('priority', 5) - 1) # Lower is better? Plan said "sort a-b". JS stack sorts a-b (asc). 
+                    # So priority 1 is highest.
+                    strategies_updated = True
+                else:
+                    s['priority'] = min(10, s.get('priority', 5) + 1)
+            
+            if strategies_updated:
+                locator.strategies.sort(key=lambda x: x.get('priority', 5))
+                locator.last_tested = datetime.utcnow()
+                locator.save()
+
+    def record_audit_event(self, session_id: str, event_type: str, details: dict):
+        """Record audit event with screenshot"""
+        session = self.get_session(session_id)
+        if not session:
+            return
+
+        # Take screenshot for significant events
+        screenshot_url = None
+        if event_type in ['action_success', 'action_failure', 'step_failure']:
+            try:
+                # We need to make this async safe or fire-and-forget? 
+                # For now, explicit call.
+                screenshot_result = self.send_command(session_id, 'screenshot', {'scope': 'viewport'})
+                if screenshot_result and 'data' in screenshot_result:
+                    screenshot_url = self._store_screenshot(screenshot_result['data'])
+            except Exception as e:
+                logger.error(f"Failed to capture audit screenshot: {e}")
+
+        # Record audit event
+        audit_event = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'event_type': event_type,
+            'details': details,
+            'screenshot_url': screenshot_url
+        }
+
+        session.audit_trail.append(audit_event)
+        # If we were using DB, we'd save here. session.save()
+        return audit_event
+
+    def _store_screenshot(self, base64_data: str) -> str:
+        """Store screenshot data (Mock implementation for now)"""
+        if not base64_data: 
+            return None
+            
+        # In real impl, save to GridFS or S3
+        # For now, just return a data URI truncation or placeholder if too large for memory
+        # to avoid blowing up memory.
+        # Ideally we write to a temp file or static folder.
+        
+        filename = f"audit_{uuid.uuid4()}.png"
+        filepath = os.path.join('app', 'static', 'uploads', filename)
+        
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        
+        try:
+            # base64_data is usually "data:image/png;base64,...."
+            if "," in base64_data:
+                header, encoded = base64_data.split(",", 1)
+            else:
+                encoded = base64_data
+                
+            data = base64.b64decode(encoded)
+            
+            with open(filepath, "wb") as f:
+                f.write(data)
+                
+            return f"/static/uploads/{filename}"
+        except Exception as e:
+            logger.error(f"Error saving screenshot: {e}")
+            return None
+
+    def execute_assertion(self, session_id: str, assertion: dict) -> dict:
+        """Execute verification step"""
+        assertion_type = assertion.get('type')
+
+        handlers = {
+            'text_present': self._assert_text_present,
+            'element_present': self._assert_element_present,
+            'url_matches': self._assert_url_matches,
+            'value_equals': self._assert_value_equals,
+            # 'table_contains': self._assert_table_contains, # TODO: Implement later
+        }
+
+        handler = handlers.get(assertion_type)
+        if not handler:
+            raise ValueError(f"Unknown assertion type: {assertion_type}")
+
+        result = handler(session_id, assertion)
+
+        if not result['passed']:
+            # Take screenshot of failure
+            try:
+                # We reuse send_command directly to avoid infinite recursion if execute_action wraps this
+                session = self.get_session(session_id)
+                # screenshot = self.send_command(session, 'screenshot', {}) 
+                # result['screenshot'] = screenshot # Implement screenshot support later
+                pass
+            except Exception:
+                pass
+
+            if assertion.get('on_failure') == 'fail':
+                raise AssertionError(f"Assertion failed: {result['message']}")
+
+        return result
+
+    def _assert_text_present(self, session_id: str, assertion: dict) -> dict:
+        """Check if text is present on page"""
+        text = assertion.get('value')
+        case_sensitive = assertion.get('case_sensitive', False)
+
+        page_state = self.get_page_state(session_id)
+        # Using innerText from body is safer than raw HTML for text assertions
+        # But get_page_state usually returns { html: ..., url: ... }
+        # We might need to ask extension for text content or parse HTML
+        # For robustness, let's ask extension via check_condition which we already have!
+        
+        session = self.get_session(session_id)
+        result = self.send_command(session, 'check_condition', {
+            'condition_type': 'text_present',
+            'condition_value': text
+        })
+        
+        passed = result.get('met', False)
+
+        return {
+            'passed': passed,
+            'message': f"Text '{text}' {'found' if passed else 'not found'} on page",
+            'expected': text
+        }
+
+    def _assert_element_present(self, session_id: str, assertion: dict) -> dict:
+        """Check if element exists"""
+        locator = assertion.get('locator') # Could be string or dict with stack
+
+        session = self.get_session(session_id)
+        
+        # Prepare payload with stack if needed
+        payload = {
+            'condition_type': 'element_present',
+            'condition_value': locator if isinstance(locator, str) else None,
+            'timeout_ms': assertion.get('timeout_ms', 1000)
+        }
+        
+        # Handle locator stack for assertions
+        if isinstance(locator, dict) or (isinstance(locator, str) and LocatorStrategy.objects(target_name=locator).first()):
+             # If it's a stack-able locator, we should resolve it
+             # Reuse logic from execute_action_with_stack to build stack?
+             # For now, let's just pass what we have. If it's a string that matches a DB entry, we should resolve it.
+             if isinstance(locator, str):
+                 strat = LocatorStrategy.objects(target_name=locator).first()
+                 if strat:
+                     payload['target_stack'] = strat.strategies
+                     
+        result = self.send_command(session, 'check_condition', payload)
+
+        passed = result.get('met', False)
+
+        return {
+            'passed': passed,
+            'message': f"Element {locator} {'found' if passed else 'not found'}",
+            'locator': locator
+        }
+
+    def _assert_url_matches(self, session_id: str, assertion: dict) -> dict:
+        """Check if current URL matches pattern"""
+        pattern = assertion.get('pattern')
+
+        page_state = self.get_page_state(session_id)
+        current_url = page_state.get('url', '')
+
+        if assertion.get('match_type') == 'regex':
+            passed = bool(re.search(pattern, current_url))
+        else:
+            passed = pattern in current_url
+
+        return {
+            'passed': passed,
+            'message': f"URL {'matches' if passed else 'does not match'} pattern '{pattern}'",
+            'expected': pattern,
+            'actual': current_url
+        }
+
+    def _assert_value_equals(self, session_id: str, assertion: dict) -> dict:
+        """Check if two values are equal (with tolerance for numbers)"""
+        expected = assertion.get('expected')
+        actual = assertion.get('actual') # Caller should resolve variable before calling
+        tolerance = assertion.get('tolerance', 0)
+
+        if isinstance(expected, (int, float)) and isinstance(actual, (int, float)):
+            passed = abs(expected - actual) <= tolerance
+        else:
+            passed = str(expected).strip() == str(actual).strip()
+
+        return {
+            'passed': passed,
+            'message': f"Expected {expected}, got {actual}",
+            'expected': expected,
+            'actual': actual,
+            'tolerance': tolerance
+        }
 
     def wait_for_user_login(self, session_id, detection_rules, instruction):
         """Pause workflow and wait for user login confirmation"""
