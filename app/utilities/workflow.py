@@ -495,7 +495,7 @@ class BrowserAutomationNode(Node):
             self.report_progress("Connecting to browser extension...")
             service.start_session(session.session_id)
 
-            # Execute actions sequentially
+        # Execute actions sequentially
             extracted_data = {}
             for i, action in enumerate(self.actions):
                 self.report_progress(
@@ -503,7 +503,19 @@ class BrowserAutomationNode(Node):
                     preview=self._get_action_preview(action)
                 )
 
-                result = self._execute_action(service, session, action, inputs)
+                # Interpolate variables
+                interpolated_action = self._interpolate_variables(action, inputs)
+
+                if interpolated_action.get('type') == 'assert':
+                     result = service.execute_assertion(session.session_id, interpolated_action)
+                     if not result['passed']:
+                         # If assertion failed, we might want to stop or retry
+                         # For now, following the plan: throw exception if configured to fail
+                         if interpolated_action.get('on_failure', 'fail') == 'fail':
+                              raise AssertionError(f"Step {i+1} failed: {result['message']}")
+                else:
+                    # Execute action using stack logic
+                    result = self._execute_action(service, session, interpolated_action, inputs)
 
                 # If the result contains extracted data, store it
                 # This handles both explicit extract actions and smart actions that perform extraction
@@ -514,6 +526,10 @@ class BrowserAutomationNode(Node):
                     # Legacy handling for extract actions that don't use structured_data wrapper
                     print(f"[BrowserAutomationNode] Extract action without wrapper, storing entire result: {result}")
                     extracted_data.update(result or {})
+                
+                # Store specific output if requested
+                if action.get('output_variable') and result:
+                     extracted_data[action['output_variable']] = result.get('structured_data', result)
 
                 # If login required, wait for user
                 if action["type"] == "ensure_login":
@@ -523,7 +539,6 @@ class BrowserAutomationNode(Node):
                 if action["type"] == "smart_action":
                     # The service handles the LLM logic and execution
                     # We just pass the instruction
-                    # Note: execute_smart_action calls execute_action internally, so it returns the result
                     pass 
 
             # Clean up
@@ -554,7 +569,7 @@ class BrowserAutomationNode(Node):
                 model=self.model
             )
 
-        return service.execute_action(session.session_id, action_with_values)
+        return service.execute_action_with_stack(session.session_id, action_with_values)
 
     def _wait_for_user_login(self, service, session, action):
         """Pause execution and wait for user to complete login"""

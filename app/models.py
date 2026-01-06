@@ -120,6 +120,51 @@ class SystemConfig(me.Document):
         return config
 
 
+
+class LocatorStrategy(me.Document):
+    """Ranked locator strategies for a single target"""
+    target_name = me.StringField(required=True, unique=True)  # e.g., "submit_button"
+    strategies = me.ListField(me.DictField())  # Ordered list of strategies
+    # Example:
+    # [
+    #   {"type": "data-testid", "value": "submit-btn", "priority": 1},
+    #   {"type": "aria-label", "value": "Submit", "priority": 2},
+    #   {"type": "role", "role": "button", "name": "Submit", "priority": 3},
+    #   {"type": "text", "value": "Submit", "match": "exact", "priority": 4},
+    #   {"type": "css", "value": "button.submit", "priority": 5}
+    # ]
+    confidence_score = me.FloatField(default=0.0)  # 0-1, based on stability
+    last_tested = me.DateTimeField()
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+
+class BrowserActionStep(me.EmbeddedDocument):
+    """Enhanced step with locator stack support"""
+    step_id = me.StringField(required=True)
+    step_type = me.StringField(required=True)  # navigate, click, extract, assert, etc.
+    description = me.StringField()  # Human-readable intent
+
+    # For actions with targets
+    target = me.DictField()  # References LocatorStrategy or inline locator stack
+    target_name = me.StringField()  # Optional, used for shared locator stacks
+
+    # For extraction
+    extraction_spec = me.DictField()
+
+    # For assertions (NEW)
+    assertion = me.DictField()  # {type: "text_present", value: "Welcome"}
+
+    # Execution options
+    timeout_ms = me.IntField(default=5000)
+    retry_count = me.IntField(default=3)
+    on_failure = me.StringField(default="fail")  # fail, retry, skip, repair
+    requires_approval = me.BooleanField(default=False)
+
+    # Outputs
+    output_variable = me.StringField()  # Name of variable to store result
+
+
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
 

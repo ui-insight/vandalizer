@@ -19,6 +19,7 @@ dependencies = [
     "flask-login",
     "flask-mail",
     "flask-socketio==5.3.6",
+    "eventlet==0.36.1",
     "flask-wtf",
     "httpx",
     "itsdangerous",

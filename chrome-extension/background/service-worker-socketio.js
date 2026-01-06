@@ -402,6 +402,54 @@ class BrowserAutomationBackground {
             this.handleBackendMessage(message);
         });
 
+        // Handle recording control events
+        this.socket.on('start_recording', (data) => {
+            console.log('[BrowserAutomation] 🔴 Start recording:', data.recording_id);
+            // Send to all tabs (the content script will start recording)
+            chrome.tabs.query({}, (tabs) => {
+                console.log(`[BrowserAutomation] Broadcasting start_recording to ${tabs.length} tabs`);
+                tabs.forEach(tab => {
+                    // Skip extension pages and chrome:// URLs
+                    if (!tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+                        console.log(`[BrowserAutomation] Sending to tab ${tab.id}: ${tab.url}`);
+                        chrome.tabs.sendMessage(tab.id, {
+                            action: 'start_recording',
+                            recording_id: data.recording_id
+                        }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.log(`[BrowserAutomation] Error sending to tab ${tab.id}:`, chrome.runtime.lastError.message);
+                            } else {
+                                console.log(`[BrowserAutomation] ✅ Successfully sent to tab ${tab.id}, response:`, response);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
+        this.socket.on('stop_recording', (data) => {
+            console.log('[BrowserAutomation] ⏹️  Stop recording:', data.recording_id);
+            // Send to all tabs
+            chrome.tabs.query({}, (tabs) => {
+                console.log(`[BrowserAutomation] Broadcasting stop_recording to ${tabs.length} tabs`);
+                tabs.forEach(tab => {
+                    if (!tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+                        console.log(`[BrowserAutomation] Sending stop to tab ${tab.id}: ${tab.url}`);
+                        chrome.tabs.sendMessage(tab.id, {
+                            action: 'stop_recording',
+                            recording_id: data.recording_id
+                        }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.log(`[BrowserAutomation] Error sending to tab ${tab.id}:`, chrome.runtime.lastError.message);
+                            } else {
+                                console.log(`[BrowserAutomation] ✅ Successfully sent stop to tab ${tab.id}, response:`, response);
+                            }
+                        });
+                    }
+                });
+            });
+        });
+
         // Heartbeat acknowledgment
         this.socket.on('heartbeat_ack', (data) => {
             // Silent - heartbeat working
@@ -538,9 +586,55 @@ class BrowserAutomationBackground {
                 });
                 break;
 
+            case 'recording_step_added':
+                // Forward step to backend via Socket.IO
+                console.log('[BrowserAutomation] Recording step added:', message.stepCount);
+                if (this.socket?.connected) {
+                    this.socket.emit('recording_step_added', {
+                        recording_id: message.recording_id,
+                        step: message.step
+                    });
+                }
+                sendResponse({ success: true });
+                break;
+
+            case 'recording_complete':
+                // Save recording and notify backend
+                console.log('[BrowserAutomation] Recording complete:', message.recording_id);
+                if (this.socket?.connected) {
+                    this.socket.emit('recording_complete', {
+                        recording_id: message.recording_id,
+                        steps: message.steps,
+                        variables: message.variables
+                    });
+                }
+                this.handleRecordingComplete(message.recording_id, message.steps, message.variables);
+                sendResponse({ success: true });
+                break;
+
             default:
                 sendResponse({ error: 'Unknown action' });
         }
+    }
+
+    handleRecordingComplete(recordingId, steps, variables) {
+        console.log('[BrowserAutomation] Recording complete. Steps:', steps.length);
+
+        // Use provided recording ID or generate new one
+        recordingId = recordingId || ('rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9));
+
+        // Store recording temporarily in chrome.storage for backup
+        chrome.storage.local.set({
+            [`recording_${recordingId}`]: {
+                id: recordingId,
+                steps: steps,
+                variables: variables,
+                created: Date.now()
+            }
+        });
+
+        console.log('[BrowserAutomation] Recording saved locally with ID:', recordingId);
+        // Note: recording_complete is already sent to backend via socket.emit in handleContentScriptMessage
     }
 
     handleTabUpdate(tabId, changeInfo, tab) {
