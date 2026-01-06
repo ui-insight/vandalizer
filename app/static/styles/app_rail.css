@@ -73,7 +73,7 @@
 
 .run-item{
   position:relative;
-  display:flex; align-items:flex-start; justify-content:flex-start;
+  display:flex; align-items:center; justify-content:flex-start;
   gap:8px; padding:8px 8px; border-radius:8px; cursor:pointer;
   transition: background-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -136,7 +136,6 @@
   position:relative;
   margin-left:auto;
   flex-shrink:0;
-  padding-top:2px; /* Align delete button with first line of text */
 }
 .run-right{ display:flex; align-items:center; gap:6px; }
 
@@ -146,13 +145,14 @@
 .run-delete{
   position:absolute;
   right:4px;
-  top:2px;
+  top:50%;
+  transform:translateY(-50%);
   display:flex; align-items:center;
   justify-content:center;
   background:rgba(255, 255, 255, 0.9);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  border:none; 
+  border:none;
   padding:4px 6px;
   border-radius:4px;
   opacity:0; pointer-events:none;
