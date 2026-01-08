@@ -2245,11 +2245,13 @@
                 $(data.template).hide().appendTo('.search-results-panel').fadeIn();
 
                 console.log(stepType);
-                $(`#confirm${capitalize(stepType)}StepBtn`).off("click").on("click", function (e) {
-                    e.preventDefault();
-                    console.log(`Add ${capitalize(stepType)}`);
-                    workflowConfirmStepTask(stepType, workflow_step_id, 0);
-                });
+                if (stepType !== "browser_automation") {
+                    $(`#confirm${capitalize(stepType)}StepBtn`).off("click").on("click", function (e) {
+                        e.preventDefault();
+                        console.log(`Add ${capitalize(stepType)}`);
+                        workflowConfirmStepTask(stepType, workflow_step_id, 0);
+                    });
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2279,11 +2281,13 @@
                 $(data.template).hide().appendTo('.search-results-panel').fadeIn();
 
                 console.log(stepType);
-                $(`#confirm${capitalize(stepType)}StepBtn`).off("click").on("click", function (e) {
-                    e.preventDefault();
-                    console.log(`Add ${capitalize(stepType)}`);
-                    workflowConfirmStepTask(stepType, workflow_step_id, workflow_task_id);
-                });
+                if (stepType !== "browser_automation") {
+                    $(`#confirm${capitalize(stepType)}StepBtn`).off("click").on("click", function (e) {
+                        e.preventDefault();
+                        console.log(`Add ${capitalize(stepType)}`);
+                        workflowConfirmStepTask(stepType, workflow_step_id, workflow_task_id);
+                    });
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -2951,27 +2955,80 @@
                         const workflow_response = data.output;
                         console.log("workflow response:", workflow_response);
 
-                        const snapshotPayload = workflow_response ?? "";
-                        window.__workflowSnapshot = {
-                            output: snapshotPayload,
-                            steps_completed: steps_completed,
-                            steps_total: total_steps,
-                            status: status,
-                            session_id: workflow_session_id,
-                            started_at: data.started_at ?? null,
-                            finished_at: data.finished_at ?? null,
-                            duration_seconds: data.duration_seconds ?? null,
-                        };
+                        // File Download Handling
+                        if (workflow_response && workflow_response.type === 'file_download' && workflow_response.data_b64) {
+                            console.log("Triggering file download: " + workflow_response.filename);
 
-                        const html = normalizeWorkflowOutput(snapshotPayload);
-                        if (!html) {
-                            return;
+                            // Create a Blob from the base64 string
+                            const byteCharacters = atob(workflow_response.data_b64);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], { type: workflow_response.content_type || 'application/pdf' }); // default to PDF
+
+                            // Create a link and trigger download
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = workflow_response.filename || "output.pdf";
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+
+                            // Optional: Still show preview in output section
+                            const html = `
+                                <div class="alert alert-success">
+                                    <h4><i class="fa fa-check-circle"></i> File Generated Successfully</h4>
+                                    <p>${workflow_response.preview || 'Your file has been downloaded.'}</p>
+                                    <button class="btn btn-sm btn-primary mt-2" onclick="
+                                        const byteCharacters = atob('${workflow_response.data_b64}');
+                                        const byteNumbers = new Array(byteCharacters.length);
+                                        for (let i = 0; i < byteCharacters.length; i++) {
+                                            byteNumbers[i] = byteCharacters.charCodeAt(i);
+                                        }
+                                        const byteArray = new Uint8Array(byteNumbers);
+                                        const blob = new Blob([byteArray], { type: '${workflow_response.content_type || 'application/pdf'}' });
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = '${workflow_response.filename || "output.pdf"}';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        document.body.removeChild(a);
+                                    "><i class="fa fa-download"></i> Download Again</button>
+                                </div>
+                            `;
+                            const $outputSection = $('.workflow-output-section');
+                            $outputSection.removeClass('hidden').empty().show();
+                            $('.workflow-output-buttons').removeClass('hidden');
+                            $outputSection.append(html);
+
+                        } else {
+                            const snapshotPayload = workflow_response ?? "";
+                            window.__workflowSnapshot = {
+                                output: snapshotPayload,
+                                steps_completed: steps_completed,
+                                steps_total: total_steps,
+                                status: status,
+                                session_id: workflow_session_id,
+                                started_at: data.started_at ?? null,
+                                finished_at: data.finished_at ?? null,
+                                duration_seconds: data.duration_seconds ?? null,
+                            };
+
+                            const html = normalizeWorkflowOutput(snapshotPayload);
+                            if (html) {
+                                const $outputSection = $('.workflow-output-section');
+                                $outputSection.removeClass('hidden').empty().show();
+                                $('.workflow-output-buttons').removeClass('hidden');
+                                $outputSection.append(html);
+                            }
                         }
 
-                        const $outputSection = $('.workflow-output-section');
-                        $outputSection.removeClass('hidden').empty().show();
-                        $('.workflow-output-buttons').removeClass('hidden');
-                        $outputSection.append(html);
                         const $workflowContainer = $('.workflow-container');
                         if ($workflowContainer.length > 0) {
                             $workflowContainer.animate({ scrollTop: $workflowContainer[0].scrollHeight }, 'slow');

@@ -25,6 +25,7 @@ from markupsafe import escape
 from pypdf import PdfReader, PdfWriter
 from werkzeug.utils import secure_filename
 
+from app import limiter
 from app.utilities.security import validate_json_request
 
 from app.models import (
@@ -508,6 +509,7 @@ def begin_search() -> ResponseReturnValue:
 
 
 @tasks.route("/extraction_status/<activity_id>", methods=["GET"])
+@limiter.exempt
 def extraction_status(activity_id: str) -> ResponseReturnValue:
     """Check the status of an extraction task."""
     # Support API key authentication for programmatic access

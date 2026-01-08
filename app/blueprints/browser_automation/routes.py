@@ -156,6 +156,34 @@ def handle_recording_complete(data):
         }
         print(f"[Browser Automation] Created new recording {recording_id} with {len(steps)} steps")
 
+@socketio.on('repair_completed', namespace='/browser_automation')
+def handle_repair_completed(data):
+    """Handle self-healing repair completed from extension"""
+    session_id = data.get('sessionId')
+    step_id = data.get('stepId')
+    repair_result = data.get('repairResult')
+
+    print(f"[Browser Automation] Repair completed for session {session_id}, step {step_id}")
+
+    # Store repair result in Redis so the waiting backend thread can retrieve it
+    service = BrowserAutomationService.get_instance()
+    repair_key = f"browser_automation:repair:{session_id}:{step_id}"
+
+    service.redis_client.setex(
+        repair_key,
+        600,  # 10 minute TTL
+        json.dumps(repair_result)
+    )
+
+    print(f"[Browser Automation] Stored repair result in Redis: {repair_key}")
+
+    # Emit confirmation back to extension
+    emit('repair_acknowledged', {
+        'sessionId': session_id,
+        'stepId': step_id,
+        'success': True
+    })
+
 @socketio.on('error', namespace='/browser_automation')
 def handle_error(error_data):
     """Handle errors from Chrome extension."""
@@ -198,6 +226,7 @@ def get_connection_status():
 
 @browser_automation_bp.route("/session/<session_id>/status", methods=["GET"])
 @token_required  # Use token auth for API access
+@limiter.exempt
 def get_session_status(session_id, auth_user):
     """
     Poll endpoint for real-time session status updates.
@@ -315,6 +344,10 @@ def start_recording():
     # Generate recording ID
     recording_id = 'rec_' + str(uuid.uuid4())
 
+    # Validating and cleaning external variables
+    data = request.json or {}
+    external_variables = data.get('external_variables', [])
+    
     # Initialize recording session in memory
     service.recordings[recording_id] = {
         'id': recording_id,
@@ -329,7 +362,8 @@ def start_recording():
     user_socket_id = service.websocket_connections.get(current_user.user_id)
     if user_socket_id:
         socketio.emit('start_recording', {
-            'recording_id': recording_id
+            'recording_id': recording_id,
+            'external_variables': external_variables
         }, room=user_socket_id, namespace='/browser_automation')
 
         return jsonify({
@@ -353,6 +387,15 @@ def stop_recording(recording_id):
 
     if not recording:
         return jsonify({'error': 'Recording not found'}), 404
+
+    # If recording is already completed or stopped, treat it as success (idempotent)
+    if recording['status'] in ['completed', 'stopped']:
+        return jsonify({
+            'recording_id': recording_id,
+            'status': recording['status'],
+            'step_count': len(recording.get('steps', [])),
+            'message': f"Recording already {recording['status']}"
+        })
 
     if recording['status'] != 'recording':
         return jsonify({'error': 'Recording is not active'}), 400

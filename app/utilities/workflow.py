@@ -4,6 +4,8 @@ import graphlib
 import json
 import multiprocessing
 import re
+import uuid
+import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from threading import Thread
@@ -435,6 +437,13 @@ class ExtractionNode(Node):
                 progress_callback=_on_progress,
             )
 
+        # Return raw output for downstream steps to access structured data
+        # But keep formatted output for display purposes
+        raw_output = (
+            extraction_response.get("raw")
+            if isinstance(extraction_response, dict)
+            else extraction_response
+        )
         formatted_output = (
             extraction_response.get("formatted")
             if isinstance(extraction_response, dict)
@@ -442,7 +451,8 @@ class ExtractionNode(Node):
         )
 
         return {
-            "output": formatted_output,
+            "output": raw_output,  # Raw structured data for variable interpolation
+            "formatted_output": formatted_output,  # Formatted markdown for display
             "input": step_input,
             "step_name": self.name,
         }
@@ -503,8 +513,38 @@ class BrowserAutomationNode(Node):
                     preview=self._get_action_preview(action)
                 )
 
-                # Interpolate variables
-                interpolated_action = self._interpolate_variables(action, inputs)
+                # Interpolate variables using both inputs and extracted_data
+                # This allows referencing variables extracted by earlier actions in the same node
+
+                # Handle different output formats from previous steps
+                prev_output = inputs.get("output", {})
+
+                if isinstance(prev_output, dict):
+                    # Output is already a dict
+                    output_dict = prev_output
+                elif isinstance(prev_output, list) and len(prev_output) > 0:
+                    # Output is a list - check if it contains dicts (common from extraction steps)
+                    if isinstance(prev_output[0], dict):
+                        # List of dicts - merge them all
+                        output_dict = {}
+                        for item in prev_output:
+                            if isinstance(item, dict):
+                                output_dict.update(item)
+                    else:
+                        # List of non-dict items - can't extract variables
+                        output_dict = {}
+                else:
+                    output_dict = {}
+
+                combined_inputs = {
+                    "output": {**output_dict, **extracted_data},
+                    "input": inputs.get("input"),
+                    "step_name": inputs.get("step_name", self.name)
+                }
+                print(f"[BrowserAutomation] Before interpolation - action: {action}")
+                print(f"[BrowserAutomation] Combined inputs: {combined_inputs}")
+                interpolated_action = self._interpolate_variables(action, combined_inputs)
+                print(f"[BrowserAutomation] After interpolation - action: {interpolated_action}")
 
                 if interpolated_action.get('type') == 'assert':
                      result = service.execute_assertion(session.session_id, interpolated_action)
@@ -528,8 +568,16 @@ class BrowserAutomationNode(Node):
                     extracted_data.update(result or {})
                 
                 # Store specific output if requested
-                if action.get('output_variable') and result:
-                     extracted_data[action['output_variable']] = result.get('structured_data', result)
+                # Support both 'output_variable' (manual) and 'variable_name' (recorder)
+                out_var = action.get('output_variable') or action.get('variable_name')
+                
+                if out_var and result:
+                     val = result.get('structured_data', result)
+                     # If the result is a dict containing the variable name (common in multi-field extract), unwrap it
+                     if isinstance(val, dict) and out_var in val:
+                         extracted_data[out_var] = val[out_var]
+                     else:
+                         extracted_data[out_var] = val
 
                 # If login required, wait for user
                 if action["type"] == "ensure_login":
@@ -616,34 +664,66 @@ class BrowserAutomationNode(Node):
 
         def replace_var(match):
             var_path = match.group(1).strip()
-            parts = var_path.split('.')
-            
+            # Log the variable being resolved
+            print(f"[Variable Interpolation] Attempting to resolve: '{var_path}'")
+            print(f"[Variable Interpolation] Full match: '{match.group(0)}'")
+
+            # Split by first dot only to handle keys with dots/spaces in them
+            if '.' in var_path:
+                first_dot = var_path.index('.')
+                parts = [var_path[:first_dot], var_path[first_dot+1:]]
+            else:
+                parts = [var_path]
+
+            print(f"[Variable Interpolation] Parts after split: {parts}")
+
             # Try to find value in inputs
             # inputs usually has structure: {"output": ..., "input": ...} or is the output of prev step
-            
+
             value = inputs
-            
+
             # If inputs has "output" key (from previous node), use that as base
             if isinstance(inputs, dict) and "output" in inputs:
                 # Check if we want the whole output or a field
                 if len(parts) == 1 and parts[0] == "previous_step":
                     return str(inputs["output"])
-                
+
                 # Try to traverse
                 current = inputs["output"]
                 found = True
                 for part in parts:
-                    if part == "previous_step": 
+                    if part == "previous_step":
                         continue
-                    if isinstance(current, dict) and part in current:
-                        current = current[part]
+                    if isinstance(current, dict):
+                        # Try exact match first
+                        if part in current:
+                            current = current[part]
+                        # Try case-insensitive match if exact fails
+                        else:
+                            # Create a mapping of lowercase keys to actual keys
+                            key_map = {k.lower(): k for k in current.keys()}
+                            lower_part = part.lower()
+                            if lower_part in key_map:
+                                actual_key = key_map[lower_part]
+                                print(f"[Variable Interpolation] Case-insensitive match: '{part}' -> '{actual_key}'")
+                                current = current[actual_key]
+                            else:
+                                # Log what keys ARE available for debugging
+                                print(f"[Variable Interpolation] Key '{part}' not found. Available keys: {list(current.keys())}")
+                                print(f"[Variable Interpolation] Available keys (repr): {[repr(k) for k in current.keys()]}")
+                                found = False
+                                break
                     else:
+                        print(f"[Variable Interpolation] Expected dict but got {type(current)} when looking for '{part}'")
                         found = False
                         break
-                
+
                 if found:
                     return str(current)
 
+            # Log when variable can't be resolved
+            print(f"[Variable Interpolation] Could not resolve variable: {var_path}")
+            print(f"[Variable Interpolation] Input structure: {inputs}")
             return match.group(0)
 
         interpolated = re.sub(pattern, replace_var, action_json)
@@ -703,6 +783,173 @@ class PromptNode(Node):
                 include_next_step=False,
             )
         return {"output": chat_response, "input": prompt, "step_name": self.name}
+
+
+
+class DocumentRendererNode(Node):
+    def __init__(self, data):
+        super().__init__("DocumentRenderer")
+        self.data = data
+        self.config = data.get("config", {})
+        self.format = self.config.get("format", "pdf")
+        self.folder_uuid = self.config.get("folder_uuid", None)
+
+    def process(self, inputs):
+        self.report_progress(f"Rendering document to {self.format.upper()}...")
+        
+        content = inputs.get("output", "")
+        # Handle dict output (e.g. from template or extraction)
+        if isinstance(content, dict):
+            content = json.dumps(content, indent=2)
+        elif isinstance(content, list):
+            content = "\n".join([str(c) for c in content])
+        
+        output_data = {}
+        
+        if self.format == "pdf":
+            try:
+                # Import here to avoid potential circular import issues
+                from app.blueprints.home.routes import markdown_or_html_to_pdf_bytes
+                
+                pdf_bytes_io = markdown_or_html_to_pdf_bytes(content, input_format="markdown")
+                pdf_bytes = pdf_bytes_io.read()
+                
+                # Check for folder saving
+                if self.folder_uuid:
+                    user_id = self.data.get("user_id")
+                    filename = f"rendered_docs/doc_{uuid.uuid4().hex[:8]}.pdf"
+                    
+                    # Ensure directory exists
+                    abs_path = Path(app.root_path) / "static" / "uploads" / user_id / "rendered_docs"
+                    abs_path.mkdir(parents=True, exist_ok=True)
+                    
+                    file_path = abs_path / f"doc_{uuid.uuid4().hex[:8]}.pdf"
+                    
+                    with open(file_path, "wb") as f:
+                        f.write(pdf_bytes)
+                        
+                    # Create SmartDocument
+                    doc = SmartDocument(
+                        user_id=user_id,
+                        title=f"Rendered Output {datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}",
+                        path=str(file_path.relative_to(Path(app.root_path) / "static" / "uploads")),
+                        extension="pdf",
+                        uuid=uuid.uuid4().hex,
+                        space="default", # Ideally passed from context
+                        folder=self.folder_uuid,
+                        raw_text=content # Store source text
+                    )
+                    doc.save()
+                    output_data["smart_document_uuid"] = doc.uuid
+                    self.report_progress(f"Saved PDF to SmartFolder {self.folder_uuid}")
+
+                # Encode for direct download/display if needed (optional, bytes might be too large)
+                # For now, we return a "download" instruction
+                import base64
+                b64_pdf = base64.b64encode(pdf_bytes).decode('utf-8')
+                
+                output_data.update({
+                    "type": "file_download",
+                    "file_type": "pdf",
+                    "filename": "output.pdf",
+                    "data_b64": b64_pdf,
+                    "preview": "PDF Generated. Click to download."
+                })
+
+                return {
+                    "output": output_data,
+                    "input": inputs,
+                    "step_name": self.name
+                }
+                
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                return {
+                    "output": f"Error rendering PDF: {str(e)}",
+                    "status": "error",
+                    "step_name": self.name
+                }
+                
+        return {
+            "output": f"[Simulated {self.format.upper()} content...]",
+            "input": inputs,
+            "step_name": self.name
+        }
+
+
+
+class FormFillerNode(Node):
+    def __init__(self, data):
+        super().__init__("FormFiller")
+        self.data = data
+        self.config = data.get("config", {})
+        self.flatten = self.config.get("flatten", False)
+
+    def process(self, inputs):
+        self.report_progress("Filling form data...")
+        data_to_fill = inputs.get("output", {})
+        # Mock implementation
+        return {
+            "output": f"[Filled PDF Form with data: {str(data_to_fill)[:50]}... Flattened={self.flatten}]",
+            "input": inputs,
+            "step_name": self.name
+        }
+
+
+class DataExportNode(Node):
+    def __init__(self, data):
+        super().__init__("DataExport")
+        self.data = data
+        self.config = data.get("config", {})
+        self.format = self.config.get("format", "csv")
+
+    def process(self, inputs):
+        self.report_progress(f"Exporting data to {self.format.upper()}...")
+        data = inputs.get("output", [])
+        # Mock implementation
+        return {
+            "output": f"[Exported {self.format.upper()} file with {len(str(data))} bytes]",
+            "input": inputs,
+            "step_name": self.name
+        }
+
+
+class PackageBuilderNode(Node):
+    def __init__(self, data):
+        super().__init__("PackageBuilder")
+        self.data = data
+        self.config = data.get("config", {})
+        self.include_manifest = self.config.get("include_manifest", False)
+
+    def process(self, inputs):
+        self.report_progress("Building package...")
+        content = inputs.get("output", "")
+        # Mock implementation
+        return {
+            "output": f"[ZIP Package created. Manifest={self.include_manifest}. Content size={len(str(content))}]",
+            "input": inputs,
+            "step_name": self.name
+        }
+
+
+class DeliveryNode(Node):
+    def __init__(self, data):
+        super().__init__("Delivery")
+        self.data = data
+        self.config = data.get("config", {})
+        self.method = self.config.get("method", "download")
+        self.email = self.config.get("email", "")
+
+    def process(self, inputs):
+        target = self.email if self.method == "email" else "User Download"
+        self.report_progress(f"Delivering via {self.method} to {target}...")
+        # Mock implementation
+        return {
+            "output": f"[Delivered via {self.method}]",
+            "input": inputs,
+            "step_name": self.name
+        }
 
 
 def sanitize_step_name(name: str) -> str:
@@ -813,7 +1060,9 @@ class WorkflowEngine:
                 detail="Workflow completed",
                 preview=None,
             )
-        final_value = self._format_final_output(latest_output.get("output"))
+        # Prefer formatted_output for display, fall back to output
+        display_value = latest_output.get("formatted_output") or latest_output.get("output")
+        final_value = self._format_final_output(display_value)
         return final_value, data
 
     def _format_final_output(self, value):
@@ -935,6 +1184,16 @@ def build_workflow_engine(steps, workflow, model, user_id=None, workflow_result=
                         data=task.data,
                     )
                     tasks.append(node)
+                elif task.name == "DocumentRenderer":
+                    tasks.append(DocumentRendererNode(task.data))
+                elif task.name == "FormFiller":
+                    tasks.append(FormFillerNode(task.data))
+                elif task.name == "DataExport":
+                    tasks.append(DataExportNode(task.data))
+                elif task.name == "PackageBuilder":
+                    tasks.append(PackageBuilderNode(task.data))
+                elif task.name == "Delivery":
+                    tasks.append(DeliveryNode(task.data))
 
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)

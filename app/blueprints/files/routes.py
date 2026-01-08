@@ -24,6 +24,7 @@ from pypdf import PdfReader
 # Normalize filename/extension early
 from werkzeug.utils import secure_filename
 
+from app import limiter
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder, UserModelConfig
 from app.utilities.security import safe_get_document, validate_json_request
 from app.utilities.document_manager import (
@@ -256,6 +257,7 @@ def upload():
 
 
 @files.route("/poll_status", methods=["GET"])
+@limiter.exempt
 def poll_status() -> ResponseReturnValue:
     """Poll the status of a document's processing."""
     document_uuid = request.args.get("docid")

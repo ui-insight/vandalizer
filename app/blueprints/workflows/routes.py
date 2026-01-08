@@ -27,6 +27,7 @@ from celery.result import AsyncResult
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app import limiter
 from app.celery_worker import celery_app
 from app.blueprints.home.routes import _get_teams, markdown_or_html_to_pdf_bytes
 from app.models import (
@@ -76,6 +77,66 @@ def clear_recommendations_cache():
     global _recommendations_cache
     _recommendations_cache.clear()
     debug("Recommendations cache cleared")
+
+# --- Browser automation helpers ---
+
+def _collect_extraction_variables_from_step(step: WorkflowStep) -> list[str]:
+    if not step:
+        return []
+
+    variables = []
+
+    try:
+        step_items = step.extraction_items()
+        if isinstance(step_items, list):
+            variables.extend(step_items)
+    except Exception:
+        pass
+
+    for task in step.tasks or []:
+        if not task:
+            continue
+        try:
+            task_items = task.extraction_items()
+            if isinstance(task_items, list):
+                variables.extend(task_items)
+        except Exception:
+            continue
+
+    seen = set()
+    cleaned = []
+    for name in variables:
+        if name is None:
+            continue
+        var_name = str(name).strip()
+        if not var_name or var_name in seen:
+            continue
+        seen.add(var_name)
+        if var_name.startswith("previous_step."):
+            cleaned.append(var_name)
+        else:
+            cleaned.append(f"previous_step.{var_name}")
+
+    return cleaned
+
+
+def _get_previous_step_variables(workflow: Workflow, workflow_step_id: str) -> list[str]:
+    if not workflow or not workflow_step_id:
+        return []
+
+    steps = list(workflow.steps or [])
+    step_ids = [str(step.id) for step in steps]
+
+    try:
+        step_index = step_ids.index(str(workflow_step_id))
+    except ValueError:
+        return []
+
+    if step_index <= 0:
+        return []
+
+    previous_step = steps[step_index - 1]
+    return _collect_extraction_variables_from_step(previous_step)
 
 # Server-side cache for recommendations (TTL: 30 seconds - reduced for faster updates)
 _CACHE_TTL_SECONDS = 30
@@ -634,6 +695,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
 
 @workflows.route("/workflow/status", methods=["GET"])
+@limiter.exempt
 def workflow_status() -> ResponseReturnValue:
     """Poll the workflow status."""
     session_id = request.args.get("session_id")
@@ -685,6 +747,7 @@ def workflow_status() -> ResponseReturnValue:
 
 @login_required
 @workflows.route("/workflow/step/status/<task_id>", methods=["GET"])
+@limiter.exempt
 def workflow_step_test_status(task_id: str) -> ResponseReturnValue:
     """Poll the status of a workflow step test Celery task."""
     if not task_id:
@@ -1634,6 +1697,7 @@ def add_browser_automation_step() -> ResponseReturnValue:
             ).first()
 
         workflow = Workflow.objects(id=workflow_id).first()
+        external_variables = _get_previous_step_variables(workflow, workflow_step_id)
 
         template = render_template(
             "workflows/workflow_steps/workflow_add_browser_automation_modal.html",
@@ -1642,6 +1706,7 @@ def add_browser_automation_step() -> ResponseReturnValue:
             is_editing=is_editing,
             workflow_task_id=workflow_task_id,
             workflow_task=workflow_task,
+            external_variables=external_variables,
         )
         response = {"template": template}
         return jsonify(response)
@@ -1719,3 +1784,83 @@ def add_browser_automation_step() -> ResponseReturnValue:
 
     return jsonify({"error": "Method not allowed"}), 405
 
+@login_required
+@workflows.route("/add_document_renderer_step", methods=["GET"])
+def add_document_renderer_step() -> ResponseReturnValue:
+    return _render_output_node_modal("document_renderer", "Document Renderer")
+
+@login_required
+@workflows.route("/add_form_filler_step", methods=["GET"])
+def add_form_filler_step() -> ResponseReturnValue:
+    return _render_output_node_modal("form_filler", "Form Filler")
+
+@login_required
+@workflows.route("/add_data_export_step", methods=["GET"])
+def add_data_export_step() -> ResponseReturnValue:
+    return _render_output_node_modal("data_export", "Data Export")
+
+@login_required
+@workflows.route("/add_package_builder_step", methods=["GET"])
+def add_package_builder_step() -> ResponseReturnValue:
+    return _render_output_node_modal("package_builder", "Package Builder")
+
+@login_required
+@workflows.route("/add_delivery_step", methods=["GET"])
+def add_delivery_step() -> ResponseReturnValue:
+    return _render_output_node_modal("delivery", "Delivery")
+
+def _render_output_node_modal(node_type, node_type_name):
+    data_str = next(iter(request.args.keys()))
+    data = json.loads(data_str)
+    workflow_step_id = data.get("workflow_step_id")
+    
+    template = render_template(
+        "workflows/workflow_steps/workflow_add_output_node_modal.html",
+        node_type=node_type,
+        node_type_name=node_type_name,
+        node_type_camel=node_type.title().replace("_", ""),
+        workflow_step_id=workflow_step_id
+    )
+    return jsonify({"template": template})
+
+@login_required
+@workflows.route("/save_output_step", methods=["POST"])
+def save_output_step() -> ResponseReturnValue:
+    data = request.get_json()
+    workflow_step_id = data.get("workflow_step_id")
+    workflow_task_id = data.get("workflow_task_id")
+    node_type = data.get("node_type")
+    config = data.get("config")
+
+    task_name_map = {
+        "document_renderer": "DocumentRenderer",
+        "form_filler": "FormFiller",
+        "data_export": "DataExport",
+        "package_builder": "PackageBuilder",
+        "delivery": "Delivery"
+    }
+
+    # Find step logic
+    step = WorkflowStep.objects(id=workflow_step_id).first()
+    if not step:
+        return jsonify({"error": "Step not found"}), 404
+
+    # Update or Create Task
+    task_data = {"config": config, "name": task_name_map.get(node_type, "OutputNode")}
+
+    if workflow_task_id:
+        task = WorkflowStepTask.objects(id=workflow_task_id).first()
+        if task:
+           task.name = task_name_map.get(node_type, "OutputNode")
+           task.data = task_data
+           task.save()
+    else:
+        task = WorkflowStepTask(
+            name=task_name_map.get(node_type, "OutputNode"),
+            data=task_data
+        )
+        task.save()
+        step.tasks.append(task)
+        step.save()
+    
+    return jsonify({"success": True})

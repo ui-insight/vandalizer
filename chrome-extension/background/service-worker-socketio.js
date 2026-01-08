@@ -339,6 +339,15 @@ class BrowserAutomationBackground {
             this.handleTabRemoved(tabId);
         });
 
+        // Listen for downloads
+        chrome.downloads.onCreated.addListener((downloadItem) => {
+            this.handleDownloadCreated(downloadItem);
+        });
+
+        chrome.downloads.onChanged.addListener((downloadDelta) => {
+            this.handleDownloadChanged(downloadDelta);
+        });
+
         // Extension installation/startup
         chrome.runtime.onInstalled.addListener(() => {
             this.initialize();
@@ -405,6 +414,7 @@ class BrowserAutomationBackground {
         // Handle recording control events
         this.socket.on('start_recording', (data) => {
             console.log('[BrowserAutomation] 🔴 Start recording:', data.recording_id);
+            const externalVariables = Array.isArray(data.external_variables) ? data.external_variables : [];
             // Send to all tabs (the content script will start recording)
             chrome.tabs.query({}, (tabs) => {
                 console.log(`[BrowserAutomation] Broadcasting start_recording to ${tabs.length} tabs`);
@@ -414,7 +424,8 @@ class BrowserAutomationBackground {
                         console.log(`[BrowserAutomation] Sending to tab ${tab.id}: ${tab.url}`);
                         chrome.tabs.sendMessage(tab.id, {
                             action: 'start_recording',
-                            recording_id: data.recording_id
+                            recording_id: data.recording_id,
+                            external_variables: externalVariables
                         }, (response) => {
                             if (chrome.runtime.lastError) {
                                 console.log(`[BrowserAutomation] Error sending to tab ${tab.id}:`, chrome.runtime.lastError.message);
@@ -612,6 +623,27 @@ class BrowserAutomationBackground {
                 sendResponse({ success: true });
                 break;
 
+            case 'repair_completed':
+                // Self-healing repair completed by user
+                console.log('[BrowserAutomation] Repair completed:', message);
+                this.handleRepairCompleted(message.sessionId, message.stepId, message.repairResult);
+                sendResponse({ success: true });
+                break;
+
+            case 'session_expired':
+                // Session expired (SSO/Duo timeout)
+                console.log('[BrowserAutomation] Session expired detected:', message);
+                this.handleSessionExpired(message.sessionId, message.expiredInfo);
+                sendResponse({ success: true });
+                break;
+
+            case 'session_restored':
+                // Session restored (user logged back in)
+                console.log('[BrowserAutomation] Session restored detected:', message);
+                this.handleSessionRestored(message.sessionId, message.restoredInfo);
+                sendResponse({ success: true });
+                break;
+
             default:
                 sendResponse({ error: 'Unknown action' });
         }
@@ -635,6 +667,58 @@ class BrowserAutomationBackground {
 
         console.log('[BrowserAutomation] Recording saved locally with ID:', recordingId);
         // Note: recording_complete is already sent to backend via socket.emit in handleContentScriptMessage
+    }
+
+    handleRepairCompleted(sessionId, stepId, repairResult) {
+        console.log('[BrowserAutomation] Repair completed for session', sessionId, 'step', stepId);
+
+        // Send repair result to backend via Socket.IO
+        if (this.socket?.connected) {
+            this.socket.emit('repair_completed', {
+                sessionId: sessionId,
+                stepId: stepId,
+                repairResult: repairResult
+            });
+            console.log('[BrowserAutomation] Sent repair result to backend');
+        } else {
+            console.error('[BrowserAutomation] Cannot send repair result - not connected to backend');
+        }
+    }
+
+    handleSessionExpired(sessionId, expiredInfo) {
+        console.log('[BrowserAutomation] Session expired for', sessionId);
+
+        // Send session expired event to backend
+        if (this.socket?.connected) {
+            this.sendToBackend({
+                type: 'event',
+                event_name: 'session_expired',
+                session_id: sessionId,
+                payload: expiredInfo,
+                timestamp: Date.now()
+            });
+            console.log('[BrowserAutomation] Sent session_expired event to backend');
+        } else {
+            console.error('[BrowserAutomation] Cannot send session_expired - not connected to backend');
+        }
+    }
+
+    handleSessionRestored(sessionId, restoredInfo) {
+        console.log('[BrowserAutomation] Session restored for', sessionId);
+
+        // Send session restored event to backend
+        if (this.socket?.connected) {
+            this.sendToBackend({
+                type: 'event',
+                event_name: 'session_restored',
+                session_id: sessionId,
+                payload: restoredInfo,
+                timestamp: Date.now()
+            });
+            console.log('[BrowserAutomation] Sent session_restored event to backend');
+        } else {
+            console.error('[BrowserAutomation] Cannot send session_restored - not connected to backend');
+        }
     }
 
     handleTabUpdate(tabId, changeInfo, tab) {
@@ -710,6 +794,59 @@ class BrowserAutomationBackground {
                 session_id: session.id,
                 payload: data,
                 timestamp: Date.now()
+            });
+        }
+    }
+
+    handleDownloadCreated(downloadItem) {
+        console.log('[BrowserAutomation] Download created:', downloadItem.id);
+        // We might not have the session ID easily here unless we track active tab ID -> session ID
+        // But downloads are global. We can broadcast or try to map if we stored tab ID with download?
+        // Limitation: downloadItem doesn't always have tabId.
+        // For now, we'll try to guess based on active sessions or broadast relevant details.
+
+        // Wait for completion in onChanged
+    }
+
+    handleDownloadChanged(downloadDelta) {
+        if (downloadDelta.state && downloadDelta.state.current === 'complete') {
+            console.log('[BrowserAutomation] Download complete:', downloadDelta.id);
+
+            chrome.downloads.search({ id: downloadDelta.id }, (items) => {
+                if (items && items.length > 0) {
+                    const item = items[0];
+                    console.log('Download details:', item);
+
+                    // Attempt to associate with a session. 
+                    // Best effort: Use the most recently active session or just send as global event
+                    // Ideally we'd map item.referrer or something, but that's unreliable.
+                    // Let's send to all active sessions? Or just the backend as a generic event?
+                    // The backend handles the session mapping maybe?
+                    // For V1, let's pick the first active session we find (assuming single user usage).
+
+                    const sessions = Array.from(this.sessionManager.sessions.values());
+                    if (sessions.length > 0) {
+                        // Picking the most recent session is a reasonable heuristic for an admin tool
+                        const session = sessions[sessions.length - 1];
+
+                        this.sendToBackend({
+                            type: 'event',
+                            event_name: 'download_completed',
+                            session_id: session.id,
+                            payload: {
+                                id: item.id,
+                                filename: item.filename,
+                                mime: item.mime,
+                                fileSize: item.fileSize,
+                                startTime: item.startTime,
+                                endTime: item.endTime,
+                                url: item.url,
+                                finalUrl: item.finalUrl
+                            },
+                            timestamp: Date.now()
+                        });
+                    }
+                }
             });
         }
     }

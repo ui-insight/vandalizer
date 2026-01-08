@@ -23,6 +23,8 @@
                                 style="margin-right: 10px;"></i>Files</li>
                         <li class="section-item add-step-web-section"><i class="fa-solid fa-globe"
                                 style="margin-right: 10px;"></i>Web & Code</li>
+                        <li class="section-item add-step-output-section"><i class="fa-solid fa-file-export"
+                                style="margin-right: 10px;"></i>Output</li>
                     </ul>
                 </div>
 
@@ -261,6 +263,78 @@
                             </a>
                         </div>
                     </div>
+                    <!-- Output Section -->
+                    <div class="add-workflow-step-output-section" style="display: none;">
+                        <h3 class="workflow-add-step-subtitle"><i class="fa-solid fa-file-export"
+                                style="margin-right: 10px;"></i>Output</h3>
+
+                        <!-- Document Renderer -->
+                        <a class="content-btn add-document-renderer-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-regular fa-file-pdf" style="font-size: 24px; color: #D44C4C;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Document Renderer</div>
+                                    <div class="add-task-description">Convert content to PDF, DOCX, HTML, Markdown, or
+                                        Word</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- Form Filler -->
+                        <a class="content-btn add-form-filler-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-pen-to-square" style="font-size: 24px; color: #70B5D2;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Form Filler</div>
+                                    <div class="add-task-description">Fill PDF AcroForms with workflow data</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- Data Export -->
+                        <a class="content-btn add-data-export-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-table" style="font-size: 24px; color: #5DBB54;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Data Export</div>
+                                    <div class="add-task-description">Export data as CSV, XLSX, or JSON</div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- Package Builder -->
+                        <a class="content-btn add-package-builder-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-box-open" style="font-size: 24px; color: #F59E0B;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Package Builder</div>
+                                    <div class="add-task-description">Create ZIP bundles with manifests and attachments
+                                    </div>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- Delivery -->
+                        <a class="content-btn add-delivery-step-btn">
+                            <div class="add-task">
+                                <div class="add-task-icon-container">
+                                    <i class="fa-solid fa-paper-plane" style="font-size: 24px; color: #3B82F6;"></i>
+                                </div>
+                                <div class="add-task-content">
+                                    <div class="add-task-title">Delivery</div>
+                                    <div class="add-task-description">Send results via Email or Download</div>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -306,6 +380,17 @@
                 $(this).addClass('active');
             });
 
+            $('.add-step-output-section').off('click').on('click', function (e) {
+                e.preventDefault();
+                $(".add-workflow-step-all-section").hide();
+                $(".add-workflow-step-text-section").hide();
+                $(".add-workflow-step-files-section").hide();
+                $(".add-workflow-step-web-section").hide();
+                $(".add-workflow-step-output-section").show();
+                $('.section-item').removeClass('active');
+                $(this).addClass('active');
+            });
+
 
             $('.add-extraction-step-btn').on("click", function (e) {
                 e.preventDefault();  // Prevent default behavior, if needed
@@ -334,6 +419,31 @@
                 e.preventDefault();
                 console.log("Add Browser Automation");
                 workflowAddStepTaskType("browser_automation", "{{ workflow_step_id }}");
+            });
+
+            $('.add-document-renderer-step-btn').on("click", function (e) {
+                e.preventDefault();
+                workflowAddStepTaskType("document_renderer", "{{ workflow_step_id }}");
+            });
+
+            $('.add-form-filler-step-btn').on("click", function (e) {
+                e.preventDefault();
+                workflowAddStepTaskType("form_filler", "{{ workflow_step_id }}");
+            });
+
+            $('.add-data-export-step-btn').on("click", function (e) {
+                e.preventDefault();
+                workflowAddStepTaskType("data_export", "{{ workflow_step_id }}");
+            });
+
+            $('.add-package-builder-step-btn').on("click", function (e) {
+                e.preventDefault();
+                workflowAddStepTaskType("package_builder", "{{ workflow_step_id }}");
+            });
+
+            $('.add-delivery-step-btn').on("click", function (e) {
+                e.preventDefault();
+                workflowAddStepTaskType("delivery", "{{ workflow_step_id }}");
             });
 
             $('.closeWorkflowAddStepTaskBtn').off("click").on("click", function () {
