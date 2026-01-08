@@ -735,6 +735,65 @@ def admin_config_add_provider():
     return redirect(url_for("admin.admin_config"))
 
 
+@admin.route("/config/auth/update_provider/<int:index>", methods=["POST"])
+@login_required
+def admin_config_update_provider(index):
+    user = current_user
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    if 0 <= index < len(config.oauth_providers):
+        provider = dict(config.oauth_providers[index])
+        provider_type = provider.get("provider")
+
+        provider["display_name"] = request.form.get(
+            "display_name", provider.get("display_name", "")
+        ).strip()
+        provider["client_id"] = request.form.get(
+            "client_id", provider.get("client_id", "")
+        ).strip()
+        provider["redirect_uri"] = request.form.get(
+            "redirect_uri", provider.get("redirect_uri", "")
+        ).strip()
+
+        client_secret = request.form.get("client_secret", "").strip()
+        if client_secret:
+            provider["client_secret"] = client_secret
+
+        if provider_type == "azure":
+            provider["tenant_id"] = request.form.get(
+                "tenant_id", provider.get("tenant_id", "")
+            ).strip()
+        elif provider_type == "saml":
+            provider["metadata_url"] = request.form.get(
+                "metadata_url", provider.get("metadata_url", "")
+            ).strip()
+            provider["entity_id"] = request.form.get(
+                "entity_id", provider.get("entity_id", "")
+            ).strip()
+        elif provider_type == "custom":
+            provider["authorization_endpoint"] = request.form.get(
+                "authorization_endpoint",
+                provider.get("authorization_endpoint", ""),
+            ).strip()
+            provider["token_endpoint"] = request.form.get(
+                "token_endpoint", provider.get("token_endpoint", "")
+            ).strip()
+            provider["userinfo_endpoint"] = request.form.get(
+                "userinfo_endpoint", provider.get("userinfo_endpoint", "")
+            ).strip()
+
+        config.oauth_providers[index] = provider
+        config.save()
+        flash("OAuth provider updated.")
+    else:
+        flash("Invalid provider index.")
+
+    return redirect(url_for("admin.admin_config"))
+
+
 @admin.route("/config/auth/toggle_provider/<int:index>", methods=["POST"])
 @login_required
 def admin_config_toggle_provider(index):

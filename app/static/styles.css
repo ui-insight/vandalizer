@@ -241,6 +241,10 @@ footer .footer-poweredby {
     vertical-align: top;
 }
 
+.hero-content .action-button {
+    text-transform: none;
+}
+
 .navbar-brand {
   text-decoration: none;
   font-weight: bold;
