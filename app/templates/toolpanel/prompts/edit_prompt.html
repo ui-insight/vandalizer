@@ -37,6 +37,10 @@
             style="float: right; margin-right: 15px; ">DELETE</a>
     </div>
 
+    <div style="clear: both;"></div>
+    <hr>
+    {% include "_edit_history.html" %}
+
     <script>
         $('#edit-prompt-close-button').off('click').on('click', function (e) {
             e.preventDefault();
