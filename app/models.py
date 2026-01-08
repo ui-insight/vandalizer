@@ -150,6 +150,14 @@ class BrowserActionStep(me.EmbeddedDocument):
     target_name = me.StringField()  # Optional, used for shared locator stacks
 
     # For extraction
+    # extraction_spec supports:
+    # 1. Simple: { "mode": "simple", "fields": [...] }
+    # 2. Table: { 
+    #      "type": "table", 
+    #      "selector": "table.data", 
+    #      "schema": { "col_name": {"type": "string", "synonyms": ["Alt Name"]} },
+    #      "pagination": { "enabled": true, "next_btn": "button.next", "max_pages": 5 } 
+    #    }
     extraction_spec = me.DictField()
 
     # For assertions (NEW)
@@ -208,6 +216,38 @@ class WorkflowAttachment(me.Document):
     attachment = me.StringField(required=True, max_length=50)
 
 
+class WorkflowRepairHistory(me.Document):
+    """History of self-healing repairs for workflow steps"""
+    workflow_id = me.StringField(required=True, max_length=200)
+    step_id = me.StringField(required=True, max_length=200)
+    old_locator = me.DictField(required=True)  # Old selector strategies
+    new_locator = me.DictField(required=True)  # New selector strategies
+    reason = me.StringField(max_length=500)  # Why repair was needed
+    repair_date = me.DateTimeField(default=datetime.datetime.now)
+    repaired_by_user_id = me.StringField(max_length=200)  # Optional: track who fixed it
+    version_created = me.IntField()  # Workflow version this repair created
+
+    meta = {
+        "collection": "workflow_repair_history",
+        "indexes": [
+            {"fields": ["workflow_id", "-repair_date"]},
+            {"fields": ["step_id"]},
+        ]
+    }
+
+
+class WorkflowArtifact(me.Document):
+    """Artifacts (files) created during workflow execution"""
+    workflow_result_id = me.StringField(required=True)
+    artifact_type = me.StringField()  # "csv", "xlsx", "pdf"
+    filename = me.StringField()
+    file_path = me.StringField() # Path on the machine running the browser
+    extracted_data = me.DictField()  # Parsed content if applicable
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {'collection': 'workflow_artifacts'}
+
+
 class Workflow(me.Document):
     """Workflow model. Represents a complete workflow."""
 
@@ -226,6 +266,10 @@ class Workflow(me.Document):
     space = me.StringField(required=False, max_length=100)
     verified = me.BooleanField(default=False)
     created_by_user_id = me.StringField(required=False, max_length=200)
+
+    # Self-healing versioning
+    version = me.IntField(default=1)
+    parent_version_id = me.StringField(max_length=200)  # For version history tracking
 
 
 class WorkflowResult(me.Document):

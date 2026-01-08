@@ -8,7 +8,8 @@
     "activeTab",
     "scripting",
     "storage",
-    "webNavigation"
+    "webNavigation",
+    "downloads"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -27,6 +28,8 @@
       "js": [
         "content/locator-stack.js",
         "content/target-picker.js",
+        "content/repair-ui.js",
+        "content/session-detector.js",
         "content/recorder.js",
         "content/dom-actions.js",
         "content/extractor.js",

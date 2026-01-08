@@ -19,6 +19,7 @@ class SessionState(Enum):
     CONNECTING = "connecting"
     READY_NO_LOGIN = "ready_no_login"
     WAITING_FOR_LOGIN = "waiting_for_login"
+    WAITING_FOR_REAUTH = "waiting_for_reauth"  # Session expired, waiting for user to log back in
     ACTIVE = "active"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -47,7 +48,12 @@ class BrowserAutomationSession:
 
     def is_active(self):
         """Check if session is in an active state"""
-        return self.state in [SessionState.READY_NO_LOGIN, SessionState.WAITING_FOR_LOGIN, SessionState.ACTIVE]
+        return self.state in [
+            SessionState.READY_NO_LOGIN,
+            SessionState.WAITING_FOR_LOGIN,
+            SessionState.WAITING_FOR_REAUTH,
+            SessionState.ACTIVE
+        ]
 
 class BrowserAutomationService:
     """Main service for managing all browser automation sessions"""
@@ -91,8 +97,30 @@ class BrowserAutomationService:
             "mode": "new_tab", # or attach_current_tab
             "allowed_domains": session.allowed_domains
         }
-        
-        return self.send_command(session, "start_session", payload)
+
+        result = self.send_command(session, "start_session", payload)
+
+        # Automatically start session expiration monitoring
+        try:
+            self.start_session_monitoring(session_id)
+        except Exception as e:
+            logger.warning(f"Failed to start session monitoring: {e}")
+
+        return result
+
+    def start_session_monitoring(self, session_id):
+        """Start monitoring for session expiration (SSO/Duo timeouts)"""
+        session = self.get_session(session_id)
+        if not session:
+            raise ValueError(f"Session {session_id} not found")
+
+        logger.info(f"Starting session expiration monitoring for session {session_id}")
+
+        payload = {
+            "sessionId": session_id
+        }
+
+        return self.send_command(session, "start_session_monitoring", payload, wait_for_response=False)
 
     def execute_action(self, session_id, action_config):
         """Execute a single action (navigate, fill, click, extract, etc.)"""
@@ -150,7 +178,31 @@ class BrowserAutomationService:
             payload = {
                 "condition_type": config.get("condition_type"),
                 "condition_value": config.get("condition_value"),
+                "condition_type": config.get("condition_type"),
+                "condition_value": config.get("condition_value"),
                 "timeout_ms": config.get("timeout_ms", 5000)
+            }
+        elif action_type == "extract_by_example":
+            # Runtime LLM extraction
+            examples = config.get("examples", [])
+            # Get full page HTML from extension to feed to LLM
+            # We use check_condition just to get state or implement a new 'get_state' command?
+            # Actually get_page_state exists but might return simplified.
+            # Let's request specific HTML.
+            
+            # Note: We need the HTML to be sent to us. 
+            # We can use send_command('get_page_content') if it existed, or eval.
+            # For now, let's assume we can get the HTML from the session state or a command.
+            
+            page_content = self.send_command(session, 'get_page_content', {}) # Need to implement this in extension
+            html = page_content.get('html', '')
+            
+            # Use LLM to find similar items
+            model = getattr(self, '_current_model', None) or "gpt-4"
+            extracted = self.extract_by_example_with_llm(session_id, html, examples, model=model)
+            
+            return {
+                "structured_data": extracted
             }
 
         return self.send_command(session, command_name, payload)
@@ -158,7 +210,12 @@ class BrowserAutomationService:
     def execute_action_with_stack(self, session_id: str, action: dict) -> dict:
         """Execute action using locator stack with fallback"""
         session = self.get_session(session_id)
-        
+
+        # Check if session is waiting for re-authentication
+        if session.state == SessionState.WAITING_FOR_REAUTH:
+            logger.info(f"Session {session_id} is waiting for re-authentication, pausing execution...")
+            self._wait_for_reauth(session_id)
+
         # Record start
         self.record_audit_event(session_id, 'action_start', {
             'action_type': action.get('type'),
@@ -215,21 +272,161 @@ class BrowserAutomationService:
             # Record which strategy succeeded
             if isinstance(result, dict) and result.get('usedStrategy'):
                  self._record_strategy_success(action.get('target'), result['usedStrategy'])
-            
+
             # Record success
             self.record_audit_event(session_id, 'action_success', {
                 'action_type': action.get('type'),
                 'result': result
             })
-            
+
             return result
         except Exception as e:
+            # Check if failure is due to element not found
+            error_message = str(e).lower()
+            is_element_not_found = any(phrase in error_message for phrase in [
+                'element not found',
+                'could not find',
+                'no such element',
+                'selector failed'
+            ])
+
             # Record failure
             self.record_audit_event(session_id, 'action_failure', {
                 'action_type': action.get('type'),
                 'error': str(e)
             })
+
+            # If element not found and repair is enabled, trigger self-healing
+            if is_element_not_found and action.get('on_failure') == 'repair':
+                logger.info(f"Triggering self-healing repair for step: {action.get('step_id')}")
+
+                # Trigger repair mode
+                repair_result = self._trigger_repair_mode(
+                    session_id,
+                    action.get('step_id'),
+                    action.get('description', 'Unknown element'),
+                    action.get('target_stack', [])
+                )
+
+                if repair_result.get('success'):
+                    # Repair succeeded, update action with new strategies and retry
+                    logger.info(f"Repair successful, retrying action with new selectors")
+                    action_copy['target_stack'] = repair_result['newStrategies']
+
+                    # Retry the action with new strategies
+                    return self.execute_action(session_id, action_copy)
+                else:
+                    # User cancelled or repair failed
+                    logger.warning(f"Repair cancelled or failed")
+                    raise Exception(f"Element not found and repair was cancelled: {str(e)}")
+
+            # No repair or different error type
             raise
+
+    def _trigger_repair_mode(self, session_id: str, step_id: str, target_description: str, old_strategies: list) -> dict:
+        """
+        Trigger self-healing repair mode in the extension.
+        Waits for user to select correct element and returns new strategies.
+        """
+        session = self.get_session(session_id)
+        if not session:
+            raise ValueError(f"Session not found: {session_id}")
+
+        logger.info(f"Triggering repair mode for step {step_id}: '{target_description}'")
+
+        # Send repair request to extension
+        try:
+            result = self.send_command(session, 'request_repair', {
+                'stepId': step_id,
+                'targetDescription': target_description,
+                'oldStrategies': old_strategies
+            })
+
+            if not result.get('success'):
+                logger.warning("Failed to start repair mode in extension")
+                return {'success': False, 'error': 'Failed to start repair mode'}
+
+        except Exception as e:
+            logger.error(f"Error sending repair command: {e}")
+            return {'success': False, 'error': str(e)}
+
+        # Wait for repair completion (user selecting element)
+        # The extension will send 'repair_completed' message back to backend
+        # We use Redis to coordinate the async response
+        repair_key = f"browser_automation:repair:{session_id}:{step_id}"
+
+        # Wait up to 5 minutes for user to complete repair
+        timeout = 300  # 5 minutes
+        start_time = time.time()
+
+        while time.time() - start_time < timeout:
+            # Check if repair result is available in Redis
+            repair_result_json = self.redis_client.get(repair_key)
+
+            if repair_result_json:
+                # Parse result
+                repair_result = json.loads(repair_result_json)
+
+                # Clean up Redis key
+                self.redis_client.delete(repair_key)
+
+                if repair_result.get('success'):
+                    # Save repair to workflow history
+                    self._save_repair_to_history(
+                        session_id,
+                        step_id,
+                        old_strategies,
+                        repair_result['newStrategies']
+                    )
+
+                return repair_result
+
+            # Sleep briefly before checking again
+            time.sleep(0.5)
+
+        # Timeout - user didn't complete repair
+        logger.warning(f"Repair mode timeout for step {step_id}")
+        return {'success': False, 'error': 'User did not complete repair within timeout'}
+
+    def _save_repair_to_history(self, session_id: str, step_id: str, old_strategies: list, new_strategies: list):
+        """Save repair to WorkflowRepairHistory"""
+        from app.models import WorkflowRepairHistory, Workflow
+
+        session = self.get_session(session_id)
+        if not session or not session.workflow_result_id:
+            return
+
+        try:
+            # Get workflow from result
+            from app.models import WorkflowResult
+            workflow_result = WorkflowResult.objects(id=session.workflow_result_id).first()
+            if not workflow_result or not workflow_result.workflow:
+                return
+
+            workflow = workflow_result.workflow
+
+            # Create repair history record
+            repair_history = WorkflowRepairHistory(
+                workflow_id=str(workflow.id),
+                step_id=step_id,
+                old_locator={'strategies': old_strategies},
+                new_locator={'strategies': new_strategies},
+                reason='Element not found - self-healing repair',
+                repair_date=datetime.utcnow()
+            )
+            repair_history.save()
+
+            # Increment workflow version
+            if not hasattr(workflow, 'version'):
+                workflow.version = 1
+            workflow.version += 1
+            workflow.updated_at = datetime.utcnow()
+            workflow.save()
+
+            logger.info(f"Saved repair to history for workflow {workflow.id}, new version: {workflow.version}")
+
+        except Exception as e:
+            logger.error(f"Error saving repair to history: {e}")
 
     def _record_strategy_success(self, target_name: str, strategy: dict):
         """Update confidence scores based on successful strategy"""
@@ -241,17 +438,17 @@ class BrowserAutomationService:
             # Boost priority of successful strategy
             # Simple re-ranking: Move successful strategy up, others down
             # Or increment a score. Plan suggests priority manipulation.
-            
+
             strategies_updated = False
             for s in locator.strategies:
                 # Strategy dict comparison
                 if s.get('type') == strategy.get('type') and s.get('value') == strategy.get('value'):
-                    s['priority'] = max(1, s.get('priority', 5) - 1) # Lower is better? Plan said "sort a-b". JS stack sorts a-b (asc). 
+                    s['priority'] = max(1, s.get('priority', 5) - 1) # Lower is better? Plan said "sort a-b". JS stack sorts a-b (asc).
                     # So priority 1 is highest.
                     strategies_updated = True
                 else:
                     s['priority'] = min(10, s.get('priority', 5) + 1)
-            
+
             if strategies_updated:
                 locator.strategies.sort(key=lambda x: x.get('priority', 5))
                 locator.last_tested = datetime.utcnow()
@@ -274,6 +471,85 @@ class BrowserAutomationService:
                     screenshot_url = self._store_screenshot(screenshot_result['data'])
             except Exception as e:
                 logger.error(f"Failed to capture audit screenshot: {e}")
+
+    def handle_download_completed(self, session_id: str, download_info: dict):
+        """Handle download complete event"""
+        from app.models import WorkflowArtifact
+        import pandas as pd
+        import os
+
+        session = self.get_session(session_id)
+        if not session:
+            return
+
+        logger.info(f"Download completed for session {session_id}: {download_info.get('filename')}")
+
+        try:
+            # Create artifact
+            artifact = WorkflowArtifact(
+                workflow_result_id=session.workflow_result_id,
+                artifact_type=self._get_artifact_type(download_info.get('mime'), download_info.get('filename')),
+                filename=download_info.get('filename'),
+                file_path=download_info.get('filename'), # Extension gives filename/relative path
+                # Note: We don't have absolute path unless we know download dir. 
+                # Assuming simple mapping or just storing name for now.
+                created_at=datetime.utcnow()
+            )
+
+            # Try to parse if data available? 
+            # Note: The extension doesn't send file CONTENT, only metadata. 
+            # We can't parse unless the file is on the server (which it typically is if local browser).
+            # If browser is remote/user's, we can't parse. 
+            # Assuming 'local' execution context for V1 or file is accessible.
+            
+            # For this Phase, simple logging and recording is 'Success'. 
+            # Parsing would require file access.
+            
+            artifact.save()
+            logger.info("Saved download artifact")
+
+        except Exception as e:
+            logger.error(f"Error handling download: {e}")
+
+    def _get_artifact_type(self, mime, filename):
+        if 'csv' in mime or filename.endswith('.csv'): return 'csv'
+        if 'excel' in mime or 'spreadsheet' in mime or filename.endswith('.xlsx'): return 'xlsx'
+        if 'pdf' in mime or filename.endswith('.pdf'): return 'pdf'
+        return 'other'
+
+
+    def handle_session_expired(self, session_id: str, expired_info: dict):
+        """Handle session expiration event from extension"""
+        session = self.get_session(session_id)
+        if not session:
+            return
+
+        logger.warning(f"Session expired detected for session {session_id}. Info: {expired_info}")
+        
+        # Transition state
+        session.transition_to(SessionState.WAITING_FOR_REAUTH, reason=f"Login detected at {expired_info.get('url')}")
+        
+        # Notify frontend via WebSocket
+        socketio.emit('workflow_paused', {
+            'session_id': session_id,
+            'reason': 'session_expired',
+            'details': expired_info
+        }, room=session.user_id)
+        
+        # We need to pause the execution thread. 
+        # Ideally, `execute_workflow` checks session state before each step.
+        
+    def resume_session_after_reauth(self, session_id: str):
+        """Resume session after user logs back in"""
+        session = self.get_session(session_id)
+        if not session:
+            return
+
+        logger.info(f"Resuming session {session_id} after re-authentication")
+        session.transition_to(SessionState.ACTIVE, reason="User resumed session")
+        
+        # Notify execution thread to continue (if using events/conditions)
+        # For now, just state change might be enough if execution loop checks state.
 
         # Record audit event
         audit_event = {
@@ -536,6 +812,59 @@ class BrowserAutomationService:
             response = agent.run_sync(f"{system_prompt}\n\n{user_prompt}")
             logger.info(f"Got response from LLM for information extraction")
 
+            if response.output:
+                # Basic JSON parsing cleanup
+                import re
+                json_match = re.search(r'\{.*\}', response.output, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group(0))
+            
+            return {"found": False, "answer": None}
+
+        except Exception as e:
+            logger.error(f"LLM extraction failed: {e}")
+            return {"found": False, "answer": None, "error": str(e)}
+
+    def extract_by_example_with_llm(self, session_id: str, html_content: str, examples: list, model="gpt-4") -> list:
+        """
+        Extract items similar to the provided examples using an LLM.
+        """
+        system_prompt = """
+        You are an intelligent data extraction assistant.
+        The user will provide HTML content and a list of 'example' items that were selected from that page.
+        Your task is to identify the pattern and extract ALL items that match that pattern from the HTML.
+        
+        Return ONLY a JSON list of objects.
+        """
+
+        example_descriptions = []
+        for ex in examples:
+            example_descriptions.append(f"- Tag: {ex.get('tagName')}, Text: {ex.get('innerText')}")
+
+        user_prompt = f"""
+        Examples selected by user:
+        {chr(10).join(example_descriptions)}
+
+        Page HTML (truncated):
+        {html_content[:50000]}
+
+        Extract all items similar to the examples. capture the inner text and any relevant links.
+        Return a JSON list: [ {{"text": "...", "link": "..."}}, ... ]
+        """
+
+        try:
+            agent = create_chat_agent(model)
+            response = agent.run_sync(f"{system_prompt}\n\n{user_prompt}")
+            
+            import re
+            json_match = re.search(r'\[.*\]', response.output, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group(0))
+            return []
+        except Exception as e:
+            logger.error(f"Extract by example failed: {e}")
+            return []
+
             # Clean up response if it contains markdown code blocks
             content = response.output.strip()
             if content.startswith("```json"):
@@ -662,17 +991,40 @@ class BrowserAutomationService:
         session_id = message.get("session_id")
         event_name = message.get("event_name")
         payload = message.get("payload")
-        
+
         session = self.get_session(session_id)
         if not session:
             return
-            
+
         if event_name == "login_state_changed":
             if payload.get("is_logged_in"):
                 # We could auto-advance here, but we prefer explicit user confirmation for now
                 pass
         elif event_name == "session_failed":
             session.transition_to(SessionState.FAILED, payload.get("reason"))
+        elif event_name == "session_expired":
+            # SSO/Duo session expired - pause workflow
+            logger.warning(f"Session {session_id} expired - transitioning to WAITING_FOR_REAUTH")
+            session.transition_to(SessionState.WAITING_FOR_REAUTH, "Session expired - SSO/Duo timeout detected")
+
+            # Record audit event
+            self.record_audit_event(session_id, 'session_expired', {
+                'url': payload.get('url'),
+                'title': payload.get('title'),
+                'timestamp': payload.get('timestamp')
+            })
+        elif event_name == "session_restored":
+            # User logged back in
+            if session.state == SessionState.WAITING_FOR_REAUTH:
+                logger.info(f"Session {session_id} restored - transitioning back to ACTIVE")
+                session.transition_to(SessionState.ACTIVE, "Session restored - user logged back in")
+
+                # Record audit event
+                self.record_audit_event(session_id, 'session_restored', {
+                    'url': payload.get('url'),
+                    'title': payload.get('title'),
+                    'timestamp': payload.get('timestamp')
+                })
 
     def send_command(self, session, command_name, payload, timeout_ms=30000, wait_for_response=True):
         """Send command to extension and track request"""

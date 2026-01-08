@@ -4,9 +4,55 @@ class BrowserAutomationContent {
         this.overlay = new OverlayManager();
         this.domActions = new DOMActions();
         this.extractor = new DataExtractor();
+        this.sessionDetector = null;
 
         this.setupListeners();
         this.checkActiveRecording();
+        this.startSessionMonitoring(); // Start passive monitoring
+    }
+
+    startSessionMonitoring() {
+        // Run check immediately
+        this.checkLogoutState();
+
+        // And on navigation/URL change
+        let lastUrl = location.href;
+        new MutationObserver(() => {
+            const url = location.href;
+            if (url !== lastUrl) {
+                lastUrl = url;
+                this.checkLogoutState();
+            }
+        }).observe(document, { subtree: true, childList: true });
+
+        // Also listen for history API
+        window.addEventListener('popstate', () => this.checkLogoutState());
+    }
+
+    checkLogoutState() {
+        // Heuristic: Check if we are on a login page
+        const url = window.location.href.toLowerCase();
+        const title = document.title.toLowerCase();
+
+        const loginIndicators = [
+            '/login', '/signin', '/auth/login', 'sso.uidaho.edu',
+            'duosecurity.com', 'shibboleth'
+        ];
+
+        const isLoginPage = loginIndicators.some(indicator => url.includes(indicator)) ||
+            (title.includes('sign in') || title.includes('log in'));
+
+        if (isLoginPage) {
+            console.log('[ContentScript] Login page detected:', url);
+            chrome.runtime.sendMessage({
+                action: 'session_expired',
+                data: {
+                    url: url,
+                    title: document.title,
+                    timestamp: Date.now()
+                }
+            });
+        }
     }
 
     async checkActiveRecording() {
@@ -14,7 +60,7 @@ class BrowserAutomationContent {
         const result = await chrome.storage.local.get(['active_recording_id']);
         if (result.active_recording_id && window.VandalizerRecorder) {
             console.log('[ContentScript] Resuming recording on page load:', result.active_recording_id);
-            this.recorder = new window.VandalizerRecorder(result.active_recording_id);
+            this.recorder = new window.VandalizerRecorder(result.active_recording_id, this.overlay);
             this.recorder.start();
         }
     }
@@ -93,13 +139,32 @@ class BrowserAutomationContent {
                     }
                     break;
 
+                case 'start_repair_mode':
+                    // Self-healing repair UI
+                    if (window.VandalizerRepairUI) {
+                        const repairUI = new window.VandalizerRepairUI();
+                        repairUI.start(data.repairRequest, (repairResult) => {
+                            // Send repair result back to backend
+                            chrome.runtime.sendMessage({
+                                action: 'repair_completed',
+                                sessionId: data.sessionId,
+                                stepId: data.stepId,
+                                repairResult: repairResult
+                            });
+                        });
+                        result = { success: true, status: 'repair_mode_started' };
+                    } else {
+                        throw new Error('RepairUI not loaded');
+                    }
+                    break;
+
                 case 'start_recording':
                     if (window.VandalizerRecorder) {
                         console.log('[ContentScript] Starting recording with ID:', message.recording_id);
                         // Store recording ID so it persists across page navigations
                         await chrome.storage.local.set({ active_recording_id: message.recording_id });
-                        this.recorder = new window.VandalizerRecorder(message.recording_id);
-                        this.recorder.start();
+                        this.recorder = new window.VandalizerRecorder(message.recording_id, this.overlay);
+                        this.recorder.start(message.external_variables || []);
                         result = { success: true, status: 'recording_started' };
                     } else {
                         throw new Error('Recorder not loaded');
@@ -117,6 +182,74 @@ class BrowserAutomationContent {
                     } else {
                         result = { success: false, error: 'No active recording' };
                     }
+                    break;
+
+                case 'start_session_monitoring':
+                    // Start monitoring for session expiration
+                    if (window.VandalizerSessionDetector) {
+                        this.sessionDetector = new window.VandalizerSessionDetector();
+                        this.sessionDetector.start(
+                            // On session expired
+                            (expiredInfo) => {
+                                console.log('[ContentScript] Session expired detected, notifying background');
+                                chrome.runtime.sendMessage({
+                                    action: 'session_expired',
+                                    sessionId: data.sessionId,
+                                    expiredInfo: expiredInfo
+                                });
+                            },
+                            // On session restored
+                            (restoredInfo) => {
+                                console.log('[ContentScript] Session restored detected, notifying background');
+                                chrome.runtime.sendMessage({
+                                    action: 'session_restored',
+                                    sessionId: data.sessionId,
+                                    restoredInfo: restoredInfo
+                                });
+                            }
+                        );
+                        result = { success: true, status: 'monitoring_started' };
+                    } else {
+                        throw new Error('SessionDetector not loaded');
+                    }
+                    break;
+
+                case 'stop_session_monitoring':
+                    if (this.sessionDetector) {
+                        this.sessionDetector.stop();
+                        this.sessionDetector = null;
+                        result = { success: true, status: 'monitoring_stopped' };
+                    } else {
+                        result = { success: false, error: 'No active monitoring' };
+                    }
+                    break;
+
+                case 'check_session_state':
+                    // Manual check if logged out
+                    if (this.sessionDetector) {
+                        result = {
+                            success: true,
+                            loggedOut: this.sessionDetector.isLoggedOut(),
+                            currentState: this.sessionDetector.lastState
+                        };
+                    } else {
+                        // Create temporary detector for one-time check
+                        const tempDetector = new window.VandalizerSessionDetector();
+                        result = {
+                            success: true,
+                            loggedOut: tempDetector.isLoggedOut()
+                        };
+                    }
+                    break;
+                    break;
+
+                case 'get_page_content':
+                    result = {
+                        success: true,
+                        html: document.documentElement.outerHTML,
+                        title: document.title,
+                        url: window.location.href
+                    };
                     break;
             }
 
@@ -246,7 +379,7 @@ class BrowserAutomationContent {
         console.log('[ContentScript] extractData received:', JSON.stringify(data, null, 2));
         const { extraction_spec } = data;
 
-        const result = this.extractor.extract(extraction_spec);
+        const result = await this.extractor.extract(extraction_spec);
         console.log('[ContentScript] extractData result:', JSON.stringify(result, null, 2));
 
         return result;

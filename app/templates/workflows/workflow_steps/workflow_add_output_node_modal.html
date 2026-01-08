@@ -1,0 +1,159 @@
+<div id="newWorkflowStepModal" class="modal informationmodal" style="display: block;">
+    <div class="modal-content" style="width: 800px; max-width: 90%; margin: 5% auto;">
+        <h2 style="margin-top: 0px; text-align: left;">
+            Configure {{ node_type_name }} Node
+        </h2>
+
+        <div style="width: 100%; padding: 15px 0px;">
+            <p class="workflow-description">Configure the settings for this output node.</p>
+
+            <div class="form-group">
+                <label for="outputNodeTitle">Step Title</label>
+                <input type="text" id="outputNodeTitle" class="form-control" value="{{ node_type_name }}"
+                    placeholder="Enter step title">
+            </div>
+
+            <!-- Dynamic Content based on Node Type -->
+            {% if node_type == 'document_renderer' %}
+            <div class="form-group">
+                <label for="documentFormat">Output Format</label>
+                <select id="documentFormat" class="form-control">
+                    <option value="pdf">PDF</option>
+                    <option value="docx">DOCX</option>
+                    <option value="html">HTML</option>
+                    <option value="markdown">Markdown</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="smartFolderUuid">Save to Smart Folder (Optional)</label>
+                <input type="text" id="smartFolderUuid" class="form-control" placeholder="Enter Smart Folder UUID">
+            </div>
+            {% elif node_type == 'form_filler' %}
+            <div class="form-group">
+                <label>Form Filler Options</label>
+                <div class="checkbox">
+                    <label><input type="checkbox" id="flattenForm"> Flatten Form (Prevent further editing)</label>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="templateFile">Upload PDF Template (AcroForm)</label>
+                <input type="file" id="templateFile" class="form-control">
+            </div>
+            {% elif node_type == 'data_export' %}
+            <div class="form-group">
+                <label for="exportFormat">Export Format</label>
+                <select id="exportFormat" class="form-control">
+                    <option value="csv">CSV</option>
+                    <option value="xlsx">Excel (XLSX)</option>
+                    <option value="json">JSON</option>
+                </select>
+            </div>
+            {% elif node_type == 'package_builder' %}
+            <div class="form-group">
+                <label>Package Options</label>
+                <div class="checkbox">
+                    <label><input type="checkbox" id="includeManifest"> Include Manifest JSON</label>
+                </div>
+            </div>
+            {% elif node_type == 'delivery' %}
+            <div class="form-group">
+                <label for="deliveryMethod">Delivery Method</label>
+                <select id="deliveryMethod" class="form-control">
+                    <option value="download">Direct Download</option>
+                    <option value="email">Email</option>
+                </select>
+            </div>
+            <div class="form-group email-settings" style="display:none;">
+                <label for="emailAddress">Recipient Email</label>
+                <input type="email" id="emailAddress" class="form-control" placeholder="recipient@example.com">
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="modal-footer">
+            <button id="closeNewWorkflowStepBtn" class="btn btn-secondary">Cancel</button>
+            <button id="confirm{{ node_type|capitalize }}StepBtn" class="btn btn-primary">Add Step</button>
+        </div>
+    </div>
+
+    <script>
+        $('#closeNewWorkflowStepBtn').off("click").on("click", function (e) {
+            e.preventDefault();
+            $('#newWorkflowStepModal').remove();
+            // Clean up URL params if needed
+            const url = new URL(window.location.href);
+            window.history.replaceState(null, '', url.toString());
+        });
+
+        // Show/Hide Email field for Delivery node
+        $('#deliveryMethod').on('change', function () {
+            if ($(this).val() === 'email') {
+                $('.email-settings').show();
+            } else {
+                $('.email-settings').hide();
+            }
+        });
+
+        // The confirmation click handler is attached in index_scripts.html via workflowAddStepTaskType
+        // But we need to define the function that gathers the data
+
+        window.getOutputNodeConfig = function () {
+            let config = {
+                title: $('#outputNodeTitle').val()
+            };
+
+            const nodeType = "{{ node_type }}";
+
+            if (nodeType === 'document_renderer') {
+                config.format = $('#documentFormat').val();
+                let folder = $('#smartFolderUuid').val();
+                if (folder && folder.trim() !== '') {
+                    config.folder_uuid = folder.trim();
+                }
+            } else if (nodeType === 'form_filler') {
+                config.flatten = $('#flattenForm').is(':checked');
+                // Note: File upload handling might need specific AJAX setup in the main script
+            } else if (nodeType === 'data_export') {
+                config.format = $('#exportFormat').val();
+            } else if (nodeType === 'package_builder') {
+                config.include_manifest = $('#includeManifest').is(':checked');
+            } else if (nodeType === 'delivery') {
+                config.method = $('#deliveryMethod').val();
+                if (config.method === 'email') {
+                    config.email = $('#emailAddress').val();
+                }
+            }
+            return config;
+        };
+
+        function workflowConfirmStepTask(stepType, workflow_step_id, workflow_task_id) {
+            let config = window.getOutputNodeConfig();
+
+            let data = JSON.stringify({
+                workflow_step_id: workflow_step_id,
+                workflow_task_id: workflow_task_id,
+                node_type: stepType,
+                config: config
+            });
+
+            $.ajax({
+                url: `/workflows/save_output_step`, // Unified save route or specific
+                type: 'POST',
+                data: data,
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    $('#newWorkflowStepModal').remove();
+                    location.reload();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        }
+
+    </script>
+</div>

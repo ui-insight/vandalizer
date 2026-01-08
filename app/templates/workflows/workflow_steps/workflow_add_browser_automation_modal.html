@@ -7,7 +7,8 @@
                     <i class="fa-solid fa-globe" style="color: #3b82f6;"></i>
                     {% if is_editing %} Update Browser Automation {% else %} Browser Automation {% endif %}
                 </h2>
-                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Automate web interactions by recording or building manually</p>
+                <p style="margin: 5px 0 0 0; color: #64748b; font-size: 14px;">Automate web interactions by recording or
+                    building manually</p>
             </div>
             <a class="closeAddBrowserAutomationToWorkflowBtn" style="color: #94a3b8; cursor: pointer; font-size: 24px;">
                 <i class="fa-solid fa-xmark"></i>
@@ -98,7 +99,8 @@
                     <label><i class="fa-solid fa-list-check"></i> Actions</label>
                     <div id="browser-automation-actions" class="actions-container">
                         <div class="empty-state">
-                            <i class="fa-solid fa-hand-pointer" style="font-size: 48px; color: #cbd5e1; margin-bottom: 10px;"></i>
+                            <i class="fa-solid fa-hand-pointer"
+                                style="font-size: 48px; color: #cbd5e1; margin-bottom: 10px;"></i>
                             <p>No actions configured yet</p>
                             <small>Add actions using the buttons below</small>
                         </div>
@@ -237,8 +239,15 @@
         }
 
         @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
         }
 
         .recorder-controls {
@@ -253,7 +262,8 @@
             gap: 16px;
         }
 
-        .btn-record, .btn-stop {
+        .btn-record,
+        .btn-stop {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -533,7 +543,8 @@
             background: #f8fafc;
         }
 
-        .btn-primary, .btn-secondary {
+        .btn-primary,
+        .btn-secondary {
             padding: 10px 20px;
             border-radius: 6px;
             font-weight: 600;
@@ -574,9 +585,10 @@
         let recordingTimer = null;
         let recordedSteps = [];
         let currentRecordingId = null;
+        const externalVariables = {{ external_variables | tojson }};
 
         // Tab switching
-        $(document).on('click', '.tab-button', function() {
+        $(document).on('click', '.tab-button', function () {
             const tab = $(this).data('tab');
             $('.tab-button').removeClass('active');
             $(this).addClass('active');
@@ -590,7 +602,7 @@
             $.ajax({
                 url: '/browser_automation/connection/status',
                 method: 'GET',
-                success: function(data) {
+                success: function (data) {
                     if (data.connected) {
                         $('#status-indicator').addClass('connected');
                         $('#status-text').text('Extension connected and ready');
@@ -600,7 +612,7 @@
                         $('#start-recording-btn').prop('disabled', true);
                     }
                 },
-                error: function() {
+                error: function () {
                     $('#status-text').text('Unable to check connection status');
                     $('#start-recording-btn').prop('disabled', true);
                 }
@@ -608,20 +620,26 @@
         }
 
         // Recording controls
-        $(document).on('click', '#start-recording-btn', function() {
+        $(document).on('click', '#start-recording-btn', function () {
             startRecording();
         });
 
-        $(document).on('click', '#stop-recording-btn', function() {
+        $(document).on('click', '#stop-recording-btn', function () {
             stopRecording();
         });
 
         function startRecording() {
             // Call backend to start recording
+            const requestData = {
+                external_variables: externalVariables
+            };
+
             $.ajax({
                 url: '/browser_automation/recording/start',
                 method: 'POST',
-                success: function(data) {
+                contentType: 'application/json',
+                data: JSON.stringify(requestData),
+                success: function (data) {
                     currentRecordingId = data.recording_id;
                     isRecording = true;
                     recordingStartTime = Date.now();
@@ -641,10 +659,11 @@
                     // Poll for updates
                     startPollingRecording();
                 },
-                error: function(xhr) {
+                error: function (xhr) {
                     const error = xhr.responseJSON || {};
-                    alert('Failed to start recording: ' + (error.message || 'Unknown error'));
-                    console.error('[UI] Failed to start recording:', error);
+                    const msg = error.message || 'Unknown error (Check console for details)';
+                    alert('Failed to start recording: ' + msg);
+                    console.error('[UI] Failed to start recording:', xhr);
                 }
             });
         }
@@ -662,11 +681,11 @@
                 $.ajax({
                     url: `/browser_automation/api/recording/${currentRecordingId}`,
                     method: 'GET',
-                    success: function(data) {
+                    success: function (data) {
                         recordedSteps = data.steps || [];
                         updateRecordingCount(recordedSteps.length);
                     },
-                    error: function() {
+                    error: function () {
                         console.error('[UI] Failed to fetch recording updates');
                     }
                 });
@@ -683,7 +702,7 @@
             $.ajax({
                 url: `/browser_automation/recording/${currentRecordingId}/stop`,
                 method: 'POST',
-                success: function(data) {
+                success: function (data) {
                     isRecording = false;
                     clearInterval(recordingTimer);
                     clearInterval(recordingPollInterval);
@@ -698,7 +717,7 @@
                     // Fetch final recording data
                     fetchRecordingData();
                 },
-                error: function(xhr) {
+                error: function (xhr) {
                     const error = xhr.responseJSON || {};
                     alert('Failed to stop recording: ' + (error.message || 'Unknown error'));
                     console.error('[UI] Failed to stop recording:', error);
@@ -714,7 +733,7 @@
             $.ajax({
                 url: `/browser_automation/api/recording/${currentRecordingId}`,
                 method: 'GET',
-                success: function(data) {
+                success: function (data) {
                     console.log('[UI] Received recording data:', data);
                     recordedSteps = data.steps || [];
                     console.log('[UI] Recorded steps count:', recordedSteps.length);
@@ -729,7 +748,7 @@
                         alert('No steps were recorded. Please try again.');
                     }
                 },
-                error: function(xhr, status, error) {
+                error: function (xhr, status, error) {
                     console.error('[UI] Failed to fetch recording data:', error);
                     alert('Failed to fetch recording data');
                 }
@@ -763,7 +782,7 @@
             $('#preview-count').text(recordedSteps.length);
         }
 
-        $(document).on('click', '#use-recording-btn', function() {
+        $(document).on('click', '#use-recording-btn', function () {
             console.log('[UI] Continue to Labeling clicked');
             console.log('[UI] recordedSteps available:', recordedSteps);
             console.log('[UI] recordedSteps length:', recordedSteps.length);
@@ -903,7 +922,7 @@
                         if (mapping.target_stack && mapping.target_stack.length > 0) {
                             const strategy = mapping.target_stack[0];
                             let strategyValue = '';
-                            switch(strategy.type) {
+                            switch (strategy.type) {
                                 case 'role':
                                     strategyValue = strategy.role || strategy.name;
                                     break;
@@ -933,7 +952,7 @@
                         console.log('[UI] First strategy:', firstStrategy);
                         // Extract value based on strategy type
                         let strategyValue = '';
-                        switch(firstStrategy.type) {
+                        switch (firstStrategy.type) {
                             case 'role':
                                 strategyValue = firstStrategy.role || firstStrategy.name;
                                 break;
@@ -1075,28 +1094,29 @@
 
         {% if is_editing and workflow_task %}
         try {
-            const taskData = {{ workflow_task.data | tojson }};
-            if (taskData.actions) {
-                browserAutomationActions = taskData.actions.filter(a => a.action_id !== 'action-initial');
+            const taskData = {{ workflow_task.data | tojson
+        }};
+        if (taskData.actions) {
+            browserAutomationActions = taskData.actions.filter(a => a.action_id !== 'action-initial');
 
-                const initialAction = taskData.actions.find(a => a.action_id === 'action-initial');
-                if (initialAction && initialAction.config.url) {
-                    $('#browser-automation-url').val(initialAction.config.url);
-                }
+            const initialAction = taskData.actions.find(a => a.action_id === 'action-initial');
+            if (initialAction && initialAction.config.url) {
+                $('#browser-automation-url').val(initialAction.config.url);
             }
+        }
 
-            if (taskData.allowed_domains) {
-                $('#browser-automation-domains').val(taskData.allowed_domains.join(', '));
-            }
+        if (taskData.allowed_domains) {
+            $('#browser-automation-domains').val(taskData.allowed_domains.join(', '));
+        }
 
-            if (taskData.summarization) {
-                $('#browser-automation-summarize').prop('checked', taskData.summarization.enabled);
-                $('#browser-automation-summary-prompt').val(taskData.summarization.prompt_template);
-            }
+        if (taskData.summarization) {
+            $('#browser-automation-summarize').prop('checked', taskData.summarization.enabled);
+            $('#browser-automation-summary-prompt').val(taskData.summarization.prompt_template);
+        }
 
-            // Show manual tab and render
-            $('.tab-button[data-tab="manual"]').click();
-            renderBrowserAutomationActions();
+        // Show manual tab and render
+        $('.tab-button[data-tab="manual"]').click();
+        renderBrowserAutomationActions();
         } catch (e) {
             console.error("Error parsing existing task data", e);
         }

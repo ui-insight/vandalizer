@@ -173,6 +173,53 @@ export class CommandHandler {
             });
 
             return result.result;
+        },
+
+        request_repair: async (sessionId, payload) => {
+            // Trigger self-healing repair mode in content script
+            const { stepId, targetDescription, oldStrategies } = payload;
+            const session = this.sessionManager.getSession(sessionId);
+
+            const result = await chrome.tabs.sendMessage(session.tabId, {
+                action: 'start_repair_mode',
+                data: {
+                    sessionId: sessionId,
+                    stepId: stepId,
+                    repairRequest: {
+                        targetDescription: targetDescription,
+                        oldStrategies: oldStrategies,
+                        stepId: stepId
+                    }
+                }
+            });
+
+            return result;
+        },
+
+        start_session_monitoring: async (sessionId, payload) => {
+            // Start monitoring for session expiration (SSO/Duo timeouts)
+            const session = this.sessionManager.getSession(sessionId);
+
+            const result = await chrome.tabs.sendMessage(session.tabId, {
+                action: 'start_session_monitoring',
+                data: {
+                    sessionId: sessionId
+                }
+            });
+
+            return result;
+        },
+
+        stop_session_monitoring: async (sessionId, payload) => {
+            // Stop monitoring for session expiration
+            const session = this.sessionManager.getSession(sessionId);
+
+            const result = await chrome.tabs.sendMessage(session.tabId, {
+                action: 'stop_session_monitoring',
+                data: {}
+            });
+
+            return result;
         }
     };
 
