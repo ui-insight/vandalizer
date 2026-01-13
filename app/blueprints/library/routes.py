@@ -32,6 +32,7 @@ from app.models import (  # adjust import path if needed
 )
 from app.utilities.library_helpers import (
     add_object_to_library,
+    get_or_create_personal_library,
     get_or_create_team_library,
     get_or_create_verified_library,
     sync_verification_flags_for_object,
@@ -780,6 +781,25 @@ def workflows_share_to_team():
     _notify_team_of_share(team, forked, kind, user)
 
     return jsonify({"ok": True})
+
+
+@library.route("/workflows/clone_to_mine", methods=["POST"])
+def workflows_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("workflow", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_workflow(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": str(forked.id)})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
