@@ -199,6 +199,7 @@ class WorkflowStep(me.Document):
         me.ReferenceField("WorkflowStepTask", reverse_delete_rule=PULL),
     )
     data = me.DictField(required=False)
+    is_output = me.BooleanField(default=False)
 
     def extraction_items(self):
         if "search_set_uuid" in self.data:

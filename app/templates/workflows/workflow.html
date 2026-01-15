@@ -39,10 +39,33 @@
     {% for step in workflow.steps %}
 
 
+    {% if step.is_output %}
+    <div class="workflow-step workflow-output-node">
+        <div class="step-connector top"></div>
+        <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}"
+            data-step-id="{{ step.id }}" data-step-type="output"
+            style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-color: #667eea;">
+            <div class="add-task-icon-container"
+                style="color: #fff; border-color: rgba(255,255,255,0.3); background: rgba(255,255,255,0.1);">
+                <i class="fa-solid fa-flag-checkered" style="font-size: 18px;"></i>
+            </div>
+            <div class="step-header" style="color: #fff;">
+                <span style="font-weight: 600;">{{ step.name }}</span>
+                <span class="item-info" style="color: rgba(255,255,255,0.9);">WORKFLOW OUTPUT</span>
+            </div>
+            <span class="workflow-loader" style="display: none;"></span>
+            <div class="step-icon">
+                <i class="fa-solid fa-sliders"
+                    style="font-size: 18px; font-weight: 300; color: rgba(255,255,255,0.7);"></i>
+            </div>
+        </div>
+        <div class="step-connector bottom" style="display: none;"></div>
+    </div>
+    {% else %}
     <div class="workflow-step">
         <div class=" step-connector top"></div>
-        <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}" data-step-id="{{ step.id }}"
-            data-step-type="{{ step.name|lower }}">
+        <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}"
+            data-step-id="{{ step.id }}" data-step-type="{{ step.name|lower }}">
             <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
                 {{ loop.index }}
             </div>
@@ -61,13 +84,17 @@
         </div>
         <div class="step-connector bottom"></div>
     </div>
+    {% endif %}
     <div class="step-connection-line"></div>
     {% endfor %}
 
     {% if can_customize_workflow %}
+    {% set last_step = workflow.steps[-1] if workflow.steps else None %}
+    {% if not last_step or not last_step.is_output %}
     <div class="add-step">
         <button id="add-workflow-step-btn">+ ADD STEP</button>
     </div>
+    {% endif %}
     {% endif %}
 
 
@@ -82,7 +109,8 @@
 
                 <span>View output</span>
 
-                <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s elapsed</i></span></span>
+                <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s
+                            elapsed</i></span></span>
                 <div class="workflow-active-step-status hidden" style="margin-top:8px;">
                     <div id="workflow-active-step-label" class="workflow-progress-label"></div>
                     <div id="workflow-active-step-preview" class="workflow-progress-detail"></div>
