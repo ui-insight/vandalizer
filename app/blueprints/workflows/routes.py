@@ -51,6 +51,7 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
 )
+from app.utilities.edit_history import build_changes, history_for, log_edit_history
 from app.utilities.semantic_recommender import (
     SemanticRecommender,
 )
@@ -186,6 +187,21 @@ def _workflow_for_task(task: WorkflowStepTask | None) -> Workflow | None:
     return _workflow_for_step(step)
 
 
+def _task_summary(task_name: str | None, task_data: dict | None) -> str:
+    name = (task_name or "Task").strip() or "Task"
+    if not task_data:
+        return name
+    if task_data.get("search_set_title"):
+        return f"{name}: {task_data.get('search_set_title')}"
+    if task_data.get("search_set_item_title"):
+        return f"{name}: {task_data.get('search_set_item_title')}"
+    if task_data.get("prompt"):
+        return f"{name}: {task_data.get('prompt')}"
+    if task_data.get("searchphrases"):
+        return f"{name}: {task_data.get('searchphrases')}"
+    return name
+
+
 @login_required
 @workflows.route("/create_workflow", methods=["POST"])
 def add_workflow() -> ResponseReturnValue:
@@ -226,6 +242,7 @@ def edit_workflow() -> ResponseReturnValue:
     template = render_template(
         "workflows/edit_workflow.html",
         workflow=workflow,
+        history_entries=history_for("workflow", str(workflow.id)),
     )
     response = {
         "template": template,
@@ -272,9 +289,22 @@ def update_workflow() -> ResponseReturnValue:
     if not _workflow_is_editable(workflow):
         return _verified_workflow_forbidden()
 
+    changes = build_changes(
+        {
+            "name": (workflow.name, workflow_data["name"]),
+            "description": (workflow.description, workflow_data["description"]),
+        }
+    )
     workflow.name = workflow_data["name"]
     workflow.description = workflow_data["description"]
     workflow.save()
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="update",
+        changes=changes,
+    )
     return {"success": True}
 
 
@@ -1004,8 +1034,17 @@ def update_workflow_title() -> ResponseReturnValue:
     if not _workflow_is_editable(workflow):
         return _verified_workflow_forbidden()
 
+    before_title = workflow.name
     workflow.name = workflow_data["title"]
     workflow.save()
+    changes = build_changes({"title": (before_title, workflow_data["title"])})
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="update_title",
+        changes=changes,
+    )
 
     response = {"complete": True}
     return jsonify(response)
@@ -1035,6 +1074,14 @@ def add_workflow_step() -> ResponseReturnValue:
     workflow_step.save()
     workflow.steps.append(workflow_step)
     workflow.save()
+    changes = build_changes({"step": ("", step_title)})
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="add_step",
+        changes=changes,
+    )
     template = render_template(
         "workflows/workflow_steps/edit_workflow_step_modal.html",
         workflow=workflow,
@@ -1095,8 +1142,17 @@ def update_workflow_step_title() -> ResponseReturnValue:
     if not _workflow_is_editable(workflow):
         return _verified_workflow_forbidden()
 
+    before_title = workflow_step.name
     workflow_step.name = workflow_step_data["title"]
     workflow_step.save()
+    changes = build_changes({"step_title": (before_title, workflow_step.name)})
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="rename_step",
+        changes=changes,
+    )
 
     response = {"complete": True}
     return jsonify(response)
@@ -1157,6 +1213,16 @@ def add_workflow_step_task() -> ResponseReturnValue:
     workflow_step_task.save()
     workflow_step.tasks.append(workflow_step_task)
     workflow_step.save()
+    changes = build_changes(
+        {"task": ("", _task_summary(task_name, task_data))}
+    )
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="add_task",
+        changes=changes,
+    )
     return jsonify({"complete": True})
 
 
@@ -1190,6 +1256,14 @@ def delete_workflow_step() -> ResponseReturnValue:
 
     # Delete the WorkflowStep itself
     step.delete()
+    changes = build_changes({"step": (step.name, "")})
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="remove_step",
+        changes=changes,
+    )
 
     return jsonify({"success": True})
 
@@ -1221,6 +1295,14 @@ def delete_workflow_step_task() -> ResponseReturnValue:
 
     # Delete all associated WorkflowStepTasks
     task.delete()
+    changes = build_changes({"task": (_task_summary(task.name, task.data), "")})
+    log_edit_history(
+        kind="workflow",
+        obj_id=str(workflow.id),
+        user=_workflow_user_or_none(),
+        action="remove_task",
+        changes=changes,
+    )
 
     return jsonify({"success": True})
 
@@ -1312,6 +1394,7 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         task_id = data.get("workflow_task_id", None)
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
+        workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
         if search_set_id:
             searchset = SearchSet.objects(id=ObjectId(search_set_id)).first()
@@ -1320,8 +1403,23 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = searchset.to_workflow_step_data()
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
             else:
                 workflow_step_task = WorkflowStepTask(
                     name="Extraction",
@@ -1332,13 +1430,39 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
                     workflow_step.tasks = []
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
 
         elif manual_input:
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = {"searchphrases": manual_input}
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
                 return jsonify({"response": "success"})
             workflow_step_task = WorkflowStepTask(
                 name="Extraction",
@@ -1350,6 +1474,17 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
                 workflow_step.tasks = []
             workflow_step.tasks.append(workflow_step_task)
             workflow_step.save()
+            changes = build_changes(
+                {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
+            )
+            if workflow:
+                log_edit_history(
+                    kind="workflow",
+                    obj_id=str(workflow.id),
+                    user=_workflow_user_or_none(),
+                    action="add_task",
+                    changes=changes,
+                )
 
         return jsonify({"response": "success"})
     return None
@@ -1448,6 +1583,7 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+        workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
         if search_set_item_id:
             workflow_step_task = None
@@ -1456,8 +1592,23 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = searchsetitem.to_workflow_step_data()
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
             else:
                 workflow_step_task = WorkflowStepTask(
                     name="Prompt",
@@ -1466,14 +1617,40 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Prompt", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
         elif manual_input:
             workflow_step_task = None
             # Editing
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = {"prompt": manual_input}
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
             else:
                 workflow_step_task = WorkflowStepTask(
                     name="Prompt",
@@ -1482,6 +1659,17 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Prompt", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
 
         return jsonify({"response": "success"})
     return None
@@ -1536,6 +1724,7 @@ def workflow_add_format_step() -> ResponseReturnValue:
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
+        workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
         workflow_step_task = None
 
@@ -1544,8 +1733,23 @@ def workflow_add_format_step() -> ResponseReturnValue:
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = searchsetitem.to_workflow_step_data()
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
             else:
                 workflow_step_task = WorkflowStepTask(
                     name="Formatter",
@@ -1554,12 +1758,38 @@ def workflow_add_format_step() -> ResponseReturnValue:
                 workflow_step_task.save()
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Formatter", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
         elif manual_input:
             if task_id is not None and task_id != 0:
                 workflow_step_task = WorkflowStepTask.objects(id=task_id).first()
                 if workflow_step_task:
+                    before_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
                     workflow_step_task.data = {"prompt": manual_input}
                     workflow_step_task.save()
+                    after_summary = _task_summary(
+                        workflow_step_task.name, workflow_step_task.data
+                    )
+                    changes = build_changes({"task": (before_summary, after_summary)})
+                    if workflow:
+                        log_edit_history(
+                            kind="workflow",
+                            obj_id=str(workflow.id),
+                            user=_workflow_user_or_none(),
+                            action="update_task",
+                            changes=changes,
+                        )
             else:
                 workflow_step_task = WorkflowStepTask(
                     name="Formatter",
@@ -1570,6 +1800,17 @@ def workflow_add_format_step() -> ResponseReturnValue:
                     workflow_step.tasks = []
                 workflow_step.tasks.append(workflow_step_task)
                 workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Formatter", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
 
         return jsonify({"response": "success"})
     return None

@@ -1177,6 +1177,33 @@ class VerificationRequest(me.Document):
         }
 
 
+# ---- Edit History ----
+
+
+class EditHistoryEntry(me.Document):
+    """Immutable-ish history entry for edits to prompts/search sets/workflows."""
+
+    obj_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    obj_id = me.StringField(required=True, max_length=200)
+    action = me.StringField(required=True, max_length=50)
+
+    user_id = me.StringField(required=False, max_length=200)
+    user_name = me.StringField(required=False, max_length=200)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    changes = me.DictField()
+
+    meta = {
+        "indexes": [
+            {"fields": ["obj_kind", "obj_id", "-created_at"]},
+        ]
+    }
+
+
 # Activity / Data Analytics
 
 

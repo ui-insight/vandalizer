@@ -61,7 +61,8 @@ dependencies = [
     "markdown>=3.8.2",
     "flower>=2.0.1",
     "xhtml2pdf>=0.2.15",
-    "sentence_transformers"
+    "sentence_transformers",
+    "python3-saml>=1.16.0",
 ]
 
 

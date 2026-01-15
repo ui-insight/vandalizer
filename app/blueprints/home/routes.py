@@ -73,6 +73,7 @@ from app.utilities.document_readers import extract_text_from_file
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
+from app.utilities.edit_history import history_for
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -328,6 +329,7 @@ def index() -> ResponseReturnValue:
                             search_set=search_set,
                             documents=snapshot_documents or documents,
                             results=stored_results,
+                            history_entries=history_for("searchset", search_set.uuid),
                         )
 
     debug(activity)
@@ -345,6 +347,7 @@ def index() -> ResponseReturnValue:
                     search_set=search_set,
                     documents=documents,
                     results=None,
+                    history_entries=history_for("searchset", search_set.uuid),
                 )
 
     return render_template(

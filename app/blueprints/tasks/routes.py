@@ -46,6 +46,7 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
 )
+from app.utilities.edit_history import build_changes, history_for, log_edit_history
 
 # SemanticRecommender is now accessed via singleton in workflows.routes
 from app.utilities.verification_helpers import user_can_modify_verified
@@ -85,6 +86,7 @@ def _can_edit_search_set(search_set: SearchSet | None) -> bool:
 
 def _render_extraction_panel(search_set: SearchSet, **context):
     context.setdefault("can_edit_extraction", _can_edit_search_set(search_set))
+    context.setdefault("history_entries", history_for("searchset", search_set.uuid))
     context["search_set"] = search_set
     return render_template(EXTRACTION_PANEL_TEMPLATE, **context)
 
@@ -233,6 +235,16 @@ def add_search_term() -> ResponseReturnValue:
         searchsetitem.text_blocks = attachments
 
     searchsetitem.save()
+    changes = build_changes(
+        {"item": ("", f"{searchtype}: {searchphrase}")}
+    )
+    log_edit_history(
+        kind="searchset",
+        obj_id=searchset_uuid,
+        user=current_user,
+        action="add_item",
+        changes=changes,
+    )
 
     template = render_template(
         "toolpanel/search_set_item.html",
@@ -240,9 +252,14 @@ def add_search_term() -> ResponseReturnValue:
         item=searchsetitem,
         item_index=searchset.items().count(),  # Assuming items is a
     )
+    history_html = render_template(
+        "_edit_history.html",
+        history_entries=history_for("searchset", searchset_uuid),
+    )
     response = {
         "complete": True,
         "template": template,
+        "history_html": history_html,
     }
     return jsonify(response)
 
@@ -298,6 +315,10 @@ def edit_prompt() -> ResponseReturnValue:
     template = render_template(
         "toolpanel/prompts/edit_prompt.html",
         prompt=prompt,
+        history_entries=history_for(
+            "formatter" if (prompt.searchtype or "").lower() == "formatter" else "prompt",
+            str(prompt.id),
+        ),
     )
     response = {
         "template": template,
@@ -320,9 +341,23 @@ def update_prompt() -> ResponseReturnValue:
     if not user_can_modify_verified(_active_user_or_none(), prompt_item):
         return _verified_edit_forbidden_response()
 
+    changes = build_changes(
+        {
+            "title": (prompt_item.title, title),
+            "prompt": (prompt_item.searchphrase, prompt),
+        }
+    )
+
     prompt_item.title = title
     prompt_item.searchphrase = prompt
     prompt_item.save()
+    log_edit_history(
+        kind="formatter" if (prompt_item.searchtype or "").lower() == "formatter" else "prompt",
+        obj_id=str(prompt_item.id),
+        user=_active_user_or_none(),
+        action="update",
+        changes=changes,
+    )
 
     response = {
         "success": True,
@@ -408,8 +443,17 @@ def update_extraction_title() -> ResponseReturnValue:
     if not user_can_modify_verified(_active_user_or_none(), extraction_step):
         return _verified_edit_forbidden_response()
 
+    before_title = extraction_step.title
     extraction_step.title = extraction_data["title"]
     extraction_step.save()
+    changes = build_changes({"title": (before_title, extraction_data["title"])})
+    log_edit_history(
+        kind="searchset",
+        obj_id=extraction_step.uuid,
+        user=_active_user_or_none(),
+        action="update",
+        changes=changes,
+    )
 
     response = {"complete": True}
     return jsonify(response)
@@ -859,6 +903,16 @@ def build_extraction_from_document() -> ResponseReturnValue:
                 searchtype="extraction",
             )
             item_obj.save()
+        changes = build_changes(
+            {"items": ("", f"Added {len(bindings)} extraction items")}
+        )
+        log_edit_history(
+            kind="searchset",
+            obj_id=search_set.uuid,
+            user=_active_user_or_none(),
+            action="bulk_add_items",
+            changes=changes,
+        )
     else:
         response = {
             "complete": False,
@@ -902,8 +956,17 @@ def rename_search_set() -> ResponseReturnValue:
     if not user_can_modify_verified(_active_user_or_none(), search_set):
         return _verified_edit_forbidden_response()
 
+    before_title = search_set.title
     search_set.title = new_title
     search_set.save()
+    changes = build_changes({"title": (before_title, new_title)})
+    log_edit_history(
+        kind="searchset",
+        obj_id=search_set.uuid,
+        user=_active_user_or_none(),
+        action="update",
+        changes=changes,
+    )
 
     return jsonify({"complete": True})
 
@@ -959,8 +1022,26 @@ def delete_search_set_item() -> ResponseReturnValue:
         if not user_can_modify_verified(user, item):
             return _verified_edit_forbidden_response()
 
+    if search_type in {"extraction", "search"}:
+        changes = build_changes(
+            {"item": (f"{search_type}: {item.searchphrase}", "")}
+        )
+        log_edit_history(
+            kind="searchset",
+            obj_id=item.searchset,
+            user=user,
+            action="remove_item",
+            changes=changes,
+        )
+
     item.delete()
-    return jsonify({"complete": True})
+    history_html = ""
+    if search_type in {"extraction", "search"}:
+        history_html = render_template(
+            "_edit_history.html",
+            history_entries=history_for("searchset", item.searchset),
+        )
+    return jsonify({"complete": True, "history_html": history_html})
 
 
 @login_required

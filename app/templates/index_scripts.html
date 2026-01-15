@@ -1589,6 +1589,9 @@
             success: function (msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
                 $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().parent().remove();
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -4009,6 +4012,9 @@
 
                 $(".set-result-items").append(msg.template);
                 $("#add-search-term-input")[0].value = "";
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);

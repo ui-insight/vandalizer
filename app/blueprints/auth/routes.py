@@ -83,6 +83,9 @@ def index() -> ResponseReturnValue:
 @auth.route("/login", methods=["GET", "POST"])
 def login() -> ResponseReturnValue:
     """Handle the login process. Redirect to Azure login if not authorized."""
+    if load_user():
+        return redirect(url_for("home.index"))
+
     methods = get_auth_methods()
     password_enabled = "password" in methods
     oauth_enabled = "oauth" in methods
@@ -210,3 +213,125 @@ def build_admin() -> ResponseReturnValue:
     user = User(user_id="admin", is_admin=True)
     user.save()
     session["user_id"] = "admin"
+
+
+@auth.route("/login/saml")
+def saml_login():
+    """Initiate SAML authentication."""
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from app.utilities.saml_utils import get_saml_config, prepare_flask_request
+
+    saml_config = get_saml_config()
+    if not saml_config:
+        flash("SAML is not configured.", "danger")
+        return redirect(url_for("auth.index"))
+
+    req = prepare_flask_request(request)
+    auth = OneLogin_Saml2_Auth(req, saml_config)
+
+    # Redirect to the IdP
+    # return_to is where we go after successful ACS processing
+    return redirect(auth.login(return_to=url_for("home.index")))
+
+
+@auth.route("/login/saml/authorized", methods=["POST"])
+def saml_authorized():
+    """Receive the SAML response (ACS)."""
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from onelogin.saml2.utils import OneLogin_Saml2_Utils
+    from app.utilities.saml_utils import get_saml_config, prepare_flask_request
+
+    saml_config = get_saml_config()
+    if not saml_config:
+        flash("SAML configuration error.", "danger")
+        return redirect(url_for("auth.index"))
+
+    req = prepare_flask_request(request)
+    auth = OneLogin_Saml2_Auth(req, saml_config)
+
+    auth.process_response()
+    errors = auth.get_errors()
+
+    if errors:
+        current_app.logger.error(f"SAML Errors: {errors}")
+        flash(f"An error occurred during SAML login: {', '.join(errors)}", "danger")
+        if current_app.debug:
+             flash(auth.get_last_error_reason(), "warning")
+        return redirect(url_for("auth.index"))
+
+    if not auth.is_authenticated():
+        flash("SAML authentication failed.", "danger")
+        return redirect(url_for("auth.index"))
+
+    # Extract user info
+    attributes = auth.get_attributes()
+    # NameID is usually the unique identifier
+    name_id = auth.get_nameid()
+    
+    # Try to map attributes to typical fields.
+    # Note: Attribute names depend on the IdP (e.g., URNs or simple names).
+    # You might need to adjust these keys based on your specific IdP.
+    email = name_id  # Fallback
+    if "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress" in attributes:
+        email = attributes["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"][0]
+    elif "email" in attributes:
+        email = attributes["email"][0]
+    elif "mail" in attributes:
+        email = attributes["mail"][0]
+        
+    display_name = email.split("@")[0]
+    if "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name" in attributes:
+        display_name = attributes["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"][0]
+    elif "name" in attributes:
+        display_name = attributes["name"][0]
+    elif "displayName" in attributes:
+        display_name = attributes["displayName"][0]
+
+    # Login or create user
+    user = User.objects(user_id=email).first()
+    if not user:
+        user = User(
+            user_id=email,
+            email=email,
+            name=display_name
+        ).save()
+    else:
+        # Update details potentially
+        if not user.email:
+            user.email = email
+            user.save()
+            
+    login_user(user)
+    
+    # Handle 'RelayState' or default to home
+    self_url = OneLogin_Saml2_Utils.get_self_url(req)
+    if "RelayState" in request.form and self_url != request.form["RelayState"]:
+        return redirect(auth.redirect_to(request.form["RelayState"]))
+        
+    return redirect(url_for("home.index"))
+
+
+@auth.route("/saml/metadata")
+def saml_metadata():
+    """Expose SP metadata XML."""
+    from flask import make_response
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from app.utilities.saml_utils import get_saml_config, prepare_flask_request
+
+    saml_config = get_saml_config()
+    if not saml_config:
+        return "SAML not configured", 404
+
+    req = prepare_flask_request(request)
+    auth = OneLogin_Saml2_Auth(req, saml_config)
+    settings = auth.get_settings()
+    metadata = settings.get_sp_metadata()
+    errors = settings.validate_metadata(metadata)
+
+    if len(errors) == 0:
+        resp = make_response(metadata, 200)
+        resp.headers["Content-Type"] = "text/xml"
+        return resp
+    else:
+        return ", ".join(errors), 500
+

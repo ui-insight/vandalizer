@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import uuid
+from copy import deepcopy
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, render_template, request, url_for
@@ -24,9 +26,13 @@ from app.models import (  # adjust import path if needed
     VerificationRequest,
     VerificationStatus,
     Workflow,
+    WorkflowAttachment,
+    WorkflowStep,
+    WorkflowStepTask,
 )
 from app.utilities.library_helpers import (
     add_object_to_library,
+    get_or_create_personal_library,
     get_or_create_team_library,
     get_or_create_verified_library,
     sync_verification_flags_for_object,
@@ -670,6 +676,82 @@ def get_verification_request():
 
 
 # -----------------------------
+# Fork helpers
+# -----------------------------
+def _fork_workflow(obj: Workflow, *, user_id: str) -> Workflow:
+    new_steps = []
+    for step in obj.steps or []:
+        new_tasks = []
+        for task in step.tasks or []:
+            task_data = deepcopy(task.data) if task.data else {}
+            dup_task = WorkflowStepTask(name=task.name, data=task_data).save()
+            new_tasks.append(dup_task)
+
+        step_data = deepcopy(step.data) if step.data else None
+        dup_step = WorkflowStep(name=step.name, tasks=new_tasks, data=step_data).save()
+        new_steps.append(dup_step)
+
+    new_atts = []
+    for att in obj.attachments or []:
+        dup_att = WorkflowAttachment(attachment=att.attachment).save()
+        new_atts.append(dup_att)
+
+    return Workflow(
+        name=obj.name,
+        description=obj.description,
+        user_id=user_id,
+        space=getattr(obj, "space", None),
+        steps=new_steps,
+        attachments=new_atts,
+        verified=False,
+        created_by_user_id=user_id,
+    ).save()
+
+
+def _fork_searchset(obj: SearchSet, *, user_id: str) -> SearchSet:
+    new_search_set = SearchSet(
+        title=obj.title,
+        uuid=uuid.uuid4().hex,
+        space=obj.space,
+        status=obj.status,
+        set_type=obj.set_type,
+        user_id=user_id,
+        is_global=False,
+        user=getattr(obj, "user", None),
+        fillable_pdf_url=getattr(obj, "fillable_pdf_url", None),
+        verified=False,
+        created_by_user_id=user_id,
+    ).save()
+
+    for item in obj.items():
+        SearchSetItem(
+            searchphrase=item.searchphrase,
+            searchset=new_search_set.uuid,
+            searchtype=item.searchtype,
+            text_blocks=item.text_blocks,
+            pdf_binding=item.pdf_binding,
+            user_id=user_id,
+            space_id=item.space_id,
+            title=item.title,
+        ).save()
+
+    return new_search_set
+
+
+def _fork_searchset_item(item: SearchSetItem, *, user_id: str) -> SearchSetItem:
+    return SearchSetItem(
+        searchphrase=item.searchphrase,
+        searchset=item.searchset,
+        searchtype=item.searchtype,
+        text_blocks=item.text_blocks,
+        pdf_binding=item.pdf_binding,
+        user_id=user_id,
+        space_id=item.space_id,
+        title=item.title,
+    ).save()
+
+
+# -----------------------------
 # Share with my team
 # -----------------------------
 @library.route("/workflows/share_to_team", methods=["POST"])
@@ -692,31 +774,32 @@ def workflows_share_to_team():
     if not obj:
         return jsonify({"error": "not found"}), 404
 
+    forked = _fork_workflow(obj, user_id=user.user_id)
     lib = get_or_create_team_library(team)
-    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
 
-    _notify_team_of_share(team, obj, kind, user)
-
-    # Move attached documents to team's shared folder
-    from app.models import SmartDocument, SmartFolder, WorkflowAttachment
-
-    # Get team's shared folder (use the workflow's space)
-    space_id = obj.space if hasattr(obj, 'space') and obj.space else None
-    if space_id:
-        shared_folder = team.ensure_shared_folder(space_id=space_id)
-
-        # Move all attached documents
-        if hasattr(obj, 'attachments') and obj.attachments:
-            for attachment_ref in obj.attachments:
-                if attachment_ref and hasattr(attachment_ref, 'attachment'):
-                    doc_uuid = attachment_ref.attachment
-                    doc = SmartDocument.objects(uuid=doc_uuid).first()
-                    if doc:
-                        # Update document's folder to team's shared folder
-                        doc.folder = shared_folder.uuid
-                        doc.save()
+    _notify_team_of_share(team, forked, kind, user)
 
     return jsonify({"ok": True})
+
+
+@library.route("/workflows/clone_to_mine", methods=["POST"])
+def workflows_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("workflow", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_workflow(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": str(forked.id)})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
@@ -738,9 +821,10 @@ def extractions_share_to_team():
     if not obj:
         return jsonify({"error": "not found"}), 404
 
+    forked = _fork_searchset(obj, user_id=user.user_id)
     lib = get_or_create_team_library(team)
-    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    _notify_team_of_share(team, obj, kind, user)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, forked, kind, user)
     return jsonify({"ok": True})
 
 
@@ -763,9 +847,10 @@ def prompts_share_to_team():
     if not obj:
         return jsonify({"error": "not found"}), 404
 
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
     lib = get_or_create_team_library(team)
-    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    _notify_team_of_share(team, obj, kind, user)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, forked, kind, user)
     return jsonify({"ok": True})
 
 
@@ -788,9 +873,10 @@ def formatters_share_to_team():
     if not obj:
         return jsonify({"error": "not found"}), 404
 
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
     lib = get_or_create_team_library(team)
-    add_object_to_library(obj, lib, added_by_user_id=user.user_id)
-    _notify_team_of_share(team, obj, kind, user)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+    _notify_team_of_share(team, forked, kind, user)
     return jsonify({"ok": True})
 
 

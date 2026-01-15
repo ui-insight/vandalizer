@@ -225,6 +225,17 @@
         gap: 8px;
     }
 
+    .provider-edit-form {
+        display: none;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px dashed #d1d5db;
+    }
+
+    .provider-edit-form.active {
+        display: block;
+    }
+
     .badge-enabled {
         background: #d1fae5;
         color: #065f46;
@@ -418,6 +429,10 @@
                         <div class="provider-type">{{ provider.provider }}</div>
                     </div>
                     <div class="provider-actions">
+                        <button type="button" class="btn btn-secondary btn-sm"
+                            onclick="toggleProviderEdit({{ loop.index0 }});">
+                            Edit
+                        </button>
                         <form method="POST" action="/admin/config/auth/toggle_provider/{{ loop.index0 }}"
                             style="margin: 0;">
                             <button type="submit" class="btn btn-toggle btn-sm">
@@ -444,6 +459,81 @@
                     {% if provider.entity_id %}
                     <div class="provider-detail"><strong>Entity ID:</strong> {{ provider.entity_id }}</div>
                     {% endif %}
+                </div>
+                <div id="provider-edit-{{ loop.index0 }}" class="provider-edit-form">
+                    <form method="POST" action="/admin/config/auth/update_provider/{{ loop.index0 }}">
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_display_name_{{ loop.index0 }}">Display Name</label>
+                                <input type="text" id="edit_display_name_{{ loop.index0 }}" name="display_name"
+                                    value="{{ provider.display_name }}" required>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_client_id_{{ loop.index0 }}">Client ID / Application ID</label>
+                                <input type="text" id="edit_client_id_{{ loop.index0 }}" name="client_id"
+                                    value="{{ provider.client_id }}" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_client_secret_{{ loop.index0 }}">Client Secret</label>
+                                <input type="password" id="edit_client_secret_{{ loop.index0 }}"
+                                    name="client_secret" placeholder="Leave blank to keep existing">
+                                <small class="metadata">Leave blank to keep the current secret.</small>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_redirect_uri_{{ loop.index0 }}">Redirect URI</label>
+                                <input type="url" id="edit_redirect_uri_{{ loop.index0 }}" name="redirect_uri"
+                                    value="{{ provider.redirect_uri }}">
+                            </div>
+                        </div>
+
+                        {% if provider.provider == "azure" %}
+                        <div class="form-row-full">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_tenant_id_{{ loop.index0 }}">Tenant ID</label>
+                                <input type="text" id="edit_tenant_id_{{ loop.index0 }}" name="tenant_id"
+                                    value="{{ provider.tenant_id or provider.tenant }}">
+                            </div>
+                        </div>
+                        {% elif provider.provider == "saml" %}
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_metadata_url_{{ loop.index0 }}">Metadata URL</label>
+                                <input type="url" id="edit_metadata_url_{{ loop.index0 }}" name="metadata_url"
+                                    value="{{ provider.metadata_url }}">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_entity_id_{{ loop.index0 }}">Entity ID</label>
+                                <input type="text" id="edit_entity_id_{{ loop.index0 }}" name="entity_id"
+                                    value="{{ provider.entity_id }}">
+                            </div>
+                        </div>
+                        {% elif provider.provider == "custom" %}
+                        <div class="form-row-full">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_authorization_endpoint_{{ loop.index0 }}">Authorization Endpoint</label>
+                                <input type="url" id="edit_authorization_endpoint_{{ loop.index0 }}"
+                                    name="authorization_endpoint" value="{{ provider.authorization_endpoint }}">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_token_endpoint_{{ loop.index0 }}">Token Endpoint</label>
+                                <input type="url" id="edit_token_endpoint_{{ loop.index0 }}" name="token_endpoint"
+                                    value="{{ provider.token_endpoint }}">
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label for="edit_userinfo_endpoint_{{ loop.index0 }}">User Info Endpoint</label>
+                                <input type="url" id="edit_userinfo_endpoint_{{ loop.index0 }}"
+                                    name="userinfo_endpoint" value="{{ provider.userinfo_endpoint }}">
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <button type="submit" class="btn btn-secondary btn-sm">Save Changes</button>
+                    </form>
                 </div>
             </li>
             {% endfor %}
@@ -684,6 +774,12 @@
         if (placeholders[providerType]) {
             displayNameInput.placeholder = placeholders[providerType];
         }
+    }
+
+    function toggleProviderEdit(index) {
+        const panel = document.getElementById(`provider-edit-${index}`);
+        if (!panel) return;
+        panel.classList.toggle('active');
     }
 </script>
 <script>
