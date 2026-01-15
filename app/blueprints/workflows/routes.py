@@ -1069,6 +1069,12 @@ def add_workflow_step() -> ResponseReturnValue:
 
     step_title = workflow_step_data["title"]
 
+    # Check if the last step is an output step - if so, don't allow adding more steps
+    if workflow.steps and workflow.steps[-1].is_output:
+        return jsonify({
+            "error": "Cannot add steps after an output step. Output steps must be the final step in a workflow."
+        }), 400
+
     workflow_step = WorkflowStep(name=step_title)
     debug(workflow_step_data)
     workflow_step.save()
@@ -2045,11 +2051,6 @@ def add_data_export_step() -> ResponseReturnValue:
 def add_package_builder_step() -> ResponseReturnValue:
     return _render_output_node_modal("package_builder", "Package Builder")
 
-@login_required
-@workflows.route("/add_delivery_step", methods=["GET"])
-def add_delivery_step() -> ResponseReturnValue:
-    return _render_output_node_modal("delivery", "Delivery")
-
 def _render_output_node_modal(node_type, node_type_name):
     data_str = next(iter(request.args.keys()))
     data = json.loads(data_str)
@@ -2077,8 +2078,7 @@ def save_output_step() -> ResponseReturnValue:
         "document_renderer": "DocumentRenderer",
         "form_filler": "FormFiller",
         "data_export": "DataExport",
-        "package_builder": "PackageBuilder",
-        "delivery": "Delivery"
+        "package_builder": "PackageBuilder"
     }
 
     # Find step logic
@@ -2095,6 +2095,9 @@ def save_output_step() -> ResponseReturnValue:
            task.name = task_name_map.get(node_type, "OutputNode")
            task.data = task_data
            task.save()
+           if not step.is_output:
+               step.is_output = True
+               step.save()
     else:
         task = WorkflowStepTask(
             name=task_name_map.get(node_type, "OutputNode"),
@@ -2102,6 +2105,7 @@ def save_output_step() -> ResponseReturnValue:
         )
         task.save()
         step.tasks.append(task)
+        step.is_output = True
         step.save()
     
     return jsonify({"success": True})

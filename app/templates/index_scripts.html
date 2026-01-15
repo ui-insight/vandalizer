@@ -409,6 +409,68 @@
 
         let content = response;
 
+        // Unwrap single-item arrays first
+        if (Array.isArray(content) && content.length === 1) {
+            content = content[0];
+        }
+
+        // Check for special object types BEFORE stringifying
+        if (typeof content === "object" && content !== null && !Array.isArray(content)) {
+            if (content.type === "file_download") {
+                // Trigger automatic download if requested
+                if (content.auto_download === true) {
+                    try {
+                        const link = document.createElement('a');
+                        link.href = `data:application/${content.file_type === 'pdf' ? 'pdf' : 'octet-stream'};base64,${content.data_b64}`;
+                        link.download = content.filename || 'output';
+                        link.style.display = 'none';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        console.log(`Auto-downloaded: ${content.filename}`);
+                    } catch (error) {
+                        console.error('Auto-download failed:', error);
+                    }
+                }
+
+                // Map file types to Font Awesome icons
+                let fileTypeIcon;
+                if (content.file_type === 'pdf') {
+                    fileTypeIcon = 'fa-file-pdf';
+                } else if (content.file_type === 'zip') {
+                    fileTypeIcon = 'fa-file-zipper';
+                } else if (content.file_type === 'csv') {
+                    fileTypeIcon = 'fa-file-csv';
+                } else if (content.file_type === 'xlsx') {
+                    fileTypeIcon = 'fa-file-excel';
+                } else if (content.file_type === 'json') {
+                    fileTypeIcon = 'fa-file-code';
+                } else {
+                    fileTypeIcon = 'fa-file-lines';
+                }
+
+                // Inline styles for simplicity
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 20px; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; margin-top: 10px;">
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <div style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #f3f4f6; border-radius: 8px; color: #4b5563;">
+                                <i class="fa-solid ${fileTypeIcon}" style="font-size: 20px;"></i>
+                            </div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 16px; color: #111827; font-weight: 600;">${content.filename || 'Output File'}</h3>
+                                <p style="margin: 2px 0 0; font-size: 14px; color: #6b7280;">${content.preview || 'Ready for download'}${content.auto_download ? ' (Downloaded automatically)' : ''}</p>
+                            </div>
+                        </div>
+                        <a href="data:application/${content.file_type === 'pdf' ? 'pdf' : 'octet-stream'};base64,${content.data_b64}" 
+                           download="${content.filename || 'output'}" 
+                           class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; background-color: #2563eb; color: white; padding: 8px 16px; border-radius: 6px; text-decoration: none;">
+                           <i class="fa-solid fa-download"></i> Download${content.auto_download ? ' Again' : ''}
+                        </a>
+                    </div>
+                 `;
+            }
+        }
+
         if (Array.isArray(content)) {
             if (content.length === 1 && typeof content[0] === "string") {
                 content = content[0];

@@ -55,19 +55,16 @@
                     <label><input type="checkbox" id="includeManifest"> Include Manifest JSON</label>
                 </div>
             </div>
-            {% elif node_type == 'delivery' %}
-            <div class="form-group">
-                <label for="deliveryMethod">Delivery Method</label>
-                <select id="deliveryMethod" class="form-control">
-                    <option value="download">Direct Download</option>
-                    <option value="email">Email</option>
-                </select>
-            </div>
-            <div class="form-group email-settings" style="display:none;">
-                <label for="emailAddress">Recipient Email</label>
-                <input type="email" id="emailAddress" class="form-control" placeholder="recipient@example.com">
-            </div>
             {% endif %}
+
+            <!-- Auto Download option (common to all output nodes) -->
+            <div class="form-group">
+                <label>Download Options</label>
+                <div class="checkbox">
+                    <label><input type="checkbox" id="autoDownload"> Automatically download when workflow
+                        completes</label>
+                </div>
+            </div>
 
         </div>
 
@@ -86,21 +83,13 @@
             window.history.replaceState(null, '', url.toString());
         });
 
-        // Show/Hide Email field for Delivery node
-        $('#deliveryMethod').on('change', function () {
-            if ($(this).val() === 'email') {
-                $('.email-settings').show();
-            } else {
-                $('.email-settings').hide();
-            }
-        });
-
         // The confirmation click handler is attached in index_scripts.html via workflowAddStepTaskType
         // But we need to define the function that gathers the data
 
         window.getOutputNodeConfig = function () {
             let config = {
-                title: $('#outputNodeTitle').val()
+                title: $('#outputNodeTitle').val(),
+                auto_download: $('#autoDownload').is(':checked')
             };
 
             const nodeType = "{{ node_type }}";
@@ -118,11 +107,6 @@
                 config.format = $('#exportFormat').val();
             } else if (nodeType === 'package_builder') {
                 config.include_manifest = $('#includeManifest').is(':checked');
-            } else if (nodeType === 'delivery') {
-                config.method = $('#deliveryMethod').val();
-                if (config.method === 'email') {
-                    config.email = $('#emailAddress').val();
-                }
             }
             return config;
         };

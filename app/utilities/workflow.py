@@ -793,6 +793,7 @@ class DocumentRendererNode(Node):
         self.config = data.get("config", {})
         self.format = self.config.get("format", "pdf")
         self.folder_uuid = self.config.get("folder_uuid", None)
+        self.auto_download = self.config.get("auto_download", False)
 
     def process(self, inputs):
         self.report_progress(f"Rendering document to {self.format.upper()}...")
@@ -853,7 +854,8 @@ class DocumentRendererNode(Node):
                     "file_type": "pdf",
                     "filename": "output.pdf",
                     "data_b64": b64_pdf,
-                    "preview": "PDF Generated. Click to download."
+                    "preview": "PDF Generated. Click to download.",
+                    "auto_download": self.auto_download
                 })
 
                 return {
@@ -885,6 +887,7 @@ class FormFillerNode(Node):
         self.data = data
         self.config = data.get("config", {})
         self.flatten = self.config.get("flatten", False)
+        self.auto_download = self.config.get("auto_download", False)
 
     def process(self, inputs):
         self.report_progress("Filling form data...")
@@ -902,17 +905,157 @@ class DataExportNode(Node):
         super().__init__("DataExport")
         self.data = data
         self.config = data.get("config", {})
-        self.format = self.config.get("format", "csv")
+        self.format = self.config.get("format", "json")
+        self.auto_download = self.config.get("auto_download", False)
 
     def process(self, inputs):
         self.report_progress(f"Exporting data to {self.format.upper()}...")
         data = inputs.get("output", [])
-        # Mock implementation
-        return {
-            "output": f"[Exported {self.format.upper()} file with {len(str(data))} bytes]",
-            "input": inputs,
-            "step_name": self.name
-        }
+        
+        try:
+            import io
+            import json
+            import base64
+            
+            if self.format == "json":
+                # JSON export is straightforward
+                json_str = json.dumps(data, indent=2, default=str)
+                json_bytes = json_str.encode('utf-8')
+                b64_data = base64.b64encode(json_bytes).decode('utf-8')
+                
+                return {
+                    "output": {
+                        "type": "file_download",
+                        "file_type": "json",
+                        "filename": "export.json",
+                        "data_b64": b64_data,
+                        "preview": f"JSON export ready ({len(json_bytes)} bytes)",
+                        "auto_download": self.auto_download
+                    },
+                    "input": inputs,
+                    "step_name": self.name
+                }
+                
+            elif self.format == "csv":
+                import csv
+                
+                # Convert data to rows
+                rows = []
+                headers = []
+                
+                if isinstance(data, list) and len(data) > 0:
+                    # List of dicts - extract headers from first item
+                    if isinstance(data[0], dict):
+                        headers = list(data[0].keys())
+                        for item in data:
+                            row = [str(item.get(h, "")) for h in headers]
+                            rows.append(row)
+                    else:
+                        # List of primitives
+                        headers = ["Value"]
+                        rows = [[str(item)] for item in data]
+                elif isinstance(data, dict):
+                    # Single dict - convert to key-value pairs
+                    headers = ["Key", "Value"]
+                    rows = [[str(k), str(v)] for k, v in data.items()]
+                else:
+                    # Single value
+                    headers = ["Value"]
+                    rows = [[str(data)]]
+                
+                # Write CSV to memory
+                csv_buffer = io.StringIO()
+                writer = csv.writer(csv_buffer)
+                writer.writerow(headers)
+                writer.writerows(rows)
+                
+                csv_bytes = csv_buffer.getvalue().encode('utf-8')
+                b64_data = base64.b64encode(csv_bytes).decode('utf-8')
+                
+                return {
+                    "output": {
+                        "type": "file_download",
+                        "file_type": "csv",
+                        "filename": "export.csv",
+                        "data_b64": b64_data,
+                        "preview": f"CSV export ready ({len(rows)} rows)",
+                        "auto_download": self.auto_download
+                    },
+                    "input": inputs,
+                    "step_name": self.name
+                }
+                
+            elif self.format == "xlsx":
+                try:
+                    import openpyxl
+                    from openpyxl import Workbook
+                except ImportError:
+                    return {
+                        "output": "Error: openpyxl library not installed. Please install it to export Excel files.",
+                        "status": "error",
+                        "step_name": self.name
+                    }
+                
+                # Create workbook
+                wb = Workbook()
+                ws = wb.active
+                ws.title = "Export"
+                
+                # Convert data to rows
+                rows = []
+                headers = []
+                
+                if isinstance(data, list) and len(data) > 0:
+                    if isinstance(data[0], dict):
+                        headers = list(data[0].keys())
+                        for item in data:
+                            row = [item.get(h, "") for h in headers]
+                            rows.append(row)
+                    else:
+                        headers = ["Value"]
+                        rows = [[item] for item in data]
+                elif isinstance(data, dict):
+                    headers = ["Key", "Value"]
+                    rows = [[k, v] for k, v in data.items()]
+                else:
+                    headers = ["Value"]
+                    rows = [[data]]
+                
+                # Write headers
+                ws.append(headers)
+                
+                # Write data rows
+                for row in rows:
+                    ws.append(row)
+                
+                # Save to memory
+                xlsx_buffer = io.BytesIO()
+                wb.save(xlsx_buffer)
+                xlsx_bytes = xlsx_buffer.getvalue()
+                
+                b64_data = base64.b64encode(xlsx_bytes).decode('utf-8')
+                
+                return {
+                    "output": {
+                        "type": "file_download",
+                        "file_type": "xlsx",
+                        "filename": "export.xlsx",
+                        "data_b64": b64_data,
+                        "preview": f"Excel export ready ({len(rows)} rows)",
+                        "auto_download": self.auto_download
+                    },
+                    "input": inputs,
+                    "step_name": self.name
+                }
+                
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "output": f"Error exporting data: {str(e)}",
+                "status": "error",
+                "step_name": self.name
+            }
 
 
 class PackageBuilderNode(Node):
@@ -921,35 +1064,76 @@ class PackageBuilderNode(Node):
         self.data = data
         self.config = data.get("config", {})
         self.include_manifest = self.config.get("include_manifest", False)
+        self.auto_download = self.config.get("auto_download", False)
 
     def process(self, inputs):
         self.report_progress("Building package...")
         content = inputs.get("output", "")
-        # Mock implementation
-        return {
-            "output": f"[ZIP Package created. Manifest={self.include_manifest}. Content size={len(str(content))}]",
-            "input": inputs,
-            "step_name": self.name
-        }
+        
+        try:
+            import io
+            import zipfile
+            import json
+            import base64
+            
+            # Create an in-memory zip file
+            zip_buffer = io.BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # Add the main content as a file
+                if isinstance(content, dict):
+                    content_str = json.dumps(content, indent=2)
+                    zip_file.writestr("data.json", content_str)
+                elif isinstance(content, list):
+                    content_str = json.dumps(content, indent=2)
+                    zip_file.writestr("data.json", content_str)
+                else:
+                    zip_file.writestr("output.txt", str(content))
+                
+                # Add manifest if requested
+                if self.include_manifest:
+                    manifest = {
+                        "created_at": datetime.datetime.now().isoformat(),
+                        "content_type": type(content).__name__,
+                        "files": []
+                    }
+                    for info in zip_file.filelist:
+                        manifest["files"].append({
+                            "filename": info.filename,
+                            "size": info.file_size
+                        })
+                    zip_file.writestr("manifest.json", json.dumps(manifest, indent=2))
+            
+            # Get the zip bytes
+            zip_bytes = zip_buffer.getvalue()
+            
+            # Encode as base64
+            b64_zip = base64.b64encode(zip_bytes).decode('utf-8')
+            
+            output_data = {
+                "type": "file_download",
+                "file_type": "zip",
+                "filename": "workflow_output.zip",
+                "data_b64": b64_zip,
+                "preview": f"ZIP package created ({len(zip_bytes)} bytes)",
+                "auto_download": self.auto_download
+            }
+            
+            return {
+                "output": output_data,
+                "input": inputs,
+                "step_name": self.name
+            }
+            
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return {
+                "output": f"Error creating ZIP package: {str(e)}",
+                "status": "error",
+                "step_name": self.name
+            }
 
-
-class DeliveryNode(Node):
-    def __init__(self, data):
-        super().__init__("Delivery")
-        self.data = data
-        self.config = data.get("config", {})
-        self.method = self.config.get("method", "download")
-        self.email = self.config.get("email", "")
-
-    def process(self, inputs):
-        target = self.email if self.method == "email" else "User Download"
-        self.report_progress(f"Delivering via {self.method} to {target}...")
-        # Mock implementation
-        return {
-            "output": f"[Delivered via {self.method}]",
-            "input": inputs,
-            "step_name": self.name
-        }
 
 
 def sanitize_step_name(name: str) -> str:
@@ -1086,13 +1270,23 @@ class WorkflowEngine:
                 return formatted_items[0]
             blocks = []
             for idx, item in enumerate(formatted_items, start=1):
-                stripped = item.lstrip()
-                if stripped.startswith("#"):
-                    blocks.append(item)
+                if isinstance(item, str):
+                    stripped = item.lstrip()
+                    if stripped.startswith("#"):
+                        blocks.append(item)
+                    else:
+                        blocks.append(f"### Result {idx}\n{item}")
                 else:
-                    blocks.append(f"### Result {idx}\n{item}")
+                    try:
+                        item_str = json.dumps(item, indent=2)
+                    except:
+                        item_str = str(item)
+                    blocks.append(f"### Result {idx}\n{item_str}")
             return "\n\n".join(blocks)
         if isinstance(value, dict):
+            # Pass through special output types (like file downloads) without stringifying
+            if value.get("type") == "file_download":
+                return value
             try:
                 return json.dumps(value, indent=2)
             except Exception:
@@ -1192,8 +1386,6 @@ def build_workflow_engine(steps, workflow, model, user_id=None, workflow_result=
                     tasks.append(DataExportNode(task.data))
                 elif task.name == "PackageBuilder":
                     tasks.append(PackageBuilderNode(task.data))
-                elif task.name == "Delivery":
-                    tasks.append(DeliveryNode(task.data))
 
             node = MultiTaskNode(step.name)
             node.add_tasks(tasks)
@@ -1286,7 +1478,21 @@ def execute_workflow_task(
 
     final_output, data = engine.execute(workflow_result)
     debug(final_output)
-    workflow_result.final_output = {"output": final_output, "data": data}
+    
+    # Check if the last workflow step is an output step
+    # If so, use its specific output as the final output
+    if workflow.steps and workflow.steps[-1].is_output:
+        last_step_name = sanitize_step_name(workflow.steps[-1].name)
+        last_step_output = workflow_result.steps_output.get(last_step_name, {})
+        
+        # Use the last step's output as the final output
+        if last_step_output:
+            workflow_result.final_output = {"output": last_step_output.get("output", final_output), "data": data}
+        else:
+            workflow_result.final_output = {"output": final_output, "data": data}
+    else:
+        workflow_result.final_output = {"output": final_output, "data": data}
+    
     workflow_result.status = "completed"
     workflow_result.save()
     print(
