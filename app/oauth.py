@@ -46,9 +46,10 @@ def azure_logged_in(blueprint, token):
             user.name = info["displayName"]
         user.save()
 
-    # Make session permanent to prevent redirect loops
+    # Make session permanent so Flask-Login session persists
     session.permanent = True
     login_user(user)
+    # Let Flask-Dance store the token (don't return False)
 
 
 def _connect_azure_signal(blueprint):

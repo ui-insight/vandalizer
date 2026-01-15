@@ -123,6 +123,9 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
+# Exempt OAuth endpoints from rate limiting to prevent authentication failures
+limiter.exempt("azure")
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
