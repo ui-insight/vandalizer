@@ -30,6 +30,7 @@ def azure_logged_in(blueprint, token):
 
     # Import here to avoid circular import at module load
     from app.models import User
+    from flask import session
 
     user = User.objects(user_id=user_principal_name).first()
 
@@ -45,6 +46,8 @@ def azure_logged_in(blueprint, token):
             user.name = info["displayName"]
         user.save()
 
+    # Make session permanent to prevent redirect loops
+    session.permanent = True
     login_user(user)
 
 
