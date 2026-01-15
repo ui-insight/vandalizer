@@ -166,6 +166,7 @@ pymupdf4llm==0.0.22
 pypandoc==1.15
 pyparsing==3.2.3
 pypdf==5.4.0
+python3-saml==1.16.0
 pypdf2==3.0.1
 pypika==0.48.9
 pyproject-hooks==1.2.0
