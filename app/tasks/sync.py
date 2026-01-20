@@ -3,11 +3,12 @@
 import os
 import requests
 import json
+from datetime import datetime, timedelta
 from celery import shared_task
 from flask import current_app
 from mongoengine import DoesNotExist
 from app.models import (
-    Workflow, SearchSet, SearchSetItem, VerificationStatus
+    Workflow, SearchSet, SearchSetItem, VerificationStatus, DailyUsageAggregate
 )
 from app.utilities.library_helpers import add_object_to_library, get_or_create_verified_library
 
@@ -80,3 +81,47 @@ def pull_verified_items():
             print(f"Error syncing {kind} {uuid}: {e}")
 
     return f"Synced {count} verified items."
+
+@shared_task(name="tasks.sync.push_telemetry")
+def push_telemetry():
+    is_main = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
+    if is_main:
+        return "Skipped (Main Server)"
+
+    url = os.getenv("MAIN_SERVER_URL")
+    key = os.getenv("SYNC_API_KEY")
+    instance_name = os.getenv("INSTANCE_NAME", "Unknown Instance")
+    
+    if not url: return "No Main URL configured"
+
+    # Gather Global Stats for last 30 days
+    cutoff = datetime.now() - timedelta(days=30)
+    
+    aggregates = DailyUsageAggregate.objects(
+        scope='global',
+        date__gte=cutoff.date()
+    )
+    
+    payload = []
+    for agg in aggregates:
+        # exclude internal fields like _id
+        data = json.loads(agg.to_json())
+        if '_id' in data: del data['_id']
+        payload.append(data)
+
+    if not payload:
+        return "No telemetry to push"
+
+    try:
+        resp = requests.post(
+            f"{url}/library/api/sync/telemetry",
+            json=payload,
+            headers={"X-Sync-Key": key, "X-Instance-Name": instance_name},
+            timeout=30
+        )
+        if resp.status_code != 200:
+            return f"Telemetry sync failed: {resp.text}"
+        
+        return f"Telemetry pushed: {len(payload)} records"
+    except Exception as e:
+        return f"Telemetry sync connection error: {e}"

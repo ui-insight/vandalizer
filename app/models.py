@@ -1206,6 +1206,7 @@ class DailyUsageAggregate(me.Document):
     scope = me.StringField(required=True, choices=["user", "team", "global"])
     user_id = me.StringField(required=False, max_length=200)  # when scope == 'user'
     team_id = me.StringField(required=False, max_length=200)  # when scope == 'team'
+    instance_name = me.StringField(required=False, max_length=200)
 
     # Generic counts by type
     conversations = me.IntField(default=0)
@@ -1228,8 +1229,21 @@ class DailyUsageAggregate(me.Document):
 
     meta = {
         "indexes": [
-            {"fields": ["date", "scope", "user_id"], "unique": True, "sparse": True},
-            {"fields": ["date", "scope", "team_id"], "unique": True, "sparse": True},
+            {
+                "fields": ["date", "scope", "user_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "user"},
+            },
+            {
+                "fields": ["date", "scope", "team_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "team"},
+            },
+            {
+                "fields": ["date", "scope", "instance_name"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "global", "instance_name": {"$exists": True}},
+            },
             {"fields": ["-date", "scope"]},
         ]
     }

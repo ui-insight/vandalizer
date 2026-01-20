@@ -1188,3 +1188,83 @@ def api_receive_verification_request():
     _notify_examiners_of_submission(None, req, User(name=instance_name))
     
     return jsonify({"ok": True, "uuid": req.uuid})
+
+
+@library.route("/api/sync/telemetry", methods=["POST"])
+def api_receive_telemetry():
+    is_main_server = os.getenv("IS_MAIN_SERVER", "false").lower() == "true"
+    if not is_main_server:
+        return jsonify({"error": "forbidden"}), 403
+    
+    auth_header = request.headers.get("X-Sync-Key")
+    instance_name = request.headers.get("X-Instance-Name", "Unknown")
+    
+    if auth_header != os.getenv("SYNC_API_KEY"):
+        return jsonify({"error": "unauthorized"}), 401
+
+    payload = request.get_json(force=True)
+    if not isinstance(payload, list):
+        return jsonify({"error": "invalid format"}), 400
+
+    from app.models import DailyUsageAggregate
+    
+    count = 0
+    for item in payload:
+        # We need date and scope from the item
+        date_val = item.get('date') # might be timestamp or string
+        scope_val = item.get('scope')
+        
+        if not date_val or not scope_val: continue
+        
+        # Convert date if needed
+        target_date = None
+        if isinstance(date_val, dict) and '$date' in date_val:
+            dt_ts = date_val['$date']
+            # if int, it is ms timestamp
+            if isinstance(dt_ts, int):
+                target_date = datetime.fromtimestamp(dt_ts/1000, timezone.utc).date()
+            else:
+                try:
+                    target_date = datetime.fromisoformat(str(dt_ts)).date()
+                except:
+                     pass
+        elif isinstance(date_val, str):
+            # Try ISO format
+             try:
+                 target_date = datetime.fromisoformat(date_val.replace("Z", "+00:00")).date()
+             except:
+                 pass
+        
+        if not target_date:
+             continue
+
+        # Upsert
+        # We set instance_name to the Sender
+        key = {
+            "date": target_date,
+            "scope": scope_val,
+            "instance_name": instance_name
+        }
+        
+        try:
+            doc = DailyUsageAggregate.objects(**key).first()
+            if not doc:
+                doc = DailyUsageAggregate(**key)
+            
+            # Update fields
+            for field in [
+                'conversations', 'searches', 'workflows_started', 
+                'workflows_completed', 'workflows_failed',
+                'tokens_input', 'tokens_output', 'documents_touched',
+                'workflow_duration_ms', 'conversation_messages'
+            ]:
+                if field in item:
+                    setattr(doc, field, item[field])
+            
+            doc.updated_at = datetime.now(timezone.utc)
+            doc.save()
+            count += 1
+        except Exception as e:
+            current_app.logger.error(f"Telemetry sync error for {instance_name}: {e}")
+
+    return jsonify({"ok": True, "processed": count})

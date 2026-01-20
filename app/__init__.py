@@ -79,6 +79,11 @@ def create_app() -> Flask:
                     # Run every 1 mins
                     "schedule": crontab(minute="*/1"),
                 },
+                "push-telemetry-hourly": {
+                    "task": "tasks.sync.push_telemetry",
+                    # Run every hour
+                    "schedule": crontab(minute=0, hour="*/1"),
+                },
             },
         }
     )
