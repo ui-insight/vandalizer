@@ -123,9 +123,6 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
-# Exempt OAuth endpoints from rate limiting to prevent authentication failures
-limiter.exempt("azure")
-
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 app.logger = logging.getLogger("app_logger")
@@ -211,7 +208,12 @@ app.config["AUTH_MODE"] = (
 )
 
 # Ensure Azure OAuth blueprint is registered/configured from DB if present
-configure_azure_blueprint(app)
+azure_bp = configure_azure_blueprint(app)
+
+# Exempt OAuth endpoints from rate limiting to prevent authentication failures
+if azure_bp:
+    from app.oauth import azure_blueprint
+    limiter.exempt(azure_blueprint)
 
 # Point the login view to the local blueprint's login function (always available path)
 login_manager.login_view = "auth.login"
