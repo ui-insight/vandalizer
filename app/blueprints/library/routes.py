@@ -29,7 +29,11 @@ from app.models import (  # adjust import path if needed
     WorkflowAttachment,
     WorkflowStep,
     WorkflowStepTask,
+    UserModelConfig,
+    ActivityEvent,
+    ActivityType,
 )
+from mongoengine import Q
 from app.utilities.library_helpers import (
     add_object_to_library,
     get_or_create_personal_library,
@@ -396,6 +400,31 @@ def _build_results_for_template(filters: dict) -> dict:
     wants_prompt = needs_tasks and (not kinds or "prompt" in kinds)
     wants_formatter = needs_tasks and (not kinds or "format" in kinds)
 
+    # --- View-based ID collection ---
+    view = filters.get("view") or "all"
+    target_ids = set()
+    
+    user_config = UserModelConfig.objects(user_id=user.user_id).first() if user else None
+    
+    if view == "pinned" and user_config:
+        target_ids = set(user_config.pinned_items)
+    elif view == "favorites" and user_config:
+        target_ids = set(user_config.favorite_items)
+    elif view == "recents" and user:
+        # Fetch recent activity for this user
+        activities = ActivityEvent.objects(
+            user_id=user.user_id, 
+            type__in=[ActivityType.WORKFLOW_RUN.value, ActivityType.SEARCH_SET_RUN.value]
+        ).order_by("-started_at").limit(50)
+        
+        # Extract object IDs
+        for act in activities:
+            if act.workflow:
+                target_ids.add(str(act.workflow.id))
+            elif act.search_set_uuid:
+                target_ids.add(act.search_set_uuid)
+    
+
     needs_map = {
         "workflow": needs_workflows,
         "searchset": wants_extract,
@@ -428,11 +457,37 @@ def _build_results_for_template(filters: dict) -> dict:
 
         if not needs_map.get(li.kind, False):
             continue
+        
+        # --- View Filtering ---
+        identifier = _verification_identifier(li.kind, obj)
+        
+        if view in ("pinned", "favorites", "recents"):
+            if identifier not in target_ids:
+                continue
+        elif view == "created_by_me":
+            if li.added_by_user_id != (user.user_id if user else ""):
+                continue
+        elif view == "shared_with_me":
+             if li.added_by_user_id == (user.user_id if user else ""):
+                continue
+        elif view == "drafts":
+             # Check verification status (naive check: unverified)
+             if getattr(obj, "verified", False):
+                 continue
+
         if gathered[li.kind] >= limits.get(li.kind, 0):
             # Already have enough of this type
             continue
 
-        identifier = _verification_identifier(li.kind, obj)
+        # Attach tags from LibraryItem to the object for template rendering
+        if hasattr(obj, "tags") and not obj.tags:
+             # If mapping exists but empty, or overwrite? 
+             # LibraryItem tags are the "organization" tags. 
+             # Let's overwrite or transparently set.
+             obj.tags = li.tags
+        elif not hasattr(obj, "tags"):
+             obj.tags = li.tags
+
         if identifier:
             verification_keys[f"{li.kind}:{identifier}"] = (li.kind, identifier)
 
@@ -520,16 +575,66 @@ def _build_results_for_template(filters: dict) -> dict:
         if formatters:
             formatters = [s for s in formatters if query in (s.title or "").lower()]
 
-    # --- Sort (optional niceties)
-    workflows.sort(
-        key=lambda w: (w.verified is False, (w.updated_at or w.created_at)),
-        reverse=True,
-    )
-    extraction_sets.sort(
-        key=lambda s: (s.verified is False, (s.created_at)), reverse=True
-    )
+    # --- Populate Last Run Map (Before sort) ---
+    # optimization: only query for items in the final lists (pre-sort, or post-filter?)
+    # We need it for sorting if sort='recent'. 
+    # But visible_wf_ids depends on the list being filtered (which it is, above).
+    
+    visible_wf_ids = [str(w.id) for w in workflows]
+    visible_ss_uuids = [s.uuid for s in extraction_sets]
+    
+    last_run_map = {}
 
-    # Assemble context for template
+    if visible_wf_ids or visible_ss_uuids:
+        # Re-using the logic from 'recents' view but broader
+        recent_acts = ActivityEvent.objects(
+            Q(user_id=user.user_id) if user else Q(id__exists=False), 
+            type__in=[ActivityType.WORKFLOW_RUN.value, ActivityType.SEARCH_SET_RUN.value]
+        ).order_by("-started_at").limit(200).only("started_at", "workflow", "search_set_uuid")
+        
+        for act in recent_acts:
+            if act.workflow:
+                w_id = str(act.workflow.id)
+                if w_id not in last_run_map and w_id in visible_wf_ids:
+                    last_run_map[w_id] = act.started_at
+            if act.search_set_uuid:
+                s_id = act.search_set_uuid
+                if s_id not in last_run_map and s_id in visible_ss_uuids:
+                    last_run_map[s_id] = act.started_at
+
+    # --- Sort
+    sort_mode = filters.get("sort") or "updated"
+    
+    # Helpers for sorting
+    def _sort_key_workflow(w):
+        val = None
+        if sort_mode == "recent":
+            val = last_run_map.get(str(w.id)) or datetime.min.replace(tzinfo=timezone.utc)
+            return val
+        elif sort_mode == "az":
+            return (w.name or "").lower()
+        else: # updated
+            return w.updated_at or w.created_at or datetime.min.replace(tzinfo=timezone.utc)
+
+    def _sort_key_searchset(s):
+        val = None
+        if sort_mode == "recent":
+            val = last_run_map.get(s.uuid) or datetime.min.replace(tzinfo=timezone.utc)
+            return val
+        elif sort_mode == "az":
+            return (s.title or "").lower()
+        else:
+            return s.updated_at or s.created_at or datetime.min.replace(tzinfo=timezone.utc)
+
+    reverse_sort = True
+    if sort_mode == "az":
+        reverse_sort = False
+
+    workflows.sort(key=_sort_key_workflow, reverse=reverse_sort)
+    extraction_sets.sort(key=_sort_key_searchset, reverse=reverse_sort)
+    prompts.sort(key=lambda p: (p.title or "").lower(), reverse=(sort_mode!="az") ) 
+    
+    # Context
     context = {
         "workflows": workflows,
         "extraction_sets": extraction_sets,
@@ -540,13 +645,20 @@ def _build_results_for_template(filters: dict) -> dict:
             "type": item_type,
             "kinds": kinds,
             "q": query,
+            "view": view,
+            "sort": sort_mode,
+            "displayMode": filters.get("displayMode", "list")
         },
         # expose simple scope used in badges in your _results.html
         "scope": "team"
         if lib_scope == LibraryScope.TEAM
         else ("mine" if lib_scope == LibraryScope.PERSONAL else "verified"),
+        "user_pinned": user_config.pinned_items if user_config else [],
+        "user_favorites": user_config.favorite_items if user_config else [],
         "can_edit_verified": can_edit_verified,
+        "last_run_map": last_run_map,
     }
+
     return context
 
 
@@ -798,8 +910,64 @@ def workflows_clone_to_mine():
     forked = _fork_workflow(obj, user_id=user.user_id)
     lib = get_or_create_personal_library(user.user_id)
     add_object_to_library(forked, lib, added_by_user_id=user.user_id)
-
+    
     return jsonify({"ok": True, "uuid": str(forked.id)})
+
+
+@library.route("/pin", methods=["POST"])
+@login_required
+@validate_json_request()
+def toggle_pin():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json() or {}
+    item_uuid = payload.get("uuid")
+    if not item_uuid:
+        return jsonify({"error": "missing uuid"}), 400
+
+    config = UserModelConfig.objects(user_id=user.user_id).first()
+    if not config:
+        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+
+    if item_uuid in config.pinned_items:
+        config.pinned_items.remove(item_uuid)
+        action = "removed"
+    else:
+        config.pinned_items.append(item_uuid)
+        action = "added"
+    
+    config.save()
+    return jsonify({"ok": True, "action": action})
+
+
+@library.route("/favorite", methods=["POST"])
+@login_required
+@validate_json_request()
+def toggle_favorite():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json() or {}
+    item_uuid = payload.get("uuid")
+    if not item_uuid:
+        return jsonify({"error": "missing uuid"}), 400
+
+    config = UserModelConfig.objects(user_id=user.user_id).first()
+    if not config:
+        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+
+    if item_uuid in config.favorite_items:
+        config.favorite_items.remove(item_uuid)
+        action = "removed"
+    else:
+        config.favorite_items.append(item_uuid)
+        action = "added"
+    
+    config.save()
+    return jsonify({"ok": True, "action": action})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
