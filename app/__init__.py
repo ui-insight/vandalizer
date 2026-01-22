@@ -109,6 +109,7 @@ app.logger.info(f"Starting server in '{env}' environment → loading {config_cla
 
 
 app.config.from_object(config_class)
+app.config["RATELIMIT_ENABLED"] = False
 
 
 Bootstrap(app)  # flask-bootstrap
@@ -123,8 +124,6 @@ limiter = Limiter(
     strategy="fixed-window",
 )
 
-# Exempt OAuth endpoints from rate limiting to prevent authentication failures
-limiter.exempt("azure")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

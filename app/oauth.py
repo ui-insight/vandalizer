@@ -136,6 +136,11 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
 
         if "azure" not in app.blueprints:
             app.register_blueprint(blueprint, url_prefix="/login")
+            
+            # Exempt from rate limiting if limiter is configured
+            if "limiter" in app.extensions:
+                app.extensions["limiter"].exempt(blueprint)
+                
             app.logger.info("Azure blueprint registered successfully")
 
         azure_blueprint = blueprint

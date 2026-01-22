@@ -3397,6 +3397,77 @@
         });
     }
 
+    // Library panel helper functions
+    function selectLibraryItem(type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            }
+        } else if (type === 'prompt') {
+            if (typeof runPromptInAssistant === 'function') {
+                runPromptInAssistant(id);
+            }
+        }
+    }
+
+    function editLibraryItem(type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction' || type === 'searchset') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            }
+        } else if (type === 'prompt' || type === 'formatter') {
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: JSON.stringify({ uuid: id }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.template) {
+                        $("#search-results-panel").html(res.template).show();
+                    }
+                },
+                error: function (err) {
+                    console.error("Error loading prompt editor", err);
+                }
+            });
+        }
+    }
+
+    function toggleMenu(e, menuId) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const isHidden = menu.hidden;
+
+        // Close all other menus
+        document.querySelectorAll('.menu').forEach(m => m.hidden = true);
+        document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+        if (isHidden) {
+            menu.hidden = false;
+            e.currentTarget.setAttribute('aria-expanded', 'true');
+
+            // Close on next click
+            const close = () => {
+                menu.hidden = true;
+                e.currentTarget.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', close);
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        } else {
+            menu.hidden = true;
+            e.currentTarget.setAttribute('aria-expanded', 'false');
+        }
+    }
+
     // PERFORM SEARCH
     function performSemanticSearch(term) {
         $.ajax({

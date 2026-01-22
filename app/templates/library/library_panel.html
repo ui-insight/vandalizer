@@ -1,97 +1,189 @@
 {% set item_type = (filters.type if filters and filters.type else 'all') %}
-{% set scope = scope or 'mine' %}
+{% set scope = scope or 'team' %}
+{% set view = filters.view if filters and filters.view else 'all' %}
 {% set can_verify = can_verify if can_verify is defined else False %}
 
-<div id="library-panel" class="tab-content" style="background-color: white; padding: 24px 0px;">
+<!-- Main Shell -->
+<div id="library-panel" class="tab-content library-shell" style="height: 100%; padding: 0; background: #fff;">
 
-    <div style="display: flex; align-items: center; padding: 0 30px; margin-bottom: 20px;">
-        <p style="font-size: 28px; font-weight: 700; margin: 0;">Library</p>
-        <div style="flex: 1;"></div>
-        <div style="width: 380px;">
-            <input id="library-search" type="text" placeholder="Search workflows and tasks…" value="{{ query or '' }}"
-                style="width:100%; padding:10px 12px; border:1px solid #ddd; border-radius:8px; outline:none;">
-        </div>
-    </div>
-
-    <div style="display: flex; border-top: 1px #ddd solid;    height: calc(100% - 70px);">
-        <div style="width: 160px; flex-shrink: 0; background-color: #f4f4f4; border-right: 1px #ddd solid; ">
-            <p
-                style="font-size: 12px; font-weight: 400; color: #00000099; padding: 20px 20px 20px 20px; margin-bottom: 20px; border-bottom: 1px #ddd solid;">
-                Shared automations your team can reuse.</p>
-
-            <ul class="section-list" style="border-bottom: 1px #ddd solid; padding-bottom: 15px;">
-                {% set t = (filters.type if filters and filters.type else 'all') %}
-                <li class="section-item library-type-section {% if t=='all' %}active{% endif %}" data-type="all">All
-                </li>
-                <li class="section-item library-type-section {% if t=='workflows' %}active{% endif %}"
-                    data-type="workflows">Workflows</li>
-                <li class="section-item library-type-section {% if t=='tasks' %}active{% endif %}" data-type="tasks">
-                    Tasks</li>
-            </ul>
-
-            <div id="task-kind-filter" style="padding: 10px 15px 10px 0px; margin: 15px 15px 15px 15px;">
-                <div style="font-size:15px; font-weight:700; color:#666; margin-bottom:8px;">Task kind</div>
-                {% set kinds = (filters.kinds if filters and filters.kinds else ['extract','prompt','format']) %}
-                <label
-                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="extract" {% if 'extract' in
-                        kinds %}checked{% endif %}>
-                    <span>Extract</span>
-                </label>
-                <label
-                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="prompt" {% if 'prompt' in
-                        kinds %}checked{% endif %}>
-                    <span>Prompt</span>
-                </label>
-                <label
-                    style="display:flex; align-items:center; gap:8px; margin:10px 0; font-size: 14px; font-weight: 400;">
-                    <input class="kind-checkbox vandalizer-checkbox" type="checkbox" value="format" {% if 'format' in
-                        kinds %}checked{% endif %}>
-                    <span>Format</span>
-                </label>
+    <!-- 1. Header -->
+    <div class="library-header">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+            <div style="font-size: 20px; font-weight: 600;">Library</div>
+            <!-- Refactored New Button using menu.js pattern -->
+            <div class="menu-anchor" style="position:relative;">
+                <button class="btn btn-primary" id="newLibraryButton" type="button" aria-haspopup="true"
+                    aria-expanded="false" data-menu="#new-library-menu"
+                    style="display: flex; align-items: center; gap: 6px;">
+                    <span>New</span>
+                </button>
+                <div id="new-library-menu" class="menu menu-right" role="menu" hidden>
+                    <a class="menu-item" role="menuitem" href="#" onclick="openWorkflowCreationModal()">
+                        <i class="fa-solid fa-diagram-project" style="width:20px;"></i> New Workflow
+                    </a>
+                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('extraction')">
+                        <i class="fa-solid fa-filter" style="width:20px;"></i> New Extraction
+                    </a>
+                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('prompt')">
+                        <i class="fa-solid fa-terminal" style="width:20px;"></i> New Prompt
+                    </a>
+                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('formatter')">
+                        <i class="fa-solid fa-code" style="width:20px;"></i> New Formatter
+                    </a>
+                </div>
             </div>
         </div>
 
-        <div
-            style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; padding: 20px 0px 20px 30px;">
-            <div id="library-scope-tabs" style="display:flex; gap:16px; margin-bottom: 20px;">
-                {% set _scope = scope or 'mine' %}
-                <a href="#" class="scope-tab {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
-                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;"> My
-                    Library </a>
-                <a href="#" class="scope-tab {% if _scope=='team' %}active{% endif %}" data-scope="team"
-                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;"> My
-                    Team </a>
-                <a href="#" class="scope-tab {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
-                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;">
-                    Verified </a>
+        <div style="display: flex; align-items: center; gap: 20px;">
+            <div class="scope-tabs">
+                {% set _scope = scope or 'team' %}
+                <button class="scope-tab-btn {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
+                    style="font-weight: 700;">Mine</button>
+                <button class="scope-tab-btn {% if _scope=='team' %}active{% endif %}" data-scope="team"
+                    style="font-weight: 700;">Team</button>
+                <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
+                    style="font-weight: 700;">Explore</button>
                 {% if can_verify %}
-                <a href="#" class="scope-tab {% if _scope=='verify' %}active{% endif %}" data-scope="verify"
-                    style="font-weight:600; padding:6px 10px; text-decoration:none; color:#111;">
-                    Verify </a>
+                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}" data-scope="verify"
+                    style="font-weight: 700;">Verify
+                    Queue</button>
                 {% endif %}
-
-
-                <div style="flex:1;"></div>
             </div>
+            <div style="flex: 1;"></div>
+            <div class="search-container" style="flex: 0 0 400px; position:relative;">
+                <input id="library-search" type="text" class="library-search-input" placeholder="Search...  ⌘K to run">
+                <div
+                    style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:10px; color:#aaa; pointer-events:none;">
+                    <span style="border:1px solid #ddd; border-radius:4px; padding:2px 4px;">⌘K</span>
+                </div>
+            </div>
+        </div>
 
-            <section id="library-results" style="flex-grow: 1; overflow-y: auto; padding-right: 30px;">
-                {% if initial_library_results %}
-                    {{ initial_library_results | safe }}
-                {% else %}
-                    <div class="library-card">
-                        <div class="meta">
-                            Loading library items…
-                        </div>
-                    </div>
-                {% endif %}
-            </section>
+        <!-- Filters & Facets Bar -->
+        <div class="results-filter-bar">
+            <!-- Filter Chips -->
+            <div class="filter-chip {% if item_type=='all' %}active{% endif %}" onclick="setLibraryType('all')">All
+                Types</div>
+            <div class="filter-chip {% if item_type=='workflows' %}active{% endif %}"
+                onclick="setLibraryType('workflows')">
+                Workflows</div>
+            <div class="filter-chip {% if item_type=='tasks' %}active{% endif %}" onclick="setLibraryType('tasks')">
+                Tasks</div>
+
+            <div style="border-left: 1px solid #ddd; margin: 0 4px;"></div>
+
+            <!-- Sort dropdown sim -->
+            <select id="library-sort" class="filter-chip" onchange="setLibrarySort(this.value)"
+                style="appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%235f6368\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>'); background-repeat: no-repeat; background-position: right 8px center;">
+                <option value="recent">Recently Used</option>
+                <option value="updated">Recently Updated</option>
+                <option value="az">A-Z</option>
+            </select>
+
+            <div style="flex: 1;"></div>
+
+            <!-- View Toggle -->
+            <button class="icon-btn active" id="view-mode-list" title="List view" onclick="setDisplayMode('list')">
+                <i class="fa-solid fa-list"></i>
+            </button>
+            <button class="icon-btn" id="view-mode-cards" title="Grid view" onclick="setDisplayMode('cards')">
+                <i class="fa-solid fa-th-large"></i>
+            </button>
         </div>
     </div>
 
+    <!-- 2. Body -->
+    <div class="library-body">
+        <!-- Left Sidebar: Views -->
+        <!-- Left Sidebar: Views -->
+        <div class="library-sidebar">
+            <div class="nav-section-label">Saved Views</div>
+            <div class="library-nav-item active" data-view="all" onclick="setLibraryView('all')">
+                <i class="fa-solid fa-layer-group"></i> All Items
+            </div>
+            <div class="library-nav-item" data-view="recents" onclick="setLibraryView('recents')">
+                <i class="fa-regular fa-clock"></i> Recent
+            </div>
+            <div class="library-nav-item" data-view="favorites" onclick="setLibraryView('favorites')">
+                <i class="fa-solid fa-star"></i> Favorites
+                <span style="margin-left:auto; font-size:12px; color:#aaa; font-weight:400;">{{ user_favorites|length if
+                    user_favorites else '' }}</span>
+            </div>
+            <div class="library-nav-item" data-view="pinned" onclick="setLibraryView('pinned')">
+                <i class="fa-solid fa-thumbtack"></i> Pinned
+                <span style="margin-left:auto; font-size:12px; color:#aaa; font-weight:400;">{{ user_pinned|length if
+                    user_pinned else '' }}</span>
+            </div>
+
+
+            <div style="border-bottom:1px solid #f0f0f0; margin: 12px 0;"></div>
+
+            <div class="nav-section-label">Filters</div>
+            <!-- Facets -->
+            <div class="library-filter-group">
+                <div class="filter-group-header">Folders</div>
+                <div class="filter-group-body">
+                    <!-- Dynamic tags would go here -->
+                    <div style="font-size:12px; color:#1967d2; cursor:pointer;"
+                        onclick="alert('Folder management coming soon')">+ Add folders to organize</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Center: Results -->
+        <div class="library-results-pane">
+            <!-- Header for table is in _results.html if list mode -->
+            <div id="library-results" class="library-results-list" style="height: 100%;">
+                {% if initial_library_results %}
+                {{ initial_library_results | safe }}
+                {% else %}
+                <div style="padding: 40px; text-align: center; color: #888;">
+                    <i class="fa-solid fa-circle-notch fa-spin"></i> Loading...
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: Details -->
+        <div id="library-details-pane" class="library-details-pane hidden">
+            <div style="padding: 40px; text-align: center; color: #aaa;">
+                Select an item to view details
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
     {% include "library/verification_modal.html" %}
-    {% include "toolpanel/tasks/tasks_bottom_panel.html" %}
+    <!-- Modals -->
+    {% include "library/verification_modal.html" %}
+    <!-- Removed bottom panel per redesign -->
+
+    <!-- Command Palette (Simple Overlay) -->
+    <div id="command-palette-overlay"
+        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; padding-top:15vh;">
+        <div
+            style="background:#fff; width:600px; max-height:50vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
+            <div style="padding:16px; border-bottom:1px solid #eee; display:flex; align-items:center;">
+                <i class="fa-solid fa-magnifying-glass" style="color:#888; margin-right:12px;"></i>
+                <input id="cmd-palette-input" type="text" placeholder="Type a command or search..."
+                    style="flex:1; border:none; outline:none; font-size:16px;">
+                <div style="font-size:12px; background:#eee; padding:2px 6px; border-radius:4px; color:#666;">ESC</div>
+            </div>
+            <div style="padding:8px 0; overflow-y:auto; flex:1;" id="cmd-palette-results">
+                <div style="padding:8px 16px; color:#888; font-size:13px;">Use this to quickly run workflows or
+                    navigate.</div>
+                <!-- Mock Results -->
+                <div class="library-nav-item"
+                    onclick="setLibraryView('recents'); $('#command-palette-overlay').hide();">
+                    <i class="fa-regular fa-clock"></i> Go to Recents
+                </div>
+                <div class="library-nav-item" onclick="setLibraryView('pinned'); $('#command-palette-overlay').hide();">
+                    <i class="fa-solid fa-thumbtack"></i> Go to Pinned
+                </div>
+                <!-- Search results would appear here -->
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -99,33 +191,16 @@
     const LibraryState = window.LibraryState || {
         scope: "{{ scope }}",
         type: "{{ item_type }}",
-        kinds: {{ kinds | tojson }},
-        q: "{{ query }}"
+        view: "{{ view }}",
+        kinds: [],
+        q: "",
+        sort: "recent",
+        displayMode: "list",
+        selectedId: null
     };
     window.LibraryState = LibraryState;
 
-    window.LIBRARY_SHARE_ENDPOINTS = window.LIBRARY_SHARE_ENDPOINTS || {
-        workflow: '/library/workflows/share_to_team',
-        extraction: '/library/extractions/share_to_team',
-        prompt: '/library/prompts/share_to_team',
-        formatter: '/library/formatters/share_to_team'
-    };
-    window.LIBRARY_VERIFY_ENDPOINTS = window.LIBRARY_VERIFY_ENDPOINTS || {
-        workflow: '/library/workflows/submit_for_verification',
-        extraction: '/library/extractions/submit_for_verification',
-        prompt: '/library/prompts/submit_for_verification',
-        formatter: '/library/formatters/submit_for_verification'
-    };
-
-    const verificationModalState = {
-        kind: null,
-        uuid: null,
-        submitUrl: null,
-        requestUuid: null,
-        editable: true,
-    };
-
-    // --- Helpers ---
+    // Helpers
     function debounce(fn, ms) {
         let t;
         return function () {
@@ -134,347 +209,180 @@
         };
     }
 
-    // Helper: set or delete a param (treat "", null, undefined as "delete")
-    function setParam(params, key, value, { treatAllAsEmpty = false } = {}) {
-        const empty =
-            value === undefined || value === null || String(value).trim() === "" ||
-            (treatAllAsEmpty && value === "all");
-        if (empty) params.delete(key);
-        else params.set(key, value);
-    }
-
-    function splitLines(value) {
-        if (!value) return [];
-        return value
-            .split(/\r?\n/)
-            .map((line) => line.trim())
-            .filter(Boolean);
-    }
-
-function formatCategoryLabel(category) {
-    const map = {
-        workflow: 'Workflow',
-        searchset: 'Extraction',
-        extraction: 'Extraction',
-        prompt: 'Prompt',
-        formatter: 'Transform',
-        transform: 'Transform',
-    };
-    return map[(category || '').toLowerCase()] || (category || 'Workflow');
-}
-
-    function formatStatusLabel(status) {
-        if (!status) return "";
-        return status
-            .toString()
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (ch) => ch.toUpperCase());
-    }
-
-    function updateVerificationStatus(status) {
-        const pill = $('#verification-status-pill');
-        const helper = $('#verification-status-helper');
-        const copy = {
-            draft: 'Fill out the form to begin verification.',
-            submitted: 'Submission received — awaiting review.',
-            in_review: 'Submission is currently being reviewed.',
-            approved: 'This item has been approved and marked verified.',
-            rejected: 'Updates are required before this can be approved.',
-        };
-
-        pill.removeClass('library-badge--pending library-badge--warning library-badge--success');
-
-        if (!status || status === 'draft') {
-            pill.hide();
-            helper.text(copy.draft);
-            return;
-        }
-
-        pill.attr('class', 'library-badge');
-        if (status === 'submitted' || status === 'in_review') {
-            pill.addClass('library-badge--pending');
-        } else if (status === 'approved') {
-            pill.addClass('library-badge--success');
-        } else if (status === 'rejected') {
-            pill.addClass('library-badge--warning');
-        }
-        pill.text(formatStatusLabel(status)).show();
-        helper.text(copy[status] || '');
-    }
-
-    function resetVerificationForm() {
-        const formEl = document.getElementById('verification-form');
-        if (formEl) {
-            formEl.reset();
-        }
-        $('#verification-error').hide().text('');
-        updateVerificationStatus('draft');
-        $('#verification-submit-btn').show().prop('disabled', false);
-        $('#verification-category-display').text('');
-        $('#verification-category').val('');
-        $('#verification-item-version').val('');
-        $('#verification-item-identifier').val('');
-    }
-
-    function fillVerificationForm(data) {
-        $('#verification-kind').val(verificationModalState.kind || '');
-        $('#verification-uuid').val(verificationModalState.uuid || '');
-        $('#verification-submitter-name').val(data.submitter_name || '');
-        $('#verification-submitter-org').val(data.submitter_org || '');
-        $('#verification-item-title').val(data.item_title || '');
-        const identifier = data.item_identifier || '';
-        $('#verification-item-identifier').val(identifier);
-        const versionHash = data.item_version_hash || '';
-        $('#verification-item-version').val(versionHash);
-        const categoryValue =
-            data.category ||
-            verificationModalState.kind ||
-            'workflow';
-        $('#verification-category').val(categoryValue);
-        $('#verification-category-display').text(formatCategoryLabel(categoryValue));
-        $('#verification-summary').val(data.summary || '');
-        $('#verification-description').val(data.description || '');
-        $('#verification-run-instructions').val(data.run_instructions || '');
-        $('#verification-example-inputs').val((data.example_inputs || []).join('\n'));
-        $('#verification-expected-outputs').val((data.expected_outputs || []).join('\n'));
-        $('#verification-eval-notes').val(data.evaluation_notes || '');
-    }
-
-    function setVerificationModalLoading(isLoading) {
-        $('#verification-form').toggleClass('is-loading', isLoading);
-        $('#verification-submit-btn').prop('disabled', isLoading);
-    }
-
-    function setVerificationFormEditable(isEditable) {
-        const $inputs = $('#verification-form').find('input:not([type="hidden"]), textarea, select');
-        $inputs.prop('disabled', !isEditable);
-        $('#verification-item-identifier').prop('disabled', true);
-        if (isEditable) {
-            $('#verification-submit-btn').show();
-        } else {
-            $('#verification-submit-btn').hide();
-        }
-    }
-
-    function closeVerificationModal() {
-        $('#verification-modal').hide();
-        setVerificationModalLoading(false);
-        $('#verification-error').hide().text('');
-    }
-
-    window.openVerificationModal = function ({ kind, uuid }) {
-        const endpoints = window.LIBRARY_VERIFY_ENDPOINTS || {};
-        verificationModalState.kind = kind;
-        verificationModalState.uuid = uuid;
-        verificationModalState.submitUrl = endpoints[kind];
-        verificationModalState.requestUuid = null;
-        verificationModalState.editable = true;
-
-        if (!verificationModalState.submitUrl) {
-            console.warn('No verification endpoint registered for kind:', kind);
-            return;
-        }
-
-        resetVerificationForm();
-        $('#verification-modal-heading').text('Submit for Verification');
-        $('#verification-submit-btn').text('Submit for verification').show();
-        setVerificationFormEditable(true);
-        $('#verification-modal').fadeIn(120);
-        setVerificationModalLoading(true);
-
-        $.getJSON('/library/verification/request', { kind, uuid })
-            .done(function (resp) {
-                if (!resp || resp.ok === false) {
-                    const errorText = resp?.error || 'Unable to load verification details.';
-                    $('#verification-error').text(errorText).show();
-                    return;
-                }
-
-                const data = resp.data || {};
-                fillVerificationForm(data);
-                const status = resp.status || data.status || 'draft';
-                updateVerificationStatus(status);
-
-                const isExisting = Boolean(resp.request_uuid || (data.status && data.status !== 'draft'));
-                if (isExisting) {
-                    $('#verification-modal-heading').text('Edit Verification Submission');
-                    $('#verification-submit-btn').text('Update submission');
-                }
-
-                verificationModalState.requestUuid = resp.request_uuid || data.uuid || null;
-                verificationModalState.editable = resp.editable !== false && status !== 'approved' && !resp.is_verified;
-                setVerificationFormEditable(verificationModalState.editable);
-
-                if (resp.is_verified) {
-                    $('#verification-status-helper').text('This item is already verified. Edits are disabled.');
-                }
-            })
-            .fail(function (xhr) {
-                const message = xhr?.responseJSON?.error || 'Unable to load verification details.';
-                $('#verification-error').text(message).show();
-            })
-            .always(function () {
-                setVerificationModalLoading(false);
-            });
-    };
-
-    function submitVerificationForm(e) {
-        e.preventDefault();
-        if (!verificationModalState.submitUrl) {
-            $('#verification-error').text('This item cannot be verified at the moment.').show();
-            return;
-        }
-
-        const formData = {
-            submitter_name: $('#verification-submitter-name').val().trim(),
-            submitter_org: $('#verification-submitter-org').val().trim(),
-            item_title: $('#verification-item-title').val().trim(),
-            item_version_hash: $('#verification-item-version').val().trim(),
-            category: $('#verification-category').val(),
-            summary: $('#verification-summary').val().trim(),
-            description: $('#verification-description').val().trim(),
-            run_instructions: $('#verification-run-instructions').val().trim(),
-            example_inputs: splitLines($('#verification-example-inputs').val()),
-            expected_outputs: splitLines($('#verification-expected-outputs').val()),
-            evaluation_notes: $('#verification-eval-notes').val().trim(),
-        };
-
-        if (!formData.item_title) {
-            $('#verification-error').text('Title is required before submitting.').show();
-            return;
-        }
-
-        setVerificationModalLoading(true);
-        $('#verification-error').hide().text('');
-
-        $.ajax({
-            url: verificationModalState.submitUrl,
-            type: 'POST',
-            data: JSON.stringify({
-                uuid: verificationModalState.uuid,
-                form: formData,
-            }),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            success: function () {
-                closeVerificationModal();
-                if (window.LibraryState && typeof refreshResults === 'function') {
-                    LibraryState.scope = 'verified';
-                    try {
-                        updateURL({ mode: 'push' });
-                    } catch (err) {
-                        console.warn('updateURL failed', err);
-                    }
-                    $('.scope-tab').removeClass('active');
-                    $('.scope-tab[data-scope="verified"]').addClass('active');
-                    if (typeof window.updateKindFilterAppearance === 'function') {
-                        window.updateKindFilterAppearance();
-                    }
-                    refreshResults();
-                } else {
-                    window.location.reload();
-                }
-            },
-            error: function (xhr) {
-                const message = xhr?.responseJSON?.error || 'Failed to submit verification request.';
-                $('#verification-error').text(message).show();
-            },
-            complete: function () {
-                setVerificationModalLoading(false);
-            },
-        });
-    }
-
-    // Replace your existing updateURL() with this:
-    function updateURL({ mode = "replace" } = {}) {
-        const url = new URL(window.location.href);
-        const params = url.searchParams;
-
-        // Only touch the filters you own; everything else remains intact.
-        setParam(params, "scope", LibraryState.scope);
-        setParam(params, "type", LibraryState.type, { treatAllAsEmpty: true }); // drop ?type=all
-        setParam(
-            params,
-            "kinds",
-            (Array.isArray(LibraryState.kinds) && LibraryState.kinds.length)
-                ? LibraryState.kinds.join(",")
-                : ""
-        );
-        setParam(params, "q", LibraryState.q);
-
-        // Write back without disturbing path or hash.
-        const newPath = url.pathname + (params.toString() ? `?${params}` : "") + url.hash;
-
-        if (mode === "push") {
-            history.pushState(null, "", newPath);
-        } else {
-            history.replaceState(null, "", newPath);
-        }
-    }
-
-    // Optional (nice UX): use push on coarse changes, replace for typing
-    $(document).ready(function () {
-        function updateKindFilterAppearance() {
-            if (LibraryState.scope === 'verify') {
-                $("#task-kind-filter").css({ opacity: 0.25, 'pointer-events': 'none' });
-                return;
-            }
-            $("#task-kind-filter").css('pointer-events', 'auto');
-            $("#task-kind-filter").css('opacity', LibraryState.type === 'workflows' ? 0.45 : 1);
-        }
-        window.updateKindFilterAppearance = updateKindFilterAppearance;
-
-        $('.scope-tab').on('click', function (e) {
-            e.preventDefault();
-            $('.scope-tab').removeClass('active');
-            $(this).addClass('active');
-            LibraryState.scope = $(this).data('scope');
-            updateURL({ mode: "push" });
-            updateKindFilterAppearance();
-            refreshResults();
-        });
-
-        $('.library-type-section').on('click', function (e) {
-            e.preventDefault();
-            $('.library-type-section').removeClass('active');
-            $(this).addClass('active');
-            LibraryState.type = $(this).data('type');
-            updateKindFilterAppearance();
-            updateURL({ mode: "push" });
-            refreshResults();
-        });
-
-        $("#task-kind-filter .kind-checkbox").on('change', function () {
-            const kinds = [];
-            $("#task-kind-filter .kind-checkbox:checked").each(function () { kinds.push($(this).val()); });
-            LibraryState.kinds = kinds;
-            updateURL({ mode: "push" });
-            refreshResults();
-        });
-
-        $("#library-search").on('input', debounce(function () {
-            LibraryState.q = $(this).val();
-            updateURL({ mode: "replace" }); // avoid flooding history while typing
-            refreshResults();
-        }, 300));
-
-        updateKindFilterAppearance();
+    // Actions
+    function setLibraryScope(scope) {
+        LibraryState.scope = scope;
+        $('.scope-tab-btn').removeClass('active');
+        $(`.scope-tab-btn[data-scope="${scope}"]`).addClass('active');
+        // Reset view to 'all' when switching scope usually makes sense, or keep current?
+        // Let's keep current unless it's incompatible.
         refreshResults();
-    });
+    }
 
+    function setLibraryType(type) {
+        LibraryState.type = type;
+        // Update UI logic for chips... for now just refresh
+        refreshResults();
+        // Force re-render of chips state (simple jQuery way)
+        $('.filter-chip').removeClass('active');
+        if (type == 'all') $('.filter-chip:contains("All Types")').addClass('active');
+        if (type == 'workflows') $('.filter-chip:contains("Workflows")').addClass('active');
+        if (type == 'tasks') $('.filter-chip:contains("Tasks")').addClass('active');
+    }
+
+    function setLibraryView(view) {
+        LibraryState.view = view;
+        $('.library-nav-item').removeClass('active');
+        $(`.library-nav-item[data-view="${view}"]`).addClass('active');
+        refreshResults();
+    }
+
+    function openWorkflowCreationModal() {
+        // Just open the modal. Expected to be defined in index.html/index_scripts.html
+        $("#newWorkflowModal").show();
+        // Clear inputs if needed so it doesn't have old data
+        if ($("#newWorkflowName").length) $("#newWorkflowName").val("");
+        if ($("#newWorkflowDescription").length) $("#newWorkflowDescription").val("");
+    }
+
+    function openLegacyCreationModal(type) {
+        // Interacts with global logic from index_scripts.html
+        if (typeof window.newTaskType !== 'undefined') {
+            window.newTaskType = type;
+        } else {
+            console.warn("newTaskType not found, assuming global");
+            newTaskType = type;
+        }
+
+        $("#newTaskModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskBtn").show();
+
+        if (type === 'extraction') {
+            $("#name-add-task-container").show();
+            $("#name-add-task-prompt-container").hide();
+        } else if (type === 'prompt' || type === 'formatter') {
+            $("#name-add-task-container").hide();
+            $("#name-add-task-prompt-container").show();
+        }
+    }
+
+    // Make functions globally accessible for dynamically-loaded content
+    window.selectLibraryItem = function (type, id) {
+        // Handle row clicks on library items
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            } else {
+                console.error("openSearchSet not found");
+            }
+        } else if (type === 'prompt') {
+            if (typeof runPromptInAssistant === 'function') {
+                runPromptInAssistant(id);
+            } else {
+                console.error("runPromptInAssistant not found");
+            }
+        }
+    };
+
+    window.editLibraryItem = function (type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction' || type === 'searchset') {
+            // Existing logic uses openSearchSet for 'Open', which likely supports editing.
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            } else {
+                console.error("openSearchSet global function not found");
+                alert("Could not open extraction editor.");
+            }
+        } else if (type === 'prompt' || type === 'formatter') {
+            // Fetch edit template and show in search-results-panel
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: JSON.stringify({ uuid: id }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.template) {
+                        const panel = $("#search-results-panel");
+                        if (panel.length) {
+                            panel.html(res.template);
+                            panel.show();
+                        } else {
+                            // Fallback if panel not found (shouldn't happen per grep)
+                            alert("Panel not found to show editor");
+                        }
+                    } else {
+                        alert("Failed to load editor.");
+                    }
+                },
+                error: function (err) {
+                    console.error("Error loading prompt editor", err);
+                    alert("Error loading editor.");
+                }
+            });
+        }
+    };
+
+    window.toggleMenu = function (e, menuId) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const isHidden = menu.hidden;
+
+        // Close all other open menus first
+        document.querySelectorAll('.menu').forEach(m => m.hidden = true);
+        document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+        if (isHidden) {
+            menu.hidden = false;
+            e.currentTarget.setAttribute('aria-expanded', 'true');
+
+            // Close on next click anywhere
+            const close = () => {
+                menu.hidden = true;
+                e.currentTarget.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', close);
+            };
+            // Timeout to ensure the current click doesn't trigger the close immediately
+            setTimeout(() => document.addEventListener('click', close), 0);
+        } else {
+            menu.hidden = true;
+            e.currentTarget.setAttribute('aria-expanded', 'false');
+        }
+    };
+
+    function setLibrarySort(val) {
+        LibraryState.sort = val;
+        refreshResults();
+    }
+
+    function setDisplayMode(mode) {
+        LibraryState.displayMode = mode;
+        $('#view-mode-list, #view-mode-cards').removeClass('active');
+        $(`#view-mode-${mode}`).addClass('active');
+        refreshResults(); // Need to re-render to switch template structure often easier than CSS toggle
+    }
 
     function refreshResults() {
         if (LibraryState.scope === 'verify') {
-            refreshVerificationQueue();
+            // Verification queue special handling
+            $.post('/library/verification/queue', JSON.stringify({}), function (res) {
+                $("#library-results").html(res.template);
+            });
             return;
         }
-        updateURL(); // Update the URL every time filters change
 
-        // Show loading indicator (optional)
-        $("#library-results").html("<p>Loading...</p>");
+        $("#library-results").css('opacity', '0.5'); // visual feedback
 
         const payload = JSON.stringify(LibraryState);
-        console.log(payload);
         $.ajax({
             url: '/library/filter',
             method: 'POST',
@@ -484,94 +392,58 @@ function formatCategoryLabel(category) {
             success: function (res) {
                 if (res && res.template) {
                     $("#library-results").html(res.template);
+                    $("#library-results").css('opacity', '1');
+
+                    // Re-apply display mode class to container
+                    $("#library-results").removeClass('card-mode list-mode');
+                    if (LibraryState.displayMode === 'cards') {
+                        $("#library-results").addClass('card-mode');
+                    }
+
                     if (typeof window.initializeLibraryResults === 'function') {
                         window.initializeLibraryResults();
-                    }
-                    if (typeof window.updateKindFilterAppearance === 'function') {
-                        window.updateKindFilterAppearance();
                     }
                 }
             },
             error: function (xhr) {
-                $("#library-results").html("<p>Error loading results.</p>");
-                console.log('Library filter error', xhr.status, xhr.responseText);
+                $("#library-results").html("<p style='padding:20px; color:red'>Error loading results.</p>");
+                $("#library-results").css('opacity', '1');
             }
         });
     }
-    window.refreshResults = refreshResults;
+    window.refreshResults = refreshResults; // Expose
 
-    function refreshVerificationQueue() {
-        updateURL();
-        $("#library-results").html("<p>Loading...</p>");
-        $.ajax({
-            url: '/library/verification/queue',
-            method: 'POST',
-            data: JSON.stringify({}),
-            contentType: 'application/json; charset=utf-8',
-            dataType: 'json',
-            success: function (res) {
-                if (res && res.template) {
-                    $("#library-results").html(res.template);
-                    if (typeof window.initializeLibraryResults === 'function') {
-                        window.initializeLibraryResults();
-                    }
-                    if (typeof window.updateKindFilterAppearance === 'function') {
-                        window.updateKindFilterAppearance();
-                    }
-                }
-            },
-            error: function (xhr) {
-                $("#library-results").html("<p>Error loading verification queue.</p>");
-                console.log('Verification queue error', xhr.status, xhr.responseText);
-            }
-        });
-    }
-
-    // --- Event Handlers ---
+    // Init Logic
     $(document).ready(function () {
-        $('#verification-cancel-btn, #verification-close-btn').on('click', closeVerificationModal);
-        $('#verification-modal').on('click', function (e) {
-            if (e.target === this) {
-                closeVerificationModal();
-            }
-        });
-        $('#verification-form').on('submit', submitVerificationForm);
-        $(document).on('keydown.verificationModal', function (e) {
-            if (e.key === 'Escape' && $('#verification-modal').is(':visible')) {
-                closeVerificationModal();
-            }
+        // Tab Clicks
+        $('.scope-tab-btn').on('click', function () {
+            setLibraryScope($(this).data('scope'));
         });
 
-        $(document).off('click', '.verification-status-action').on('click', '.verification-status-action', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            const requestUuid = $(this).data('request');
-            const status = $(this).data('status');
-            if (!requestUuid || !status) return;
+        // Search
+        $("#library-search").on('input', debounce(function () {
+            LibraryState.q = $(this).val();
+            refreshResults();
+        }, 300));
 
-            const confirmMessages = {
-                approved: 'Mark this submission as verified?',
-                rejected: 'Send this submission back for changes?',
-            };
-            if (confirmMessages[status] && !confirm(confirmMessages[status])) {
-                return;
+        // Initial load
+        refreshResults();
+
+        // Global Cmd+K
+        $(document).keydown(function (e) {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                $('#command-palette-overlay').css('display', 'flex');
+                $('#cmd-palette-input').focus();
             }
-
-            $.ajax({
-                url: `/library/verification/${requestUuid}/status`,
-                type: 'POST',
-                data: JSON.stringify({ status }),
-                contentType: 'application/json; charset=utf-8',
-                dataType: 'json',
-                success: function () {
-                    refreshVerificationQueue();
-                },
-                error: function (xhr) {
-                    const message = xhr?.responseJSON?.error || 'Failed to update verification status.';
-                    alert(message);
-                },
-            });
         });
 
+        // Palette Close
+        $('#command-palette-overlay').click(function (e) {
+            if (e.target === this) $(this).hide();
+        });
+        $(document).keydown(function (e) {
+            if (e.key === "Escape") $('#command-palette-overlay').hide();
+        });
     });
 </script>

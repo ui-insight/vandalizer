@@ -1,206 +1,444 @@
-/* Left nav list styles */
-    .section-list {
-        list-style: none;
-        padding: 0;
-        margin: 0 0 20px 0;
-    }
+/* =========================================
+   Library Layout (3-pane)
+   ========================================= */
+.library-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background-color: #fff;
+    overflow: hidden;
+}
 
-    .section-item {
-        padding: 7.5px 20px 7.5px 15px;
-        cursor: pointer;
-        font-weight: 500;
-        font-size: 16px;
-        border-left: 3px solid transparent;
-    }
+.library-header {
+    flex-shrink: 0;
+    border-bottom: 1px solid #e0e0e0;
+    background-color: #fff;
+    padding: 16px 24px 0 24px;
+}
 
-    .section-item:hover {
-        background-color: #f5f5f5;
-    }
+.library-body {
+    display: flex;
+    flex-grow: 1;
+    overflow: hidden;
+    height: 100%;
+}
 
-    .section-item.active {
-        font-weight: 700;
-        color: #000;
-         background-color: #dadada;
-        /* No border or background for this style */
-    }
+/* Sidebar (Views) */
+.library-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    border-right: 1px solid #f0f0f0;
+    background-color: #fafafa;
+    padding: 24px 0;
+    overflow-y: auto;
+}
 
-    /* Scope tab and card styles */
-    .scope-tab.active {
-        border-bottom: 4px solid var(--highlight-color, #f1b300);
-    }
+.library-nav-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px 6px 24px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #4a4a4a;
+    transition: background 0.1s;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+}
 
-    .library-card {
-        border: 1px solid #eee;
-        border-radius: 12px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-    }
+.library-nav-item:hover {
+    background-color: #f0f0f0;
+    color: #1a1a1a;
+}
 
-    .library-card .meta {
-        color: #00000090;
-        font-size: 12px;
-    }
+.library-nav-item.active {
+    background-color: #e8f0fe;
+    color: #1967d2;
+    font-weight: 600;
+    border-left-color: #1967d2;
+    /* Google style active indicator */
+}
 
-    .library-card .title {
-        font-weight: 600;
-    }
+.library-nav-item i {
+    width: 20px;
+    margin-right: 10px;
+    text-align: center;
+    font-size: 14px;
+}
 
-.library-badge {
-        font-size: 11px;
-        padding: 3px 6px;
-        border-radius: 999px;
-        background: #f2f2f2;
-        margin-right: 6px;
-    }
+.nav-section-label {
+    padding: 0 24px;
+    margin-bottom: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #888;
+    letter-spacing: 0.5px;
+}
 
-.library-badge--pending {
-        background: #e8f0fe;
-        color: #1a4fb0;
-    }
+/* Filters (Facets) */
+.library-filter-group {
+    padding: 0 24px;
+    margin-bottom: 16px;
+}
 
-.library-badge--warning {
-        background: #fff4e5;
-        color: #8a4b16;
-    }
+.filter-group-header {
+    font-size: 13px;
+    font-weight: 600;
+    color: #5f6368;
+    margin-bottom: 6px;
+}
 
-.library-badge--success {
-        background: #e6f4ea;
-        color: #1a7f37;
-    }
+.filter-group-body label {
+    display: block;
+    font-size: 13px;
+    color: #4a4a4a;
+    margin-bottom: 4px;
+    cursor: pointer;
+}
 
-.verification-modal__content {
-        max-width: 760px;
-        width: 92%;
-        background: #fff;
-        padding: 24px;
-        border-radius: 12px;
-        box-shadow: 0 12px 35px rgba(15, 23, 42, 0.18);
-    }
+.filter-group-body input {
+    margin-right: 6px;
+}
 
-.verification-modal__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 10px;
-    }
+/* Results Pane */
+.library-results-pane {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: #fff;
+    border-right: 1px solid #f0f0f0;
+}
 
-.verification-modal__status {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-bottom: 16px;
-    }
+.results-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    background-color: #fff;
+    min-height: 50px;
+}
 
-.verification-modal__status-text {
-        font-size: 13px;
-        color: #3b3b3b;
-    }
+.results-filter-bar {
+    display: flex;
+    gap: 8px;
+    padding: 12px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    overflow-x: auto;
+    white-space: nowrap;
+}
 
-.verification-form__section {
-        border: 1px solid #e4e4e4;
-        border-radius: 10px;
-        padding: 12px 16px;
-        margin-bottom: 16px;
-    }
+.library-results-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 0;
+}
 
-.verification-form__section legend {
-        font-weight: 600;
-        font-size: 14px;
-        padding: 0 4px;
-    }
+.library-results-list.card-mode {
+    padding: 24px;
+}
 
-.verification-form__field {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        margin-bottom: 12px;
-        font-size: 13px;
-    }
+/* Details Pane */
+.library-details-pane {
+    width: 360px;
+    flex-shrink: 0;
+    background-color: #fff;
+    border-left: 1px solid #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
 
-.verification-form__field input,
-.verification-form__field textarea,
-.verification-form__field select {
-        padding: 8px 10px;
-        border: 1px solid #d0d0d0;
-        border-radius: 6px;
-        font-size: 13px;
-        width: 100%;
-    }
+.library-details-pane.hidden {
+    display: none;
+}
 
-.verification-form__field textarea {
-        resize: vertical;
-        min-height: 60px;
-    }
+/* Header Elements */
+.scope-tabs {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+}
 
-.verification-form__field--inline {
-        display: flex;
-        gap: 12px;
-    }
+.scope-tab-btn {
+    padding: 8px 0;
+    font-size: 14px;
+    font-weight: 500;
+    color: #5f6368;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+}
 
-.verification-form__field--inline label {
-        flex: 1 1 0;
-    }
+.scope-tab-btn:hover {
+    color: #202124;
+}
 
-.verification-modal__actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: 12px;
-        margin-top: 20px;
-    }
+.scope-tab-btn.active {
+    color: #1967d2;
+    border-bottom-color: #1967d2;
+}
 
-.verification-modal__error {
-        margin-top: 10px;
-        font-size: 13px;
-        color: #b3261e;
-    }
+/* Search Bar */
+.search-container {
+    padding: 12px 0;
+}
 
-.verification-form.is-loading input,
-.verification-form.is-loading textarea,
-.verification-form.is-loading select {
-        opacity: 0.6;
-        pointer-events: none;
-    }
+.library-search-input {
+    width: 100%;
+    max-width: 600px;
+    background: #f1f3f4;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 10px 16px 10px 40px;
+    font-size: 14px;
+    outline: none;
+    transition: all 0.2s;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%235f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>');
+    background-repeat: no-repeat;
+    background-position: 12px center;
+}
 
-.verification-card__header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 8px;
-    }
+.library-search-input:focus {
+    background: #fff;
+    border-color: #dadce0;
+    box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+}
 
-.verification-card__title {
-        font-weight: 600;
-        font-size: 15px;
-        margin-left: 6px;
-    }
+/* Filter Chips */
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 12px;
+    border-radius: 16px;
+    border: 1px solid #dadce0;
+    background-color: #fff;
+    font-size: 13px;
+    color: #3c4043;
+    cursor: pointer;
+    user-select: none;
+}
 
-.verification-card__submitted {
-        font-size: 12px;
-        color: #666;
-    }
+.filter-chip:hover {
+    background-color: #f8f9fa;
+    border-color: #dadce0;
+}
 
-.verification-card__summary {
-        font-size: 13px;
-        color: #222;
-        margin: 8px 0;
-    }
+.filter-chip.active {
+    background-color: #e8f0fe;
+    color: #1967d2;
+    border-color: #e8f0fe;
+}
 
-.verification-card__meta {
-        font-size: 12px;
-        color: #555;
-        margin-bottom: 10px;
-    }
+/* Hybrid List Row Styles */
+.library-list-header {
+    display: grid;
+    grid-template-columns: 4fr 3fr 2fr 150px;
+    /* Revised widths for action column */
+    padding: 10px 24px;
+    background-color: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #5f6368;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
 
-.verification-card__actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
+.library-list-row {
+    display: grid;
+    grid-template-columns: 4fr 3fr 2fr 150px;
+    padding: 12px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.1s;
+    height: 72px;
+    /* Fixed height for consistency */
+}
 
-.verification-card__right {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
+.library-list-row:hover {
+    background-color: #f8f9fa;
+}
+
+.library-list-row.selected {
+    background-color: #e8f0fe;
+}
+
+/* Columns */
+.col-cell {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 16px;
+    font-size: 13px;
+    color: #3c4043;
+}
+
+.col-cell.primary {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.col-cell.primary .row-title {
+    font-weight: 500;
+    font-size: 14px;
+    color: #202124;
+    display: flex;
+    align-items: center;
+}
+
+.col-cell.primary .row-desc {
+    font-size: 12px;
+    color: #70757a;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.col-cell.secondary {
+    color: #70757a;
+    font-size: 12px;
+}
+
+/* Chips & Badges */
+.chip-kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #f1f3f4;
+    font-size: 11px;
+    font-weight: 500;
+    color: #5f6368;
+}
+
+.chip-verified {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #137333;
+    /* Green */
+    background: #e6f4ea;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+
+.chip-tag {
+    font-size: 11px;
+    color: #1967d2;
+    background: #e8f0fe;
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.row-tags {
+    margin-top: 4px;
+}
+
+/* Actions */
+.actions-cell {
+    text-align: right;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 4px;
+    z-index: 10;
+    position: relative;
+    background-color: transparent;
+    /* Ensure it's not transparent if overlap is issue? No transparency allows seeing under. */
+}
+
+/* Show actions only on hover? User wants hover reveal but Star/Pin state always visible. 
+   Simplest logic: Opacity 0 default for unstarred/unpinned, 1 for active.
+   BUT user said "Show filled star/pin state when active (even when not hovering)" 
+   So we make the cell visible, but maybe dim the inactive buttons? 
+   Let's keep cell visible but inactive buttons low opacity/hidden unless hover.
+*/
+.actions-cell .action-icon {
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.library-list-row:hover .actions-cell .action-icon {
+    opacity: 1;
+}
+
+.actions-cell .action-icon.active {
+    opacity: 1 !important;
+    /* Always show active ones */
+}
+
+.run-btn {
+    font-size: 12px;
+    padding: 4px 12px;
+    height: 28px;
+    line-height: normal;
+    margin-right: 8px;
+    opacity: 0;
+    transition: opacity 0.1s;
+}
+
+.library-list-row:hover .run-btn {
+    opacity: 1;
+}
+
+.action-icon {
+    background: none;
+    border: none;
+    color: #9aa0a6;
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.action-icon:hover {
+    background-color: #f1f3f4;
+    color: #5f6368;
+}
+
+.action-icon.active[title="Favorite"] {
+    color: #fbbc04;
+    /* Gold */
+}
+
+.action-icon.active[title="Pin"] {
+    color: #1967d2;
+    /* Blue */
+}
+
+/* Legacy Card override if needed */
+.library-card {
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: box-shadow 0.2s;
+}
+
+.library-card:hover {
+    box-shadow: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+}
+
+.library-card .title {
+    font-weight: 500;
+    font-size: 15px;
+    margin-bottom: 4px;
+}
+
+.library-card .meta {
+    font-size: 12px;
+    color: #70757a;
+}

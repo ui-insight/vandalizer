@@ -46,6 +46,10 @@ class UserModelConfig(me.Document):
     top_p = me.FloatField(default=0.9)
     available_models = me.ListField(me.DictField(), required=False, default=[])
 
+    # Library Preferences
+    pinned_items = me.ListField(me.StringField(), default=[])
+    favorite_items = me.ListField(me.StringField(), default=[])
+
 
 class SystemConfig(me.Document):
     """System-wide configuration model. Only accessible to system administrators."""
