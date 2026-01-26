@@ -23,6 +23,8 @@ from app.models import (  # adjust import path if needed
     Team,
     TeamMembership,
     User,
+    VerifiedCollection,
+    VerifiedItemMetadata,
     VerificationRequest,
     VerificationStatus,
     Workflow,
@@ -123,6 +125,16 @@ def _object_title(kind: str, obj) -> str:
     if kind == "workflow":
         return getattr(obj, "name", "") or getattr(obj, "title", "")
     return getattr(obj, "title", "") or getattr(obj, "name", "")
+
+
+def _object_description(kind: str, obj) -> str:
+    if not obj:
+        return ""
+    if kind == "workflow":
+        return getattr(obj, "description", "") or ""
+    if kind in {"prompt", "formatter"}:
+        return getattr(obj, "searchphrase", "") or ""
+    return ""
 
 
 def _default_version_hash(obj) -> str:
@@ -389,6 +401,9 @@ def _build_results_for_template(filters: dict) -> dict:
     team = _current_team_for_user(user)
     lib_scope = _resolve_scope(scope_in)
     lib = _get_or_none_library(lib_scope, user=user, team=team)
+    collections = []
+    if lib_scope == LibraryScope.VERIFIED:
+        collections = list(VerifiedCollection.objects().order_by("-updated_at"))
 
     # If there is no library yet, present empty lists gracefully
     lib_items: list[LibraryItem] = list(lib.items) if lib else []
@@ -641,6 +656,7 @@ def _build_results_for_template(filters: dict) -> dict:
         "prompts": prompts,
         "formatters": formatters,
         "verification_requests": verification_payloads,
+        "collections": collections,
         "filters": {
             "type": item_type,
             "kinds": kinds,
@@ -660,6 +676,182 @@ def _build_results_for_template(filters: dict) -> dict:
     }
 
     return context
+
+
+@library.route("/manage_verified")
+@login_required
+def manage_verified():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    verified_lib = get_or_create_verified_library()
+    library_items = list(verified_lib.items) if verified_lib else []
+    verified_items = []
+    item_lookup = {}
+
+    for li in library_items:
+        obj = li.obj
+        kind = li.kind
+        identifier = _verification_identifier(kind, obj)
+        if not identifier:
+            continue
+        meta = VerifiedItemMetadata.objects(
+            item_kind=kind, item_identifier=identifier
+        ).first()
+        title = _object_title(kind, obj)
+        description = _object_description(kind, obj)
+        payload = {
+            "library_item_id": str(li.id),
+            "kind": kind,
+            "identifier": identifier,
+            "title": title,
+            "description": description,
+            "display_name": meta.display_name if meta else "",
+            "meta_description": meta.description if meta else "",
+            "markdown": meta.markdown if meta else "",
+        }
+        verified_items.append(payload)
+        item_lookup[str(li.id)] = {
+            "title": title,
+            "kind": kind,
+        }
+
+    collections = list(VerifiedCollection.objects().order_by("-updated_at"))
+    verification_queue = _build_verification_queue()
+
+    return render_template(
+        "library/manage_verified.html",
+        verified_items=verified_items,
+        collections=collections,
+        item_lookup=item_lookup,
+        verification_queue=verification_queue,
+    )
+
+
+@library.route("/verified/item/update", methods=["POST"])
+@login_required
+def update_verified_item_metadata():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    if not kind or not identifier:
+        return jsonify({"error": "missing required fields"}), 400
+
+    meta = VerifiedItemMetadata.objects(
+        item_kind=kind, item_identifier=identifier
+    ).first()
+    if not meta:
+        meta = VerifiedItemMetadata(item_kind=kind, item_identifier=identifier)
+
+    meta.display_name = (data.get("display_name") or "").strip()
+    meta.description = (data.get("description") or "").strip()
+    meta.markdown = (data.get("markdown") or "").strip()
+    meta.updated_by_user_id = user.user_id
+    meta.save()
+
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections", methods=["POST"])
+@login_required
+def create_verified_collection():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title required"}), 400
+
+    collection = VerifiedCollection(
+        title=title,
+        description=(data.get("description") or "").strip(),
+        promo_image_url=(data.get("promo_image_url") or "").strip(),
+        created_by_user_id=user.user_id,
+    )
+    collection.save()
+    return jsonify({"ok": True, "id": str(collection.id)})
+
+
+@library.route("/verified/collections/<collection_id>/update", methods=["POST"])
+@login_required
+def update_verified_collection(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(silent=True) or request.form or {}
+    title = (data.get("title") or "").strip()
+    if title:
+        collection.title = title
+    collection.description = (data.get("description") or "").strip()
+    collection.promo_image_url = (data.get("promo_image_url") or "").strip()
+    collection.save()
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections/<collection_id>/items/add", methods=["POST"])
+@login_required
+def add_verified_collection_item(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(force=True) or {}
+    item_id = (data.get("library_item_id") or "").strip()
+    if not item_id:
+        return jsonify({"error": "library_item_id required"}), 400
+
+    li = LibraryItem.objects(id=item_id).first()
+    if not li:
+        return jsonify({"error": "library item not found"}), 404
+
+    if li not in collection.items:
+        collection.items.append(li)
+        collection.save()
+
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections/<collection_id>/items/remove", methods=["POST"])
+@login_required
+def remove_verified_collection_item(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(force=True) or {}
+    item_id = (data.get("library_item_id") or "").strip()
+    if not item_id:
+        return jsonify({"error": "library_item_id required"}), 400
+
+    li = LibraryItem.objects(id=item_id).first()
+    if not li:
+        return jsonify({"error": "library item not found"}), 404
+
+    if li in collection.items:
+        collection.items.remove(li)
+        collection.save()
+
+    return jsonify({"ok": True})
 
 
 # -----------------------------

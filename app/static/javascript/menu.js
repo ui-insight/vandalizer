@@ -16,6 +16,20 @@
         openTrigger = trigger;
         openMenu = menu;
 
+        // Position menu fixed to viewport to avoid overflow clipping
+        const rect = trigger.getBoundingClientRect();
+        menu.style.position = 'fixed';
+        menu.style.top = (rect.bottom + 4) + 'px';
+        menu.style.left = '';
+        menu.style.right = '';
+        // Align right edge of menu to right edge of trigger
+        if (menu.classList.contains('menu-right')) {
+            menu.style.right = (window.innerWidth - rect.right) + 'px';
+        } else {
+            menu.style.left = rect.left + 'px';
+        }
+        menu.style.zIndex = '1030';
+
         const first = menu.querySelector('.menu-item:not([disabled])');
         if (first) first.focus();
 
@@ -28,6 +42,11 @@
     function closeDropdown() {
         if (!openMenu) return;
         openMenu.hidden = true;
+        openMenu.style.position = '';
+        openMenu.style.top = '';
+        openMenu.style.left = '';
+        openMenu.style.right = '';
+        openMenu.style.zIndex = '';
         if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
         document.removeEventListener('click', onDocClick, true);
         document.removeEventListener('keydown', onKeyDown, true);

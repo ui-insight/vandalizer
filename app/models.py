@@ -1071,6 +1071,59 @@ class VerificationRequest(me.Document):
         }
 
 
+class VerifiedItemMetadata(me.Document):
+    """Curated metadata for verified library items."""
+
+    item_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    item_identifier = me.StringField(required=True, max_length=200)
+    display_name = me.StringField(required=False, max_length=300)
+    description = me.StringField(required=False, max_length=5000)
+    markdown = me.StringField(required=False, max_length=20000)
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "indexes": [
+            {"fields": ["item_kind", "item_identifier"], "unique": True},
+        ]
+    }
+
+    def save(self, *args, **kwargs):
+        self.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        return super().save(*args, **kwargs)
+
+
+class VerifiedCollection(me.Document):
+    """Curated collection of verified items."""
+
+    title = me.StringField(required=True, max_length=200)
+    description = me.StringField(required=False, max_length=2000)
+    promo_image_url = me.StringField(required=False, max_length=500)
+    items = me.ListField(
+        me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL), default=[]
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    meta = {"ordering": ["-updated_at"]}
+
+    def save(self, *args, **kwargs):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if not self.created_at:
+            self.created_at = now
+        self.updated_at = now
+        return super().save(*args, **kwargs)
+
+
 # ---- Edit History ----
 
 

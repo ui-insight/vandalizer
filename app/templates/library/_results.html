@@ -99,10 +99,6 @@
 
         <!-- 4. Actions: Star, Pin, Run, Menu -->
         <div class="col-cell actions-cell">
-            <!-- Run (Hover only via CSS usually, or just keep it) -->
-            <button class="btn btn-primary btn-sm run-btn"
-                onclick="event.stopPropagation(); selectLibraryItem('workflow', '{{ wf.id }}')">Open</button>
-
             <!-- Favorites -->
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
                 onclick="event.stopPropagation(); toggleFavorite('{{ wf.id }}');" title="Favorite">
@@ -116,7 +112,8 @@
             </button>
 
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
-                <button class="icon-btn" onclick="toggleMenu(event, 'menu-wf-{{ wf.id }}')">
+                <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
+                    data-menu="#menu-wf-{{ wf.id }}">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
                 <div id="menu-wf-{{ wf.id }}" class="menu menu-right" role="menu" hidden>
@@ -202,9 +199,6 @@
         </div>
 
         <div class="col-cell actions-cell">
-            <button class="btn btn-primary btn-sm run-btn"
-                onclick="event.stopPropagation(); openSearchSet('{{ s.uuid }}')">Open</button>
-
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
                 onclick="event.stopPropagation(); toggleFavorite('{{ s.uuid }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
@@ -216,7 +210,8 @@
             </button>
 
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
-                <button class="icon-btn" onclick="toggleMenu(event, 'menu-ext-{{ s.uuid }}')">
+                <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
+                    data-menu="#menu-ext-{{ s.uuid }}">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
                 <div id="menu-ext-{{ s.uuid }}" class="menu menu-right" role="menu" hidden>
@@ -271,9 +266,6 @@
         </div>
         <div class="col-cell secondary"></div>
         <div class="col-cell actions-cell">
-            <button class="btn btn-primary btn-sm run-btn"
-                onclick="event.stopPropagation(); runPromptInAssistant('{{ p.id }}')">Run</button>
-
             <!-- Favorites -->
             {% set is_fav = p.id|string in user_favorites %}
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
@@ -289,7 +281,8 @@
             </button>
 
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
-                <button class="icon-btn" onclick="toggleMenu(event, 'menu-pmt-{{ p.id }}')">
+                <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
+                    data-menu="#menu-pmt-{{ p.id }}">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
                 <div id="menu-pmt-{{ p.id }}" class="menu menu-right" role="menu" hidden>
