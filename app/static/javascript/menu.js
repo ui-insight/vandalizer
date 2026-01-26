@@ -8,18 +8,36 @@
     // State
     let openTrigger = null;
     let openMenu = null;
+    let originalParent = null;
+    let originalNextSibling = null;
 
     function openDropdown(trigger, menu) {
         if (openMenu) closeDropdown();
+
+        // Store original position so we can restore it
+        originalParent = menu.parentNode;
+        originalNextSibling = menu.nextSibling;
+
+        // Move menu to body to escape any stacking context issues
+        document.body.appendChild(menu);
+
         menu.hidden = false;
         trigger.setAttribute('aria-expanded', 'true');
         openTrigger = trigger;
         openMenu = menu;
 
-        // Position menu fixed to viewport to avoid overflow clipping
+        // Position menu fixed to viewport
         const rect = trigger.getBoundingClientRect();
         menu.style.position = 'fixed';
-        menu.style.top = (rect.bottom + 4) + 'px';
+        const menuHeight = menu.offsetHeight;
+        const desiredTop = rect.bottom + 4;
+        if (desiredTop + menuHeight > window.innerHeight - 8) {
+            // Not enough room below, open above the trigger instead
+            const fallbackTop = rect.top - menuHeight - 4;
+            menu.style.top = (fallbackTop < 8 ? 8 : fallbackTop) + 'px';
+        } else {
+            menu.style.top = desiredTop + 'px';
+        }
         menu.style.left = '';
         menu.style.right = '';
         // Align right edge of menu to right edge of trigger
@@ -28,7 +46,7 @@
         } else {
             menu.style.left = rect.left + 'px';
         }
-        menu.style.zIndex = '1030';
+        menu.style.zIndex = '10100';
 
         const first = menu.querySelector('.menu-item:not([disabled])');
         if (first) first.focus();
@@ -47,12 +65,24 @@
         openMenu.style.left = '';
         openMenu.style.right = '';
         openMenu.style.zIndex = '';
+
+        // Move menu back to its original location
+        if (originalParent) {
+            if (originalNextSibling) {
+                originalParent.insertBefore(openMenu, originalNextSibling);
+            } else {
+                originalParent.appendChild(openMenu);
+            }
+        }
+
         if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
         document.removeEventListener('click', onDocClick, true);
         document.removeEventListener('keydown', onKeyDown, true);
         window.removeEventListener('scroll', closeDropdown, true);
         openTrigger = null;
         openMenu = null;
+        originalParent = null;
+        originalNextSibling = null;
     }
 
     function onDocClick(e) {
@@ -91,7 +121,6 @@
     document.addEventListener('click', function dropdownRouter(e) {
         const trigger = e.target.closest('[data-menu]');
         const menuItem = e.target.closest('.menu-item[data-action]');
-        const genericMenuItem = e.target.closest('.menu-item');
         const inMenu = e.target.closest('.menu');
 
         // 1) Trigger clicked → toggle
@@ -157,16 +186,45 @@
             return; // unknown action is still swallowed
         }
 
-        // 3) Clicked inside menu but not on an actionable item → swallow so cards don't see it
-        if (inMenu) {
-            if (!genericMenuItem) {
-                e.stopPropagation();
-                e.stopImmediatePropagation();
-            }
-            return;
+        // 3) Clicked inside menu on a menu-item without data-action → let onclick fire
+        //    The menu-anchor's onclick="event.stopPropagation()" handles blocking the row
+        if (inMenu && e.target.closest('.menu-item')) {
+            // Don't stop propagation here - let inline onclick handlers fire
+            // Close the dropdown after a short delay to allow the action to complete
+            setTimeout(closeDropdown, 50);
         }
 
         // 4) Else: let it fall through (outside-click handler will close it)
     }, true); // ← CAPTURE PHASE
+
+    // Close dropdown when any modal becomes visible
+    const modalObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                const el = mutation.target;
+                if (el.classList.contains('modal') && window.getComputedStyle(el).display !== 'none') {
+                    closeDropdown();
+                    return;
+                }
+            }
+        }
+    });
+
+    // Observe all modals for style changes (display: none -> block)
+    document.querySelectorAll('.modal').forEach(modal => {
+        modalObserver.observe(modal, { attributes: true, attributeFilter: ['style'] });
+    });
+
+    // Also observe for dynamically added modals
+    const bodyObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+            mutation.addedNodes.forEach(node => {
+                if (node.nodeType === 1 && node.classList?.contains('modal')) {
+                    modalObserver.observe(node, { attributes: true, attributeFilter: ['style'] });
+                }
+            });
+        }
+    });
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
 
 })();

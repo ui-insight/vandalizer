@@ -4,91 +4,65 @@
 {% set can_verify = can_verify if can_verify is defined else False %}
 
 <!-- Main Shell -->
-<div id="library-panel" class="tab-content library-shell" style="height: 100%; padding: 0; background: #fff;">
+<div id="library-panel" class="tab-content library-shell">
 
     <!-- 1. Header -->
     <div class="library-header">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <div style="font-size: 20px; font-weight: 600;">Library</div>
-            <!-- Refactored New Button using menu.js pattern -->
-            <div class="menu-anchor" style="position:relative;">
-                <button class="btn btn-primary" id="newLibraryButton" type="button" aria-haspopup="true"
-                    aria-expanded="false" data-menu="#new-library-menu"
-                    style="display: flex; align-items: center; gap: 6px;">
-                    <span>New</span>
-                </button>
-                <div id="new-library-menu" class="menu menu-right" role="menu" hidden>
-                    <a class="menu-item" role="menuitem" href="#" onclick="openWorkflowCreationModal()">
-                        <i class="fa-solid fa-diagram-project" style="width:20px;"></i> New Workflow
-                    </a>
-                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('extraction')">
-                        <i class="fa-solid fa-filter" style="width:20px;"></i> New Extraction
-                    </a>
-                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('prompt')">
-                        <i class="fa-solid fa-terminal" style="width:20px;"></i> New Prompt
-                    </a>
-                    <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('formatter')">
-                        <i class="fa-solid fa-code" style="width:20px;"></i> New Formatter
-                    </a>
+        <div class="library-header-row title-row">
+            <div class="library-title">Library</div>
+            <div class="library-header-actions">
+                <div class="search-container">
+                    <input id="library-search" type="text" class="library-search-input" placeholder="Search...">
+                </div>
+                <div class="menu-anchor library-new-btn">
+                    <button class="btn btn-primary" id="newLibraryButton" type="button" aria-haspopup="true"
+                        aria-expanded="false" data-menu="#new-library-menu">
+                        + New
+                    </button>
+                    <div id="new-library-menu" class="menu menu-right" role="menu" hidden>
+                        <a class="menu-item" role="menuitem" href="#" onclick="openWorkflowCreationModal()">
+                            <i class="fa-solid fa-diagram-project" style="width:20px;"></i> New Workflow
+                        </a>
+                        <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('extraction')">
+                            <i class="fa-solid fa-filter" style="width:20px;"></i> New Extraction
+                        </a>
+                        <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('prompt')">
+                            <i class="fa-solid fa-terminal" style="width:20px;"></i> New Prompt
+                        </a>
+                        <a class="menu-item" role="menuitem" href="#" onclick="openLegacyCreationModal('formatter')">
+                            <i class="fa-solid fa-code" style="width:20px;"></i> New Formatter
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 20px;">
+        <div class="library-header-row tabs-row">
             <div class="scope-tabs">
                 {% set _scope = scope or 'team' %}
-                <button class="scope-tab-btn {% if _scope=='mine' %}active{% endif %}" data-scope="mine"
-                    style="font-weight: 700;">Mine</button>
-                <button class="scope-tab-btn {% if _scope=='team' %}active{% endif %}" data-scope="team"
-                    style="font-weight: 700;">Team</button>
-                <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}" data-scope="verified"
-                    style="font-weight: 700;">Explore</button>
+                <button class="scope-tab-btn {% if _scope=='mine' %}active{% endif %}" data-scope="mine">Mine</button>
+                <button class="scope-tab-btn {% if _scope=='team' %}active{% endif %}" data-scope="team">Team</button>
+                <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}" data-scope="verified">Explore</button>
                 {% if can_verify %}
-                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}" data-scope="verify"
-                    style="font-weight: 700;">Verify
-                    Queue</button>
+                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}" data-scope="verify">Verify</button>
                 {% endif %}
             </div>
-            <div style="flex: 1;"></div>
-            <div class="search-container" style="flex: 0 0 400px; position:relative;">
-                <input id="library-search" type="text" class="library-search-input" placeholder="Search...  ⌘K to run">
-                <div
-                    style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:10px; color:#aaa; pointer-events:none;">
-                    <span style="border:1px solid #ddd; border-radius:4px; padding:2px 4px;">⌘K</span>
-                </div>
-            </div>
+            <div class="tabs-spacer"></div>
         </div>
 
-        <!-- Filters & Facets Bar -->
-        <div class="results-filter-bar">
-            <!-- Filter Chips -->
-            <div class="filter-chip {% if item_type=='all' %}active{% endif %}" onclick="setLibraryType('all')">All
-                Types</div>
-            <div class="filter-chip {% if item_type=='workflows' %}active{% endif %}"
-                onclick="setLibraryType('workflows')">
-                Workflows</div>
-            <div class="filter-chip {% if item_type=='tasks' %}active{% endif %}" onclick="setLibraryType('tasks')">
-                Tasks</div>
-
-            <div style="border-left: 1px solid #ddd; margin: 0 4px;"></div>
-
-            <!-- Sort dropdown sim -->
-            <select id="library-sort" class="filter-chip" onchange="setLibrarySort(this.value)"
-                style="appearance: none; -webkit-appearance: none; padding-right: 28px; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%235f6368\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><polyline points=\'6 9 12 15 18 9\'></polyline></svg>'); background-repeat: no-repeat; background-position: right 8px center;">
-                <option value="recent">Recently Used</option>
-                <option value="updated">Recently Updated</option>
-                <option value="az">A-Z</option>
-            </select>
-
-            <div style="flex: 1;"></div>
-
-            <!-- View Toggle -->
-            <button class="icon-btn active" id="view-mode-list" title="List view" onclick="setDisplayMode('list')">
-                <i class="fa-solid fa-list"></i>
-            </button>
-            <button class="icon-btn" id="view-mode-cards" title="Grid view" onclick="setDisplayMode('cards')">
-                <i class="fa-solid fa-th-large"></i>
-            </button>
+        <div class="library-header-row controls-row">
+            <div class="filter-chip-group">
+                <div class="filter-chip {% if item_type=='all' %}active{% endif %}" onclick="setLibraryType('all')">All Types</div>
+                <div class="filter-chip {% if item_type=='workflows' %}active{% endif %}" onclick="setLibraryType('workflows')">Workflows</div>
+                <div class="filter-chip {% if item_type=='tasks' %}active{% endif %}" onclick="setLibraryType('tasks')">Tasks</div>
+            </div>
+            <div class="controls-sort">
+                <select id="library-sort" class="filter-chip" onchange="setLibrarySort(this.value)">
+                    <option value="recent">Recently Used</option>
+                    <option value="updated">Recently Updated</option>
+                    <option value="az">A-Z</option>
+                </select>
+            </div>
         </div>
     </div>
 
@@ -124,8 +98,8 @@
                 <div class="filter-group-header">Folders</div>
                 <div class="filter-group-body">
                     <!-- Dynamic tags would go here -->
-                    <div style="font-size:12px; color:#1967d2; cursor:pointer;"
-                        onclick="alert('Folder management coming soon')">+ Add folders to organize</div>
+                    <div id="sidebar-folder-list"></div>
+                    <div class="folder-hint" onclick="createNewFolder()">+ Add folders to organize</div>
                 </div>
             </div>
         </div>
@@ -158,29 +132,24 @@
     {% include "library/verification_modal.html" %}
     <!-- Removed bottom panel per redesign -->
 
-    <!-- Command Palette (Simple Overlay) -->
-    <div id="command-palette-overlay"
-        style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:9999; justify-content:center; padding-top:15vh;">
-        <div
-            style="background:#fff; width:600px; max-height:50vh; border-radius:12px; display:flex; flex-direction:column; overflow:hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.3);">
-            <div style="padding:16px; border-bottom:1px solid #eee; display:flex; align-items:center;">
-                <i class="fa-solid fa-magnifying-glass" style="color:#888; margin-right:12px;"></i>
-                <input id="cmd-palette-input" type="text" placeholder="Type a command or search..."
-                    style="flex:1; border:none; outline:none; font-size:16px;">
-                <div style="font-size:12px; background:#eee; padding:2px 6px; border-radius:4px; color:#666;">ESC</div>
+
+
+    <!-- Move Modal -->
+    <div id="move-modal" class="modal" hidden>
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3>Move Item</h3>
             </div>
-            <div style="padding:8px 0; overflow-y:auto; flex:1;" id="cmd-palette-results">
-                <div style="padding:8px 16px; color:#888; font-size:13px;">Use this to quickly run workflows or
-                    navigate.</div>
-                <!-- Mock Results -->
-                <div class="library-nav-item"
-                    onclick="setLibraryView('recents'); $('#command-palette-overlay').hide();">
-                    <i class="fa-regular fa-clock"></i> Go to Recents
+            <div class="modal-body">
+                <p>Select destination folder:</p>
+                <div id="move-folder-list"
+                    style="max-height: 300px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 4px;">
+                    <!-- Populated by JS -->
                 </div>
-                <div class="library-nav-item" onclick="setLibraryView('pinned'); $('#command-palette-overlay').hide();">
-                    <i class="fa-solid fa-thumbtack"></i> Go to Pinned
-                </div>
-                <!-- Search results would appear here -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="$('#move-modal').hide()">Cancel</button>
+                <button class="btn btn-primary" id="confirm-move-btn" disabled>Move</button>
             </div>
         </div>
     </div>
@@ -195,7 +164,7 @@
         kinds: [],
         q: "",
         sort: "recent",
-        displayMode: "list",
+        folderId: null,
         selectedId: null
     };
     window.LibraryState = LibraryState;
@@ -243,6 +212,9 @@
         // Clear inputs if needed so it doesn't have old data
         if ($("#newWorkflowName").length) $("#newWorkflowName").val("");
         if ($("#newWorkflowDescription").length) $("#newWorkflowDescription").val("");
+        if (typeof bindNewWorkflowModalActions === "function") {
+            bindNewWorkflowModalActions();
+        }
     }
 
     function openLegacyCreationModal(type) {
@@ -265,22 +237,423 @@
             $("#name-add-task-container").hide();
             $("#name-add-task-prompt-container").show();
         }
+        refreshResults();
     }
 
+    function setLibraryFolder(folderId) {
+        LibraryState.folderId = folderId;
+        refreshResults();
+    }
+    window.setLibraryFolder = setLibraryFolder;
+
+    function createNewFolder() {
+        const folderName = prompt("Enter folder name:");
+        if (!folderName) return;
+
+        $.ajax({
+            url: '/library/folder/create',
+            method: 'POST',
+            data: JSON.stringify({
+                name: folderName,
+                parent_id: LibraryState.folderId,
+                scope: LibraryState.scope
+            }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) refreshResults();
+            },
+            error: function (err) {
+                alert("Failed to create folder");
+                console.error(err);
+            }
+        });
+    }
+    window.createNewFolder = createNewFolder;
+
+    // -- Drag & Drop --
+    function dragLibraryItem(ev, kind, uuid) {
+        ev.dataTransfer.setData("application/json", JSON.stringify({ kind: kind, uuid: uuid }));
+    }
+    window.dragLibraryItem = dragLibraryItem;
+
+    function allowDrop(ev) {
+        ev.preventDefault();
+    }
+    window.allowDrop = allowDrop;
+
+    function dragEnter(ev) {
+        ev.preventDefault();
+        $(ev.currentTarget).addClass('drag-over');
+    }
+    window.dragEnter = dragEnter;
+
+    function dragLeave(ev) {
+        ev.preventDefault();
+        $(ev.currentTarget).removeClass('drag-over');
+    }
+    window.dragLeave = dragLeave;
+
+    function dropOnFolder(ev, targetFolderUuid) {
+        ev.preventDefault();
+        $(ev.currentTarget).removeClass('drag-over');
+        const data = ev.dataTransfer.getData("application/json");
+        if (!data) return;
+
+        try {
+            const item = JSON.parse(data);
+            if (!item.kind || !item.uuid) return;
+
+            // Call move API
+            $.ajax({
+                url: '/library/folder/move_items',
+                method: 'POST',
+                data: JSON.stringify({
+                    items: [{ kind: item.kind, uuid: item.uuid }],
+                    target_folder_uuid: targetFolderUuid,
+                    scope: LibraryState.scope
+                }),
+                contentType: 'application/json',
+                success: function (res) {
+                    if (res.ok) refreshResults();
+                },
+                error: function (err) {
+                    alert("Failed to move item");
+                    console.error(err);
+                }
+            });
+
+        } catch (e) {
+            console.error(e);
+        }
+    }
+    window.dropOnFolder = dropOnFolder;
+
+
+
+
+    function renameFolder(uuid, currentName) {
+        const newName = prompt("Enter new name:", currentName);
+        if (!newName || newName === currentName) return;
+
+        $.ajax({
+            url: '/library/folder/rename',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid, name: newName }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) refreshResults();
+            },
+            error: function (err) {
+                alert("Failed to rename folder");
+                console.error(err);
+            }
+        });
+    }
+    window.renameFolder = renameFolder;
+
+    function deleteFolder(uuid) {
+        if (!confirm("Are you sure you want to delete this folder? Items inside will be moved to the root.")) return;
+        $.ajax({
+            url: '/library/folder/delete',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    if (LibraryState.folderId == uuid) {
+                        LibraryState.folderId = null; // Reset if we deleted current view
+                    }
+                    refreshResults();
+                }
+            },
+            error: function (err) {
+                alert("Failed to delete folder");
+                console.error(err);
+            }
+        });
+    }
+    window.deleteFolder = deleteFolder;
+
+    function moveLibraryItem(kind, uuid) {
+        // Show modal
+        $("#move-modal").show();
+        $("#move-folder-list").html('<div style="padding:12px; color:#888;">Loading...</div>');
+        $("#confirm-move-btn").prop("disabled", true).off('click');
+
+        // Fetch folders for current scope
+        // Reuse sidebar folders logic or new endpoint? 
+        // We already have sidebar folders in `lastSidebarFolders` if we saved them... 
+        // But let's just use the ones we rendered in sidebar if possible, or fetch via API?
+        // Actually, let's just scrape sidebar? No, that's brittle.
+        // Let's assume we can fetch roots again or use what we have.
+        // Better: We should have the folders in JS memory if we want to be clean, but for now let's just look at sidebar DOM or re-fetch.
+        // Re-fetching is safest to get all folders (recurisve?).
+        // For now, let's just list the ROOT folders + currently visible folders?
+        // Let's just iterate the sidebar elements for the list.
+
+        const folderListHtml = [];
+
+        // Add "None / Root" option
+        folderListHtml.push(`
+            <div class="move-option" data-uuid="" onclick="selectMoveTarget(this)" 
+                 style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee;">
+                 <i class="fa-solid fa-folder-open" style="margin-right:8px; color:#5f6368;"></i> Library Root
+            </div>
+        `);
+
+        // Scrape sidebar for now as a quick hack to get available roots
+        $("#sidebar-folder-list .sidebar-folder-row").each(function () {
+            const name = $(this).find("span").text().trim();
+            // Extract UUID from onclick attribute... brittle but works for now
+            const onclick = $(this).attr("onclick"); // setLibraryFolder('uuid')
+            const match = onclick.match(/'([^']+)'/);
+            if (match) {
+                const fid = match[1];
+                folderListHtml.push(`
+                    <div class="move-option" data-uuid="${fid}" onclick="selectMoveTarget(this)" 
+                         style="padding:8px 12px; cursor:pointer; border-bottom:1px solid #eee;">
+                         <i class="fa-solid fa-folder" style="margin-right:8px; color:#5f6368;"></i> ${name}
+                    </div>
+                `);
+            }
+        });
+
+        $("#move-folder-list").html(folderListHtml.join(""));
+
+        // Bind Confirm
+        $("#confirm-move-btn").on('click', function () {
+            const targetUuid = $(this).data("target-uuid");
+            $.ajax({
+                url: '/library/folder/move_items',
+                method: 'POST',
+                data: JSON.stringify({
+                    items: [{ kind: kind, uuid: uuid }],
+                    target_folder_uuid: targetUuid || null,
+                    scope: LibraryState.scope
+                }),
+                contentType: 'application/json',
+                success: function (res) {
+                    if (res.ok) {
+                        refreshResults();
+                        $("#move-modal").hide();
+                    }
+                },
+                error: function (err) {
+                    alert("Failed to move item");
+                }
+            });
+        });
+    }
+    window.moveLibraryItem = moveLibraryItem;
+
+    function selectMoveTarget(el) {
+        $(".move-option").css("background", "transparent");
+        $(el).css("background", "#e8f0fe");
+        const uuid = $(el).data("uuid");
+        $("#confirm-move-btn").data("target-uuid", uuid).prop("disabled", false);
+    }
+    window.selectMoveTarget = selectMoveTarget;
+
+    // Library item action functions
+    function togglePin(uuid) {
+        $.ajax({
+            url: '/library/pin',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    refreshResults();
+                }
+            },
+            error: function (err) {
+                console.error('Error toggling pin:', err);
+            }
+        });
+    }
+    window.togglePin = togglePin;
+
+    function toggleFavorite(uuid) {
+        $.ajax({
+            url: '/library/favorite',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    refreshResults();
+                }
+            },
+            error: function (err) {
+                console.error('Error toggling favorite:', err);
+            }
+        });
+    }
+    window.toggleFavorite = toggleFavorite;
+
+    function shareItemWithTeam(type, uuid) {
+        // Map type to route
+        const typeMap = {
+            'workflow': 'workflows',
+            'extraction': 'extractions',
+            'searchset': 'extractions',
+            'prompt': 'prompts',
+            'formatter': 'formatters'
+        };
+        const routeType = typeMap[type] || type + 's';
+
+        $.ajax({
+            url: '/library/' + routeType + '/share_to_team',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    alert('Shared to team successfully');
+                    refreshResults();
+                }
+            },
+            error: function (err) {
+                console.error('Error sharing to team:', err);
+                alert('Failed to share to team');
+            }
+        });
+    }
+    window.shareItemWithTeam = shareItemWithTeam;
+
+    const verificationRouteMap = {
+        'workflow': 'workflows',
+        'extraction': 'extractions',
+        'searchset': 'extractions',
+        'prompt': 'prompts',
+        'formatter': 'formatters'
+    };
+    const verificationKindMap = {
+        'workflow': 'workflow',
+        'extraction': 'searchset',
+        'searchset': 'searchset',
+        'prompt': 'prompt',
+        'formatter': 'formatter'
+    };
+    const verificationCategoryMap = {
+        'workflow': 'workflow',
+        'searchset': 'extraction',
+        'prompt': 'prompt',
+        'formatter': 'transform'
+    };
+
+    function submitForVerification(type, uuid, title = "") {
+        openVerificationModal(type, uuid, title);
+    }
+    window.submitForVerification = submitForVerification;
+
+    function openVerificationModal(type, uuid, title = "") {
+        const routeType = verificationRouteMap[type] || `${type}s`;
+        const kind = verificationKindMap[type] || type;
+        const category = verificationCategoryMap[kind] || 'workflow';
+        const modal = $("#verification-modal");
+
+        $("#verification-kind").val(kind);
+        $("#verification-uuid").val(uuid);
+        $("#verification-item-identifier").val(uuid);
+        $("#verification-item-title").val(title);
+        $("#verification-category").val(category);
+        $("#verification-category-display").text(category);
+        $("#verification-status-helper").text("Please describe how this task works and how you validated it.");
+        $("#verification-error").hide().text("");
+        $("#verification-status-pill").hide();
+
+        modal.data("verification-route", routeType);
+        modal.show();
+    }
+
+    function closeVerificationModal() {
+        $("#verification-modal").hide();
+    }
+
+    function duplicateItem(type, uuid) {
+        // Clone to personal library
+        const typeMap = {
+            'workflow': 'workflows',
+            'extraction': 'extractions',
+            'searchset': 'extractions',
+            'prompt': 'prompts',
+            'formatter': 'formatters'
+        };
+        const routeType = typeMap[type] || type + 's';
+
+        $.ajax({
+            url: '/library/' + routeType + '/clone_to_mine',
+            method: 'POST',
+            data: JSON.stringify({ uuid: uuid }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    alert('Duplicated successfully');
+                    refreshResults();
+                }
+            },
+            error: function (err) {
+                console.error('Error duplicating:', err);
+                alert('Failed to duplicate');
+            }
+        });
+    }
+    window.duplicateItem = duplicateItem;
+
+    function deleteItem(type, uuid) {
+        if (!confirm('Are you sure you want to delete this item?')) {
+            return;
+        }
+
+        // 'type' coming from the UI onclick is actually our 'kind' (workflow, extraction, prompt...)
+        // We also need the current scope to know which library to remove from.
+        const payload = {
+            uuid: uuid,
+            kind: type,
+            scope: LibraryState.scope
+        };
+
+        $.ajax({
+            url: '/library/remove',
+            method: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    refreshResults();
+                } else {
+                    alert('Failed to delete item: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function (err) {
+                console.error('Error deleting:', err);
+                alert('Failed to delete item');
+            }
+        });
+    }
+    window.deleteItem = deleteItem;
+
     // Make functions globally accessible for dynamically-loaded content
-    window.selectLibraryItem = function (type, id) {
-        // Handle row clicks on library items
+    window.selectLibraryItem = function (type, id, title = "") {
         if (type === 'workflow') {
-            window.location.href = '/workflows/' + id;
-        } else if (type === 'extraction') {
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(id);
+            } else {
+                console.error("fetchWorkflow not defined");
+            }
+        } else if (type === 'extraction' || type === 'searchset') {
             if (typeof openSearchSet === 'function') {
                 openSearchSet(id);
             } else {
                 console.error("openSearchSet not found");
             }
-        } else if (type === 'prompt') {
+        } else if (type === 'prompt' || type === 'formatter') {
             if (typeof runPromptInAssistant === 'function') {
-                runPromptInAssistant(id);
+                if (typeof setSection === 'function') {
+                    setSection("Assistant");
+                }
+                runPromptInAssistant(id, title);
             } else {
                 console.error("runPromptInAssistant not found");
             }
@@ -364,13 +737,6 @@
         refreshResults();
     }
 
-    function setDisplayMode(mode) {
-        LibraryState.displayMode = mode;
-        $('#view-mode-list, #view-mode-cards').removeClass('active');
-        $(`#view-mode-${mode}`).addClass('active');
-        refreshResults(); // Need to re-render to switch template structure often easier than CSS toggle
-    }
-
     function refreshResults() {
         if (LibraryState.scope === 'verify') {
             // Verification queue special handling
@@ -394,10 +760,28 @@
                     $("#library-results").html(res.template);
                     $("#library-results").css('opacity', '1');
 
-                    // Re-apply display mode class to container
-                    $("#library-results").removeClass('card-mode list-mode');
-                    if (LibraryState.displayMode === 'cards') {
-                        $("#library-results").addClass('card-mode');
+                    // Update sidebar folders if provided
+                    if (res.sidebar_folders) {
+                        const container = $("#sidebar-folder-list");
+                        container.empty();
+                        res.sidebar_folders.forEach(f => {
+                            const activeClass = (LibraryState.folderId === f.uuid) ? 'active' : '';
+                            container.append(`
+                                <div class="library-nav-item ${activeClass} sidebar-folder-row" onclick="setLibraryFolder('${f.uuid}')" 
+                                     ondrop="dropOnFolder(event, '${f.uuid}')" ondragover="allowDrop(event)"
+                                     ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
+                                     style="padding-left: 24px; font-size: 13px; display: flex; align-items: center; justify-content: space-between;">
+                                    <div style="display: flex; align-items: center; overflow: hidden;">
+                                        <i class="fa-solid fa-folder" style="color: #5f6368; width: 16px; margin-right: 8px;"></i>
+                                        <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${f.name}</span>
+                                    </div>
+                                    <div class="sidebar-folder-actions" onclick="event.stopPropagation()" style="display: none; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-pen" onclick="renameFolder('${f.uuid}', '${f.name}')" title="Rename" style="cursor: pointer; color: #70757a; font-size: 11px;"></i>
+                                        <i class="fa-solid fa-trash" onclick="deleteFolder('${f.uuid}')" title="Delete" style="cursor: pointer; color: #70757a; font-size: 11px;"></i>
+                                    </div>
+                                </div>
+                            `);
+                        });
                     }
 
                     if (typeof window.initializeLibraryResults === 'function') {
@@ -429,21 +813,60 @@
         // Initial load
         refreshResults();
 
-        // Global Cmd+K
-        $(document).keydown(function (e) {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault();
-                $('#command-palette-overlay').css('display', 'flex');
-                $('#cmd-palette-input').focus();
-            }
+        $("#verification-close-btn, #verification-cancel-btn").on("click", function () {
+            closeVerificationModal();
         });
 
-        // Palette Close
-        $('#command-palette-overlay').click(function (e) {
-            if (e.target === this) $(this).hide();
+        $("#verification-form").on("submit", function (e) {
+            e.preventDefault();
+            const modal = $("#verification-modal");
+            const routeType = modal.data("verification-route");
+            if (!routeType) {
+                $("#verification-error").text("Verification route could not be determined.").show();
+                return;
+            }
+
+            const payload = {
+                uuid: $("#verification-uuid").val(),
+                form: {
+                    submitter_name: $("#verification-submitter-name").val(),
+                    submitter_org: $("#verification-submitter-org").val(),
+                    item_title: $("#verification-item-title").val(),
+                    category: $("#verification-category").val(),
+                    summary: $("#verification-summary").val(),
+                    description: $("#verification-description").val(),
+                    run_instructions: $("#verification-run-instructions").val(),
+                    evaluation_notes: $("#verification-eval-notes").val(),
+                    example_inputs: $("#verification-example-inputs").val(),
+                    expected_outputs: $("#verification-expected-outputs").val(),
+                }
+            };
+
+            const submitBtn = $("#verification-submit-btn");
+            submitBtn.prop("disabled", true).text("Submitting...");
+
+            $.ajax({
+                url: `/library/${routeType}/submit_for_verification`,
+                method: "POST",
+                data: JSON.stringify(payload),
+                contentType: "application/json",
+                success: function (res) {
+                    if (res && res.ok) {
+                        showToast("Verification request submitted");
+                    }
+                    closeVerificationModal();
+                    refreshResults();
+                },
+                error: function (xhr) {
+                    const message =
+                        (xhr.responseJSON && xhr.responseJSON.error) || "Failed to submit verification request";
+                    $("#verification-error").text(message).show();
+                },
+                complete: function () {
+                    submitBtn.prop("disabled", false).text("Submit for verification");
+                }
+            });
         });
-        $(document).keydown(function (e) {
-            if (e.key === "Escape") $('#command-palette-overlay').hide();
-        });
+
     });
 </script>

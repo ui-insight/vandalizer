@@ -65,10 +65,12 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    // Preserve existing URL parameters
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('section', 'Library');
-                    location.href = url.toString();
+                    if (typeof refreshResults === 'function') {
+                        refreshResults();
+                    }
+                    $("#search-results-panel").hide();
+                    $("#search-results-panel").empty();
+                    showToast("Prompt updated");
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

@@ -199,6 +199,19 @@ footer .footer-poweredby {
   color: #a2aebd;
 }
 
+.close-workflow-btn {
+  background-color: #fff;
+  color: var(--highlight-color, #f1b300);
+  border: 1px solid var(--highlight-color, #f1b300);
+  border-radius: var(--ui-radius, 12px);
+  margin-left: 10px;
+}
+
+.close-workflow-btn:hover {
+  color: var(--highlight-text-color, #fff);
+  background-color: var(--highlight-color, #f1b300);
+}
+
 .navbar-default .navbar-brand {
     color: black;
     font-size: 32px;

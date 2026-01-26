@@ -859,6 +859,32 @@ class LibraryScope(Enum):
     VERIFIED = "verified"  # global verified catalog
 
 
+class LibraryFolder(me.Document):
+    """
+    Represents a folder within the library (personal or team).
+    """
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    parent_id = me.StringField(default=None, required=False, max_length=200)  # uuid of parent folder or None for root
+
+    scope = me.EnumField(LibraryScope, required=True)
+    
+    # Ownership (matches Library)
+    owner_user_id = me.StringField(required=False, max_length=200)
+    team = me.ReferenceField(Team, required=False, reverse_delete_rule=me.CASCADE)
+
+    created_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    meta = {
+        "indexes": [
+            {"fields": ["scope", "owner_user_id", "parent_id", "name"]},
+            {"fields": ["scope", "team", "parent_id", "name"]},
+        ]
+    }
+
+
 class LibraryItem(me.Document):
     """
     A pointer to either a Workflow or a SearchSet, with provenance and optional verification stamp.
@@ -883,6 +909,9 @@ class LibraryItem(me.Document):
     # Optional tags/notes to help curate libraries
     tags = me.ListField(me.StringField(max_length=100), default=[])
     note = me.StringField(required=False, max_length=2000)
+    
+    # Folder organization
+    folder = me.ReferenceField("LibraryFolder", required=False, reverse_delete_rule=me.NULLIFY)
 
     meta = {
         "indexes": [

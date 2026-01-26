@@ -16,6 +16,7 @@ from app import load_user, mail
 from app.utilities.security import validate_json_request
 from app.models import (  # adjust import path if needed
     Library,
+    LibraryFolder,
     LibraryItem,
     LibraryScope,
     SearchSet,
@@ -406,7 +407,63 @@ def _build_results_for_template(filters: dict) -> dict:
         collections = list(VerifiedCollection.objects().order_by("-updated_at"))
 
     # If there is no library yet, present empty lists gracefully
-    lib_items: list[LibraryItem] = list(lib.items) if lib else []
+    # We filter lib_items by folder if applicable
+    target_folder_id = filters.get("folderId")
+    if target_folder_id == "0":
+         target_folder_id = None
+         
+    # Fetch Folders (subfolders)
+    # We need to find folders in this scope that have the given parent_id
+    folders = []
+    if lib_scope == LibraryScope.PERSONAL and user:
+        folders = list(LibraryFolder.objects(scope=LibraryScope.PERSONAL, owner_user_id=user.user_id, parent_id=target_folder_id).order_by("name"))
+    elif lib_scope == LibraryScope.TEAM and team:
+        folders = list(LibraryFolder.objects(scope=LibraryScope.TEAM, team=team, parent_id=target_folder_id).order_by("name"))
+        
+    # Get Breadcrumbs
+    breadcrumbs = []
+    current_folder = None
+    if target_folder_id:
+        current_folder = LibraryFolder.objects(uuid=target_folder_id).first()
+        # Build chain (naive recursive/iterative up)
+        curr = current_folder
+        while curr:
+            breadcrumbs.insert(0, {"name": curr.name, "uuid": curr.uuid})
+            if curr.parent_id:
+                curr = LibraryFolder.objects(uuid=curr.parent_id).first()
+            else:
+                curr = None
+    
+    # Filter items by folder
+    # Note: lib.items is a list of references. iterating and dereferencing is expensive if list is huge.
+    # But for now we stick to the pattern.
+    raw_items = list(lib.items) if lib else []
+    lib_items: list[LibraryItem] = []
+    
+    for li in raw_items:
+        # Check folder match
+        # li.folder is a ReferenceField. 
+        # access checks DB? MongoEngine caches?
+        # If li.folder is None, it means root.
+        # We need to compare UUIDs safely.
+        
+        li_folder_id = None
+        if li.folder:
+             li_folder_id = li.folder.uuid # Assuming we resolve it or it has uuid field
+             
+        if str(li_folder_id or "") == str(target_folder_id or ""):
+             lib_items.append(li)
+             
+    # If using search (query), we might want to ignore folders and show all matching items?
+    # Usually search transcends folders.
+    if query:
+        # If searching, reset lib_items to ALL items matching query, ignore folder structure?
+        # Or search within folder? 
+        # Standard UX: Search is global or global-context.
+        # Let's search ALL items in library if query exists.
+        lib_items = raw_items 
+        folders = [] # Hide folders in search mode? Or filter folders?
+
 
     # Determine which categories we need to collect & cap counts to avoid massive payloads
     needs_workflows = item_type in ("workflows", "all")
@@ -673,6 +730,9 @@ def _build_results_for_template(filters: dict) -> dict:
         "user_favorites": user_config.favorite_items if user_config else [],
         "can_edit_verified": can_edit_verified,
         "last_run_map": last_run_map,
+        "folders": folders,
+        "breadcrumbs": breadcrumbs,
+        "current_folder_id": target_folder_id,
     }
 
     return context
@@ -896,8 +956,44 @@ def filter_library_items():
     """
     filters = request.get_json() or {}
     ctx = _build_results_for_template(filters)
+    
+    # Also fetch "Sidebar" folders (Roots for the current scope)
+    # We want to show the top-level structure in the sidebar.
+    # We can reuse logic or just query roots.
+    # Scope logic matches _build_results_for_template.
+    
+    scope_in = filters.get("scope") or "team"
+    lib_scope = _resolve_scope(scope_in)
+    user = load_user()
+    team = _current_team_for_user(user)
+    
+    sidebar_folders_data = []
+    # Only fetch if we are in a folder-supporting scope
+    if lib_scope in (LibraryScope.PERSONAL, LibraryScope.TEAM):
+        # Fetch ALL folders or just roots? 
+        # Ideally a tree, but let's start with Roots + lazy load or just Roots. 
+        # User said "folders section", implying a list.
+        # Let's return ALL folders for now so we can build a client-side tree or flat list?
+        # Or just Roots for now. "Folders" usually implies the top level buckets.
+        
+        # ACTUALLY: Sidebar usually shows the full tree or at least roots.
+        # Let's fetch roots (parent_id=None).
+        
+        q_kwargs = {"scope": lib_scope, "parent_id": None}
+        if lib_scope == LibraryScope.PERSONAL:
+             q_kwargs["owner_user_id"] = user.user_id
+        elif lib_scope == LibraryScope.TEAM:
+             q_kwargs["team"] = team
+             
+        roots = LibraryFolder.objects(**q_kwargs).order_by("name")
+        sidebar_folders_data = [{"name": f.name, "uuid": f.uuid} for f in roots]
+
     rendered_html = render_template("library/_results.html", **ctx)
-    return jsonify({"template": rendered_html})
+    
+    return jsonify({
+        "template": rendered_html,
+        "sidebar_folders": sidebar_folders_data
+    })
 
 
 @library.route("/verification/queue", methods=["POST"])
@@ -1106,6 +1202,63 @@ def workflows_clone_to_mine():
     return jsonify({"ok": True, "uuid": str(forked.id)})
 
 
+@library.route("/extractions/clone_to_mine", methods=["POST"])
+def extractions_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("extraction", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
+@library.route("/prompts/clone_to_mine", methods=["POST"])
+def prompts_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("prompt", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
+@library.route("/formatters/clone_to_mine", methods=["POST"])
+def formatters_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("formatter", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
 @library.route("/pin", methods=["POST"])
 @login_required
 @validate_json_request()
@@ -1240,23 +1393,19 @@ def formatters_share_to_team():
     return jsonify({"ok": True})
 
 
-@library.route("/team/remove", methods=["POST"])
-def remove_from_team_library():
+@library.route("/remove", methods=["POST"])
+@login_required
+@validate_json_request()
+def remove_library_item():
     user = load_user()
     if not user:
         return jsonify({"error": "unauthenticated"}), 401
 
-    team = _current_team_for_user(user)
-    if not team:
-        return jsonify({"error": "no team"}), 400
-
-    membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
-    if not membership:
-        return jsonify({"error": "forbidden"}), 403
-
-    payload = request.get_json(force=True) or {}
+    payload = request.get_json() or {}
     uuid = payload.get("uuid")
     kind = payload.get("kind")
+    scope = payload.get("scope") or "team"
+
     if not uuid or not kind:
         return jsonify({"error": "invalid request"}), 400
 
@@ -1264,24 +1413,43 @@ def remove_from_team_library():
     if not obj or not normalized_kind:
         return jsonify({"error": "not found"}), 404
 
-    team_library = Library.objects(
-        scope=LibraryScope.TEAM, team=team
-    ).first()
-    if not team_library:
-        return jsonify({"ok": False, "removed": False}), 200
+    # Resolve target library
+    target_lib = None
+    if scope in ("mine", "personal"):
+        target_lib = get_or_create_personal_library(user.user_id)
+    else:
+        # Default to team
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "no team"}), 400
+        # Check membership
+        membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
+        if not membership:
+            return jsonify({"error": "forbidden"}), 403
+        
+        target_lib = get_or_create_team_library(team)
 
+    if not target_lib:
+        return jsonify({"error": "library not found"}), 404
+
+    # Find item in library
     target_item = None
-    for item in list(team_library.items):
+    for item in list(target_lib.items):
         if item.kind == normalized_kind and item.obj == obj:
             target_item = item
             break
 
     if not target_item:
-        return jsonify({"ok": False, "removed": False}), 200
+        # It's possible the item isn't in the library but user wants to delete it? 
+        # For now, assume success if it's already gone from the library view.
+        return jsonify({"ok": True, "removed": False}), 200
 
-    team_library.items.remove(target_item)
-    team_library.updated_at = datetime.now(timezone.utc)
-    team_library.save()
+    # Remove from library list
+    target_lib.items.remove(target_item)
+    target_lib.updated_at = datetime.now(timezone.utc)
+    target_lib.save()
+    
+    # Delete the LibraryItem document itself (cleanup)
     target_item.delete()
 
     return jsonify({"ok": True, "removed": True})
@@ -1479,3 +1647,198 @@ def _submit_for_verification_route(kind: str):
             "redirect_url": url_for("home.index", scope="mine"),
         }
     )
+
+# -----------------------------
+# Folder Management Routes
+# -----------------------------
+
+@library.route("/folder/create", methods=["POST"])
+@login_required
+@validate_json_request()
+def create_folder():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+    
+    payload = request.get_json()
+    name = payload.get("name")
+    parent_id = payload.get("parent_id") # Optional uuid
+    scope_str = payload.get("scope", "personal")
+    
+    if not name:
+        return jsonify({"error": "name required"}), 400
+        
+    # Resolve Scope
+    try:
+        scope = _resolve_scope(scope_str)
+    except ValueError:
+        return jsonify({"error": "invalid scope"}), 400
+
+    team = None
+    owner_user_id = None
+    
+    if scope == LibraryScope.PERSONAL:
+        owner_user_id = user.user_id
+    elif scope == LibraryScope.TEAM:
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "no team context"}), 400
+    else:
+        return jsonify({"error": "invalid scope for folders"}), 400
+
+    # Create
+    folder = LibraryFolder(
+        name=name,
+        parent_id=parent_id,
+        scope=scope,
+        owner_user_id=owner_user_id,
+        team=team
+    )
+    folder.save()
+    
+    return jsonify({"ok": True, "folder": {
+        "uuid": folder.uuid,
+        "name": folder.name
+    }})
+
+@library.route("/folder/delete", methods=["POST"])
+@login_required
+@validate_json_request()
+def delete_folder():
+    """
+    Deletes a folder. 
+    Options: 
+    - delete contents (recursive) - NOT IMPLEMENTED YET, items move to root or fail?
+    - currently: move items to parent (or root) automatically? 
+      Strict implementation: Delete reference in items.
+    """
+    user = load_user()
+    payload = request.get_json()
+    folder_uuid = payload.get("uuid")
+    
+    if not folder_uuid:
+        return jsonify({"error": "uuid required"}), 400
+        
+    folder = LibraryFolder.objects(uuid=folder_uuid).first()
+    if not folder:
+        return jsonify({"error": "not found"}), 404
+        
+    # Auth check
+    if folder.scope == LibraryScope.PERSONAL:
+        if folder.owner_user_id != user.user_id:
+            return jsonify({"error": "forbidden"}), 403
+    elif folder.scope == LibraryScope.TEAM:
+        # TODO: checking team permissions? Assuming members can manage folders for now
+        team = _current_team_for_user(user)
+        if not team or folder.team != team:
+             return jsonify({"error": "forbidden"}), 403
+             
+    # Logic: Unassign items from this folder (move to root of same library)
+    # Alternatively: Delete items? Safest is unassign folder.
+    LibraryItem.objects(folder=folder).update(set__folder=None)
+    
+    # Subfolders? Move to parent
+    LibraryFolder.objects(parent_id=folder.uuid).update(set__parent_id=folder.parent_id)
+    
+    folder.delete()
+    return jsonify({"ok": True})
+
+@library.route("/folder/rename", methods=["POST"])
+@login_required
+@validate_json_request()
+def rename_folder():
+    user = load_user()
+    payload = request.get_json()
+    folder_uuid = payload.get("uuid")
+    new_name = payload.get("name")
+    
+    if not folder_uuid or not new_name:
+        return jsonify({"error": "uuid and name required"}), 400
+        
+    folder = LibraryFolder.objects(uuid=folder_uuid).first()
+    if not folder:
+        return jsonify({"error": "not found"}), 404
+        
+    # Auth check
+    if folder.scope == LibraryScope.PERSONAL:
+        if folder.owner_user_id != user.user_id:
+            return jsonify({"error": "forbidden"}), 403
+    elif folder.scope == LibraryScope.TEAM:
+        team = _current_team_for_user(user)
+        if not team or folder.team != team:
+             return jsonify({"error": "forbidden"}), 403
+             
+    folder.name = new_name
+    folder.save()
+    return jsonify({"ok": True})
+
+@library.route("/folder/move_items", methods=["POST"])
+@login_required
+@validate_json_request()
+def move_items_to_folder():
+    """
+    Moves list of library items (by item identifiers or LibraryItem IDs?) 
+    Client likely sends [kind, id] pairs or LibraryItem UUIDs?
+    Given existing API structure, better to send library item IDs if known, 
+    but UI often deals with [kind, uuid].
+    Let's assume payload: items: [{kind, uuid}], target_folder_uuid (or null for root)
+    """
+    user = load_user()
+    payload = request.get_json()
+    items_meta = payload.get("items", []) # List of {kind, uuid}
+    target_folder_uuid = payload.get("target_folder_uuid")
+    scope_str = payload.get("scope")
+    intent_scope = _resolve_scope(scope_str) if scope_str else None
+
+    target_folder = None
+    if target_folder_uuid:
+        target_folder = LibraryFolder.objects(uuid=target_folder_uuid).first()
+        if not target_folder:
+            return jsonify({"error": "target folder not found"}), 404
+            
+    # Resolve items and update
+    count = 0
+    for meta in items_meta:
+        kind = meta.get("kind")
+        uuid = meta.get("uuid")
+        
+        obj, normalized_kind = _resolve_obj(kind, uuid)
+        if not obj: 
+            continue
+            
+        candidates = LibraryItem.objects(obj=obj, kind=normalized_kind)
+        target_li = None
+        
+        for c in candidates:
+             # Find which library contains this item
+             parent_lib = Library.objects(items=c).first()
+             if not parent_lib: 
+                 continue
+                 
+             if target_folder:
+                 # Match target folder's library context
+                 if parent_lib.scope == target_folder.scope:
+                      if parent_lib.scope == LibraryScope.PERSONAL and parent_lib.owner_user_id == target_folder.owner_user_id:
+                            target_li = c
+                            break
+                      if parent_lib.scope == LibraryScope.TEAM and parent_lib.team == target_folder.team:
+                            target_li = c
+                            break
+             elif intent_scope:
+                 # Moving to root, match intent scope
+                 if parent_lib.scope == intent_scope:
+                      if intent_scope == LibraryScope.PERSONAL and parent_lib.owner_user_id == user.user_id:
+                           target_li = c
+                           break
+                      if intent_scope == LibraryScope.TEAM:
+                           current_team = _current_team_for_user(user)
+                           if parent_lib.team == current_team:
+                                target_li = c
+                                break
+        
+        if target_li:
+            target_li.folder = target_folder
+            target_li.save()
+            count += 1
+            
+    return jsonify({"ok": True, "count": count})

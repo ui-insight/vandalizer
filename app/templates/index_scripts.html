@@ -2031,10 +2031,6 @@
             $('#attachmentModal').hide();
         });
 
-        $('#closeNewWorkflowBtn').on('click', function () {
-            $('#newWorkflowModal').hide();
-        });
-
         $('#closeNewTaskBtn').on('click', function () {
             $('#newTaskModal').hide();
         });
@@ -3285,17 +3281,27 @@
             });
     });
 
-    $(".add-new_workflow-button").on("click", function () {
-        $("#newWorkflowModal").show();
-        $("#add-task-container").hide();
-        $("#newTaskModal").hide();
-
+    function bindNewWorkflowModalActions() {
         $("#newWorkflowBtn")
             .off("click")
             .on("click", function () {
                 createNewWorkflow();
                 $("#newWorkflowModal").hide();
             });
+        $("#closeNewWorkflowBtn").off("click").on("click", function () {
+            $("#newWorkflowModal").hide();
+        });
+    }
+
+    window.bindNewWorkflowModalActions = bindNewWorkflowModalActions;
+
+    bindNewWorkflowModalActions();
+
+    $(".add-new_workflow-button").on("click", function () {
+        $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
+        bindNewWorkflowModalActions();
     });
 
     var newTaskType = "";
@@ -3398,17 +3404,28 @@
     }
 
     // Library panel helper functions
-    function selectLibraryItem(type, id) {
+    function openSearchSet(uuid) {
+        updateSearchSetPanel(uuid);
+    }
+
+    function runPromptInAssistant(uuid, title = "") {
+        if (typeof setSection === 'function') {
+            setSection("Assistant");
+        }
+        beginPrompt(uuid, title || "Prompt");
+    }
+
+    function selectLibraryItem(type, id, title = "") {
         if (type === 'workflow') {
-            window.location.href = '/workflows/' + id;
-        } else if (type === 'extraction') {
-            if (typeof openSearchSet === 'function') {
-                openSearchSet(id);
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(id);
+            } else {
+                console.error("fetchWorkflow not defined");
             }
-        } else if (type === 'prompt') {
-            if (typeof runPromptInAssistant === 'function') {
-                runPromptInAssistant(id);
-            }
+        } else if (type === 'extraction' || type === 'searchset') {
+            openSearchSet(id);
+        } else if (type === 'prompt' || type === 'formatter') {
+            runPromptInAssistant(id, title);
         }
     }
 

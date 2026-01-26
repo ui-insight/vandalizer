@@ -1,14 +1,39 @@
 {# expects: workflows, extraction_sets, prompts, formatters, scope, filters, user_pinned, user_favorites, last_run_map
 #}
-{% set display_mode = filters.displayMode if filters.displayMode else 'list' %}
-{% set is_list = (display_mode == 'list') %}
 {% set is_explore = (scope == 'verified') %}
 
 <div class="library-results-content">
 
+
+    <!-- Breadcrumbs (Shared) -->
+    {% if breadcrumbs %}
+    <div class="library-breadcrumbs"
+        style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5f6368;">
+        <div style="cursor: pointer; display: flex; align-items: center;" ondrop="dropOnFolder(event, null)"
+            ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
+            onclick="setLibraryFolder(null)">
+            <span class="hover-underline">Library</span>
+        </div>
+        {% for crumb in breadcrumbs %}
+        <i class="fa-solid fa-chevron-right" style="font-size: 10px; color: #dadce0;"></i>
+        <div style="cursor: pointer; display: flex; align-items: center;"
+            ondrop="dropOnFolder(event, '{{ crumb.uuid }}')" ondragover="allowDrop(event)"
+            ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
+            onclick="setLibraryFolder('{{ crumb.uuid }}')">
+            <span class="hover-underline">{{ crumb.name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+
+
     {% if is_explore %}
     <!-- EXPLORE / MARKETPLACE VIEW -->
     <div style="padding: 24px;">
+
+
+        {% if is_explore %}
         <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">Featured Collections</div>
         <div
             style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 32px;">
@@ -40,11 +65,12 @@
     </div>
     {% endif %}
 
+    {% endif %}
 
-    {% if is_list and not is_explore %}
+    {% if not is_explore %}
     <div class="library-list-header">
         <div>Name</div>
-        <div>Status</div>
+        <!-- Status col removed -->
         <div>Last Used</div>
         <div style="text-align:right;">Actions</div>
     </div>
@@ -52,22 +78,19 @@
 
     <!-- WORKFLOWS -->
     {% if workflows %}
-    {% if not is_list %}<div style="margin: 12px 18px 8px; font-weight: 700;">Workflows</div>{% endif %}
     {% for wf in workflows %}
     {% set last_run = last_run_map.get(wf.id|string) %}
     {% set is_pinned = wf.id|string in user_pinned %}
     {% set is_fav = wf.id|string in user_favorites %}
 
-    {% if is_list %}
-    <div class="library-list-row" onclick="selectLibraryItem('workflow', '{{ wf.id }}')">
+    <div class="library-list-row" onclick="selectLibraryItem('workflow', '{{ wf.id }}')" draggable="true"
+        ondragstart="dragLibraryItem(event, 'workflow', '{{ wf.id }}')">
 
-        <!-- 1. Name & Desc & Tags -->
         <div class="col-cell primary">
             <div class="row-title">
                 {{ wf.name }}
-                <!-- Pinned icon in title removed in favor of explicit pinned action/view -->
             </div>
-            <div class="row-desc">{{ wf.description | truncate(80) }}</div>
+            <div class="row-desc">Workflow</div>
             {% if wf.tags %}
             <div class="row-tags" style="margin-top:4px; display:flex; gap:4px;">
                 {% for tag in wf.tags[:3] %}
@@ -79,14 +102,6 @@
             {% endif %}
         </div>
 
-        <!-- 2. Badges (Verified, Shared, Draft) - No Tags -->
-        <div class="col-cell" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-            {% if wf.verified %}<span class="chip-verified"><i class="fa-solid fa-check-circle"></i> Verified</span>{%
-            endif %}
-            {% if not wf.verified %}<span class="chip-kind" style="background:#eee; color:#666;">Draft</span>{% endif %}
-        </div>
-
-        <!-- 3. Last Used (Primary) -->
         <div class="col-cell secondary">
             {% if last_run %}
             <div style="color:#3c4043; font-weight:500;" title="{{ last_run }}">
@@ -97,15 +112,12 @@
             {% endif %}
         </div>
 
-        <!-- 4. Actions: Star, Pin, Run, Menu -->
         <div class="col-cell actions-cell">
-            <!-- Favorites -->
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
                 onclick="event.stopPropagation(); toggleFavorite('{{ wf.id }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
 
-            <!-- Pin -->
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ wf.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
@@ -120,14 +132,22 @@
                     <a class="menu-item" href="#" onclick="editLibraryItem('workflow', '{{ wf.id }}')">
                         <i class="fa-solid fa-pen" style="width:20px;"></i> Edit
                     </a>
-                    <a class="menu-item" href="#" onclick="togglePin('{{ wf.id }}')">{{
-                        'Unpin' if is_pinned else 'Pin' }}</a>
+                    <a class="menu-item" href="#" onclick="togglePin('{{ wf.id }}')">{{ 'Unpin' if is_pinned else 'Pin'
+                        }}</a>
                     <a class="menu-item" href="#" onclick="toggleFavorite('{{ wf.id }}')">{{ 'Unfavorite' if is_fav else
                         'Favorite' }}</a>
                     <hr class="menu-divider">
+                    {% if scope in ['team', 'verified'] %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('workflow', '{{ wf.id }}')">Add to my
+                        library</a>
+                    {% else %}
                     <a class="menu-item" href="#" onclick="duplicateItem('workflow', '{{ wf.id }}')">Duplicate</a>
+                    <a class="menu-item" href="#" onclick="moveLibraryItem('workflow', '{{ wf.id }}')">Move to...</a>
+                    {% endif %}
+                    {% if scope != 'team' %}
                     <a class="menu-item" href="#" onclick="shareItemWithTeam('workflow', '{{ wf.id }}')">Send to
                         team</a>
+                    {% endif %}
                     {% if not wf.verified %}
                     <a class="menu-item" href="#" onclick="submitForVerification('workflow', '{{ wf.id }}')">Submit to
                         verification</a>
@@ -139,34 +159,18 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <!-- CARD VIEW -->
-    <div class="library-card" onclick="selectLibraryItem('workflow', '{{ wf.id }}')">
-        <div style="display:flex;">
-            <i class="fa-solid fa-diagram-project" style="margin-right:10px; margin-top:3px; color:#5f6368;"></i>
-            <div style="flex:1;">
-                <div class="title">{{ wf.name }}</div>
-                <div class="meta">{{ wf.description | truncate(100) }}</div>
-                <div style="margin-top:8px;">
-                    {% if wf.verified %}<span class="library-badge library-badge--success">Verified</span>{% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
     {% endfor %}
     {% endif %}
 
     <!-- EXTRACTION SETS -->
     {% if extraction_sets %}
-    {% if not is_list %}<div style="margin: 12px 18px 8px; font-weight: 700;">Extraction Tasks</div>{% endif %}
     {% for s in extraction_sets %}
     {% set last_run = last_run_map.get(s.uuid) %}
     {% set is_pinned = s.uuid in user_pinned %}
     {% set is_fav = s.uuid in user_favorites %}
 
-    {% if is_list %}
-    <div class="library-list-row" onclick="selectLibraryItem('extraction', '{{ s.uuid }}')">
+    <div class="library-list-row" onclick="selectLibraryItem('extraction', '{{ s.uuid }}')" draggable="true"
+        ondragstart="dragLibraryItem(event, 'extraction', '{{ s.uuid }}')">
         <div class="col-cell primary">
             <div class="row-title">
                 {{ s.title }}
@@ -181,11 +185,6 @@
                     - 3 }}</span>{% endif %}
             </div>
             {% endif %}
-        </div>
-
-        <div class="col-cell" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-            {% if s.verified %}<span class="chip-verified"><i class="fa-solid fa-check-circle"></i> Verified</span>{%
-            endif %}
         </div>
 
         <div class="col-cell secondary">
@@ -218,18 +217,25 @@
                     <a class="menu-item" href="#" onclick="editLibraryItem('extraction', '{{ s.uuid }}')">
                         <i class="fa-solid fa-pen" style="width:20px;"></i> Edit
                     </a>
-                    <a class="menu-item" href="#" onclick="togglePin('{{ s.uuid }}')">{{
-                        'Unpin' if is_pinned else 'Pin' }}</a>
+                    <a class="menu-item" href="#" onclick="togglePin('{{ s.uuid }}')">{{ 'Unpin' if is_pinned else 'Pin'
+                        }}</a>
                     <a class="menu-item" href="#" onclick="toggleFavorite('{{ s.uuid }}')">{{ 'Unfavorite' if is_fav
-                        else
-                        'Favorite' }}</a>
+                        else 'Favorite' }}</a>
                     <hr class="menu-divider">
+                    {% if scope in ['team', 'verified'] %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ s.uuid }}')">Add to my
+                        library</a>
+                    {% else %}
                     <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ s.uuid }}')">Duplicate</a>
+                    <a class="menu-item" href="#" onclick="moveLibraryItem('searchset', '{{ s.uuid }}')">Move to...</a>
+                    {% endif %}
+                    {% if scope != 'team' %}
                     <a class="menu-item" href="#" onclick="shareItemWithTeam('searchset', '{{ s.uuid }}')">Send to
                         team</a>
+                    {% endif %}
                     {% if not s.verified %}
-                    <a class="menu-item" href="#" onclick="submitForVerification('searchset', '{{ s.uuid }}')">Submit to
-                        verification</a>
+                    <a class="menu-item" href="#" onclick="submitForVerification('searchset', '{{ s.uuid }}')">Submit
+                        to verification</a>
                     {% endif %}
                     <hr class="menu-divider">
                     <a class="menu-item" href="#" onclick="deleteItem('searchset', '{{ s.uuid }}')"
@@ -238,43 +244,28 @@
             </div>
         </div>
     </div>
-    {% else %}
-    <div class="library-card" onclick="selectLibraryItem('extraction', '{{ s.uuid }}')">
-        <div style="display:flex;">
-            <i class="fa-solid fa-filter" style="margin-right:10px; margin-top:3px; color:#5f6368;"></i>
-            <div style="flex:1;">
-                <div class="title">{{ s.title }}</div>
-                <div class="meta">{{ s.item_count() }} items</div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
     {% endfor %}
     {% endif %}
 
     <!-- PROMPTS -->
     {% if prompts %}
-    {% if not is_list %}<div style="margin: 12px 18px 8px; font-weight: 700;">Prompts</div>{% endif %}
     {% for p in prompts %}
-    {% if is_list %}
-    <div class="library-list-row" onclick="selectLibraryItem('prompt', '{{ p.id }}')">
+    {% set is_fav = p.id|string in user_favorites %}
+    {% set is_pinned = p.id|string in user_pinned %}
+
+    <div class="library-list-row" onclick="selectLibraryItem('prompt', '{{ p.id }}')" draggable="true"
+        ondragstart="dragLibraryItem(event, 'prompt', '{{ p.id }}')">
         <div class="col-cell primary">
             <div class="row-title">{{ p.title }}</div>
-        </div>
-        <div class="col-cell">
-            <span class="chip-kind">Prompt</span>
+            <div class="row-desc">Prompt</div>
         </div>
         <div class="col-cell secondary"></div>
         <div class="col-cell actions-cell">
-            <!-- Favorites -->
-            {% set is_fav = p.id|string in user_favorites %}
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
                 onclick="event.stopPropagation(); toggleFavorite('{{ p.id }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
 
-            <!-- Pin -->
-            {% set is_pinned = p.id|string in user_pinned %}
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ p.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
@@ -289,12 +280,24 @@
                     <a class="menu-item" href="#" onclick="editLibraryItem('prompt', '{{ p.id }}')">
                         <i class="fa-solid fa-pen" style="width:20px;"></i> Edit
                     </a>
-                    <a class="menu-item" href="#" onclick="togglePin('{{ p.id }}')">{{
-                        'Unpin' if is_pinned else 'Pin' }}</a>
-                    <a class="menu-item" href="#" onclick="toggleFavorite('{{ p.id }}')">{{
-                        'Unfavorite' if is_fav else 'Favorite' }}</a>
+                    <a class="menu-item" href="#" onclick="togglePin('{{ p.id }}')">{{ 'Unpin' if is_pinned else 'Pin'
+                        }}</a>
+                    <a class="menu-item" href="#" onclick="toggleFavorite('{{ p.id }}')">{{ 'Unfavorite' if is_fav else
+                        'Favorite' }}</a>
                     <hr class="menu-divider">
+                    {% if scope != 'team' %}
                     <a class="menu-item" href="#" onclick="shareItemWithTeam('prompt', '{{ p.id }}')">Send to team</a>
+                    {% endif %}
+                    {% if scope in ['team', 'verified'] %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('prompt', '{{ p.id }}')">Add to my library</a>
+                    {% else %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('prompt', '{{ p.id }}')">Duplicate</a>
+                    <a class="menu-item" href="#" onclick="moveLibraryItem('prompt', '{{ p.id }}')">Move to...</a>
+                    {% endif %}
+                    {% if not p.verified %}
+                    <a class="menu-item" href="#" onclick="submitForVerification('prompt', '{{ p.id }}')">Submit to
+                        verification</a>
+                    {% endif %}
                     <hr class="menu-divider">
                     <a class="menu-item" href="#" onclick="deleteItem('prompt', '{{ p.id }}')"
                         style="color:red;">Delete</a>
@@ -302,11 +305,72 @@
             </div>
         </div>
     </div>
-    {% endif %}
     {% endfor %}
     {% endif %}
 
-    {% if not workflows and not extraction_sets and not prompts %}
+    {% if formatters %}
+    {% for f in formatters %}
+    {% set is_fav = f.id|string in user_favorites %}
+    {% set is_pinned = f.id|string in user_pinned %}
+
+    <div class="library-list-row" onclick="selectLibraryItem('formatter', '{{ f.id }}')" draggable="true"
+        ondragstart="dragLibraryItem(event, 'formatter', '{{ f.id }}')">
+        <div class="col-cell primary">
+            <div class="row-title">{{ f.title }}</div>
+            <div class="row-desc">Formatter</div>
+        </div>
+        <div class="col-cell secondary"></div>
+        <div class="col-cell actions-cell">
+            <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
+                onclick="event.stopPropagation(); toggleFavorite('{{ f.id }}');" title="Favorite">
+                <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
+            </button>
+
+            <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
+                onclick="event.stopPropagation(); togglePin('{{ f.id }}');" title="Pin">
+                <i class="fa-solid fa-thumbtack"></i>
+            </button>
+
+            <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
+                <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
+                    data-menu="#menu-fmt-{{ f.id }}">
+                    <i class="fa-solid fa-ellipsis"></i>
+                </button>
+                <div id="menu-fmt-{{ f.id }}" class="menu menu-right" role="menu" hidden>
+                    <a class="menu-item" href="#" onclick="editLibraryItem('formatter', '{{ f.id }}')">
+                        <i class="fa-solid fa-pen" style="width:20px;"></i> Edit
+                    </a>
+                    <a class="menu-item" href="#" onclick="togglePin('{{ f.id }}')">{{ 'Unpin' if is_pinned else 'Pin'
+                        }}</a>
+                    <a class="menu-item" href="#" onclick="toggleFavorite('{{ f.id }}')">{{ 'Unfavorite' if is_fav else
+                        'Favorite' }}</a>
+                    <hr class="menu-divider">
+                    {% if scope != 'team' %}
+                    <a class="menu-item" href="#" onclick="shareItemWithTeam('formatter', '{{ f.id }}')">Send to
+                        team</a>
+                    {% endif %}
+                    {% if scope in ['team', 'verified'] %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('formatter', '{{ f.id }}')">Add to my
+                        library</a>
+                    {% else %}
+                    <a class="menu-item" href="#" onclick="duplicateItem('formatter', '{{ f.id }}')">Duplicate</a>
+                    <a class="menu-item" href="#" onclick="moveLibraryItem('formatter', '{{ f.id }}')">Move to...</a>
+                    {% endif %}
+                    {% if not f.verified %}
+                    <a class="menu-item" href="#" onclick="submitForVerification('formatter', '{{ f.id }}')">Submit to
+                        verification</a>
+                    {% endif %}
+                    <hr class="menu-divider">
+                    <a class="menu-item" href="#" onclick="deleteItem('formatter', '{{ f.id }}')"
+                        style="color:red;">Delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {% if not workflows and not extraction_sets and not prompts and not formatters %}
     <div style="padding: 40px; text-align: center; color: #888;">
         No items found.
         {% if is_explore %}
