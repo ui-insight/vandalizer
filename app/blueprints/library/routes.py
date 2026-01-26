@@ -7,6 +7,8 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 
+from typing import Any
+
 from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import login_required
 from mongoengine.errors import DoesNotExist
@@ -704,14 +706,37 @@ def _build_results_for_template(filters: dict) -> dict:
 
     workflows.sort(key=_sort_key_workflow, reverse=reverse_sort)
     extraction_sets.sort(key=_sort_key_searchset, reverse=reverse_sort)
-    prompts.sort(key=lambda p: (p.title or "").lower(), reverse=(sort_mode!="az") ) 
+    prompts.sort(key=lambda p: (p.title or "").lower(), reverse=(sort_mode!="az"))
     
     # Context
+    mixed_items: list[dict[str, Any]] | None = None
+    if sort_mode == "az" and item_type == "all":
+        def _normalize(entry_kind: str, entry_obj) -> str:
+            if entry_kind == "workflow":
+                return (entry_obj.name or "").lower()
+            if entry_kind == "searchset":
+                return (entry_obj.title or "").lower()
+            return (entry_obj.title or "").lower()
+
+        candidates: list[dict[str, Any]] = []
+        for wf in workflows:
+            candidates.append({"kind": "workflow", "obj": wf, "key": _normalize("workflow", wf)})
+        for ss in extraction_sets:
+            candidates.append({"kind": "searchset", "obj": ss, "key": _normalize("searchset", ss)})
+        for p in prompts:
+            candidates.append({"kind": "prompt", "obj": p, "key": _normalize("prompt", p)})
+        for f in formatters:
+            candidates.append({"kind": "formatter", "obj": f, "key": _normalize("formatter", f)})
+
+        candidates.sort(key=lambda entry: entry["key"])
+        mixed_items = candidates
+
     context = {
         "workflows": workflows,
         "extraction_sets": extraction_sets,
         "prompts": prompts,
         "formatters": formatters,
+        "mixed_items": mixed_items,
         "verification_requests": verification_payloads,
         "collections": collections,
         "filters": {

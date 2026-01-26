@@ -42,19 +42,23 @@
                 {% set _scope = scope or 'team' %}
                 <button class="scope-tab-btn {% if _scope=='mine' %}active{% endif %}" data-scope="mine">Mine</button>
                 <button class="scope-tab-btn {% if _scope=='team' %}active{% endif %}" data-scope="team">Team</button>
-                <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}" data-scope="verified">Explore</button>
+                <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}"
+                    data-scope="verified">Explore</button>
                 {% if can_verify %}
-                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}" data-scope="verify">Verify</button>
+                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}"
+                    data-scope="verify">Verify</button>
                 {% endif %}
             </div>
-            <div class="tabs-spacer"></div>
         </div>
 
         <div class="library-header-row controls-row">
             <div class="filter-chip-group">
-                <div class="filter-chip {% if item_type=='all' %}active{% endif %}" onclick="setLibraryType('all')">All Types</div>
-                <div class="filter-chip {% if item_type=='workflows' %}active{% endif %}" onclick="setLibraryType('workflows')">Workflows</div>
-                <div class="filter-chip {% if item_type=='tasks' %}active{% endif %}" onclick="setLibraryType('tasks')">Tasks</div>
+                <div class="filter-chip {% if item_type=='all' %}active{% endif %}" onclick="setLibraryType('all')">All
+                    Types</div>
+                <div class="filter-chip {% if item_type=='workflows' %}active{% endif %}"
+                    onclick="setLibraryType('workflows')">Workflows</div>
+                <div class="filter-chip {% if item_type=='tasks' %}active{% endif %}" onclick="setLibraryType('tasks')">
+                    Tasks</div>
             </div>
             <div class="controls-sort">
                 <select id="library-sort" class="filter-chip" onchange="setLibrarySort(this.value)">
@@ -99,7 +103,7 @@
                 <div class="filter-group-body">
                     <!-- Dynamic tags would go here -->
                     <div id="sidebar-folder-list"></div>
-                    <div class="folder-hint" onclick="createNewFolder()">+ Add folders to organize</div>
+                    <button type="button" class="folder-hint" onclick="createNewFolder()">+ Add folders</button>
                 </div>
             </div>
         </div>
@@ -273,6 +277,26 @@
     // -- Drag & Drop --
     function dragLibraryItem(ev, kind, uuid) {
         ev.dataTransfer.setData("application/json", JSON.stringify({ kind: kind, uuid: uuid }));
+
+// Custom Drag Image
+        const dragIcon = document.createElement('div');
+        dragIcon.style.padding = '8px 12px';
+        dragIcon.style.background = '#333';
+        dragIcon.style.color = '#fff';
+        dragIcon.style.borderRadius = '4px';
+        dragIcon.style.fontSize = '12px';
+        dragIcon.style.fontWeight = '600';
+        dragIcon.style.position = 'absolute';
+        ragIcon.style.top = '-1000px';
+        dagIcon.innerText = "Moving item...";
+        document.body.appendChild(dragIcon);
+
+        evnsfer.setDragImage(dragIcon, 0, 0);
+
+        // Cleanuprag start (browser makes copy)
+        requestAnimationFrame(() => {
+            document.body.removeChild(dragIcon);
+        });
     }
     window.dragLibraryItem = dragLibraryItem;
 

@@ -1,91 +1,19 @@
 {# expects: workflows, extraction_sets, prompts, formatters, scope, filters, user_pinned, user_favorites, last_run_map
 #}
 {% set is_explore = (scope == 'verified') %}
+{% set library_filters = filters if filters is defined else {} %}
+{% set current_type = (library_filters.get('type') if library_filters else 'all') or 'all' %}
+{% set current_sort = (library_filters.get('sort') if library_filters else 'recent') or 'recent' %}
+{% set use_mixed_alphabetical = mixed_items and current_type == 'all' and current_sort == 'az' %}
 
 <div class="library-results-content">
 
-
-    <!-- Breadcrumbs (Shared) -->
-    {% if breadcrumbs %}
-    <div class="library-breadcrumbs"
-        style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5f6368;">
-        <div style="cursor: pointer; display: flex; align-items: center;" ondrop="dropOnFolder(event, null)"
-            ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
-            onclick="setLibraryFolder(null)">
-            <span class="hover-underline">Library</span>
-        </div>
-        {% for crumb in breadcrumbs %}
-        <i class="fa-solid fa-chevron-right" style="font-size: 10px; color: #dadce0;"></i>
-        <div style="cursor: pointer; display: flex; align-items: center;"
-            ondrop="dropOnFolder(event, '{{ crumb.uuid }}')" ondragover="allowDrop(event)"
-            ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
-            onclick="setLibraryFolder('{{ crumb.uuid }}')">
-            <span class="hover-underline">{{ crumb.name }}</span>
-        </div>
-        {% endfor %}
-    </div>
-    {% endif %}
-
-
-
-    {% if is_explore %}
-    <!-- EXPLORE / MARKETPLACE VIEW -->
-    <div style="padding: 24px;">
-
-
-        {% if is_explore %}
-        <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">Featured Collections</div>
-        <div
-            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 32px;">
-            <!-- Mock Featured Cards -->
-            <div class="library-card"
-                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div
-                    style="height:100px; background:#f1f3f4; border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color:#9aa0a6;">
-                    <i class="fa-solid fa-layer-group" style="font-size:32px;"></i>
-                </div>
-                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Team Standards</div>
-                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">Official workflows approved by your org.
-                </div>
-                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
-            </div>
-            <div class="library-card"
-                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-                <div
-                    style="height:100px; background:#e8f0fe; border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color:#1967d2;">
-                    <i class="fa-solid fa-star" style="font-size:32px;"></i>
-                </div>
-                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Golden Tasks</div>
-                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">High-accuracy extraction logic.</div>
-                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
-            </div>
-        </div>
-
-        <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">All Verified Items</div>
-    </div>
-    {% endif %}
-
-    {% endif %}
-
-    {% if not is_explore %}
-    <div class="library-list-header">
-        <div>Name</div>
-        <!-- Status col removed -->
-        <div>Last Used</div>
-        <div style="text-align:right;">Actions</div>
-    </div>
-    {% endif %}
-
-    <!-- WORKFLOWS -->
-    {% if workflows %}
-    {% for wf in workflows %}
+    {% macro workflow_row(wf) -%}
     {% set last_run = last_run_map.get(wf.id|string) %}
     {% set is_pinned = wf.id|string in user_pinned %}
     {% set is_fav = wf.id|string in user_favorites %}
-
     <div class="library-list-row" onclick="selectLibraryItem('workflow', '{{ wf.id }}')" draggable="true"
         ondragstart="dragLibraryItem(event, 'workflow', '{{ wf.id }}')">
-
         <div class="col-cell primary">
             <div class="row-title">
                 {{ wf.name }}
@@ -101,7 +29,6 @@
             </div>
             {% endif %}
         </div>
-
         <div class="col-cell secondary">
             {% if last_run %}
             <div style="color:#3c4043; font-weight:500;" title="{{ last_run }}">
@@ -111,18 +38,15 @@
             <div style="color:#9aa0a6;">Never used</div>
             {% endif %}
         </div>
-
         <div class="col-cell actions-cell">
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
                 onclick="event.stopPropagation(); toggleFavorite('{{ wf.id }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
-
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ wf.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
             </button>
-
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
                 <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
                     data-menu="#menu-wf-{{ wf.id }}">
@@ -159,34 +83,27 @@
             </div>
         </div>
     </div>
-    {% endfor %}
-    {% endif %}
+    {% endmacro %}
 
-    <!-- EXTRACTION SETS -->
-    {% if extraction_sets %}
-    {% for s in extraction_sets %}
-    {% set last_run = last_run_map.get(s.uuid) %}
-    {% set is_pinned = s.uuid in user_pinned %}
-    {% set is_fav = s.uuid in user_favorites %}
-
-    <div class="library-list-row" onclick="selectLibraryItem('extraction', '{{ s.uuid }}')" draggable="true"
-        ondragstart="dragLibraryItem(event, 'extraction', '{{ s.uuid }}')">
+    {% macro searchset_row(ss) -%}
+    {% set last_run = last_run_map.get(ss.uuid) %}
+    {% set is_pinned = ss.uuid in user_pinned %}
+    {% set is_fav = ss.uuid in user_favorites %}
+    <div class="library-list-row" onclick="selectLibraryItem('extraction', '{{ ss.uuid }}')" draggable="true"
+        ondragstart="dragLibraryItem(event, 'extraction', '{{ ss.uuid }}')">
         <div class="col-cell primary">
-            <div class="row-title">
-                {{ s.title }}
-            </div>
+            <div class="row-title">{{ ss.title }}</div>
             <div class="row-desc">Extraction Task</div>
-            {% if s.tags %}
+            {% if ss.tags %}
             <div class="row-tags" style="margin-top:4px; display:flex; gap:4px;">
-                {% for tag in s.tags[:3] %}
+                {% for tag in ss.tags[:3] %}
                 <span class="chip-tag">{{ tag }}</span>
                 {% endfor %}
-                {% if s.tags|length > 3 %}<span style="font-size:10px; color:#888; align-self:center;">+{{ s.tags|length
-                    - 3 }}</span>{% endif %}
+                {% if ss.tags|length > 3 %}<span style="font-size:10px; color:#888; align-self:center;">+{{
+                    ss.tags|length - 3 }}</span>{% endif %}
             </div>
             {% endif %}
         </div>
-
         <div class="col-cell secondary">
             {% if last_run %}
             <div style="color:#3c4043; font-weight:500;" title="{{ last_run }}">
@@ -196,63 +113,56 @@
             <div style="color:#9aa0a6;">Never used</div>
             {% endif %}
         </div>
-
         <div class="col-cell actions-cell">
             <button class="icon-btn action-icon {% if is_fav %}active{% endif %}"
-                onclick="event.stopPropagation(); toggleFavorite('{{ s.uuid }}');" title="Favorite">
+                onclick="event.stopPropagation(); toggleFavorite('{{ ss.uuid }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
-
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
-                onclick="event.stopPropagation(); togglePin('{{ s.uuid }}');" title="Pin">
+                onclick="event.stopPropagation(); togglePin('{{ ss.uuid }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
             </button>
-
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
                 <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
-                    data-menu="#menu-ext-{{ s.uuid }}">
+                    data-menu="#menu-ext-{{ ss.uuid }}">
                     <i class="fa-solid fa-ellipsis"></i>
                 </button>
-                <div id="menu-ext-{{ s.uuid }}" class="menu menu-right" role="menu" hidden>
-                    <a class="menu-item" href="#" onclick="editLibraryItem('extraction', '{{ s.uuid }}')">
+                <div id="menu-ext-{{ ss.uuid }}" class="menu menu-right" role="menu" hidden>
+                    <a class="menu-item" href="#" onclick="editLibraryItem('extraction', '{{ ss.uuid }}')">
                         <i class="fa-solid fa-pen" style="width:20px;"></i> Edit
                     </a>
-                    <a class="menu-item" href="#" onclick="togglePin('{{ s.uuid }}')">{{ 'Unpin' if is_pinned else 'Pin'
-                        }}</a>
-                    <a class="menu-item" href="#" onclick="toggleFavorite('{{ s.uuid }}')">{{ 'Unfavorite' if is_fav
+                    <a class="menu-item" href="#" onclick="togglePin('{{ ss.uuid }}')">{{ 'Unpin' if is_pinned else
+                        'Pin' }}</a>
+                    <a class="menu-item" href="#" onclick="toggleFavorite('{{ ss.uuid }}')">{{ 'Unfavorite' if is_fav
                         else 'Favorite' }}</a>
                     <hr class="menu-divider">
                     {% if scope in ['team', 'verified'] %}
-                    <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ s.uuid }}')">Add to my
+                    <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ ss.uuid }}')">Add to my
                         library</a>
                     {% else %}
-                    <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ s.uuid }}')">Duplicate</a>
-                    <a class="menu-item" href="#" onclick="moveLibraryItem('searchset', '{{ s.uuid }}')">Move to...</a>
+                    <a class="menu-item" href="#" onclick="duplicateItem('searchset', '{{ ss.uuid }}')">Duplicate</a>
+                    <a class="menu-item" href="#" onclick="moveLibraryItem('searchset', '{{ ss.uuid }}')">Move to...</a>
                     {% endif %}
                     {% if scope != 'team' %}
-                    <a class="menu-item" href="#" onclick="shareItemWithTeam('searchset', '{{ s.uuid }}')">Send to
+                    <a class="menu-item" href="#" onclick="shareItemWithTeam('searchset', '{{ ss.uuid }}')">Send to
                         team</a>
                     {% endif %}
-                    {% if not s.verified %}
-                    <a class="menu-item" href="#" onclick="submitForVerification('searchset', '{{ s.uuid }}')">Submit
+                    {% if not ss.verified %}
+                    <a class="menu-item" href="#" onclick="submitForVerification('searchset', '{{ ss.uuid }}')">Submit
                         to verification</a>
                     {% endif %}
                     <hr class="menu-divider">
-                    <a class="menu-item" href="#" onclick="deleteItem('searchset', '{{ s.uuid }}')"
+                    <a class="menu-item" href="#" onclick="deleteItem('searchset', '{{ ss.uuid }}')"
                         style="color:red;">Delete</a>
                 </div>
             </div>
         </div>
     </div>
-    {% endfor %}
-    {% endif %}
+    {% endmacro %}
 
-    <!-- PROMPTS -->
-    {% if prompts %}
-    {% for p in prompts %}
+    {% macro prompt_row(p) -%}
     {% set is_fav = p.id|string in user_favorites %}
     {% set is_pinned = p.id|string in user_pinned %}
-
     <div class="library-list-row" onclick="selectLibraryItem('prompt', '{{ p.id }}')" draggable="true"
         ondragstart="dragLibraryItem(event, 'prompt', '{{ p.id }}')">
         <div class="col-cell primary">
@@ -265,12 +175,10 @@
                 onclick="event.stopPropagation(); toggleFavorite('{{ p.id }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
-
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ p.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
             </button>
-
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
                 <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
                     data-menu="#menu-pmt-{{ p.id }}">
@@ -305,14 +213,11 @@
             </div>
         </div>
     </div>
-    {% endfor %}
-    {% endif %}
+    {% endmacro %}
 
-    {% if formatters %}
-    {% for f in formatters %}
+    {% macro formatter_row(f) -%}
     {% set is_fav = f.id|string in user_favorites %}
     {% set is_pinned = f.id|string in user_pinned %}
-
     <div class="library-list-row" onclick="selectLibraryItem('formatter', '{{ f.id }}')" draggable="true"
         ondragstart="dragLibraryItem(event, 'formatter', '{{ f.id }}')">
         <div class="col-cell primary">
@@ -325,12 +230,10 @@
                 onclick="event.stopPropagation(); toggleFavorite('{{ f.id }}');" title="Favorite">
                 <i class="{% if is_fav %}fa-solid{% else %}fa-regular{% endif %} fa-star"></i>
             </button>
-
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ f.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
             </button>
-
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
                 <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"
                     data-menu="#menu-fmt-{{ f.id }}">
@@ -367,15 +270,121 @@
             </div>
         </div>
     </div>
+    {% endmacro %}
+
+
+    <!-- Breadcrumbs (Shared) -->
+    {% if breadcrumbs %}
+    <div class="library-breadcrumbs"
+        style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: #5f6368;">
+        <div style="cursor: pointer; display: flex; align-items: center; padding: 4px 8px; border-radius: 4px;"
+            ondrop="dropOnFolder(event, null)" ondragover="allowDrop(event)" ondragenter="dragEnter(event)"
+            ondragleave="dragLeave(event)" onclick="setLibraryFolder(null)">
+            <span class="hover-underline">Library</span>
+        </div>
+        {% for crumb in breadcrumbs %}
+        <i class="fa-solid fa-chevron-right" style="font-size: 10px; color: #dadce0;"></i>
+        <div style="cursor: pointer; display: flex; align-items: center; padding: 4px 8px; border-radius: 4px;"
+            ondrop="dropOnFolder(event, '{{ crumb.uuid }}')" ondragover="allowDrop(event)"
+            ondragenter="dragEnter(event)" ondragleave="dragLeave(event)"
+            onclick="setLibraryFolder('{{ crumb.uuid }}')">
+            <span class="hover-underline">{{ crumb.name }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+
+
+    {% if is_explore %}
+    <!-- EXPLORE / MARKETPLACE VIEW -->
+    <div style="padding: 24px;">
+
+
+        {% if is_explore %}
+        <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">Featured Collections</div>
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 32px;">
+            <!-- Mock Featured Cards -->
+            <div class="library-card"
+                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div
+                    style="height:100px; background: color-mix(in srgb, var(--library-highlight) 12%, #ffffff); border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color: color-mix(in srgb, var(--library-highlight) 60%, #5f6368);">
+                    <i class="fa-solid fa-layer-group" style="font-size:32px;"></i>
+                </div>
+                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Team Standards</div>
+                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">Official workflows approved by your org.
+                </div>
+                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
+            </div>
+            <div class="library-card"
+                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                <div
+                    style="height:100px; background: var(--library-highlight-soft); border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color: var(--library-highlight);">
+                    <i class="fa-solid fa-star" style="font-size:32px;"></i>
+                </div>
+                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Golden Tasks</div>
+                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">High-accuracy extraction logic.</div>
+                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">All Verified Items</div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+
+    {% if not is_explore %}
+    <div class="library-list-header">
+        <div>Name</div>
+        <!-- Status col removed -->
+        <div>Last Used</div>
+        <div style="text-align:right;">Actions</div>
+    </div>
+
+    {% if use_mixed_alphabetical %}
+    {% for entry in mixed_items %}
+    {% if entry.kind == 'workflow' %}
+    {{ workflow_row(entry.obj) }}
+    {% elif entry.kind == 'searchset' %}
+    {{ searchset_row(entry.obj) }}
+    {% elif entry.kind == 'prompt' %}
+    {{ prompt_row(entry.obj) }}
+    {% elif entry.kind == 'formatter' %}
+    {{ formatter_row(entry.obj) }}
+    {% endif %}
+    {% endfor %}
+    {% else %}
+    {% if workflows %}
+    {% for wf in workflows %}
+    {{ workflow_row(wf) }}
+    {% endfor %}
+    {% endif %}
+
+    {% if extraction_sets %}
+    {% for s in extraction_sets %}
+    {{ searchset_row(s) }}
+    {% endfor %}
+    {% endif %}
+
+    {% if prompts %}
+    {% for p in prompts %}
+    {{ prompt_row(p) }}
+    {% endfor %}
+    {% endif %}
+
+    {% if formatters %}
+    {% for f in formatters %}
+    {{ formatter_row(f) }}
     {% endfor %}
     {% endif %}
 
     {% if not workflows and not extraction_sets and not prompts and not formatters %}
     <div style="padding: 40px; text-align: center; color: #888;">
         No items found.
-        {% if is_explore %}
-        <div style="margin-top:10px;">Try adjusting filters or submit a new workflow for verification.</div>
-        {% endif %}
     </div>
+    {% endif %}
+    {% endif %}
     {% endif %}
 </div>

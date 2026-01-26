@@ -7,8 +7,8 @@
     height: 100%;
     min-height: 0;
     background-color: #fff;
-    --library-highlight: var(--highlight-color, #1967d2);
-    --library-highlight-soft: color-mix(in srgb, var(--library-highlight) 15%, #ffffff);
+    --library-highlight: var(--highlight-color, #eab308);
+    --library-highlight-soft: color-mix(in srgb, var(--library-highlight) 18%, #ffffff);
     --library-highlight-muted: color-mix(in srgb, var(--library-highlight) 10%, #f8f9fa);
     overflow: hidden;
 }
@@ -23,20 +23,17 @@
     flex-shrink: 0;
     border-bottom: 1px solid #e0e0e0;
     background-color: #fff;
-    padding: 16px 24px 0 24px;
+    padding: 14px 24px 6px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
 
 .library-header-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-}
-
-.library-header-row + .library-header-row {
-    margin-top: 12px;
-}
-.title-row + .tabs-row {
-    margin-top: 6px;
+    gap: 16px;
 }
 
 .library-title {
@@ -49,41 +46,77 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
 }
 
 .library-header-actions .search-container {
-    min-width: 240px;
+    flex: 1;
+    min-width: 0;
+    max-width: 400px;
+}
+
+.library-new-btn {
+    flex-shrink: 0;
 }
 
 .tabs-row .scope-tabs {
     display: flex;
-    gap: 16px;
+    gap: 14px;
     flex-wrap: nowrap;
+    margin-top: 0;
 }
 
 .tabs-row .scope-tabs .scope-tab-btn {
     white-space: nowrap;
-    padding: 8px 12px;
+    padding: 0px 14px;
+    font-weight: 500;
+    font-size: 14px;
+    border-radius: 0;
+    line-height: 1.2;
+    min-height: 34px;
+    background: none;
+    color: #5f6368;
+    border: none;
+    border-bottom: 2px solid transparent;
 }
 
-.tabs-spacer {
-    flex: 1;
+.tabs-row .scope-tabs .scope-tab-btn:hover {
+    color: #202124;
+}
+
+.tabs-row .scope-tabs .scope-tab-btn.active {
+    color: var(--library-highlight);
+    border-bottom-color: var(--library-highlight);
+}
+
+.tabs-row {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    margin-bottom: 6px;
 }
 
 .controls-row {
-    padding-bottom: 8px;
+    width: 100%;
+    justify-content: space-between;
+    padding-bottom: 0;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 0;
 }
 
 .filter-chip-group {
     display: flex;
     gap: 10px;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .controls-sort {
     min-width: 200px;
     display: flex;
     justify-content: flex-end;
+    flex-shrink: 0;
 }
 
 .controls-sort select {
@@ -114,7 +147,7 @@
 .library-nav-item {
     display: flex;
     align-items: center;
-    padding: 6px 16px 6px 24px;
+    padding: 10px 16px 10px 24px;
     cursor: pointer;
     font-size: 14px;
     color: #4a4a4a;
@@ -160,10 +193,19 @@
 }
 
 .folder-hint {
-    font-size: 12px;
-    color: var(--library-highlight);
+    font-size: 13px;
+    color: #5f6368;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 500;
+    display: inline-block;
+    padding: 6px 0;
+    background: none;
+    border: none;
+    font-family: inherit;
+}
+
+.folder-hint:hover {
+    text-decoration: underline;
 }
 
 .filter-group-header {
@@ -244,33 +286,6 @@
 
 .library-details-pane.hidden {
     display: none;
-}
-
-/* Header Elements */
-.scope-tabs {
-    display: flex;
-    gap: 24px;
-    margin-top: 0;
-}
-
-.scope-tab-btn {
-    padding: 8px 0;
-    font-size: 14px;
-    font-weight: 500;
-    color: #5f6368;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-}
-
-.scope-tab-btn:hover {
-    color: #202124;
-}
-
-.scope-tab-btn.active {
-    color: var(--library-highlight);
-    border-bottom-color: var(--library-highlight);
 }
 
 /* Search Bar */
@@ -425,8 +440,8 @@
 
 .chip-tag {
     font-size: 11px;
-    color: #1967d2;
-    background: #e8f0fe;
+    color: var(--library-highlight);
+    background: color-mix(in srgb, var(--library-highlight) 12%, #ffffff);
     padding: 2px 6px;
     border-radius: 4px;
 }
@@ -538,7 +553,7 @@
 
 .hover-underline:hover {
     text-decoration: underline;
-    color: #1a73e8;
+    color: var(--library-highlight);
     /* Google blue */
 }
 
@@ -573,6 +588,9 @@
 
 /* Drag & Drop Visuals */
 .drag-over {
-    background-color: #e8f0fe !important;
-    border: 2px dashed #1a73e8 !important;
+    background-color: color-mix(in srgb, var(--library-highlight) 25%, #ffffff) !important;
+    border: 2px solid var(--library-highlight) !important;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--library-highlight) 25%, #ffffff);
+    transform: scale(1.02);
+    transition: all 0.1s;
 }
