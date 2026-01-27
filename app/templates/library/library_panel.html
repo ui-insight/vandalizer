@@ -44,10 +44,6 @@
                 <button class="scope-tab-btn {% if _scope=='team' %}active{% endif %}" data-scope="team">Team</button>
                 <button class="scope-tab-btn {% if _scope=='verified' %}active{% endif %}"
                     data-scope="verified">Explore</button>
-                {% if can_verify %}
-                <button class="scope-tab-btn {% if _scope=='verify' %}active{% endif %}"
-                    data-scope="verify">Verify</button>
-                {% endif %}
             </div>
         </div>
 
@@ -278,7 +274,7 @@
     function dragLibraryItem(ev, kind, uuid) {
         ev.dataTransfer.setData("application/json", JSON.stringify({ kind: kind, uuid: uuid }));
 
-// Custom Drag Image
+        // Custom Drag Image
         const dragIcon = document.createElement('div');
         dragIcon.style.padding = '8px 12px';
         dragIcon.style.background = '#333';
@@ -764,10 +760,11 @@
     function refreshResults() {
         if (LibraryState.scope === 'verify') {
             // Verification queue special handling
-            $.post('/library/verification/queue', JSON.stringify({}), function (res) {
-                $("#library-results").html(res.template);
-            });
-            return;
+            // We can use the same filter endpoint now that we updated it!
+            // Just fall through to normal logic, but we might want to hide filters?
+            // Actually, let's just let it fall through, the backend now returns the right template.
+            // BUT we might want to hide the "Sort" and "Type" filters if they are not relevant?
+            // For now, let's just use the common path.
         }
 
         $("#library-results").css('opacity', '0.5'); // visual feedback
@@ -890,6 +887,39 @@
                     submitBtn.prop("disabled", false).text("Submit for verification");
                 }
             });
+        });
+
+        // Verification Queue Actions (Delegate)
+        $("#library-results").on("click", ".verification-status-action", function () {
+            const btn = $(this);
+            const uuid = btn.data("request");
+            const status = btn.data("status");
+            const note = status === 'rejected' ? prompt("Reason for rejection (optional):") : null;
+
+            if (status === 'rejected' && note === null) return; // Cancelled
+
+            $.ajax({
+                url: '/library/verification/review',
+                method: 'POST',
+                data: JSON.stringify({
+                    request_uuid: uuid,
+                    status: status,
+                    note: note
+                }),
+                contentType: 'application/json',
+                success: function (res) {
+                    if (res.ok) refreshResults();
+                },
+                error: function (err) {
+                    alert("Failed to update status");
+                }
+            });
+        });
+
+        // Open Item Actions (Delegate)
+        $("#library-results").on("click", ".edit-workflow-button", function () {
+            const uuid = $(this).data("uuid");
+            window.open('/workflow/' + uuid, '_blank');
         });
 
     });

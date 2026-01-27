@@ -111,6 +111,12 @@ app.logger.info(f"Starting server in '{env}' environment → loading {config_cla
 app.config.from_object(config_class)
 app.config["RATELIMIT_ENABLED"] = False
 
+# Session cookie defaults for OAuth flows (can be overridden via env/config).
+app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+if env == "production":
+    app.config.setdefault("SESSION_COOKIE_SECURE", True)
+    app.config.setdefault("PREFERRED_URL_SCHEME", "https")
+
 
 Bootstrap(app)  # flask-bootstrap
 mail = Mail(app)
