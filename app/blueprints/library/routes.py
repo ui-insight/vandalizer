@@ -731,6 +731,52 @@ def _build_results_for_template(filters: dict) -> dict:
         candidates.sort(key=lambda entry: entry["key"])
         mixed_items = candidates
 
+    # --- Build verified items list with metadata (for VERIFIED scope) ---
+    verified_items_with_meta = []
+    if lib_scope == LibraryScope.VERIFIED and lib:
+        # Get all items from verified library
+        for li in list(lib.items):
+            try:
+                obj = li.obj
+            except DoesNotExist:
+                continue
+            
+            kind = li.kind
+            identifier = _verification_identifier(kind, obj)
+            if not identifier:
+                continue
+            
+            # Fetch metadata
+            meta = VerifiedItemMetadata.objects(
+                item_kind=kind, item_identifier=identifier
+            ).first()
+            
+            title = _object_title(kind, obj)
+            description = _object_description(kind, obj)
+            
+            verified_items_with_meta.append({
+                "obj": obj,
+                "kind": kind,
+                "identifier": identifier,
+                "title": meta.display_name if meta and meta.display_name else title,
+                "description": meta.description if meta and meta.description else description,
+                "markdown": meta.markdown if meta else "",
+                "category": _default_category_for_kind(kind),
+                "library_item_id": str(li.id),
+            })
+    
+    # --- Format collections with item counts ---
+    formatted_collections = []
+    for coll in collections:
+        formatted_collections.append({
+            "id": str(coll.id),
+            "title": coll.title,
+            "description": coll.description or "",
+            "promo_image_url": coll.promo_image_url or "",
+            "item_count": len(coll.items) if coll.items else 0,
+            "updated_at": coll.updated_at,
+        })
+
     context = {
         "workflows": workflows,
         "extraction_sets": extraction_sets,
@@ -738,7 +784,8 @@ def _build_results_for_template(filters: dict) -> dict:
         "formatters": formatters,
         "mixed_items": mixed_items,
         "verification_requests": verification_payloads,
-        "collections": collections,
+        "collections": formatted_collections,
+        "verified_items": verified_items_with_meta,
         "filters": {
             "type": item_type,
             "kinds": kinds,
@@ -761,6 +808,7 @@ def _build_results_for_template(filters: dict) -> dict:
     }
 
     return context
+
 
 
 @library.route("/manage_verified")
@@ -937,6 +985,163 @@ def remove_verified_collection_item(collection_id: str):
         collection.save()
 
     return jsonify({"ok": True})
+
+
+# -----------------------------
+# Verified Catalog Exploration Routes
+# -----------------------------
+@library.route("/collection/<collection_id>", methods=["GET"])
+@login_required
+def get_collection_details(collection_id):
+    """Fetch detailed information about a specific collection."""
+    try:
+        collection = VerifiedCollection.objects(id=collection_id).first()
+        if not collection:
+            return jsonify({"error": "Collection not found"}), 404
+        
+        # Build list of items in this collection
+        items_data = []
+        for li in collection.items:
+            try:
+                obj = li.obj
+            except DoesNotExist:
+                continue
+            
+            kind = li.kind
+            identifier = _verification_identifier(kind, obj)
+            if not identifier:
+                continue
+            
+            # Fetch metadata
+            meta = VerifiedItemMetadata.objects(
+                item_kind=kind, item_identifier=identifier
+            ).first()
+            
+            title = _object_title(kind, obj)
+            description = _object_description(kind, obj)
+            
+            items_data.append({
+                "kind": kind,
+                "identifier": identifier,
+                "title": meta.display_name if meta and meta.display_name else title,
+                "description": meta.description if meta and meta.description else description,
+                "category": _default_category_for_kind(kind),
+                "library_item_id": str(li.id),
+            })
+        
+        return jsonify({
+            "ok": True,
+            "collection": {
+                "id": str(collection.id),
+                "title": collection.title,
+                "description": collection.description or "",
+                "promo_image_url": collection.promo_image_url or "",
+                "items": items_data,
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@library.route("/verified_item/metadata", methods=["POST"])
+@login_required
+def get_verified_item_metadata():
+    """Fetch metadata for a verified item."""
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    
+    if not kind or not identifier:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Fetch the actual object to get basic info
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj:
+        return jsonify({"error": "Item not found"}), 404
+    
+    # Fetch metadata if available
+    meta = VerifiedItemMetadata.objects(
+        item_kind=normalized_kind, item_identifier=identifier
+    ).first()
+    
+    # Fetch verification request if available
+    verification_req = VerificationRequest.objects(
+        item_kind=normalized_kind, item_identifier=identifier
+    ).first()
+    
+    title = _object_title(normalized_kind, obj)
+    description = _object_description(normalized_kind, obj)
+    
+    result = {
+        "kind": normalized_kind,
+        "identifier": identifier,
+        "title": meta.display_name if meta and meta.display_name else title,
+        "description": meta.description if meta and meta.description else description,
+        "markdown": meta.markdown if meta else "",
+        "category": _default_category_for_kind(normalized_kind),
+    }
+    
+    # Add verification request data if available
+    if verification_req:
+        result.update({
+            "example_inputs": verification_req.example_inputs or [],
+            "expected_outputs": verification_req.expected_outputs or [],
+            "dependencies": verification_req.dependencies or [],
+            "run_instructions": verification_req.run_instructions or "",
+            "known_limitations": verification_req.known_limitations or "",
+        })
+    
+    return jsonify({"ok": True, "metadata": result})
+
+
+@library.route("/verified_item/add_to_library", methods=["POST"])
+@login_required
+def add_verified_item_to_library():
+    """Add a verified item to the user's personal or team library."""
+    user = load_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    scope_str = (data.get("scope") or "personal").strip().lower()
+    
+    if not kind or not identifier:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Resolve the object
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj:
+        return jsonify({"error": "Item not found"}), 404
+    
+    # Determine target library
+    if scope_str in ("personal", "mine"):
+        target_lib = get_or_create_personal_library(user.user_id)
+    elif scope_str == "team":
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "No active team"}), 400
+        target_lib = get_or_create_team_library(team)
+    else:
+        return jsonify({"error": "Invalid scope"}), 400
+    
+    # Check if already in library
+    existing = LibraryItem.objects(obj=obj, kind=normalized_kind).first()
+    if existing and existing in target_lib.items:
+        return jsonify({"ok": True, "message": "Item already in library", "added": False})
+    
+    # Add to library
+    try:
+        add_object_to_library(
+            obj,
+            normalized_kind,
+            user.user_id,
+            target_lib
+        )
+        return jsonify({"ok": True, "message": "Item added to library", "added": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------

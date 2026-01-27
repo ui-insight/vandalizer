@@ -153,6 +153,40 @@
             </div>
         </div>
     </div>
+
+    <!-- Metadata Modal -->
+    <div id="metadata-modal" class="modal" hidden>
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3 id="metadata-modal-title">Item Details</h3>
+                <button class="modal-close" onclick="$('#metadata-modal').hide()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom:16px;">
+                    <strong>Category:</strong> <span id="metadata-modal-category"></span>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong>Description:</strong>
+                    <p id="metadata-modal-description" style="color:#5f6368; margin-top:4px;"></p>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong>Documentation:</strong>
+                    <div id="metadata-modal-markdown" style="margin-top:4px; max-height:300px; overflow-y:auto;"></div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong>Example Inputs:</strong>
+                    <div id="metadata-modal-examples" style="margin-top:4px;"></div>
+                </div>
+                <div style="margin-bottom:16px;">
+                    <strong>Dependencies:</strong>
+                    <div id="metadata-modal-dependencies" style="margin-top:4px;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="$('#metadata-modal').hide()">Close</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -817,6 +851,174 @@
         });
     }
     window.refreshResults = refreshResults; // Expose
+
+    // --- Verified Catalog Functions ---
+    function viewCollectionDetails(collectionId) {
+        // Fetch and display collection details
+        $.ajax({
+            url: '/library/collection/' + collectionId,
+            method: 'GET',
+            success: function (res) {
+                if (res.ok && res.collection) {
+                    // Build HTML for collection view
+                    const coll = res.collection;
+                    let html = `
+                            <div style="padding: 24px;">
+                                <div style="margin-bottom:16px;">
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshResults()">
+                                        <i class="fa-solid fa-arrow-left"></i> Back to Explore
+                                    </button>
+                                </div>
+                                <h2 style="margin-bottom:8px;">${coll.title}</h2>
+                                <p style="color:#5f6368; margin-bottom:24px;">${coll.description || ''}</p>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+                        `;
+
+                    coll.items.forEach((item, idx) => {
+                        html += `
+                                <div class="library-card verified-item-card" style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom:8px;">
+                                        <div style="font-weight:600; font-size:15px; flex:1;">${item.title}</div>
+                                        <span class="chip-tag" style="background: #e8f0fe; color: #1967d2; font-size:10px; padding:2px 6px;">${item.category}</span>
+                                    </div>
+                                    <div style="font-size:13px; color:#5f6368; margin-bottom:12px; min-height: 40px;">${item.description || 'No description available.'}</div>
+                                    <div style="display: flex; gap:8px;">
+                                        <button class="btn btn-sm btn-primary" style="flex:1;" onclick="runVerifiedItem('${item.kind}', '${item.identifier}')">
+                                            <i class="fa-solid fa-play"></i> Run
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="addVerifiedItemToLibrary('${item.kind}', '${item.identifier}', 'personal')">
+                                            <i class="fa-solid fa-plus"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="viewItemMetadata('${item.kind}', '${item.identifier}')">
+                                            <i class="fa-solid fa-info-circle"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                    });
+
+                    html += '</div></div>';
+                    $('#library-results').html(html);
+                }
+            },
+            error: function (err) {
+                console.error('Error fetching collection:', err);
+                alert('Failed to load collection details');
+            }
+        });
+    }
+    window.viewCollectionDetails = viewCollectionDetails;
+
+    function viewItemMetadata(kind, identifier) {
+        // Fetch metadata and show in modal
+        $.ajax({
+            url: '/library/verified_item/metadata',
+            method: 'POST',
+            data: JSON.stringify({ kind: kind, identifier: identifier }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok && res.metadata) {
+                    const meta = res.metadata;
+                    $('#metadata-modal-title').text(meta.title);
+                    $('#metadata-modal-category').text(meta.category);
+                    $('#metadata-modal-description').text(meta.description || 'No description available.');
+
+                    // Markdown documentation
+                    if (meta.markdown) {
+                        $('#metadata-modal-markdown').html('<pre style="white-space: pre-wrap; background: #f5f5f5; padding: 12px; border-radius: 4px;">' + $('<div>').text(meta.markdown).html() + '</pre>');
+                    } else {
+                        $('#metadata-modal-markdown').html('<p style="color:#888;">No documentation available.</p>');
+                    }
+
+                    // Example inputs
+                    if (meta.example_inputs && meta.example_inputs.length > 0) {
+                        let html = '<ul>';
+                        meta.example_inputs.forEach(input => {
+                            html += '<li>' + $('<div>').text(input).html() + '</li>';
+                        });
+                        html += '</ul>';
+                        $('#metadata-modal-examples').html(html);
+                    } else {
+                        $('#metadata-modal-examples').html('<p style="color:#888;">No examples provided.</p>');
+                    }
+
+                    // Dependencies
+                    if (meta.dependencies && meta.dependencies.length > 0) {
+                        let html = '<ul>';
+                        meta.dependencies.forEach(dep => {
+                            html += '<li>' + $('<div>').text(dep).html() + '</li>';
+                        });
+                        html += '</ul>';
+                        $('#metadata-modal-dependencies').html(html);
+                    } else {
+                        $('#metadata-modal-dependencies').html('<p style="color:#888;">No dependencies.</p>');
+                    }
+
+                    $('#metadata-modal').show();
+                }
+            },
+            error: function (err) {
+                console.error('Error fetching metadata:', err);
+                alert('Failed to load item details');
+            }
+        });
+    }
+    window.viewItemMetadata = viewItemMetadata;
+
+    function addVerifiedItemToLibrary(kind, identifier, scope) {
+        $.ajax({
+            url: '/library/verified_item/add_to_library',
+            method: 'POST',
+            data: JSON.stringify({ kind: kind, identifier: identifier, scope: scope }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    if (res.added) {
+                        alert(res.message || 'Item added to library');
+                    } else {
+                        alert(res.message || 'Item already in library');
+                    }
+                } else {
+                    alert('Failed to add item: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function (err) {
+                console.error('Error adding to library:', err);
+                alert('Failed to add item to library');
+            }
+        });
+    }
+    window.addVerifiedItemToLibrary = addVerifiedItemToLibrary;
+
+    function runVerifiedItem(kind, identifier) {
+        // Route to appropriate execution context
+        if (kind === 'workflow') {
+            // Workflows use the id as identifier
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(identifier);
+            } else {
+                console.error('fetchWorkflow not defined');
+            }
+        } else if (kind === 'searchset') {
+            // SearchSets use uuid
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(identifier);
+            } else {
+                console.error('openSearchSet not defined');
+            }
+        } else if (kind === 'prompt' || kind === 'formatter') {
+            // Run in assistant
+            if (typeof runPromptInAssistant === 'function') {
+                if (typeof setSection === 'function') {
+                    setSection('Assistant');
+                }
+                runPromptInAssistant(identifier, '');
+            } else {
+                console.error('runPromptInAssistant not defined');
+            }
+        }
+    }
+    window.runVerifiedItem = runVerifiedItem;
 
     // Init Logic
     $(document).ready(function () {

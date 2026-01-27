@@ -300,39 +300,99 @@
     <!-- EXPLORE / MARKETPLACE VIEW -->
     <div style="padding: 24px;">
 
-
-        {% if is_explore %}
+        <!-- Featured Collections -->
+        {% if collections %}
         <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">Featured Collections</div>
         <div
             style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-bottom: 32px;">
-            <!-- Mock Featured Cards -->
-            <div class="library-card"
-                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+            {% for coll in collections %}
+            <div class="library-card collection-card" data-collection-id="{{ coll.id }}"
+                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05); cursor: pointer; transition: all 0.2s;"
+                onclick="viewCollectionDetails('{{ coll.id }}')">
+                {% if coll.promo_image_url %}
+                <div
+                    style="height:100px; background-image: url('{{ coll.promo_image_url }}'); background-size: cover; background-position: center; border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px;">
+                </div>
+                {% else %}
                 <div
                     style="height:100px; background: color-mix(in srgb, var(--library-highlight) 12%, #ffffff); border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color: color-mix(in srgb, var(--library-highlight) 60%, #5f6368);">
                     <i class="fa-solid fa-layer-group" style="font-size:32px;"></i>
                 </div>
-                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Team Standards</div>
-                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">Official workflows approved by your org.
-                </div>
-                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
-            </div>
-            <div class="library-card"
-                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                {% endif %}
+                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">{{ coll.title }}</div>
                 <div
-                    style="height:100px; background: var(--library-highlight-soft); border-radius:4px 4px 0 0; margin:-16px -16px 12px -16px; display:flex; align-items:center; justify-content:center; color: var(--library-highlight);">
-                    <i class="fa-solid fa-star" style="font-size:32px;"></i>
+                    style="font-size:13px; color:#5f6368; margin-bottom:12px; min-height: 38px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    {{ coll.description or "A curated collection of verified items." }}
                 </div>
-                <div style="font-weight:600; font-size:15px; margin-bottom:4px;">Golden Tasks</div>
-                <div style="font-size:13px; color:#5f6368; margin-bottom:12px;">High-accuracy extraction logic.</div>
-                <button class="btn btn-sm btn-outline-primary" style="width:100%;">Browse Collection</button>
+                <div style="font-size:12px; color:#888; margin-bottom:12px;">
+                    <i class="fa-solid fa-cube" style="margin-right:4px;"></i>{{ coll.item_count }} item{{ 's' if
+                    coll.item_count != 1 else '' }}
+                </div>
+                <button class="btn btn-sm btn-outline-primary" style="width:100%;"
+                    onclick="event.stopPropagation(); viewCollectionDetails('{{ coll.id }}')">
+                    Browse Collection
+                </button>
             </div>
+            {% endfor %}
         </div>
+        {% endif %}
 
+        <!-- All Verified Items -->
         <div style="margin-bottom: 20px; font-size: 18px; font-weight: 600;">All Verified Items</div>
-    </div>
-    {% endif %}
 
+        <!-- Verified Items List -->
+        {% if verified_items %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
+            {% for item in verified_items %}
+            <div class="library-card verified-item-card"
+                style="background:#fff; border:1px solid #e0e0e0; box-shadow:0 1px 3px rgba(0,0,0,0.05); position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom:8px;">
+                    <div style="font-weight:600; font-size:15px; flex:1; margin-right:8px;">{{ item.title }}</div>
+                    <span class="chip-tag"
+                        style="background: #e8f0fe; color: #1967d2; font-size:10px; padding:2px 6px; white-space: nowrap;">
+                        {{ item.category }}
+                    </span>
+                </div>
+                <div
+                    style="font-size:13px; color:#5f6368; margin-bottom:12px; min-height: 40px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                    {{ item.description or "No description available." }}
+                </div>
+                <div style="display: flex; gap:8px; margin-top:auto;">
+                    <button class="btn btn-sm btn-primary" style="flex:1;"
+                        onclick="runVerifiedItem('{{ item.kind }}', '{{ item.identifier }}')">
+                        <i class="fa-solid fa-play" style="margin-right:4px;"></i>Run
+                    </button>
+                    <div class="menu-anchor" style="position:relative;">
+                        <button class="btn btn-sm btn-outline-secondary" type="button" aria-haspopup="true"
+                            aria-expanded="false" data-menu="#verified-menu-{{ loop.index }}">
+                            <i class="fa-solid fa-ellipsis"></i>
+                        </button>
+                        <div id="verified-menu-{{ loop.index }}" class="menu menu-right" role="menu" hidden>
+                            <a class="menu-item" href="#"
+                                onclick="addVerifiedItemToLibrary('{{ item.kind }}', '{{ item.identifier }}', 'personal')">
+                                <i class="fa-solid fa-user" style="width:20px;"></i> Add to My Library
+                            </a>
+                            <a class="menu-item" href="#"
+                                onclick="addVerifiedItemToLibrary('{{ item.kind }}', '{{ item.identifier }}', 'team')">
+                                <i class="fa-solid fa-users" style="width:20px;"></i> Add to Team Library
+                            </a>
+                            <hr class="menu-divider">
+                            <a class="menu-item" href="#"
+                                onclick="viewItemMetadata('{{ item.kind }}', '{{ item.identifier }}')">
+                                <i class="fa-solid fa-info-circle" style="width:20px;"></i> View Details
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div style="padding: 40px; text-align: center; color: #888;">
+            No verified items available yet.
+        </div>
+        {% endif %}
+    </div>
     {% endif %}
 
     {% if not is_explore %}
