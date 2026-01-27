@@ -46,6 +46,10 @@ class UserModelConfig(me.Document):
     top_p = me.FloatField(default=0.9)
     available_models = me.ListField(me.DictField(), required=False, default=[])
 
+    # Library Preferences
+    pinned_items = me.ListField(me.StringField(), default=[])
+    favorite_items = me.ListField(me.StringField(), default=[])
+
 
 class SystemConfig(me.Document):
     """System-wide configuration model. Only accessible to system administrators."""
@@ -966,6 +970,32 @@ class LibraryScope(Enum):
     VERIFIED = "verified"  # global verified catalog
 
 
+class LibraryFolder(me.Document):
+    """
+    Represents a folder within the library (personal or team).
+    """
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    parent_id = me.StringField(default=None, required=False, max_length=200)  # uuid of parent folder or None for root
+
+    scope = me.EnumField(LibraryScope, required=True)
+    
+    # Ownership (matches Library)
+    owner_user_id = me.StringField(required=False, max_length=200)
+    team = me.ReferenceField(Team, required=False, reverse_delete_rule=me.CASCADE)
+
+    created_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    meta = {
+        "indexes": [
+            {"fields": ["scope", "owner_user_id", "parent_id", "name"]},
+            {"fields": ["scope", "team", "parent_id", "name"]},
+        ]
+    }
+
+
 class LibraryItem(me.Document):
     """
     A pointer to either a Workflow or a SearchSet, with provenance and optional verification stamp.
@@ -990,6 +1020,9 @@ class LibraryItem(me.Document):
     # Optional tags/notes to help curate libraries
     tags = me.ListField(me.StringField(max_length=100), default=[])
     note = me.StringField(required=False, max_length=2000)
+    
+    # Folder organization
+    folder = me.ReferenceField("LibraryFolder", required=False, reverse_delete_rule=me.NULLIFY)
 
     meta = {
         "indexes": [
@@ -1176,6 +1209,59 @@ class VerificationRequest(me.Document):
             else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
+
+
+class VerifiedItemMetadata(me.Document):
+    """Curated metadata for verified library items."""
+
+    item_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    item_identifier = me.StringField(required=True, max_length=200)
+    display_name = me.StringField(required=False, max_length=300)
+    description = me.StringField(required=False, max_length=5000)
+    markdown = me.StringField(required=False, max_length=20000)
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "indexes": [
+            {"fields": ["item_kind", "item_identifier"], "unique": True},
+        ]
+    }
+
+    def save(self, *args, **kwargs):
+        self.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        return super().save(*args, **kwargs)
+
+
+class VerifiedCollection(me.Document):
+    """Curated collection of verified items."""
+
+    title = me.StringField(required=True, max_length=200)
+    description = me.StringField(required=False, max_length=2000)
+    promo_image_url = me.StringField(required=False, max_length=500)
+    items = me.ListField(
+        me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL), default=[]
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    meta = {"ordering": ["-updated_at"]}
+
+    def save(self, *args, **kwargs):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if not self.created_at:
+            self.created_at = now
+        self.updated_at = now
+        return super().save(*args, **kwargs)
 
 
 # ---- Edit History ----

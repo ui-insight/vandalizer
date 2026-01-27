@@ -7,6 +7,8 @@ import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
 
+from typing import Any
+
 from flask import Blueprint, jsonify, render_template, request, url_for
 from flask_login import login_required
 from mongoengine.errors import DoesNotExist
@@ -16,6 +18,7 @@ from app import load_user, mail
 from app.utilities.security import validate_json_request
 from app.models import (  # adjust import path if needed
     Library,
+    LibraryFolder,
     LibraryItem,
     LibraryScope,
     SearchSet,
@@ -23,13 +26,19 @@ from app.models import (  # adjust import path if needed
     Team,
     TeamMembership,
     User,
+    VerifiedCollection,
+    VerifiedItemMetadata,
     VerificationRequest,
     VerificationStatus,
     Workflow,
     WorkflowAttachment,
     WorkflowStep,
     WorkflowStepTask,
+    UserModelConfig,
+    ActivityEvent,
+    ActivityType,
 )
+from mongoengine import Q
 from app.utilities.library_helpers import (
     add_object_to_library,
     get_or_create_personal_library,
@@ -119,6 +128,16 @@ def _object_title(kind: str, obj) -> str:
     if kind == "workflow":
         return getattr(obj, "name", "") or getattr(obj, "title", "")
     return getattr(obj, "title", "") or getattr(obj, "name", "")
+
+
+def _object_description(kind: str, obj) -> str:
+    if not obj:
+        return ""
+    if kind == "workflow":
+        return getattr(obj, "description", "") or ""
+    if kind in {"prompt", "formatter"}:
+        return getattr(obj, "searchphrase", "") or ""
+    return ""
 
 
 def _default_version_hash(obj) -> str:
@@ -385,9 +404,68 @@ def _build_results_for_template(filters: dict) -> dict:
     team = _current_team_for_user(user)
     lib_scope = _resolve_scope(scope_in)
     lib = _get_or_none_library(lib_scope, user=user, team=team)
+    collections = []
+    if lib_scope == LibraryScope.VERIFIED:
+        collections = list(VerifiedCollection.objects().order_by("-updated_at"))
 
     # If there is no library yet, present empty lists gracefully
-    lib_items: list[LibraryItem] = list(lib.items) if lib else []
+    # We filter lib_items by folder if applicable
+    target_folder_id = filters.get("folderId")
+    if target_folder_id == "0":
+         target_folder_id = None
+         
+    # Fetch Folders (subfolders)
+    # We need to find folders in this scope that have the given parent_id
+    folders = []
+    if lib_scope == LibraryScope.PERSONAL and user:
+        folders = list(LibraryFolder.objects(scope=LibraryScope.PERSONAL, owner_user_id=user.user_id, parent_id=target_folder_id).order_by("name"))
+    elif lib_scope == LibraryScope.TEAM and team:
+        folders = list(LibraryFolder.objects(scope=LibraryScope.TEAM, team=team, parent_id=target_folder_id).order_by("name"))
+        
+    # Get Breadcrumbs
+    breadcrumbs = []
+    current_folder = None
+    if target_folder_id:
+        current_folder = LibraryFolder.objects(uuid=target_folder_id).first()
+        # Build chain (naive recursive/iterative up)
+        curr = current_folder
+        while curr:
+            breadcrumbs.insert(0, {"name": curr.name, "uuid": curr.uuid})
+            if curr.parent_id:
+                curr = LibraryFolder.objects(uuid=curr.parent_id).first()
+            else:
+                curr = None
+    
+    # Filter items by folder
+    # Note: lib.items is a list of references. iterating and dereferencing is expensive if list is huge.
+    # But for now we stick to the pattern.
+    raw_items = list(lib.items) if lib else []
+    lib_items: list[LibraryItem] = []
+    
+    for li in raw_items:
+        # Check folder match
+        # li.folder is a ReferenceField. 
+        # access checks DB? MongoEngine caches?
+        # If li.folder is None, it means root.
+        # We need to compare UUIDs safely.
+        
+        li_folder_id = None
+        if li.folder:
+             li_folder_id = li.folder.uuid # Assuming we resolve it or it has uuid field
+             
+        if str(li_folder_id or "") == str(target_folder_id or ""):
+             lib_items.append(li)
+             
+    # If using search (query), we might want to ignore folders and show all matching items?
+    # Usually search transcends folders.
+    if query:
+        # If searching, reset lib_items to ALL items matching query, ignore folder structure?
+        # Or search within folder? 
+        # Standard UX: Search is global or global-context.
+        # Let's search ALL items in library if query exists.
+        lib_items = raw_items 
+        folders = [] # Hide folders in search mode? Or filter folders?
+
 
     # Determine which categories we need to collect & cap counts to avoid massive payloads
     needs_workflows = item_type in ("workflows", "all")
@@ -395,6 +473,31 @@ def _build_results_for_template(filters: dict) -> dict:
     wants_extract = needs_tasks and (not kinds or "extract" in kinds)
     wants_prompt = needs_tasks and (not kinds or "prompt" in kinds)
     wants_formatter = needs_tasks and (not kinds or "format" in kinds)
+
+    # --- View-based ID collection ---
+    view = filters.get("view") or "all"
+    target_ids = set()
+    
+    user_config = UserModelConfig.objects(user_id=user.user_id).first() if user else None
+    
+    if view == "pinned" and user_config:
+        target_ids = set(user_config.pinned_items)
+    elif view == "favorites" and user_config:
+        target_ids = set(user_config.favorite_items)
+    elif view == "recents" and user:
+        # Fetch recent activity for this user
+        activities = ActivityEvent.objects(
+            user_id=user.user_id, 
+            type__in=[ActivityType.WORKFLOW_RUN.value, ActivityType.SEARCH_SET_RUN.value]
+        ).order_by("-started_at").limit(50)
+        
+        # Extract object IDs
+        for act in activities:
+            if act.workflow:
+                target_ids.add(str(act.workflow.id))
+            elif act.search_set_uuid:
+                target_ids.add(act.search_set_uuid)
+    
 
     needs_map = {
         "workflow": needs_workflows,
@@ -428,11 +531,37 @@ def _build_results_for_template(filters: dict) -> dict:
 
         if not needs_map.get(li.kind, False):
             continue
+        
+        # --- View Filtering ---
+        identifier = _verification_identifier(li.kind, obj)
+        
+        if view in ("pinned", "favorites", "recents"):
+            if identifier not in target_ids:
+                continue
+        elif view == "created_by_me":
+            if li.added_by_user_id != (user.user_id if user else ""):
+                continue
+        elif view == "shared_with_me":
+             if li.added_by_user_id == (user.user_id if user else ""):
+                continue
+        elif view == "drafts":
+             # Check verification status (naive check: unverified)
+             if getattr(obj, "verified", False):
+                 continue
+
         if gathered[li.kind] >= limits.get(li.kind, 0):
             # Already have enough of this type
             continue
 
-        identifier = _verification_identifier(li.kind, obj)
+        # Attach tags from LibraryItem to the object for template rendering
+        if hasattr(obj, "tags") and not obj.tags:
+             # If mapping exists but empty, or overwrite? 
+             # LibraryItem tags are the "organization" tags. 
+             # Let's overwrite or transparently set.
+             obj.tags = li.tags
+        elif not hasattr(obj, "tags"):
+             obj.tags = li.tags
+
         if identifier:
             verification_keys[f"{li.kind}:{identifier}"] = (li.kind, identifier)
 
@@ -520,34 +649,499 @@ def _build_results_for_template(filters: dict) -> dict:
         if formatters:
             formatters = [s for s in formatters if query in (s.title or "").lower()]
 
-    # --- Sort (optional niceties)
-    workflows.sort(
-        key=lambda w: (w.verified is False, (w.updated_at or w.created_at)),
-        reverse=True,
-    )
-    extraction_sets.sort(
-        key=lambda s: (s.verified is False, (s.created_at)), reverse=True
-    )
+    # --- Populate Last Run Map (Before sort) ---
+    # optimization: only query for items in the final lists (pre-sort, or post-filter?)
+    # We need it for sorting if sort='recent'. 
+    # But visible_wf_ids depends on the list being filtered (which it is, above).
+    
+    visible_wf_ids = [str(w.id) for w in workflows]
+    visible_ss_uuids = [s.uuid for s in extraction_sets]
+    
+    last_run_map = {}
 
-    # Assemble context for template
+    if visible_wf_ids or visible_ss_uuids:
+        # Re-using the logic from 'recents' view but broader
+        recent_acts = ActivityEvent.objects(
+            Q(user_id=user.user_id) if user else Q(id__exists=False), 
+            type__in=[ActivityType.WORKFLOW_RUN.value, ActivityType.SEARCH_SET_RUN.value]
+        ).order_by("-started_at").limit(200).only("started_at", "workflow", "search_set_uuid")
+        
+        for act in recent_acts:
+            if act.workflow:
+                w_id = str(act.workflow.id)
+                if w_id not in last_run_map and w_id in visible_wf_ids:
+                    last_run_map[w_id] = act.started_at
+            if act.search_set_uuid:
+                s_id = act.search_set_uuid
+                if s_id not in last_run_map and s_id in visible_ss_uuids:
+                    last_run_map[s_id] = act.started_at
+
+    # --- Sort
+    sort_mode = filters.get("sort") or "updated"
+    
+    # Helpers for sorting
+    def _sort_key_workflow(w):
+        val = None
+        if sort_mode == "recent":
+            val = last_run_map.get(str(w.id)) or datetime.min.replace(tzinfo=timezone.utc)
+            return val
+        elif sort_mode == "az":
+            return (w.name or "").lower()
+        else: # updated
+            return w.updated_at or w.created_at or datetime.min.replace(tzinfo=timezone.utc)
+
+    def _sort_key_searchset(s):
+        val = None
+        if sort_mode == "recent":
+            val = last_run_map.get(s.uuid) or datetime.min.replace(tzinfo=timezone.utc)
+            return val
+        elif sort_mode == "az":
+            return (s.title or "").lower()
+        else:
+            return s.updated_at or s.created_at or datetime.min.replace(tzinfo=timezone.utc)
+
+    reverse_sort = True
+    if sort_mode == "az":
+        reverse_sort = False
+
+    workflows.sort(key=_sort_key_workflow, reverse=reverse_sort)
+    extraction_sets.sort(key=_sort_key_searchset, reverse=reverse_sort)
+    prompts.sort(key=lambda p: (p.title or "").lower(), reverse=(sort_mode!="az"))
+    
+    # Context
+    mixed_items: list[dict[str, Any]] | None = None
+    if sort_mode == "az" and item_type == "all":
+        def _normalize(entry_kind: str, entry_obj) -> str:
+            if entry_kind == "workflow":
+                return (entry_obj.name or "").lower()
+            if entry_kind == "searchset":
+                return (entry_obj.title or "").lower()
+            return (entry_obj.title or "").lower()
+
+        candidates: list[dict[str, Any]] = []
+        for wf in workflows:
+            candidates.append({"kind": "workflow", "obj": wf, "key": _normalize("workflow", wf)})
+        for ss in extraction_sets:
+            candidates.append({"kind": "searchset", "obj": ss, "key": _normalize("searchset", ss)})
+        for p in prompts:
+            candidates.append({"kind": "prompt", "obj": p, "key": _normalize("prompt", p)})
+        for f in formatters:
+            candidates.append({"kind": "formatter", "obj": f, "key": _normalize("formatter", f)})
+
+        candidates.sort(key=lambda entry: entry["key"])
+        mixed_items = candidates
+
+    # --- Build verified items list with metadata (for VERIFIED scope) ---
+    verified_items_with_meta = []
+    if lib_scope == LibraryScope.VERIFIED and lib:
+        # Get all items from verified library
+        for li in list(lib.items):
+            try:
+                obj = li.obj
+            except DoesNotExist:
+                continue
+            
+            kind = li.kind
+            identifier = _verification_identifier(kind, obj)
+            if not identifier:
+                continue
+            
+            # Fetch metadata
+            meta = VerifiedItemMetadata.objects(
+                item_kind=kind, item_identifier=identifier
+            ).first()
+            
+            title = _object_title(kind, obj)
+            description = _object_description(kind, obj)
+            
+            verified_items_with_meta.append({
+                "obj": obj,
+                "kind": kind,
+                "identifier": identifier,
+                "title": meta.display_name if meta and meta.display_name else title,
+                "description": meta.description if meta and meta.description else description,
+                "markdown": meta.markdown if meta else "",
+                "category": _default_category_for_kind(kind),
+                "library_item_id": str(li.id),
+            })
+    
+    # --- Format collections with item counts ---
+    formatted_collections = []
+    for coll in collections:
+        formatted_collections.append({
+            "id": str(coll.id),
+            "title": coll.title,
+            "description": coll.description or "",
+            "promo_image_url": coll.promo_image_url or "",
+            "item_count": len(coll.items) if coll.items else 0,
+            "updated_at": coll.updated_at,
+        })
+
     context = {
         "workflows": workflows,
         "extraction_sets": extraction_sets,
         "prompts": prompts,
         "formatters": formatters,
+        "mixed_items": mixed_items,
         "verification_requests": verification_payloads,
+        "collections": formatted_collections,
+        "verified_items": verified_items_with_meta,
         "filters": {
             "type": item_type,
             "kinds": kinds,
             "q": query,
+            "view": view,
+            "sort": sort_mode,
+            "displayMode": filters.get("displayMode", "list")
         },
         # expose simple scope used in badges in your _results.html
         "scope": "team"
         if lib_scope == LibraryScope.TEAM
         else ("mine" if lib_scope == LibraryScope.PERSONAL else "verified"),
+        "user_pinned": user_config.pinned_items if user_config else [],
+        "user_favorites": user_config.favorite_items if user_config else [],
         "can_edit_verified": can_edit_verified,
+        "last_run_map": last_run_map,
+        "folders": folders,
+        "breadcrumbs": breadcrumbs,
+        "current_folder_id": target_folder_id,
     }
+
     return context
+
+
+
+@library.route("/manage_verified")
+@login_required
+def manage_verified():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    verified_lib = get_or_create_verified_library()
+    library_items = list(verified_lib.items) if verified_lib else []
+    verified_items = []
+    item_lookup = {}
+
+    for li in library_items:
+        obj = li.obj
+        kind = li.kind
+        identifier = _verification_identifier(kind, obj)
+        if not identifier:
+            continue
+        meta = VerifiedItemMetadata.objects(
+            item_kind=kind, item_identifier=identifier
+        ).first()
+        title = _object_title(kind, obj)
+        description = _object_description(kind, obj)
+        payload = {
+            "library_item_id": str(li.id),
+            "kind": kind,
+            "identifier": identifier,
+            "title": title,
+            "description": description,
+            "display_name": meta.display_name if meta else "",
+            "meta_description": meta.description if meta else "",
+            "markdown": meta.markdown if meta else "",
+        }
+        verified_items.append(payload)
+        item_lookup[str(li.id)] = {
+            "title": title,
+            "kind": kind,
+        }
+
+    collections = list(VerifiedCollection.objects().order_by("-updated_at"))
+    verification_queue = _build_verification_queue()
+
+    return render_template(
+        "library/manage_verified.html",
+        verified_items=verified_items,
+        collections=collections,
+        item_lookup=item_lookup,
+        verification_queue=verification_queue,
+    )
+
+
+@library.route("/verified/item/update", methods=["POST"])
+@login_required
+def update_verified_item_metadata():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    if not kind or not identifier:
+        return jsonify({"error": "missing required fields"}), 400
+
+    meta = VerifiedItemMetadata.objects(
+        item_kind=kind, item_identifier=identifier
+    ).first()
+    if not meta:
+        meta = VerifiedItemMetadata(item_kind=kind, item_identifier=identifier)
+
+    meta.display_name = (data.get("display_name") or "").strip()
+    meta.description = (data.get("description") or "").strip()
+    meta.markdown = (data.get("markdown") or "").strip()
+    meta.updated_by_user_id = user.user_id
+    meta.save()
+
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections", methods=["POST"])
+@login_required
+def create_verified_collection():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(silent=True) or request.form or {}
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "title required"}), 400
+
+    collection = VerifiedCollection(
+        title=title,
+        description=(data.get("description") or "").strip(),
+        promo_image_url=(data.get("promo_image_url") or "").strip(),
+        created_by_user_id=user.user_id,
+    )
+    collection.save()
+    return jsonify({"ok": True, "id": str(collection.id)})
+
+
+@library.route("/verified/collections/<collection_id>/update", methods=["POST"])
+@login_required
+def update_verified_collection(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(silent=True) or request.form or {}
+    title = (data.get("title") or "").strip()
+    if title:
+        collection.title = title
+    collection.description = (data.get("description") or "").strip()
+    collection.promo_image_url = (data.get("promo_image_url") or "").strip()
+    collection.save()
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections/<collection_id>/items/add", methods=["POST"])
+@login_required
+def add_verified_collection_item(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(force=True) or {}
+    item_id = (data.get("library_item_id") or "").strip()
+    if not item_id:
+        return jsonify({"error": "library_item_id required"}), 400
+
+    li = LibraryItem.objects(id=item_id).first()
+    if not li:
+        return jsonify({"error": "library item not found"}), 404
+
+    if li not in collection.items:
+        collection.items.append(li)
+        collection.save()
+
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/collections/<collection_id>/items/remove", methods=["POST"])
+@login_required
+def remove_verified_collection_item(collection_id: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    collection = VerifiedCollection.objects(id=collection_id).first()
+    if not collection:
+        return jsonify({"error": "not found"}), 404
+
+    data = request.get_json(force=True) or {}
+    item_id = (data.get("library_item_id") or "").strip()
+    if not item_id:
+        return jsonify({"error": "library_item_id required"}), 400
+
+    li = LibraryItem.objects(id=item_id).first()
+    if not li:
+        return jsonify({"error": "library item not found"}), 404
+
+    if li in collection.items:
+        collection.items.remove(li)
+        collection.save()
+
+    return jsonify({"ok": True})
+
+
+# -----------------------------
+# Verified Catalog Exploration Routes
+# -----------------------------
+@library.route("/collection/<collection_id>", methods=["GET"])
+@login_required
+def get_collection_details(collection_id):
+    """Fetch detailed information about a specific collection."""
+    try:
+        collection = VerifiedCollection.objects(id=collection_id).first()
+        if not collection:
+            return jsonify({"error": "Collection not found"}), 404
+        
+        # Build list of items in this collection
+        items_data = []
+        for li in collection.items:
+            try:
+                obj = li.obj
+            except DoesNotExist:
+                continue
+            
+            kind = li.kind
+            identifier = _verification_identifier(kind, obj)
+            if not identifier:
+                continue
+            
+            # Fetch metadata
+            meta = VerifiedItemMetadata.objects(
+                item_kind=kind, item_identifier=identifier
+            ).first()
+            
+            title = _object_title(kind, obj)
+            description = _object_description(kind, obj)
+            
+            items_data.append({
+                "kind": kind,
+                "identifier": identifier,
+                "title": meta.display_name if meta and meta.display_name else title,
+                "description": meta.description if meta and meta.description else description,
+                "category": _default_category_for_kind(kind),
+                "library_item_id": str(li.id),
+            })
+        
+        return jsonify({
+            "ok": True,
+            "collection": {
+                "id": str(collection.id),
+                "title": collection.title,
+                "description": collection.description or "",
+                "promo_image_url": collection.promo_image_url or "",
+                "items": items_data,
+            }
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@library.route("/verified_item/metadata", methods=["POST"])
+@login_required
+def get_verified_item_metadata():
+    """Fetch metadata for a verified item."""
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    
+    if not kind or not identifier:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Fetch the actual object to get basic info
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj:
+        return jsonify({"error": "Item not found"}), 404
+    
+    # Fetch metadata if available
+    meta = VerifiedItemMetadata.objects(
+        item_kind=normalized_kind, item_identifier=identifier
+    ).first()
+    
+    # Fetch verification request if available
+    verification_req = VerificationRequest.objects(
+        item_kind=normalized_kind, item_identifier=identifier
+    ).first()
+    
+    title = _object_title(normalized_kind, obj)
+    description = _object_description(normalized_kind, obj)
+    
+    result = {
+        "kind": normalized_kind,
+        "identifier": identifier,
+        "title": meta.display_name if meta and meta.display_name else title,
+        "description": meta.description if meta and meta.description else description,
+        "markdown": meta.markdown if meta else "",
+        "category": _default_category_for_kind(normalized_kind),
+    }
+    
+    # Add verification request data if available
+    if verification_req:
+        result.update({
+            "example_inputs": verification_req.example_inputs or [],
+            "expected_outputs": verification_req.expected_outputs or [],
+            "dependencies": verification_req.dependencies or [],
+            "run_instructions": verification_req.run_instructions or "",
+            "known_limitations": verification_req.known_limitations or "",
+        })
+    
+    return jsonify({"ok": True, "metadata": result})
+
+
+@library.route("/verified_item/add_to_library", methods=["POST"])
+@login_required
+def add_verified_item_to_library():
+    """Add a verified item to the user's personal or team library."""
+    user = load_user()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    scope_str = (data.get("scope") or "personal").strip().lower()
+    
+    if not kind or not identifier:
+        return jsonify({"error": "Missing required fields"}), 400
+    
+    # Resolve the object
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj:
+        return jsonify({"error": "Item not found"}), 404
+    
+    # Determine target library
+    if scope_str in ("personal", "mine"):
+        target_lib = get_or_create_personal_library(user.user_id)
+    elif scope_str == "team":
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "No active team"}), 400
+        target_lib = get_or_create_team_library(team)
+    else:
+        return jsonify({"error": "Invalid scope"}), 400
+    
+    # Check if already in library
+    existing = LibraryItem.objects(obj=obj, kind=normalized_kind).first()
+    if existing and existing in target_lib.items:
+        return jsonify({"ok": True, "message": "Item already in library", "added": False})
+    
+    # Add to library
+    try:
+        add_object_to_library(
+            obj,
+            normalized_kind,
+            user.user_id,
+            target_lib
+        )
+        return jsonify({"ok": True, "message": "Item added to library", "added": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # -----------------------------
@@ -592,8 +1186,47 @@ def filter_library_items():
     """
     filters = request.get_json() or {}
     ctx = _build_results_for_template(filters)
-    rendered_html = render_template("library/_results.html", **ctx)
-    return jsonify({"template": rendered_html})
+    
+    # Also fetch "Sidebar" folders (Roots for the current scope)
+    # We want to show the top-level structure in the sidebar.
+    # We can reuse logic or just query roots.
+    # Scope logic matches _build_results_for_template.
+    
+    scope_in = filters.get("scope") or "team"
+    lib_scope = _resolve_scope(scope_in)
+    user = load_user()
+    team = _current_team_for_user(user)
+    
+    sidebar_folders_data = []
+    # Only fetch if we are in a folder-supporting scope
+    if lib_scope in (LibraryScope.PERSONAL, LibraryScope.TEAM):
+        # Fetch ALL folders or just roots? 
+        # Ideally a tree, but let's start with Roots + lazy load or just Roots. 
+        # User said "folders section", implying a list.
+        # Let's return ALL folders for now so we can build a client-side tree or flat list?
+        # Or just Roots for now. "Folders" usually implies the top level buckets.
+        
+        # ACTUALLY: Sidebar usually shows the full tree or at least roots.
+        # Let's fetch roots (parent_id=None).
+        
+        q_kwargs = {"scope": lib_scope, "parent_id": None}
+        if lib_scope == LibraryScope.PERSONAL:
+             q_kwargs["owner_user_id"] = user.user_id
+        elif lib_scope == LibraryScope.TEAM:
+             q_kwargs["team"] = team
+             
+        roots = LibraryFolder.objects(**q_kwargs).order_by("name")
+        sidebar_folders_data = [{"name": f.name, "uuid": f.uuid} for f in roots]
+
+    if scope_in == "verify":
+        rendered_html = render_template("library/_verification_queue.html", requests=ctx.get("verification_queue"), team=team)
+    else:
+        rendered_html = render_template("library/_results.html", **ctx)
+    
+    return jsonify({
+        "template": rendered_html,
+        "sidebar_folders": sidebar_folders_data
+    })
 
 
 @library.route("/verification/queue", methods=["POST"])
@@ -798,8 +1431,121 @@ def workflows_clone_to_mine():
     forked = _fork_workflow(obj, user_id=user.user_id)
     lib = get_or_create_personal_library(user.user_id)
     add_object_to_library(forked, lib, added_by_user_id=user.user_id)
-
+    
     return jsonify({"ok": True, "uuid": str(forked.id)})
+
+
+@library.route("/extractions/clone_to_mine", methods=["POST"])
+def extractions_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("extraction", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
+@library.route("/prompts/clone_to_mine", methods=["POST"])
+def prompts_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("prompt", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
+@library.route("/formatters/clone_to_mine", methods=["POST"])
+def formatters_clone_to_mine():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json(force=True) or {}
+    uuid = payload.get("uuid")
+    obj, _kind = _resolve_obj("formatter", uuid)
+    if not obj:
+        return jsonify({"error": "not found"}), 404
+
+    forked = _fork_searchset_item(obj, user_id=user.user_id)
+    lib = get_or_create_personal_library(user.user_id)
+    add_object_to_library(forked, lib, added_by_user_id=user.user_id)
+
+    return jsonify({"ok": True, "uuid": forked.uuid})
+
+
+@library.route("/pin", methods=["POST"])
+@login_required
+@validate_json_request()
+def toggle_pin():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json() or {}
+    item_uuid = payload.get("uuid")
+    if not item_uuid:
+        return jsonify({"error": "missing uuid"}), 400
+
+    config = UserModelConfig.objects(user_id=user.user_id).first()
+    if not config:
+        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+
+    if item_uuid in config.pinned_items:
+        config.pinned_items.remove(item_uuid)
+        action = "removed"
+    else:
+        config.pinned_items.append(item_uuid)
+        action = "added"
+    
+    config.save()
+    return jsonify({"ok": True, "action": action})
+
+
+@library.route("/favorite", methods=["POST"])
+@login_required
+@validate_json_request()
+def toggle_favorite():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    payload = request.get_json() or {}
+    item_uuid = payload.get("uuid")
+    if not item_uuid:
+        return jsonify({"error": "missing uuid"}), 400
+
+    config = UserModelConfig.objects(user_id=user.user_id).first()
+    if not config:
+        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+
+    if item_uuid in config.favorite_items:
+        config.favorite_items.remove(item_uuid)
+        action = "removed"
+    else:
+        config.favorite_items.append(item_uuid)
+        action = "added"
+    
+    config.save()
+    return jsonify({"ok": True, "action": action})
 
 
 @library.route("/extractions/share_to_team", methods=["POST"])
@@ -880,23 +1626,19 @@ def formatters_share_to_team():
     return jsonify({"ok": True})
 
 
-@library.route("/team/remove", methods=["POST"])
-def remove_from_team_library():
+@library.route("/remove", methods=["POST"])
+@login_required
+@validate_json_request()
+def remove_library_item():
     user = load_user()
     if not user:
         return jsonify({"error": "unauthenticated"}), 401
 
-    team = _current_team_for_user(user)
-    if not team:
-        return jsonify({"error": "no team"}), 400
-
-    membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
-    if not membership:
-        return jsonify({"error": "forbidden"}), 403
-
-    payload = request.get_json(force=True) or {}
+    payload = request.get_json() or {}
     uuid = payload.get("uuid")
     kind = payload.get("kind")
+    scope = payload.get("scope") or "team"
+
     if not uuid or not kind:
         return jsonify({"error": "invalid request"}), 400
 
@@ -904,24 +1646,43 @@ def remove_from_team_library():
     if not obj or not normalized_kind:
         return jsonify({"error": "not found"}), 404
 
-    team_library = Library.objects(
-        scope=LibraryScope.TEAM, team=team
-    ).first()
-    if not team_library:
-        return jsonify({"ok": False, "removed": False}), 200
+    # Resolve target library
+    target_lib = None
+    if scope in ("mine", "personal"):
+        target_lib = get_or_create_personal_library(user.user_id)
+    else:
+        # Default to team
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "no team"}), 400
+        # Check membership
+        membership = TeamMembership.objects(team=team, user_id=user.user_id).first()
+        if not membership:
+            return jsonify({"error": "forbidden"}), 403
+        
+        target_lib = get_or_create_team_library(team)
 
+    if not target_lib:
+        return jsonify({"error": "library not found"}), 404
+
+    # Find item in library
     target_item = None
-    for item in list(team_library.items):
+    for item in list(target_lib.items):
         if item.kind == normalized_kind and item.obj == obj:
             target_item = item
             break
 
     if not target_item:
-        return jsonify({"ok": False, "removed": False}), 200
+        # It's possible the item isn't in the library but user wants to delete it? 
+        # For now, assume success if it's already gone from the library view.
+        return jsonify({"ok": True, "removed": False}), 200
 
-    team_library.items.remove(target_item)
-    team_library.updated_at = datetime.now(timezone.utc)
-    team_library.save()
+    # Remove from library list
+    target_lib.items.remove(target_item)
+    target_lib.updated_at = datetime.now(timezone.utc)
+    target_lib.save()
+    
+    # Delete the LibraryItem document itself (cleanup)
     target_item.delete()
 
     return jsonify({"ok": True, "removed": True})
@@ -1119,3 +1880,198 @@ def _submit_for_verification_route(kind: str):
             "redirect_url": url_for("home.index", scope="mine"),
         }
     )
+
+# -----------------------------
+# Folder Management Routes
+# -----------------------------
+
+@library.route("/folder/create", methods=["POST"])
+@login_required
+@validate_json_request()
+def create_folder():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+    
+    payload = request.get_json()
+    name = payload.get("name")
+    parent_id = payload.get("parent_id") # Optional uuid
+    scope_str = payload.get("scope", "personal")
+    
+    if not name:
+        return jsonify({"error": "name required"}), 400
+        
+    # Resolve Scope
+    try:
+        scope = _resolve_scope(scope_str)
+    except ValueError:
+        return jsonify({"error": "invalid scope"}), 400
+
+    team = None
+    owner_user_id = None
+    
+    if scope == LibraryScope.PERSONAL:
+        owner_user_id = user.user_id
+    elif scope == LibraryScope.TEAM:
+        team = _current_team_for_user(user)
+        if not team:
+            return jsonify({"error": "no team context"}), 400
+    else:
+        return jsonify({"error": "invalid scope for folders"}), 400
+
+    # Create
+    folder = LibraryFolder(
+        name=name,
+        parent_id=parent_id,
+        scope=scope,
+        owner_user_id=owner_user_id,
+        team=team
+    )
+    folder.save()
+    
+    return jsonify({"ok": True, "folder": {
+        "uuid": folder.uuid,
+        "name": folder.name
+    }})
+
+@library.route("/folder/delete", methods=["POST"])
+@login_required
+@validate_json_request()
+def delete_folder():
+    """
+    Deletes a folder. 
+    Options: 
+    - delete contents (recursive) - NOT IMPLEMENTED YET, items move to root or fail?
+    - currently: move items to parent (or root) automatically? 
+      Strict implementation: Delete reference in items.
+    """
+    user = load_user()
+    payload = request.get_json()
+    folder_uuid = payload.get("uuid")
+    
+    if not folder_uuid:
+        return jsonify({"error": "uuid required"}), 400
+        
+    folder = LibraryFolder.objects(uuid=folder_uuid).first()
+    if not folder:
+        return jsonify({"error": "not found"}), 404
+        
+    # Auth check
+    if folder.scope == LibraryScope.PERSONAL:
+        if folder.owner_user_id != user.user_id:
+            return jsonify({"error": "forbidden"}), 403
+    elif folder.scope == LibraryScope.TEAM:
+        # TODO: checking team permissions? Assuming members can manage folders for now
+        team = _current_team_for_user(user)
+        if not team or folder.team != team:
+             return jsonify({"error": "forbidden"}), 403
+             
+    # Logic: Unassign items from this folder (move to root of same library)
+    # Alternatively: Delete items? Safest is unassign folder.
+    LibraryItem.objects(folder=folder).update(set__folder=None)
+    
+    # Subfolders? Move to parent
+    LibraryFolder.objects(parent_id=folder.uuid).update(set__parent_id=folder.parent_id)
+    
+    folder.delete()
+    return jsonify({"ok": True})
+
+@library.route("/folder/rename", methods=["POST"])
+@login_required
+@validate_json_request()
+def rename_folder():
+    user = load_user()
+    payload = request.get_json()
+    folder_uuid = payload.get("uuid")
+    new_name = payload.get("name")
+    
+    if not folder_uuid or not new_name:
+        return jsonify({"error": "uuid and name required"}), 400
+        
+    folder = LibraryFolder.objects(uuid=folder_uuid).first()
+    if not folder:
+        return jsonify({"error": "not found"}), 404
+        
+    # Auth check
+    if folder.scope == LibraryScope.PERSONAL:
+        if folder.owner_user_id != user.user_id:
+            return jsonify({"error": "forbidden"}), 403
+    elif folder.scope == LibraryScope.TEAM:
+        team = _current_team_for_user(user)
+        if not team or folder.team != team:
+             return jsonify({"error": "forbidden"}), 403
+             
+    folder.name = new_name
+    folder.save()
+    return jsonify({"ok": True})
+
+@library.route("/folder/move_items", methods=["POST"])
+@login_required
+@validate_json_request()
+def move_items_to_folder():
+    """
+    Moves list of library items (by item identifiers or LibraryItem IDs?) 
+    Client likely sends [kind, id] pairs or LibraryItem UUIDs?
+    Given existing API structure, better to send library item IDs if known, 
+    but UI often deals with [kind, uuid].
+    Let's assume payload: items: [{kind, uuid}], target_folder_uuid (or null for root)
+    """
+    user = load_user()
+    payload = request.get_json()
+    items_meta = payload.get("items", []) # List of {kind, uuid}
+    target_folder_uuid = payload.get("target_folder_uuid")
+    scope_str = payload.get("scope")
+    intent_scope = _resolve_scope(scope_str) if scope_str else None
+
+    target_folder = None
+    if target_folder_uuid:
+        target_folder = LibraryFolder.objects(uuid=target_folder_uuid).first()
+        if not target_folder:
+            return jsonify({"error": "target folder not found"}), 404
+            
+    # Resolve items and update
+    count = 0
+    for meta in items_meta:
+        kind = meta.get("kind")
+        uuid = meta.get("uuid")
+        
+        obj, normalized_kind = _resolve_obj(kind, uuid)
+        if not obj: 
+            continue
+            
+        candidates = LibraryItem.objects(obj=obj, kind=normalized_kind)
+        target_li = None
+        
+        for c in candidates:
+             # Find which library contains this item
+             parent_lib = Library.objects(items=c).first()
+             if not parent_lib: 
+                 continue
+                 
+             if target_folder:
+                 # Match target folder's library context
+                 if parent_lib.scope == target_folder.scope:
+                      if parent_lib.scope == LibraryScope.PERSONAL and parent_lib.owner_user_id == target_folder.owner_user_id:
+                            target_li = c
+                            break
+                      if parent_lib.scope == LibraryScope.TEAM and parent_lib.team == target_folder.team:
+                            target_li = c
+                            break
+             elif intent_scope:
+                 # Moving to root, match intent scope
+                 if parent_lib.scope == intent_scope:
+                      if intent_scope == LibraryScope.PERSONAL and parent_lib.owner_user_id == user.user_id:
+                           target_li = c
+                           break
+                      if intent_scope == LibraryScope.TEAM:
+                           current_team = _current_team_for_user(user)
+                           if parent_lib.team == current_team:
+                                target_li = c
+                                break
+        
+        if target_li:
+            target_li.folder = target_folder
+            target_li.save()
+            count += 1
+            
+    return jsonify({"ok": True, "count": count})
