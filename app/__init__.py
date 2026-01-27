@@ -110,6 +110,13 @@ app.logger.info(f"Starting server in '{env}' environment → loading {config_cla
 
 
 app.config.from_object(config_class)
+app.config["RATELIMIT_ENABLED"] = False
+
+# Session cookie defaults for OAuth flows (can be overridden via env/config).
+app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+if env == "production":
+    app.config.setdefault("SESSION_COOKIE_SECURE", True)
+    app.config.setdefault("PREFERRED_URL_SCHEME", "https")
 
 
 Bootstrap(app)  # flask-bootstrap
@@ -131,6 +138,7 @@ limiter = Limiter(
     default_limits=["200 per day", "50 per hour"],
     strategy="fixed-window",
 )
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -221,7 +229,12 @@ app.config["AUTH_MODE"] = (
 )
 
 # Ensure Azure OAuth blueprint is registered/configured from DB if present
-configure_azure_blueprint(app)
+azure_bp = configure_azure_blueprint(app)
+
+# Exempt OAuth endpoints from rate limiting to prevent authentication failures
+if azure_bp:
+    from app.oauth import azure_blueprint
+    limiter.exempt(azure_blueprint)
 
 # Point the login view to the local blueprint's login function (always available path)
 login_manager.login_view = "auth.login"

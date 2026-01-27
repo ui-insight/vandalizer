@@ -1,0 +1,882 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .modal[hidden] {
+        display: none !important;
+    }
+
+    .vm-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .vm-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 24px;
+    }
+
+    .vm-header h2 {
+        font-weight: 600;
+        font-size: 24px;
+        margin: 0;
+    }
+
+    .vm-header-subtitle {
+        color: #5f6368;
+        margin-top: 4px;
+    }
+
+    .vm-tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid #e5e7eb;
+        margin-bottom: 24px;
+    }
+
+    .vm-tab {
+        padding: 12px 24px;
+        font-weight: 500;
+        color: #5f6368;
+        cursor: pointer;
+        border: none;
+        background: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -2px;
+        transition: all 0.2s;
+    }
+
+    .vm-tab:hover {
+        color: #1a73e8;
+    }
+
+    .vm-tab.active {
+        color: #1a73e8;
+        border-bottom-color: #1a73e8;
+    }
+
+    .vm-tab-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 20px;
+        padding: 0 6px;
+        margin-left: 8px;
+        background: #e8f0fe;
+        color: #1a73e8;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .vm-panel {
+        display: none;
+    }
+
+    .vm-panel.active {
+        display: block;
+    }
+
+    .vm-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 12px;
+        transition: box-shadow 0.2s;
+    }
+
+    .vm-card:hover {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .vm-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 8px;
+    }
+
+    .vm-card-title {
+        font-weight: 600;
+        font-size: 16px;
+        color: #1f2937;
+    }
+
+    .vm-card-meta {
+        font-size: 13px;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .vm-card-summary {
+        font-size: 14px;
+        color: #4b5563;
+        margin-bottom: 12px;
+    }
+
+    .vm-card-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .vm-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .vm-badge--pending {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .vm-badge--success {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .vm-badge--danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .vm-badge--info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .vm-empty {
+        text-align: center;
+        padding: 60px 20px;
+        color: #9ca3af;
+    }
+
+    .vm-empty i {
+        font-size: 48px;
+        margin-bottom: 16px;
+        display: block;
+    }
+
+    .vm-search-bar {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 20px;
+        align-items: center;
+    }
+
+    .vm-search-input {
+        flex: 1;
+        padding: 10px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .vm-filter-chips {
+        display: flex;
+        gap: 8px;
+    }
+
+    .vm-filter-chip {
+        padding: 6px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s;
+    }
+
+    .vm-filter-chip.active {
+        background: #1a73e8;
+        color: white;
+        border-color: #1a73e8;
+    }
+
+    .vm-collection-card {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 16px;
+    }
+
+    .vm-collection-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px;
+        cursor: pointer;
+        background: #f9fafb;
+    }
+
+    .vm-collection-header:hover {
+        background: #f3f4f6;
+    }
+
+    .vm-collection-items {
+        display: none;
+        padding: 16px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .vm-collection-items.open {
+        display: block;
+    }
+
+    .vm-collection-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .vm-collection-item:hover {
+        background: #f9fafb;
+    }
+
+    .vm-item-kind {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        background: #f3f4f6;
+        color: #6b7280;
+        margin-right: 8px;
+    }
+
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 8px;
+        width: 100%;
+        max-width: 600px;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 20px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        padding: 16px 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .form-group textarea {
+        resize: vertical;
+        min-height: 100px;
+    }
+
+    .form-hint {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+</style>
+
+<div class="vm-container">
+    <!-- Header -->
+    <div class="vm-header">
+        <div>
+            <h2>Verification Management</h2>
+            <div class="vm-header-subtitle">Manage verification requests, catalog items, and collections</div>
+        </div>
+        <a href="/library" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i> Back to Library
+        </a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="vm-tabs">
+        <button class="vm-tab active" data-tab="queue">
+            <i class="fa-solid fa-inbox"></i> Verification Queue
+            {% if verification_queue %}
+            <span class="vm-tab-badge">{{ verification_queue|length }}</span>
+            {% endif %}
+        </button>
+        <button class="vm-tab" data-tab="catalog">
+            <i class="fa-solid fa-book"></i> Verified Catalog
+        </button>
+        <button class="vm-tab" data-tab="collections">
+            <i class="fa-solid fa-layer-group"></i> Collections
+        </button>
+    </div>
+
+    <!-- Tab 1: Verification Queue -->
+    <div class="vm-panel active" id="panel-queue">
+        {% if verification_queue %}
+        {% for item in verification_queue %}
+        {% set request = item.request %}
+        {% set data = item.data %}
+        {% set status = data.status %}
+        <div class="vm-card" data-request-uuid="{{ data.uuid }}">
+            <div class="vm-card-header">
+                <div>
+                    <span
+                        class="vm-badge {% if status == 'in_review' %}vm-badge--info{% else %}vm-badge--pending{% endif %}">
+                        {{ status.replace('_', ' ')|title }}
+                    </span>
+                    <span class="vm-card-title">{{ item.title }}</span>
+                </div>
+                <span class="vm-item-kind">{{ item.kind }}</span>
+            </div>
+            <div class="vm-card-meta">
+                Submitted by <strong>{{ item.submitter }}</strong>
+                {% if item.team_name %} · {{ item.team_name }}{% endif %}
+                {% if data.submitted_at %} · {{ data.submitted_at[:10] }}{% endif %}
+            </div>
+            {% if item.summary %}
+            <div class="vm-card-summary">{{ item.summary }}</div>
+            {% endif %}
+            <div class="vm-card-actions">
+                {% if item.kind == 'workflow' %}
+                <a href="/workflows/{{ item.identifier }}" class="btn btn-secondary btn-sm" target="_blank">
+                    <i class="fa-solid fa-external-link"></i> Open Workflow
+                </a>
+                {% endif %}
+                {% if status != 'in_review' %}
+                <button class="btn btn-light btn-sm" onclick="updateVerificationStatus('{{ data.uuid }}', 'in_review')">
+                    <i class="fa-solid fa-eye"></i> Mark In Review
+                </button>
+                {% endif %}
+                <button class="btn btn-primary btn-sm"
+                    onclick="updateVerificationStatus('{{ data.uuid }}', 'approved')">
+                    <i class="fa-solid fa-check"></i> Approve
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="updateVerificationStatus('{{ data.uuid }}', 'rejected')">
+                    <i class="fa-solid fa-times"></i> Request Changes
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="vm-empty">
+            <i class="fa-solid fa-inbox"></i>
+            <div>No pending verification requests</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab 2: Verified Catalog -->
+    <div class="vm-panel" id="panel-catalog">
+        <div class="vm-search-bar">
+            <input type="text" class="vm-search-input" id="catalog-search" placeholder="Search verified items...">
+            <div class="vm-filter-chips">
+                <span class="vm-filter-chip active" data-kind="all">All</span>
+                <span class="vm-filter-chip" data-kind="workflow">Workflows</span>
+                <span class="vm-filter-chip" data-kind="searchset">Extractions</span>
+                <span class="vm-filter-chip" data-kind="prompt">Prompts</span>
+                <span class="vm-filter-chip" data-kind="formatter">Formatters</span>
+            </div>
+        </div>
+
+        <div id="catalog-list">
+            {% if verified_items %}
+            {% for item in verified_items %}
+            <div class="vm-card catalog-item" data-title="{{ item.title|lower }}" data-kind="{{ item.kind }}">
+                <div class="vm-card-header">
+                    <div>
+                        <span class="vm-item-kind">{{ item.kind }}</span>
+                        <span class="vm-card-title">{{ item.display_name or item.title }}</span>
+                    </div>
+                    <button class="btn btn-outline-primary btn-sm"
+                        onclick="openMetadataModal('{{ item.kind }}', '{{ item.identifier }}', '{{ item.display_name|e }}', '{{ item.meta_description|e }}', '{{ item.markdown|e }}')">
+                        <i class="fa-solid fa-pen"></i> Edit Metadata
+                    </button>
+                </div>
+                {% if item.meta_description %}
+                <div class="vm-card-summary">{{ item.meta_description }}</div>
+                {% endif %}
+                <div class="vm-card-meta">
+                    ID: {{ item.identifier }}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="vm-empty">
+                <i class="fa-solid fa-book"></i>
+                <div>No verified items in the catalog</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tab 3: Collections -->
+    <div class="vm-panel" id="panel-collections">
+        <div style="margin-bottom: 20px;">
+            <button class="btn btn-primary" onclick="openCreateCollectionModal()">
+                <i class="fa-solid fa-plus"></i> New Collection
+            </button>
+        </div>
+
+        <div id="collections-list">
+            {% if collections %}
+            {% for col in collections %}
+            <div class="vm-collection-card" data-collection-id="{{ col.id }}">
+                <div class="vm-collection-header" onclick="toggleCollection('{{ col.id }}')">
+                    <div>
+                        <div style="font-weight: 600; font-size: 16px;">{{ col.title }}</div>
+                        <div style="font-size: 13px; color: #6b7280;">{{ col.items|length }} items</div>
+                    </div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <button class="btn btn-light btn-sm"
+                            onclick="event.stopPropagation(); openEditCollectionModal('{{ col.id }}', '{{ col.title|e }}', '{{ col.description|e }}', '{{ col.promo_image_url|e }}')">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <button class="btn btn-light btn-sm"
+                            onclick="event.stopPropagation(); openAddItemModal('{{ col.id }}')">
+                            <i class="fa-solid fa-plus"></i> Add Item
+                        </button>
+                        <i class="fa-solid fa-chevron-down collection-chevron"></i>
+                    </div>
+                </div>
+                <div class="vm-collection-items" id="collection-items-{{ col.id }}">
+                    {% if col.items %}
+                    {% for li in col.items %}
+                    {% set item_title = li.obj.name if li.kind == 'workflow' else li.obj.title %}
+                    <div class="vm-collection-item">
+                        <div>
+                            <span class="vm-item-kind">{{ li.kind }}</span>
+                            {{ item_title or 'Untitled' }}
+                        </div>
+                        <button class="btn btn-light btn-sm"
+                            onclick="removeFromCollection('{{ col.id }}', '{{ li.id }}')">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <div style="color: #9ca3af; text-align: center; padding: 20px;">
+                        No items in this collection
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+            {% else %}
+            <div class="vm-empty">
+                <i class="fa-solid fa-layer-group"></i>
+                <div>No collections created yet</div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Edit Metadata Modal -->
+<div class="modal" id="metadata-modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Item Metadata</h3>
+            <button onclick="closeModal('metadata-modal')"
+                style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="meta-kind">
+            <input type="hidden" id="meta-identifier">
+            <div class="form-group">
+                <label>Display Name</label>
+                <input type="text" id="meta-display-name">
+                <div class="form-hint">Public-facing name that overrides the internal title</div>
+            </div>
+            <div class="form-group">
+                <label>Short Description</label>
+                <textarea id="meta-description" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Documentation (Markdown)</label>
+                <textarea id="meta-markdown" rows="8" style="font-family: monospace;"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('metadata-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveMetadata()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Create Collection Modal -->
+<div class="modal" id="create-collection-modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create Collection</h3>
+            <button onclick="closeModal('create-collection-modal')"
+                style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="new-collection-title">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="new-collection-description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Promo Image URL (optional)</label>
+                <input type="text" id="new-collection-image">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('create-collection-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="createCollection()">Create Collection</button>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Collection Modal -->
+<div class="modal" id="edit-collection-modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Edit Collection</h3>
+            <button onclick="closeModal('edit-collection-modal')"
+                style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="edit-collection-id">
+            <div class="form-group">
+                <label>Title</label>
+                <input type="text" id="edit-collection-title">
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="edit-collection-description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label>Promo Image URL (optional)</label>
+                <input type="text" id="edit-collection-image">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('edit-collection-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="saveCollection()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item to Collection Modal -->
+<div class="modal" id="add-item-modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Add Item to Collection</h3>
+            <button onclick="closeModal('add-item-modal')"
+                style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="add-item-collection-id">
+            <div class="form-group">
+                <label>Select an item to add</label>
+                <select id="add-item-select"
+                    style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <option value="">Choose...</option>
+                    {% for item in verified_items %}
+                    <option value="{{ item.library_item_id }}">{{ item.title }} ({{ item.kind }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('add-item-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="addItemToCollection()">Add Item</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Tab switching
+    document.querySelectorAll('.vm-tab').forEach(tab => {
+        tab.addEventListener('click', function () {
+            document.querySelectorAll('.vm-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.vm-panel').forEach(p => p.classList.remove('active'));
+
+            this.classList.add('active');
+            document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+        });
+    });
+
+    // Catalog search
+    document.getElementById('catalog-search').addEventListener('input', function (e) {
+        const term = e.target.value.toLowerCase();
+        filterCatalog();
+    });
+
+    // Filter chips
+    document.querySelectorAll('.vm-filter-chip').forEach(chip => {
+        chip.addEventListener('click', function () {
+            document.querySelectorAll('.vm-filter-chip').forEach(c => c.classList.remove('active'));
+            this.classList.add('active');
+            filterCatalog();
+        });
+    });
+
+    function filterCatalog() {
+        const term = document.getElementById('catalog-search').value.toLowerCase();
+        const kind = document.querySelector('.vm-filter-chip.active').dataset.kind;
+
+        document.querySelectorAll('.catalog-item').forEach(item => {
+            const matchesTerm = item.dataset.title.includes(term);
+            const matchesKind = kind === 'all' || item.dataset.kind === kind;
+            item.style.display = (matchesTerm && matchesKind) ? '' : 'none';
+        });
+    }
+
+    // Collection toggle
+    function toggleCollection(collectionId) {
+        const items = document.getElementById('collection-items-' + collectionId);
+        items.classList.toggle('open');
+    }
+
+    // Modal helpers
+    function closeModal(modalId) {
+        document.getElementById(modalId).hidden = true;
+    }
+
+    // Verification status
+    function updateVerificationStatus(requestUuid, status) {
+        const confirmMsg = status === 'approved'
+            ? 'Approve this item? It will be added to the verified library.'
+            : status === 'rejected'
+                ? 'Request changes? The submitter will be notified.'
+                : 'Mark this item as in review?';
+
+        if (!confirm(confirmMsg)) return;
+
+        $.ajax({
+            url: '/library/verification/' + requestUuid + '/status',
+            method: 'POST',
+            data: JSON.stringify({ status: status }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to update status: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function (err) {
+                alert('Failed to update status');
+                console.error(err);
+            }
+        });
+    }
+
+    // Metadata modal
+    function openMetadataModal(kind, identifier, displayName, description, markdown) {
+        document.getElementById('meta-kind').value = kind;
+        document.getElementById('meta-identifier').value = identifier;
+        document.getElementById('meta-display-name').value = displayName || '';
+        document.getElementById('meta-description').value = description || '';
+        document.getElementById('meta-markdown').value = markdown || '';
+        document.getElementById('metadata-modal').hidden = false;
+    }
+
+    function saveMetadata() {
+        const payload = {
+            kind: document.getElementById('meta-kind').value,
+            identifier: document.getElementById('meta-identifier').value,
+            display_name: document.getElementById('meta-display-name').value,
+            description: document.getElementById('meta-description').value,
+            markdown: document.getElementById('meta-markdown').value
+        };
+
+        $.ajax({
+            url: '/library/verified/item/update',
+            method: 'POST',
+            data: JSON.stringify(payload),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to save: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function () {
+                alert('Failed to save metadata');
+            }
+        });
+    }
+
+    // Collection creation
+    function openCreateCollectionModal() {
+        document.getElementById('new-collection-title').value = '';
+        document.getElementById('new-collection-description').value = '';
+        document.getElementById('new-collection-image').value = '';
+        document.getElementById('create-collection-modal').hidden = false;
+    }
+
+    function createCollection() {
+        const title = document.getElementById('new-collection-title').value.trim();
+        if (!title) {
+            alert('Title is required');
+            return;
+        }
+
+        $.ajax({
+            url: '/library/verified/collections',
+            method: 'POST',
+            data: JSON.stringify({
+                title: title,
+                description: document.getElementById('new-collection-description').value,
+                promo_image_url: document.getElementById('new-collection-image').value
+            }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to create: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function () {
+                alert('Failed to create collection');
+            }
+        });
+    }
+
+    // Edit collection
+    function openEditCollectionModal(id, title, description, imageUrl) {
+        document.getElementById('edit-collection-id').value = id;
+        document.getElementById('edit-collection-title').value = title || '';
+        document.getElementById('edit-collection-description').value = description || '';
+        document.getElementById('edit-collection-image').value = imageUrl || '';
+        document.getElementById('edit-collection-modal').hidden = false;
+    }
+
+    function saveCollection() {
+        const id = document.getElementById('edit-collection-id').value;
+        $.ajax({
+            url: '/library/verified/collections/' + id + '/update',
+            method: 'POST',
+            data: JSON.stringify({
+                title: document.getElementById('edit-collection-title').value,
+                description: document.getElementById('edit-collection-description').value,
+                promo_image_url: document.getElementById('edit-collection-image').value
+            }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                }
+            },
+            error: function () {
+                alert('Failed to save collection');
+            }
+        });
+    }
+
+    // Add item to collection
+    function openAddItemModal(collectionId) {
+        document.getElementById('add-item-collection-id').value = collectionId;
+        document.getElementById('add-item-select').value = '';
+        document.getElementById('add-item-modal').hidden = false;
+    }
+
+    function addItemToCollection() {
+        const collectionId = document.getElementById('add-item-collection-id').value;
+        const itemId = document.getElementById('add-item-select').value;
+
+        if (!itemId) {
+            alert('Please select an item');
+            return;
+        }
+
+        $.ajax({
+            url: '/library/verified/collections/' + collectionId + '/items/add',
+            method: 'POST',
+            data: JSON.stringify({ library_item_id: itemId }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                }
+            },
+            error: function () {
+                alert('Failed to add item');
+            }
+        });
+    }
+
+    // Remove from collection
+    function removeFromCollection(collectionId, itemId) {
+        if (!confirm('Remove this item from the collection?')) return;
+
+        $.ajax({
+            url: '/library/verified/collections/' + collectionId + '/items/remove',
+            method: 'POST',
+            data: JSON.stringify({ library_item_id: itemId }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                }
+            },
+            error: function () {
+                alert('Failed to remove item');
+            }
+        });
+    }
+</script>
+{% endblock %}

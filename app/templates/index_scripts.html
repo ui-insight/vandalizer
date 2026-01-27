@@ -2093,10 +2093,6 @@
             $('#attachmentModal').hide();
         });
 
-        $('#closeNewWorkflowBtn').on('click', function () {
-            $('#newWorkflowModal').hide();
-        });
-
         $('#closeNewTaskBtn').on('click', function () {
             $('#newTaskModal').hide();
         });
@@ -3404,17 +3400,27 @@
             });
     });
 
-    $(".add-new_workflow-button").on("click", function () {
-        $("#newWorkflowModal").show();
-        $("#add-task-container").hide();
-        $("#newTaskModal").hide();
-
+    function bindNewWorkflowModalActions() {
         $("#newWorkflowBtn")
             .off("click")
             .on("click", function () {
                 createNewWorkflow();
                 $("#newWorkflowModal").hide();
             });
+        $("#closeNewWorkflowBtn").off("click").on("click", function () {
+            $("#newWorkflowModal").hide();
+        });
+    }
+
+    window.bindNewWorkflowModalActions = bindNewWorkflowModalActions;
+
+    bindNewWorkflowModalActions();
+
+    $(".add-new_workflow-button").on("click", function () {
+        $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
+        bindNewWorkflowModalActions();
     });
 
     var newTaskType = "";
@@ -3514,6 +3520,88 @@
                 console.log(thrownError);
             },
         });
+    }
+
+    // Library panel helper functions
+    function openSearchSet(uuid) {
+        updateSearchSetPanel(uuid);
+    }
+
+    function runPromptInAssistant(uuid, title = "") {
+        if (typeof setSection === 'function') {
+            setSection("Assistant");
+        }
+        beginPrompt(uuid, title || "Prompt");
+    }
+
+    function selectLibraryItem(type, id, title = "") {
+        if (type === 'workflow') {
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(id);
+            } else {
+                console.error("fetchWorkflow not defined");
+            }
+        } else if (type === 'extraction' || type === 'searchset') {
+            openSearchSet(id);
+        } else if (type === 'prompt' || type === 'formatter') {
+            runPromptInAssistant(id, title);
+        }
+    }
+
+    function editLibraryItem(type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction' || type === 'searchset') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            }
+        } else if (type === 'prompt' || type === 'formatter') {
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: JSON.stringify({ uuid: id }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.template) {
+                        $("#search-results-panel").html(res.template).show();
+                    }
+                },
+                error: function (err) {
+                    console.error("Error loading prompt editor", err);
+                }
+            });
+        }
+    }
+
+    function toggleMenu(e, menuId) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const isHidden = menu.hidden;
+
+        // Close all other menus
+        document.querySelectorAll('.menu').forEach(m => m.hidden = true);
+        document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+        if (isHidden) {
+            menu.hidden = false;
+            e.currentTarget.setAttribute('aria-expanded', 'true');
+
+            // Close on next click
+            const close = () => {
+                menu.hidden = true;
+                e.currentTarget.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', close);
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        } else {
+            menu.hidden = true;
+            e.currentTarget.setAttribute('aria-expanded', 'false');
+        }
     }
 
     // PERFORM SEARCH

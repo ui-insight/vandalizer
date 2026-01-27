@@ -30,6 +30,7 @@ def azure_logged_in(blueprint, token):
 
     # Import here to avoid circular import at module load
     from app.models import User
+    from flask import session
 
     user = User.objects(user_id=user_principal_name).first()
 
@@ -45,7 +46,10 @@ def azure_logged_in(blueprint, token):
             user.name = info["displayName"]
         user.save()
 
+    # Make session permanent so Flask-Login session persists
+    session.permanent = True
     login_user(user)
+    # Let Flask-Dance store the token (don't return False)
 
 
 def _connect_azure_signal(blueprint):
@@ -132,6 +136,11 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
 
         if "azure" not in app.blueprints:
             app.register_blueprint(blueprint, url_prefix="/login")
+            
+            # Exempt from rate limiting if limiter is configured
+            if "limiter" in app.extensions:
+                app.extensions["limiter"].exempt(blueprint)
+                
             app.logger.info("Azure blueprint registered successfully")
 
         azure_blueprint = blueprint

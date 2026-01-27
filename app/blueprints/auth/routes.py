@@ -127,8 +127,8 @@ def login() -> ResponseReturnValue:
         if "azure" not in current_app.blueprints:
             flash("OAuth is enabled but no provider is configured.", "danger")
             return redirect(url_for("auth.index"))
-        if not azure.authorized:
-            return redirect(url_for("azure.login"))
+        # After OAuth completes, user will be logged in via Flask-Login
+        # Don't check azure.authorized here as it causes redirect loops
         return redirect(url_for("home.index"))
 
     flash("No authentication methods are enabled. Contact an administrator.", "danger")
