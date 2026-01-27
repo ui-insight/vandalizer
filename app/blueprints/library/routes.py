@@ -1013,7 +1013,10 @@ def filter_library_items():
         roots = LibraryFolder.objects(**q_kwargs).order_by("name")
         sidebar_folders_data = [{"name": f.name, "uuid": f.uuid} for f in roots]
 
-    rendered_html = render_template("library/_results.html", **ctx)
+    if scope_in == "verify":
+        rendered_html = render_template("library/_verification_queue.html", requests=ctx.get("verification_queue"), team=team)
+    else:
+        rendered_html = render_template("library/_results.html", **ctx)
     
     return jsonify({
         "template": rendered_html,
