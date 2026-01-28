@@ -129,9 +129,21 @@
               style="font-weight: bold; font-size: 14px; color: rgba(255, 255, 255, 0.712);">Create
               account</a>
           </p>
+          {% if saml_enabled and saml_providers %}
+          <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.15);">
+            <p style="font-size: 13px; color: rgba(255,255,255,0.5); margin-bottom: 10px;">Or sign in with SSO:</p>
+            {% for provider in saml_providers %}
+            <a class="action-button" href="{{ url_for('auth.saml_login', provider=loop.index0) }}" style="display: inline-block; margin-bottom: 8px; font-size: 14px;">{{ provider.display_name }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
 
           {% elif oauth_enabled %}
           <a class="action-button" href="/login" class="">SIGN IN</a>
+          {% elif saml_enabled and saml_providers %}
+          {% for provider in saml_providers %}
+          <a class="action-button" href="{{ url_for('auth.saml_login', provider=loop.index0) }}" style="display: inline-block; margin-bottom: 8px;">{{ provider.display_name }}</a>
+          {% endfor %}
           {% else %}
           <p class="text-sm text-gray-200">No authentication methods are enabled. Please contact an administrator.</p>
           {% endif %}

@@ -93,6 +93,72 @@ The following environment variables must be set:
 - `ROLLBAR_ACCESS_TOKEN`: Rollbar API token
 - `MAIL_SERVER`, `MAIL_PORT`, `MAIL_DEFAULT_SENDER`: Mail server settings if different from defaults
 
+## SAML Authentication
+
+Vandalizer supports SAML 2.0 Single Sign-On alongside password and OAuth authentication. Admins can configure one or more SAML Identity Providers (IdPs) through the admin config page.
+
+### Setup
+
+1. **Enable SAML in admin config**
+
+   Navigate to `/admin/config`, scroll to **Authentication Configuration**, check **SAML 2.0**, and click **Update Auth Methods**.
+
+2. **Add a SAML provider**
+
+   In the **Add New Provider** form:
+   - **Provider Type**: SAML 2.0
+   - **Display Name**: A label shown on the login page (e.g. "SUU SSO", "UIdaho SAML")
+   - **IdP Metadata URL**: Your IdP's metadata endpoint. This must return XML metadata, not an SSO login page.
+   - Other fields (SP Entity ID, Name ID Format, SP Certificate/Key) are optional.
+
+   Click **Add Provider**.
+
+3. **Register your SP with the IdP**
+
+   Provide your IdP administrator with:
+   - **SP Metadata XML**: Download from `/saml/metadata`
+   - **ACS URL**: `https://<your-host>/saml/acs` (shown on the provider card in admin config)
+
+4. **Test the login**
+
+   Log out. The landing page will show an SSO button for each enabled SAML provider. Click it to initiate the SAML login flow.
+
+### User Attribute Mapping
+
+The ACS callback extracts user attributes from the SAML response:
+
+| SAML Attribute | User Field |
+|---|---|
+| `urn:oid:0.9.2342.19200300.100.1.3` (mail) | `email`, `user_id` |
+| `urn:oid:2.5.4.42` + `urn:oid:2.5.4.4` (givenName + sn) | `name` |
+| `displayName` | `name` (preferred) |
+| `NameID` | `user_id` (fallback) |
+
+### Editing a Provider
+
+Each provider card in admin config has a collapsible **Edit Provider** section. Expand it to update the metadata URL, display name, or other fields without removing and re-adding the provider.
+
+### Testing with MockSAML
+
+[MockSAML](https://mocksaml.com/) is a free test IdP that accepts any SP — no registration required.
+
+1. Follow the setup steps above with these values:
+   - **Display Name**: `MockSAML SSO`
+   - **IdP Metadata URL**: `https://mocksaml.com/api/saml/metadata`
+
+   > **Important**: Use the metadata URL (`/api/saml/metadata`), not the SSO URL (`/api/saml/sso`). The metadata URL returns XML; the SSO URL is the login page.
+
+2. Log out and click **MockSAML SSO** on the landing page.
+
+3. MockSAML presents a login form pre-filled with `jackson@example.com`. Any password works. Click **Sign In**.
+
+4. You will be redirected back to Vandalizer, logged in as `jackson@example.com`.
+
+
+### Coexistence with Other Auth Methods
+
+SAML, OAuth, and password auth can all be enabled simultaneously. Each method gets its own section on the landing page. Users can sign in with whichever method is available to them.
+
 ## Testing
 
 We have End-to-End tests written in pytest and Selenium.

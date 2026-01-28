@@ -187,14 +187,19 @@ if env != "production" and "password" not in auth_methods:
     auth_methods = auth_methods + ["password"]
 PASSWORD_AUTH_ENABLED = "password" in auth_methods
 OAUTH_AUTH_ENABLED = "oauth" in auth_methods
+SAML_AUTH_ENABLED = "saml" in auth_methods
 
 app.config["AUTH_PASSWORD_ENABLED"] = PASSWORD_AUTH_ENABLED
 app.config["AUTH_OAUTH_ENABLED"] = OAUTH_AUTH_ENABLED
+app.config["AUTH_SAML_ENABLED"] = SAML_AUTH_ENABLED
+
+# Determine auth mode — any SSO method counts as non-password
+sso_enabled = OAUTH_AUTH_ENABLED or SAML_AUTH_ENABLED
 app.config["AUTH_MODE"] = (
     "OAUTH"
-    if OAUTH_AUTH_ENABLED and not PASSWORD_AUTH_ENABLED
+    if sso_enabled and not PASSWORD_AUTH_ENABLED
     else "PASSWORD"
-    if PASSWORD_AUTH_ENABLED and not OAUTH_AUTH_ENABLED
+    if PASSWORD_AUTH_ENABLED and not sso_enabled
     else "HYBRID"
 )
 
@@ -256,6 +261,7 @@ def inject_ui_config():
         "ui_radius": get_ui_radius(),
         "auth_password_enabled": PASSWORD_AUTH_ENABLED,
         "auth_oauth_enabled": OAUTH_AUTH_ENABLED,
+        "auth_saml_enabled": SAML_AUTH_ENABLED,
     }
 
 

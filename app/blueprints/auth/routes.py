@@ -17,7 +17,7 @@ from mongoengine.errors import NotUniqueError
 
 from app import load_user
 from app.models import TeamInvite, TeamMembership, User
-from app.utilities.config import get_auth_methods
+from app.utilities.config import get_auth_methods, get_saml_providers
 
 auth = Blueprint("auth", __name__)
 
@@ -31,11 +31,14 @@ def index() -> ResponseReturnValue:
         return redirect(url_for("home.index"))
 
     methods = get_auth_methods()
+    saml_providers = get_saml_providers() if "saml" in methods else []
     return render_template(
         "landing.html",
         AUTH_MODE=current_app.config["AUTH_MODE"],
         password_enabled="password" in methods,
         oauth_enabled="oauth" in methods,
+        saml_enabled="saml" in methods,
+        saml_providers=saml_providers,
     )
 
 
@@ -149,6 +152,158 @@ def register():
 @auth.route("/logout")
 def logout() -> ResponseReturnValue:
     """Handle the logout process. Clear the session and redirect to the landing page."""
+    session.clear()
+    return redirect(url_for("auth.index"))
+
+
+@auth.route("/saml/login")
+def saml_login() -> ResponseReturnValue:
+    """Initiate SAML login redirect to IdP."""
+    from app.blueprints.auth.saml_utils import prepare_saml_auth
+
+    provider_index = request.args.get("provider", 0, type=int)
+    providers = get_saml_providers()
+    if provider_index < 0 or provider_index >= len(providers):
+        flash("Invalid SAML provider.", "danger")
+        return redirect(url_for("auth.index"))
+
+    provider = providers[provider_index]
+    try:
+        saml_auth = prepare_saml_auth(provider)
+        sso_url = saml_auth.login()
+        return redirect(sso_url)
+    except ValueError as e:
+        current_app.logger.error("SAML configuration error: %s", e)
+        flash(str(e), "danger")
+        return redirect(url_for("auth.index"))
+    except Exception:
+        current_app.logger.exception("SAML login initiation failed")
+        flash("SAML login failed. Please try again or contact an administrator.", "danger")
+        return redirect(url_for("auth.index"))
+
+
+@auth.route("/saml/acs", methods=["POST"])
+def saml_acs() -> ResponseReturnValue:
+    """SAML Assertion Consumer Service — process IdP response."""
+    from app.blueprints.auth.saml_utils import extract_user_attrs, prepare_saml_auth
+
+    provider_index = request.form.get("RelayState", session.get("saml_provider_index", "0"))
+    try:
+        provider_index = int(provider_index)
+    except (ValueError, TypeError):
+        provider_index = 0
+
+    providers = get_saml_providers()
+    if provider_index < 0 or provider_index >= len(providers):
+        flash("Invalid SAML provider.", "danger")
+        return redirect(url_for("auth.index"))
+
+    provider = providers[provider_index]
+    try:
+        saml_auth = prepare_saml_auth(provider)
+        saml_auth.process_response()
+        errors = saml_auth.get_errors()
+        if errors:
+            current_app.logger.warning("SAML ACS errors: %s — reason: %s", errors, saml_auth.get_last_error_reason())
+            flash("SAML authentication failed. Please try again.", "danger")
+            return redirect(url_for("auth.index"))
+
+        if not saml_auth.is_authenticated():
+            flash("SAML authentication was not successful.", "danger")
+            return redirect(url_for("auth.index"))
+
+        # Extract user attributes and create/update user
+        user_info = extract_user_attrs(saml_auth)
+        user_id = user_info["user_id"]
+        if not user_id:
+            flash("Could not determine user identity from SAML response.", "danger")
+            return redirect(url_for("auth.index"))
+
+        user = User.objects(user_id=user_id).first()
+        if not user:
+            user = User(
+                user_id=user_id,
+                email=user_info.get("email") or user_id,
+                name=user_info.get("name"),
+            )
+            # Check for pending team invites
+            pending_invites = list(TeamInvite.objects(email=user_id.lower(), accepted=False))
+            if pending_invites:
+                user.current_team = pending_invites[0].team
+            user.save()
+
+            # Process pending invites
+            for inv in pending_invites:
+                try:
+                    existing = TeamMembership.objects(team=inv.team, user_id=user_id).first()
+                    if not existing:
+                        TeamMembership(team=inv.team, user_id=user_id, role=inv.role).save()
+                    inv.accepted = True
+                    inv.save()
+                except NotUniqueError:
+                    inv.accepted = True
+                    inv.save()
+        else:
+            updated = False
+            if user_info.get("email") and not user.email:
+                user.email = user_info["email"]
+                updated = True
+            if user_info.get("name") and not user.name:
+                user.name = user_info["name"]
+                updated = True
+            if updated:
+                user.save()
+
+        login_user(user)
+        flash("You have been logged in!", "success")
+        return redirect(url_for("home.index"))
+
+    except Exception:
+        current_app.logger.exception("SAML ACS processing failed")
+        flash("SAML authentication failed. Please try again.", "danger")
+        return redirect(url_for("auth.index"))
+
+
+@auth.route("/saml/metadata")
+def saml_metadata() -> ResponseReturnValue:
+    """Serve SP metadata XML for IdP registration."""
+    from app.blueprints.auth.saml_utils import prepare_saml_auth
+
+    providers = get_saml_providers()
+    provider = providers[0] if providers else {}
+    try:
+        saml_auth = prepare_saml_auth(provider)
+        metadata = saml_auth.get_settings().get_sp_metadata()
+        errors = saml_auth.get_settings().validate_metadata(metadata)
+        if errors:
+            current_app.logger.warning("SP metadata validation errors: %s", errors)
+        return current_app.response_class(metadata, mimetype="text/xml")
+    except Exception:
+        current_app.logger.exception("Failed to generate SP metadata")
+        return "Failed to generate SP metadata", 500
+
+
+@auth.route("/saml/sls")
+def saml_sls() -> ResponseReturnValue:
+    """Single Logout Service — handle IdP-initiated logout."""
+    from app.blueprints.auth.saml_utils import prepare_saml_auth
+
+    providers = get_saml_providers()
+    if not providers:
+        session.clear()
+        return redirect(url_for("auth.index"))
+
+    try:
+        saml_auth = prepare_saml_auth(providers[0])
+        url = saml_auth.process_slo(delete_session_cb=lambda: session.clear())
+        errors = saml_auth.get_errors()
+        if errors:
+            current_app.logger.warning("SAML SLS errors: %s", errors)
+        if url:
+            return redirect(url)
+    except Exception:
+        current_app.logger.exception("SAML SLS processing failed")
+
     session.clear()
     return redirect(url_for("auth.index"))
 

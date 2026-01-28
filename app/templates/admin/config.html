@@ -442,7 +442,12 @@
                     <div class="checkbox-group">
                         <input type="checkbox" id="auth_oauth" name="auth_oauth"
                                {% if 'oauth' in config.auth_methods %}checked{% endif %}>
-                        <label for="auth_oauth" style="margin: 0;">OAuth/SAML</label>
+                        <label for="auth_oauth" style="margin: 0;">OAuth</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="auth_saml" name="auth_saml"
+                               {% if 'saml' in config.auth_methods %}checked{% endif %}>
+                        <label for="auth_saml" style="margin: 0;">SAML 2.0</label>
                     </div>
                 </div>
             </div>
@@ -480,8 +485,12 @@
                         </div>
                     </div>
                     <div class="provider-details">
+                        {% if provider.client_id %}
                         <div class="provider-detail"><strong>Client ID:</strong> {{ provider.client_id[:20] }}...</div>
+                        {% endif %}
+                        {% if provider.redirect_uri %}
                         <div class="provider-detail"><strong>Redirect URI:</strong> {{ provider.redirect_uri }}</div>
+                        {% endif %}
                         {% if provider.tenant_id %}
                         <div class="provider-detail"><strong>Tenant ID:</strong> {{ provider.tenant_id }}</div>
                         {% endif %}
@@ -491,7 +500,106 @@
                         {% if provider.entity_id %}
                         <div class="provider-detail"><strong>Entity ID:</strong> {{ provider.entity_id }}</div>
                         {% endif %}
+                        {% if provider.provider == 'saml' %}
+                        <div class="provider-detail">
+                            <strong>ACS URL:</strong> {{ url_for('auth.saml_acs', _external=True) }}
+                        </div>
+                        <div class="provider-detail">
+                            <a href="{{ url_for('auth.saml_metadata') }}" target="_blank" style="color: #3b82f6;">Download SP Metadata</a>
+                        </div>
+                        {% endif %}
                     </div>
+
+                    <!-- Edit Provider (collapsible) -->
+                    <details style="margin-top: 12px;">
+                        <summary style="cursor: pointer; font-size: 13px; font-weight: 600; color: #3b82f6;">Edit Provider</summary>
+                        <form method="POST" action="/admin/config/auth/edit_provider/{{ loop.index0 }}" style="margin-top: 12px;">
+                            <div class="form-row">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Display Name</label>
+                                    <input type="text" name="display_name" value="{{ provider.display_name }}" placeholder="Display Name">
+                                </div>
+                                {% if provider.provider != 'saml' %}
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Client ID</label>
+                                    <input type="text" name="client_id" value="{{ provider.client_id or '' }}" placeholder="Client ID">
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% if provider.provider != 'saml' %}
+                            <div class="form-row">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Client Secret</label>
+                                    <input type="password" name="client_secret" placeholder="Leave blank to keep current">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Redirect URI</label>
+                                    <input type="url" name="redirect_uri" value="{{ provider.redirect_uri or '' }}" placeholder="Redirect URI">
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if provider.provider == 'azure' %}
+                            <div class="form-row-full">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Tenant ID</label>
+                                    <input type="text" name="tenant_id" value="{{ provider.tenant_id or '' }}" placeholder="Tenant ID">
+                                </div>
+                            </div>
+                            {% elif provider.provider == 'saml' %}
+                            <div class="form-row">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>IdP Metadata URL</label>
+                                    <input type="url" name="metadata_url" value="{{ provider.metadata_url or '' }}" placeholder="https://idp.example.com/metadata">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>SP Entity ID</label>
+                                    <input type="text" name="entity_id" value="{{ provider.entity_id or '' }}" placeholder="Auto-generated">
+                                </div>
+                            </div>
+                            <div class="form-row-full">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Name ID Format</label>
+                                    <select name="name_id_format">
+                                        <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" {% if provider.get('name_id_format','') == 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress' or not provider.get('name_id_format') %}selected{% endif %}>Email Address</option>
+                                        <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified" {% if provider.get('name_id_format','') == 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified' %}selected{% endif %}>Unspecified</option>
+                                        <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent" {% if provider.get('name_id_format','') == 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent' %}selected{% endif %}>Persistent</option>
+                                        <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" {% if provider.get('name_id_format','') == 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient' %}selected{% endif %}>Transient</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row-full">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>SP Certificate (PEM)</label>
+                                    <textarea name="sp_x509cert" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:monospace;" placeholder="Leave blank to keep current">{{ provider.x509cert or '' }}</textarea>
+                                </div>
+                            </div>
+                            <div class="form-row-full">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>SP Private Key (PEM)</label>
+                                    <textarea name="sp_private_key" rows="2" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:8px;font-size:12px;font-family:monospace;" placeholder="Leave blank to keep current"></textarea>
+                                </div>
+                            </div>
+                            {% elif provider.provider not in ('azure', 'saml') %}
+                            <div class="form-row-full">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Authorization Endpoint</label>
+                                    <input type="url" name="authorization_endpoint" value="{{ provider.authorization_endpoint or '' }}">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group" style="margin: 0;">
+                                    <label>Token Endpoint</label>
+                                    <input type="url" name="token_endpoint" value="{{ provider.token_endpoint or '' }}">
+                                </div>
+                                <div class="form-group" style="margin: 0;">
+                                    <label>User Info Endpoint</label>
+                                    <input type="url" name="userinfo_endpoint" value="{{ provider.userinfo_endpoint or '' }}">
+                                </div>
+                            </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 8px;">Save Changes</button>
+                        </form>
+                    </details>
                 </li>
                 {% endfor %}
             </ul>
@@ -556,16 +664,46 @@
                     <div id="saml-fields" class="provider-specific-fields">
                         <div class="form-row">
                             <div class="form-group" style="margin: 0;">
-                                <label for="metadata_url">Metadata URL</label>
+                                <label for="metadata_url">IdP Metadata URL <span style="color: #ef4444;">*</span></label>
                                 <input type="url" id="metadata_url" name="metadata_url"
                                        placeholder="https://idp.example.com/metadata">
                             </div>
                             <div class="form-group" style="margin: 0;">
-                                <label for="entity_id">Entity ID</label>
+                                <label for="entity_id">SP Entity ID (optional)</label>
                                 <input type="text" id="entity_id" name="entity_id"
-                                       placeholder="urn:example:sp">
+                                       placeholder="Auto-generated from app URL">
                             </div>
                         </div>
+                        <div class="form-row-full">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="name_id_format">Name ID Format</label>
+                                <select id="name_id_format" name="name_id_format">
+                                    <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">Email Address (recommended)</option>
+                                    <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">Unspecified</option>
+                                    <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">Persistent</option>
+                                    <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:transient">Transient</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row-full">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="sp_x509cert">SP Certificate (optional, PEM format)</label>
+                                <textarea id="sp_x509cert" name="sp_x509cert" rows="3"
+                                          style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:monospace;"
+                                          placeholder="Paste PEM certificate (without BEGIN/END headers)"></textarea>
+                            </div>
+                        </div>
+                        <div class="form-row-full">
+                            <div class="form-group" style="margin: 0;">
+                                <label for="sp_private_key">SP Private Key (optional, PEM format)</label>
+                                <textarea id="sp_private_key" name="sp_private_key" rows="3"
+                                          style="width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:8px;font-size:13px;font-family:monospace;"
+                                          placeholder="Paste PEM private key (without BEGIN/END headers)"></textarea>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: #6b7280; margin-top: 8px;">
+                            ACS URL (configure in your IdP): <code>{{ url_for('auth.saml_acs', _external=True) }}</code>
+                        </p>
                     </div>
 
                     <!-- Custom OAuth fields -->
@@ -718,11 +856,26 @@
             customFields.classList.add('active');
         }
 
+        // SAML doesn't need client_id or redirect_uri
+        const clientIdInput = document.getElementById('client_id');
+        const redirectUriInput = document.getElementById('redirect_uri');
+        if (providerType === 'saml') {
+            clientIdInput.removeAttribute('required');
+            redirectUriInput.removeAttribute('required');
+            clientIdInput.closest('.form-row').style.display = 'none';
+            redirectUriInput.closest('.form-row-full').style.display = 'none';
+        } else {
+            clientIdInput.setAttribute('required', '');
+            redirectUriInput.setAttribute('required', '');
+            clientIdInput.closest('.form-row').style.display = '';
+            redirectUriInput.closest('.form-row-full').style.display = '';
+        }
+
         // Update display name placeholder
         const displayNameInput = document.getElementById('display_name');
         const placeholders = {
             'azure': 'Sign in with Azure',
-            'saml': 'Sign in with SAML',
+            'saml': 'Sign in with SUU SSO',
             'google': 'Sign in with Google',
             'github': 'Sign in with GitHub',
             'okta': 'Sign in with Okta',

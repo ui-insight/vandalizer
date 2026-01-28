@@ -322,6 +322,19 @@ def get_oauth_providers(enabled_only: bool = True) -> list[dict]:
     return []
 
 
+def get_saml_providers(enabled_only: bool = True) -> list[dict]:
+    """Get SAML providers from database config.
+
+    Args:
+        enabled_only: If True, only return enabled providers
+
+    Returns:
+        List of SAML provider configurations
+    """
+    providers = get_oauth_providers(enabled_only=enabled_only)
+    return [p for p in providers if p.get("provider") == "saml"]
+
+
 def get_oauth_provider_by_type(provider_type: str) -> dict | None:
     """Get a specific OAuth provider configuration by type.
 

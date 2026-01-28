@@ -454,12 +454,15 @@ def admin_config_update_auth_methods():
     # Get selected auth methods from checkboxes
     password_enabled = request.form.get("auth_password") == "on"
     oauth_enabled = request.form.get("auth_oauth") == "on"
+    saml_enabled = request.form.get("auth_saml") == "on"
 
     auth_methods = []
     if password_enabled:
         auth_methods.append("password")
     if oauth_enabled:
         auth_methods.append("oauth")
+    if saml_enabled:
+        auth_methods.append("saml")
 
     # Ensure at least one method is enabled
     if not auth_methods:
@@ -488,8 +491,14 @@ def admin_config_add_oauth_provider():
     client_secret = request.form.get("client_secret", "").strip()
     redirect_uri = request.form.get("redirect_uri", "").strip()
 
-    if not all([provider_type, display_name, client_id, redirect_uri]):
-        return jsonify({"error": "Provider type, display name, client ID, and redirect URI are required"}), 400
+    # SAML providers don't require client_id or redirect_uri
+    if provider_type == "saml":
+        metadata_url = request.form.get("metadata_url", "").strip()
+        if not all([provider_type, display_name, metadata_url]):
+            return jsonify({"error": "Provider type, display name, and metadata URL are required for SAML"}), 400
+    else:
+        if not all([provider_type, display_name, client_id, redirect_uri]):
+            return jsonify({"error": "Provider type, display name, client ID, and redirect URI are required"}), 400
 
     new_provider = {
         "provider": provider_type,
@@ -511,10 +520,19 @@ def admin_config_add_oauth_provider():
     elif provider_type == "saml":
         metadata_url = request.form.get("metadata_url", "").strip()
         entity_id = request.form.get("entity_id", "").strip()
+        name_id_format = request.form.get("name_id_format", "").strip()
+        x509cert = request.form.get("sp_x509cert", "").strip()
+        private_key = request.form.get("sp_private_key", "").strip()
         if metadata_url:
             new_provider["metadata_url"] = metadata_url
         if entity_id:
             new_provider["entity_id"] = entity_id
+        if name_id_format:
+            new_provider["name_id_format"] = name_id_format
+        if x509cert:
+            new_provider["x509cert"] = x509cert
+        if private_key:
+            new_provider["private_key"] = private_key
 
     else:
         # Custom OAuth provider
@@ -533,6 +551,53 @@ def admin_config_add_oauth_provider():
         config.oauth_providers = []
 
     config.oauth_providers.append(new_provider)
+    config.updated_at = datetime.now(timezone.utc)
+    config.updated_by = user.user_id
+    config.save()
+
+    return redirect(url_for("admin.admin_config"))
+
+
+@admin.route("/config/auth/edit_provider/<int:index>", methods=["POST"])
+def admin_config_edit_oauth_provider(index):
+    """Edit an existing OAuth/SAML provider."""
+    user = load_user()
+    if not user.is_admin:
+        abort(403)
+
+    config = SystemConfig.get_config()
+
+    if index < 0 or index >= len(config.oauth_providers):
+        return jsonify({"error": "Invalid provider index"}), 400
+
+    provider = config.oauth_providers[index]
+
+    # Update common fields (only if provided and non-empty)
+    for field in ("display_name", "client_id", "client_secret", "redirect_uri"):
+        val = request.form.get(field, "").strip()
+        if val:
+            provider[field] = val
+
+    # Update provider-type-specific fields
+    ptype = provider.get("provider")
+    if ptype == "azure":
+        tenant_id = request.form.get("tenant_id", "").strip()
+        if tenant_id:
+            provider["tenant_id"] = tenant_id
+            provider["authority"] = f"https://login.microsoftonline.com/{tenant_id}"
+    elif ptype == "saml":
+        for field in ("metadata_url", "entity_id", "name_id_format", "x509cert", "private_key"):
+            form_key = f"sp_{field}" if field in ("x509cert", "private_key") else field
+            val = request.form.get(form_key, "").strip()
+            if val:
+                provider[field] = val
+    else:
+        for field in ("authorization_endpoint", "token_endpoint", "userinfo_endpoint"):
+            val = request.form.get(field, "").strip()
+            if val:
+                provider[field] = val
+
+    config.oauth_providers[index] = provider
     config.updated_at = datetime.now(timezone.utc)
     config.updated_by = user.user_id
     config.save()
