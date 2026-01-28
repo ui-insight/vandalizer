@@ -61,6 +61,19 @@ def create_app() -> Flask:
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
+                # Passive Vandalizer: passive processing queue
+                "tasks.passive.*": {"queue": "passive"},
+            },
+            # Passive Vandalizer: Beat schedule for passive processing
+            "beat_schedule": {
+                "process-pending-triggers": {
+                    "task": "tasks.passive.process_pending_triggers",
+                    "schedule": 60.0,  # Every minute
+                },
+                "cleanup-old-trigger-events": {
+                    "task": "tasks.passive.cleanup_old_trigger_events",
+                    "schedule": 86400.0,  # Daily
+                },
             },
         }
     )
@@ -167,6 +180,7 @@ def load_user() -> User | None:
 from .blueprints.activity.routes import activity  # noqa: E402
 from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
+from .blueprints.automation.routes import automation  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
 from .blueprints.files.routes import files  # noqa: E402
 from .blueprints.home.routes import home  # noqa: E402
@@ -189,6 +203,7 @@ app.register_blueprint(admin, url_prefix="/admin")
 app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
+app.register_blueprint(automation, url_prefix="/automation")
 
 # Import Celery tasks so they're registered when app starts
 # This ensures tasks are discovered by Celery workers

@@ -252,6 +252,29 @@ def upload():
 
     document.save()
 
+    # Passive Vandalizer: Check for workflows watching this folder
+    try:
+        from app.models import Workflow
+        from app.utilities.passive_triggers import create_folder_watch_trigger
+        
+        # Find workflows with folder watch enabled for this folder
+        watching_workflows = Workflow.objects(
+            input_config__folder_watch__enabled=True
+        )
+        
+        for workflow in watching_workflows:
+            folder_watch_config = workflow.input_config.get("folder_watch", {})
+            watched_folders = folder_watch_config.get("folders", [])
+            
+            # Check if this folder is being watched
+            if str(target_folder) in watched_folders or target_folder in watched_folders:
+                # Create a pending trigger event
+                create_folder_watch_trigger(workflow, document)
+                
+    except Exception as e:
+        # Log error but don't fail the upload
+        current_app.logger.error(f"Error creating folder watch trigger: {e}")
+
     return jsonify({"complete": True, "uuid": uid}), 200
 
 

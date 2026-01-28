@@ -755,6 +755,29 @@
         }
     };
 
+    window.openWorkflowConfig = function (workflowId) {
+        // Set flag to switch to Input tab after workflow loads
+        window._switchToInputTab = true;
+
+        // Fetch workflow normally
+        if (typeof fetchWorkflow === 'function') {
+            fetchWorkflow(workflowId);
+        } else {
+            console.error("fetchWorkflow function not found");
+            alert("Could not open workflow configuration.");
+        }
+    };
+
+    // Listen for when workflow loads, then switch to Input tab if flagged
+    $(document).on('DOMNodeInserted', '.workflow-tabs', function (e) {
+        if (window._switchToInputTab) {
+            window._switchToInputTab = false;
+            setTimeout(function () {
+                $('.workflow-tab[data-tab="input"]').click();
+            }, 150);
+        }
+    });
+
     window.toggleMenu = function (e, menuId) {
         e.stopPropagation();
         e.preventDefault();

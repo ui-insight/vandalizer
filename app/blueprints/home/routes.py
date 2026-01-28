@@ -534,10 +534,47 @@ def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
         return "", ""
 
     can_customize = user_can_modify_verified(load_user(), workflow)
+
+    # Prepare workflow configuration for JS (Input/Output tabs)
+    user = load_user()
+    workflow_config = {}
+    
+    if user:
+        # Get available folders for the user
+        folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+        
+        # Build folder paths
+        available_folders = []
+        for folder in folders:
+            # Build folder path by traversing parents
+            path_parts = [folder.title]
+            current = folder
+            while current.parent_id and current.parent_id != "0":
+                parent = SmartFolder.objects(uuid=current.parent_id).only('title', 'parent_id').first()
+                if parent:
+                    path_parts.insert(0, parent.title)
+                    current = parent
+                else:
+                    break
+            
+            available_folders.append({
+                'uuid': folder.uuid,
+                'title': folder.title,
+                'path': ' / '.join(path_parts)
+            })
+
+        workflow_config = {
+            'workflow_id': str(workflow.id),
+            'input_config': workflow.input_config or {},
+            'output_config': workflow.output_config or {},
+            'available_folders': available_folders
+        }
+
     workflow_tpl = render_template(
         "workflows/workflow.html",
         workflow=workflow,
         can_customize_workflow=can_customize,
+        workflow_config=workflow_config,
     )
 
     step_tpl = ""

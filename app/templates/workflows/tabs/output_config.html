@@ -1,0 +1,219 @@
+<div class="config-tab-content">
+    <!-- Storage -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <label class="config-toggle">
+                <input type="checkbox" id="storage-enabled" class="config-checkbox">
+                <span class="config-toggle-slider"></span>
+            </label>
+            <i class="fa-solid fa-hard-drive"></i> Storage
+            <span class="config-badge" id="storage-status">Disabled</span>
+        </div>
+
+        <div id="storage-config" style="display: none;">
+            <div class="config-field">
+                <label class="config-field-label">
+                    Destination Folder
+                    <span style="color: #ef4444;">*</span>
+                </label>
+                <select id="storage-destination-folder">
+                    <option value="">Select a folder...</option>
+                    <!-- Will be populated by JavaScript -->
+                </select>
+                <p class="config-field-hint">
+                    Save workflow results to this folder.
+                </p>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">File Format</label>
+                <select id="storage-format">
+                    <option value="csv">CSV</option>
+                    <option value="json">JSON</option>
+                    <option value="xlsx">Excel (XLSX)</option>
+                </select>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">File Naming Template</label>
+                <input type="text" id="storage-filename" value="{date}_{workflow_name}_results">
+                <p class="config-field-hint">
+                    Available variables: <code>{date}</code>, <code>{time}</code>, <code>{workflow_name}</code>,
+                    <code>{run_id}</code>
+                    <br>Example: <span id="filename-preview" style="font-weight: 500;"></span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications -->
+    <!-- Notifications -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <label class="config-toggle">
+                <input type="checkbox" id="notifications-enabled" class="config-checkbox">
+                <span class="config-toggle-slider"></span>
+            </label>
+            <i class="fa-solid fa-envelope"></i> Notifications
+            <span class="config-badge" style="background: #dbeafe; color: #1e40af;"
+                id="notifications-status">Disabled</span>
+        </div>
+
+        <div id="notifications-config" style="display: none;">
+            <div style="display: flex; justify-content: flex-end; margin-bottom: 15px;">
+                <button class="btn-secondary" id="add-notification-btn">
+                    <i class="fa-solid fa-plus"></i> Add Notification
+                </button>
+            </div>
+
+            <div id="notifications-list">
+                <!-- Notification items will be added here dynamically -->
+            </div>
+
+            <div id="no-notifications-message"
+                style="color: #6b7280; font-size: 13px; text-align: center; padding: 20px;">
+                <i class="fa-solid fa-bell-slash"></i> No notifications configured. Click "Add Notification" to get
+                started.
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Notification Template (Hidden) -->
+<template id="notification-template">
+    <div class="notification-item" data-index="0">
+        <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+                <div class="config-field">
+                    <label class="config-field-label">Channel</label>
+                    <select class="notification-channel">
+                        <option value="email">Email</option>
+                        <option value="slack" disabled>Slack (Phase 2)</option>
+                        <option value="teams" disabled>MS Teams (Phase 2)</option>
+                    </select>
+                </div>
+
+                <div class="config-field">
+                    <label class="config-field-label">Recipients (Email Addresses)</label>
+                    <input type="text" class="notification-recipients"
+                        placeholder="email1@example.com, email2@example.com">
+                    <p class="config-field-hint">Comma-separated email addresses</p>
+                </div>
+
+                <div class="config-field">
+                    <label class="config-field-label">Email Subject</label>
+                    <input type="text" class="notification-subject" value="Workflow Notification: {workflow_name}">
+                    <p class="config-field-hint">
+                        Available variables: <code>{workflow_name}</code>, <code>{status}</code>, <code>{date}</code>
+                    </p>
+                </div>
+
+                <div class="config-field">
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="notification-notify-owner"> Notify workflow owner
+                    </label>
+                </div>
+
+                <div class="config-field">
+                    <label class="config-field-label">When to Send</label>
+                    <select class="notification-conditions">
+                        <option value="always">Always</option>
+                        <option value="success">On Success Only</option>
+                        <option value="failure">On Failure Only</option>
+                    </select>
+                </div>
+
+                <div class="config-field">
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="notification-include-summary" checked> Include results summary
+                    </label>
+                </div>
+            </div>
+
+            <button class="btn-important remove-notification-btn" style="margin-left: 15px; padding: 8px 12px;">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        </div>
+    </div>
+</template>
+
+<script>
+    let notificationIndex = 0;
+
+    // Storage toggle
+    $('#storage-enabled').on('change', function () {
+        const enabled = $(this).is(':checked');
+        $('#storage-config').toggle(enabled);
+        $('#storage-status').text(enabled ? 'Enabled' : 'Disabled')
+            .css({
+                'background': enabled ? '#d1fae5' : '#dbeafe',
+                'color': enabled ? '#065f46' : '#1e40af'
+            });
+        updateOutputBadge();
+    });
+
+    // Notifications toggle
+    $('#notifications-enabled').on('change', function () {
+        const enabled = $(this).is(':checked');
+        $('#notifications-config').toggle(enabled);
+        $('#notifications-status').text(enabled ? 'Enabled' : 'Disabled')
+            .css({
+                'background': enabled ? '#d1fae5' : '#dbeafe',
+                'color': enabled ? '#065f46' : '#1e40af'
+            });
+        updateOutputBadge();
+    });
+
+    // Update filename preview
+    function updateFilenamePreview() {
+        const template = $('#storage-filename').val();
+        const now = new Date();
+        const preview = template
+            .replace('{date}', now.toISOString().split('T')[0])
+            .replace('{time}', now.toTimeString().split(' ')[0].replace(/:/g, '-'))
+            .replace('{workflow_name}', 'my_workflow')
+            .replace('{run_id}', '12345');
+        const format = $('#storage-format').val();
+        $('#filename-preview').text(preview + '.' + format);
+    }
+
+    $('#storage-filename, #storage-format').on('input change', updateFilenamePreview);
+    updateFilenamePreview();
+
+    // Add notification
+    $('#add-notification-btn').on('click', function () {
+        const template = $('#notification-template').html();
+        const $notification = $(template);
+        $notification.attr('data-index', notificationIndex++);
+        $('#notifications-list').append($notification);
+        $('#no-notifications-message').hide();
+        updateOutputBadge();
+    });
+
+    // Remove notification
+    $(document).on('click', '.remove-notification-btn', function () {
+        $(this).closest('.notification-item').remove();
+        if ($('.notification-item').length === 0) {
+            $('#no-notifications-message').show();
+        }
+        updateOutputBadge();
+    });
+
+    function updateOutputBadge() {
+        const storageEnabled = $('#storage-enabled').is(':checked');
+        const notificationsEnabled = $('#notifications-enabled').is(':checked');
+        const notificationCount = $('.notification-item').length;
+
+        let badgeText = [];
+        if (storageEnabled) badgeText.push('Storage');
+        if (notificationsEnabled) {
+            badgeText.push(`${notificationCount || 'No'} notification${notificationCount !== 1 ? 's' : ''}`);
+        }
+
+        if (badgeText.length > 0) {
+            $('#output-badge').text(badgeText.join(', ')).show();
+        } else {
+            $('#output-badge').hide();
+        }
+    }
+</script>

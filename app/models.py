@@ -185,6 +185,63 @@ class Workflow(me.Document):
     space = me.StringField(required=False, max_length=100)
     verified = me.BooleanField(default=False)
     created_by_user_id = me.StringField(required=False, max_length=200)
+    
+    # Passive Vandalizer: Input configuration (how workflow triggers)
+    input_config = me.DictField(required=False, default=lambda: {
+        'manual_enabled': True,  # Existing manual "Run" behavior
+        'folder_watch': {
+            'enabled': False,
+            'folders': [],  # List of SmartFolder UUIDs to watch
+            'delay_seconds': 300,  # Wait 5 min after upload
+            'file_filters': {
+                'types': [],  # e.g., ['pdf', 'docx']
+                'exclude_patterns': []  # e.g., ['*_draft*']
+            },
+            'batch_mode': 'per_document'  # or 'collect_batch'
+        },
+        'conditions': []  # Optional document filters
+    })
+    
+    # Passive Vandalizer: Output configuration (what happens after completion)
+    output_config = me.DictField(required=False, default=lambda: {
+        'storage': {
+            'enabled': False,
+            'destination_folder': None,  # SmartFolder UUID
+            'file_naming': '{date}_{workflow_name}_results',
+            'format': 'csv',  # csv, json, xlsx
+            'append_mode': False
+        },
+        'notifications': []  # List of notification configs
+    })
+    
+    # Passive Vandalizer: Resource controls
+    resource_config = me.DictField(required=False, default=lambda: {
+        'budget': {
+            'daily_token_limit': None,
+            'monthly_token_limit': None
+        },
+        'throttling': {
+            'max_concurrent': 3,
+            'min_delay_between_runs': 60
+        },
+        'retry': {
+            'max_retries': 3,
+            'retry_delay_seconds': 300
+        }
+    })
+    
+    # Passive Vandalizer: Statistics tracking
+    stats = me.DictField(required=False, default=lambda: {
+        'total_runs': 0,
+        'manual_runs': 0,
+        'passive_runs': 0,
+        'successful_runs': 0,
+        'failed_runs': 0,
+        'documents_processed': 0,
+        'tokens_used': 0,
+        'last_run_at': None,
+        'last_passive_run_at': None
+    })
 
 
 class WorkflowResult(me.Document):
@@ -201,6 +258,75 @@ class WorkflowResult(me.Document):
     current_step_name = me.StringField(required=False, max_length=500)
     current_step_detail = me.StringField(required=False, max_length=50000)
     current_step_preview = me.StringField(required=False)
+    
+    # Passive Vandalizer: Passive execution tracking
+    trigger_event = me.ReferenceField("WorkflowTriggerEvent", required=False)
+    trigger_type = me.StringField(required=False)  # Denormalized for queries: 'manual', 'folder_watch', etc.
+    is_passive = me.BooleanField(default=False)
+    input_context = me.DictField(required=False)  # For chained workflows, API metadata
+
+
+class WorkflowTriggerEvent(me.Document):
+    """Tracks pending and completed triggers for passive workflow execution."""
+    
+    uuid = me.StringField(required=True, max_length=200, unique=True)
+    workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE)
+    trigger_type = me.StringField(
+        required=True,
+        choices=["manual", "folder_watch", "schedule", "api", "chain"]
+    )
+    status = me.StringField(
+        required=True,
+        choices=["pending", "queued", "running", "completed", "failed", "skipped"],
+        default="pending"
+    )
+    
+    # Documents to process
+    documents = me.ListField(me.ReferenceField("SmartDocument"))
+    document_count = me.IntField(default=0)
+    
+    # Trigger context
+    trigger_context = me.DictField()  # folder ref, schedule name, etc.
+    
+    # Timing
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    process_after = me.DateTimeField()  # For delayed processing
+    queued_at = me.DateTimeField()
+    started_at = me.DateTimeField()
+    completed_at = me.DateTimeField()
+    duration_ms = me.IntField()
+    
+    # Results
+    workflow_result = me.ReferenceField("WorkflowResult")
+    documents_succeeded = me.IntField(default=0)
+    documents_failed = me.IntField(default=0)
+    tokens_used = me.IntField(default=0)
+    error = me.StringField()
+    
+    # Retry tracking
+    attempt_number = me.IntField(default=0)
+    max_attempts = me.IntField(default=3)
+    next_retry_at = me.DateTimeField()
+    
+    # Output delivery status
+    output_delivery = me.DictField(default=lambda: {
+        "storage_status": None,
+        "storage_path": None,
+        "notifications_sent": [],
+        "webhooks_called": [],
+        "chains_triggered": []
+    })
+    
+    meta = {
+        "collection": "workflow_trigger_events",
+        "indexes": [
+            "workflow",
+            "status",
+            "process_after",
+            "trigger_type",
+            "created_at"
+        ]
+    }
 
 
 # Teams

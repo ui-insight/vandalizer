@@ -1,0 +1,249 @@
+<div class="config-tab-content">
+    <!-- Manual Trigger (Always ON) -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <i class="fa-solid fa-hand-pointer"></i> Manual Trigger
+            <span class="config-badge">Always Enabled</span>
+        </div>
+        <p style="font-size: 13px; color: #6b7280; margin: 0;">
+            You can always manually run this workflow by selecting documents and clicking "Run".
+        </p>
+    </div>
+
+    <!-- Folder Watch -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <label class="config-toggle">
+                <input type="checkbox" id="folder-watch-enabled" class="config-checkbox">
+                <span class="config-toggle-slider"></span>
+            </label>
+            <i class="fa-solid fa-folder"></i> Folder Watch
+            <span class="config-badge" style="background: #dbeafe; color: #1e40af;"
+                id="folder-watch-status">Disabled</span>
+        </div>
+
+        <div id="folder-watch-config" style="display: none;">
+            <div class="config-field">
+                <label class="config-field-label">
+                    Watched Folders
+                    <span style="color: #ef4444;">*</span>
+                </label>
+                <div id="folder-watch-list" class="folder-list"
+                    style="height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 6px; padding: 10px; background: white;">
+                    <!-- Will be populated by JavaScript -->
+                    <div style="color: #9ca3af; font-size: 13px; text-align: center; padding-top: 80px;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Loading folders...
+                    </div>
+                </div>
+                <p class="config-field-hint">
+                    <i class="fa-solid fa-info-circle"></i> Select folders to watch. When a document is uploaded to
+                    these folders, the workflow will automatically trigger.
+                </p>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">Delay (seconds)</label>
+                <input type="number" id="folder-watch-delay" value="300" min="0" step="60">
+                <p class="config-field-hint">
+                    Wait this many seconds after upload before processing. Default: 300 seconds (5 minutes).
+                </p>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">File Type Filters</label>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="file-type-filter" value="pdf"> PDF
+                    </label>
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="file-type-filter" value="docx"> Word (DOCX)
+                    </label>
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="file-type-filter" value="xlsx"> Excel (XLSX)
+                    </label>
+                    <label style="font-size: 13px;">
+                        <input type="checkbox" class="file-type-filter" value="xls"> Excel (XLS)
+                    </label>
+                </div>
+                <p class="config-field-hint">
+                    If no types are selected, all file types will be processed.
+                </p>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">Exclude Patterns (Optional)</label>
+                <input type="text" id="folder-watch-exclude" placeholder="e.g., *_draft*, temp_*">
+                <p class="config-field-hint">
+                    Comma-separated filename patterns to exclude. Use * as wildcard.
+                </p>
+            </div>
+
+            <div class="config-field">
+                <label class="config-field-label">Batch Mode</label>
+                <select id="folder-watch-batch-mode">
+                    <option value="per_document">Process each document individually</option>
+                    <option value="collect_batch">Collect and process as a batch</option>
+                </select>
+                <p class="config-field-hint">
+                    Choose how documents should be processed when multiple are uploaded.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Trigger -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <label class="config-toggle">
+                <input type="checkbox" id="api-trigger-enabled" class="config-checkbox">
+                <span class="config-toggle-slider"></span>
+            </label>
+            <i class="fa-solid fa-link"></i> API Trigger
+            <span class="config-badge" style="background: #dbeafe; color: #1e40af;"
+                id="api-trigger-status">Disabled</span>
+        </div>
+
+        <div id="api-trigger-config" style="display: none;">
+            <p style="font-size: 13px; color: #6b7280; margin-bottom: 15px;">
+                Trigger this workflow programmatically using the code snippets below.
+            </p>
+
+            <div class="quickstart-code"
+                style="position: relative; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+                <div
+                    style="background: #f3f4f6; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb;">
+                    <span style="font-size: 12px; font-weight: 600; color: #374151;">Integration Code</span>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <select id="api-language-dropdown"
+                            style="padding: 4px 8px; border-radius: 4px; border: 1px solid #d1d5db; font-size: 12px; width: auto;">
+                            <option value="python">Python</option>
+                            <option value="bash">Bash</option>
+                        </select>
+                        <button id="api-copy-btn" class="btn btn-secondary" style="padding: 4px 8px; font-size: 12px;">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <pre
+                    style="margin: 0; padding: 15px; background: #1f2937; color: #f9fafb; overflow-x: auto; font-size: 12px; line-height: 1.5;"><code id="api-code-snippet">import requests
+
+files = {
+    'file1': open('path/to/your/file1.txt', 'rb'),
+    'file2': open('path/to/your/file2.txt', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'workflowID': '{{ workflow.id }}',
+}
+
+response = requests.post(
+    'https://vandalizer.nkn.uidaho.edu/workflow/run',
+    headers={
+        'x-api-key': '{{ current_user.id }}',
+        'Accept': 'application/json',
+    },
+    data=data,
+    files=files,
+)
+
+print(response.json())</code></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+
+    // Initialize folder watch toggle
+    $('#folder-watch-enabled').on('change', function () {
+        const enabled = $(this).is(':checked');
+        $('#folder-watch-config').toggle(enabled);
+        $('#folder-watch-status').text(enabled ? 'Enabled' : 'Disabled')
+            .css({
+                'background': enabled ? '#d1fae5' : '#dbeafe',
+                'color': enabled ? '#065f46' : '#1e40af'
+            });
+        updateInputBadge();
+    });
+
+    // Initialize API trigger toggle
+    $('#api-trigger-enabled').on('change', function () {
+        const enabled = $(this).is(':checked');
+        $('#api-trigger-config').toggle(enabled);
+        $('#api-trigger-status').text(enabled ? 'Enabled' : 'Disabled')
+            .css({
+                'background': enabled ? '#d1fae5' : '#dbeafe',
+                'color': enabled ? '#065f46' : '#1e40af'
+            });
+    });
+
+    // API Trigger Language Switching
+    $('#api-language-dropdown').on('change', function () {
+        const language = $(this).val();
+        let code = '';
+
+        if (language === 'python') {
+            code = `import requests
+
+files = {
+    'file1': open('path/to/your/file1.txt', 'rb'),
+    'file2': open('path/to/your/file2.txt', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'workflowID': '{{ workflow.id }}',
+}
+
+response = requests.post(
+    'https://vandalizer.nkn.uidaho.edu/workflow/run',
+    headers={
+        'x-api-key': '{{ current_user.id }}',
+        'Accept': 'application/json',
+    },
+    data=data,
+    files=files,
+)
+
+print(response.json())`;
+        } else if (language === 'bash') {
+            code = `curl -X POST https://vandalizer.nkn.uidaho.edu/workflow/run \\
+    -H "x-api-key: {{ current_user.id }}" \\
+    -H "Accept: application/json" \\
+    -F "workflowID={{ workflow.id }}" \\
+    -F "file=@path/to/your/file1.txt" \\
+    -F "file=@path/to/your/file2.txt"
+    # Add more files using additional -F flags`;
+        }
+
+        $('#api-code-snippet').text(code);
+    });
+
+    // API Trigger Copy Button
+    $('#api-copy-btn').on('click', function () {
+        const code = $('#api-code-snippet').text();
+        navigator.clipboard.writeText(code).then(() => {
+            const $btn = $(this);
+            const originalHtml = $btn.html();
+            $btn.html('<i class="fa-solid fa-check"></i>').addClass('text-green-600');
+            setTimeout(() => {
+                $btn.html(originalHtml).removeClass('text-green-600');
+            }, 2000);
+        });
+    });
+
+    function updateInputBadge() {
+        const folderWatchEnabled = $('#folder-watch-enabled').is(':checked');
+        const numWatchedFolders = $('.folder-watch-checkbox:checked').length;
+
+        if (folderWatchEnabled && numWatchedFolders > 0) {
+            $('#input-badge').text(`${numWatchedFolders} folder${numWatchedFolders > 1 ? 's' : ''}`).show();
+        } else {
+            $('#input-badge').hide();
+        }
+    }
+
+    $(document).on('change', '.folder-watch-checkbox', updateInputBadge);
+</script>

@@ -33,6 +33,7 @@ from app.models import (
     SearchSet,
     SearchSetItem,
     SmartDocument,
+    SmartFolder,
     Space,
     User,
     UserModelConfig,
@@ -245,6 +246,118 @@ def update_workflow() -> ResponseReturnValue:
         changes=changes,
     )
     return {"success": True}
+
+
+@login_required
+@workflows.route("/edit_configuration", methods=["POST"])
+def edit_configuration() -> ResponseReturnValue:
+    """Edit workflow with configuration tabs (Input/Output)."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+    
+    data = request.get_json()
+    uuid = data["uuid"]
+    workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
+    # Get available folders for the user
+    from app.models import SmartFolder
+    folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+    
+    # Build folder paths
+    available_folders = []
+    for folder in folders:
+        # Build folder path by traversing parents
+        path_parts = [folder.title]
+        current = folder
+        while current.parent_id and current.parent_id != "0":
+            parent = SmartFolder.objects(uuid=current.parent_id).only('title', 'parent_id').first()
+            if parent:
+                path_parts.insert(0, parent.title)
+                current = parent
+            else:
+                break
+        
+        available_folders.append({
+            'uuid': folder.uuid,
+            'title': folder.title,
+            'path': ' / '.join(path_parts)
+        })
+
+    # Prepare workflow config for JS
+    workflow_config = {
+        'workflow_id': str(workflow.id),
+        'input_config': workflow.input_config or {},
+        'output_config': workflow.output_config or {},
+        'available_folders': available_folders
+    }
+
+    template = render_template(
+        "workflows/edit_workflow_config.html",
+        workflow=workflow,
+        workflow_config=workflow_config
+    )
+    return {"template": template}
+
+
+@login_required
+@workflows.route("/save_configuration", methods=["POST"])
+def save_configuration() -> ResponseReturnValue:
+    """Save workflow input/output configuration."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+    
+    data = request.get_json()
+    workflow_id = data.get("workflow_id")
+    workflow = Workflow.objects(id=workflow_id).first()
+    
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
+    try:
+        # Update basic fields
+        if "name" in data:
+            workflow.name = data["name"]
+        if "description" in data:
+            workflow.description = data["description"]
+        
+        # Update input configuration
+        if "input_config" in data:
+            workflow.input_config = data["input_config"]
+        
+        # Update output configuration
+        if "output_config" in data:
+            workflow.output_config = data["output_config"]
+        
+        workflow.updated_at = datetime.datetime.now()
+        workflow.save()
+        
+        # Log the change
+        log_edit_history(
+            kind="workflow",
+            obj_id=str(workflow.id),
+            user=_workflow_user_or_none(),
+            action="update_configuration",
+            changes={
+                "input_config": "Updated",
+                "output_config": "Updated"
+            },
+        )
+        
+        return jsonify({"success": True, "workflow_id": str(workflow.id)})
+    
+    except Exception as e:
+        current_app.logger.error(f"Error saving workflow configuration: {e}")
+        return jsonify({"error": str(e)}), 500
 
 
 @login_required
@@ -912,10 +1025,41 @@ def fetch_workflow() -> ResponseReturnValue:
     workflow = Workflow.objects(id=workflow_id).first()
     can_customize = _workflow_is_editable(workflow)
 
+    # Get user and folders for Input/Output configuration
+    user = current_user
+    folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+    
+    # Build folder paths for dropdown
+    available_folders = []
+    for folder in folders:
+        path_parts = [folder.title]
+        current = folder
+        while current.parent_id:
+            parent = SmartFolder.objects(uuid=current.parent_id).first()
+            if parent:
+                path_parts.insert(0, parent.title)
+                current = parent
+            else:
+                break
+        available_folders.append({
+            'uuid': folder.uuid,
+            'title': folder.title,
+            'path': ' / '.join(path_parts)
+        })
+    
+    # Prepare workflow configuration for tabs
+    workflow_config = {
+        'workflow_id': str(workflow.id),
+        'input_config': workflow.input_config or {},
+        'output_config': workflow.output_config or {},
+        'available_folders': available_folders
+    }
+
     template = render_template(
         "workflows/workflow.html",
         workflow=workflow,
         can_customize_workflow=can_customize,
+        workflow_config=workflow_config,
     )
 
     response = {
