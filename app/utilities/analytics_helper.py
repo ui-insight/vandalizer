@@ -1,11 +1,14 @@
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
+from devtools import debug
 from app.models import (
     ActivityEvent,
     ActivityStatus,
     ActivityType,
     DailyUsageAggregate,
+    SmartDocument,
     Workflow,
     WorkflowResult,
 )
@@ -49,6 +52,7 @@ def activity_start(
     steps_total: int = 0,
     meta_summary: dict | None = None,
     tags: list[str] | None = None,
+    document_uuids: list[str] | None = None,
 ) -> ActivityEvent:
     now = datetime.now(timezone.utc)
     ev = ActivityEvent(
@@ -73,6 +77,16 @@ def activity_start(
     # Rollup "started" counts immediately for workflows
     if type == ActivityType.WORKFLOW_RUN:
         _rollup_workflow_started(ev)
+    
+    # Generate short description asynchronously if we have documents
+    if document_uuids and len(document_uuids) > 0:
+        try:
+            from app.utilities.activity_description import generate_activity_description_task
+            debug(f"Triggering description generation for activity {ev.id} with {len(document_uuids)} documents")
+            generate_activity_description_task.delay(str(ev.id), type.value, document_uuids)
+        except Exception as e:
+            logger.warning(f"Failed to trigger description generation: {e}")
+            debug(f"Error triggering description task: {e}")
     
     return ev
 

@@ -82,7 +82,7 @@
     position: fixed;
     bottom: 0;
     padding: 15px;
-    right: 0;
+    right: var(--rail-w);
     width: 40%;
     height: 80px;
     background-color: white;
@@ -142,7 +142,7 @@
     margin-right: 60px;
     margin-top: 30px;
     background-color: white;
-    border-radius: 16px;
+    border-radius: var(--ui-radius, 12px);
     
     box-shadow: 0 0 29px 4px rgb(211, 211, 211);
 }

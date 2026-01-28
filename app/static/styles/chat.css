@@ -37,6 +37,7 @@
     text-align: center;
     padding: 10px 22px;
     flex: 1;
+    border-radius: var(--ui-radius, 12px);
 }
 
 .chat-card-suggestion:hover {
@@ -74,7 +75,7 @@
     display: flex;
     flex-direction: column;
     border: 1px solid hsl(var(--border)); /* Using CSS variables if you have them */
-    border-radius: 12px;
+    border-radius: var(--ui-radius, 12px);
     padding: 0.5rem;
     background-color: hsl(var(--background)); /* Using CSS variables if you have them */
 }

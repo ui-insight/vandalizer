@@ -15,10 +15,12 @@ from dotenv import load_dotenv
 from flask import Flask, got_request_exception
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
-from flask_dance.consumer import oauth_authorized
-from flask_dance.contrib.azure import make_azure_blueprint
-from flask_login import LoginManager, current_user, login_user
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_login import LoginManager, current_user
 from flask_mail import Mail
+from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
+from app.oauth import configure_azure_blueprint
 
 CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
@@ -69,6 +71,10 @@ def create_app() -> Flask:
 
 app = create_app()
 
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
 CORS(
     app,
     resources={
@@ -103,10 +109,27 @@ app.logger.info(f"Starting server in '{env}' environment → loading {config_cla
 
 
 app.config.from_object(config_class)
+app.config["RATELIMIT_ENABLED"] = False
+
+# Session cookie defaults for OAuth flows (can be overridden via env/config).
+app.config.setdefault("SESSION_COOKIE_SAMESITE", "Lax")
+if env == "production":
+    app.config.setdefault("SESSION_COOKIE_SECURE", True)
+    app.config.setdefault("PREFERRED_URL_SCHEME", "https")
 
 
 Bootstrap(app)  # flask-bootstrap
 mail = Mail(app)
+
+# Set up rate limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    storage_uri=f"redis://{REDIS_HOST}:6379/2",
+    default_limits=["200 per day", "50 per hour"],
+    strategy="fixed-window",
+)
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -114,16 +137,30 @@ app.logger = logging.getLogger("app_logger")
 
 from app.models import User
 
+# Connect to MongoDB early so config reads work before first request
+me.connect(
+    app.config["MONGO_DB"],
+    host=os.getenv("MONGO_HOST", "mongodb://localhost:27017/").lower(),
+)
+
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "auth.login"  # Redirect here if @login_required fails
 
 
 @login_manager.user_loader
-def load_user(user_id: str | None = None) -> User | None:
-    """Loads user from DB for session management."""
-    id = user_id if user_id else current_user.get_id()
-    return User.objects(user_id=id).first()
+def _load_user_by_id(user_id: str) -> User | None:
+    """Loads user from DB for session management (used by flask_login)."""
+    if not user_id:
+        return None
+    return User.objects(user_id=user_id).first()
+
+
+def load_user() -> User | None:
+    """Get the current logged-in user."""
+    if current_user.is_authenticated:
+        return current_user._get_current_object()
+    return None
 
 
 # Setup blueprints
@@ -153,66 +190,76 @@ app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
 
+# Import Celery tasks so they're registered when app starts
+# This ensures tasks are discovered by Celery workers
+with app.app_context():
+    from app.utilities import activity_description  # noqa: F401
+
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
-AUTH_MODE = "LOCAL" if env != "production" else os.getenv("AUTH_MODE", "AZURE").upper()
-app.logger.info(f"Authentication mode set to: {AUTH_MODE}")
+auth_methods = get_auth_methods()
 
-if AUTH_MODE == "AZURE":
-    # --- Azure AD / Flask-Dance Mode ---
-    blueprint = make_azure_blueprint(
-        client_id=app.config["CLIENT_ID"],
-        client_secret=app.config["CLIENT_SECRET"],
-        tenant=app.config["TENANT_NAME"],
-    )
+# In non-production, if nothing is configured at all, enable password to avoid lockout
+if env != "production" and not auth_methods:
+    app.logger.warning("No auth methods configured; enabling password auth in non-production to avoid lockout.")
+    auth_methods = ["password"]
+PASSWORD_AUTH_ENABLED = "password" in auth_methods
+OAUTH_AUTH_ENABLED = "oauth" in auth_methods
 
-    app.register_blueprint(blueprint, url_prefix="/login")
+app.config["AUTH_PASSWORD_ENABLED"] = PASSWORD_AUTH_ENABLED
+app.config["AUTH_OAUTH_ENABLED"] = OAUTH_AUTH_ENABLED
+app.config["AUTH_MODE"] = (
+    "OAUTH"
+    if OAUTH_AUTH_ENABLED and not PASSWORD_AUTH_ENABLED
+    else "PASSWORD"
+    if PASSWORD_AUTH_ENABLED and not OAUTH_AUTH_ENABLED
+    else "HYBRID"
+)
 
-    @oauth_authorized.connect_via(blueprint)
-    def azure_logged_in(blueprint, token):
-        """Creates or loads a user after successful Azure login."""
-        if not token:
-            app.logger.warning("Failed to fetch token from Azure.")
-            return
+# Ensure Azure OAuth blueprint is registered/configured from DB if present
+azure_bp = configure_azure_blueprint(app)
 
-        resp = blueprint.session.get("/v1.0/me")
-        if not resp.ok:
-            app.logger.warning(
-                f"Failed to fetch user info from Azure Graph: {resp.text}"
-            )
-            return
+# Exempt OAuth endpoints from rate limiting to prevent authentication failures
+if azure_bp:
+    from app.oauth import azure_blueprint
+    limiter.exempt(azure_blueprint)
 
-        info = resp.json()
-        user_principal_name = info.get("userPrincipalName")
-        user = User.objects(user_id=user_principal_name).first()
-
-        if not user:
-            # Create a new user if they don't exist
-            # Try to get email from 'mail' field, fallback to 'userPrincipalName'
-            email = info.get("mail") or user_principal_name
-            user = User(
-                user_id=user_principal_name,
-                email=email,
-                name=info["displayName"]
-            ).save()
-        else:
-            # Update existing user's email and name if they're missing
-            if not user.email:
-                user.email = info.get("mail") or user_principal_name
-            if not user.name:
-                user.name = info["displayName"]
-            user.save()
-
-        login_user(user)  # This is the critical step to create the user session
-
-elif AUTH_MODE == "LOCAL":
-    # Point the login view to the local blueprint's login function
-    login_manager.login_view = "auth.login"
-
-else:
-    raise ValueError(f"Invalid AUTH_MODE: '{AUTH_MODE}'. Must be 'AZURE' or 'LOCAL'.")
+# Point the login view to the local blueprint's login function (always available path)
+login_manager.login_view = "auth.login"
 
 
-app.config["AUTH_MODE"] = AUTH_MODE
+@app.context_processor
+def inject_ui_config():
+    """Expose UI/auth configuration to templates."""
+    return {
+        "highlight_color": get_highlight_color(),
+        "ui_radius": get_ui_radius(),
+        "auth_password_enabled": PASSWORD_AUTH_ENABLED,
+        "auth_oauth_enabled": OAUTH_AUTH_ENABLED,
+    }
+
+
+@app.context_processor
+def inject_team_context():
+    """Provide current_team and my_teams to all templates safely."""
+    from app.models import Team, TeamMembership
+
+    if current_user.is_authenticated:
+        try:
+            current_team = current_user.ensure_current_team()
+            my_teams = TeamMembership.objects(user_id=current_user.get_id())
+            return {
+                "current_team": current_team,
+                "my_teams": my_teams,
+            }
+        except Exception:
+            # If there's any error, return empty values
+            pass
+
+    # Not authenticated or error occurred
+    return {
+        "current_team": None,
+        "my_teams": [],
+    }
 
 
 with app.app_context():
@@ -230,9 +277,3 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
-
-
-me.connect(
-    app.config["MONGO_DB"],
-    host=os.getenv("MONGO_HOST", "mongodb://localhost:27017/").lower(),
-)

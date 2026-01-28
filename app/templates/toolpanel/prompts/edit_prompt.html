@@ -37,6 +37,10 @@
             style="float: right; margin-right: 15px; ">DELETE</a>
     </div>
 
+    <div style="clear: both;"></div>
+    <hr>
+    {% include "_edit_history.html" %}
+
     <script>
         $('#edit-prompt-close-button').off('click').on('click', function (e) {
             e.preventDefault();
@@ -61,10 +65,12 @@
                 dataType: 'json',
                 async: true,
                 success: function (data) {
-                    // Preserve existing URL parameters
-                    const url = new URL(window.location.href);
-                    url.searchParams.set('section', 'Library');
-                    location.href = url.toString();
+                    if (typeof refreshResults === 'function') {
+                        refreshResults();
+                    }
+                    $("#search-results-panel").hide();
+                    $("#search-results-panel").empty();
+                    showToast("Prompt updated");
                 },
                 error: function (xhr, ajaxOptions, thrownError) {
                     console.log(xhr.status);

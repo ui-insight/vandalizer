@@ -8,6 +8,7 @@
     var current_space_id = "{{ current_space_id }}"
     var workflow_elapsed_time = 0;
     var workflow_session_id = "";
+    var workflow_start_time_ms = null;
 
     var workflow_time = 0;
     var steps_completed = 0;
@@ -60,10 +61,10 @@
     // Add a new activity to the top of the app rail
     function addActivityToRail(activityId, activityData) {
         if (!activityId) return;
-        
+
         const ul = document.getElementById("run-list");
         if (!ul) return;
-        
+
         // Check if activity already exists
         const existing = ul.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (existing) {
@@ -71,34 +72,34 @@
             ul.insertBefore(existing, ul.children[2]);
             return existing;
         }
-        
+
         // Use liForActivity from _app_rail.html if available
-        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity 
-            ? window.liForActivity 
+        const liForActivityFn = typeof window !== 'undefined' && window.liForActivity
+            ? window.liForActivity
             : null;
-        
+
         if (!liForActivityFn) {
             console.warn("liForActivity function not available");
             return null;
         }
-        
+
         // Create the activity item
         const li = liForActivityFn(activityData);
         if (!li) {
             console.warn("Failed to create activity item", activityData);
             return null;
         }
-        
+
         // Insert at the top (after "New chat" and spacer, which are indices 0 and 1)
         if (ul.children.length > 2) {
             ul.insertBefore(li, ul.children[2]);
         } else {
             ul.appendChild(li);
         }
-        
+
         return li;
     }
-    
+
     function setActiveRailActivity(activityId, options) {
         if (!activityId) return;
 
@@ -109,7 +110,7 @@
         clearRailActiveState();
 
         let li = ul.querySelector(`li.run-item[data-run-id='${activityId}']`);
-        
+
         // If activity doesn't exist and we have promote option, try to fetch and add it
         if (!li && opts.promote) {
             // Fetch activity data from server
@@ -126,9 +127,13 @@
                         li = addActivityToRail(activityId, activityData);
                         if (li) {
                             li.classList.add("active");
-                            if (opts.running) {
+                            // Check type before applying running state
+                            const isAutomation = activityData.type === 'search_set_run' || activityData.type === 'workflow_run';
+                            if (opts.running && isAutomation) {
                                 li.classList.add("is-running");
                             }
+                            // Check if title should be updated
+                            checkActivityTitleUpdate(activityId, activityData);
                         }
                     }
                 })
@@ -137,16 +142,24 @@
                 });
             return;
         }
-        
+
         if (!li) return;
-        
+
         // Move to top if promote is true
         if (opts.promote && ul.children.length > 2) {
             ul.insertBefore(li, ul.children[2]);
         }
 
         li.classList.add("active");
-        if (opts.running) {
+
+        // Check if automation run based on icon class
+        const typeIcon = li.querySelector('.run-type-icon');
+        const isAutomationRun = typeIcon && (
+            typeIcon.classList.contains('fa-list-check') || // search_set_run
+            typeIcon.classList.contains('fa-diagram-project') // workflow_run
+        );
+
+        if (opts.running && isAutomationRun) {
             li.classList.add("is-running");
         }
     }
@@ -219,60 +232,140 @@
     function shimmerActivityItem(activityId) {
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) return;
-        
+
         // Add shimmer class
         activityItem.classList.add('shimmer');
-        
+
         // Remove shimmer after animation completes (typically 1-2 seconds)
         setTimeout(() => {
             activityItem.classList.remove('shimmer');
         }, 2000);
     }
-    
+
+    // Helper function to update activity title with shimmer effect
+    function updateActivityTitle(activityId, newTitle) {
+        if (!activityId || !newTitle) return;
+
+        const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
+        if (!activityItem) return;
+
+        const titleElement = activityItem.querySelector('.run-title');
+        if (!titleElement) return;
+
+        const currentTitle = titleElement.textContent.trim();
+        // Check if we're replacing loading text or existing title
+        const isReplacingLoading = currentTitle.includes("Generating title");
+        if (!isReplacingLoading && currentTitle === newTitle.trim()) return; // No change needed
+
+        // Update title with shimmer effect
+        titleElement.innerHTML = newTitle; // Use innerHTML to replace any HTML (like loading text)
+        titleElement.setAttribute('title', newTitle);
+
+        // Add shimmer class to the title element for animation
+        titleElement.style.position = 'relative';
+        titleElement.style.overflow = 'hidden';
+        titleElement.classList.add('title-shimmer');
+
+        // Remove shimmer after animation
+        setTimeout(() => {
+            titleElement.classList.remove('title-shimmer');
+        }, 2000);
+    }
+
+    // Helper to check and update activity title from polling
+    function checkActivityTitleUpdate(activityId, activityData) {
+        if (!activityId || !activityData || !activityData.title) return;
+        updateActivityTitle(activityId, activityData.title);
+    }
+
+    // Poll chat activity title updates
+    function pollChatActivityTitle(activityId) {
+        if (!activityId) return;
+
+        let pollCount = 0;
+        const maxPolls = 30; // Poll for up to 30 seconds (30 * 1000ms)
+        const pollInterval = 2000; // Poll every 2 seconds
+
+        const intervalId = setInterval(function () {
+            pollCount++;
+
+            fetch(`/activity/runs/${activityId}/data`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.activity) {
+                        const activityData = data.activity;
+                        // Check for title updates
+                        if (activityData.title) {
+                            checkActivityTitleUpdate(activityId, activityData);
+                        }
+
+                        // Stop polling once we have a real title, or we timed out.
+                        // Do NOT stop just because the activity completed: title generation
+                        // is async and can land after completion.
+                        if ((activityData.title && String(activityData.title).trim().length > 0) || pollCount >= maxPolls) {
+                            clearInterval(intervalId);
+                        }
+                    }
+                })
+                .catch(err => {
+                    console.warn("Failed to poll chat activity title:", err);
+                    if (pollCount >= 5) {
+                        // After 5 failed attempts, give up
+                        clearInterval(intervalId);
+                    }
+                });
+        }, pollInterval);
+    }
+
     // Helper function to update activity item status in the app rail
     function updateActivityItemStatus(activityId, status) {
         if (!activityId || !status) return;
-        
+
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) {
             console.warn("Activity item not found for:", activityId);
             return;
         }
-        
+
         // Normalize status to lowercase for comparison
         const normalizedStatus = String(status).toLowerCase();
         const isProgress = normalizedStatus === "running" || normalizedStatus === "queued";
-        
+
         // Check if it's an automation run by looking at the type icon
         const typeIcon = activityItem.querySelector('.run-type-icon');
         const isAutomationRun = typeIcon && (
             typeIcon.classList.contains('fa-list-check') || // search_set_run
             typeIcon.classList.contains('fa-diagram-project') // workflow_run
         );
-        
+
         // Update is-running class
         const wasRunning = activityItem.classList.contains("is-running");
         if (isProgress && isAutomationRun) {
             activityItem.classList.add("is-running");
         } else {
             activityItem.classList.remove("is-running");
-            
+
             // If it was running and now completed, add shimmer effect
             if (wasRunning && (normalizedStatus === "completed" || normalizedStatus === "failed" || normalizedStatus === "canceled")) {
                 shimmerActivityItem(activityId);
             }
         }
-        
+
         // Update status icon
         const runActions = activityItem.querySelector('.run-actions');
         if (!runActions) return;
-        
+
         // Remove existing status icon (look for .run-right that contains .run-state-icon)
         const existingRight = runActions.querySelector('.run-right');
         if (existingRight && existingRight.querySelector('.run-state-icon')) {
             existingRight.remove();
         }
-        
+
         // Add new status icon if needed
         if (status === "failed") {
             const iconSpan = document.createElement('span');
@@ -344,9 +437,57 @@
 
     function formatWorkflowElapsed(seconds) {
         const safeSeconds = Math.max(Number(seconds) || 0, 0);
-        const mins = Math.floor(safeSeconds / 60);
-        const secs = safeSeconds % 60;
+        const totalSeconds = Math.floor(safeSeconds);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
         return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function parseIsoTimeToMs(value) {
+        if (typeof value !== "string" || !value.trim()) {
+            return null;
+        }
+        const ms = Date.parse(value);
+        return Number.isFinite(ms) ? ms : null;
+    }
+
+    function resolveWorkflowDurationSeconds(payload, fallbackSeconds = 0) {
+        const durationSeconds = payload && typeof payload.duration_seconds === "number"
+            ? payload.duration_seconds
+            : null;
+        if (typeof durationSeconds === "number" && durationSeconds >= 0) {
+            return durationSeconds;
+        }
+
+        const startedMs = parseIsoTimeToMs(payload?.started_at);
+        const finishedMs = parseIsoTimeToMs(payload?.finished_at);
+        if (startedMs != null && finishedMs != null && finishedMs >= startedMs) {
+            return (finishedMs - startedMs) / 1000;
+        }
+
+        if (typeof workflow_start_time_ms === "number") {
+            const now = Date.now();
+            if (Number.isFinite(now) && now >= workflow_start_time_ms) {
+                return (now - workflow_start_time_ms) / 1000;
+            }
+        }
+
+        return Math.max(Number(fallbackSeconds) || 0, 0);
+    }
+
+    function formatWorkflowCompletionLabel(status, durationSeconds) {
+        const normalized = (status || "").toString().toLowerCase();
+        const base =
+            normalized === "failed"
+                ? "Failed"
+                : normalized === "canceled"
+                    ? "Canceled"
+                    : "Completed";
+        const seconds = Math.max(Number(durationSeconds) || 0, 0);
+        if (seconds <= 0) {
+            return base;
+        }
+        return `${base} in ${formatWorkflowElapsed(seconds)}`;
     }
 
     function updateWorkflowProgressInfo(stepsCompleted = 0, totalSteps = null, elapsedSeconds = 0, options = {}) {
@@ -416,22 +557,22 @@
         const cleaned = (labelText || "").trim()
             .replace(/\n/g, " ")  // Replace newlines with spaces
             .replace(/\s+/g, " ");  // Collapse multiple spaces
-        
+
         // Limit to 70 characters and add "..." if truncated
-        const normalized = cleaned.length > 70 
-            ? cleaned.substring(0, 70) + "..." 
+        const normalized = cleaned.length > 70
+            ? cleaned.substring(0, 70) + "..."
             : cleaned;
-        
+
         if (!normalized) {
             resetWorkflowActiveStatus();
             return;
         }
-        
+
         // Only update if the label actually changed to prevent spamming
         if (workflowActiveLabel === normalized) {
             return;
         }
-        
+
         workflowActiveLabel = normalized;
         workflowActiveTemplateIndex = 0;
         renderWorkflowActiveMessage();
@@ -493,11 +634,32 @@
 
         if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
             const completed = Math.max(stepsCompleted, 0);
-            let statusLabel = status || "Completed";
-            if (typeof statusLabel === "string" && statusLabel.length > 0) {
-                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+            const normalizedStatus = (status || "").toString().toLowerCase();
+            const startedMs = parseIsoTimeToMs(snapshot.started_at);
+            const finishedMs = parseIsoTimeToMs(snapshot.finished_at);
+            const durationSeconds =
+                typeof snapshot.duration_seconds === "number"
+                    ? snapshot.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(completed, stepsTotal, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+                return;
             }
-            updateWorkflowProgressInfo(completed, stepsTotal, 0, { trailingLabel: statusLabel });
+
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
+            updateWorkflowProgressInfo(completed, stepsTotal, elapsedSeconds);
         } else if (status) {
             const label = status.charAt(0).toUpperCase() + status.slice(1);
             updateWorkflowProgressInfo(0, null, 0, { trailingLabel: label });
@@ -844,6 +1006,10 @@
             if ($("#search-results-panel").children().length > 0) {
                 $("#search-results-panel").show();
             }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.syncBottomToolbarsToPanels === 'function') {
+            window.syncBottomToolbarsToPanels();
         }
 
         cleanup();
@@ -1423,6 +1589,9 @@
             success: function (msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
                 $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().parent().remove();
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -1860,10 +2029,6 @@
 
         $('#closeAttachBtn').on('click', function () {
             $('#attachmentModal').hide();
-        });
-
-        $('#closeNewWorkflowBtn').on('click', function () {
-            $('#newWorkflowModal').hide();
         });
 
         $('#closeNewTaskBtn').on('click', function () {
@@ -2456,6 +2621,7 @@
         let session_id = generateSessionId();
         workflow_session_id = session_id;
         active_step = 0;
+        workflow_start_time_ms = Date.now();
 
         // Start the timer before making the API call
         $('.workflow-output-buttons').addClass('hidden');
@@ -2645,6 +2811,33 @@
         });
     }
 
+    function integrateExtraction(search_set_uuid) {
+        let data = JSON.stringify({
+            search_set_uuid: search_set_uuid,
+        });
+
+        $.ajax({
+            url: '/tasks/integrate',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                $(data.template).hide().appendTo('.search-results-panel').fadeIn();
+                addResultListeners();
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+                // If endpoint doesn't exist yet, show a placeholder message
+                if (xhr.status === 404) {
+                    showToast("Extraction integration is coming soon!");
+                }
+            }
+        });
+    }
+
 
 
     function updateWorkflowStatus() {
@@ -2720,14 +2913,15 @@
                         clearInterval(workflow_interval_id);
                         workflow_interval_id = null;
                     }
-                    
+
                     // Ensure activity status is updated (in case updateActivityItemStatus didn't catch it)
                     if (activityId) {
                         updateActivityItemStatus(activityId, status);
                     }
-                    
+
                     resetWorkflowActiveStatus();
-                    const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
+                    const durationSeconds = resolveWorkflowDurationSeconds(data, workflow_time);
+                    const trailingLabel = formatWorkflowCompletionLabel(status, durationSeconds);
                     updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
                         trailingLabel: trailingLabel,
                     });
@@ -2738,6 +2932,9 @@
                         steps_total: total_steps,
                         status: status,
                         session_id: workflow_session_id,
+                        started_at: data.started_at ?? null,
+                        finished_at: data.finished_at ?? null,
+                        duration_seconds: data.duration_seconds ?? null,
                     };
 
                     if (status === 'failed') {
@@ -2760,6 +2957,9 @@
                             steps_total: total_steps,
                             status: status,
                             session_id: workflow_session_id,
+                            started_at: data.started_at ?? null,
+                            finished_at: data.finished_at ?? null,
+                            duration_seconds: data.duration_seconds ?? null,
                         };
 
                         const html = normalizeWorkflowOutput(snapshotPayload);
@@ -2908,13 +3108,18 @@
     }
 
     function pollWorkflowStatus(session_id) {
-        let startTime = Date.now(); // Capture start time to calculate elapsed time
         const pollInterval = 1000; // Poll every second
+        if (typeof workflow_start_time_ms !== "number") {
+            workflow_start_time_ms = Date.now();
+        }
         workflow_elapsed_time = 0;
 
         let intervalId = setInterval(() => {
-            workflow_elapsed_time += 1;
-
+            const now = Date.now();
+            workflow_elapsed_time = Math.max(
+                Math.floor((now - workflow_start_time_ms) / 1000),
+                0,
+            );
             performWorkflowStatus(session_id, workflow_elapsed_time);
         }, pollInterval);
 
@@ -3019,9 +3224,42 @@
 
     tabMenuItems.forEach((item) => {
         item.addEventListener("click", function () {
+            const tabTitle = $(this).text().trim();
+            const url = new URL(window.location.href);
+            const currentSection = url.searchParams.get("section") || "";
+
+            // If clicking Library tab and already on Library, close panels and reset
+            const isLibraryVisible = $("#library-panel").is(":visible");
+            if (tabTitle === "Library" && (currentSection === "Library" || currentSection === "Workflows" || isLibraryVisible)) {
+                // Close any open panels
+                $(".search-results-panel").hide();
+                $("#search-results-panel").empty();
+
+                // Clear library-related URL params but keep section=Library
+                url.searchParams.delete("search_set_uuid");
+                url.searchParams.delete("workflow_id");
+                url.searchParams.delete("activity_id");
+                url.searchParams.set("section", "Library");
+                window.history.pushState({}, "", url.toString());
+
+                // Show library panel
+                $(".tab-content").hide();
+                $("#library-panel").show();
+
+                // Update active tab
+                tabMenuItems.forEach((node) => node.classList.remove("active"));
+                this.classList.add("active");
+
+                // Refresh library view if there's a refresh function
+                if (typeof refreshResults === 'function') {
+                    refreshResults();
+                }
+                return;
+            }
+
+            // Normal tab switching behavior
             tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
-            const tabTitle = $(this).text().trim();
             setSection(tabTitle);
         });
     });
@@ -3043,17 +3281,27 @@
             });
     });
 
-    $(".add-new_workflow-button").on("click", function () {
-        $("#newWorkflowModal").show();
-        $("#add-task-container").hide();
-        $("#newTaskModal").hide();
-
+    function bindNewWorkflowModalActions() {
         $("#newWorkflowBtn")
             .off("click")
             .on("click", function () {
                 createNewWorkflow();
                 $("#newWorkflowModal").hide();
             });
+        $("#closeNewWorkflowBtn").off("click").on("click", function () {
+            $("#newWorkflowModal").hide();
+        });
+    }
+
+    window.bindNewWorkflowModalActions = bindNewWorkflowModalActions;
+
+    bindNewWorkflowModalActions();
+
+    $(".add-new_workflow-button").on("click", function () {
+        $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
+        bindNewWorkflowModalActions();
     });
 
     var newTaskType = "";
@@ -3153,6 +3401,88 @@
                 console.log(thrownError);
             },
         });
+    }
+
+    // Library panel helper functions
+    function openSearchSet(uuid) {
+        updateSearchSetPanel(uuid);
+    }
+
+    function runPromptInAssistant(uuid, title = "") {
+        if (typeof setSection === 'function') {
+            setSection("Assistant");
+        }
+        beginPrompt(uuid, title || "Prompt");
+    }
+
+    function selectLibraryItem(type, id, title = "") {
+        if (type === 'workflow') {
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(id);
+            } else {
+                console.error("fetchWorkflow not defined");
+            }
+        } else if (type === 'extraction' || type === 'searchset') {
+            openSearchSet(id);
+        } else if (type === 'prompt' || type === 'formatter') {
+            runPromptInAssistant(id, title);
+        }
+    }
+
+    function editLibraryItem(type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction' || type === 'searchset') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            }
+        } else if (type === 'prompt' || type === 'formatter') {
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: JSON.stringify({ uuid: id }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.template) {
+                        $("#search-results-panel").html(res.template).show();
+                    }
+                },
+                error: function (err) {
+                    console.error("Error loading prompt editor", err);
+                }
+            });
+        }
+    }
+
+    function toggleMenu(e, menuId) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const isHidden = menu.hidden;
+
+        // Close all other menus
+        document.querySelectorAll('.menu').forEach(m => m.hidden = true);
+        document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+        if (isHidden) {
+            menu.hidden = false;
+            e.currentTarget.setAttribute('aria-expanded', 'true');
+
+            // Close on next click
+            const close = () => {
+                menu.hidden = true;
+                e.currentTarget.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', close);
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        } else {
+            menu.hidden = true;
+            e.currentTarget.setAttribute('aria-expanded', 'false');
+        }
     }
 
     // PERFORM SEARCH
@@ -3317,9 +3647,8 @@
                     url.searchParams.set('activity_id', data.activity_id);
                     window.history.replaceState(null, '', url.toString());
 
-                    // Show loading message
-                    $("#search-results-panel").show();
-                    $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                    // Show overlay on top of extraction panel
+                    showExtractionOverlay();
 
                     // Poll for completion
                     pollExtractionStatus(data.activity_id, search_set_uuid);
@@ -3382,9 +3711,8 @@
                         url.searchParams.set('activity_id', data.activity_id);
                         window.history.replaceState(null, '', url.toString());
 
-                        // Show loading message
-                        $("#search-results-panel").show();
-                        $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                        // Show overlay on top of extraction panel
+                        showExtractionOverlay();
 
                         // Poll for completion
                         const search_set_uuid = data.search_set_uuid || new URLSearchParams(window.location.search).get('search_set_uuid');
@@ -3420,6 +3748,16 @@
                 return;
             }
             performExtraction(uuid);
+        });
+
+        $('.integrate-extraction').off("click").on("click", function (e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid") || search_set_add_uuid;
+            if (!uuid) {
+                showToast("Select an extraction to integrate.");
+                return;
+            }
+            integrateExtraction(uuid);
         });
 
         $("#set-close-button").on("click", function () {
@@ -3705,6 +4043,9 @@
 
                 $(".set-result-items").append(msg.template);
                 $("#add-search-term-input")[0].value = "";
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -3838,6 +4179,54 @@
         addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 
+    function showExtractionOverlay() {
+        const panel = $("#search-results-panel");
+        if (panel.length === 0) return;
+
+        // Ensure panel is visible
+        panel.show();
+
+        // Add overlay class to prevent scrolling
+        panel.addClass("has-overlay");
+
+        // Find the content body where search terms are displayed
+        const contentBody = panel.find(".search-results-content-body");
+
+        // Check if overlay already exists
+        let overlay = panel.find(".extraction-loading-overlay");
+        if (overlay.length === 0) {
+            overlay = $('<div class="extraction-loading-overlay"><div class="lds-grid"><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style="margin-top: 20px; font-size: 16px; font-weight: 700; color: #333;">Running extraction...</p></div>');
+            // Append to content body to cover search terms section, leaving bottom toolbar visible
+            if (contentBody.length > 0) {
+                contentBody.css("position", "relative");
+                contentBody.prepend(overlay);
+            } else {
+                // Fallback: append to panel but position to leave bottom toolbar visible
+                overlay.css("bottom", "120px");
+                panel.append(overlay);
+            }
+        } else {
+            overlay.removeClass("hidden");
+        }
+    }
+
+    function hideExtractionOverlay() {
+        const panel = $("#search-results-panel");
+        // Remove overlay from panel
+        const overlay = panel.find(".extraction-loading-overlay");
+        overlay.remove();
+
+        // Also remove from content body if it exists there
+        const contentBody = panel.find(".search-results-content-body");
+        if (contentBody.length > 0) {
+            contentBody.find(".extraction-loading-overlay").remove();
+        }
+
+        panel.removeClass("has-overlay");
+        console.log("Extraction overlay removed");
+        console.log("Remaining overlays:", panel.find(".extraction-loading-overlay").length);
+    }
+
     function pollExtractionStatus(activity_id, search_set_uuid) {
         let pollCount = 0;
         const maxPolls = 120; // 2 minutes max (120 * 1000ms)
@@ -3851,20 +4240,107 @@
                 dataType: "json",
                 success: function (response) {
                     console.log("Extraction status:", response.status);
+                    console.log("Extraction status response:", response);
 
                     // Update activity status in app rail
                     updateActivityItemStatus(activity_id, response.status);
-                    
+                    // Check for title updates
+                    if (response.title) {
+                        checkActivityTitleUpdate(activity_id, { title: response.title });
+                    }
+
                     if (response.status === "completed") {
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
 
-                        // Display results
+                        // Hide overlay and display results
+                        hideExtractionOverlay();
                         $("#search-results-panel").empty();
-                        $(response.template).hide().appendTo("#search-results-panel").fadeIn();
-                        addResultListeners();
-                        search_set_add_uuid = search_set_uuid;
+
+                        // Check if template exists in response
+                        console.log("Checking for template in response...");
+                        console.log("response.template exists:", "template" in response);
+                        console.log("response.template value:", response.template ? "present" : "missing");
+                        console.log("response.template type:", typeof response.template);
+                        console.log("response.template length:", response.template ? response.template.length : "N/A");
+
+                        if (response.template && response.template.length > 0) {
+                            console.log("Template found, length:", response.template.length);
+                            try {
+                                // Ensure overlay is completely removed first
+                                hideExtractionOverlay();
+
+                                // Wait a moment to ensure overlay is removed
+                                setTimeout(function () {
+                                    // Make sure panel is visible and remove any overlay remnants
+                                    const $panel = $("#search-results-panel");
+
+                                    // Remove all overlays from panel and content body
+                                    $panel.find(".extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
+                                    $panel.removeClass("has-overlay");
+
+                                    // Make sure panel is visible
+                                    $panel.show();
+                                    $panel.css("display", "block");
+                                    $panel.css("visibility", "visible");
+                                    $panel.css("opacity", "1");
+
+                                    console.log("Panel display:", $panel.css("display"));
+                                    console.log("Panel visibility:", $panel.css("visibility"));
+                                    console.log("Panel z-index:", $panel.css("z-index"));
+                                    console.log("Panel height:", $panel.height());
+
+                                    // Clear and append template
+                                    const $template = $(response.template);
+                                    $panel.empty();
+
+                                    console.log("Appending template to panel...");
+                                    console.log("Template HTML preview (first 500 chars):", response.template.substring(0, 500));
+
+                                    // Append template without hiding it first - just show it directly
+                                    $template.appendTo($panel);
+
+                                    // Double-check no overlays remain anywhere in the panel
+                                    $panel.find(".extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
+                                    $panel.find(".search-results-content .extraction-loading-overlay").remove();
+
+                                    // Remove overlay class
+                                    $panel.removeClass("has-overlay");
+
+                                    console.log("Template appended");
+                                    console.log("Panel content length:", $panel.html().length);
+                                    console.log("Panel is visible:", $panel.is(":visible"));
+                                    console.log("Panel display:", $panel.css("display"));
+                                    console.log("Panel offset:", $panel.offset());
+                                    console.log("Panel dimensions:", { width: $panel.width(), height: $panel.height() });
+                                    console.log("First child element:", $panel.children().first().prop("tagName"));
+                                    console.log("Overlays remaining:", $panel.find(".extraction-loading-overlay").length);
+
+                                    // Force scroll to top of panel
+                                    $panel.scrollTop(0);
+
+                                    // Ensure panel is visible
+                                    $panel.show();
+                                    $panel.css("display", "block");
+
+                                    addResultListeners();
+                                    search_set_add_uuid = search_set_uuid;
+                                    console.log("Template successfully displayed");
+                                }, 100);
+                            } catch (e) {
+                                console.error("Error appending template:", e);
+                                console.error("Error stack:", e.stack);
+                                $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error displaying template: " + e.message + "</div>");
+                            }
+                        } else {
+                            console.error("No template in extraction status response");
+                            console.error("Full response:", JSON.stringify(response, null, 2));
+                            console.error("Template error:", response.template_error);
+                            $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction completed, but results could not be displayed. Error: " + (response.template_error || "Template not provided") + "</div>");
+                        }
 
                         if ($('#run-term-button').length > 0) {
                             $('#run-term-button')[0].textContent = "RUN";
@@ -3877,10 +4353,14 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
-                        
+
+                        // Hide overlay and show error
+                        hideExtractionOverlay();
+
                         // Update activity status in app rail
                         updateActivityItemStatus(activity_id, response.status);
 
+                        // Show error message - replace content since extraction failed
                         $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Extraction failed: " + (response.error || "Unknown error") + "</div>");
 
                         if ($('#run-term-button').length > 0) {
@@ -3893,6 +4373,8 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
+                        // Hide overlay and show timeout message
+                        hideExtractionOverlay();
                         $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction is taking longer than expected. Check back later.</div>");
                         showToast("Extraction timeout");
                     }
@@ -3905,6 +4387,8 @@
                         clearInterval(intervalId);
                         hideWorking();
                         stopScanning();
+                        // Hide overlay and show error
+                        hideExtractionOverlay();
                         $("#search-results-panel").html("<div style='padding: 20px; color: red;'>Error checking extraction status</div>");
                     }
                 }
@@ -3958,11 +4442,11 @@
     function nextHighlight() {
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         if (typeof window.current_search_item === 'undefined') {
             window.current_search_item = 0;
         }
-        
+
         window.current_search_item += 1;
         if (window.current_search_item >= highlights.length) {
             window.current_search_item = 0;
@@ -3989,11 +4473,11 @@
     function previousHighlight() {
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         if (typeof window.current_search_item === 'undefined') {
             window.current_search_item = 0;
         }
-        
+
         window.current_search_item -= 1;
         if (window.current_search_item < 0) {
             window.current_search_item = highlights.length - 1;
@@ -4012,27 +4496,27 @@
             window.updateHighlightDisplay();
             return;
         }
-        
+
         // Fallback implementation
         const highlights = document.querySelectorAll('.highlight');
         if (highlights.length === 0) return;
-        
+
         const currentIndex = window.current_search_item || 0;
         const safeIndex = Math.max(0, Math.min(currentIndex, highlights.length - 1));
         window.current_search_item = safeIndex;
-        
+
         // Update all highlights
         highlights.forEach((hl, idx) => {
             hl.style.backgroundColor = idx === safeIndex ? 'red' : 'yellow';
             hl.style.opacity = 0.5;
         });
-        
+
         // Update count
         $("#semantic-panel-count").text((safeIndex + 1) + " of " + highlights.length);
-        
+
         // Scroll to current highlight using the global function if available
         if (typeof window.scrollToHighlight !== 'undefined') {
-            setTimeout(function() {
+            setTimeout(function () {
                 window.scrollToHighlight(safeIndex);
             }, 50);
         } else {
@@ -4237,9 +4721,15 @@
                         url.searchParams.set('activity_id', newActivityId);
                         url.searchParams.set('section', 'Assistant');
                         window.history.replaceState({}, '', url);
+
+                        // Start polling for title updates
+                        pollChatActivityTitle(newActivityId);
                     }
+                } else {
+                    // Poll for title updates on existing activity too
+                    pollChatActivityTitle(current_activity_id);
                 }
-                
+
                 if (!response.body) throw new Error("No response body");
 
                 const reader = response.body.getReader();
@@ -4614,42 +5104,65 @@
         const urlParams = new URLSearchParams(window.location.search);
         const activityId = urlParams.get('activity_id');
         const searchSetUuid = urlParams.get('search_set_uuid');
-        
+
         // Helper function to display current workflow state
         function displayWorkflowProgress(data) {
             if (!data) return;
-            
+
             const steps_completed = data.steps_completed || 0;
             const total_steps = data.total_steps || 0;
             const status = data.status;
+            const normalizedStatus = (status || "").toString().toLowerCase();
             const currentStepName = data.current_step_name;
             const currentStepDetail = data.current_step_detail;
             const currentStepPreview = data.current_step_preview;
             const output = data.output;
-            
+            const startedMs = parseIsoTimeToMs(data.started_at);
+            const finishedMs = parseIsoTimeToMs(data.finished_at);
+            const durationSeconds =
+                typeof data.duration_seconds === "number"
+                    ? data.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
+
             // Ensure workflow panel is visible
             setSection("Library");
             $('#search-results-panel').show();
-            
+
             // Update active step status
             if (currentStepName || currentStepDetail) {
                 renderActiveStepStatus(currentStepName, currentStepDetail);
             }
-            
+
             // Update progress info
-            updateWorkflowProgressInfo(steps_completed, total_steps, 0);
-            
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(steps_completed, total_steps, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+            } else {
+                updateWorkflowProgressInfo(steps_completed, total_steps, elapsedSeconds);
+            }
+
             // Show workflow output section if we have preview or output
             if (currentStepPreview || output) {
                 const $outputSection = $('.workflow-output-section');
                 const $outputContainer = $('.workflow-output');
-                
+
                 if ($outputSection.length && $outputContainer.length) {
                     $outputContainer.removeClass('hidden').addClass('active');
                     $outputContainer.find('.step-connector').addClass('active');
                     $('.workflow-loader').hide();
                     $('.workflow-output-buttons').removeClass('hidden');
-                    
+
                     // Display preview if available, otherwise output
                     const content = currentStepPreview || output;
                     if (content) {
@@ -4661,7 +5174,7 @@
                     }
                 }
             }
-            
+
             // Update workflow steps UI
             if (steps_completed >= 0 && total_steps > 0) {
                 // Mark completed steps as done
@@ -4678,26 +5191,26 @@
                 }
             }
         }
-        
+
         // Check for running workflow - try workflow_session_id first, then check activity_id
         if (workflow_session_id && workflowActivityStatus) {
             const status = workflowActivityStatus.toLowerCase();
             if (status === 'running' || status === 'queued') {
                 console.log("Resuming workflow polling for session:", workflow_session_id);
-                
+
                 // Immediately fetch current status to display progress
                 $.ajax({
                     url: `/workflows/workflow/status?session_id=${workflow_session_id}`,
                     type: 'GET',
                     dataType: 'json',
-                    success: function(data) {
+                    success: function (data) {
                         displayWorkflowProgress(data);
                     },
-                    error: function(err) {
+                    error: function (err) {
                         console.warn("Failed to fetch initial workflow status:", err);
                     }
                 });
-                
+
                 if (workflow_interval_id) {
                     clearInterval(workflow_interval_id);
                 }
@@ -4721,7 +5234,7 @@
                             const workflowId = activity.workflow_id;
                             if (sessionId) {
                                 console.log("Resuming workflow polling for session from activity:", sessionId);
-                                
+
                                 // If we have a workflow_id, ensure the workflow panel is loaded
                                 let needsWorkflowLoad = false;
                                 if (workflowId && (!current_workflow_id || current_workflow_id === "0" || current_workflow_id !== workflowId)) {
@@ -4729,23 +5242,23 @@
                                     fetchWorkflow(workflowId);
                                     needsWorkflowLoad = true;
                                 }
-                                
+
                                 // Immediately fetch current status to display progress
                                 $.ajax({
                                     url: `/workflows/workflow/status?session_id=${sessionId}`,
                                     type: 'GET',
                                     dataType: 'json',
-                                    success: function(statusData) {
+                                    success: function (statusData) {
                                         // Wait a bit for workflow panel to load if we just fetched it
                                         setTimeout(() => {
                                             displayWorkflowProgress(statusData);
                                         }, needsWorkflowLoad ? 500 : 0);
                                     },
-                                    error: function(err) {
+                                    error: function (err) {
                                         console.warn("Failed to fetch initial workflow status:", err);
                                     }
                                 });
-                                
+
                                 if (workflow_interval_id) {
                                     clearInterval(workflow_interval_id);
                                 }
@@ -4759,7 +5272,7 @@
                 })
                 .catch(err => console.warn("Failed to check workflow activity:", err));
         }
-        
+
         // Check for running extraction
         if (activityId && searchSetUuid) {
             // Fetch activity to check status
@@ -4778,7 +5291,8 @@
                             showWorking();
                             showScanning();
                             $("#search-results-panel").show();
-                            $("#search-results-panel").html("<div style='padding: 40px 20px; text-align: center;'><div class='lds-grid'><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div><div></div></div><p style='margin-top: 20px; font-size: 16px; font-weight: 500; color: #333;'>Running extraction...</p></div>");
+                            // Show overlay on top of extraction panel
+                            showExtractionOverlay();
                             // Resume polling
                             pollExtractionStatus(activityId, searchSetUuid);
                         }
@@ -4788,7 +5302,7 @@
                     console.warn("Failed to check activity status for polling resume:", err);
                 });
         }
-        
+
         // Also check all activities in the rail for running ones
         const runList = document.getElementById("run-list");
         if (runList) {
@@ -4796,7 +5310,7 @@
             runningItems.forEach(item => {
                 const itemActivityId = item.dataset.runId;
                 if (!itemActivityId) return;
-                
+
                 // Check if it's an extraction (has search_set_uuid in URL or we can fetch it)
                 const typeIcon = item.querySelector('.run-type-icon');
                 if (typeIcon && typeIcon.classList.contains('fa-list-check')) {
@@ -4851,7 +5365,434 @@
             });
         }
     }
-    
+
     // Resume polling after a short delay to ensure DOM is ready
     setTimeout(resumePollingForRunningActivities, 500);
+
+    // ==========================================
+    // Text Selection Search Feature
+    // ==========================================
+
+    let currentSelectionSpan = null;
+
+    // Handle text selection in the right panel
+    $(document).on('mouseup', '.right-panel', function (e) {
+        // Don't interfere with buttons or links
+        if ($(e.target).is('button, a, i, input, textarea')) {
+            return;
+        }
+
+        // Check if a document is loaded
+        if (!documentPath || !window.document_displayed) {
+            return;
+        }
+
+        const selection = window.getSelection();
+        const selectedText = selection.toString().trim();
+
+        // Remove previous selection highlight if it exists
+        if (currentSelectionSpan) {
+            const parent = currentSelectionSpan.parentNode;
+            const textNode = document.createTextNode(currentSelectionSpan.textContent);
+            parent.replaceChild(textNode, currentSelectionSpan);
+            parent.normalize(); // Merge adjacent text nodes
+            currentSelectionSpan = null;
+        }
+
+        // Only proceed if text is selected and it's substantial enough
+        if (selectedText.length > 0 && selectedText.length < 500) {
+            try {
+                const range = selection.getRangeAt(0);
+
+                // Check if selection is within right panel
+                const rightPanel = document.querySelector('.right-panel');
+                if (!rightPanel.contains(range.commonAncestorContainer)) {
+                    return;
+                }
+
+                // Create a span to wrap the selected text
+                const span = document.createElement('span');
+                span.className = 'selected-text-highlight';
+                span.setAttribute('data-search-text', selectedText);
+                span.title = 'Searching in document...';
+
+                // Wrap the selection
+                try {
+                    range.surroundContents(span);
+                    currentSelectionSpan = span;
+
+                    // Clear the selection to show the highlight
+                    selection.removeAllRanges();
+                } catch (err) {
+                    // If surroundContents fails (e.g., selection spans multiple elements),
+                    // extract contents and wrap them
+                    console.log('Selection spans multiple elements, using alternative method');
+                    const fragment = range.extractContents();
+                    span.appendChild(fragment);
+                    range.insertNode(span);
+                    currentSelectionSpan = span;
+                    selection.removeAllRanges();
+                }
+
+                // Automatically trigger search
+                performDocumentSearch(selectedText);
+            } catch (err) {
+                console.error('Error wrapping selection:', err);
+            }
+        }
+    });
+
+    // Function to perform document search
+    function performDocumentSearch(searchText) {
+        if (!searchText || !documentPath) {
+            return;
+        }
+
+        console.log('Searching for text in document:', searchText);
+
+        // Get the current document UUID
+        const docContainer = document.querySelector('.document-container');
+        if (!docContainer) {
+            console.error('No document container found');
+            return;
+        }
+
+        const docUuid = docContainer.getAttribute('data-doc-uuid');
+        if (!docUuid) {
+            console.error('No document UUID found');
+            return;
+        }
+
+        // Call backend to search for text in document
+        $.ajax({
+            url: '/tasks/search_in_document',
+            type: 'POST',
+            data: JSON.stringify({
+                search_text: searchText,
+                document_uuid: docUuid
+            }),
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            success: function (response) {
+                if (response.found && response.matches > 0) {
+                    console.log(`Found ${response.matches} matches for "${searchText}"`);
+
+                    // Update global highlight terms
+                    window.highlightTerms = [searchText];
+                    searchTerm = searchText;
+
+                    // Set flag to scroll to first highlight
+                    window.needsScroll = true;
+                    needsScroll = true;
+
+                    // Re-render the PDF with highlights
+                    renderPDF();
+
+                    // Show a brief toast notification
+                    showToast(`Found ${response.matches} occurrence${response.matches > 1 ? 's' : ''} of "${searchText}"`);
+                } else {
+                    console.log('No matches found for:', searchText);
+
+                    // Shake the highlight to indicate no matches
+                    if (currentSelectionSpan) {
+                        // Add a shake animation with fade-out
+                        currentSelectionSpan.style.animation = 'selection-no-match 0.8s ease-out';
+
+                        // Auto-dismiss after animation completes
+                        setTimeout(function () {
+                            if (currentSelectionSpan && currentSelectionSpan.parentNode) {
+                                const parent = currentSelectionSpan.parentNode;
+                                const textNode = document.createTextNode(currentSelectionSpan.textContent);
+                                parent.replaceChild(textNode, currentSelectionSpan);
+                                parent.normalize();
+                                currentSelectionSpan = null;
+                            }
+                        }, 800);
+                    }
+
+                    // Clear any existing highlights
+                    window.highlightTerms = [];
+                    $('#semantic-panel').hide();
+                }
+            },
+            error: function (xhr, status, error) {
+                console.error('Error searching document:', error);
+                showToast('Error searching document');
+            }
+        });
+    }
+
+    // Handle click on selected text to re-search in document
+    $(document).on('click', '.selected-text-highlight', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const searchText = $(this).attr('data-search-text') || $(this).text().trim();
+        if (searchText) {
+            performDocumentSearch(searchText);
+        }
+    });
+
+    // Clear selection highlight when clicking elsewhere
+    $(document).on('mousedown', function (e) {
+        if (currentSelectionSpan && !$(e.target).closest('.selected-text-highlight').length) {
+            const parent = currentSelectionSpan.parentNode;
+            if (parent) {
+                const textNode = document.createTextNode(currentSelectionSpan.textContent);
+                parent.replaceChild(textNode, currentSelectionSpan);
+                parent.normalize();
+            }
+            currentSelectionSpan = null;
+        }
+    });
+
+    // Panel resizer drag functionality
+    (function () {
+        const resizer = document.getElementById('panel-resizer');
+        const leftPanel = document.querySelector('.left-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        const header = document.querySelector('.main-panel .header');
+        const semanticPanel = document.querySelector('.left-panel .semantic-panel');
+
+        if (!resizer || !leftPanel || !rightPanel) return;
+
+        let isDragging = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+
+        // Get current rail width
+        function getRailWidth() {
+            const railW = getComputedStyle(document.documentElement).getPropertyValue('--rail-w');
+            return parseFloat(railW) || 220;
+        }
+
+        function updateBottomToolbars() {
+            const railWidth = Math.max(getRailWidth(), 0);
+            const leftEdge = Math.max(leftPanel.getBoundingClientRect().width, 0);
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.left = `${leftEdge}px`;
+                    toolbar.style.right = `${railWidth}px`;
+                    toolbar.style.width = 'auto';
+                });
+        }
+
+        let bottomToolbarUpdateScheduled = false;
+        function scheduleBottomToolbarUpdate() {
+            if (bottomToolbarUpdateScheduled) return;
+            bottomToolbarUpdateScheduled = true;
+            requestAnimationFrame(() => {
+                bottomToolbarUpdateScheduled = false;
+                updateBottomToolbars();
+            });
+        }
+
+        // Update all dependent elements with new percentages
+        function updateDependentElements(rightPercent) {
+            if (header) {
+                header.style.right = `calc(${rightPercent}% + var(--rail-w))`;
+            }
+            if (semanticPanel) {
+                semanticPanel.style.right = `calc(${rightPercent}% + var(--rail-w) + 30px)`;
+            }
+            updateBottomToolbars();
+        }
+
+        // Calculate initial position based on panel widths
+        function updateResizerPosition() {
+            const leftWidth = leftPanel.offsetWidth;
+            resizer.style.left = leftWidth + 'px';
+        }
+
+        // Calculate target position based on percentages (for rail dock/undock)
+        function updateResizerPositionFromPercentages() {
+            const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            if (savedLeftPercent) {
+                // Calculate the actual left panel width: (leftPercent% of window) - rail width
+                const targetLeftWidth = (parseFloat(savedLeftPercent) / 100 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            } else {
+                // Use default 60/40 split
+                const targetLeftWidth = (0.6 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            }
+        }
+
+        // Disable transitions initially to prevent animation on page load
+        resizer.style.transition = 'none';
+        leftPanel.style.transition = 'none';
+        rightPanel.style.transition = 'none';
+        if (header) header.style.transition = 'none';
+        if (semanticPanel) semanticPanel.style.transition = 'none';
+        updateBottomToolbars();
+
+        // Check for saved panel widths first
+        const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+        const savedRightPercent = localStorage.getItem('panelRightPercent');
+
+        if (savedLeftPercent && savedRightPercent) {
+            // Apply saved widths before setting position
+            leftPanel.style.width = `calc(${savedLeftPercent}% - var(--rail-w))`;
+            rightPanel.style.width = `${savedRightPercent}%`;
+            updateDependentElements(savedRightPercent);
+        } else {
+            updateBottomToolbars();
+        }
+
+        // Set initial position without animation
+        updateResizerPosition();
+
+        // Enable transitions after initial position is set
+        requestAnimationFrame(() => {
+            resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+            leftPanel.style.transition = 'width 0.3s ease';
+            rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+            if (header) header.style.transition = 'right 0.3s ease';
+            if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+        });
+
+        resizer.addEventListener('mousedown', function (e) {
+            isDragging = true;
+            startX = e.clientX;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            // Disable transitions during drag for instant feedback
+            resizer.style.transition = 'background 0.2s ease';
+            leftPanel.style.transition = 'none';
+            rightPanel.style.transition = 'none';
+            if (header) header.style.transition = 'none';
+            if (semanticPanel) semanticPanel.style.transition = 'none';
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.transition = 'none';
+                });
+
+            // Get starting widths
+            startLeftWidth = leftPanel.offsetWidth;
+            startRightWidth = rightPanel.offsetWidth;
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - startX;
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            // Calculate new widths in pixels
+            const newLeftWidth = startLeftWidth + deltaX;
+            const newRightWidth = startRightWidth - deltaX;
+
+            // Calculate total available width for both panels
+            const totalAvailable = windowWidth - railWidth;
+
+            // Enforce minimum widths (30% of available space each)
+            const minWidth = totalAvailable * 0.3;
+
+            if (newLeftWidth >= minWidth && newRightWidth >= minWidth) {
+                // Calculate percentages relative to window width
+                // Left panel uses: calc(X% - var(--rail-w))
+                // So: newLeftWidth = (leftPercent/100) * windowWidth - railWidth
+                // Therefore: leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100
+                const leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100;
+                const rightPercent = (newRightWidth / windowWidth) * 100;
+
+                // Apply new widths
+                leftPanel.style.width = `calc(${leftPercent}% - var(--rail-w))`;
+                rightPanel.style.width = `${rightPercent}%`;
+
+                // Update resizer position
+                resizer.style.left = newLeftWidth + 'px';
+
+                // Update all dependent elements
+                updateDependentElements(rightPercent);
+
+                // Save to localStorage
+                localStorage.setItem('panelLeftPercent', leftPercent);
+                localStorage.setItem('panelRightPercent', rightPercent);
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (isDragging) {
+                isDragging = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+
+                // Re-enable transitions after drag
+                resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+                leftPanel.style.transition = 'width 0.3s ease';
+                rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+                if (header) header.style.transition = 'right 0.3s ease';
+                if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+                updateBottomToolbars();
+            }
+        });
+
+        // Update resizer position on window resize
+        window.addEventListener('resize', function () {
+            updateResizerPosition();
+            scheduleBottomToolbarUpdate();
+        });
+
+        // Make functions available globally
+        if (typeof window !== 'undefined') {
+            window.updatePanelResizerPosition = updateResizerPosition;
+            window.updatePanelResizerPositionFromPercentages = updateResizerPositionFromPercentages;
+            window.syncBottomToolbarsToPanels = scheduleBottomToolbarUpdate;
+        }
+
+        // Keep toolbars synced when panels/layout change (e.g., showing a toolbar later)
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(scheduleBottomToolbarUpdate);
+            ro.observe(leftPanel);
+            ro.observe(rightPanel);
+        }
+        const mo = new MutationObserver(scheduleBottomToolbarUpdate);
+        mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+    })();
+
+    // Keep panel-resizer hidden while custom .modal overlays are visible
+    (function () {
+        function anyModalVisible() {
+            return Array.from(document.querySelectorAll('.modal')).some((modal) => {
+                return window.getComputedStyle(modal).display !== 'none';
+            });
+        }
+
+        function updateModalOpenState() {
+            document.body.classList.toggle('modal-open', anyModalVisible());
+        }
+
+        updateModalOpenState();
+
+        const observer = new MutationObserver(updateModalOpenState);
+        observer.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+        });
+
+        window.addEventListener('keydown', function () {
+            // Some modals close on ESC; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
+        window.addEventListener('click', function () {
+            // Some modals close on outside click; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
+    })();
+
 </script>

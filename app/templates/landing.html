@@ -110,16 +110,42 @@
           </p>
 
           {% block hero_auth %}
-          {% if AUTH_MODE == 'LOCAL' %}
-
-          <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
+          {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="mb-6 space-y-2">
             {% for category, message in messages %}
             <div class="alert alert-{{ category }}">{{ message }}</div>
             {% endfor %}
+          </div>
+          {% endif %}
+          {% endwith %}
+
+          {% if oauth_enabled %}
+          <div class="mb-6">
+            {% if azure_enabled %}
+            <a class="action-button" href="{{ url_for('azure.login') }}">{{ azure_label }}</a>
+            {% elif azure_configured %}
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>{{ azure_label }}</button>
+            {% if azure_disabled_reason %}
+            <p class="text-sm text-gray-200 mt-2">{{ azure_disabled_reason }}</p>
+            {% elif not azure_config_complete %}
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but required fields are missing: {{ azure_missing_fields|join(', ') }}.</p>
+            {% elif not azure_blueprint_registered %}
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Restart the server after saving the provider settings.</p>
+            {% else %}
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Please verify the client ID,
+              secret, and tenant are valid.</p>
             {% endif %}
-            {% endwith %}
+            {% else %}
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>Azure sign-in unavailable</button>
+            <p class="text-sm text-gray-200 mt-2">Add and enable the Azure provider in System Configuration to allow SSO.</p>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          {% if password_enabled %}
+
+          <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
             <input type="email" name="email" placeholder="Email Address" required />
             <input type="password" name="password" placeholder="Password" required />
             <button type="submit">SIGN IN</button>
@@ -130,8 +156,8 @@
               account</a>
           </p>
 
-          {% else %}
-          <a class="action-button" href="/login" class="">SIGN IN</a>
+          {% elif not oauth_enabled %}
+          <p class="text-sm text-gray-200">No authentication methods are enabled. Please contact an administrator.</p>
           {% endif %}
           {% endblock %}
         </div>
@@ -612,7 +638,7 @@
       </p>
 
       <div class="flex flex-col sm:flex-row gap-4 justify-center">
-        <a href="mailto:ai4ra@uidaho.edu"
+        <a href="https://ai4ra.uidaho.edu/contact/"
           class="inline-flex h-14 items-center justify-center rounded-full bg-white text-black px-8 font-bold text-lg transition-all hover:bg-gray-200 hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]">
           <i data-lucide="mail" class="w-5 h-5 mr-2"></i> Contact the Team
         </a>
