@@ -1,8 +1,5 @@
-import asyncio
 import os
-import threading
 
-import nest_asyncio
 from devtools import debug
 from dotenv import load_dotenv
 
@@ -38,6 +35,6 @@ debug(langfuse_enabled)
 # ----------------------------------------
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5002))
+    port = int(os.environ.get("PORT", 5003))
     app.run(host="0.0.0.0", port=port)
 # , ssl_context=("certs/cert.pem", "certs/key.pem"))

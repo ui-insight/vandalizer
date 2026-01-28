@@ -46,6 +46,83 @@ class UserModelConfig(me.Document):
     top_p = me.FloatField(default=0.9)
     available_models = me.ListField(me.DictField(), required=False, default=[])
 
+    # Library Preferences
+    pinned_items = me.ListField(me.StringField(), default=[])
+    favorite_items = me.ListField(me.StringField(), default=[])
+
+
+class SystemConfig(me.Document):
+    """System-wide configuration model. Only accessible to system administrators."""
+
+    # OCR Configuration
+    ocr_endpoint = me.StringField(
+        default="https://processpdf.insight.uidaho.edu",
+        max_length=500
+    )
+
+    # LLM Configuration
+    llm_endpoint = me.StringField(
+        default="https://mindrouter-api.nkn.uidaho.edu/v1",
+        max_length=500
+    )
+
+    # Available models configuration
+    # Each model is a dict with keys: name, tag, external, thinking, endpoint, api_protocol
+    # thinking: bool - whether the model supports thinking mode (default False)
+    # endpoint: str - API endpoint URL for this specific model (optional, falls back to llm_endpoint)
+    # api_protocol: str - API protocol to use: "openai", "ollama", or "vllm" (default: auto-detect)
+    available_models = me.ListField(me.DictField(), default=[
+        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False, "thinking": False, "endpoint": "", "api_protocol": ""},
+        {"name": "openai/gpt-5", "tag": "Cloud", "external": True, "thinking": False, "endpoint": "", "api_protocol": ""}
+    ])
+
+    # UI Configuration
+    highlight_color = me.StringField(
+        default="#eab308",  # Vandal gold/yellow (Tailwind yellow-500)
+        max_length=50
+    )
+    ui_radius = me.StringField(
+        default="12px",
+        max_length=50
+    )
+
+    # Authentication Configuration
+    # List of enabled authentication methods
+    auth_methods = me.ListField(me.StringField(), default=["password"])
+
+    # OAuth/SAML provider configurations
+    # Each provider is a dict with keys:
+    # - provider: "azure" | "saml" | "google" | "github" | etc.
+    # - enabled: bool
+    # - display_name: str (e.g., "Sign in with Azure")
+    # - client_id: str
+    # - client_secret: str (encrypted in production)
+    # - tenant_id: str (Azure-specific)
+    # - redirect_uri: str
+    # - metadata_url: str (SAML-specific)
+    # - entity_id: str (SAML-specific)
+    # - authorization_endpoint: str (custom OAuth)
+    # - token_endpoint: str (custom OAuth)
+    # - userinfo_endpoint: str (custom OAuth)
+    oauth_providers = me.ListField(me.DictField(), default=[])
+
+    # Metadata
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_by = me.StringField(max_length=200)
+
+    meta = {
+        "collection": "system_config",
+        "indexes": []
+    }
+
+    @classmethod
+    def get_config(cls):
+        """Get or create the singleton system configuration."""
+        config = cls.objects.first()
+        if not config:
+            config = cls().save()
+        return config
+
 
 class WorkflowStepTask(me.Document):
     """Workflow step task model. Represents a task within a workflow step."""
@@ -240,10 +317,16 @@ class User(me.Document):
 
     def set_password(self, password):
         """Create a hashed password."""
+        if password is None or not isinstance(password, str):
+            raise ValueError("Password must be a non-empty string")
+        if len(password) == 0:
+            raise ValueError("Password cannot be empty")
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         """Check a hashed password."""
+        if password is None or not isinstance(password, str):
+            return False
         return check_password_hash(self.password_hash, password)
 
     def _membership_for(self, team: "Team | None" = None) -> "TeamMembership | None":
@@ -776,6 +859,32 @@ class LibraryScope(Enum):
     VERIFIED = "verified"  # global verified catalog
 
 
+class LibraryFolder(me.Document):
+    """
+    Represents a folder within the library (personal or team).
+    """
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    name = me.StringField(required=True, max_length=200)
+    parent_id = me.StringField(default=None, required=False, max_length=200)  # uuid of parent folder or None for root
+
+    scope = me.EnumField(LibraryScope, required=True)
+    
+    # Ownership (matches Library)
+    owner_user_id = me.StringField(required=False, max_length=200)
+    team = me.ReferenceField(Team, required=False, reverse_delete_rule=me.CASCADE)
+
+    created_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    updated_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+
+    meta = {
+        "indexes": [
+            {"fields": ["scope", "owner_user_id", "parent_id", "name"]},
+            {"fields": ["scope", "team", "parent_id", "name"]},
+        ]
+    }
+
+
 class LibraryItem(me.Document):
     """
     A pointer to either a Workflow or a SearchSet, with provenance and optional verification stamp.
@@ -800,6 +909,9 @@ class LibraryItem(me.Document):
     # Optional tags/notes to help curate libraries
     tags = me.ListField(me.StringField(max_length=100), default=[])
     note = me.StringField(required=False, max_length=2000)
+    
+    # Folder organization
+    folder = me.ReferenceField("LibraryFolder", required=False, reverse_delete_rule=me.NULLIFY)
 
     meta = {
         "indexes": [
@@ -988,6 +1100,86 @@ class VerificationRequest(me.Document):
         }
 
 
+class VerifiedItemMetadata(me.Document):
+    """Curated metadata for verified library items."""
+
+    item_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    item_identifier = me.StringField(required=True, max_length=200)
+    display_name = me.StringField(required=False, max_length=300)
+    description = me.StringField(required=False, max_length=5000)
+    markdown = me.StringField(required=False, max_length=20000)
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "indexes": [
+            {"fields": ["item_kind", "item_identifier"], "unique": True},
+        ]
+    }
+
+    def save(self, *args, **kwargs):
+        self.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        return super().save(*args, **kwargs)
+
+
+class VerifiedCollection(me.Document):
+    """Curated collection of verified items."""
+
+    title = me.StringField(required=True, max_length=200)
+    description = me.StringField(required=False, max_length=2000)
+    promo_image_url = me.StringField(required=False, max_length=500)
+    items = me.ListField(
+        me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL), default=[]
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+
+    meta = {"ordering": ["-updated_at"]}
+
+    def save(self, *args, **kwargs):
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if not self.created_at:
+            self.created_at = now
+        self.updated_at = now
+        return super().save(*args, **kwargs)
+
+
+# ---- Edit History ----
+
+
+class EditHistoryEntry(me.Document):
+    """Immutable-ish history entry for edits to prompts/search sets/workflows."""
+
+    obj_kind = me.StringField(
+        required=True, choices=["workflow", "searchset", "prompt", "formatter"]
+    )
+    obj_id = me.StringField(required=True, max_length=200)
+    action = me.StringField(required=True, max_length=50)
+
+    user_id = me.StringField(required=False, max_length=200)
+    user_name = me.StringField(required=False, max_length=200)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    changes = me.DictField()
+
+    meta = {
+        "indexes": [
+            {"fields": ["obj_kind", "obj_id", "-created_at"]},
+        ]
+    }
+
+
 # Activity / Data Analytics
 
 
@@ -1149,8 +1341,21 @@ class DailyUsageAggregate(me.Document):
 
     meta = {
         "indexes": [
-            {"fields": ["date", "scope", "user_id"], "unique": True, "sparse": True},
-            {"fields": ["date", "scope", "team_id"], "unique": True, "sparse": True},
+            {
+                "fields": ["date", "scope", "user_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "user"},
+            },
+            {
+                "fields": ["date", "scope", "team_id"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "team"},
+            },
+            {
+                "fields": ["date", "scope"],
+                "unique": True,
+                "partialFilterExpression": {"scope": "global"},
+            },
             {"fields": ["-date", "scope"]},
         ]
     }

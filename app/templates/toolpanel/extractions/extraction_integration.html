@@ -1,0 +1,208 @@
+<div id="extractionIntegrationModal" class="workflow-overlay" style="display: block; overflow: scroll;">
+    <div class="workflow-modal-content">
+        <h2 class="workflow-modal-header">
+            Integration
+            <a id="closeExtractionIntegrationBtn" style="float:right; color: #88888899; cursor: pointer;">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </h2>
+
+        <!-- Description -->
+        <hr>
+        <h3 class="workflow-modal-subtitle">Programmatically access your extraction</h3>
+        <hr style="padding-bottom: 0px; margin-bottom: 0px;">
+
+        <!-- Tabbed navigation -->
+        <p class="workflow-label" style="padding: 15px 30px;">Basic Setup</p>
+
+        <!-- Added design section -->
+        <div class="workflow-content-body" style="background-color: white; padding: 0px 30px 60px 30px;">
+            <div class="quickstart-code">
+                <h4>Start Extraction</h4>
+                <div style="position: relative;">
+                    <a id="copyExtractionCodeButton" class="btn btn-secondary"
+                        style="position: absolute; top: 10px; right: 10px; cursor: pointer;"><i
+                            class="fa-regular fa-copy"></i></a>
+                    <div style="position: absolute; bottom: 10px; right: 10px;">
+                        <select id="extractionLanguageDropdown" style="cursor: pointer; border-radius: var(--ui-radius, 12px); box-shadow: none;">
+                            <option value="python">Python</option>
+                            <option value="bash">Bash</option>
+                        </select>
+                    </div>
+                    <pre style="border-radius: var(--ui-radius, 12px);"><code id="extractionCodeSnippet">
+import requests
+import json
+
+files = {
+    'file': open('path/to/your/file1.pdf', 'rb'),
+    'file': open('path/to/your/file2.pdf', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'search_set_uuid': '{{ search_set.uuid }}',
+}
+
+response = requests.post(
+    '{{ base_url }}/tasks/run_integrated',
+    headers={
+        'x-api-key': '{{ user.id }}',
+        'Accept': 'application/json',
+    },
+    data=data,
+    files=files,
+)
+
+result = response.json()
+print(result)</code></pre>
+                </div>
+            </div>
+
+            <div class="run-response">
+                <h4>Run Response</h4>
+                <pre><code>{
+  "status": "queued",
+  "activity_id": "activity-uuid",
+  "message": "Extraction task started"
+}</code></pre>
+            </div>
+
+            <div class="quickstart-code" style="margin-top: 30px;">
+                <h4>Check Status</h4>
+                <div style="position: relative;">
+                    <a id="copyStatusCodeButton" class="btn btn-secondary"
+                        style="position: absolute; top: 10px; right: 10px; cursor: pointer;"><i
+                            class="fa-regular fa-copy"></i></a>
+                    <div style="position: absolute; bottom: 10px; right: 10px;">
+                        <select id="statusLanguageDropdown" style="cursor: pointer; border-radius: var(--ui-radius, 12px); box-shadow: none;">
+                            <option value="python">Python</option>
+                            <option value="bash">Bash</option>
+                        </select>
+                    </div>
+                    <pre style="border-radius: var(--ui-radius, 12px);"><code id="statusCodeSnippet">import requests
+
+response = requests.get(
+    '{{ base_url }}/tasks/extraction_status/&lt;activity_id&gt;',
+    headers={
+        'x-api-key': '{{ user.id }}',
+        'Accept': 'application/json',
+    },
+)
+
+status = response.json()
+print(status)</code></pre>
+                </div>
+            </div>
+
+            <div class="run-response" style="margin-top: 30px;">
+                <h4>Status Response</h4>
+                <pre><code>{
+  "activity_id": "activity-uuid",
+  "status": "completed",
+  "title": "Extraction",
+  "results": [
+    {
+      "field1": "value1",
+      "field2": "value2"
+    }
+  ]
+}</code></pre>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        $('#closeExtractionIntegrationBtn').on("click", function (e) {
+            e.preventDefault();
+            $('#extractionIntegrationModal').remove();
+        });
+
+        $('#copyExtractionCodeButton').on("click", function () {
+            const code = document.getElementById('extractionCodeSnippet').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Code copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        });
+
+        $('#extractionLanguageDropdown').on("change", function () {
+            const language = $(this).val();
+            let codeSnippet = '';
+
+            if (language === 'python') {
+                codeSnippet = `import requests
+import json
+
+files = {
+    'file': open('path/to/your/file1.pdf', 'rb'),
+    'file': open('path/to/your/file2.pdf', 'rb'),
+    # Add more files as needed
+}
+
+data = {
+    'search_set_uuid': '{{ search_set.uuid }}',
+}
+
+response = requests.post(
+    '{{ base_url }}/tasks/run_integrated',
+    headers={
+        'x-api-key': '{{ user.id }}',
+        'Accept': 'application/json',
+    },
+    data=data,
+    files=files,
+)
+
+result = response.json()
+print(result)`;
+            } else if (language === 'bash') {
+                codeSnippet = `curl -X POST {{ base_url }}/tasks/run_integrated \\
+    -H "x-api-key: {{ user.id }}" \\
+    -H "Accept: application/json" \\
+    -F "search_set_uuid={{ search_set.uuid }}" \\
+    -F "file=@path/to/your/file1.pdf" \\
+    -F "file=@path/to/your/file2.pdf"
+    # Add more files using additional -F flags`;
+            }
+
+            $('#extractionCodeSnippet').text(codeSnippet);
+        });
+
+        $('#copyStatusCodeButton').on("click", function () {
+            const code = document.getElementById('statusCodeSnippet').innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                alert('Code copied to clipboard!');
+            }).catch(err => {
+                console.error('Failed to copy text: ', err);
+            });
+        });
+
+        $('#statusLanguageDropdown').on("change", function () {
+            const language = $(this).val();
+            let codeSnippet = '';
+
+            if (language === 'python') {
+                codeSnippet = `import requests
+
+response = requests.get(
+    '{{ base_url }}/tasks/extraction_status/<activity_id>',
+    headers={
+        'x-api-key': '{{ user.id }}',
+        'Accept': 'application/json',
+    },
+)
+
+status = response.json()
+print(status)`;
+            } else if (language === 'bash') {
+                codeSnippet = `curl -X GET {{ base_url }}/tasks/extraction_status/<activity_id> \\
+    -H "x-api-key: {{ user.id }}" \\
+    -H "Accept: application/json"`;
+            }
+
+            $('#statusCodeSnippet').text(codeSnippet);
+        });
+    </script>
+</div>
+

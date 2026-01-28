@@ -38,6 +38,20 @@
         </a>
         {% endif %}
 
+        {% if current_user.is_admin %}
+        <a class="menu-item" role="menuitem" href="/admin/config">
+            <i class="fa-solid fa-sliders" style="width:18px;"></i> System Configuration
+        </a>
+        {% endif %}
+
+        {% if current_user.is_examiner %}
+        <hr class="menu-divider">
+
+        <a class="menu-item" role="menuitem" href="/library/manage_verified">
+            <i class="fa-solid fa-clipboard-check" style="width:18px;"></i> Verification Management
+        </a>
+        {% endif %}
+
         <hr class="menu-divider">
 
         <a class="menu-item" role="menuitem" href="/logout">

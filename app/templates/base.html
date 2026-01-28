@@ -1,4 +1,4 @@
-{% extends "bootstrap/base.html" %} {%block title%}Doc Scanner{%endblock%} {%
+{% extends "bootstrap/base.html" %} {%block title%}Vandalizer{%endblock%} {%
 block head %} {{super()}}
 <link
   rel="shortcut icon"
@@ -18,6 +18,37 @@ block head %} {{super()}}
   rel="stylesheet"
   href="{{url_for('static', filename='fontawesome/css/solid.css')}}?"
 />
+
+<style>
+  :root {
+    --highlight-color: {{ highlight_color|default('#eab308') }};
+    /* Choose black or white text based on highlight brightness */
+    {% set h = highlight_color.lstrip('#') %}
+    {% set r = h[0:2]|int(base=16) if h|length >=6 else 0 %}
+    {% set g = h[2:4]|int(base=16) if h|length >=6 else 0 %}
+    {% set b = h[4:6]|int(base=16) if h|length >=6 else 0 %}
+    {% set luminance = (0.299*r + 0.587*g + 0.114*b)/255 %}
+    --highlight-text-color: {{ '#000000' if luminance > 0.6 else '#ffffff' }};
+    {% set rc = 255 - r %}
+    {% set gc = 255 - g %}
+    {% set bc = 255 - b %}
+    --highlight-complement: {{ '#{:02x}{:02x}{:02x}'.format(rc, gc, bc) }};
+    --ui-radius: {{ ui_radius|default('12px') }};
+  }
+
+  .highlight {
+    background-color: var(--highlight-color) !important;
+  }
+
+  .selected-text-highlight {
+    background: color-mix(in srgb, var(--highlight-color) 70%, transparent);
+    border-radius: 2px;
+  }
+
+  .selected-text-highlight:hover {
+    background: color-mix(in srgb, var(--highlight-color) 85%, transparent);
+  }
+</style>
 
 {% endblock %} {% block scripts %} {{super()}}
 

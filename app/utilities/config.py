@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 
+import os
+
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -171,5 +173,166 @@ class Settings(BaseSettings):
         description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
     )
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Override with database config if available
+        self._load_from_db()
+
+    def _load_from_db(self):
+        """Load configuration from database SystemConfig if available."""
+        try:
+            from app.models import SystemConfig
+            db_config = SystemConfig.get_config()
+            if db_config:
+                # Override LLM endpoint
+                if db_config.llm_endpoint:
+                    self.insight_endpoint = db_config.llm_endpoint
+
+                # Override available models
+                if db_config.available_models:
+                    self.models = [
+                        ModelType(**model) for model in db_config.available_models
+                    ]
+        except Exception as e:
+            # Silently fail if database is not available or SystemConfig doesn't exist
+            # This allows the app to start even if MongoDB is not yet initialized
+            pass
+
 
 settings = Settings()
+
+
+def get_ocr_endpoint() -> str:
+    """Get OCR endpoint from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.ocr_endpoint:
+            return db_config.ocr_endpoint
+    except Exception:
+        pass
+    return "https://processpdf.insight.uidaho.edu"
+
+
+def get_llm_endpoint() -> str:
+    """Get LLM endpoint from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.llm_endpoint:
+            return db_config.llm_endpoint
+    except Exception:
+        pass
+    return settings.insight_endpoint
+
+
+def get_llm_models() -> list[dict]:
+    """Return the current list of LLM models (SystemConfig or defaults)."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.available_models:
+            return db_config.available_models
+    except Exception:
+        pass
+    return [m.model_dump() for m in settings.models]
+
+
+def get_default_model_name() -> str:
+    """Return a sensible default model name based on configured models."""
+    models = get_llm_models()
+    if models:
+        first = models[0]
+        if isinstance(first, dict):
+            return first.get("name") or settings.base_model
+    return settings.base_model
+
+
+def get_highlight_color() -> str:
+    """Get UI highlight color from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.highlight_color:
+            return db_config.highlight_color
+    except Exception:
+        pass
+    return "#eab308"  # Vandal gold/yellow
+
+
+def _normalize_radius(value: str) -> str:
+    """Ensure a CSS-friendly radius string (append px if numeric)."""
+    if not value:
+        return "12px"
+    value = value.strip()
+    if value.isdigit():
+        return f"{value}px"
+    if value.replace(".", "", 1).isdigit() and not value.endswith("px"):
+        return f"{value}px"
+    return value
+
+
+def get_ui_radius() -> str:
+    """Get UI radius from database config or default."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and getattr(db_config, "ui_radius", None):
+            return _normalize_radius(db_config.ui_radius)
+    except Exception:
+        pass
+    return "12px"
+
+
+def get_auth_methods() -> list[str]:
+    """Get enabled authentication methods from database config."""
+    env = os.getenv("FLASK_ENV", "development").lower()
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.auth_methods is not None:
+            methods = list(db_config.auth_methods)
+            # If nothing is configured at all, fall back to password in non-prod to avoid lockout
+            if methods or env == "production":
+                return methods
+    except Exception:
+        pass
+    # Default/fallback: allow password in non-prod to avoid lockout when no config is present
+    return [] if env == "production" else ["password"]
+
+
+def get_oauth_providers(enabled_only: bool = True) -> list[dict]:
+    """Get OAuth/SAML providers from database config.
+
+    Args:
+        enabled_only: If True, only return enabled providers
+
+    Returns:
+        List of provider configurations
+    """
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.oauth_providers:
+            if enabled_only:
+                return [p for p in db_config.oauth_providers if p.get("enabled", True)]
+            return db_config.oauth_providers
+    except Exception:
+        pass
+    return []
+
+
+def get_oauth_provider_by_type(provider_type: str) -> dict | None:
+    """Get a specific OAuth provider configuration by type.
+
+    Args:
+        provider_type: The provider type (azure, saml, google, etc.)
+
+    Returns:
+        Provider configuration dict or None if not found
+    """
+    providers = get_oauth_providers(enabled_only=True)
+    for provider in providers:
+        if provider.get("provider") == provider_type:
+            return provider
+    return None

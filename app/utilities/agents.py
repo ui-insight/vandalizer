@@ -20,8 +20,8 @@ from pydantic_ai.profiles.openai import (
 )
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 
-from app.models import SmartDocument
-from app.utilities.config import settings
+from app.models import SmartDocument, SystemConfig
+from app.utilities.config import get_default_model_name, settings
 from app.utilities.document_manager import DocumentManager
 
 load_dotenv()
@@ -125,34 +125,236 @@ def get_default_system_prompt(include_next_step: bool = True) -> str:
     )
 
 
+def _get_model_config(model_name: str) -> Optional[dict]:
+    """Get model configuration from SystemConfig by model name."""
+    try:
+        config = SystemConfig.get_config()
+        if config and config.available_models:
+            for model in config.available_models:
+                if model.get("name") == model_name:
+                    return model
+    except Exception:
+        pass
+    return None
+
+
+def _get_model_endpoint(model_name: str) -> str:
+    """Get the endpoint URL for a specific model, falling back to default if not set."""
+    model_config = _get_model_config(model_name)
+    if model_config and model_config.get("endpoint"):
+        endpoint = model_config.get("endpoint", "").strip()
+        if endpoint:
+            return endpoint
+    
+    # Fallback to default LLM endpoint
+    from app.utilities.config import get_llm_endpoint
+    return get_llm_endpoint()
+
+
+def _detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
+    """
+    Detect API protocol based on model name and configuration.
+    Returns: "openai", "ollama", or "vllm"
+    """
+    if model_config and model_config.get("api_protocol"):
+        protocol = model_config.get("api_protocol", "").strip().lower()
+        if protocol in ["openai", "ollama", "vllm"]:
+            return protocol
+    
+    # Auto-detect based on model name patterns
+    model_lower = model_name.lower()
+    
+    # OpenAI models typically have "gpt" or "openai/" prefix
+    if "openai/" in model_name or model_name.startswith("gpt-") or "claude" in model_lower:
+        return "openai"
+    
+    # Ollama models typically don't have "/" and are simple names
+    if "/" not in model_name and not model_name.startswith("http"):
+        return "ollama"
+    
+    # VLLM models might have specific patterns
+    if "vllm" in model_lower or model_name.startswith("vllm/"):
+        return "vllm"
+    
+    # Default to OpenAI-compatible for unknown models
+    return "openai"
+
+
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
+    def __init__(self, api_key: str, thinking_enabled: bool = False, endpoint: Optional[str] = None):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
+        self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
+
     @property
     def base_url(self) -> str:
+        if hasattr(self, '_endpoint') and self._endpoint:
+            return self._endpoint
         return "https://mindrouter-api.nkn.uidaho.edu/v1"
 
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         # Special handling for Ollama models, those that do not contain "/" in the name
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            return OpenAIModelProfile(
+            model_profile = OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
+            
+            # Disable thinking if the model doesn't support it
+            if not self.thinking_enabled:
+                try:
+                    if hasattr(model_profile, 'model_copy'):
+                        model_profile = model_profile.model_copy(update={
+                            "supports_thinking": False
+                        })
+                    elif hasattr(model_profile, 'supports_thinking'):
+                        model_profile.supports_thinking = False
+                except Exception:
+                    debug(f"Could not disable thinking for model {model_name}")
+            
+            return model_profile
+
+        # Fallback to parent logic
+        return super().model_profile(model_name)
+
+
+class OllamaProvider(OpenRouterProvider):
+    """Provider for Ollama API-compatible servers."""
+
+    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
+        self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
+
+    @property
+    def base_url(self) -> str:
+        # Ollama typically uses /api/v1 or just /v1
+        if hasattr(self, '_endpoint') and self._endpoint:
+            if not self._endpoint.endswith("/v1") and not self._endpoint.endswith("/api/v1"):
+                if self._endpoint.endswith("/"):
+                    return self._endpoint + "v1"
+                return self._endpoint + "/v1"
+            return self._endpoint
+        return "http://localhost:11434/v1"  # Default Ollama endpoint
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # Ollama models use OpenAI-compatible profile
+        profile = openai_model_profile(model_name)
+        model_profile = OpenAIModelProfile(
+            json_schema_transformer=OpenAIJsonSchemaTransformer
+        ).update(profile)
+        
+        if not self.thinking_enabled:
+            try:
+                if hasattr(model_profile, 'model_copy'):
+                    model_profile = model_profile.model_copy(update={
+                        "supports_thinking": False
+                    })
+                elif hasattr(model_profile, 'supports_thinking'):
+                    model_profile.supports_thinking = False
+            except Exception:
+                debug(f"Could not disable thinking for Ollama model {model_name}")
+        
+        return model_profile
+
+
+class VLLMProvider(OpenRouterProvider):
+    """Provider for VLLM API-compatible servers."""
+
+    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+        # Set endpoint before calling super().__init__() because base_url property is accessed during initialization
+        self._endpoint = endpoint
+        self.thinking_enabled = thinking_enabled
+        super().__init__(api_key=api_key)
+
+    @property
+    def base_url(self) -> str:
+        # VLLM typically uses /v1
+        if hasattr(self, '_endpoint') and self._endpoint:
+            if not self._endpoint.endswith("/v1"):
+                if self._endpoint.endswith("/"):
+                    return self._endpoint + "v1"
+                return self._endpoint + "/v1"
+            return self._endpoint
+        return "http://localhost:8000/v1"  # Default VLLM endpoint
+
+    def model_profile(self, model_name: str) -> Optional[ModelProfile]:
+        # VLLM uses OpenAI-compatible profile
+        # Special handling for models that do not contain "/" in the name
+        if "/" not in model_name:
+            profile = openai_model_profile(model_name)
+            model_profile = OpenAIModelProfile(
+                json_schema_transformer=OpenAIJsonSchemaTransformer
+            ).update(profile)
+            
+            # Disable thinking if the model doesn't support it
+            if not self.thinking_enabled:
+                try:
+                    if hasattr(model_profile, 'model_copy'):
+                        model_profile = model_profile.model_copy(update={
+                            "supports_thinking": False
+                        })
+                    elif hasattr(model_profile, 'supports_thinking'):
+                        model_profile.supports_thinking = False
+                except Exception:
+                    debug(f"Could not disable thinking for VLLM model {model_name}")
+            
+            return model_profile
 
         # Fallback to parent logic
         return super().model_profile(model_name)
 
 
 def get_agent_model(agent_model):
-    if "openai" in agent_model:
+    """
+    Get the appropriate model instance based on model configuration.
+    Supports per-model endpoints and API protocols (OpenAI, Ollama, VLLM).
+    """
+    # Get model configuration
+    model_config = _get_model_config(agent_model)
+    thinking_enabled = model_config.get("thinking", False) if model_config else False
+    
+    # Handle OpenAI models (external OpenAI API)
+    if "openai" in agent_model and model_config and model_config.get("external", False):
         model_name = agent_model.split("/")[-1]
         return OpenAIModel(
             model_name=model_name,
         )
+    
+    # Get endpoint and protocol for this model
+    endpoint = _get_model_endpoint(agent_model)
+    api_protocol = _detect_api_protocol(agent_model, model_config)
+    
+    debug(f"Using model {agent_model} with endpoint {endpoint} and protocol {api_protocol}")
+    
+    # Create appropriate provider based on protocol
+    if api_protocol == "ollama":
+        provider = OllamaProvider(
+            api_key="no-api-key",
+            endpoint=endpoint,
+            thinking_enabled=thinking_enabled
+        )
+    elif api_protocol == "vllm":
+        provider = VLLMProvider(
+            api_key="no-api-key",
+            endpoint=endpoint,
+            thinking_enabled=thinking_enabled
+        )
+    else:
+        # Default to OpenAI-compatible (InsightAIProvider)
+        provider = InsightAIProvider(
+            api_key="no-api-key",
+            thinking_enabled=thinking_enabled,
+            endpoint=endpoint
+        )
+    
     return OpenAIModel(
         model_name=agent_model,
-        provider=InsightAIProvider(api_key="no-api-key"),
+        provider=provider,
     )
 
 
@@ -302,11 +504,11 @@ def create_secure_agent(agent_model):
     return _secure_agent_cache[cache_key]
 
 
-upload_agent = create_upload_agent(settings.base_model)
+upload_agent = create_upload_agent(get_default_model_name())
 
-rag_agent = create_rag_agent(settings.base_model)
+rag_agent = create_rag_agent(get_default_model_name())
 
-prompt_agent = create_prompt_agent(settings.base_model)
+prompt_agent = create_prompt_agent(get_default_model_name())
 
 secure_agent = create_secure_agent(settings.secure_model)
 
@@ -388,7 +590,7 @@ def create_field_inference_agent(agent_model, keys, context, prompt_context=None
     )
 
 
-model = get_agent_model(settings.base_model)
+model = get_agent_model(get_default_model_name())
 
 
 def get_cache_key(key: str, context: str) -> str:
@@ -412,7 +614,7 @@ def create_extraction_agent(agent_model):
     )
 
 
-extraction_agent = create_extraction_agent(settings.base_model)
+extraction_agent = create_extraction_agent(get_default_model_name())
 
 
 @extraction_agent.system_prompt
@@ -462,7 +664,7 @@ Text:
 
 # @observe()
 def extract_entities_with_agent(
-    text: str, keys: list[str], context: str = "", model_name: str = settings.base_model
+    text: str, keys: list[str], context: str = "", model_name: str | None = None
 ) -> dict:
     """Extract entities from text based on the provided extraction keys and return structured output.
 
@@ -498,7 +700,7 @@ def extract_entities_with_agent(
         # Create a single model directly (not wrapped in "entities" array)
         extraction_model = create_model(unique_model_name, **inferred_fields)
 
-        model = get_agent_model(model_name)
+        model = get_agent_model(model_name or get_default_model_name())
         _extraction_agent_cache[cache_key] = Agent(
             model,
             deps_type=ExtractionDeps,

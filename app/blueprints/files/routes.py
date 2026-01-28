@@ -25,6 +25,7 @@ from pypdf import PdfReader
 from werkzeug.utils import secure_filename
 
 from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder, UserModelConfig
+from app.utilities.security import safe_get_document, validate_json_request
 from app.utilities.document_manager import (
     DocumentManager,
     cleanup_document,
@@ -315,13 +316,15 @@ def rename_document() -> ResponseReturnValue:
 
 
 @files.route("/rename_folder", methods=["POST"])
+@login_required
+@validate_json_request({"uuid": str, "newName": str})
 def rename_folder() -> ResponseReturnValue:
     """Rename a folder."""
     data = request.get_json()
     document_uuid = data["uuid"]
     new_title = data["newName"]
 
-    document = SmartFolder.objects(uuid=document_uuid).first()
+    document = safe_get_document(SmartFolder, uuid=document_uuid)
     document.title = new_title
     document.save()
     return jsonify({"complete": True})
@@ -455,13 +458,14 @@ def move_item() -> ResponseReturnValue:
 
 
 @files.route("/toggle_default_doc")
+@login_required
 def toggle_default_doc() -> ResponseReturnValue:
     """Toggle the default document status."""
     doc_id = request.args.get("doc_id")
     request.args.get("folder_id")
     redirect_url = request.args.get("redirect_url")
 
-    doc = SmartDocument.objects(uuid=doc_id).first()
+    doc = safe_get_document(SmartDocument, uuid=doc_id)
     doc.is_default = not doc.is_default
     doc.save()
 

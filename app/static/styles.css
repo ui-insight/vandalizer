@@ -27,12 +27,14 @@ body:has(.front-page-header) {
 
 
 a {
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
 }
 
 
 .btn-primary {
-    background-color: #f1b300;
+    background-color: var(--highlight-color, #f1b300);
+    color: var(--highlight-text-color, #191919);
+    border-radius: var(--ui-radius, 12px);
 }
 
 .navbar-default {
@@ -92,10 +94,10 @@ footer {
 }
 
 a.btn-frontpage-cta:hover {
-    border-color : #f1b300;
-    background-color: #f1b300;
+    border-color : var(--highlight-color, #f1b300);
+    background-color: var(--highlight-color, #f1b300);
     border-width: 2px;
-    color: #fff;
+    color: var(--highlight-text-color, #fff);
 
 }
 
@@ -197,6 +199,19 @@ footer .footer-poweredby {
   color: #a2aebd;
 }
 
+.close-workflow-btn {
+  background-color: #fff;
+  color: var(--highlight-color, #f1b300);
+  border: 1px solid var(--highlight-color, #f1b300);
+  border-radius: var(--ui-radius, 12px);
+  margin-left: 10px;
+}
+
+.close-workflow-btn:hover {
+  color: var(--highlight-text-color, #fff);
+  background-color: var(--highlight-color, #f1b300);
+}
+
 .navbar-default .navbar-brand {
     color: black;
     font-size: 32px;
@@ -211,7 +226,7 @@ footer .footer-poweredby {
     padding: 4rem;
     border-radius: 32px;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    box-shadow: -0.7rem 0 0 #f1b300, 0 24px 40px rgba(0, 0, 0, 0.35);
+    box-shadow: -0.7rem 0 0 var(--highlight-color, #f1b300), 0 24px 40px rgba(0, 0, 0, 0.35);
 }
 
 .hero-content a.action-button:hover, .hero-content a:focus, .hero-content button:hover, .hero-content button:focus {
@@ -220,15 +235,15 @@ footer .footer-poweredby {
     background: none;
     color: white;
     text-decoration: none;
-    border-bottom: 0.1em solid #f1b300;
+    border-bottom: 0.1em solid var(--highlight-color, #f1b300);
 }
 
 .hero-content a.action-button, .hero-content  button {
     display: inline-block;
     width: 100%;
     color: #191919;
-    border: 0.1em solid #f1b300;
-    background: #f1b300;
+    border: 0.1em solid var(--highlight-color, #f1b300);
+    background: var(--highlight-color, #f1b300);
     margin: 1.5rem 0 0;
     padding: .5em 1em .5em;
     font-size: 2rem;
@@ -237,6 +252,10 @@ footer .footer-poweredby {
     text-align: center;
     text-transform: uppercase;
     vertical-align: top;
+}
+
+.hero-content .action-button {
+    text-transform: none;
 }
 
 .navbar-brand {
@@ -313,7 +332,7 @@ footer .footer-poweredby {
 
 .btn-primary:hover {
     background-color: white;
-    border-color : #f1b300;
+    border-color : var(--highlight-color, #f1b300);
     color: black;
 }
 
@@ -472,7 +491,7 @@ tr {
 }
 
 .progress-bar {
-    background-color: #f1b300;
+    background-color: var(--highlight-color, #f1b300);
 }
 
 .response-table td, th {
@@ -489,7 +508,7 @@ tr {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 10;
+    z-index: 10000;
   }
   .opened:before {
     display: block;
@@ -510,7 +529,7 @@ tr {
     position: fixed;
     left: 50%;
     top: -100%;
-    z-index: 11;
+    z-index: 10001;
     width: 360px;
     box-shadow:0 5px 10px rgba(0,0,0,0.3);
     -webkit-transform: translate(0, -500%);
@@ -892,7 +911,7 @@ tr {
 }
 
 .folder.drag-over {
-    border: 2px solid #f1b300; /* Add dashed border when dragging over */
+    border: 2px solid var(--highlight-color, #f1b300); /* Add dashed border when dragging over */
 }
 
 .drag-ghost {
@@ -970,7 +989,7 @@ tr {
 }
 
 .default-tag {
-    color: #f1b300;
+    color: var(--highlight-color, #f1b300);
     font-size: 0.8em;
     background-color: #eaeaea;
     border-radius: 15px;
@@ -992,6 +1011,7 @@ tr {
     margin-bottom: 15px;
     color: black;
     background-color: #00000008;
+    border-radius: var(--ui-radius, 12px);
 }
 
 .message-you {
@@ -999,7 +1019,8 @@ tr {
     margin-bottom: 10px;
     color:white;
     background-color: #191919;
-    border-left: 7px solid #f1b300;
+    border-left: 7px solid var(--highlight-color, #f1b300);
+    border-radius: var(--ui-radius, 12px);
 }
 
 .main-panel .header .row .col {
@@ -1026,11 +1047,11 @@ tr {
   }
 
 .btn, .btn-primary {
-    background-color: #f1b300;
-    border-radius: 0px;
+    background-color: var(--highlight-color, #f1b300);
+    border-radius: var(--ui-radius, 12px);
     text-decoration: none;
     text-align: center;
-    border: 2px solid #f1b300;
+    border: 2px solid var(--highlight-color, #f1b300);
     -webkit-transition: all 0.3s ease 0s;
     -moz-transition: all 0.3s ease 0s;
     -o-transition: all 0.3s ease 0s;
@@ -1039,7 +1060,7 @@ tr {
     line-height: 1;
     font-weight: 700;
     text-transform: uppercase;
-    color: #191919;
+    color: var(--highlight-text-color, #191919);
     padding: 0.65em;
     outline-offset: 3px;
 }
@@ -1058,7 +1079,7 @@ textarea {
     height: 100%;
     padding: 15px;
     border-width: 0px;
-    border-radius: 0px;
+    border-radius: var(--ui-radius, 12px);
     border: 1px solid #d3d3d3;
 }
 
@@ -1113,8 +1134,12 @@ textarea {
     position: relative;
     overflow: hidden;
     padding: 2rem;
-    /* border-radius: 12px; */
-    background: linear-gradient(135deg, #6a11cb, #2575fc);
+    border-radius: var(--ui-radius, 12px);
+    background: linear-gradient(
+        135deg,
+        var(--highlight-complement, #6a11cb),
+        color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
+    );
     color: #fff;
     font-family: 'Montserrat', sans-serif;
     text-align: center;
@@ -1215,7 +1240,7 @@ textarea {
 .loading-progress-fill {
     width: 0;
     height: 100%;
-    background: #f1b300;
+    background: var(--highlight-color, #f1b300);
     transition: width 2s ease-in-out;
 }
 
@@ -1288,13 +1313,13 @@ textarea {
     .gradient-border {
     display: inline-block;
     padding: 2px;                   /* thickness of the border */
-    /* border-radius: 12px;            rounds outer edge */
+    border-radius: var(--ui-radius, 12px);            /* rounds outer edge */
     background: linear-gradient(
       45deg,
-      #6a11cb,
-      #2575fc,
-      #ff00cc,
-      #00ffd1
+      var(--highlight-complement, #6a11cb),
+      var(--highlight-color, #f1b300),
+      var(--highlight-complement, #6a11cb),
+      color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
     );
     background-size: 400% 400%;
     animation:
@@ -1323,7 +1348,7 @@ textarea {
     display: flex;
     align-items: center;
     background: #fff;
-    /* border-radius: 10px; */
+    border-radius: calc(var(--ui-radius, 12px) - 2px); /* Slightly less than outer to account for border padding */
     padding: 15px 30px 15px 15px;
     width: 100%;
     box-sizing: border-box;
@@ -1428,6 +1453,14 @@ think:hover > * {
 .btn-primary.shimmer {
   position: relative;
   overflow: hidden;
+  /* Use complementary color gradient like "Let's get started" panel */
+  background: linear-gradient(
+    135deg,
+    var(--highlight-complement, #6a11cb),
+    color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%)
+  ) !important;
+  background-size: 200% 100%;
+  animation: button-gradient-shimmer 2s linear infinite;
 }
 
 /* 2) The shimmer stripe */
@@ -1454,6 +1487,12 @@ think:hover > * {
   /* animate it */
   animation: button-shimmer 2s infinite;
   -webkit-animation: button-shimmer 2s infinite;  /* Safari */
+}
+
+/* Keyframe for the gradient background animation */
+@keyframes button-gradient-shimmer {
+  0%   { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
 }
 /* Keyframe for the button shimmer effect */
 @keyframes button-shimmer {
@@ -1516,7 +1555,7 @@ think:hover > * {
     color: #999999;
 }
     .local-login-form button {
-      background-color: #f1b300; /* Vandal Gold */
+      background-color: var(--highlight-color, #f1b300); /* Vandal Gold */
       color: #000;
       font-weight: bold;
       border: none;

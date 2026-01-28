@@ -14,7 +14,7 @@ from devtools import debug
 
 from app.models import SearchSetItem, SmartDocument
 from app.utilities.agents import create_chat_agent, extract_entities_with_agent
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name
 from app.utilities.llm_helpers import remove_code_markers
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -100,7 +100,7 @@ class ExtractionManager4:
         chunk_size: int = 6000,
         chunk_overlap: int = 400,
     ) -> None:
-        self.model_name = model_name or settings.base_model
+        self.model_name = model_name or get_default_model_name()
         self.max_workers = max(1, max_workers)
         self.chunk_size = max(1000, chunk_size)
         self.chunk_overlap = max(0, min(chunk_overlap, self.chunk_size // 2))

@@ -10,13 +10,13 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from app.celery_worker import celery_app
 from app.models import SmartDocument
 from app.utilities.agents import create_chat_agent, secure_agent
-from app.utilities.config import settings
+from app.utilities.config import get_default_model_name, upload_compliance
 from app.utilities.document_readers import extract_text_from_doc
 
 load_dotenv()
 
 
-chat_agent = create_chat_agent(settings.base_model)
+chat_agent = create_chat_agent(get_default_model_name())
 
 
 @celery_app.task(
@@ -157,7 +157,7 @@ def perform_document_validation(
     text = document_text
     if text is None:
         text = extract_text_from_doc(document_path)
-    compliance = settings.upload_compliance
+    compliance = upload_compliance
 
     debug(text[:100])
 
