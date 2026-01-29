@@ -95,14 +95,6 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
     if not oauth_enabled_now:
         return None
 
-    # If we've already served a request, don't attempt to register new blueprints.
-    if getattr(app, "_got_first_request", False) and "azure" not in app.blueprints:
-        app.logger.warning(
-            "Azure OAuth blueprint not registered before first request; restart required after updating config."
-        )
-        app.config["AZURE_BLUEPRINT_SKIPPED"] = True
-        return None
-
     if "azure" in app.blueprints and not force:
         azure_blueprint = app.blueprints["azure"]
         _connect_azure_signal(azure_blueprint)
