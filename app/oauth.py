@@ -89,13 +89,17 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
 
     try:
         oauth_enabled_now = "oauth" in get_auth_methods()
-    except Exception:
+        app.logger.info(f"configure_azure_blueprint called. oauth_enabled: {oauth_enabled_now}")
+    except Exception as e:
         oauth_enabled_now = app.config.get("AUTH_OAUTH_ENABLED", False)
+        app.logger.warning(f"Failed to get auth methods from DB, using config: {oauth_enabled_now}. Error: {e}")
 
     if not oauth_enabled_now:
+        app.logger.info("OAuth not enabled, skipping Azure blueprint")
         return None
 
     if "azure" in app.blueprints and not force:
+        app.logger.info("Azure blueprint already registered, connecting signals")
         azure_blueprint = app.blueprints["azure"]
         _connect_azure_signal(azure_blueprint)
         return azure_blueprint
@@ -124,7 +128,6 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
                 tenant=tenant,
                 redirect_url=redirect_url or None,
                 redirect_to="/home",
-                login_error_redirect="/",
             )
             app.logger.info("Azure blueprint configured from database")
         else:
@@ -140,7 +143,6 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
                     tenant=tenant,
                     redirect_url=redirect_url or None,
                     redirect_to="/home",
-                    login_error_redirect="/",
                 )
                 app.logger.info("Azure blueprint configured from app config")
             else:
