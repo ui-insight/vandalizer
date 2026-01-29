@@ -60,10 +60,8 @@ def index() -> ResponseReturnValue:
     if oauth_enabled and azure_provider and not azure_enabled:
         if not azure_config_complete:
             azure_disabled_reason = f"Azure config missing: {', '.join(azure_missing_fields)}."
-        elif current_app.config.get("AZURE_BLUEPRINT_SKIPPED"):
-            azure_disabled_reason = "Azure sign-in is configured but the OAuth blueprint was not registered before first request. Restart the server to apply changes."
         elif not azure_blueprint_registered:
-            azure_disabled_reason = "Azure sign-in is configured but the Azure OAuth blueprint is not active."
+            azure_disabled_reason = "Azure sign-in is configured but the Azure OAuth blueprint failed to register. Check server logs for details."
 
     return render_template(
         "landing.html",
