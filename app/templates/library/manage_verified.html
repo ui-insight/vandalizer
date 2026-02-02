@@ -385,8 +385,8 @@
             <h2>Verification Management</h2>
             <div class="vm-header-subtitle">Manage verification requests, catalog items, and collections</div>
         </div>
-        <a href="/library" class="btn btn-secondary">
-            <i class="fa-solid fa-arrow-left"></i> Back to Library
+        <a href="/home" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i> Back to Home
         </a>
     </div>
 
@@ -465,8 +465,8 @@
             {% endif %}
             <div class="vm-card-actions">
                 <button class="btn btn-outline-secondary btn-sm"
-                    onclick='runVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ item.title|tojson }})'>
-                    <i class="fa-solid fa-play"></i> Run
+                    onclick='reviewVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ item.title|tojson }})'>
+                    <i class="fa-solid fa-eye"></i> Review
                 </button>
                 {% if item.kind == 'workflow' %}
                 <a href="/workflows/{{ item.identifier }}" class="btn btn-secondary btn-sm" target="_blank">
@@ -539,8 +539,8 @@
                 </div>
                 <div class="vm-card-actions" style="margin-top: 12px;">
                     <button class="btn btn-primary btn-sm"
-                        onclick='runVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
-                        <i class="fa-solid fa-play"></i> Run
+                        onclick='reviewVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
+                        <i class="fa-solid fa-eye"></i> Review
                     </button>
                     <button class="btn btn-light btn-sm"
                         onclick='openSendToUserModal({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
@@ -845,28 +845,20 @@
         });
     }
 
-    function runVerificationItem(kind, identifier, title) {
-        const params = new URLSearchParams();
-        params.set('run_item_kind', kind);
-        params.set('run_item_id', identifier);
-        if (title) {
-            params.set('run_item_title', title);
-        }
+    function reviewVerificationItem(kind, identifier, title) {
+        const url = new URL('/home', window.location.origin);
         if (kind === 'workflow') {
-            params.set('section', 'Library');
-            params.set('workflow_id', identifier);
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('workflow_id', identifier);
         } else if (kind === 'searchset' || kind === 'extraction') {
-            params.set('section', 'Library');
-            params.set('search_set_uuid', identifier);
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('search_set_uuid', identifier);
         } else if (kind === 'prompt' || kind === 'formatter') {
-            params.set('section', 'Assistant');
-            params.set('run_prompt_id', identifier);
-            if (title) {
-                params.set('run_prompt_title', title);
-            }
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('edit_prompt_id', identifier);
+            url.searchParams.set('edit_prompt_kind', kind);
         }
-        const url = '/?' + params.toString();
-        window.open(url, '_blank');
+        window.open(url.toString(), '_blank');
     }
 
     function removeVerificationRequest(requestUuid, title) {

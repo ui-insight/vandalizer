@@ -173,6 +173,19 @@ class Settings(BaseSettings):
         description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
     )
 
+    # Extraction strategy configuration
+    # two_pass: thinking draft -> structured final (no thinking)
+    # one_pass_thinking: structured extraction with thinking enabled
+    # one_pass_no_thinking: structured extraction with thinking disabled
+    extraction_strategy: str = Field(
+        default="two_pass",
+        description="Extraction strategy: two_pass, one_pass_thinking, one_pass_no_thinking.",
+    )
+    extraction_model: str = Field(
+        default="",
+        description="Optional model name to use for extraction (overrides user selection).",
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Override with database config if available
@@ -246,6 +259,30 @@ def get_default_model_name() -> str:
         if isinstance(first, dict):
             return first.get("name") or settings.base_model
     return settings.base_model
+
+
+def get_extraction_strategy() -> str:
+    """Get extraction strategy from database config or default settings."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.extraction_strategy:
+            return db_config.extraction_strategy
+    except Exception:
+        pass
+    return settings.extraction_strategy
+
+
+def get_extraction_model_name() -> str | None:
+    """Get extraction model name from database config or default settings."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.extraction_model:
+            return db_config.extraction_model
+    except Exception:
+        pass
+    return settings.extraction_model or None
 
 
 def get_highlight_color() -> str:

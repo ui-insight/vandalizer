@@ -335,15 +335,45 @@
         {% endif %}
     </div>
 
-    <!-- LLM Configuration -->
+    <!-- Extraction Configuration -->
     <div class="config-section">
-        <h2>LLM Configuration</h2>
-        <p>Configure the Large Language Model endpoint and available models.</p>
+        <h2>Extraction Configuration</h2>
+        <p>Control structured output behavior for extraction runs.</p>
 
+        {% set extraction_strategy = config.extraction_strategy or 'two_pass' %}
+        {% set extraction_model = config.extraction_model or '' %}
+        <div class="form-group">
+            <label for="extraction_model">Extraction Model</label>
+            <select id="extraction_model" name="extraction_model">
+                <option value="" {% if extraction_model == '' %}selected{% endif %}>
+                    Default (user selection)
+                </option>
+                {% for model in config.available_models %}
+                <option value="{{ model.name }}" {% if extraction_model == model.name %}selected{% endif %}>
+                    {{ model.name }}
+                </option>
+                {% endfor %}
+            </select>
+            <small style="color: #6b7280; font-size: 12px;">
+                Model settings (endpoint, protocol, thinking) are configured in Available Models.
+            </small>
+        </div>
         <div class="form-group mb-0">
-            <label for="llm_endpoint">LLM Endpoint URL</label>
-            <input type="url" id="llm_endpoint" name="llm_endpoint" value="{{ config.llm_endpoint }}"
-                placeholder="https://mindrouter-api.nkn.uidaho.edu/v1" required>
+            <label for="extraction_strategy">Extraction Strategy</label>
+            <select id="extraction_strategy" name="extraction_strategy">
+                <option value="two_pass" {% if extraction_strategy == 'two_pass' %}selected{% endif %}>
+                    Two-pass (thinking draft -> structured final)
+                </option>
+                <option value="one_pass_thinking" {% if extraction_strategy == 'one_pass_thinking' %}selected{% endif %}>
+                    One-pass (thinking enabled)
+                </option>
+                <option value="one_pass_no_thinking" {% if extraction_strategy == 'one_pass_no_thinking' %}selected{% endif %}>
+                    One-pass (thinking disabled)
+                </option>
+            </select>
+            <small style="color: #6b7280; font-size: 12px;">
+                Two-pass uses a thinking draft for reasoning, then a strict structured output pass.
+            </small>
         </div>
     </div>
 

@@ -90,6 +90,18 @@ class SystemConfig(me.Document):
             },
         ],
     )
+    # Extraction model configuration
+    # If empty, use user-selected or default model
+    extraction_model = me.StringField(default="", max_length=200)
+    # Extraction strategy configuration
+    # two_pass: thinking draft -> structured final (no thinking)
+    # one_pass_thinking: structured extraction with thinking enabled
+    # one_pass_no_thinking: structured extraction with thinking disabled
+    extraction_strategy = me.StringField(
+        default="two_pass",
+        choices=["two_pass", "one_pass_thinking", "one_pass_no_thinking"],
+        max_length=50,
+    )
 
     # UI Configuration
     highlight_color = me.StringField(
