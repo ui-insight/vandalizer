@@ -3417,6 +3417,24 @@
 
     function maybeRunItemFromQuery() {
         const params = new URLSearchParams(window.location.search);
+        const editPromptId = params.get('edit_prompt_id');
+        const editPromptKind = params.get('edit_prompt_kind') || 'prompt';
+        if (editPromptId) {
+            if (typeof setSection === 'function') {
+                setSection('Library');
+            }
+            if (typeof editLibraryItem === 'function') {
+                editLibraryItem(editPromptKind, editPromptId);
+            } else {
+                console.error('editLibraryItem not defined');
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
+            window.history.replaceState({}, '', url.toString());
+            return;
+        }
+
         const runKind = params.get('run_item_kind');
         const runId = params.get('run_item_id');
         const runTitle = params.get('run_item_title') || params.get('run_prompt_title') || 'Prompt';
@@ -3454,6 +3472,8 @@
             url.searchParams.delete('run_item_title');
             url.searchParams.delete('run_prompt_id');
             url.searchParams.delete('run_prompt_title');
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
             window.history.replaceState({}, '', url.toString());
             return;
         }
