@@ -372,6 +372,33 @@
         color: #b91c1c;
     }
 
+    .vm-examiner-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0 16px;
+        padding: 0;
+        list-style: none;
+    }
+
+    .vm-examiner-pill {
+        background: #e5e7eb;
+        color: #111827;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .vm-examiner-empty {
+        font-size: 12px;
+        color: #6b7280;
+        margin: 12px 0 16px;
+    }
+
     .vm-badge--neutral {
         background: #f3f4f6;
         color: #4b5563;
@@ -396,6 +423,16 @@
             <div class="vm-card-title">Examiner Access</div>
         </div>
         <div class="vm-card-summary">Grant or revoke examiner status for users.</div>
+        {% set current_examiners = examiner_users|selectattr('is_examiner')|list %}
+        {% if current_examiners %}
+        <ul class="vm-examiner-list">
+            {% for u in current_examiners %}
+            <li class="vm-examiner-pill">{{ u.label }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="vm-examiner-empty">No users currently have examiner access.</div>
+        {% endif %}
         {% if examiner_users %}
         <div class="vm-examiner-controls">
             <div class="form-group" style="margin-bottom: 0;">

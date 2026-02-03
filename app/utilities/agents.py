@@ -180,6 +180,13 @@ def _detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -
     return "openai"
 
 
+def get_model_api_protocol(model_name: str) -> str:
+    """Public helper to determine API protocol for a model."""
+    model_config = _get_model_config(model_name)
+    return _detect_api_protocol(model_name, model_config)
+
+
+
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 

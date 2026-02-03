@@ -680,25 +680,32 @@ def _build_results_for_template(filters: dict) -> dict:
     sort_mode = filters.get("sort") or "updated"
     
     # Helpers for sorting
+    def _normalize_dt(value: datetime | None) -> datetime:
+        if not value:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
     def _sort_key_workflow(w):
         val = None
         if sort_mode == "recent":
-            val = last_run_map.get(str(w.id)) or datetime.min.replace(tzinfo=timezone.utc)
-            return val
+            val = last_run_map.get(str(w.id))
+            return _normalize_dt(val)
         elif sort_mode == "az":
             return (w.name or "").lower()
         else: # updated
-            return w.updated_at or w.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            return _normalize_dt(w.updated_at or w.created_at)
 
     def _sort_key_searchset(s):
         val = None
         if sort_mode == "recent":
-            val = last_run_map.get(s.uuid) or datetime.min.replace(tzinfo=timezone.utc)
-            return val
+            val = last_run_map.get(s.uuid)
+            return _normalize_dt(val)
         elif sort_mode == "az":
             return (s.title or "").lower()
         else:
-            return s.updated_at or s.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            return _normalize_dt(s.updated_at or s.created_at)
 
     reverse_sort = True
     if sort_mode == "az":

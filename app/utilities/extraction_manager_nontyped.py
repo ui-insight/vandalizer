@@ -3,9 +3,14 @@ import time
 import openai
 import json
 from typing import Optional, Any, List
-from pydantic import create_model, BaseModel
+from pydantic import create_model, BaseModel, ConfigDict, model_validator
 from pydantic_ai import Agent
-from app.utilities.agents import get_agent_model, create_chat_agent
+from pydantic_ai._json_schema import InlineDefsJsonSchemaTransformer
+from app.utilities.agents import (
+    get_agent_model,
+    create_chat_agent,
+    get_model_api_protocol,
+)
 from app.utilities.config import (
     get_default_model_name,
     get_extraction_model_name,
@@ -95,7 +100,9 @@ class ExtractionManagerNonTyped:
                     model,
                     strategy=extraction_strategy,
                 )
-                debug(f"Extraction result for document {document_uuid}: {result}")
+                debug(
+                    f"Extraction result for document {document_uuid}: {len(result)} entities"
+                )
                 extraction.extend(result)
         else:
             doc_text = full_text
@@ -156,6 +163,7 @@ class ExtractionManagerNonTyped:
             model_name,
             thinking_override=False,
             draft_hint=draft_hint,
+            allow_fallback=False,
         )
 
         if final_entities:
@@ -198,6 +206,7 @@ class ExtractionManagerNonTyped:
         model_name: str,
         thinking_override: Optional[bool] = None,
         draft_hint: dict | None = None,
+        allow_fallback: bool = True,
     ) -> list:
         # Create a dynamic Pydantic model where all fields are Optional[str]
         # This avoids type inference issues and forces the LLM to return strings
@@ -207,9 +216,40 @@ class ExtractionManagerNonTyped:
 
         # Define the output model as a list of these entities
         class ExtractionModel(BaseModel):
+            model_config = ConfigDict(extra="allow")
             entities: List[DynamicEntity]
 
-        model = get_agent_model(model_name, thinking_override=thinking_override)
+            @model_validator(mode="before")
+            @classmethod
+            def coerce_entities(cls, value):
+                # Accept multiple shapes and normalize into {"entities": [...]}
+                if isinstance(value, str):
+                    try:
+                        value = json.loads(value)
+                    except Exception:
+                        return value
+
+                if isinstance(value, list):
+                    return {"entities": value}
+
+                if isinstance(value, dict):
+                    if "entities" in value:
+                        entities = value.get("entities")
+                        if isinstance(entities, dict):
+                            value["entities"] = [entities]
+                        return value
+                    return {"entities": [value]}
+
+                return value
+
+        def _build_structured_output_schema() -> dict:
+            schema = ExtractionModel.model_json_schema()
+            if "$defs" in schema:
+                schema = InlineDefsJsonSchemaTransformer(schema).walk()
+            return schema
+
+        api_protocol = get_model_api_protocol(model_name)
+        structured_retries = 1 if api_protocol == "vllm" else 3
 
         system_prompt = (
             "You are a precise entity extraction assistant. Extract the requested information from the text. "
@@ -217,13 +257,6 @@ class ExtractionManagerNonTyped:
             "do not change formatting. Keep everything as strings. "
             "If a field is not found, leave it as null. "
             "Return a JSON object with an 'entities' key containing a list of extracted objects."
-        )
-
-        agent = Agent(
-            model,
-            system_prompt=system_prompt,
-            output_type=ExtractionModel,
-            retries=3,
         )
 
         try:
@@ -239,17 +272,33 @@ class ExtractionManagerNonTyped:
                     f"{prompt}"
                 )
 
-            debug(f"Extraction prompt (first 500 chars): {prompt[:500]}")
-            debug(f"Text length: {len(text)}")
-            debug(f"Keys to extract: {keys}")
-            debug(f"Model name: {model_name}")
-
-            result = agent.run_sync(prompt)
-
-            debug(f"Agent result type: {type(result)}")
             debug(
-                "Agent result output type: "
-                f"{type(result.output) if hasattr(result, 'output') else 'no output attr'}"
+                f"Structured extraction: model={model_name} keys={len(keys)} text_length={len(text)}"
+            )
+
+            model_settings = None
+            if api_protocol == "vllm":
+                schema = _build_structured_output_schema()
+                model_settings = {
+                    "extra_body": {
+                        "structured_outputs": {
+                            "json": schema,
+                        }
+                    }
+                }
+
+            model = get_agent_model(model_name, thinking_override=thinking_override)
+            agent = Agent(
+                model,
+                system_prompt=system_prompt,
+                output_type=ExtractionModel,
+                retries=structured_retries,
+                output_retries=structured_retries,
+            )
+
+            result = agent.run_sync(
+                prompt,
+                model_settings=model_settings,
             )
 
             # Convert back to list of dicts
@@ -258,9 +307,6 @@ class ExtractionManagerNonTyped:
                 return []
 
             entities = result.output.entities
-            debug(f"Raw entities from LLM: {entities}")
-            debug(f"Number of entities: {len(entities)}")
-            debug(f"Entity types: {[type(e) for e in entities]}")
 
             # Convert Pydantic models to dicts
             raw_entities = []
@@ -272,12 +318,9 @@ class ExtractionManagerNonTyped:
                 else:
                     debug(f"Unexpected entity type: {type(entity)}, value: {entity}")
 
-            debug(f"Raw entities as dicts: {raw_entities}")
-
             # Filter empty entities to match original behavior
             filtered = self._filter_empty_entities(raw_entities)
-            debug(f"Filtered entities (after removing empty): {filtered}")
-            debug(f"Number of filtered entities: {len(filtered)}")
+            debug(f"Structured extraction returned {len(filtered)} entities")
 
             return filtered
 
@@ -286,16 +329,18 @@ class ExtractionManagerNonTyped:
             debug(f"Extraction failed: {e}")
             import traceback
             debug(f"Traceback: {traceback.format_exc()}")
-
             # Check if it's a validation error (common with VLLM)
             if "output validation" in error_msg or "retries" in error_msg.lower():
-                debug("Output validation failed, attempting fallback with raw JSON parsing")
-                return self._extract_fallback_json(
-                    text,
-                    keys,
-                    model_name,
-                    thinking_override=thinking_override,
-                )
+                if allow_fallback:
+                    debug("Output validation failed, attempting fallback with raw JSON parsing")
+                    return self._extract_fallback_json(
+                        text,
+                        keys,
+                        model_name,
+                        thinking_override=thinking_override,
+                    )
+                debug("Output validation failed, skipping fallback for structured pass")
+                return []
 
             # Fallback or return empty list
             return []
