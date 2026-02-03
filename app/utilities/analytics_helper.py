@@ -78,8 +78,13 @@ def activity_start(
     if type == ActivityType.WORKFLOW_RUN:
         _rollup_workflow_started(ev)
     
-    # Generate short description asynchronously if we have documents
-    if document_uuids and len(document_uuids) > 0:
+    # Generate short description asynchronously if we have documents.
+    # Skip search_set_run here; extraction flow triggers after results are available.
+    if (
+        document_uuids
+        and len(document_uuids) > 0
+        and type != ActivityType.SEARCH_SET_RUN
+    ):
         try:
             from app.utilities.activity_description import generate_activity_description_task
             debug(f"Triggering description generation for activity {ev.id} with {len(document_uuids)} documents")

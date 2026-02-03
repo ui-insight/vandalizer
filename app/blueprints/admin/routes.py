@@ -662,9 +662,30 @@ def admin_config_update():
     
     # Update fields
     config.ocr_endpoint = request.form.get("ocr_endpoint", "").strip()
-    config.llm_endpoint = request.form.get("llm_endpoint", "").strip()
+    if "llm_endpoint" in request.form:
+        config.llm_endpoint = request.form.get("llm_endpoint", "").strip()
     config.highlight_color = request.form.get("highlight_color", "#eab308").strip()
     config.ui_radius = request.form.get("ui_radius", "12px").strip()
+    config.extraction_strategy = request.form.get(
+        "extraction_strategy",
+        "two_pass",
+    ).strip()
+    config.extraction_model = request.form.get("extraction_model", "").strip()
+    allowed_strategies = {
+        "two_pass",
+        "one_pass_thinking",
+        "one_pass_no_thinking",
+    }
+    if config.extraction_strategy not in allowed_strategies:
+        config.extraction_strategy = "two_pass"
+    if config.extraction_model:
+        available_model_names = {
+            m.get("name")
+            for m in (config.available_models or [])
+            if isinstance(m, dict) and m.get("name")
+        }
+        if config.extraction_model not in available_model_names:
+            config.extraction_model = ""
     
     config.updated_at = datetime.now()
     config.updated_by = user.email or user.name

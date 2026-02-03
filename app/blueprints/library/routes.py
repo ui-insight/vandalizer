@@ -680,25 +680,32 @@ def _build_results_for_template(filters: dict) -> dict:
     sort_mode = filters.get("sort") or "updated"
     
     # Helpers for sorting
+    def _normalize_dt(value: datetime | None) -> datetime:
+        if not value:
+            return datetime.min.replace(tzinfo=timezone.utc)
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
     def _sort_key_workflow(w):
         val = None
         if sort_mode == "recent":
-            val = last_run_map.get(str(w.id)) or datetime.min.replace(tzinfo=timezone.utc)
-            return val
+            val = last_run_map.get(str(w.id))
+            return _normalize_dt(val)
         elif sort_mode == "az":
             return (w.name or "").lower()
         else: # updated
-            return w.updated_at or w.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            return _normalize_dt(w.updated_at or w.created_at)
 
     def _sort_key_searchset(s):
         val = None
         if sort_mode == "recent":
-            val = last_run_map.get(s.uuid) or datetime.min.replace(tzinfo=timezone.utc)
-            return val
+            val = last_run_map.get(s.uuid)
+            return _normalize_dt(val)
         elif sort_mode == "az":
             return (s.title or "").lower()
         else:
-            return s.updated_at or s.created_at or datetime.min.replace(tzinfo=timezone.utc)
+            return _normalize_dt(s.updated_at or s.created_at)
 
     reverse_sort = True
     if sort_mode == "az":
@@ -852,6 +859,31 @@ def manage_verified():
 
     collections = list(VerifiedCollection.objects().order_by("-updated_at"))
     verification_queue = _build_verification_queue()
+    can_manage_examiners = bool(user.is_admin and user.is_examiner)
+    examiner_users = []
+    if can_manage_examiners:
+        users = list(User.objects())
+        users.sort(
+            key=lambda u: (
+                (u.name or "").lower(),
+                (u.email or "").lower(),
+                (u.user_id or "").lower(),
+            )
+        )
+        examiner_users = [
+            {
+                "user_id": u.user_id,
+                "label": (
+                    f"{u.name} - {u.email} ({u.user_id})"
+                    if u.name and u.email
+                    else (f"{u.name} ({u.user_id})" if u.name else None)
+                    or (f"{u.email} ({u.user_id})" if u.email else None)
+                    or u.user_id
+                ),
+                "is_examiner": bool(u.is_examiner),
+            }
+            for u in users
+        ]
 
     return render_template(
         "library/manage_verified.html",
@@ -859,6 +891,39 @@ def manage_verified():
         collections=collections,
         item_lookup=item_lookup,
         verification_queue=verification_queue,
+        can_manage_examiners=can_manage_examiners,
+        examiner_users=examiner_users,
+    )
+
+
+@library.route("/verification/examiners/update", methods=["POST"])
+@login_required
+def update_examiner_status():
+    user = load_user()
+    if not user or not user.is_examiner or not user.is_admin:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    target_user_id = (data.get("user_id") or "").strip()
+    if not target_user_id:
+        return jsonify({"error": "missing user_id"}), 400
+
+    if "is_examiner" not in data:
+        return jsonify({"error": "missing is_examiner"}), 400
+
+    target = User.objects(user_id=target_user_id).first()
+    if not target:
+        return jsonify({"error": "user not found"}), 404
+
+    target.is_examiner = bool(data.get("is_examiner"))
+    target.save()
+
+    return jsonify(
+        {
+            "ok": True,
+            "user_id": target.user_id,
+            "is_examiner": bool(target.is_examiner),
+        }
     )
 
 
@@ -888,6 +953,90 @@ def update_verified_item_metadata():
     meta.save()
 
     return jsonify({"ok": True})
+
+
+@library.route("/verified/item/remove", methods=["POST"])
+@login_required
+def remove_verified_item():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    if not kind or not identifier:
+        return jsonify({"error": "missing required fields"}), 400
+
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj or not normalized_kind:
+        return jsonify({"error": "not found"}), 404
+
+    verified_lib = get_or_create_verified_library()
+    target_li = None
+    if verified_lib:
+        for li in list(verified_lib.items):
+            if li.kind == normalized_kind and li.obj == obj:
+                target_li = li
+                break
+
+    if target_li:
+        verified_lib.items.remove(target_li)
+        verified_lib.updated_at = datetime.now(timezone.utc)
+        verified_lib.save()
+        target_li.delete()
+
+    if hasattr(obj, "verified"):
+        setattr(obj, "verified", False)
+        obj.save()
+        sync_verification_flags_for_object(obj, None)
+
+    item_identifier = _verification_identifier(normalized_kind, obj)
+    if item_identifier:
+        VerifiedItemMetadata.objects(
+            item_kind=normalized_kind, item_identifier=item_identifier
+        ).delete()
+        req = VerificationRequest.objects(
+            item_kind=normalized_kind, item_identifier=item_identifier
+        ).first()
+        if req and req.library_item == target_li:
+            req.library_item = None
+            req.save()
+
+    return jsonify({"ok": True})
+
+
+@library.route("/verified/item/send_to_user", methods=["POST"])
+@login_required
+def send_verified_item_to_user():
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    data = request.get_json(force=True) or {}
+    kind = (data.get("kind") or "").strip().lower()
+    identifier = (data.get("identifier") or "").strip()
+    recipient = (data.get("recipient") or "").strip()
+    if not kind or not identifier or not recipient:
+        return jsonify({"error": "missing required fields"}), 400
+
+    recipient_user = User.objects(Q(user_id=recipient) | Q(email=recipient)).first()
+    if not recipient_user:
+        return jsonify({"error": "user not found"}), 404
+
+    obj, normalized_kind = _resolve_obj(kind, identifier)
+    if not obj or not normalized_kind:
+        return jsonify({"error": "item not found"}), 404
+
+    lib = get_or_create_personal_library(recipient_user.user_id)
+    li = add_object_to_library(obj, lib, added_by_user_id=user.user_id)
+    return jsonify(
+        {
+            "ok": True,
+            "added": bool(li),
+            "recipient": recipient_user.user_id,
+        }
+    )
 
 
 @library.route("/verified/collections", methods=["POST"])
@@ -1768,6 +1917,40 @@ def update_verification_status(request_uuid: str):
     _notify_submitter_of_status_change(req, previous_status, new_status, user)
 
     return jsonify({"ok": True, "status": req.status.value})
+
+
+@library.route("/verification/<request_uuid>/remove", methods=["POST"])
+@login_required
+def remove_verification_request(request_uuid: str):
+    user = load_user()
+    if not user or not user.is_examiner:
+        return jsonify({"error": "forbidden"}), 403
+
+    req = VerificationRequest.objects(uuid=request_uuid).first()
+    if not req:
+        return jsonify({"error": "not found"}), 404
+
+    if req.status not in {VerificationStatus.SUBMITTED, VerificationStatus.IN_REVIEW}:
+        return jsonify({"error": "cannot remove non-pending request"}), 400
+
+    obj, _kind = _resolve_obj(req.item_kind, req.item_identifier)
+    if obj and hasattr(obj, "verified"):
+        setattr(obj, "verified", False)
+        obj.save()
+        sync_verification_flags_for_object(obj, None)
+
+    li = req.library_item
+    if li:
+        verified_lib = get_or_create_verified_library()
+        if verified_lib and li in verified_lib.items:
+            verified_lib.items.remove(li)
+            verified_lib.updated_at = datetime.now(timezone.utc)
+            verified_lib.save()
+        li.delete()
+        req.library_item = None
+
+    req.delete()
+    return jsonify({"ok": True})
 
 
 def _submit_for_verification_route(kind: str):

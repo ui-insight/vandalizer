@@ -22,6 +22,25 @@ from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.semantic_recommender import SemanticRecommender
 
 
+def _build_extraction_ingestion_text(documents: list[SmartDocument], keys: list) -> str:
+    ingestion_text = "# Documents selected:"
+    for document in documents:
+        # Include document title and first part of raw_text for better semantic matching
+        ingestion_text += f"\n- {document.title}"
+        if document.raw_text:
+            text_preview = (
+                document.raw_text[:500]
+                if len(document.raw_text) > 500
+                else document.raw_text
+            )
+            ingestion_text += f"\n{text_preview}"
+    if keys:
+        ingestion_text += "\n\n# Extraction performed:\n"
+        for key in keys:
+            ingestion_text += f"- {key}\n"
+    return ingestion_text
+
+
 def normalize_results(results, expected_keys: List[str] = None) -> Dict[str, Any]:
     """Normalize a list of dicts into a single dict of unique values (comma-joined),
     or return the dict as-is. Non-list/dict inputs yield {}.
@@ -119,14 +138,15 @@ def perform_extraction_task(
         results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
 
-        debug(f"Raw extraction results from em.extract: {results}")
-        debug(f"Type of results: {type(results)}, Length: {len(results) if isinstance(results, (list, dict)) else 'N/A'}")
+        result_count = (
+            len(results)
+            if isinstance(results, list)
+            else (1 if isinstance(results, dict) else 0)
+        )
+        debug(f"Extraction produced {result_count} result(s)")
 
         if len(results) == 1:
             results = results[0]
-            debug(f"After single-item conversion: {results}, Type: {type(results)}")
-
-        debug(f"Results before normalization: {results}")
 
         # Get search set and documents
         search_set = SearchSet.objects(uuid=searchset_uuid).first()
@@ -171,8 +191,10 @@ def perform_extraction_task(
 
         # Normalize and save results - pass keys to ensure all are included
         normalized_results = normalize_results(results, expected_keys=keys)
-        debug(f"Normalized results: {normalized_results}")
-        debug(f"Normalized results type: {type(normalized_results)}, Length: {len(normalized_results) if isinstance(normalized_results, dict) else 'N/A'}")
+        if isinstance(normalized_results, dict):
+            debug(
+                f"Normalized results contains {len(normalized_results)} fields"
+            )
 
         # Finish activity
         if activity:
@@ -194,58 +216,14 @@ def perform_extraction_task(
             except Exception as e:
                 debug(f"Error triggering description generation after extraction: {e}")
 
-        # Ingest extraction into vector database for recommendations
+        # Ingest extraction into vector database for recommendations asynchronously
         try:
-            ingestion_text = ""
-            ingestion_text += "# Documents selected:"
-            for document in documents:
-                # Include document title and first part of raw_text for better semantic matching
-                ingestion_text += f"\n- {document.title}"
-                if document.raw_text:
-                    # Include first 500 chars of document text for semantic matching
-                    text_preview = document.raw_text[:500] if len(document.raw_text) > 500 else document.raw_text
-                    ingestion_text += f"\n{document.raw_text[:500]}"
-            ingestion_text += "\n\n# Extraction performed:\n"
-            for key in keys:
-                ingestion_text += f"- {key}\n"
-
-            # Ingest into semantic recommender - use singleton to avoid expensive re-initialization
-            try:
-                from app.blueprints.workflows.routes import get_recommendation_manager
-
-                recommendation_manager = get_recommendation_manager()
-                recommendation_manager.ingest_recommendation_item(
-                    identifier=str(search_set.uuid),
-                    ingestion_text=ingestion_text,
-                    recommendation_type="Extraction",
-                )
-
-                debug(
-                    f"Successfully ingested Extrxtion: {str(search_set.uuid)} with text length {len(ingestion_text)}"
-                )
-
-                # Clear recommendations cache so new extraction appears immediately
-                try:
-                    from app.blueprints.workflows.routes import (
-                        clear_recommendations_cache,
-                    )
-
-                    clear_recommendations_cache()
-                except Exception as cache_error:
-                    debug(f"Error clearing recommendations cache: {cache_error}")
-            except ImportError:
-                # Fallback if singleton not available (shouldn't happen in normal flow)
-                persist_directory = "data/recommendations_vectordb"
-                recommendation_manager = SemanticRecommender(
-                    persist_directory=persist_directory
-                )
-                recommendation_manager.ingest_recommendation_item(
-                    identifier=str(search_set.uuid),
-                    ingestion_text=ingestion_text,
-                    recommendation_type="Extraction",
+            if search_set:
+                ingest_extraction_recommendation_task.delay(
+                    str(search_set.uuid), document_uuids, keys
                 )
         except Exception as e:
-            debug(f"Error ingesting extraction recommendation: {e}")
+            debug(f"Error scheduling extraction recommendation ingestion: {e}")
 
         return {
             "status": "completed",
@@ -261,3 +239,70 @@ def perform_extraction_task(
             activity.error = str(e)
             activity_finish(activity, status=ActivityStatus.FAILED, error=str(e))
         raise
+
+
+@celery_app.task(
+    name="tasks.extraction.ingest_recommendation",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=5,
+)
+def ingest_extraction_recommendation_task(
+    searchset_uuid: str, document_uuids: list, keys: list
+):
+    """Build and ingest extraction recommendations without blocking extraction results."""
+    try:
+        search_set = SearchSet.objects(uuid=searchset_uuid).first()
+        if not search_set:
+            debug(f"Recommendation ingest skipped: search set not found {searchset_uuid}")
+            return
+
+        documents = []
+        for doc_uuid in document_uuids:
+            document = SmartDocument.objects(uuid=doc_uuid).first()
+            if document:
+                documents.append(document)
+
+        if not documents:
+            debug(
+                f"Recommendation ingest skipped: no documents found for {searchset_uuid}"
+            )
+            return
+
+        ingestion_text = _build_extraction_ingestion_text(documents, keys)
+
+        # Ingest into semantic recommender - use singleton to avoid expensive re-initialization
+        try:
+            from app.blueprints.workflows.routes import get_recommendation_manager
+
+            recommendation_manager = get_recommendation_manager()
+            recommendation_manager.ingest_recommendation_item(
+                identifier=str(search_set.uuid),
+                ingestion_text=ingestion_text,
+                recommendation_type="Extraction",
+            )
+
+            debug(
+                f"Successfully ingested Extraction: {str(search_set.uuid)} with text length {len(ingestion_text)}"
+            )
+
+            # Clear recommendations cache so new extraction appears immediately
+            try:
+                from app.blueprints.workflows.routes import clear_recommendations_cache
+
+                clear_recommendations_cache()
+            except Exception as cache_error:
+                debug(f"Error clearing recommendations cache: {cache_error}")
+        except ImportError:
+            # Fallback if singleton not available (shouldn't happen in normal flow)
+            persist_directory = "data/recommendations_vectordb"
+            recommendation_manager = SemanticRecommender(
+                persist_directory=persist_directory
+            )
+            recommendation_manager.ingest_recommendation_item(
+                identifier=str(search_set.uuid),
+                ingestion_text=ingestion_text,
+                recommendation_type="Extraction",
+            )
+    except Exception as e:
+        debug(f"Error ingesting extraction recommendation: {e}")

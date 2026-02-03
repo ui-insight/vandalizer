@@ -189,6 +189,7 @@ def build_breadcrumbs(
 
 @login_required
 @home.route("/")
+@home.route("/home")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
     user = load_user()
