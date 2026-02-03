@@ -3415,6 +3415,83 @@
         beginPrompt(uuid, title || "Prompt");
     }
 
+    function maybeRunItemFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const editPromptId = params.get('edit_prompt_id');
+        const editPromptKind = params.get('edit_prompt_kind') || 'prompt';
+        if (editPromptId) {
+            if (typeof setSection === 'function') {
+                setSection('Library');
+            }
+            if (typeof editLibraryItem === 'function') {
+                editLibraryItem(editPromptKind, editPromptId);
+            } else {
+                console.error('editLibraryItem not defined');
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
+            window.history.replaceState({}, '', url.toString());
+            return;
+        }
+
+        const runKind = params.get('run_item_kind');
+        const runId = params.get('run_item_id');
+        const runTitle = params.get('run_item_title') || params.get('run_prompt_title') || 'Prompt';
+
+        if (runKind && runId) {
+            if (runKind === 'workflow') {
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (typeof fetchWorkflow === 'function') {
+                    fetchWorkflow(runId);
+                } else {
+                    console.error('fetchWorkflow not defined');
+                }
+            } else if (runKind === 'searchset' || runKind === 'extraction') {
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (typeof openSearchSet === 'function') {
+                    openSearchSet(runId);
+                } else {
+                    console.error('openSearchSet not defined');
+                }
+            } else if (runKind === 'prompt' || runKind === 'formatter') {
+                if (typeof runPromptInAssistant === 'function') {
+                    runPromptInAssistant(runId, runTitle);
+                } else {
+                    console.error('runPromptInAssistant not defined');
+                }
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.delete('run_item_kind');
+            url.searchParams.delete('run_item_id');
+            url.searchParams.delete('run_item_title');
+            url.searchParams.delete('run_prompt_id');
+            url.searchParams.delete('run_prompt_title');
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
+            window.history.replaceState({}, '', url.toString());
+            return;
+        }
+
+        const promptId = params.get('run_prompt_id');
+        if (promptId && typeof runPromptInAssistant === 'function') {
+            runPromptInAssistant(promptId, runTitle);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('run_prompt_id');
+            url.searchParams.delete('run_prompt_title');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }
+
+    $(document).ready(function () {
+        maybeRunItemFromQuery();
+    });
+
     function selectLibraryItem(type, id, title = "") {
         if (type === 'workflow') {
             if (typeof fetchWorkflow === 'function') {

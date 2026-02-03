@@ -56,14 +56,12 @@ class SystemConfig(me.Document):
 
     # OCR Configuration
     ocr_endpoint = me.StringField(
-        default="https://processpdf.insight.uidaho.edu",
-        max_length=500
+        default="https://processpdf.insight.uidaho.edu", max_length=500
     )
 
     # LLM Configuration
     llm_endpoint = me.StringField(
-        default="https://mindrouter-api.nkn.uidaho.edu/v1",
-        max_length=500
+        default="https://mindrouter-api.nkn.uidaho.edu/v1", max_length=500
     )
 
     # Available models configuration
@@ -71,20 +69,46 @@ class SystemConfig(me.Document):
     # thinking: bool - whether the model supports thinking mode (default False)
     # endpoint: str - API endpoint URL for this specific model (optional, falls back to llm_endpoint)
     # api_protocol: str - API protocol to use: "openai", "ollama", or "vllm" (default: auto-detect)
-    available_models = me.ListField(me.DictField(), default=[
-        {"name": "gpt-oss-32k:120b", "tag": "University of Idaho - Private", "external": False, "thinking": False, "endpoint": "", "api_protocol": ""},
-        {"name": "openai/gpt-5", "tag": "Cloud", "external": True, "thinking": False, "endpoint": "", "api_protocol": ""}
-    ])
+    available_models = me.ListField(
+        me.DictField(),
+        default=[
+            {
+                "name": "gpt-oss-32k:120b",
+                "tag": "University of Idaho - Private",
+                "external": False,
+                "thinking": False,
+                "endpoint": "",
+                "api_protocol": "",
+            },
+            {
+                "name": "openai/gpt-5",
+                "tag": "Cloud",
+                "external": True,
+                "thinking": False,
+                "endpoint": "",
+                "api_protocol": "",
+            },
+        ],
+    )
+    # Extraction model configuration
+    # If empty, use user-selected or default model
+    extraction_model = me.StringField(default="", max_length=200)
+    # Extraction strategy configuration
+    # two_pass: thinking draft -> structured final (no thinking)
+    # one_pass_thinking: structured extraction with thinking enabled
+    # one_pass_no_thinking: structured extraction with thinking disabled
+    extraction_strategy = me.StringField(
+        default="two_pass",
+        choices=["two_pass", "one_pass_thinking", "one_pass_no_thinking"],
+        max_length=50,
+    )
 
     # UI Configuration
     highlight_color = me.StringField(
         default="#eab308",  # Vandal gold/yellow (Tailwind yellow-500)
-        max_length=50
+        max_length=50,
     )
-    ui_radius = me.StringField(
-        default="12px",
-        max_length=50
-    )
+    ui_radius = me.StringField(default="12px", max_length=50)
 
     # Authentication Configuration
     # List of enabled authentication methods
@@ -110,10 +134,7 @@ class SystemConfig(me.Document):
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     updated_by = me.StringField(max_length=200)
 
-    meta = {
-        "collection": "system_config",
-        "indexes": []
-    }
+    meta = {"collection": "system_config", "indexes": []}
 
     @classmethod
     def get_config(cls):
@@ -992,16 +1013,22 @@ class LibraryFolder(me.Document):
 
     uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
     name = me.StringField(required=True, max_length=200)
-    parent_id = me.StringField(default=None, required=False, max_length=200)  # uuid of parent folder or None for root
+    parent_id = me.StringField(
+        default=None, required=False, max_length=200
+    )  # uuid of parent folder or None for root
 
     scope = me.EnumField(LibraryScope, required=True)
-    
+
     # Ownership (matches Library)
     owner_user_id = me.StringField(required=False, max_length=200)
     team = me.ReferenceField(Team, required=False, reverse_delete_rule=me.CASCADE)
 
-    created_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
-    updated_at = me.DateTimeField(default=lambda: datetime.datetime.now(datetime.timezone.utc))
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    updated_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
 
     meta = {
         "indexes": [
@@ -1034,10 +1061,12 @@ class LibraryItem(me.Document):
 
     # Optional tags/notes to help curate libraries
     tags = me.ListField(me.StringField(max_length=100), default=[])
-    note = me.StringField(required=False, max_length=2000)
-    
+    note = me.StringField(required=False, max_length=10000)
+
     # Folder organization
-    folder = me.ReferenceField("LibraryFolder", required=False, reverse_delete_rule=me.NULLIFY)
+    folder = me.ReferenceField(
+        "LibraryFolder", required=False, reverse_delete_rule=me.NULLIFY
+    )
 
     meta = {
         "indexes": [

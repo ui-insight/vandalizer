@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from flask import Flask, current_app
-from flask_dance.consumer import oauth_authorized
+from flask_dance.consumer import oauth_authorized, oauth_error
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import login_user
 
@@ -14,23 +14,25 @@ azure_blueprint = None
 
 def azure_logged_in(blueprint, token):
     """Creates or loads a user after successful Azure login."""
+    from flask import redirect, url_for, session
+    from app.models import User
+
+    current_app.logger.info(f"azure_logged_in signal received. Token present: {bool(token)}")
+
     if not token:
         current_app.logger.warning("Failed to fetch token from Azure.")
-        return
+        # Return False to stop Flask-Dance's default redirect behavior
+        return False
 
     resp = blueprint.session.get("/v1.0/me")
     if not resp.ok:
         current_app.logger.warning(
             f"Failed to fetch user info from Azure Graph: {resp.text}"
         )
-        return
+        return False
 
     info = resp.json()
     user_principal_name = info.get("userPrincipalName")
-
-    # Import here to avoid circular import at module load
-    from app.models import User
-    from flask import session
 
     user = User.objects(user_id=user_principal_name).first()
 
@@ -49,7 +51,23 @@ def azure_logged_in(blueprint, token):
     # Make session permanent so Flask-Login session persists
     session.permanent = True
     login_user(user)
-    # Let Flask-Dance store the token (don't return False)
+    current_app.logger.info(f"User {user_principal_name} logged in via Azure OAuth")
+
+    # Return False to tell Flask-Dance we've handled the login ourselves.
+    # This prevents Flask-Dance from storing the token and triggering its
+    # default redirect behavior, which can cause infinite loops.
+    return False
+
+
+def azure_error_handler(blueprint, message, response):
+    """Handle OAuth errors to prevent infinite redirect loops."""
+    current_app.logger.error(f"Azure OAuth error: {message}")
+    if response:
+        current_app.logger.error(f"OAuth error response: {response}")
+    from flask import flash
+    flash(f"OAuth login failed: {message}", "danger")
+    # Return False to let Flask-Dance handle the error redirect
+    return False
 
 
 def _connect_azure_signal(blueprint):
@@ -57,6 +75,7 @@ def _connect_azure_signal(blueprint):
     if getattr(blueprint, "_oauth_signal_connected", False):
         return
     oauth_authorized.connect(azure_logged_in, blueprint)
+    oauth_error.connect(azure_error_handler, blueprint)
     blueprint._oauth_signal_connected = True
 
 
@@ -70,21 +89,17 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
 
     try:
         oauth_enabled_now = "oauth" in get_auth_methods()
-    except Exception:
+        app.logger.info(f"configure_azure_blueprint called. oauth_enabled: {oauth_enabled_now}")
+    except Exception as e:
         oauth_enabled_now = app.config.get("AUTH_OAUTH_ENABLED", False)
+        app.logger.warning(f"Failed to get auth methods from DB, using config: {oauth_enabled_now}. Error: {e}")
 
     if not oauth_enabled_now:
-        return None
-
-    # If we've already served a request, don't attempt to register new blueprints.
-    if getattr(app, "_got_first_request", False) and "azure" not in app.blueprints:
-        app.logger.warning(
-            "Azure OAuth blueprint not registered before first request; restart required after updating config."
-        )
-        app.config["AZURE_BLUEPRINT_SKIPPED"] = True
+        app.logger.info("OAuth not enabled, skipping Azure blueprint")
         return None
 
     if "azure" in app.blueprints and not force:
+        app.logger.info("Azure blueprint already registered, connecting signals")
         azure_blueprint = app.blueprints["azure"]
         _connect_azure_signal(azure_blueprint)
         return azure_blueprint
@@ -112,6 +127,7 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
                 client_secret=client_secret,
                 tenant=tenant,
                 redirect_url=redirect_url or None,
+                redirect_to="/home",
             )
             app.logger.info("Azure blueprint configured from database")
         else:
@@ -126,6 +142,7 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
                     client_secret=client_secret,
                     tenant=tenant,
                     redirect_url=redirect_url or None,
+                    redirect_to="/home",
                 )
                 app.logger.info("Azure blueprint configured from app config")
             else:

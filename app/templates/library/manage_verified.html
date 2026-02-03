@@ -334,6 +334,75 @@
         color: #6b7280;
         margin-top: 4px;
     }
+
+    .vm-examiner-card {
+        margin-bottom: 24px;
+    }
+
+    .vm-examiner-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        align-items: flex-end;
+    }
+
+    .vm-examiner-select {
+        min-width: 260px;
+        flex: 1;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+        background: white;
+    }
+
+    .vm-examiner-status {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .vm-examiner-feedback {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 6px;
+    }
+
+    .vm-examiner-feedback.error {
+        color: #b91c1c;
+    }
+
+    .vm-examiner-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0 16px;
+        padding: 0;
+        list-style: none;
+    }
+
+    .vm-examiner-pill {
+        background: #e5e7eb;
+        color: #111827;
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .vm-examiner-empty {
+        font-size: 12px;
+        color: #6b7280;
+        margin: 12px 0 16px;
+    }
+
+    .vm-badge--neutral {
+        background: #f3f4f6;
+        color: #4b5563;
+    }
 </style>
 
 <div class="vm-container">
@@ -343,10 +412,51 @@
             <h2>Verification Management</h2>
             <div class="vm-header-subtitle">Manage verification requests, catalog items, and collections</div>
         </div>
-        <a href="/library" class="btn btn-secondary">
-            <i class="fa-solid fa-arrow-left"></i> Back to Library
+        <a href="/home" class="btn btn-secondary">
+            <i class="fa-solid fa-arrow-left"></i> Back to Home
         </a>
     </div>
+
+    {% if can_manage_examiners %}
+    <div class="vm-card vm-examiner-card">
+        <div class="vm-card-header">
+            <div class="vm-card-title">Examiner Access</div>
+        </div>
+        <div class="vm-card-summary">Grant or revoke examiner status for users.</div>
+        {% set current_examiners = examiner_users|selectattr('is_examiner')|list %}
+        {% if current_examiners %}
+        <ul class="vm-examiner-list">
+            {% for u in current_examiners %}
+            <li class="vm-examiner-pill">{{ u.label }}</li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="vm-examiner-empty">No users currently have examiner access.</div>
+        {% endif %}
+        {% if examiner_users %}
+        <div class="vm-examiner-controls">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="examiner-user-select">User</label>
+                <select id="examiner-user-select" class="vm-examiner-select">
+                    <option value="">Choose a user...</option>
+                    {% for u in examiner_users %}
+                    <option value="{{ u.user_id }}">{{ u.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="vm-examiner-status">
+                <span id="examiner-status-pill" class="vm-badge vm-badge--neutral">Select a user</span>
+                <button type="button" class="btn btn-primary btn-sm" id="examiner-toggle-btn" disabled>
+                    Grant Examiner
+                </button>
+            </div>
+        </div>
+        <div id="examiner-feedback" class="vm-examiner-feedback"></div>
+        {% else %}
+        <div class="vm-card-summary">No users available to manage.</div>
+        {% endif %}
+    </div>
+    {% endif %}
 
     <!-- Tabs -->
     <div class="vm-tabs">
@@ -391,6 +501,10 @@
             <div class="vm-card-summary">{{ item.summary }}</div>
             {% endif %}
             <div class="vm-card-actions">
+                <button class="btn btn-outline-secondary btn-sm"
+                    onclick='reviewVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ item.title|tojson }})'>
+                    <i class="fa-solid fa-eye"></i> Review
+                </button>
                 {% if item.kind == 'workflow' %}
                 <a href="/workflows/{{ item.identifier }}" class="btn btn-secondary btn-sm" target="_blank">
                     <i class="fa-solid fa-external-link"></i> Open Workflow
@@ -407,6 +521,14 @@
                 </button>
                 <button class="btn btn-danger btn-sm" onclick="updateVerificationStatus('{{ data.uuid }}', 'rejected')">
                     <i class="fa-solid fa-times"></i> Request Changes
+                </button>
+                <button class="btn btn-light btn-sm"
+                    onclick='openSendToUserModal({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ item.title|tojson }})'>
+                    <i class="fa-solid fa-paper-plane"></i> Send to User
+                </button>
+                <button class="btn btn-outline-danger btn-sm"
+                    onclick='removeVerificationRequest({{ data.uuid|tojson }}, {{ item.title|tojson }})'>
+                    <i class="fa-solid fa-trash"></i> Remove
                 </button>
             </div>
         </div>
@@ -451,6 +573,20 @@
                 {% endif %}
                 <div class="vm-card-meta">
                     ID: {{ item.identifier }}
+                </div>
+                <div class="vm-card-actions" style="margin-top: 12px;">
+                    <button class="btn btn-primary btn-sm"
+                        onclick='reviewVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
+                        <i class="fa-solid fa-eye"></i> Review
+                    </button>
+                    <button class="btn btn-light btn-sm"
+                        onclick='openSendToUserModal({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
+                        <i class="fa-solid fa-paper-plane"></i> Send to User
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm"
+                        onclick='removeVerifiedItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
+                        <i class="fa-solid fa-trash"></i> Remove
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -521,6 +657,30 @@
                 <div>No collections created yet</div>
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Send to User Modal -->
+<div class="modal" id="send-to-user-modal" hidden>
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Send Item to User</h3>
+            <button onclick="closeModal('send-to-user-modal')"
+                style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="send-item-kind">
+            <input type="hidden" id="send-item-identifier">
+            <div class="form-group">
+                <label>User ID or Email</label>
+                <input type="text" id="send-item-recipient" placeholder="user@example.com">
+                <div class="form-hint">Adds the item to the recipient's personal library.</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('send-to-user-modal')">Cancel</button>
+            <button class="btn btn-primary" onclick="sendItemToUser()">Send</button>
         </div>
     </div>
 </div>
@@ -722,6 +882,43 @@
         });
     }
 
+    function reviewVerificationItem(kind, identifier, title) {
+        const url = new URL('/home', window.location.origin);
+        if (kind === 'workflow') {
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('workflow_id', identifier);
+        } else if (kind === 'searchset' || kind === 'extraction') {
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('search_set_uuid', identifier);
+        } else if (kind === 'prompt' || kind === 'formatter') {
+            url.searchParams.set('section', 'Library');
+            url.searchParams.set('edit_prompt_id', identifier);
+            url.searchParams.set('edit_prompt_kind', kind);
+        }
+        window.open(url.toString(), '_blank');
+    }
+
+    function removeVerificationRequest(requestUuid, title) {
+        const label = title ? `Remove verification request for "${title}"?` : 'Remove verification request?';
+        if (!confirm(label)) return;
+
+        $.ajax({
+            url: '/library/verification/' + requestUuid + '/remove',
+            method: 'POST',
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to remove: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function () {
+                alert('Failed to remove verification request');
+            }
+        });
+    }
+
     // Metadata modal
     function openMetadataModal(kind, identifier, displayName, description, markdown) {
         document.getElementById('meta-kind').value = kind;
@@ -755,6 +952,68 @@
             },
             error: function () {
                 alert('Failed to save metadata');
+            }
+        });
+    }
+
+    function removeVerifiedItem(kind, identifier, title) {
+        const label = title ? `Remove "${title}" from the verified catalog?` : 'Remove item from verified catalog?';
+        if (!confirm(label)) return;
+
+        $.ajax({
+            url: '/library/verified/item/remove',
+            method: 'POST',
+            data: JSON.stringify({ kind: kind, identifier: identifier }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to remove: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function () {
+                alert('Failed to remove item');
+            }
+        });
+    }
+
+    function openSendToUserModal(kind, identifier, title) {
+        document.getElementById('send-item-kind').value = kind;
+        document.getElementById('send-item-identifier').value = identifier;
+        document.getElementById('send-item-recipient').value = '';
+        document.getElementById('send-to-user-modal').hidden = false;
+        const input = document.getElementById('send-item-recipient');
+        if (input) {
+            input.focus();
+        }
+    }
+
+    function sendItemToUser() {
+        const kind = document.getElementById('send-item-kind').value;
+        const identifier = document.getElementById('send-item-identifier').value;
+        const recipient = document.getElementById('send-item-recipient').value.trim();
+
+        if (!recipient) {
+            alert('Please enter a user ID or email');
+            return;
+        }
+
+        $.ajax({
+            url: '/library/verified/item/send_to_user',
+            method: 'POST',
+            data: JSON.stringify({ kind: kind, identifier: identifier, recipient: recipient }),
+            contentType: 'application/json',
+            success: function (res) {
+                if (res.ok) {
+                    closeModal('send-to-user-modal');
+                    alert('Item sent to ' + (res.recipient || recipient));
+                } else {
+                    alert('Failed to send: ' + (res.error || 'Unknown error'));
+                }
+            },
+            error: function () {
+                alert('Failed to send item');
             }
         });
     }
@@ -877,6 +1136,103 @@
                 alert('Failed to remove item');
             }
         });
+    }
+
+    const canManageExaminers = {{ can_manage_examiners|tojson }};
+    if (canManageExaminers) {
+        const examinerUsers = {{ examiner_users|tojson }};
+        const examinerMap = {};
+        examinerUsers.forEach(user => {
+            examinerMap[user.user_id] = user;
+        });
+
+        const select = document.getElementById('examiner-user-select');
+        const toggleBtn = document.getElementById('examiner-toggle-btn');
+        const statusPill = document.getElementById('examiner-status-pill');
+        const feedback = document.getElementById('examiner-feedback');
+
+        function setFeedback(message, isError) {
+            if (!feedback) return;
+            feedback.textContent = message || '';
+            feedback.classList.toggle('error', Boolean(isError));
+        }
+
+        function refreshExaminerControls() {
+            if (!select || !toggleBtn || !statusPill) return;
+            const userId = select.value;
+            const user = examinerMap[userId];
+
+            if (!userId || !user) {
+                statusPill.textContent = 'Select a user';
+                statusPill.className = 'vm-badge vm-badge--neutral';
+                toggleBtn.textContent = 'Grant Examiner';
+                toggleBtn.className = 'btn btn-primary btn-sm';
+                toggleBtn.disabled = true;
+                return;
+            }
+
+            const isExaminer = Boolean(user.is_examiner);
+            statusPill.textContent = isExaminer ? 'Examiner' : 'Not examiner';
+            statusPill.className = 'vm-badge ' + (isExaminer ? 'vm-badge--success' : 'vm-badge--neutral');
+            toggleBtn.textContent = isExaminer ? 'Remove Examiner' : 'Grant Examiner';
+            toggleBtn.className = isExaminer ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+            toggleBtn.disabled = false;
+        }
+
+        function toggleExaminerStatus() {
+            if (!select) return;
+            const userId = select.value;
+            const user = examinerMap[userId];
+            if (!user) {
+                setFeedback('Select a user first.', true);
+                return;
+            }
+
+            const nextStatus = !user.is_examiner;
+            const label = user.label || user.user_id;
+            const confirmMsg = nextStatus
+                ? `Grant examiner access to ${label}?`
+                : `Remove examiner access for ${label}?`;
+
+            if (!confirm(confirmMsg)) return;
+
+            toggleBtn.disabled = true;
+            setFeedback('Saving...', false);
+
+            $.ajax({
+                url: '/library/verification/examiners/update',
+                method: 'POST',
+                data: JSON.stringify({ user_id: userId, is_examiner: nextStatus }),
+                contentType: 'application/json',
+                success: function (res) {
+                    if (res.ok) {
+                        examinerMap[userId].is_examiner = Boolean(res.is_examiner);
+                        setFeedback('Examiner status updated.', false);
+                        refreshExaminerControls();
+                    } else {
+                        setFeedback('Failed to update: ' + (res.error || 'Unknown error'), true);
+                        toggleBtn.disabled = false;
+                    }
+                },
+                error: function () {
+                    setFeedback('Failed to update examiner status.', true);
+                    toggleBtn.disabled = false;
+                }
+            });
+        }
+
+        if (select) {
+            select.addEventListener('change', function () {
+                setFeedback('', false);
+                refreshExaminerControls();
+            });
+        }
+
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', toggleExaminerStatus);
+        }
+
+        refreshExaminerControls();
     }
 </script>
 {% endblock %}

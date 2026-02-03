@@ -180,6 +180,13 @@ def _detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -
     return "openai"
 
 
+def get_model_api_protocol(model_name: str) -> str:
+    """Public helper to determine API protocol for a model."""
+    model_config = _get_model_config(model_name)
+    return _detect_api_protocol(model_name, model_config)
+
+
+
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
@@ -309,7 +316,7 @@ class VLLMProvider(OpenRouterProvider):
         return super().model_profile(model_name)
 
 
-def get_agent_model(agent_model):
+def get_agent_model(agent_model, thinking_override: Optional[bool] = None):
     """
     Get the appropriate model instance based on model configuration.
     Supports per-model endpoints and API protocols (OpenAI, Ollama, VLLM).
@@ -317,6 +324,8 @@ def get_agent_model(agent_model):
     # Get model configuration
     model_config = _get_model_config(agent_model)
     thinking_enabled = model_config.get("thinking", False) if model_config else False
+    if thinking_override is not None:
+        thinking_enabled = thinking_override
     
     # Handle OpenAI models (external OpenAI API)
     if "openai" in agent_model and model_config and model_config.get("external", False):
@@ -408,7 +417,12 @@ def create_rag_agent(agent_model):
     return _rag_agent_cache[cache_key]
 
 
-def create_chat_agent(agent_model, system_prompt=None, include_next_step=True):
+def create_chat_agent(
+    agent_model,
+    system_prompt=None,
+    include_next_step=True,
+    thinking_override: Optional[bool] = None,
+):
     """Create or retrieve a cached chat agent to prevent context leaks.
 
     Args:
@@ -424,11 +438,11 @@ def create_chat_agent(agent_model, system_prompt=None, include_next_step=True):
         if system_prompt is not None
         else get_default_system_prompt(include_next_step=include_next_step)
     )
-    cache_key = f"{agent_model}_{hash(prompt_to_use)}"
+    cache_key = f"{agent_model}_{hash(prompt_to_use)}_{thinking_override}"
 
     # Return cached agent if available
     if cache_key not in _chat_agent_cache:
-        model = get_agent_model(agent_model)
+        model = get_agent_model(agent_model, thinking_override=thinking_override)
         _chat_agent_cache[cache_key] = Agent(
             model,
             system_prompt=prompt_to_use,

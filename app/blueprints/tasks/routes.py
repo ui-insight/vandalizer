@@ -40,7 +40,11 @@ from app.utilities.analytics_helper import ActivityType, activity_finish, activi
 from app.utilities.chat_manager import ChatManager
 from app.utilities.config import get_default_model_name, get_llm_models
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
-from app.utilities.extraction_tasks import normalize_results, perform_extraction_task
+from app.utilities.extraction_tasks import (
+    ingest_extraction_recommendation_task,
+    normalize_results,
+    perform_extraction_task,
+)
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
     add_object_to_library,
@@ -826,33 +830,13 @@ def begin_search_sync() -> ResponseReturnValue:
             "activity_id": str(activity.id),
         }
 
-        # Ingest extraction into vector database for future recommendations
-        # Use singleton instance to avoid expensive re-initialization
+        # Ingest extraction into vector database asynchronously
         try:
-            from app.blueprints.workflows.routes import get_recommendation_manager
-
-            recommendation_manager = get_recommendation_manager()
-
-            ingestion_text = "# Documents selected:"
-            for doc in documents:
-                ingestion_text += f"\n{doc.raw_text}"
-
-            debug("BEGINNING EXTRACTION RECOMMENDATION")
-
-            recommendation_manager.ingest_recommendation_item(
-                identifier=str(search_set.uuid),
-                ingestion_text=ingestion_text,
-                recommendation_type="Extraction",
+            ingest_extraction_recommendation_task.delay(
+                str(search_set.uuid), document_uuids, keys
             )
-            # Clear recommendations cache so new extraction appears immediately
-            try:
-                from app.blueprints.workflows.routes import clear_recommendations_cache
-
-                clear_recommendations_cache()
-            except Exception as cache_error:
-                debug(f"Error clearing recommendations cache: {cache_error}")
         except Exception as e:
-            debug(f"Error ingesting extraction recommendation: {e}")
+            debug(f"Error scheduling extraction recommendation ingestion: {e}")
 
         return jsonify(response)
 
