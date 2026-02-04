@@ -19,12 +19,13 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user
 from flask_mail import Mail
-from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
-from app.oauth import configure_azure_blueprint
 
-CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
+from app.oauth import configure_azure_blueprint
+from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
+
+CURRENT_RELEASE_VERSION = "3.2.01"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.3.01:
+Release 3.2.01:
 - Over 20 bug fixes and tweaks
 - Restored elegant formatting
 - Improved workflow speed and performance
@@ -200,7 +201,9 @@ auth_methods = get_auth_methods()
 
 # In non-production, if nothing is configured at all, enable password to avoid lockout
 if env != "production" and not auth_methods:
-    app.logger.warning("No auth methods configured; enabling password auth in non-production to avoid lockout.")
+    app.logger.warning(
+        "No auth methods configured; enabling password auth in non-production to avoid lockout."
+    )
     auth_methods = ["password"]
 PASSWORD_AUTH_ENABLED = "password" in auth_methods
 OAUTH_AUTH_ENABLED = "oauth" in auth_methods
@@ -221,6 +224,7 @@ azure_bp = configure_azure_blueprint(app)
 # Exempt OAuth endpoints from rate limiting to prevent authentication failures
 if azure_bp:
     from app.oauth import azure_blueprint
+
     limiter.exempt(azure_blueprint)
 
 # Point the login view to the local blueprint's login function (always available path)
