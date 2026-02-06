@@ -250,12 +250,7 @@ footer .footer-poweredby {
     line-height: 1;
     font-weight: 900;
     text-align: center;
-    text-transform: uppercase;
     vertical-align: top;
-}
-
-.hero-content .action-button {
-    text-transform: none;
 }
 
 .navbar-brand {
