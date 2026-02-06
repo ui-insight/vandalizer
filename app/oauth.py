@@ -115,8 +115,6 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
             client_id = azure_config.get("client_id")
             client_secret = azure_config.get("client_secret")
             tenant = azure_config.get("tenant_id") or azure_config.get("tenant")
-            redirect_url = azure_config.get("redirect_uri")
-
             if not client_id or not client_secret or not tenant:
                 app.logger.error(
                     f"Azure config incomplete - client_id: {bool(client_id)}, client_secret: {bool(client_secret)}, tenant: {bool(tenant)}"
@@ -126,23 +124,24 @@ def configure_azure_blueprint(app: Flask, force: bool = False):
                 client_id=client_id,
                 client_secret=client_secret,
                 tenant=tenant,
-                redirect_url=redirect_url or None,
-                redirect_to="/home",
+                # redirect_to expects an endpoint; redirect_url is a *post-login* URL.
+                # Do not pass the OAuth callback URL here (that causes redirect loops).
+                redirect_to="home.index",
             )
             app.logger.info("Azure blueprint configured from database")
         else:
             client_id = app.config.get("CLIENT_ID")
             client_secret = app.config.get("CLIENT_SECRET")
             tenant = app.config.get("TENANT_NAME")
-            redirect_url = app.config.get("AZURE_REDIRECT_URI")
 
             if client_id and client_secret and tenant:
                 blueprint = make_azure_blueprint(
                     client_id=client_id,
                     client_secret=client_secret,
                     tenant=tenant,
-                    redirect_url=redirect_url or None,
-                    redirect_to="/home",
+                    # redirect_to expects an endpoint; redirect_url is a *post-login* URL.
+                    # Do not pass the OAuth callback URL here (that causes redirect loops).
+                    redirect_to="home.index",
                 )
                 app.logger.info("Azure blueprint configured from app config")
             else:
