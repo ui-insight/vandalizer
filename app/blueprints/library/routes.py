@@ -972,11 +972,16 @@ def remove_verified_item():
     if not obj or not normalized_kind:
         return jsonify({"error": "not found"}), 404
 
+    item_identifier = _verification_identifier(normalized_kind, obj)
+    if not item_identifier:
+        return jsonify({"error": "identifier not found"}), 400
+
     verified_lib = get_or_create_verified_library()
     target_li = None
     if verified_lib:
         for li in list(verified_lib.items):
-            if li.kind == normalized_kind and li.obj == obj:
+            li_identifier = _verification_identifier(li.kind, li.obj)
+            if li.kind == normalized_kind and li_identifier == item_identifier:
                 target_li = li
                 break
 
@@ -991,19 +996,32 @@ def remove_verified_item():
         obj.save()
         sync_verification_flags_for_object(obj, None)
 
-    item_identifier = _verification_identifier(normalized_kind, obj)
-    if item_identifier:
-        VerifiedItemMetadata.objects(
-            item_kind=normalized_kind, item_identifier=item_identifier
-        ).delete()
-        req = VerificationRequest.objects(
-            item_kind=normalized_kind, item_identifier=item_identifier
-        ).first()
-        if req and req.library_item == target_li:
-            req.library_item = None
-            req.save()
+    req = VerificationRequest.objects(
+        item_kind=normalized_kind, item_identifier=item_identifier
+    ).first()
+    if not req:
+        team = _current_team_for_user(user)
+        req = VerificationRequest(
+            item_kind=normalized_kind,
+            item_identifier=item_identifier,
+            team=team,
+            status=VerificationStatus.SUBMITTED,
+            submitter_user_id=user.user_id,
+            submitter_name=user.name or user.user_id,
+            submitter_org=team.name if team else "",
+            submitter_role=user.role_in_team(team) if team else "",
+            item_title=_object_title(normalized_kind, obj) or item_identifier,
+            item_version_hash=_default_version_hash(obj),
+            category=_default_category_for_kind(normalized_kind),
+            summary="Moved from verified catalog for re-review.",
+        )
+    else:
+        req.status = VerificationStatus.SUBMITTED
 
-    return jsonify({"ok": True})
+    req.library_item = None
+    req.save()
+
+    return jsonify({"ok": True, "status": req.status.value})
 
 
 @library.route("/verified/item/send_to_user", methods=["POST"])
@@ -1891,6 +1909,14 @@ def update_verification_status(request_uuid: str):
     now = datetime.now(timezone.utc)
 
     if new_status == VerificationStatus.APPROVED:
+        if not obj:
+            return jsonify({"error": "item not found"}), 404
+
+        verified_lib = get_or_create_verified_library()
+        li = add_object_to_library(obj, verified_lib, added_by_user_id=user.user_id)
+        req.library_item = li
+        req.save()
+
         if hasattr(obj, "verified"):
             setattr(obj, "verified", True)
             obj.save()
