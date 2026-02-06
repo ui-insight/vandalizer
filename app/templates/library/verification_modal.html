@@ -112,6 +112,10 @@
         background: #fff;
     }
 
+    #verification-modal .verification-form__field input[type="file"] {
+        padding: 8px;
+    }
+
     #verification-modal .verification-inline-field {
         background: #f8fafc;
         color: #334155;
@@ -122,6 +126,18 @@
 
     #verification-modal .verification-form__field--full {
         grid-column: 1 / -1;
+    }
+
+    #verification-modal .verification-file-list {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: #334155;
+        font-size: 13px;
+    }
+
+    #verification-modal .verification-file-list li {
+        margin: 2px 0;
+        word-break: break-word;
     }
 
     #verification-modal .verification-modal__actions {
@@ -230,7 +246,8 @@
                 <div class="verification-form__grid">
                     <label class="verification-form__field">
                         <span>Example Input Document(s)</span>
-                        <textarea id="verification-example-inputs" rows="4" placeholder="One URL or file path per line"></textarea>
+                        <input type="file" id="verification-example-input-files" multiple>
+                        <ul id="verification-example-input-files-list" class="verification-file-list" style="display:none;"></ul>
                     </label>
                     <label class="verification-form__field">
                         <span>Expected Output(s)</span>

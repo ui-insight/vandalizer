@@ -612,6 +612,21 @@
                 </div>
                 {% endif %}
 
+                {% if data.test_files %}
+                <div class="vm-request-details-block">
+                    <strong>Test Files</strong>
+                    <ul>
+                        {% for file in data.test_files %}
+                        <li>
+                            <a href="{{ file.download_url }}" target="_blank" rel="noopener" download>
+                                {{ file.original_name or file.stored_name or file.path }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
                 {% if data.expected_outputs %}
                 <div class="vm-request-details-block">
                     <strong>Expected Outputs</strong>

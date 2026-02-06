@@ -6,13 +6,15 @@ import json
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 
 from typing import Any
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request, url_for
 from flask_login import login_required
 from mongoengine.errors import DoesNotExist
 from flask_mail import Message
+from werkzeug.utils import secure_filename
 
 from app import load_user, mail
 from app.utilities.security import validate_json_request
@@ -1252,6 +1254,7 @@ def get_verified_item_metadata():
     if verification_req:
         result.update({
             "example_inputs": verification_req.example_inputs or [],
+            "test_files": verification_req.test_files or [],
             "expected_outputs": verification_req.expected_outputs or [],
             "dependencies": verification_req.dependencies or [],
             "run_instructions": verification_req.run_instructions or "",
@@ -1446,6 +1449,7 @@ def get_verification_request():
         "summary": "",
         "description": "",
         "example_inputs": [],
+        "test_files": [],
         "expected_outputs": [],
         "dependencies": [],
         "run_instructions": "",
@@ -1979,6 +1983,55 @@ def remove_verification_request(request_uuid: str):
     return jsonify({"ok": True})
 
 
+@library.route("/verification/upload_test_files", methods=["POST"])
+@login_required
+def upload_verification_test_files():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    uploaded_files = request.files.getlist("files")
+    if not uploaded_files:
+        return jsonify({"error": "no files uploaded"}), 400
+
+    upload_dir = (
+        Path(current_app.root_path)
+        / "static"
+        / "uploads"
+        / str(user.user_id)
+        / "verification"
+    )
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    files_payload = []
+    for f in uploaded_files:
+        if not f or not f.filename:
+            continue
+
+        original_name = secure_filename(f.filename)
+        if not original_name:
+            continue
+
+        stored_name = f"{uuid.uuid4().hex}_{original_name}"
+        destination = upload_dir / stored_name
+        f.save(str(destination))
+
+        relative_path = f"uploads/{user.user_id}/verification/{stored_name}"
+        files_payload.append(
+            {
+                "original_name": original_name,
+                "stored_name": stored_name,
+                "path": relative_path,
+                "download_url": url_for("static", filename=relative_path),
+            }
+        )
+
+    if not files_payload:
+        return jsonify({"error": "no valid files uploaded"}), 400
+
+    return jsonify({"ok": True, "files": files_payload})
+
+
 def _submit_for_verification_route(kind: str):
     user = load_user()
     if not user:
@@ -2049,6 +2102,27 @@ def _submit_for_verification_route(kind: str):
     request_doc.summary = (form.get("summary") or "").strip()
     request_doc.description = (form.get("description") or "").strip()
     request_doc.example_inputs = _coerce_string_list(form.get("example_inputs"))
+    incoming_test_files = form.get("test_files")
+    if isinstance(incoming_test_files, list):
+        cleaned_test_files = []
+        for file_entry in incoming_test_files:
+            if not isinstance(file_entry, dict):
+                continue
+            original_name = (file_entry.get("original_name") or "").strip()
+            stored_name = (file_entry.get("stored_name") or "").strip()
+            path = (file_entry.get("path") or "").strip()
+            download_url = (file_entry.get("download_url") or "").strip()
+            if not path or not download_url:
+                continue
+            cleaned_test_files.append(
+                {
+                    "original_name": original_name,
+                    "stored_name": stored_name,
+                    "path": path,
+                    "download_url": download_url,
+                }
+            )
+        request_doc.test_files = cleaned_test_files
     request_doc.expected_outputs = _coerce_string_list(form.get("expected_outputs"))
     if "dependencies" in form:
         request_doc.dependencies = _coerce_string_list(form.get("dependencies"))

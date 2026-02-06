@@ -1054,6 +1054,7 @@ class VerificationRequest(me.Document):
     summary = me.StringField(required=False, max_length=500)
     description = me.StringField(required=False, max_length=5000)
     example_inputs = me.ListField(me.StringField(max_length=500), default=[])
+    test_files = me.ListField(me.DictField(), default=[])
     expected_outputs = me.ListField(me.StringField(max_length=500), default=[])
     dependencies = me.ListField(me.StringField(max_length=300), default=[])
     run_instructions = me.StringField(required=False, max_length=5000)
@@ -1116,6 +1117,7 @@ class VerificationRequest(me.Document):
             "summary": self.summary or "",
             "description": self.description or "",
             "example_inputs": self.example_inputs or [],
+            "test_files": self.test_files or [],
             "expected_outputs": self.expected_outputs or [],
             "dependencies": self.dependencies or [],
             "run_instructions": self.run_instructions or "",
