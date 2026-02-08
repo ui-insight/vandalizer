@@ -294,18 +294,21 @@ class WorkflowTriggerEvent(me.Document):
     workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE)
     trigger_type = me.StringField(
         required=True,
-        choices=["manual", "folder_watch", "schedule", "api", "chain"]
+        choices=["manual", "folder_watch", "schedule", "api", "chain", "m365_intake"]
     )
     status = me.StringField(
         required=True,
         choices=["pending", "queued", "running", "completed", "failed", "skipped"],
         default="pending"
     )
-    
+
     # Documents to process
     documents = me.ListField(me.ReferenceField("SmartDocument"))
     document_count = me.IntField(default=0)
-    
+
+    # M365 work item reference (set when trigger_type == "m365_intake")
+    work_item = me.ReferenceField("WorkItem", required=False)
+
     # Trigger context
     trigger_context = me.DictField()  # folder ref, schedule name, etc.
     
@@ -446,6 +449,10 @@ class User(me.Document):
     current_team = me.ReferenceField(
         "Team", required=False, reverse_delete_rule=me.NULLIFY
     )
+
+    # M365 integration opt-in
+    m365_enabled = me.BooleanField(default=False)
+    m365_connected_at = me.DateTimeField(required=False)
 
     @property
     def current_team_uuid(self) -> str | None:
@@ -1515,4 +1522,196 @@ class DailyUsageAggregate(me.Document):
             },
             {"fields": ["-date", "scope"]},
         ]
+    }
+
+
+# ---------------------------------------------------------------------------
+# M365 Passive Workflow Models
+# ---------------------------------------------------------------------------
+
+
+class WorkItem(me.Document):
+    """Normalized intake item from any M365 source (email, OneDrive file, etc.)."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    source = me.StringField(
+        required=True,
+        choices=["outlook_shared", "outlook_folder", "onedrive_drop", "manual"],
+    )
+    status = me.StringField(
+        required=True,
+        default="received",
+        choices=[
+            "received",
+            "triaged",
+            "processing",
+            "awaiting_review",
+            "completed",
+            "failed",
+            "rejected",
+        ],
+    )
+
+    # Source identifiers (Graph API IDs)
+    graph_message_id = me.StringField(max_length=500)
+    graph_drive_item_id = me.StringField(max_length=500)
+    source_mailbox = me.StringField(max_length=320)
+    source_folder_path = me.StringField(max_length=500)
+
+    # Extracted metadata
+    subject = me.StringField(max_length=1000)
+    sender_email = me.StringField(max_length=320)
+    sender_name = me.StringField(max_length=200)
+    received_at = me.DateTimeField()
+    body_text = me.StringField()
+    body_html = me.StringField()
+
+    # Attachments (stored as SmartDocuments after download)
+    attachments = me.ListField(me.ReferenceField("SmartDocument"))
+    attachment_count = me.IntField(default=0)
+
+    # Triage results (populated by triage agent)
+    triage_category = me.StringField(max_length=200)
+    triage_confidence = me.FloatField()
+    triage_tags = me.ListField(me.StringField(max_length=100))
+    sensitivity_flags = me.ListField(me.StringField(max_length=100))
+    triage_summary = me.StringField(max_length=5000)
+
+    # Workflow binding
+    intake_config = me.ReferenceField("IntakeConfig", required=False)
+    matched_workflow = me.ReferenceField("Workflow", required=False)
+    trigger_event = me.ReferenceField("WorkflowTriggerEvent", required=False)
+    workflow_result = me.ReferenceField("WorkflowResult", required=False)
+
+    # OneDrive case folder (populated after output)
+    case_folder_url = me.StringField(max_length=1000)
+    case_folder_drive_path = me.StringField(max_length=500)
+
+    # Feedback (from Teams cards or UI)
+    feedback_action = me.StringField(
+        max_length=50, choices=["correct", "fix", "stop", "reassign", None]
+    )
+    feedback_by = me.StringField(max_length=200)
+    feedback_at = me.DateTimeField()
+    feedback_note = me.StringField(max_length=2000)
+
+    # Ownership / audit
+    owner_user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+    updated_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "work_items",
+        "indexes": [
+            "uuid",
+            "source",
+            "status",
+            "owner_user_id",
+            "team_id",
+            "graph_message_id",
+            "-created_at",
+            {"fields": ["source_mailbox", "status"]},
+        ],
+    }
+
+
+class GraphSubscription(me.Document):
+    """Tracks an active Microsoft Graph webhook subscription."""
+
+    subscription_id = me.StringField(required=True, unique=True, max_length=200)
+    resource = me.StringField(required=True, max_length=500)
+    change_type = me.StringField(required=True, max_length=50)
+    notification_url = me.StringField(required=True, max_length=500)
+    expiration = me.DateTimeField(required=True)
+    owner_user_id = me.StringField(required=True, max_length=200)
+    intake_config_id = me.StringField(max_length=200)
+    active = me.BooleanField(default=True)
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "graph_subscriptions",
+        "indexes": ["subscription_id", "expiration", "active"],
+    }
+
+
+class IntakeConfig(me.Document):
+    """Configuration for an M365 intake lane (shared mailbox, folder, OneDrive drop)."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    name = me.StringField(required=True, max_length=200)
+    intake_type = me.StringField(
+        required=True,
+        choices=["outlook_shared", "outlook_folder", "onedrive_drop"],
+    )
+    enabled = me.BooleanField(default=False)
+
+    # Source configuration (populate the ones relevant to intake_type)
+    mailbox_address = me.StringField(max_length=320)
+    outlook_folder_id = me.StringField(max_length=500)
+    drive_id = me.StringField(max_length=200)
+    folder_path = me.StringField(max_length=500)
+
+    # Routing — which workflow(s) to route to
+    default_workflow = me.ReferenceField("Workflow", required=False)
+    triage_enabled = me.BooleanField(default=True)
+    triage_rules = me.ListField(me.DictField(), default=[])
+
+    # File filters (reuse concept from passive_triggers)
+    file_filters = me.DictField(
+        default=lambda: {
+            "types": ["pdf", "docx", "xlsx"],
+            "exclude_patterns": [],
+            "max_size_bytes": 50_000_000,
+        }
+    )
+
+    # Teams notification configuration
+    teams_config = me.DictField(
+        default=lambda: {
+            "enabled": False,
+            "team_id": None,
+            "channel_id": None,
+            "notify_on_complete": True,
+            "notify_on_error": True,
+            "daily_digest": True,
+        }
+    )
+
+    # Graph subscription reference
+    subscription = me.ReferenceField("GraphSubscription", required=False)
+
+    # Ownership
+    owner_user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(max_length=200)
+
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+    updated_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "intake_configs",
+        "indexes": ["uuid", "intake_type", "owner_user_id", "enabled"],
+    }
+
+
+class M365AuditEntry(me.Document):
+    """Immutable audit log for M365 integration actions."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    action = me.StringField(required=True, max_length=50)
+    actor_user_id = me.StringField(max_length=200)
+    actor_type = me.StringField(
+        max_length=20, choices=["user", "system", "graph_webhook"]
+    )
+
+    work_item_id = me.StringField(max_length=200)
+    intake_config_id = me.StringField(max_length=200)
+    workflow_id = me.StringField(max_length=200)
+
+    detail = me.DictField()
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "m365_audit_log",
+        "indexes": ["-created_at", "action", "work_item_id", "actor_user_id"],
     }

@@ -133,6 +133,36 @@ def check_workflow_budget(workflow):
     return True, None
 
 
+def create_m365_trigger(workflow, work_item):
+    """Create a trigger event for an M365-ingested work item.
+
+    Args:
+        workflow: Workflow instance to execute.
+        work_item: WorkItem that triggered this.
+
+    Returns:
+        WorkflowTriggerEvent instance.
+    """
+    event = WorkflowTriggerEvent(
+        uuid=uuid4().hex,
+        workflow=workflow,
+        trigger_type='m365_intake',
+        status='pending',
+        documents=list(work_item.attachments) if work_item.attachments else [],
+        document_count=work_item.attachment_count or 0,
+        work_item=work_item,
+        trigger_context={
+            'work_item_uuid': work_item.uuid,
+            'source': work_item.source,
+            'intake_config_id': str(work_item.intake_config.id) if work_item.intake_config else None,
+        },
+        created_at=datetime.utcnow(),
+        process_after=datetime.utcnow(),  # Process immediately (no delay for M365)
+    )
+    event.save()
+    return event
+
+
 def check_throttling(workflow):
     """
     Check if workflow can run based on throttling configuration.
