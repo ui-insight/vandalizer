@@ -11,6 +11,7 @@ from app.models import (
     WorkflowResult,
     WorkflowStep,
     WorkflowTriggerEvent,
+    WorkItem,
     SmartDocument,
 )
 from app.utilities.passive_triggers import (
@@ -238,6 +239,7 @@ def process_outputs(workflow_result_id):
     
     from app.utilities.output_handlers import (
         save_results_to_folder,
+        save_results_to_onedrive_channel,
         send_workflow_notification,
         should_send_notification,
     )
@@ -252,38 +254,63 @@ def process_outputs(workflow_result_id):
     
     output_config = workflow.output_config or {}
     event = result.trigger_event
-    
+
+    # Resolve the WorkItem linked to this trigger event (if any)
+    work_item = None
+    if event:
+        work_item = WorkItem.objects(trigger_event=event).first()
+
     outputs_processed = {
         "storage": None,
+        "onedrive": None,
         "notifications": []
     }
-    
-    # 1. Storage
+
+    # 1. Local storage
     storage_config = output_config.get("storage", {})
     if storage_config.get("enabled"):
         try:
             path = save_results_to_folder(result, storage_config)
             outputs_processed["storage"] = {"status": "completed", "path": path}
-            
+
             if event:
                 event.output_delivery["storage_status"] = "completed"
                 event.output_delivery["storage_path"] = path
                 event.save()
         except Exception as e:
             outputs_processed["storage"] = {"status": "failed", "error": str(e)}
-            
+
             if event:
                 event.output_delivery["storage_status"] = "failed"
                 event.output_delivery["storage_error"] = str(e)
                 event.save()
-    
-    # 2. Notifications
+
+    # 2. OneDrive case folder
+    onedrive_config = output_config.get("onedrive", {})
+    if onedrive_config.get("enabled") and work_item:
+        try:
+            folder_path = save_results_to_onedrive_channel(result, onedrive_config, work_item)
+            outputs_processed["onedrive"] = {"status": "completed", "path": folder_path}
+
+            if event:
+                event.output_delivery["onedrive_status"] = "completed"
+                event.output_delivery["onedrive_path"] = folder_path
+                event.save()
+        except Exception as e:
+            outputs_processed["onedrive"] = {"status": "failed", "error": str(e)}
+
+            if event:
+                event.output_delivery["onedrive_status"] = "failed"
+                event.output_delivery["onedrive_error"] = str(e)
+                event.save()
+
+    # 3. Notifications (email + Teams)
     notifications = output_config.get("notifications", [])
     for notification in notifications:
         try:
             if should_send_notification(result, notification):
-                send_workflow_notification(result, notification)
-                
+                send_workflow_notification(result, notification, work_item=work_item)
+
                 notification_result = {
                     "channel": notification.get("channel"),
                     "recipients": notification.get("recipients"),
@@ -291,7 +318,7 @@ def process_outputs(workflow_result_id):
                     "status": "sent"
                 }
                 outputs_processed["notifications"].append(notification_result)
-                
+
                 if event:
                     event.output_delivery["notifications_sent"].append(notification_result)
                     event.save()
@@ -302,11 +329,21 @@ def process_outputs(workflow_result_id):
                 "error": str(e)
             }
             outputs_processed["notifications"].append(notification_result)
-            
+
             if event:
                 event.output_delivery["notifications_sent"].append(notification_result)
                 event.save()
-    
+
+    # 4. Update WorkItem status to reflect completion
+    if work_item and result.status == "completed":
+        work_item.status = "completed"
+        work_item.updated_at = datetime.utcnow()
+        work_item.save()
+    elif work_item and result.status == "failed":
+        work_item.status = "failed"
+        work_item.updated_at = datetime.utcnow()
+        work_item.save()
+
     return outputs_processed
 
 

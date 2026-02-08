@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% block title %}M365 Dashboard - Vandalizer{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1400px; margin: 40px auto; padding: 0 30px;">
+    <div class="dashboard-header" style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px;">
+        <div>
+            <h1 style="font-size: 32px; font-weight: 700; margin-bottom: 10px;">
+                <i class="fa-solid fa-envelope-open-text"></i> M365 Dashboard
+            </h1>
+            <p style="color: #6b7280; font-size: 14px;">
+                Monitor your Microsoft 365 intake lanes, work items, and processing status.
+            </p>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            {% if connection.connected %}
+            <span class="connection-badge connected">
+                <i class="fa-solid fa-check-circle"></i> M365 Connected
+            </span>
+            {% else %}
+            <a href="/office/connect/graph-connect" class="btn btn-primary" style="font-size: 14px;">
+                <i class="fa-solid fa-plug"></i> Connect M365
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 40px;">
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);">
+                <i class="fa-solid fa-inbox"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Active Intakes</div>
+                <div class="stat-value">{{ stats.active_intakes }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);">
+                <i class="fa-solid fa-check-circle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Completed Today</div>
+                <div class="stat-value">{{ stats.today_completed }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Awaiting Review</div>
+                <div class="stat-value">{{ stats.awaiting_review }}</div>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon" style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);">
+                <i class="fa-solid fa-exclamation-triangle"></i>
+            </div>
+            <div class="stat-content">
+                <div class="stat-label">Failed Today</div>
+                <div class="stat-value">{{ stats.today_failed }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Intake Lanes -->
+    <div class="dashboard-section" style="margin-bottom: 30px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 class="section-title" style="margin-bottom: 0;">
+                <i class="fa-solid fa-tower-broadcast"></i> Intake Lanes
+            </h2>
+            {% if connection.connected %}
+            <a href="/office/intakes" class="btn-secondary-small">
+                <i class="fa-solid fa-plus"></i> New Intake
+            </a>
+            {% endif %}
+        </div>
+
+        {% if intakes|length == 0 %}
+        <div class="empty-state">
+            <i class="fa-solid fa-inbox" style="font-size: 48px; color: #d1d5db; margin-bottom: 16px;"></i>
+            <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">No Intake Lanes Configured</h3>
+            <p style="color: #6b7280; margin-bottom: 20px;">
+                {% if connection.connected %}
+                Create an intake lane to start monitoring an Outlook mailbox or OneDrive folder.
+                {% else %}
+                Connect your Microsoft 365 account to get started.
+                {% endif %}
+            </p>
+        </div>
+        {% else %}
+        <div class="intakes-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 16px;">
+            {% for intake in intakes %}
+            <div class="intake-card">
+                <div class="intake-card-header">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        {% if intake.intake_type == 'outlook_folder' %}
+                        <i class="fa-solid fa-envelope" style="color: #0078d4; font-size: 18px;"></i>
+                        {% elif intake.intake_type == 'outlook_shared' %}
+                        <i class="fa-solid fa-envelopes-bulk" style="color: #0078d4; font-size: 18px;"></i>
+                        {% else %}
+                        <i class="fa-solid fa-cloud" style="color: #0078d4; font-size: 18px;"></i>
+                        {% endif %}
+                        <div>
+                            <h4 style="font-weight: 600; margin: 0;">{{ intake.name }}</h4>
+                            <span style="font-size: 12px; color: #6b7280;">{{ intake.intake_type | replace('_', ' ') | title }}</span>
+                        </div>
+                    </div>
+                    <span class="intake-status {{ 'active' if intake.enabled else 'inactive' }}">
+                        {{ 'Active' if intake.enabled else 'Paused' }}
+                    </span>
+                </div>
+                <div class="intake-card-body">
+                    {% if intake.mailbox_address %}
+                    <div class="intake-detail"><strong>Mailbox:</strong> {{ intake.mailbox_address }}</div>
+                    {% endif %}
+                    {% if intake.folder_path %}
+                    <div class="intake-detail"><strong>Folder:</strong> {{ intake.folder_path }}</div>
+                    {% endif %}
+                    {% if intake.default_workflow %}
+                    <div class="intake-detail"><strong>Workflow:</strong> {{ intake.default_workflow.name }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Work Items -->
+    <div class="dashboard-section">
+        <h2 class="section-title">
+            <i class="fa-solid fa-list-check"></i> Recent Work Items
+        </h2>
+
+        {% if work_items|length == 0 %}
+        <div class="empty-state-small">
+            <p style="color: #9ca3af; text-align: center;">No work items yet</p>
+        </div>
+        {% else %}
+        <div class="events-table">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th class="th-style">STATUS</th>
+                        <th class="th-style">SUBJECT</th>
+                        <th class="th-style">SOURCE</th>
+                        <th class="th-style">CATEGORY</th>
+                        <th class="th-style">RECEIVED</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in work_items %}
+                    <tr style="border-bottom: 1px solid #f3f4f6;">
+                        <td style="padding: 12px;">
+                            {% if item.status == 'completed' %}
+                            <span class="status-badge status-success"><i class="fa-solid fa-check-circle"></i> Done</span>
+                            {% elif item.status == 'failed' %}
+                            <span class="status-badge status-error"><i class="fa-solid fa-times-circle"></i> Failed</span>
+                            {% elif item.status == 'awaiting_review' %}
+                            <span class="status-badge status-review"><i class="fa-solid fa-eye"></i> Review</span>
+                            {% elif item.status == 'processing' %}
+                            <span class="status-badge status-running"><i class="fa-solid fa-spinner fa-spin"></i> Processing</span>
+                            {% elif item.status == 'triaged' %}
+                            <span class="status-badge status-pending"><i class="fa-solid fa-tag"></i> Triaged</span>
+                            {% else %}
+                            <span class="status-badge">{{ item.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px;">
+                            <a href="/office/workitems/{{ item.uuid }}" style="font-weight: 500; color: #1f2937; text-decoration: none;">
+                                {{ item.subject or '(no subject)' }}
+                            </a>
+                            {% if item.sensitivity_flags %}
+                            <span style="color: #dc2626; font-size: 11px; margin-left: 6px;">
+                                <i class="fa-solid fa-shield-halved"></i> {{ item.sensitivity_flags | join(', ') }}
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 12px; color: #6b7280; font-size: 13px;">
+                            {{ item.source | replace('_', ' ') | title }}
+                        </td>
+                        <td style="padding: 12px; font-size: 13px;">
+                            {{ item.triage_category or '-' }}
+                        </td>
+                        <td style="padding: 12px; color: #6b7280; font-size: 13px;">
+                            {{ item.received_at.strftime('%b %d, %I:%M %p') if item.received_at else item.created_at.strftime('%b %d, %I:%M %p') if item.created_at else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+    .stat-card {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .stat-icon {
+        width: 60px; height: 60px; border-radius: 12px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 24px; color: #374151;
+    }
+    .stat-label { font-size: 13px; color: #6b7280; font-weight: 500; margin-bottom: 4px; }
+    .stat-value { font-size: 32px; font-weight: 700; color: #1f2937; }
+    .dashboard-section {
+        background: white; border-radius: 12px; padding: 30px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .section-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #1f2937; }
+    .connection-badge {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    }
+    .connection-badge.connected { background: #d1fae5; color: #065f46; }
+    .intake-card {
+        border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px;
+    }
+    .intake-card-header {
+        display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .intake-card-body { font-size: 13px; color: #4b5563; }
+    .intake-detail { margin-bottom: 4px; }
+    .intake-status {
+        display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+    }
+    .intake-status.active { background: #d1fae5; color: #065f46; }
+    .intake-status.inactive { background: #f3f4f6; color: #6b7280; }
+    .th-style {
+        text-align: left; padding: 12px; border-bottom: 2px solid #e5e7eb;
+        font-size: 12px; font-weight: 600; color: #6b7280;
+    }
+    .status-badge {
+        display: inline-block; padding: 4px 12px; border-radius: 12px;
+        font-size: 12px; font-weight: 500;
+    }
+    .status-success { background: #d1fae5; color: #065f46; }
+    .status-error { background: #fee2e2; color: #991b1b; }
+    .status-review { background: #fef3c7; color: #92400e; }
+    .status-running { background: #dbeafe; color: #1e40af; }
+    .status-pending { background: #f3f4f6; color: #374151; }
+    .empty-state { text-align: center; padding: 60px 20px; color: #9ca3af; }
+    .empty-state-small { padding: 40px 20px; }
+    .btn-secondary-small {
+        background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+        padding: 6px 12px; border-radius: 6px; cursor: pointer;
+        font-size: 13px; font-weight: 500; text-decoration: none; display: inline-block;
+    }
+    .btn-secondary-small:hover { background: #e5e7eb; }
+</style>
+{% endblock %}

@@ -337,7 +337,7 @@ def triage_work_item(work_item_id: str) -> dict:
         if result.sensitivity_flags and result.suggested_action == "review":
             work_item.status = "awaiting_review"
             work_item.save()
-            # Teams notification will be sent by the notification layer
+            _notify_teams_hold(work_item)
             return {
                 "status": "awaiting_review",
                 "reason": f"Sensitivity flags: {result.sensitivity_flags}",
@@ -377,6 +377,28 @@ def triage_work_item(work_item_id: str) -> dict:
         "workflow": workflow.name,
         "trigger_event": event.uuid,
     }
+
+
+def _notify_teams_hold(work_item: WorkItem) -> None:
+    """Send a Teams card when a work item is held for human review."""
+    intake = work_item.intake_config
+    if not intake:
+        return
+    teams_cfg = intake.teams_config or {}
+    if not teams_cfg.get("enabled"):
+        return
+    team_id = teams_cfg.get("team_id")
+    channel_id = teams_cfg.get("channel_id")
+    if not team_id or not channel_id:
+        return
+    try:
+        from app.utilities.teams_cards import build_work_item_card
+
+        card = build_work_item_card(work_item)
+        client = GraphClient(work_item.owner_user_id)
+        client.send_channel_message(team_id, channel_id, card_json=card)
+    except Exception as e:
+        logger.warning(f"Failed to send Teams hold notification: {e}")
 
 
 def _match_workflow(work_item: WorkItem, intake: IntakeConfig) -> Workflow | None:

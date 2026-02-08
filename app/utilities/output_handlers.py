@@ -11,7 +11,7 @@ from flask import render_template
 from flask_mail import Message
 
 from app import app, mail
-from app.models import WorkflowResult, SmartDocument, SmartFolder, Workflow
+from app.models import WorkflowResult, SmartDocument, SmartFolder, Workflow, WorkItem
 
 
 def save_results_to_folder(result, storage_config):
@@ -165,18 +165,21 @@ def should_send_notification(result, notification):
     return True
 
 
-def send_workflow_notification(result, notification):
+def send_workflow_notification(result, notification, work_item=None):
     """
-    Send email notification for workflow completion.
-    
+    Send notification for workflow completion.
+
     Args:
         result: WorkflowResult instance
         notification: Dict with channel, recipients, settings
+        work_item: Optional WorkItem instance (for M365 Teams notifications)
     """
-    
+
     channel = notification.get("channel", "email")
+    if channel == "teams":
+        _send_teams_notification(result, notification, work_item)
+        return
     if channel != "email":
-        # MVP only supports email
         return
     
     # Build recipient list
@@ -237,6 +240,84 @@ def send_workflow_notification(result, notification):
     )
     
     mail.send(msg)
+
+
+def save_results_to_onedrive_channel(result, onedrive_config, work_item=None):
+    """Save workflow results to a OneDrive case folder.
+
+    Args:
+        result: WorkflowResult instance.
+        onedrive_config: Dict with drive_id, base_path, etc.
+        work_item: Optional WorkItem instance. If None, tries to find one
+            via the trigger event.
+
+    Returns:
+        The case folder path string.
+    """
+    if not work_item:
+        event = result.trigger_event
+        if event:
+            work_item = WorkItem.objects(trigger_event=event).first()
+    if not work_item:
+        raise ValueError("No WorkItem available for OneDrive output")
+
+    from app.utilities.onedrive_output import save_results_to_onedrive
+
+    return save_results_to_onedrive(result, work_item, onedrive_config)
+
+
+def _send_teams_notification(result, notification, work_item=None):
+    """Send a Teams Adaptive Card notification for a workflow result.
+
+    Args:
+        result: WorkflowResult instance.
+        notification: Dict with team_id, channel_id settings.
+        work_item: Optional WorkItem for richer card content.
+    """
+    team_id = notification.get("team_id")
+    channel_id = notification.get("channel_id")
+    if not team_id or not channel_id:
+        return
+
+    # Resolve work item if not provided
+    if not work_item:
+        event = result.trigger_event
+        if event:
+            work_item = WorkItem.objects(trigger_event=event).first()
+
+    # Determine which card to build
+    from app.utilities.teams_cards import build_work_item_card, build_exception_card
+
+    if result.status == "failed":
+        error = str(result.final_output.get("error", "Unknown error")) if result.final_output else "Unknown error"
+        if work_item:
+            card = build_exception_card(work_item, error)
+        else:
+            return  # Can't build a useful card without a work item
+    elif work_item:
+        card = build_work_item_card(work_item, result=result)
+    else:
+        return
+
+    # Find a user_id to authenticate the Graph call
+    user_id = None
+    if work_item:
+        user_id = work_item.owner_user_id
+    if not user_id:
+        user_id = result.workflow.user_id if result.workflow else None
+    if not user_id:
+        return
+
+    try:
+        from app.utilities.graph_client import GraphClient
+
+        client = GraphClient(user_id)
+        client.send_channel_message(team_id, channel_id, card_json=card)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"Failed to send Teams notification for result {result.id}"
+        )
 
 
 def call_webhook(result, webhook_config):

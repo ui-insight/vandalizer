@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Intake Lanes - Vandalizer{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px; margin: 40px auto; padding: 0 30px;">
+
+    <!-- Breadcrumb -->
+    <div style="margin-bottom: 20px; font-size: 13px; color: #6b7280;">
+        <a href="/office/dashboard" style="color: #6b7280; text-decoration: none;">M365 Dashboard</a>
+        <span style="margin: 0 8px;">/</span>
+        <span>Intake Lanes</span>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1 style="font-size: 28px; font-weight: 700;">
+            <i class="fa-solid fa-tower-broadcast"></i> Intake Lanes
+        </h1>
+    </div>
+
+    <!-- Create New Intake -->
+    <div class="form-section" style="margin-bottom: 30px;">
+        <h2 class="section-title">Create Intake Lane</h2>
+        <form method="POST" action="/office/intakes" id="intake-form">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-input" placeholder="e.g. Admissions Inbox" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Type</label>
+                    <select name="intake_type" class="form-input" id="intake-type" required>
+                        <option value="outlook_shared">Shared Mailbox</option>
+                        <option value="outlook_folder">Outlook Folder</option>
+                        <option value="onedrive_drop">OneDrive Drop Folder</option>
+                    </select>
+                </div>
+
+                <!-- Mailbox fields -->
+                <div class="form-group mailbox-field">
+                    <label class="form-label">Mailbox Address</label>
+                    <input type="email" name="mailbox_address" class="form-input"
+                           placeholder="shared-mailbox@university.edu">
+                </div>
+
+                <div class="form-group mailbox-field">
+                    <label class="form-label">Folder Name</label>
+                    <input type="text" name="folder_name" class="form-input"
+                           placeholder="Inbox" value="Inbox">
+                </div>
+
+                <!-- OneDrive fields -->
+                <div class="form-group drive-field" style="display: none;">
+                    <label class="form-label">Folder Path</label>
+                    <input type="text" name="folder_path" class="form-input"
+                           placeholder="/Vandalizer/Drop">
+                </div>
+
+                <div class="form-group drive-field" style="display: none;">
+                    <label class="form-label">Drive ID (optional)</label>
+                    <input type="text" name="drive_id" class="form-input"
+                           placeholder="Leave blank for user's default drive">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Default Workflow</label>
+                    <select name="default_workflow_id" class="form-input">
+                        <option value="">-- Select workflow --</option>
+                        {% for wf in workflows %}
+                        <option value="{{ wf.id }}">{{ wf.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Team ID (optional)</label>
+                    <input type="text" name="team_id" class="form-input"
+                           placeholder="For team-scoped access">
+                </div>
+            </div>
+
+            <!-- Teams notification -->
+            <div style="margin-top: 16px; padding: 16px; background: #f9fafb; border-radius: 8px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                    <input type="checkbox" name="teams_enabled" id="teams-toggle">
+                    Enable Teams notifications
+                </label>
+                <div id="teams-fields" style="display: none; margin-top: 12px;">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="form-label">Teams Team ID</label>
+                            <input type="text" name="teams_team_id" class="form-input">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Teams Channel ID</label>
+                            <input type="text" name="teams_channel_id" class="form-input">
+                        </div>
+                    </div>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-top: 8px; cursor: pointer;">
+                        <input type="checkbox" name="teams_daily_digest" checked>
+                        Send daily digest
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-plus"></i> Create Intake Lane
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Existing Intakes -->
+    {% if intakes|length > 0 %}
+    <div class="form-section">
+        <h2 class="section-title">Configured Intakes</h2>
+        {% for intake in intakes %}
+        <div class="intake-row">
+            <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
+                    {% if intake.intake_type == 'outlook_shared' %}
+                    <i class="fa-solid fa-envelopes-bulk" style="color: #0078d4;"></i>
+                    {% elif intake.intake_type == 'outlook_folder' %}
+                    <i class="fa-solid fa-envelope" style="color: #0078d4;"></i>
+                    {% else %}
+                    <i class="fa-solid fa-cloud" style="color: #0078d4;"></i>
+                    {% endif %}
+                    <strong>{{ intake.name }}</strong>
+                    <span class="intake-status {{ 'active' if intake.enabled else 'inactive' }}">
+                        {{ 'Active' if intake.enabled else 'Paused' }}
+                    </span>
+                </div>
+                <div style="font-size: 12px; color: #6b7280;">
+                    {{ intake.intake_type | replace('_', ' ') | title }}
+                    {% if intake.mailbox_address %} &middot; {{ intake.mailbox_address }}{% endif %}
+                    {% if intake.folder_path %} &middot; {{ intake.folder_path }}{% endif %}
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                {% if intake.enabled %}
+                <form method="POST" action="/office/intakes/{{ intake.uuid }}/disable" style="display: inline;">
+                    <button type="submit" class="btn-secondary-small">Pause</button>
+                </form>
+                {% else %}
+                <form method="POST" action="/office/intakes/{{ intake.uuid }}/enable" style="display: inline;">
+                    <button type="submit" class="btn-secondary-small" style="color: #065f46;">Enable</button>
+                </form>
+                {% endif %}
+                <form method="DELETE" action="/office/intakes/{{ intake.uuid }}" style="display: inline;"
+                      onsubmit="return confirm('Delete this intake lane?');">
+                    <button type="submit" class="btn-secondary-small" style="color: #991b1b;">Delete</button>
+                </form>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+<style>
+    .form-section {
+        background: white; border-radius: 12px; padding: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    .section-title { font-size: 18px; font-weight: 600; margin-bottom: 16px; color: #1f2937; }
+    .form-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+    }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; }
+    .form-label { font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 4px; }
+    .form-input {
+        padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 6px;
+        font-size: 14px; color: #1f2937; background: white;
+    }
+    .form-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .intake-row {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 16px 0; border-bottom: 1px solid #f3f4f6;
+    }
+    .intake-row:last-child { border-bottom: none; }
+    .intake-status {
+        display: inline-block; padding: 2px 8px; border-radius: 10px;
+        font-size: 11px; font-weight: 600;
+    }
+    .intake-status.active { background: #d1fae5; color: #065f46; }
+    .intake-status.inactive { background: #f3f4f6; color: #6b7280; }
+    .btn-secondary-small {
+        background: #f3f4f6; color: #374151; border: 1px solid #d1d5db;
+        padding: 6px 12px; border-radius: 6px; cursor: pointer;
+        font-size: 13px; font-weight: 500;
+    }
+    .btn-secondary-small:hover { background: #e5e7eb; }
+</style>
+
+<script>
+    // Toggle mailbox/drive fields based on type
+    const typeSelect = document.getElementById('intake-type');
+    const mailboxFields = document.querySelectorAll('.mailbox-field');
+    const driveFields = document.querySelectorAll('.drive-field');
+
+    typeSelect.addEventListener('change', function() {
+        const isDrive = this.value === 'onedrive_drop';
+        mailboxFields.forEach(f => f.style.display = isDrive ? 'none' : '');
+        driveFields.forEach(f => f.style.display = isDrive ? '' : 'none');
+    });
+
+    // Toggle Teams fields
+    const teamsToggle = document.getElementById('teams-toggle');
+    const teamsFields = document.getElementById('teams-fields');
+    teamsToggle.addEventListener('change', function() {
+        teamsFields.style.display = this.checked ? 'block' : 'none';
+    });
+</script>
+{% endblock %}

@@ -20,7 +20,7 @@ from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user
 from flask_mail import Mail
 
-from app.oauth import configure_azure_blueprint
+from app.oauth import configure_azure_blueprint, configure_graph_consent_blueprint
 from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
 
 CURRENT_RELEASE_VERSION = "3.2.01"  # Update this when you have a new release.
@@ -73,6 +73,16 @@ def create_app() -> Flask:
                 },
                 "cleanup-old-trigger-events": {
                     "task": "tasks.passive.cleanup_old_trigger_events",
+                    "schedule": 86400.0,  # Daily
+                },
+                # M365: renew Graph webhook subscriptions every 12 hours
+                "renew-graph-subscriptions": {
+                    "task": "tasks.passive.renew_graph_subscriptions",
+                    "schedule": 43200.0,  # 12 hours
+                },
+                # M365: daily digest summary to Teams channels
+                "send-daily-digest": {
+                    "task": "tasks.passive.send_daily_digest",
                     "schedule": 86400.0,  # Daily
                 },
             },
@@ -241,6 +251,9 @@ if azure_bp:
     from app.oauth import azure_blueprint
 
     limiter.exempt(azure_blueprint)
+
+# Register Graph consent blueprint for M365 integration (separate from login)
+graph_bp = configure_graph_consent_blueprint(app)
 
 # Point the login view to the local blueprint's login function (always available path)
 login_manager.login_view = "auth.login"
