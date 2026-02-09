@@ -8,6 +8,7 @@
     var current_space_id = "{{ current_space_id }}"
     var workflow_elapsed_time = 0;
     var workflow_session_id = "";
+    var workflow_result_id = null;
     var workflow_start_time_ms = null;
 
     var workflow_time = 0;
@@ -618,6 +619,9 @@
         if (snapshot.session_id) {
             workflow_session_id = snapshot.session_id;
         }
+        if (snapshot.workflow_result_id) {
+            workflow_result_id = snapshot.workflow_result_id;
+        }
 
         $outputContainer.removeClass("hidden").addClass("active");
         $outputContainer.find(".step-connector").addClass("active");
@@ -625,6 +629,7 @@
 
         $outputSection.show().empty().append(html);
         configureWorkflowDownloadButton();
+        configureValidateButton();
         $(".workflow-output-buttons").removeClass("hidden");
 
         const stepsCompleted =
@@ -2414,6 +2419,7 @@
         });
 
         configureWorkflowDownloadButton();
+        configureValidateButton();
         wireWorkflowDownloadOptions();
     }
 
@@ -2660,6 +2666,11 @@
             async: true,
             success: function (data) {
                 console.log("Workflow run response:", data);
+
+                // Track workflow result ID for validation
+                if (data.workflow_result_id) {
+                    workflow_result_id = data.workflow_result_id;
+                }
 
                 // Track the activity without leaving the page
                 if (data.activity_id) {
@@ -2926,6 +2937,11 @@
                         trailingLabel: trailingLabel,
                     });
 
+                    // Capture workflow_result_id from status response
+                    if (data.workflow_result_id) {
+                        workflow_result_id = data.workflow_result_id;
+                    }
+
                     window.__workflowSnapshot = {
                         output: data.output ?? null,
                         steps_completed: steps_completed,
@@ -2991,6 +3007,7 @@
                     $('.workflow-output').addClass('active');
 
                     configureWorkflowDownloadButton();
+                    configureValidateButton();
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -3064,6 +3081,264 @@
 
             showWorkflowDownloadMenu($(this));
         });
+    }
+
+    // ── Workflow Validation ──────────────────────────────────────────────
+
+    function configureValidateButton() {
+        const $btn = $('#validateWorkflowBtn');
+        if ($btn.length === 0) return;
+
+        $btn.off('click.workflow-validate').on('click.workflow-validate', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            validateWorkflow();
+        });
+
+        $('#closeValidationReportBtn').off('click').on('click', function () {
+            $('#validation-report-section').addClass('hidden');
+        });
+    }
+
+    function validateWorkflow() {
+        if (!current_workflow_id) {
+            showToast('No workflow selected.');
+            return;
+        }
+        if (!workflow_result_id) {
+            showToast('Run the workflow first before validating.');
+            return;
+        }
+
+        const $section = $('#validation-report-section');
+        $section.removeClass('hidden');
+        $('#validation-grade-badge').attr('class', 'validation-grade-badge').text('');
+        $('#validation-summary').empty();
+        $('#validation-checks').empty().html(
+            '<div class="validation-running"><span class="workflow-loader"></span>Generating evaluation plan...</div>'
+        );
+
+        // Step 1: generate evaluation plan
+        $.ajax({
+            url: `/workflows/workflow/${encodeURIComponent(current_workflow_id)}/generate-eval-plan`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ coverage_level: 'standard' }),
+            dataType: 'json',
+            success: function (res) {
+                if (res.task_id) {
+                    pollEvalPlanStatus(res.task_id);
+                } else if (res.plan_id) {
+                    runValidation(res.plan_id);
+                } else {
+                    showValidationError('Unexpected response from plan generation.');
+                }
+            },
+            error: function (xhr) {
+                showValidationError(xhr.responseJSON?.error || 'Failed to generate evaluation plan.');
+            },
+        });
+    }
+
+    function pollEvalPlanStatus(taskId) {
+        let attempts = 0;
+        const maxAttempts = 120;
+
+        const timer = setInterval(function () {
+            attempts++;
+            if (attempts > maxAttempts) {
+                clearInterval(timer);
+                showValidationError('Plan generation timed out.');
+                return;
+            }
+
+            $.ajax({
+                url: `/workflows/eval-plan/status/${encodeURIComponent(taskId)}`,
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    const state = (res.state || '').toUpperCase();
+                    if (state === 'SUCCESS') {
+                        clearInterval(timer);
+                        const planId = res.result?.plan_id;
+                        if (planId) {
+                            $('#validation-checks').html(
+                                '<div class="validation-running"><span class="workflow-loader"></span>Running validation checks...</div>'
+                            );
+                            runValidation(planId);
+                        } else {
+                            showValidationError('Plan generated but no plan ID returned.');
+                        }
+                    } else if (state === 'FAILURE') {
+                        clearInterval(timer);
+                        showValidationError(res.error || 'Plan generation failed.');
+                    }
+                },
+                error: function () {
+                    // Keep polling on network errors
+                },
+            });
+        }, 2000);
+    }
+
+    function runValidation(planId) {
+        $.ajax({
+            url: `/workflows/workflow-runs/${encodeURIComponent(workflow_result_id)}/validate`,
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ plan_id: planId }),
+            dataType: 'json',
+            success: function (res) {
+                if (res.task_id) {
+                    pollValidationStatus(res.task_id);
+                } else {
+                    showValidationError('Unexpected response from validation.');
+                }
+            },
+            error: function (xhr) {
+                showValidationError(xhr.responseJSON?.error || 'Failed to start validation.');
+            },
+        });
+    }
+
+    function pollValidationStatus(taskId) {
+        let attempts = 0;
+        const maxAttempts = 180;
+
+        const timer = setInterval(function () {
+            attempts++;
+            if (attempts > maxAttempts) {
+                clearInterval(timer);
+                showValidationError('Validation timed out.');
+                return;
+            }
+
+            $.ajax({
+                url: `/workflows/validation/status/${encodeURIComponent(taskId)}`,
+                type: 'GET',
+                dataType: 'json',
+                success: function (res) {
+                    const state = (res.state || '').toUpperCase();
+                    if (state === 'SUCCESS') {
+                        clearInterval(timer);
+                        fetchValidationReport();
+                    } else if (state === 'FAILURE') {
+                        clearInterval(timer);
+                        showValidationError(res.error || 'Validation failed.');
+                    }
+                },
+                error: function () {
+                    // Keep polling on network errors
+                },
+            });
+        }, 2000);
+    }
+
+    function fetchValidationReport() {
+        $.ajax({
+            url: `/workflows/workflow-runs/${encodeURIComponent(workflow_result_id)}/validation-report`,
+            type: 'GET',
+            dataType: 'json',
+            success: function (data) {
+                displayValidationReport(data);
+            },
+            error: function (xhr) {
+                showValidationError(xhr.responseJSON?.error || 'Failed to fetch validation report.');
+            },
+        });
+    }
+
+    function displayValidationReport(data) {
+        const grade = data.grade || '?';
+        const score = data.overall_score != null ? Math.round(data.overall_score) : '?';
+        const gradeClass = 'grade-' + grade.toLowerCase().charAt(0);
+
+        // Grade badge
+        const $badge = $('#validation-grade-badge');
+        $badge.attr('class', 'validation-grade-badge ' + gradeClass);
+        $badge.text(grade + ' (' + score + '%)');
+
+        // Summary counts
+        const $summary = $('#validation-summary');
+        $summary.empty();
+        const counts = [
+            { label: 'Passed', value: data.num_passed || 0, cls: 'pass' },
+            { label: 'Failed', value: data.num_failed || 0, cls: 'fail' },
+            { label: 'Warnings', value: data.num_warned || 0, cls: 'warn' },
+            { label: 'Skipped', value: data.num_skipped || 0, cls: 'skip' },
+        ];
+        counts.forEach(function (c) {
+            $summary.append(
+                '<div class="validation-summary-item">' +
+                '<span class="dot dot-' + c.cls + '"></span>' +
+                '<span>' + c.value + ' ' + c.label + '</span>' +
+                '</div>'
+            );
+        });
+
+        // Check results
+        const $checks = $('#validation-checks');
+        $checks.empty();
+        const results = data.check_results || [];
+        if (results.length === 0) {
+            $checks.html('<div style="padding: 8px; color: #888;">No checks found.</div>');
+            return;
+        }
+
+        results.forEach(function (check) {
+            const status = (check.status || 'SKIP').toUpperCase();
+            const statusLabel = status === 'NEEDS_INVESTIGATION' ? 'REVIEW' : status;
+            const statusClass = status === 'PASS' ? 'pass'
+                : status === 'FAIL' ? 'fail'
+                : status === 'WARN' ? 'warn'
+                : 'skip';
+
+            const severity = check.severity || '';
+            const description = check.description || check.check_id || 'Check';
+            const evidence = check.evidence || '';
+            const reasoning = check.reasoning || '';
+            const fixSuggestion = check.fix_suggestion || '';
+
+            let detailHtml = '';
+            if (evidence) {
+                detailHtml += '<div class="validation-check-evidence">' + escapeHtml(evidence) + '</div>';
+            }
+            if (reasoning && status !== 'PASS') {
+                detailHtml += '<div class="validation-check-evidence" style="color:#888;">' + escapeHtml(reasoning) + '</div>';
+            }
+            if (fixSuggestion && (status === 'FAIL' || status === 'WARN')) {
+                detailHtml += '<div class="validation-check-evidence" style="color:#b45309;">Fix: ' + escapeHtml(fixSuggestion) + '</div>';
+            }
+
+            $checks.append(
+                '<div class="validation-check-row check-' + statusClass + '">' +
+                '<div class="validation-check-status status-' + statusClass + '">' + statusLabel + '</div>' +
+                '<div class="validation-check-body">' +
+                '<div class="validation-check-desc">' + escapeHtml(description) + '</div>' +
+                detailHtml +
+                '</div>' +
+                '<div class="validation-check-severity">' + escapeHtml(severity) + '</div>' +
+                '</div>'
+            );
+        });
+
+        // Scroll to report
+        const $workflowContainer = $('.workflow-container');
+        if ($workflowContainer.length > 0) {
+            $workflowContainer.animate({ scrollTop: $workflowContainer[0].scrollHeight }, 'slow');
+        }
+    }
+
+    function showValidationError(msg) {
+        const $checks = $('#validation-checks');
+        $checks.html('<div style="padding: 8px; color: #dc2626;">' + escapeHtml(msg) + '</div>');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
     }
 
     function wireWorkflowDownloadOptions() {
@@ -5247,6 +5522,7 @@
                         if (html) {
                             $outputSection.removeClass('hidden').show().empty().append(html);
                             configureWorkflowDownloadButton();
+                            configureValidateButton();
                         }
                     }
                 }
