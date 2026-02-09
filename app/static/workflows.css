@@ -511,11 +511,11 @@ h4 {
 
 /* Validation Report */
 .validation-report-section {
-  margin-top: 15px;
-  padding: 15px;
-  background-color: #fff;
+  margin-top: 0;
+  padding: 20px;
+  background-color: #f9fafb;
   border-radius: var(--ui-radius, 12px);
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e5e7eb;
 }
 
 .validation-report-header {

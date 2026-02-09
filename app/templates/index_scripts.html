@@ -629,7 +629,6 @@
 
         $outputSection.show().empty().append(html);
         configureWorkflowDownloadButton();
-        configureValidateButton();
         $(".workflow-output-buttons").removeClass("hidden");
 
         const stepsCompleted =
@@ -3007,7 +3006,6 @@
                     $('.workflow-output').addClass('active');
 
                     configureWorkflowDownloadButton();
-                    configureValidateButton();
                 }
             },
             error: function (xhr, ajaxOptions, thrownError) {
@@ -3094,10 +3092,6 @@
             e.stopPropagation();
             validateWorkflow();
         });
-
-        $('#closeValidationReportBtn').off('click').on('click', function () {
-            $('#validation-report-section').addClass('hidden');
-        });
     }
 
     function validateWorkflow() {
@@ -3110,6 +3104,8 @@
             return;
         }
 
+        // Show the report section, hide the empty state
+        $('#validation-empty-state').hide();
         const $section = $('#validation-report-section');
         $section.removeClass('hidden');
         $('#validation-grade-badge').attr('class', 'validation-grade-badge').text('');
@@ -3322,11 +3318,18 @@
             );
         });
 
-        // Scroll to report
-        const $workflowContainer = $('.workflow-container');
-        if ($workflowContainer.length > 0) {
-            $workflowContainer.animate({ scrollTop: $workflowContainer[0].scrollHeight }, 'slow');
+        // Scroll to top of report
+        const $tabValidate = $('#tab-validate');
+        if ($tabValidate.length > 0) {
+            $tabValidate.animate({ scrollTop: 0 }, 'slow');
         }
+
+        // Update the validate tab badge with the grade
+        const $tabBadge = $('#validate-tab-badge');
+        $tabBadge.text(grade).css({
+            'background': gradeClass === 'grade-a' ? '#dcfce7' : gradeClass === 'grade-b' ? '#ecfccb' : gradeClass === 'grade-c' ? '#fef9c3' : gradeClass === 'grade-d' ? '#ffedd5' : '#fee2e2',
+            'color': gradeClass === 'grade-a' ? '#166534' : gradeClass === 'grade-b' ? '#3f6212' : gradeClass === 'grade-c' ? '#854d0e' : gradeClass === 'grade-d' ? '#9a3412' : '#991b1b'
+        }).show();
     }
 
     function showValidationError(msg) {
@@ -5522,7 +5525,6 @@
                         if (html) {
                             $outputSection.removeClass('hidden').show().empty().append(html);
                             configureWorkflowDownloadButton();
-                            configureValidateButton();
                         }
                     }
                 }
