@@ -224,6 +224,83 @@ class WorkflowResult(me.Document):
     current_step_preview = me.StringField(required=False)
 
 
+class EvaluationPlan(me.Document):
+    """Evaluation plan generated for a workflow. Contains a checklist of validation checks."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE, required=True)
+
+    coverage_level = me.StringField(
+        default="standard",
+        choices=["quick", "standard", "exhaustive"],
+        max_length=20,
+    )
+    model_used = me.StringField(required=False, max_length=200)
+
+    # Each check dict: check_id, check_type, target_step, target_field, description,
+    # severity (must/should/nice), weight, deterministic, validation_rule, llm_prompt
+    checks = me.ListField(me.DictField(), default=[])
+    num_checks = me.IntField(default=0)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(timezone.utc)
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "collection": "evaluation_plans",
+        "indexes": [
+            {"fields": ["workflow"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
+
+
+class EvaluationRun(me.Document):
+    """Execution of an evaluation plan against a specific workflow result."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    plan = me.ReferenceField("EvaluationPlan", reverse_delete_rule=CASCADE, required=True)
+    workflow_result = me.ReferenceField(
+        "WorkflowResult", reverse_delete_rule=CASCADE, required=True
+    )
+
+    status = me.StringField(
+        default="pending",
+        choices=["pending", "running", "completed", "failed"],
+        max_length=20,
+    )
+
+    # Each result dict: check_id, status, confidence, evidence, reasoning, fix_suggestion
+    check_results = me.ListField(me.DictField(), default=[])
+
+    overall_score = me.FloatField(default=0.0)
+    grade = me.StringField(default="", max_length=2)
+    num_passed = me.IntField(default=0)
+    num_failed = me.IntField(default=0)
+    num_warned = me.IntField(default=0)
+    num_skipped = me.IntField(default=0)
+
+    model_used = me.StringField(required=False, max_length=200)
+    started_at = me.DateTimeField(required=False)
+    finished_at = me.DateTimeField(required=False)
+    error = me.StringField(required=False, max_length=2000)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(timezone.utc)
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "collection": "evaluation_runs",
+        "indexes": [
+            {"fields": ["workflow_result"]},
+            {"fields": ["plan"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
+
+
 # Teams
 class Team(me.Document):
     """A collaborative group of users."""

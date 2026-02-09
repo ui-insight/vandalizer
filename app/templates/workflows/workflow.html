@@ -97,6 +97,21 @@
         <div class="workflow-output-section"></div>
         <div class="workflow-output-buttons hidden">
             <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
+            <button id="validateWorkflowBtn" class="workflow-output-button btn btn-secondary">Validate</button>
+        </div>
+
+        <div id="validation-report-section" class="validation-report-section hidden">
+            <div class="validation-report-header">
+                <div class="validation-report-title">
+                    <span>Validation Report</span>
+                    <a id="closeValidationReportBtn" style="cursor: pointer; color: #88888899; margin-left: 8px;">
+                        <i class="fa-solid fa-circle-xmark"></i>
+                    </a>
+                </div>
+                <div id="validation-grade-badge" class="validation-grade-badge"></div>
+            </div>
+            <div id="validation-summary" class="validation-summary"></div>
+            <div id="validation-checks" class="validation-checks"></div>
         </div>
 
 

@@ -702,6 +702,7 @@ def workflow_status() -> ResponseReturnValue:
         "output": final_output,
         "status": workflow_result.status,
         "activity_id": activity_id,
+        "workflow_result_id": str(workflow_result.id),
         "started_at": started_at,
         "finished_at": finished_at,
         "duration_seconds": duration_seconds,
@@ -1820,3 +1821,165 @@ def duplicate_workflow(workflow_id):
 
     flash("Workflow duplicated into your space!", "success")
     return redirect(url_for("home.index", sesction="Workflows"))
+
+
+# =========================================================
+# @MARK: ~~ Evaluation / Self-Validation
+# =========================================================
+
+
+@login_required
+@workflows.route("/workflow/<workflow_id>/generate-eval-plan", methods=["POST"])
+def generate_eval_plan(workflow_id: str) -> ResponseReturnValue:
+    """Generate an evaluation plan for a workflow."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    data = request.get_json() or {}
+    coverage_level = data.get("coverage_level", "standard")
+    if coverage_level not in ("quick", "standard", "exhaustive"):
+        coverage_level = "standard"
+
+    from app.utilities.evaluation_tasks import generate_evaluation_plan_task
+
+    async_result = generate_evaluation_plan_task.delay(
+        workflow_id=workflow_id,
+        coverage_level=coverage_level,
+        user_id=user.get_id(),
+    )
+
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
+
+
+@login_required
+@workflows.route("/workflow-runs/<run_id>/validate", methods=["POST"])
+def validate_workflow_run(run_id: str) -> ResponseReturnValue:
+    """Run validation against a completed workflow result."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    workflow_result = WorkflowResult.objects(id=run_id).first()
+    if not workflow_result:
+        return jsonify({"error": "Workflow result not found"}), 404
+
+    if workflow_result.status != "completed":
+        return (
+            jsonify({"error": "Workflow must be completed before validation"}),
+            400,
+        )
+
+    data = request.get_json() or {}
+    plan_id = data.get("plan_id")
+
+    if not plan_id:
+        from app.models import EvaluationPlan
+
+        plan = (
+            EvaluationPlan.objects(workflow=workflow_result.workflow)
+            .order_by("-created_at")
+            .first()
+        )
+        if not plan:
+            return (
+                jsonify(
+                    {"error": "No evaluation plan found. Generate one first."}
+                ),
+                404,
+            )
+        plan_id = str(plan.id)
+
+    from app.utilities.evaluation_tasks import run_validation_task
+
+    async_result = run_validation_task.delay(
+        plan_id=plan_id,
+        workflow_result_id=run_id,
+        user_id=user.get_id(),
+    )
+
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
+
+
+@login_required
+@workflows.route("/workflow-runs/<run_id>/validation-report", methods=["GET"])
+def get_validation_report(run_id: str) -> ResponseReturnValue:
+    """Get the validation report for a workflow run."""
+    from app.models import EvaluationRun
+
+    evaluation_run = (
+        EvaluationRun.objects(workflow_result=run_id)
+        .order_by("-created_at")
+        .first()
+    )
+
+    if not evaluation_run:
+        return jsonify({"error": "No validation report found"}), 404
+
+    return jsonify(
+        {
+            "uuid": evaluation_run.uuid,
+            "status": evaluation_run.status,
+            "overall_score": evaluation_run.overall_score,
+            "grade": evaluation_run.grade,
+            "num_passed": evaluation_run.num_passed,
+            "num_failed": evaluation_run.num_failed,
+            "num_warned": evaluation_run.num_warned,
+            "num_skipped": evaluation_run.num_skipped,
+            "check_results": evaluation_run.check_results,
+            "started_at": evaluation_run.started_at.isoformat()
+            if evaluation_run.started_at
+            else None,
+            "finished_at": evaluation_run.finished_at.isoformat()
+            if evaluation_run.finished_at
+            else None,
+            "model_used": evaluation_run.model_used,
+            "error": evaluation_run.error,
+        }
+    )
+
+
+@workflows.route("/eval-plan/status/<task_id>", methods=["GET"])
+def eval_plan_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of an evaluation plan generation task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {"task_id": task_id, "state": state}
+
+    if result.successful():
+        response["result"] = result.result
+    elif result.failed():
+        response["error"] = str(result.result)
+
+    return jsonify(response)
+
+
+@workflows.route("/validation/status/<task_id>", methods=["GET"])
+def validation_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of a validation run task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {"task_id": task_id, "state": state}
+
+    if result.successful():
+        response["result"] = result.result
+    elif result.failed():
+        response["error"] = str(result.result)
+
+    return jsonify(response)

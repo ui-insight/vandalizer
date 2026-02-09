@@ -62,6 +62,7 @@ def create_app() -> Flask:
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
+                "tasks.evaluation.*": {"queue": "workflows"},
             },
         }
     )
@@ -195,6 +196,7 @@ app.register_blueprint(activity, url_prefix="/activity")
 # This ensures tasks are discovered by Celery workers
 with app.app_context():
     from app.utilities import activity_description  # noqa: F401
+    from app.utilities import evaluation_tasks  # noqa: F401
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
