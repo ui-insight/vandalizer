@@ -41,6 +41,12 @@
             <span id="output-tab-badge" class="tab-badge"
                 style="display: none; background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; font-weight: 600;"></span>
         </button>
+        <button class="workflow-tab" data-tab="validate"
+            style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 500; color: #6b7280; cursor: pointer; transition: all 0.2s;">
+            <i class="fa-solid fa-clipboard-check"></i> Validate
+            <span id="validate-tab-badge" class="tab-badge"
+                style="display: none; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; font-weight: 600;"></span>
+        </button>
     </div>
 
 </div>
@@ -128,7 +134,6 @@
                 <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
             </div>
 
-
         </div>
         <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
             <ul>
@@ -202,6 +207,44 @@
 <div id="tab-output" class="workflow-tab-content"
     style="display: none; background: white; padding: 30px; min-height: calc(100vh - 200px);">
     {% include "workflows/tabs/output_config.html" %}
+</div>
+
+<!-- Validate Tab Content (White Background) -->
+<div id="tab-validate" class="workflow-tab-content"
+    style="display: none; background: white; padding: 30px; min-height: calc(100vh - 200px);">
+    <div class="config-tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h3 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Workflow Validation</h3>
+                <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                    Run automated checks against the latest workflow output to verify quality and correctness.
+                </p>
+            </div>
+            <button id="validateWorkflowBtn" class="btn btn-primary"
+                style="white-space: nowrap;">
+                <i class="fa-solid fa-play" style="margin-right: 6px;"></i> Run Validation
+            </button>
+        </div>
+
+        <div id="validation-report-section" class="validation-report-section hidden">
+            <div class="validation-report-header">
+                <div class="validation-report-title">
+                    <span>Validation Report</span>
+                </div>
+                <div id="validation-grade-badge" class="validation-grade-badge"></div>
+            </div>
+            <div id="validation-summary" class="validation-summary"></div>
+            <div id="validation-checks" class="validation-checks"></div>
+        </div>
+
+        <div id="validation-empty-state" class="validation-empty-state">
+            <div style="text-align: center; padding: 60px 20px; color: #9ca3af;">
+                <i class="fa-solid fa-clipboard-check" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                <p style="font-size: 15px; font-weight: 500; color: #6b7280; margin: 0 0 8px;">No validation results yet</p>
+                <p style="font-size: 13px; margin: 0;">Run the workflow first, then click <b>Run Validation</b> to check the output.</p>
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Include workflow configuration JavaScript -->
