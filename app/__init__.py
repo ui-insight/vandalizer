@@ -23,12 +23,12 @@ from flask_mail import Mail
 from app.oauth import configure_azure_blueprint
 from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
 
-CURRENT_RELEASE_VERSION = "3.2.01"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "3.2.02"  # Update this when you have a new release.
 RELEASE_NOTES = """
 Release 3.2.01:
-- Over 20 bug fixes and tweaks
-- Restored elegant formatting
-- Improved workflow speed and performance
+- Nearly twice as fast!
+- New library improvements and customization
+- Bug fixes from your feedback!
 """
 
 # Load environment variables from .env file
@@ -154,7 +154,20 @@ def _load_user_by_id(user_id: str) -> User | None:
     """Loads user from DB for session management (used by flask_login)."""
     if not user_id:
         return None
-    return User.objects(user_id=user_id).first()
+    user = User.objects(user_id=user_id).first()
+    if user:
+        return user
+
+    # Backward compatibility: older sessions may store a user_id alias that was
+    # merged into a canonical user record.
+    from app.utilities.user_identity import resolve_user_identity
+
+    return resolve_user_identity(
+        user_id_hint=user_id,
+        email_hint=user_id,
+        create_if_missing=False,
+        auto_merge_duplicates=True,
+    )
 
 
 def load_user() -> User | None:

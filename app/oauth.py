@@ -7,6 +7,7 @@ from flask_dance.consumer import oauth_authorized, oauth_error
 from flask_dance.contrib.azure import make_azure_blueprint
 from flask_login import login_user
 
+from app.utilities.user_identity import normalize_identity, resolve_user_identity
 from app.utilities.config import get_auth_methods, get_oauth_provider_by_type
 
 azure_blueprint = None
@@ -14,8 +15,7 @@ azure_blueprint = None
 
 def azure_logged_in(blueprint, token):
     """Creates or loads a user after successful Azure login."""
-    from flask import redirect, url_for, session
-    from app.models import User
+    from flask import session
 
     current_app.logger.info(f"azure_logged_in signal received. Token present: {bool(token)}")
 
@@ -32,26 +32,33 @@ def azure_logged_in(blueprint, token):
         return False
 
     info = resp.json()
-    user_principal_name = info.get("userPrincipalName")
+    user_principal_name = normalize_identity(info.get("userPrincipalName"))
+    email = normalize_identity(info.get("mail")) or user_principal_name
+    display_name = info.get("displayName") or email or user_principal_name
 
-    user = User.objects(user_id=user_principal_name).first()
+    if not user_principal_name and not email:
+        current_app.logger.warning(
+            "Azure response missing both userPrincipalName and mail; cannot resolve user."
+        )
+        return False
 
+    user = resolve_user_identity(
+        user_id_hint=user_principal_name,
+        email_hint=email,
+        name_hint=display_name,
+        create_if_missing=True,
+        auto_merge_duplicates=True,
+    )
     if not user:
-        email = info.get("mail") or user_principal_name
-        user = User(
-            user_id=user_principal_name, email=email, name=info["displayName"]
-        ).save()
-    else:
-        if not user.email:
-            user.email = info.get("mail") or user_principal_name
-        if not user.name:
-            user.name = info["displayName"]
-        user.save()
+        current_app.logger.warning("Failed to resolve user from Azure identity payload.")
+        return False
 
     # Make session permanent so Flask-Login session persists
     session.permanent = True
     login_user(user)
-    current_app.logger.info(f"User {user_principal_name} logged in via Azure OAuth")
+    current_app.logger.info(
+        f"Azure login resolved identity '{email or user_principal_name}' to user_id '{user.user_id}'."
+    )
 
     # Return False to tell Flask-Dance we've handled the login ourselves.
     # This prevents Flask-Dance from storing the token and triggering its

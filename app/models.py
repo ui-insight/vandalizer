@@ -984,6 +984,7 @@ class Library(me.Document):
                     "owner_user_id": {"$exists": True},
                     # optionally: {"$type": "string"}
                 },
+                "name": "library_personal_unique_v2",
             },
             # TEAM: one per team
             {
@@ -995,12 +996,14 @@ class Library(me.Document):
                     # if you know it's an ObjectId, you can use:
                     # "team": {"$type": "objectId"}
                 },
+                "name": "library_team_unique_v2",
             },
             # VERIFIED: single global
             {
                 "fields": ["scope"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "verified"},
+                "name": "library_verified_unique_v2",
             },
         ]
     }
@@ -1376,16 +1379,19 @@ class DailyUsageAggregate(me.Document):
                 "fields": ["date", "scope", "user_id"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "user"},
+                "name": "daily_usage_user_unique_v2",
             },
             {
                 "fields": ["date", "scope", "team_id"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "team"},
+                "name": "daily_usage_team_unique_v2",
             },
             {
                 "fields": ["date", "scope"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "global"},
+                "name": "daily_usage_global_unique_v2",
             },
             {"fields": ["-date", "scope"]},
         ]
