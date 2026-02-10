@@ -73,6 +73,7 @@ from app.utilities.document_readers import extract_text_from_file
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
+from app.utilities.edit_history import history_for
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -98,6 +99,15 @@ def verify_document(document: SmartDocument) -> None:
     print(document.absolute_path)
 
     if not document.raw_text or document.raw_text == "":
+        # Check if the user's model is external
+        model_config = UserModelConfig.objects(user_id=document.user_id).first()
+        is_external_model = False
+        if model_config and model_config.available_models:
+            for model in model_config.available_models:
+                if model.get("name") == model_config.name:
+                    is_external_model = model.get("external", False)
+                    break
+
         extraction_task = perform_extraction_and_update.s(
             document_uuid=document.uuid,
             extension=extension,
@@ -108,12 +118,31 @@ def verify_document(document: SmartDocument) -> None:
             document_path=str(document.absolute_path),
         )
 
-        workflow = extraction_task | validation_task  # | ingestion_task
-        workflow_task_result = workflow.apply_async(
-            link=update_document_fields.si(document.uuid),
-            link_error=cleanup_document.si(document.uuid),
-        )
-        document.task_id = workflow_task_result.id
+        if is_external_model:
+            # External model: Sequential flow (extraction -> validation)
+            # Document not usable until both complete
+            workflow = extraction_task | validation_task
+            workflow_task_result = workflow.apply_async(
+                link=update_document_fields.si(document.uuid),
+                link_error=cleanup_document.si(document.uuid),
+            )
+            document.task_id = workflow_task_result.id
+        else:
+            # Internal model: Document usable after extraction, validation runs in background
+            workflow_task_result = extraction_task.apply_async(
+                link=update_document_fields.si(document.uuid),
+                link_error=cleanup_document.si(document.uuid),
+            )
+            document.task_id = workflow_task_result.id
+
+            validation_task_background = perform_document_validation.s(
+                document_text=None,
+                document_uuid=document.uuid,
+                document_path=str(document.absolute_path),
+                background=True,
+            )
+            validation_task_background.apply_async()
+
         document.processing = True
         document.save()
 
@@ -160,6 +189,7 @@ def build_breadcrumbs(
 
 @login_required
 @home.route("/")
+@home.route("/home")
 def index() -> ResponseReturnValue:
     """Primary entry point."""
     user = load_user()
@@ -276,6 +306,18 @@ def index() -> ResponseReturnValue:
                         snapshot["status"] = workflow_result.status
                     if workflow_result.session_id and "session_id" not in snapshot:
                         snapshot["session_id"] = workflow_result.session_id
+                    if activity.started_at and "started_at" not in snapshot:
+                        snapshot["started_at"] = activity.started_at.isoformat()
+                    if activity.finished_at and "finished_at" not in snapshot:
+                        snapshot["finished_at"] = activity.finished_at.isoformat()
+                    if (
+                        activity.started_at
+                        and activity.finished_at
+                        and "duration_seconds" not in snapshot
+                    ):
+                        snapshot["duration_seconds"] = (
+                            activity.finished_at - activity.started_at
+                        ).total_seconds()
                     workflow_activity_snapshot = snapshot or None
 
                     stored_doc_uuids = snapshot.get("document_uuids") or []
@@ -316,6 +358,7 @@ def index() -> ResponseReturnValue:
                             search_set=search_set,
                             documents=snapshot_documents or documents,
                             results=stored_results,
+                            history_entries=history_for("searchset", search_set.uuid),
                         )
 
     debug(activity)
@@ -333,6 +376,7 @@ def index() -> ResponseReturnValue:
                     search_set=search_set,
                     documents=documents,
                     results=None,
+                    history_entries=history_for("searchset", search_set.uuid),
                 )
 
     return render_template(
@@ -639,7 +683,8 @@ def _build_activities(user: User) -> list[ActivityEvent]:
 def chat() -> ResponseReturnValue:
     """Handle chat requests."""
     data = request.get_json()
-    message = data["message"]
+    raw_message = data["message"]
+    message = raw_message
     activity_id = data.get("activity_id", None)
     current_space_id = data.get("current_space_id", None)
     # get activity if it exists
@@ -678,6 +723,19 @@ def chat() -> ResponseReturnValue:
             space=current_space_id,
             document_uuids=document_uuids,
         )
+        # If this chat isn't tied to any documents, we won't run the LLM-based
+        # activity description job. In that case, set a simple safe title
+        # immediately so the app rail doesn't stay stuck on "Generating title…".
+        if (not document_uuids) and (not activity.title):
+            first_line = (raw_message or "").strip().splitlines()[0] if raw_message else ""
+            words = [w for w in first_line.split() if w]
+            short = " ".join(words[:8]).strip()
+            if not short:
+                short = "Chat"
+            if len(short) > 80:
+                short = short[:77].rstrip() + "..."
+            activity.title = escape(short)
+            activity.save()
 
     else:
         activity = ActivityEvent.objects(id=activity_id).first()

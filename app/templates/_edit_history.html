@@ -1,0 +1,36 @@
+{% set entries = history_entries if history_entries is defined else [] %}
+<div id="edit-history-container" style="padding: 10px 30px 20px;">
+    <div style="display: flex; align-items: center; gap: 8px; margin: 0 0 10px;">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <b>History</b>
+    </div>
+    {% if entries %}
+    <div>
+        {% for entry in entries %}
+        <div style="border-top: 1px solid #eee; padding: 10px 0;">
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; color: #666;">
+                <span style="font-weight: 600;">{{ entry.user_name or entry.user_id or "Unknown" }}</span>
+                <span>{{ entry.created_at.strftime("%Y-%m-%d %H:%M") if entry.created_at else "" }}</span>
+                <span style="color: #999;">{{ entry.action|replace("_", " ") }}</span>
+            </div>
+            {% if entry.changes %}
+            <ul style="margin: 6px 0 0 18px; padding: 0; font-size: 12px; word-break: break-word;">
+                {% for field, delta in entry.changes.items() %}
+                <li style="margin: 2px 0;">
+                    <span style="font-weight: 600;">{{ field }}</span>:
+                    {% if delta.before is defined and delta.before %}
+                    <span>{{ delta.before|truncate(140) }}</span>
+                    <span style="margin: 0 4px;">-></span>
+                    {% endif %}
+                    <span>{{ delta.after|truncate(140) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="font-size: 12px; color: #888;">No changes yet.</div>
+    {% endif %}
+</div>

@@ -1,3 +1,175 @@
+<style>
+    #verification-modal .verification-modal__content {
+        width: min(1100px, 92vw);
+        max-width: min(1100px, 92vw);
+        max-height: 88vh;
+        margin: 4vh auto;
+        padding: 0;
+        border: 1px solid #d9dee3;
+        border-radius: 12px;
+        text-align: left;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    #verification-modal .verification-modal__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 18px 22px 14px;
+        border-bottom: 1px solid #eceff3;
+    }
+
+    #verification-modal .verification-modal__header h3 {
+        margin: 0;
+        font-size: 28px;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    #verification-modal .verification-modal__header .modal-close {
+        border: 1px solid #d7dce2;
+        background: #f9fafb;
+        border-radius: 8px;
+        width: 36px;
+        height: 36px;
+        line-height: 1;
+        font-size: 24px;
+        cursor: pointer;
+    }
+
+    #verification-modal .verification-modal__status {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 12px 22px;
+        border-bottom: 1px solid #eceff3;
+        background: #f8fafc;
+    }
+
+    #verification-modal .verification-modal__status-text {
+        font-size: 14px;
+        color: #374151;
+    }
+
+    #verification-modal .verification-form {
+        padding: 18px 22px 22px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    #verification-modal .verification-form__section {
+        border: 1px solid #e6eaf0;
+        border-radius: 10px;
+        background: #fff;
+        padding: 14px;
+        margin: 0;
+    }
+
+    #verification-modal .verification-form__section legend {
+        font-size: 14px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0;
+        padding: 0 6px;
+        width: auto;
+        border: 0;
+    }
+
+    #verification-modal .verification-form__grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 16px;
+        align-items: start;
+    }
+
+    #verification-modal .verification-form__field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin: 0;
+    }
+
+    #verification-modal .verification-form__field span {
+        font-size: 13px;
+        font-weight: 600;
+        color: #1f2937;
+    }
+
+    #verification-modal .verification-form__field input,
+    #verification-modal .verification-form__field textarea,
+    #verification-modal .verification-inline-field {
+        width: 100%;
+        border: 1px solid #cfd5dd;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        color: #111827;
+        background: #fff;
+    }
+
+    #verification-modal .verification-form__field input[type="file"] {
+        padding: 8px;
+    }
+
+    #verification-modal .verification-inline-field {
+        background: #f8fafc;
+        color: #334155;
+        min-height: 42px;
+        display: flex;
+        align-items: center;
+    }
+
+    #verification-modal .verification-form__field--full {
+        grid-column: 1 / -1;
+    }
+
+    #verification-modal .verification-file-list {
+        margin: 6px 0 0;
+        padding-left: 18px;
+        color: #334155;
+        font-size: 13px;
+    }
+
+    #verification-modal .verification-file-list li {
+        margin: 2px 0;
+        word-break: break-word;
+    }
+
+    #verification-modal .verification-modal__actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        padding-top: 4px;
+    }
+
+    #verification-modal .verification-modal__error {
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    @media (max-width: 900px) {
+        #verification-modal .verification-modal__content {
+            width: 96vw;
+            max-width: 96vw;
+            max-height: 94vh;
+            margin: 2vh auto;
+        }
+
+        #verification-modal .verification-form__grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
 <div id="verification-modal" class="modal" style="display: none;">
     <div class="modal-content verification-modal__content">
         <div class="verification-modal__header">
@@ -21,58 +193,67 @@
 
             <fieldset class="verification-form__section">
                 <legend>Submitter</legend>
-                <label class="verification-form__field">
-                    <span>Submitter name / organization</span>
-                    <input type="text" id="verification-submitter-name" placeholder="Name or organization" maxlength="200">
-                </label>
-                <label class="verification-form__field">
-                    <span>Submitter organization</span>
-                    <input type="text" id="verification-submitter-org" placeholder="Organization" maxlength="200">
-                </label>
+                <div class="verification-form__grid">
+                    <label class="verification-form__field">
+                        <span>Submitter Name / Organization</span>
+                        <input type="text" id="verification-submitter-name" placeholder="Name or organization" maxlength="200">
+                    </label>
+                    <label class="verification-form__field">
+                        <span>Submitter Organization</span>
+                        <input type="text" id="verification-submitter-org" placeholder="Organization" maxlength="200">
+                    </label>
+                </div>
             </fieldset>
 
             <fieldset class="verification-form__section">
                 <legend>Task Details</legend>
-                <label class="verification-form__field">
-                    <span>Title</span>
-                    <input type="text" id="verification-item-title" placeholder="Workflow or task title" maxlength="300" required>
-                </label>
-                <div class="verification-form__field">
-                    <span>Category</span>
-                    <div id="verification-category-display" class="verification-inline-field" aria-live="polite" style="font-weight:600;"></div>
+                <div class="verification-form__grid">
+                    <label class="verification-form__field">
+                        <span>Title</span>
+                        <input type="text" id="verification-item-title" placeholder="Workflow or task title" maxlength="300" required>
+                    </label>
+                    <div class="verification-form__field">
+                        <span>Category</span>
+                        <div id="verification-category-display" class="verification-inline-field" aria-live="polite"></div>
+                    </div>
                 </div>
             </fieldset>
 
             <fieldset class="verification-form__section">
                 <legend>Description</legend>
-                <label class="verification-form__field">
-                    <span>Summary (1–2 sentences)</span>
-                    <textarea id="verification-summary" rows="2" maxlength="500" placeholder="Brief summary of what this automation does"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>Detailed description / intended outcome</span>
-                    <textarea id="verification-description" rows="4" maxlength="5000" placeholder="Describe logic, goals, and success criteria"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>Run instructions (Markdown supported)</span>
-                    <textarea id="verification-run-instructions" rows="4" maxlength="5000" placeholder="Steps to execute the task locally or in-app"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>How did you evaluate this task?</span>
-                    <textarea id="verification-eval-notes" rows="4" maxlength="4000" placeholder="Explain how you verified behavior, reviewed outputs, and determined quality."></textarea>
-                </label>
+                <div class="verification-form__grid">
+                    <label class="verification-form__field verification-form__field--full">
+                        <span>Summary (1-2 sentences)</span>
+                        <textarea id="verification-summary" rows="2" maxlength="500" placeholder="Brief summary of what this automation does"></textarea>
+                    </label>
+                    <label class="verification-form__field verification-form__field--full">
+                        <span>Detailed Description / Intended Outcome</span>
+                        <textarea id="verification-description" rows="5" maxlength="5000" placeholder="Describe logic, goals, and success criteria"></textarea>
+                    </label>
+                    <label class="verification-form__field">
+                        <span>Run Instructions (Markdown supported)</span>
+                        <textarea id="verification-run-instructions" rows="4" maxlength="5000" placeholder="Steps to execute the task locally or in-app"></textarea>
+                    </label>
+                    <label class="verification-form__field">
+                        <span>How did you evaluate this task?</span>
+                        <textarea id="verification-eval-notes" rows="4" maxlength="4000" placeholder="Explain how you verified behavior, reviewed outputs, and determined quality."></textarea>
+                    </label>
+                </div>
             </fieldset>
 
             <fieldset class="verification-form__section">
                 <legend>Artifacts</legend>
-                <label class="verification-form__field">
-                    <span>Example input document(s)</span>
-                    <textarea id="verification-example-inputs" rows="3" placeholder="One URL or file path per line"></textarea>
-                </label>
-                <label class="verification-form__field">
-                    <span>Expected output(s)</span>
-                    <textarea id="verification-expected-outputs" rows="3" placeholder="Links or JSON snippets per line"></textarea>
-                </label>
+                <div class="verification-form__grid">
+                    <label class="verification-form__field">
+                        <span>Example Input Document(s)</span>
+                        <input type="file" id="verification-example-input-files" multiple>
+                        <ul id="verification-example-input-files-list" class="verification-file-list" style="display:none;"></ul>
+                    </label>
+                    <label class="verification-form__field">
+                        <span>Expected Output(s)</span>
+                        <textarea id="verification-expected-outputs" rows="4" placeholder="Links or JSON snippets per line"></textarea>
+                    </label>
+                </div>
             </fieldset>
 
             <div id="verification-error" class="verification-modal__error" role="alert" style="display:none;"></div>

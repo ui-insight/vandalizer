@@ -8,6 +8,7 @@
     var current_space_id = "{{ current_space_id }}"
     var workflow_elapsed_time = 0;
     var workflow_session_id = "";
+    var workflow_start_time_ms = null;
 
     var workflow_time = 0;
     var steps_completed = 0;
@@ -126,7 +127,9 @@
                         li = addActivityToRail(activityId, activityData);
                         if (li) {
                             li.classList.add("active");
-                            if (opts.running) {
+                            // Check type before applying running state
+                            const isAutomation = activityData.type === 'search_set_run' || activityData.type === 'workflow_run';
+                            if (opts.running && isAutomation) {
                                 li.classList.add("is-running");
                             }
                             // Check if title should be updated
@@ -148,7 +151,15 @@
         }
 
         li.classList.add("active");
-        if (opts.running) {
+
+        // Check if automation run based on icon class
+        const typeIcon = li.querySelector('.run-type-icon');
+        const isAutomationRun = typeIcon && (
+            typeIcon.classList.contains('fa-list-check') || // search_set_run
+            typeIcon.classList.contains('fa-diagram-project') // workflow_run
+        );
+
+        if (opts.running && isAutomationRun) {
             li.classList.add("is-running");
         }
     }
@@ -234,7 +245,7 @@
     // Helper function to update activity title with shimmer effect
     function updateActivityTitle(activityId, newTitle) {
         if (!activityId || !newTitle) return;
-        
+
         const activityItem = document.querySelector(`li.run-item[data-run-id="${activityId}"]`);
         if (!activityItem) return;
 
@@ -249,12 +260,12 @@
         // Update title with shimmer effect
         titleElement.innerHTML = newTitle; // Use innerHTML to replace any HTML (like loading text)
         titleElement.setAttribute('title', newTitle);
-        
+
         // Add shimmer class to the title element for animation
         titleElement.style.position = 'relative';
         titleElement.style.overflow = 'hidden';
         titleElement.classList.add('title-shimmer');
-        
+
         // Remove shimmer after animation
         setTimeout(() => {
             titleElement.classList.remove('title-shimmer');
@@ -266,18 +277,18 @@
         if (!activityId || !activityData || !activityData.title) return;
         updateActivityTitle(activityId, activityData.title);
     }
-    
+
     // Poll chat activity title updates
     function pollChatActivityTitle(activityId) {
         if (!activityId) return;
-        
+
         let pollCount = 0;
         const maxPolls = 30; // Poll for up to 30 seconds (30 * 1000ms)
         const pollInterval = 2000; // Poll every 2 seconds
-        
-        const intervalId = setInterval(function() {
+
+        const intervalId = setInterval(function () {
             pollCount++;
-            
+
             fetch(`/activity/runs/${activityId}/data`)
                 .then(response => {
                     if (!response.ok) {
@@ -292,10 +303,11 @@
                         if (activityData.title) {
                             checkActivityTitleUpdate(activityId, activityData);
                         }
-                        
-                        // Stop polling if we've gotten a title update or max polls reached
-                        // Also stop if activity is completed (title generation should be done)
-                        if (activityData.status === "completed" || pollCount >= maxPolls) {
+
+                        // Stop polling once we have a real title, or we timed out.
+                        // Do NOT stop just because the activity completed: title generation
+                        // is async and can land after completion.
+                        if ((activityData.title && String(activityData.title).trim().length > 0) || pollCount >= maxPolls) {
                             clearInterval(intervalId);
                         }
                     }
@@ -425,9 +437,57 @@
 
     function formatWorkflowElapsed(seconds) {
         const safeSeconds = Math.max(Number(seconds) || 0, 0);
-        const mins = Math.floor(safeSeconds / 60);
-        const secs = safeSeconds % 60;
+        const totalSeconds = Math.floor(safeSeconds);
+        const mins = Math.floor(totalSeconds / 60);
+        const secs = totalSeconds % 60;
         return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+    }
+
+    function parseIsoTimeToMs(value) {
+        if (typeof value !== "string" || !value.trim()) {
+            return null;
+        }
+        const ms = Date.parse(value);
+        return Number.isFinite(ms) ? ms : null;
+    }
+
+    function resolveWorkflowDurationSeconds(payload, fallbackSeconds = 0) {
+        const durationSeconds = payload && typeof payload.duration_seconds === "number"
+            ? payload.duration_seconds
+            : null;
+        if (typeof durationSeconds === "number" && durationSeconds >= 0) {
+            return durationSeconds;
+        }
+
+        const startedMs = parseIsoTimeToMs(payload?.started_at);
+        const finishedMs = parseIsoTimeToMs(payload?.finished_at);
+        if (startedMs != null && finishedMs != null && finishedMs >= startedMs) {
+            return (finishedMs - startedMs) / 1000;
+        }
+
+        if (typeof workflow_start_time_ms === "number") {
+            const now = Date.now();
+            if (Number.isFinite(now) && now >= workflow_start_time_ms) {
+                return (now - workflow_start_time_ms) / 1000;
+            }
+        }
+
+        return Math.max(Number(fallbackSeconds) || 0, 0);
+    }
+
+    function formatWorkflowCompletionLabel(status, durationSeconds) {
+        const normalized = (status || "").toString().toLowerCase();
+        const base =
+            normalized === "failed"
+                ? "Failed"
+                : normalized === "canceled"
+                    ? "Canceled"
+                    : "Completed";
+        const seconds = Math.max(Number(durationSeconds) || 0, 0);
+        if (seconds <= 0) {
+            return base;
+        }
+        return `${base} in ${formatWorkflowElapsed(seconds)}`;
     }
 
     function updateWorkflowProgressInfo(stepsCompleted = 0, totalSteps = null, elapsedSeconds = 0, options = {}) {
@@ -574,11 +634,32 @@
 
         if (typeof stepsCompleted === "number" && typeof stepsTotal === "number" && stepsTotal >= 0) {
             const completed = Math.max(stepsCompleted, 0);
-            let statusLabel = status || "Completed";
-            if (typeof statusLabel === "string" && statusLabel.length > 0) {
-                statusLabel = statusLabel.charAt(0).toUpperCase() + statusLabel.slice(1);
+            const normalizedStatus = (status || "").toString().toLowerCase();
+            const startedMs = parseIsoTimeToMs(snapshot.started_at);
+            const finishedMs = parseIsoTimeToMs(snapshot.finished_at);
+            const durationSeconds =
+                typeof snapshot.duration_seconds === "number"
+                    ? snapshot.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(completed, stepsTotal, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+                return;
             }
-            updateWorkflowProgressInfo(completed, stepsTotal, 0, { trailingLabel: statusLabel });
+
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
+            updateWorkflowProgressInfo(completed, stepsTotal, elapsedSeconds);
         } else if (status) {
             const label = status.charAt(0).toUpperCase() + status.slice(1);
             updateWorkflowProgressInfo(0, null, 0, { trailingLabel: label });
@@ -925,6 +1006,10 @@
             if ($("#search-results-panel").children().length > 0) {
                 $("#search-results-panel").show();
             }
+        }
+
+        if (typeof window !== 'undefined' && typeof window.syncBottomToolbarsToPanels === 'function') {
+            window.syncBottomToolbarsToPanels();
         }
 
         cleanup();
@@ -1504,6 +1589,9 @@
             success: function (msg) {
                 // Get the set entry group with data-uuid equal to uuid and delete parent
                 $(`.delete-set-item-button[data-uuid=${uuid}]`).parent().parent().parent().remove();
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -1941,10 +2029,6 @@
 
         $('#closeAttachBtn').on('click', function () {
             $('#attachmentModal').hide();
-        });
-
-        $('#closeNewWorkflowBtn').on('click', function () {
-            $('#newWorkflowModal').hide();
         });
 
         $('#closeNewTaskBtn').on('click', function () {
@@ -2537,6 +2621,7 @@
         let session_id = generateSessionId();
         workflow_session_id = session_id;
         active_step = 0;
+        workflow_start_time_ms = Date.now();
 
         // Start the timer before making the API call
         $('.workflow-output-buttons').addClass('hidden');
@@ -2835,7 +2920,8 @@
                     }
 
                     resetWorkflowActiveStatus();
-                    const trailingLabel = status === 'failed' ? 'Failed' : 'Completed';
+                    const durationSeconds = resolveWorkflowDurationSeconds(data, workflow_time);
+                    const trailingLabel = formatWorkflowCompletionLabel(status, durationSeconds);
                     updateWorkflowProgressInfo(steps_completed, total_steps, workflow_time, {
                         trailingLabel: trailingLabel,
                     });
@@ -2846,6 +2932,9 @@
                         steps_total: total_steps,
                         status: status,
                         session_id: workflow_session_id,
+                        started_at: data.started_at ?? null,
+                        finished_at: data.finished_at ?? null,
+                        duration_seconds: data.duration_seconds ?? null,
                     };
 
                     if (status === 'failed') {
@@ -2868,6 +2957,9 @@
                             steps_total: total_steps,
                             status: status,
                             session_id: workflow_session_id,
+                            started_at: data.started_at ?? null,
+                            finished_at: data.finished_at ?? null,
+                            duration_seconds: data.duration_seconds ?? null,
                         };
 
                         const html = normalizeWorkflowOutput(snapshotPayload);
@@ -3016,13 +3108,18 @@
     }
 
     function pollWorkflowStatus(session_id) {
-        let startTime = Date.now(); // Capture start time to calculate elapsed time
         const pollInterval = 1000; // Poll every second
+        if (typeof workflow_start_time_ms !== "number") {
+            workflow_start_time_ms = Date.now();
+        }
         workflow_elapsed_time = 0;
 
         let intervalId = setInterval(() => {
-            workflow_elapsed_time += 1;
-
+            const now = Date.now();
+            workflow_elapsed_time = Math.max(
+                Math.floor((now - workflow_start_time_ms) / 1000),
+                0,
+            );
             performWorkflowStatus(session_id, workflow_elapsed_time);
         }, pollInterval);
 
@@ -3130,36 +3227,36 @@
             const tabTitle = $(this).text().trim();
             const url = new URL(window.location.href);
             const currentSection = url.searchParams.get("section") || "";
-            
+
             // If clicking Library tab and already on Library, close panels and reset
             const isLibraryVisible = $("#library-panel").is(":visible");
             if (tabTitle === "Library" && (currentSection === "Library" || currentSection === "Workflows" || isLibraryVisible)) {
                 // Close any open panels
                 $(".search-results-panel").hide();
                 $("#search-results-panel").empty();
-                
+
                 // Clear library-related URL params but keep section=Library
                 url.searchParams.delete("search_set_uuid");
                 url.searchParams.delete("workflow_id");
                 url.searchParams.delete("activity_id");
                 url.searchParams.set("section", "Library");
                 window.history.pushState({}, "", url.toString());
-                
+
                 // Show library panel
                 $(".tab-content").hide();
                 $("#library-panel").show();
-                
+
                 // Update active tab
                 tabMenuItems.forEach((node) => node.classList.remove("active"));
                 this.classList.add("active");
-                
+
                 // Refresh library view if there's a refresh function
                 if (typeof refreshResults === 'function') {
                     refreshResults();
                 }
                 return;
             }
-            
+
             // Normal tab switching behavior
             tabMenuItems.forEach((node) => node.classList.remove("active"));
             this.classList.add("active");
@@ -3184,17 +3281,27 @@
             });
     });
 
-    $(".add-new_workflow-button").on("click", function () {
-        $("#newWorkflowModal").show();
-        $("#add-task-container").hide();
-        $("#newTaskModal").hide();
-
+    function bindNewWorkflowModalActions() {
         $("#newWorkflowBtn")
             .off("click")
             .on("click", function () {
                 createNewWorkflow();
                 $("#newWorkflowModal").hide();
             });
+        $("#closeNewWorkflowBtn").off("click").on("click", function () {
+            $("#newWorkflowModal").hide();
+        });
+    }
+
+    window.bindNewWorkflowModalActions = bindNewWorkflowModalActions;
+
+    bindNewWorkflowModalActions();
+
+    $(".add-new_workflow-button").on("click", function () {
+        $("#newWorkflowModal").show();
+        $("#add-task-container").hide();
+        $("#newTaskModal").hide();
+        bindNewWorkflowModalActions();
     });
 
     var newTaskType = "";
@@ -3294,6 +3401,165 @@
                 console.log(thrownError);
             },
         });
+    }
+
+    // Library panel helper functions
+    function openSearchSet(uuid) {
+        updateSearchSetPanel(uuid);
+    }
+
+    function runPromptInAssistant(uuid, title = "") {
+        if (typeof setSection === 'function') {
+            setSection("Assistant");
+        }
+        beginPrompt(uuid, title || "Prompt");
+    }
+
+    function maybeRunItemFromQuery() {
+        const params = new URLSearchParams(window.location.search);
+        const editPromptId = params.get('edit_prompt_id');
+        const editPromptKind = params.get('edit_prompt_kind') || 'prompt';
+        if (editPromptId) {
+            if (typeof setSection === 'function') {
+                setSection('Library');
+            }
+            if (typeof editLibraryItem === 'function') {
+                editLibraryItem(editPromptKind, editPromptId);
+            } else {
+                console.error('editLibraryItem not defined');
+            }
+            const url = new URL(window.location.href);
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
+            window.history.replaceState({}, '', url.toString());
+            return;
+        }
+
+        const runKind = params.get('run_item_kind');
+        const runId = params.get('run_item_id');
+        const runTitle = params.get('run_item_title') || params.get('run_prompt_title') || 'Prompt';
+
+        if (runKind && runId) {
+            if (runKind === 'workflow') {
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (typeof fetchWorkflow === 'function') {
+                    fetchWorkflow(runId);
+                } else {
+                    console.error('fetchWorkflow not defined');
+                }
+            } else if (runKind === 'searchset' || runKind === 'extraction') {
+                if (typeof setSection === 'function') {
+                    setSection('Library');
+                }
+                if (typeof openSearchSet === 'function') {
+                    openSearchSet(runId);
+                } else {
+                    console.error('openSearchSet not defined');
+                }
+            } else if (runKind === 'prompt' || runKind === 'formatter') {
+                if (typeof runPromptInAssistant === 'function') {
+                    runPromptInAssistant(runId, runTitle);
+                } else {
+                    console.error('runPromptInAssistant not defined');
+                }
+            }
+
+            const url = new URL(window.location.href);
+            url.searchParams.delete('run_item_kind');
+            url.searchParams.delete('run_item_id');
+            url.searchParams.delete('run_item_title');
+            url.searchParams.delete('run_prompt_id');
+            url.searchParams.delete('run_prompt_title');
+            url.searchParams.delete('edit_prompt_id');
+            url.searchParams.delete('edit_prompt_kind');
+            window.history.replaceState({}, '', url.toString());
+            return;
+        }
+
+        const promptId = params.get('run_prompt_id');
+        if (promptId && typeof runPromptInAssistant === 'function') {
+            runPromptInAssistant(promptId, runTitle);
+            const url = new URL(window.location.href);
+            url.searchParams.delete('run_prompt_id');
+            url.searchParams.delete('run_prompt_title');
+            window.history.replaceState({}, '', url.toString());
+        }
+    }
+
+    $(document).ready(function () {
+        maybeRunItemFromQuery();
+    });
+
+    function selectLibraryItem(type, id, title = "") {
+        if (type === 'workflow') {
+            if (typeof fetchWorkflow === 'function') {
+                fetchWorkflow(id);
+            } else {
+                console.error("fetchWorkflow not defined");
+            }
+        } else if (type === 'extraction' || type === 'searchset') {
+            openSearchSet(id);
+        } else if (type === 'prompt' || type === 'formatter') {
+            runPromptInAssistant(id, title);
+        }
+    }
+
+    function editLibraryItem(type, id) {
+        if (type === 'workflow') {
+            window.location.href = '/workflows/' + id;
+        } else if (type === 'extraction' || type === 'searchset') {
+            if (typeof openSearchSet === 'function') {
+                openSearchSet(id);
+            }
+        } else if (type === 'prompt' || type === 'formatter') {
+            $.ajax({
+                url: '/tasks/edit_prompt',
+                type: 'POST',
+                data: JSON.stringify({ uuid: id }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                success: function (res) {
+                    if (res && res.template) {
+                        $("#search-results-panel").html(res.template).show();
+                    }
+                },
+                error: function (err) {
+                    console.error("Error loading prompt editor", err);
+                }
+            });
+        }
+    }
+
+    function toggleMenu(e, menuId) {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const menu = document.getElementById(menuId);
+        if (!menu) return;
+
+        const isHidden = menu.hidden;
+
+        // Close all other menus
+        document.querySelectorAll('.menu').forEach(m => m.hidden = true);
+        document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute('aria-expanded', 'false'));
+
+        if (isHidden) {
+            menu.hidden = false;
+            e.currentTarget.setAttribute('aria-expanded', 'true');
+
+            // Close on next click
+            const close = () => {
+                menu.hidden = true;
+                e.currentTarget.setAttribute('aria-expanded', 'false');
+                document.removeEventListener('click', close);
+            };
+            setTimeout(() => document.addEventListener('click', close), 0);
+        } else {
+            menu.hidden = true;
+            e.currentTarget.setAttribute('aria-expanded', 'false');
+        }
     }
 
     // PERFORM SEARCH
@@ -3854,6 +4120,9 @@
 
                 $(".set-result-items").append(msg.template);
                 $("#add-search-term-input")[0].value = "";
+                if (msg.history_html) {
+                    $("#edit-history-container").replaceWith(msg.history_html);
+                }
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -3984,22 +4253,22 @@
     });
 
     $("#add-search-set-button").on("click", function () {
-addSearchSet($("#add-search-set-input")[0].value, "extraction");
+        addSearchSet($("#add-search-set-input")[0].value, "extraction");
     });
 
     function showExtractionOverlay() {
         const panel = $("#search-results-panel");
         if (panel.length === 0) return;
-        
+
         // Ensure panel is visible
         panel.show();
-        
+
         // Add overlay class to prevent scrolling
         panel.addClass("has-overlay");
-        
+
         // Find the content body where search terms are displayed
         const contentBody = panel.find(".search-results-content-body");
-        
+
         // Check if overlay already exists
         let overlay = panel.find(".extraction-loading-overlay");
         if (overlay.length === 0) {
@@ -4023,13 +4292,13 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
         // Remove overlay from panel
         const overlay = panel.find(".extraction-loading-overlay");
         overlay.remove();
-        
+
         // Also remove from content body if it exists there
         const contentBody = panel.find(".search-results-content-body");
         if (contentBody.length > 0) {
             contentBody.find(".extraction-loading-overlay").remove();
         }
-        
+
         panel.removeClass("has-overlay");
         console.log("Extraction overlay removed");
         console.log("Remaining overlays:", panel.find(".extraction-loading-overlay").length);
@@ -4065,59 +4334,59 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                         // Hide overlay and display results
                         hideExtractionOverlay();
                         $("#search-results-panel").empty();
-                        
+
                         // Check if template exists in response
                         console.log("Checking for template in response...");
                         console.log("response.template exists:", "template" in response);
                         console.log("response.template value:", response.template ? "present" : "missing");
                         console.log("response.template type:", typeof response.template);
                         console.log("response.template length:", response.template ? response.template.length : "N/A");
-                        
+
                         if (response.template && response.template.length > 0) {
                             console.log("Template found, length:", response.template.length);
                             try {
                                 // Ensure overlay is completely removed first
                                 hideExtractionOverlay();
-                                
+
                                 // Wait a moment to ensure overlay is removed
-                                setTimeout(function() {
+                                setTimeout(function () {
                                     // Make sure panel is visible and remove any overlay remnants
                                     const $panel = $("#search-results-panel");
-                                    
+
                                     // Remove all overlays from panel and content body
                                     $panel.find(".extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
                                     $panel.removeClass("has-overlay");
-                                    
+
                                     // Make sure panel is visible
                                     $panel.show();
                                     $panel.css("display", "block");
                                     $panel.css("visibility", "visible");
                                     $panel.css("opacity", "1");
-                                    
+
                                     console.log("Panel display:", $panel.css("display"));
                                     console.log("Panel visibility:", $panel.css("visibility"));
                                     console.log("Panel z-index:", $panel.css("z-index"));
                                     console.log("Panel height:", $panel.height());
-                                    
+
                                     // Clear and append template
                                     const $template = $(response.template);
                                     $panel.empty();
-                                    
+
                                     console.log("Appending template to panel...");
                                     console.log("Template HTML preview (first 500 chars):", response.template.substring(0, 500));
-                                    
+
                                     // Append template without hiding it first - just show it directly
                                     $template.appendTo($panel);
-                                    
+
                                     // Double-check no overlays remain anywhere in the panel
                                     $panel.find(".extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content-body .extraction-loading-overlay").remove();
                                     $panel.find(".search-results-content .extraction-loading-overlay").remove();
-                                    
+
                                     // Remove overlay class
                                     $panel.removeClass("has-overlay");
-                                    
+
                                     console.log("Template appended");
                                     console.log("Panel content length:", $panel.html().length);
                                     console.log("Panel is visible:", $panel.is(":visible"));
@@ -4126,14 +4395,14 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                                     console.log("Panel dimensions:", { width: $panel.width(), height: $panel.height() });
                                     console.log("First child element:", $panel.children().first().prop("tagName"));
                                     console.log("Overlays remaining:", $panel.find(".extraction-loading-overlay").length);
-                                    
+
                                     // Force scroll to top of panel
                                     $panel.scrollTop(0);
-                                    
+
                                     // Ensure panel is visible
                                     $panel.show();
                                     $panel.css("display", "block");
-                                    
+
                                     addResultListeners();
                                     search_set_add_uuid = search_set_uuid;
                                     console.log("Template successfully displayed");
@@ -4529,7 +4798,7 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
                         url.searchParams.set('activity_id', newActivityId);
                         url.searchParams.set('section', 'Assistant');
                         window.history.replaceState({}, '', url);
-                        
+
                         // Start polling for title updates
                         pollChatActivityTitle(newActivityId);
                     }
@@ -4920,10 +5189,23 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             const steps_completed = data.steps_completed || 0;
             const total_steps = data.total_steps || 0;
             const status = data.status;
+            const normalizedStatus = (status || "").toString().toLowerCase();
             const currentStepName = data.current_step_name;
             const currentStepDetail = data.current_step_detail;
             const currentStepPreview = data.current_step_preview;
             const output = data.output;
+            const startedMs = parseIsoTimeToMs(data.started_at);
+            const finishedMs = parseIsoTimeToMs(data.finished_at);
+            const durationSeconds =
+                typeof data.duration_seconds === "number"
+                    ? data.duration_seconds
+                    : startedMs != null && finishedMs != null && finishedMs >= startedMs
+                        ? (finishedMs - startedMs) / 1000
+                        : 0;
+            const elapsedSeconds =
+                startedMs != null && (normalizedStatus === "running" || normalizedStatus === "queued")
+                    ? Math.max((Date.now() - startedMs) / 1000, 0)
+                    : 0;
 
             // Ensure workflow panel is visible
             setSection("Library");
@@ -4935,7 +5217,17 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             }
 
             // Update progress info
-            updateWorkflowProgressInfo(steps_completed, total_steps, 0);
+            if (
+                normalizedStatus === "completed" ||
+                normalizedStatus === "failed" ||
+                normalizedStatus === "canceled"
+            ) {
+                updateWorkflowProgressInfo(steps_completed, total_steps, durationSeconds, {
+                    trailingLabel: formatWorkflowCompletionLabel(normalizedStatus, durationSeconds),
+                });
+            } else {
+                updateWorkflowProgressInfo(steps_completed, total_steps, elapsedSeconds);
+            }
 
             // Show workflow output section if we have preview or output
             if (currentStepPreview || output) {
@@ -5330,5 +5622,254 @@ addSearchSet($("#add-search-set-input")[0].value, "extraction");
             currentSelectionSpan = null;
         }
     });
+
+    // Panel resizer drag functionality
+    (function () {
+        const resizer = document.getElementById('panel-resizer');
+        const leftPanel = document.querySelector('.left-panel');
+        const rightPanel = document.querySelector('.right-panel');
+        const header = document.querySelector('.main-panel .header');
+        const semanticPanel = document.querySelector('.left-panel .semantic-panel');
+
+        if (!resizer || !leftPanel || !rightPanel) return;
+
+        let isDragging = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+
+        // Get current rail width
+        function getRailWidth() {
+            const railW = getComputedStyle(document.documentElement).getPropertyValue('--rail-w');
+            return parseFloat(railW) || 220;
+        }
+
+        function updateBottomToolbars() {
+            const railWidth = Math.max(getRailWidth(), 0);
+            const leftEdge = Math.max(leftPanel.getBoundingClientRect().width, 0);
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.left = `${leftEdge}px`;
+                    toolbar.style.right = `${railWidth}px`;
+                    toolbar.style.width = 'auto';
+                });
+        }
+
+        let bottomToolbarUpdateScheduled = false;
+        function scheduleBottomToolbarUpdate() {
+            if (bottomToolbarUpdateScheduled) return;
+            bottomToolbarUpdateScheduled = true;
+            requestAnimationFrame(() => {
+                bottomToolbarUpdateScheduled = false;
+                updateBottomToolbars();
+            });
+        }
+
+        // Update all dependent elements with new percentages
+        function updateDependentElements(rightPercent) {
+            if (header) {
+                header.style.right = `calc(${rightPercent}% + var(--rail-w))`;
+            }
+            if (semanticPanel) {
+                semanticPanel.style.right = `calc(${rightPercent}% + var(--rail-w) + 30px)`;
+            }
+            updateBottomToolbars();
+        }
+
+        // Calculate initial position based on panel widths
+        function updateResizerPosition() {
+            const leftWidth = leftPanel.offsetWidth;
+            resizer.style.left = leftWidth + 'px';
+        }
+
+        // Calculate target position based on percentages (for rail dock/undock)
+        function updateResizerPositionFromPercentages() {
+            const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            if (savedLeftPercent) {
+                // Calculate the actual left panel width: (leftPercent% of window) - rail width
+                const targetLeftWidth = (parseFloat(savedLeftPercent) / 100 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            } else {
+                // Use default 60/40 split
+                const targetLeftWidth = (0.6 * windowWidth) - railWidth;
+                resizer.style.left = targetLeftWidth + 'px';
+            }
+        }
+
+        // Disable transitions initially to prevent animation on page load
+        resizer.style.transition = 'none';
+        leftPanel.style.transition = 'none';
+        rightPanel.style.transition = 'none';
+        if (header) header.style.transition = 'none';
+        if (semanticPanel) semanticPanel.style.transition = 'none';
+        updateBottomToolbars();
+
+        // Check for saved panel widths first
+        const savedLeftPercent = localStorage.getItem('panelLeftPercent');
+        const savedRightPercent = localStorage.getItem('panelRightPercent');
+
+        if (savedLeftPercent && savedRightPercent) {
+            // Apply saved widths before setting position
+            leftPanel.style.width = `calc(${savedLeftPercent}% - var(--rail-w))`;
+            rightPanel.style.width = `${savedRightPercent}%`;
+            updateDependentElements(savedRightPercent);
+        } else {
+            updateBottomToolbars();
+        }
+
+        // Set initial position without animation
+        updateResizerPosition();
+
+        // Enable transitions after initial position is set
+        requestAnimationFrame(() => {
+            resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+            leftPanel.style.transition = 'width 0.3s ease';
+            rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+            if (header) header.style.transition = 'right 0.3s ease';
+            if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+        });
+
+        resizer.addEventListener('mousedown', function (e) {
+            isDragging = true;
+            startX = e.clientX;
+            resizer.classList.add('dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+
+            // Disable transitions during drag for instant feedback
+            resizer.style.transition = 'background 0.2s ease';
+            leftPanel.style.transition = 'none';
+            rightPanel.style.transition = 'none';
+            if (header) header.style.transition = 'none';
+            if (semanticPanel) semanticPanel.style.transition = 'none';
+            document
+                .querySelectorAll('.right-panel .bottom-toolbar, .floating-bottom-toolbar')
+                .forEach((toolbar) => {
+                    toolbar.style.transition = 'none';
+                });
+
+            // Get starting widths
+            startLeftWidth = leftPanel.offsetWidth;
+            startRightWidth = rightPanel.offsetWidth;
+
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - startX;
+            const railWidth = getRailWidth();
+            const windowWidth = window.innerWidth;
+
+            // Calculate new widths in pixels
+            const newLeftWidth = startLeftWidth + deltaX;
+            const newRightWidth = startRightWidth - deltaX;
+
+            // Calculate total available width for both panels
+            const totalAvailable = windowWidth - railWidth;
+
+            // Enforce minimum widths (30% of available space each)
+            const minWidth = totalAvailable * 0.3;
+
+            if (newLeftWidth >= minWidth && newRightWidth >= minWidth) {
+                // Calculate percentages relative to window width
+                // Left panel uses: calc(X% - var(--rail-w))
+                // So: newLeftWidth = (leftPercent/100) * windowWidth - railWidth
+                // Therefore: leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100
+                const leftPercent = ((newLeftWidth + railWidth) / windowWidth) * 100;
+                const rightPercent = (newRightWidth / windowWidth) * 100;
+
+                // Apply new widths
+                leftPanel.style.width = `calc(${leftPercent}% - var(--rail-w))`;
+                rightPanel.style.width = `${rightPercent}%`;
+
+                // Update resizer position
+                resizer.style.left = newLeftWidth + 'px';
+
+                // Update all dependent elements
+                updateDependentElements(rightPercent);
+
+                // Save to localStorage
+                localStorage.setItem('panelLeftPercent', leftPercent);
+                localStorage.setItem('panelRightPercent', rightPercent);
+            }
+        });
+
+        document.addEventListener('mouseup', function () {
+            if (isDragging) {
+                isDragging = false;
+                resizer.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+
+                // Re-enable transitions after drag
+                resizer.style.transition = 'background 0.2s ease, left 0.3s ease';
+                leftPanel.style.transition = 'width 0.3s ease';
+                rightPanel.style.transition = 'width 0.3s ease, margin-right 0.3s ease';
+                if (header) header.style.transition = 'right 0.3s ease';
+                if (semanticPanel) semanticPanel.style.transition = 'right 0.3s ease';
+                updateBottomToolbars();
+            }
+        });
+
+        // Update resizer position on window resize
+        window.addEventListener('resize', function () {
+            updateResizerPosition();
+            scheduleBottomToolbarUpdate();
+        });
+
+        // Make functions available globally
+        if (typeof window !== 'undefined') {
+            window.updatePanelResizerPosition = updateResizerPosition;
+            window.updatePanelResizerPositionFromPercentages = updateResizerPositionFromPercentages;
+            window.syncBottomToolbarsToPanels = scheduleBottomToolbarUpdate;
+        }
+
+        // Keep toolbars synced when panels/layout change (e.g., showing a toolbar later)
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(scheduleBottomToolbarUpdate);
+            ro.observe(leftPanel);
+            ro.observe(rightPanel);
+        }
+        const mo = new MutationObserver(scheduleBottomToolbarUpdate);
+        mo.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['style', 'class'] });
+    })();
+
+    // Keep panel-resizer hidden while custom .modal overlays are visible
+    (function () {
+        function anyModalVisible() {
+            return Array.from(document.querySelectorAll('.modal')).some((modal) => {
+                return window.getComputedStyle(modal).display !== 'none';
+            });
+        }
+
+        function updateModalOpenState() {
+            document.body.classList.toggle('modal-open', anyModalVisible());
+        }
+
+        updateModalOpenState();
+
+        const observer = new MutationObserver(updateModalOpenState);
+        observer.observe(document.body, {
+            subtree: true,
+            childList: true,
+            attributes: true,
+            attributeFilter: ['style', 'class'],
+        });
+
+        window.addEventListener('keydown', function () {
+            // Some modals close on ESC; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
+        window.addEventListener('click', function () {
+            // Some modals close on outside click; let DOM update, then resync
+            setTimeout(updateModalOpenState, 0);
+        });
+    })();
 
 </script>

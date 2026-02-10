@@ -173,6 +173,19 @@ class Settings(BaseSettings):
         description="Use ChromaDB server instead of persistent client (auto-enabled for staging/prod)",
     )
 
+    # Extraction strategy configuration
+    # two_pass: thinking draft -> structured final (no thinking)
+    # one_pass_thinking: structured extraction with thinking enabled
+    # one_pass_no_thinking: structured extraction with thinking disabled
+    extraction_strategy: str = Field(
+        default="two_pass",
+        description="Extraction strategy: two_pass, one_pass_thinking, one_pass_no_thinking.",
+    )
+    extraction_model: str = Field(
+        default="",
+        description="Optional model name to use for extraction (overrides user selection).",
+    )
+
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         # Override with database config if available
@@ -248,6 +261,30 @@ def get_default_model_name() -> str:
     return settings.base_model
 
 
+def get_extraction_strategy() -> str:
+    """Get extraction strategy from database config or default settings."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.extraction_strategy:
+            return db_config.extraction_strategy
+    except Exception:
+        pass
+    return settings.extraction_strategy
+
+
+def get_extraction_model_name() -> str | None:
+    """Get extraction model name from database config or default settings."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.extraction_model:
+            return db_config.extraction_model
+    except Exception:
+        pass
+    return settings.extraction_model or None
+
+
 def get_highlight_color() -> str:
     """Get UI highlight color from database config or default."""
     try:
@@ -290,15 +327,15 @@ def get_auth_methods() -> list[str]:
     try:
         from app.models import SystemConfig
         db_config = SystemConfig.get_config()
-        if db_config and db_config.auth_methods:
+        if db_config and db_config.auth_methods is not None:
             methods = list(db_config.auth_methods)
-            if env != "production" and "password" not in methods:
-                methods.append("password")
-            return methods
+            # If nothing is configured at all, fall back to password in non-prod to avoid lockout
+            if methods or env == "production":
+                return methods
     except Exception:
         pass
-    # default: always allow password in non-prod
-    return ["password"]
+    # Default/fallback: allow password in non-prod to avoid lockout when no config is present
+    return [] if env == "production" else ["password"]
 
 
 def get_oauth_providers(enabled_only: bool = True) -> list[dict]:

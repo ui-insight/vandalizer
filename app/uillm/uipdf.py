@@ -1,10 +1,6 @@
-import warnings
-from typing import List, Optional
+from typing import Optional
 
 import requests
-from PyPDF2 import PdfReader
-
-warnings.simplefilter("always", UserWarning)
 
 # Default OCR endpoint - can be overridden by system configuration
 DEFAULT_HOST_URL = "https://processpdf.insight.uidaho.edu"
@@ -18,194 +14,43 @@ def get_host_url() -> str:
     except Exception:
         return DEFAULT_HOST_URL
 
-valid_vlm_methods = [
-    "gemma3-64k:27b",
-    "llama3.2-vision:11b",
-    "llama3.2-vision:90b",
-    "mistralai/pixtral-large-2411",
-    "mistralai/pixtral-12b",
-    "google/gemini-pro-1.5",
-    "google/gemini-2.0-flash-lite-001",
-    "microsoft/phi-4-multimodal-instruct",
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
-    "granite3.2-vision-16k:2b",
-    "qwen2.5-VL-8k:7b",
-]
 
-valid_ocr_methods = ["ocr", "doctr", "easyocr", "olmocr", "tesseract", "smoldocling"]
-
-unsafe_methods = [
-    "mistralai/pixtral-large-2411",
-    "mistralai/pixtral-12b",
-    "google/gemini-pro-1.5",
-    "google/gemini-2.0-flash-lite-001",
-    "microsoft/phi-4-multimodal-instruct",
-    "openai/gpt-4o",
-    "openai/gpt-4o-mini",
-]
-
-
-# The UIPDF class for document extraction
 class UIPDF:
     """
-    The UIPDF class provides high-level interfaces for extracting text and tables from PDF documents
-    using both local OCR (Optical Character Recognition) methods and remote vision-language model (VLM) APIs.
-
-    Key Features:
-    -------------
-    - Supports a variety of OCR engines (e.g., Tesseract, EasyOCR, Doctr) and VLM-based extraction methods.
-    - Offers simple static methods for extracting full text or tables from PDFs with minimal configuration.
-    - Allows asynchronous processing via webhook callbacks or synchronous extraction with immediate return.
-    - Supports output in multiple formats (plain text, markdown, HTML, CSV) for tables.
-
-    Main Usage Modes:
-    -----------------
-    1. **Text Extraction (`convert_to_text`)**:
-        - Extracts all or specified pages' text from a PDF file.
-        - Allows selection of OCR/VLM method.
-        - Can operate synchronously or asynchronously (with `webhook_url`).
-        - Returns the extracted text as a string if successful.
-
-    2. **Table Extraction (`convert_table`)**:
-        - Extracts a table from a specific page in a PDF file.
-        - Allows selection of OCR/VLM method and output format (markdown, HTML, CSV).
-        - Returns the extracted table as a string if successful.
-
-    Methods:
-    --------
-    - `convert_to_text(file_path, method, webhook_url, only_these_pages)`:
-        Extracts text from a PDF using the specified OCR or VLM method.
-    - `convert_table(file_path, page_number, method, webhook_url, table_format)`:
-        Extracts a table from a specific page in a PDF in the desired format.
-
-    Notes:
-    ------
-    - The class is designed to be used with both local and remote PDF processing pipelines.
-    - Refer to individual method docstrings for detailed arguments, return values, and exceptions.
-
-    Example:
-    --------
-        # Extract all text from a PDF
-        text = UIPDF.convert_to_text(
-            file_path="./mydoc.pdf",
-            method="qwen2.5-VL-8k:7b"
-        )
-
-        # Extract a table from page 2 in markdown format
-        table_md = UIPDF.convert_table(
-            file_path="./sample.pdf",
-            page_number=2,
-            method="qwen2.5-VL-8k:7b",
-            table_format="markdown"
-        )
+    The UIPDF class provides an interface for extracting text from PDF documents
+    by posting them to a configured OCR endpoint that returns markdown.
     """
 
     @staticmethod
-    def convert_to_text(
-        file_path: str = "./path/to/your/file.pdf",
-        method: Optional[str] = None,
-        webhook_url: Optional[str] = None,
-        only_these_pages: Optional[List[int]] = None,
-    ):
+    def convert_to_text(file_path: str) -> Optional[str]:
         """
-        Converts a PDF file to text using an OCR or VLM method via an API endpoint.
-
-        This function uploads a PDF file to a remote API for text extraction using the specified OCR or VLM method.
-        The extracted text is returned if the operation is successful.
+        Converts a PDF file to markdown text by posting it to the configured OCR endpoint.
 
         Args:
-            file_path (str):
-                The path to the PDF file to be processed. Defaults to './path/to/your/file.pdf'.
-            method (Optional[str]):
-                The OCR or VLM method to use for text extraction. If not specified, defaults to 'qwen2.5-VL-8k:7b'.
-                Must be in the list of valid OCR or VLM methods.
-            webhook_url (Optional[str]):
-                If provided, the API will send job status and results to this URL and return a job ID. If not provided, the
-                function will fetch the result via normal routes.
-            only_these_pages (Optional[str]):
-                A list of page numbers to process (e.g., [1,3,5]). If None, all pages are processed. Note that pages are 0-N indexed.
+            file_path (str): The path to the PDF file to be processed.
 
         Returns:
-            str or dict: The extracted text or job ID if successful. Returns NoneType if the file is not found or an error occurs.
-
-        Raises:
-            FileNotFoundError: If the file_path does not exist.
-            ValueError: If the specified method is invalid.
-
-
-        Example:
-            >>> text = UIPDF.convert_to_text(
-            ...     file_path="./mydoc.pdf",
-            ...     method="qwen2.5-VL-8k:7b"
-            ... )
-            >>> print(text)
+            str or None: The extracted markdown text if successful, None on error.
         """
-        # warn user that method is not safe for protected data
-        if method:
-            if method in unsafe_methods:
-                warnings.warn(
-                    f"Method: {method} is **NOT SAFE** for protected data!", UserWarning
+        endpoint = get_host_url()
+        try:
+            with open(file_path, "rb") as f:
+                response = requests.post(
+                    url=endpoint,
+                    files={"file": f},
+                    headers={"Accept": "text/markdown"},
                 )
-
-        try:
-            file = {"file": open(file_path, "rb")}
-        except FileNotFoundError:
-            return None
-
-        if not method:
-            method = "qwen2.5-VL-8k:7b"
-            print(f"Method not specified, using default {method}")
-
-        params = {
-            "format": "markdown",
-            "return_document_as": "merged_text",
-            "extract_images": "false",
-            "extract_tables": "false",
-        }
-        if only_these_pages:
-            params["pages_to_extract"] = str(only_these_pages)
-
-        if method in valid_ocr_methods:
-            _type = "ocr"
-            params["ocr_tool"] = method
-        elif method in valid_vlm_methods:
-            _type = "vlm"
-            params["vlm_name"] = (method,)
-        else:
-            raise ValueError(f"Invalid method: {method}")
-
-        params["tool_type"] = _type
-        host_url = get_host_url()
-        if webhook_url:
-            params["webhook_url"] = webhook_url
-            endpoint = f"{host_url}/api/v1/start-job"
-        else:
-            if _type == "ocr":
-                endpoint = f"{host_url}/api/v1/ExtractPDF"
-            elif _type == "vlm":
-                endpoint = f"{host_url}/api/v1/AIExtractPDF"
-
-        try:
-            response = requests.post(url=endpoint, params=params, files=file)
-            if response.status_code in [200, 201, 202]:
-                response_dict = response.json()
-
-                if webhook_url:
-                    return response_dict
-                else:
-                    if "token_usage" in response_dict:
-                        print(
-                            f"Your query consumed ~{response_dict['token_usage']} tokens"
-                        )
-                    return response_dict["text"]
+            if response.status_code in [200, 201]:
+                return response.text
             else:
-                print("SERVER ERROR")
-                print(response.status_code)
+                print(f"OCR SERVER ERROR: {response.status_code}")
                 print(response.text)
                 return None
+        except FileNotFoundError:
+            print(f"File not found: {file_path}")
+            return None
         except requests.RequestException as e:
-            print(f"Error occurred while converting PDF: {e}")
+            print(f"Error calling OCR endpoint: {e}")
             return None
 
     @staticmethod
@@ -213,166 +58,14 @@ class UIPDF:
         file_path: str = "./path/to/your/file.pdf", webhook_url: Optional[str] = None
     ) -> str:
         """
-        This function is a temporary static method the APLU Demo for plug into vandalizer. It bypasses usual tesseract logic
-        uses gemini-2.0-flash-lite-0 to improve speed and compute by offloading OCR to frontier AI (necessary for many concurrent
-        OCR tasks.)
+        Extract text from a PDF file using the configured OCR endpoint.
 
         Args:
-           file_path (str): The path to the PDF file.
-           webhook_url (Optional[str]): The webhook URL to use for the request.
+            file_path (str): The path to the PDF file.
+            webhook_url (Optional[str]): Unused, kept for backward compatibility.
 
         Returns:
-           str: The extracted text from the PDF.
-
-        Example:
-           >>> text = UIPDF.convert_to_text_demo(file_path="./path/to/your/file.pdf")
-           >>> print(text)
+            str: The extracted text from the PDF, or empty string on error.
         """
-        # warn user that method is not safe for protected data
-        method = "google/gemini-2.0-flash-lite-001"
-
-        try:
-            with open(file_path, "rb") as pdf_file:
-                pdf = PdfReader(pdf_file)
-                num_pages = len(pdf.pages)
-                only_these_pages = list(range(num_pages))
-        except FileNotFoundError:
-            return ""
-
-        params = {
-            "format": "markdown",
-            "return_document_as": "merged_text",
-            "extract_images": "false",
-            "extract_tables": "false",
-            "tool_type": "vlm",
-            "vlm_name": method,
-            "pages_to_extract": str(only_these_pages),
-        }
-        host_url = get_host_url()
-        if webhook_url:
-            params["webhook_url"] = webhook_url
-            endpoint = f"{host_url}/api/v1/start-job"
-        else:
-            endpoint = f"{host_url}/api/v1/AIExtractPDF"
-
-        try:
-            with open(file_path, "rb") as pdf_file:
-                file = {"file": pdf_file}
-                response = requests.post(url=endpoint, params=params, files=file)
-
-            if response.status_code in [200, 201, 202]:
-                response_dict = response.json()
-
-                if webhook_url:
-                    return response_dict
-                else:
-                    if "token_usage" in response_dict:
-                        print(
-                            f"Your query consumed ~{response_dict['token_usage']} tokens"
-                        )
-                    return response_dict["text"]
-            else:
-                print("SERVER ERROR")
-                print(response.status_code)
-                print(response.text)
-                return ""
-        except requests.RequestException as e:
-            print(f"Error occurred while converting PDF: {e}")
-            return ""
-
-    @staticmethod
-    def convert_table(
-        file_path: str = "./path/to/your/file.pdf",
-        page_number: int = None,
-        method: Optional[str] = None,
-        table_format: Optional[str] = None,
-    ):
-        """
-        Extracts a table from a specific page of a PDF file using the specified OCR or VLM method via an API endpoint.
-
-        This function uploads a PDF file to a remote API and extracts a table from the given page number
-        in the desired format (markdown, HTML, or CSV). The extracted table is returned as text.
-
-        Args:
-            file_path (str):
-                The path to the PDF file to be processed. Defaults to './path/to/your/file.pdf'. (Required)
-            page_number (int):
-                The 1-based index of the page to extract the table from. (Required)
-            method (Optional[str]):
-                The OCR or VLM method to use for table extraction. If not specified, defaults to 'qwen2.5-VL-8k:7b'.
-                Must be present in the list of valid OCR or VLM methods.
-            table_format (Optional[str]):
-                Output format for the table. Must be one of 'markdown', 'html', or 'csv'. Defaults to 'markdown'. Note that
-                table_format is only supported for VLM methods.
-
-        Returns:
-            str or None: The extracted table as text if successful, otherwise None.
-            Returns an empty string if the file is not found.
-
-        Raises:
-            ValueError: If the specified method or table_format is invalid, or if page_number is not specified.
-
-        Example:
-            >>> table_md = MyClass.convert_table(
-            ...     file_path="./sample.pdf",
-            ...     page_number=2,
-            ...     method="qwen2.5-VL-8k:7b",
-            ...     table_format="markdown"
-            ... )
-            >>> print(table_md)
-        """
-
-        try:
-            file = {"file": open(file_path, "rb")}
-        except FileNotFoundError:
-            return None
-
-        if not method:
-            method = "qwen2.5-VL-8k:7b"
-            print(f"Method not specified, using default {method}")
-
-        if not table_format:
-            table_format = "markdown"
-        else:
-            if table_format not in ["markdown", "html", "csv"]:
-                raise ValueError(
-                    f'ERROR: table_format must be one of markdown, html, or csv - not "{table_format}"'
-                )
-
-        if not page_number:
-            raise ValueError("ERROR: page_number must be specified")
-        else:
-            pn = page_number - 1
-
-        params = {
-            "detection_threshold": 0.5,
-            "page_number": pn,
-            "format": table_format,
-        }
-
-        if method in valid_ocr_methods:
-            _type = "ocr"
-            params["ocr_tool"] = method
-        elif method in valid_vlm_methods:
-            _type = "vlm"
-            params["vlm_name"] = (method,)
-        else:
-            raise ValueError(f"Invalid method: {method}")
-
-        params["tool_type"] = _type
-        endpoint = f"{get_host_url()}/api/v1/ExtractTable"
-
-        try:
-            response = requests.post(url=endpoint, params=params, files=file)
-
-            if response.status_code in [200, 201, 202]:
-                response_dict = response.json()
-                return response_dict["text"]
-            else:
-                print("SERVER ERROR")
-                print(response.status_code)
-                print(response.text)
-                return None
-        except requests.RequestException as e:
-            print(f"Error occurred while converting PDF: {e}")
-            return None
+        result = UIPDF.convert_to_text(file_path)
+        return result if result is not None else ""

@@ -128,7 +128,7 @@
   position: fixed;
   bottom: 0;
   padding: 15px;
-  right: 0;
+  right: var(--rail-w);
   width: 40%;
   background-color: white;
   box-shadow: 0 0px 23px -8px rgb(211, 211, 211);
