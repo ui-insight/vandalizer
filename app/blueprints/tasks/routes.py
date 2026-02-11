@@ -33,12 +33,15 @@ from app.models import (
     SearchSetItem,
     SmartDocument,
     User,
-    UserModelConfig,
 )
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import get_default_model_name, get_llm_models
+from app.utilities.config import (
+    get_user_model_name,
+    reconcile_user_model_config,
+    resolve_model_name,
+)
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.extraction_tasks import (
     ingest_extraction_recommendation_task,
@@ -103,43 +106,27 @@ def filter_models() -> ResponseReturnValue:
     validation_failed = False
     user = current_user
 
-    settings_models = get_llm_models()
-    default_model = get_default_model_name()
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    if not model_config:
-        model_config = UserModelConfig(user_id=user.user_id, name=default_model)
-        model_config.available_models = settings_models
-        model_config.save()
+    _, settings_models, current_model = reconcile_user_model_config(
+        user_id=user.user_id,
+        create_if_missing=True,
+    )
 
-    model_config.available_models = settings_models
-    model_config.save()
-
-    # refresh the  model config
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-
-    current_model = default_model
-    print(current_model)
     models = settings_models
     if len(uuids) == 0:
-        if model_config:
-            current_model = model_config.name
         return jsonify({"models": settings_models, "current_model": current_model})
+
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
         if doc is not None and not doc.valid:
             validation_failed = True
             break
+
     if validation_failed:
-        # filter out the external models
-        models = [m for m in model_config.available_models if not m.get("external")]
-        model_names = [m["name"] for m in models]
-        current_model = (
-            model_config.name
-            if model_config.name in model_names
-            else default_model
-        )
-    elif model_config:
-        current_model = model_config.name
+        # Document validation failures must only expose internal models.
+        models = [m for m in settings_models if not m.get("external")]
+        model_names = {m.get("name") for m in models if m.get("name")}
+        if current_model not in model_names:
+            current_model = resolve_model_name(None, models=models)
 
     return jsonify({"models": models, "current_model": current_model})
 
@@ -159,18 +146,21 @@ def update_model() -> ResponseReturnValue:
     ):
         return jsonify({"error": "login required"}), 401
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config, settings_models, _ = reconcile_user_model_config(
+        user_id=user.user_id,
+        create_if_missing=True,
+    )
     if model_config is None:
-        model_config = UserModelConfig(
-            user_id=user.user_id, name=name, temperature=temperature, top_p=top_p
-        )
-    else:
-        model_config.name = name
-        model_config.temperature = temperature
-        model_config.top_p = top_p
+        return jsonify({"error": "failed to load model config"}), 500
+
+    resolved_name = resolve_model_name(name, models=settings_models)
+    model_config.name = resolved_name
+    model_config.temperature = temperature
+    model_config.top_p = top_p
+    model_config.available_models = settings_models
     model_config.save()
 
-    response = {"current_model": name}
+    response = {"current_model": resolved_name}
     return jsonify(response)
 
 
@@ -493,10 +483,7 @@ def begin_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     debug(f"Searching for search set: {searchset_uuid}")
 
-    user_model_config = UserModelConfig.objects(user_id=current_user.get_id()).first()
-    model = get_default_model_name()
-    if user_model_config is not None:
-        model = user_model_config.name
+    model = get_user_model_name(current_user.get_id())
 
     keys = []
     items = []
@@ -740,10 +727,7 @@ def begin_search_sync() -> ResponseReturnValue:
         em = ExtractionManagerNonTyped()
         em.root_path = current_app.root_path
         # get current model
-        user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
-        model_name = get_default_model_name()
-        if user_config:
-            model_name = user_config.name
+        model_name = get_user_model_name(current_user.user_id)
 
         results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
@@ -866,10 +850,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
         return _verified_edit_forbidden_response()
 
     user_id = current_user.get_id()
-    user_model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if user_model_config is not None:
-        model = user_model_config.name
+    model = get_user_model_name(user_id)
 
     em = ExtractionManagerNonTyped()
     em.root_path = current_app.root_path

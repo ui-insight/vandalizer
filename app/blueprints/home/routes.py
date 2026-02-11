@@ -52,7 +52,6 @@ from app.models import (
     TeamMembership,
     UrlAttachment,
     User,
-    UserModelConfig,
     Workflow,
     WorkflowStep,
 )
@@ -63,7 +62,7 @@ from app.utilities.analytics_helper import (
     activity_start,
 )
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import get_default_model_name, settings
+from app.utilities.config import get_user_model_name, is_external_model, settings
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
@@ -99,14 +98,9 @@ def verify_document(document: SmartDocument) -> None:
     print(document.absolute_path)
 
     if not document.raw_text or document.raw_text == "":
-        # Check if the user's model is external
-        model_config = UserModelConfig.objects(user_id=document.user_id).first()
-        is_external_model = False
-        if model_config and model_config.available_models:
-            for model in model_config.available_models:
-                if model.get("name") == model_config.name:
-                    is_external_model = model.get("external", False)
-                    break
+        # Check if the user's selected model is external.
+        model_name = get_user_model_name(document.user_id)
+        selected_model_is_external = is_external_model(model_name)
 
         extraction_task = perform_extraction_and_update.s(
             document_uuid=document.uuid,
@@ -118,7 +112,7 @@ def verify_document(document: SmartDocument) -> None:
             document_path=str(document.absolute_path),
         )
 
-        if is_external_model:
+        if selected_model_is_external:
             # External model: Sequential flow (extraction -> validation)
             # Document not usable until both complete
             workflow = extraction_task | validation_task
@@ -777,11 +771,7 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = get_default_model_name()
+    model = get_user_model_name(user_id)
 
     def generate():
         for chunk in ChatManager().ask_question_to_documents_stream(
@@ -1289,11 +1279,7 @@ def chat_download() -> ResponseReturnValue:
 
     user = load_user()
     user_id = user.get_id()
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = get_default_model_name()
+    model = get_user_model_name(user_id)
 
     if fmt == "pdf":
         formatted = final_output

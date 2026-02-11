@@ -5,8 +5,7 @@ from devtools import debug
 from app.celery_worker import celery_app
 from app.models import ActivityEvent, ActivityType, SmartDocument, SearchSet, SearchSetItem
 from app.utilities.agents import create_chat_agent
-from app.utilities.config import get_default_model_name
-from app.models import UserModelConfig
+from app.utilities.config import get_user_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -82,13 +81,8 @@ def generate_activity_description_task(self, activity_id: str, activity_type: st
                         if non_null_count > 0:
                             extraction_context += f"\nFound {non_null_count} values"
 
-        # Get user's model preference
-        user_model_config = UserModelConfig.objects(user_id=activity.user_id).first()
-        model_name = (
-            user_model_config.name
-            if user_model_config and user_model_config.name
-            else get_default_model_name()
-        )
+        # Get user's model preference with stale-model fallback.
+        model_name = get_user_model_name(activity.user_id)
 
         # Create prompt for LLM
         if activity_type == ActivityType.SEARCH_SET_RUN.value:
@@ -144,4 +138,3 @@ Generate exactly 8 words (no more, no less) that describe this activity. Be conc
         debug(f"Error generating description for activity {activity_id}: {e}")
         debug(f"Traceback: {error_trace}")
         logger.error(f"Failed to generate activity description for {activity_id}: {e}", exc_info=True)
-

@@ -35,7 +35,6 @@ from app.models import (
     SmartDocument,
     Space,
     User,
-    UserModelConfig,
     Workflow,
     WorkflowAttachment,
     WorkflowResult,
@@ -44,7 +43,7 @@ from app.models import (
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import ActivityType, activity_start
-from app.utilities.config import get_default_model_name, settings
+from app.utilities.config import get_user_model_name, settings
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
@@ -296,10 +295,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user_id)
 
     workflow_id = str(workflow.id)
     workflow_result_id = str(workflow_result.id)
@@ -521,10 +517,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user_id)
 
     task_data["user_id"] = user_id
     task_data["model"] = model
@@ -643,10 +636,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow_trigger_step_id = str(document_trigger_step.id)
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user.user_id)
 
     # **6. Execute the Workflow**
     workflow_output = execute_workflow_task.delay(
@@ -837,11 +827,7 @@ def workflow_download() -> ResponseReturnValue:
     if fmt == "pdf":
         formatted = final_output_str
     else:
-        model_config = UserModelConfig.objects(user_id=user.user_id).first()
-        if model_config:
-            model = model_config.name
-        else:
-            model = get_default_model_name()
+        model = get_user_model_name(user.user_id)
 
         chat_agent = create_chat_agent(model)
         # get current event loop

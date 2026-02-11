@@ -15,9 +15,9 @@ from app.models import (
     SearchSet,
     SearchSetItem,
     SmartDocument,
-    UserModelConfig,
 )
 from app.utilities.analytics_helper import activity_finish
+from app.utilities.config import get_user_model_name
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.semantic_recommender import SemanticRecommender
 
@@ -121,16 +121,9 @@ def perform_extraction_task(
             activity.status = "running"
             activity.save()
 
-        # get user model config
+        # Get a valid user model, auto-falling back if their saved model is stale.
         user_id = activity.user_id if activity else None
-        user_model_config = UserModelConfig.objects(user_id=user_id).first()
-        from app.utilities.config import get_default_model_name
-
-        model_name = (
-            user_model_config.name
-            if user_model_config and user_model_config.name
-            else get_default_model_name()
-        )
+        model_name = get_user_model_name(user_id)
 
         # Perform extraction
         em = ExtractionManagerNonTyped()

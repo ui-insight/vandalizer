@@ -261,6 +261,124 @@ def get_default_model_name() -> str:
     return settings.base_model
 
 
+def get_llm_model_names(models: list[dict] | None = None) -> set[str]:
+    """Return the set of configured model names."""
+    configured_models = models if models is not None else get_llm_models()
+    return {
+        model.get("name")
+        for model in configured_models
+        if isinstance(model, dict) and model.get("name")
+    }
+
+
+def get_llm_model_by_name(
+    model_name: str | None,
+    models: list[dict] | None = None,
+) -> dict | None:
+    """Return the configured model dict by name, if present."""
+    if not model_name:
+        return None
+    configured_models = models if models is not None else get_llm_models()
+    for model in configured_models:
+        if isinstance(model, dict) and model.get("name") == model_name:
+            return model
+    return None
+
+
+def resolve_model_name(
+    model_name: str | None,
+    models: list[dict] | None = None,
+) -> str:
+    """
+    Resolve a model name to a currently configured model.
+
+    If the provided model is missing/stale, falls back to the first configured model.
+    """
+    configured_models = models if models is not None else get_llm_models()
+    if get_llm_model_by_name(model_name, configured_models):
+        return model_name
+
+    if configured_models:
+        first = configured_models[0]
+        if isinstance(first, dict) and first.get("name"):
+            return first["name"]
+
+    return settings.base_model
+
+
+def is_external_model(
+    model_name: str | None,
+    models: list[dict] | None = None,
+) -> bool:
+    """Return whether a model is marked external in system configuration."""
+    model = get_llm_model_by_name(model_name, models=models)
+    return bool(model and model.get("external"))
+
+
+def reconcile_user_model_config(
+    user_id: str | None,
+    create_if_missing: bool = False,
+    persist: bool = True,
+):
+    """
+    Reconcile a user's model config with current system model configuration.
+
+    Returns:
+        tuple(model_config_or_none, configured_models, resolved_model_name)
+    """
+    configured_models = get_llm_models()
+    resolved_default = resolve_model_name(None, configured_models)
+
+    if not user_id:
+        return None, configured_models, resolved_default
+
+    try:
+        from app.models import UserModelConfig
+    except Exception:
+        return None, configured_models, resolved_default
+
+    model_config = UserModelConfig.objects(user_id=user_id).first()
+    if model_config is None:
+        if create_if_missing:
+            model_config = UserModelConfig(
+                user_id=user_id,
+                name=resolved_default,
+                available_models=configured_models,
+            )
+            if persist:
+                model_config.save()
+        return model_config, configured_models, resolved_default
+
+    resolved_model = resolve_model_name(model_config.name, configured_models)
+
+    needs_save = False
+    if model_config.name != resolved_model:
+        model_config.name = resolved_model
+        needs_save = True
+    if model_config.available_models != configured_models:
+        model_config.available_models = configured_models
+        needs_save = True
+
+    if needs_save and persist:
+        model_config.save()
+
+    return model_config, configured_models, resolved_model
+
+
+def get_user_model_name(
+    user_id: str | None,
+    create_if_missing: bool = False,
+    persist: bool = True,
+) -> str:
+    """Return a valid current model name for the user (auto-heals stale values)."""
+    _, _, model_name = reconcile_user_model_config(
+        user_id=user_id,
+        create_if_missing=create_if_missing,
+        persist=persist,
+    )
+    return model_name
+
+
 def get_extraction_strategy() -> str:
     """Get extraction strategy from database config or default settings."""
     try:
