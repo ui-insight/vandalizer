@@ -974,6 +974,10 @@ class Library(me.Document):
     items = me.ListField(me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL))
 
     meta = {
+        # Production databases may already have equivalent library indexes under
+        # legacy names/options. Let migrations manage index changes explicitly to
+        # avoid request-time IndexOptionsConflict (Mongo code 85) on first query.
+        "auto_create_index": False,
         "indexes": [
             # PERSONAL: one per user
             {
@@ -984,7 +988,6 @@ class Library(me.Document):
                     "owner_user_id": {"$exists": True},
                     # optionally: {"$type": "string"}
                 },
-                "name": "library_personal_unique_v2",
             },
             # TEAM: one per team
             {
@@ -996,14 +999,12 @@ class Library(me.Document):
                     # if you know it's an ObjectId, you can use:
                     # "team": {"$type": "objectId"}
                 },
-                "name": "library_team_unique_v2",
             },
             # VERIFIED: single global
             {
                 "fields": ["scope"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "verified"},
-                "name": "library_verified_unique_v2",
             },
         ]
     }
