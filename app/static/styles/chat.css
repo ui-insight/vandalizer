@@ -111,6 +111,38 @@
     padding-top: 5px;
 }
 
+/* Keep chat add-menu layout stable even with legacy/global anchor styles. */
+#chat-add-menu {
+    min-width: 220px;
+    padding: 6px;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    border-radius: var(--ui-radius, 12px);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+}
+
+#chat-add-menu .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 40px;
+    line-height: 1.2;
+    white-space: nowrap;
+    color: #1f2937;
+    border-radius: 8px;
+    padding: 9px 12px;
+}
+
+#chat-add-menu .menu-item i {
+    flex: 0 0 18px;
+    width: 18px !important;
+    text-align: center;
+}
+
+#chat-add-menu .menu-item + .menu-item {
+    margin-top: 2px;
+}
+
 /* Styling for the new "Tasks" link */
 .tasks-link-style {
     color: #6c757d; /* Muted text color */
