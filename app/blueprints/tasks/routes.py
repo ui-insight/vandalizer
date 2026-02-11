@@ -53,6 +53,7 @@ from app.utilities.library_helpers import (
     add_object_to_library,
 )
 from app.utilities.edit_history import build_changes, history_for, log_edit_history
+from app.utilities.extraction_metrics import get_extraction_runtime_stats
 
 # SemanticRecommender is now accessed via singleton in workflows.routes
 from app.utilities.verification_helpers import user_can_modify_verified
@@ -91,10 +92,58 @@ def _can_edit_search_set(search_set: SearchSet | None) -> bool:
 
 
 def _render_extraction_panel(search_set: SearchSet, **context):
+    from app.models import SystemConfig
     context.setdefault("can_edit_extraction", _can_edit_search_set(search_set))
     context.setdefault("history_entries", history_for("searchset", search_set.uuid))
     context["search_set"] = search_set
+    sys_config = SystemConfig.get_config()
+    context.setdefault("available_models", sys_config.available_models or [])
+    
+    # Merge system config with search set specific config
+    base_config = sys_config.get_extraction_config()
+    override_config = search_set.extraction_config or {}
+    
+    from app.models import _deep_merge
+    # Deep copy to avoid mutating the cached system config
+    from copy import deepcopy
+    final_config = deepcopy(base_config)
+    _deep_merge(final_config, override_config)
+    
+    context.setdefault("extraction_config", final_config)
+    context.setdefault("has_custom_config", bool(search_set.extraction_config))
+    runtime_stats = get_extraction_runtime_stats(search_set.uuid)
+    context.setdefault("avg_runtime_seconds", runtime_stats["avg_runtime_seconds"])
+    context.setdefault("avg_runtime_sample_size", runtime_stats["sample_size"])
+    context.setdefault("avg_runtime_sample_limit", runtime_stats["sample_limit"])
     return render_template(EXTRACTION_PANEL_TEMPLATE, **context)
+
+
+@tasks.route("/extraction/update_config", methods=["POST"])
+@login_required
+def update_extraction_config():
+    """Update the extraction configuration for a specific search set."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    extraction_uuid = data.get("extraction_uuid")
+    new_config = data.get("config")
+
+    if not extraction_uuid or new_config is None:
+        return jsonify({"error": "Missing extraction_uuid or config"}), 400
+
+    search_set = SearchSet.objects(uuid=extraction_uuid).first()
+    if not search_set:
+        return jsonify({"error": "Extraction set not found"}), 404
+
+    if not _can_edit_search_set(search_set):
+        return _verified_edit_forbidden_response()
+
+    # Update and save
+    search_set.extraction_config = new_config
+    search_set.save()
+
+    return jsonify({"message": "Configuration updated successfully"}), 200
 
 
 @login_required
@@ -468,6 +517,7 @@ def begin_search() -> ResponseReturnValue:
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
+    extraction_config_override = data.get("extraction_config_override")
 
     debug(data)
 
@@ -523,6 +573,7 @@ def begin_search() -> ResponseReturnValue:
                 keys,
                 current_app.root_path,
                 fillable_pdf_url,
+                extraction_config_override,
             ]
         )
 
@@ -565,6 +616,7 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
         "activity_id": str(activity.id),
         "status": activity.status,
         "title": activity.title,
+        "progress_message": activity.progress_message,
     }
 
     # If completed, include results
@@ -948,6 +1000,8 @@ def clone_search_set() -> ResponseReturnValue:
     new_search_set.id = None
     new_search_set.uuid = uuid.uuid4().hex
     new_search_set.is_global = False
+    new_search_set.verified = False
+    new_search_set.user_id = user.user_id
     new_search_set.title = "Copy of " + new_search_set.title
     new_search_set.save()
 

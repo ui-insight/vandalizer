@@ -4,8 +4,7 @@
         <span id="extractionTitle">
             {{ search_set.title }}
             {% if can_edit_extraction %}
-            <i class="fa-regular fa-pen-to-square"
-                id="editExtractionTitleBtn"
+            <i class="fa-regular fa-pen-to-square" id="editExtractionTitleBtn"
                 style="margin-left: 15px; font-size: 16px; color: #adadad99; cursor: pointer; font-weight: 200;"></i>
             {% endif %}
         </span>
@@ -28,76 +27,125 @@
         class="doc-selected-counter workflow-modal-subtitle"><i>{{ documents|length
             }} documents selected</i></p>
     <hr style="padding-bottom: 0px; margin-bottom: 0px;">
-    <div class="search-results-content-body">
-        {% for item in search_set.search_items() %}
-        <div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}"
-            data-search-type="{{ search_set.searchtype }}">
-            <div class="set-content">
-                <span style="float: left; font-size: 1em; color: #191919;">
-                    <i class="fa-brands fa-searchengin"></i>
-                </span>
-                <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
-                    item.searchphrase }}</p>
-            </div>
-        </div>
-        {% endfor %}
-        <br>
-        <p><i class="fa-solid fa-filter"
-                style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Extractions</b>
+    <!-- Tab Navigation -->
+    <div class="extraction-tab-menu">
+        <div class="extraction-tab active" data-tab="design">Design</div>
+        <div class="extraction-tab" data-tab="tools">Tools</div>
+        <div class="extraction-tab" data-tab="advanced">Advanced</div>
+    </div>
 
-            {% if results != null %}
-            <span style="float: right;"><a id="export" href="#">Export</a></span>
-            {% endif %}
-        </p>
+    <style>
+        .extraction-tab-menu {
+            display: flex;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 0px;
+            padding: 0 16px;
+        }
 
-        <div class="set-items set-result-items">
-            {% if search_set.extraction_items()|length == 0 %}
-            <i id="first-item-hint" style="color: rgba(0, 0, 0, 0.425);">Add your first item to begin</i>
-            {% endif %}
-            {% for item in search_set.extraction_items() %}
-            <div class="set-entry-group">
-                <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}"
-                    data-search-type="{{ search_set.searchtype }}">
-                    <div class="set-content">
-                        <span style="float: left; font-size: 1em; color: #191919;">
-                            {{ loop.index }}.
-                        </span>
-                        <p class="set-title"
-                            style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
-                            item.searchphrase }}</p>
+        .extraction-tab {
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
 
+        .extraction-tab:hover {
+            color: #111827;
+        }
 
-                        {% if can_edit_extraction %}
-                        <a class="delete-set-item-button" data-uuid="{{ item.id }}"
-                            style="float: right; font-size: 1em; color: #adadad99;">
-                            <i class="fa-solid fa-circle-xmark"></i>
-                        </a>
-                        {% endif %}
-                    </div>
+        .extraction-tab.active {
+            color: #111827;
+            border-bottom: 2px solid #000;
+        }
+
+        .extraction-tab-content {
+            display: none;
+            padding: 16px;
+        }
+
+        .extraction-tab-content.active {
+            display: block;
+        }
+    </style>
+
+    <!-- Design Tab -->
+    <div id="tab-design" class="extraction-tab-content active" style="padding: 0;">
+        <div class="search-results-content-body">
+            {% for item in search_set.search_items() %}
+            <div class="set-entry semantic-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ item.searchphrase }}"
+                data-search-type="{{ search_set.searchtype }}">
+                <div class="set-content">
+                    <span style="float: left; font-size: 1em; color: #191919;">
+                        <i class="fa-brands fa-searchengin"></i>
+                    </span>
+                    <p class="set-title" style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+                        item.searchphrase }}</p>
                 </div>
-                {% if results is defined and results is not none %}
+            </div>
+            {% endfor %}
+            <br>
+            <p><i class="fa-solid fa-filter"
+                    style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Extractions</b>
+
+                {% if results != null %}
+                <span style="float: right;"><a id="export" href="#">Export</a></span>
+                {% endif %}
+            </p>
+
+            <div class="set-items set-result-items">
+                {% if search_set.extraction_items()|length == 0 %}
+                <i id="first-item-hint" style="color: rgba(0, 0, 0, 0.425);">Add your first item to begin</i>
+                {% endif %}
+                {% for item in search_set.extraction_items() %}
+                <div class="set-entry-group">
+                    <div class="set-entry" data-uuid="{{ search_set.uuid }}" data-title="{{ search_set.title }}"
+                        data-search-type="{{ search_set.searchtype }}">
+                        <div class="set-content">
+                            <span style="float: left; font-size: 1em; color: #191919;">
+                                {{ loop.index }}.
+                            </span>
+                            <p class="set-title"
+                                style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">{{
+                                item.searchphrase }}</p>
+
+
+                            {% if can_edit_extraction %}
+                            <a class="delete-set-item-button" data-uuid="{{ item.id }}"
+                                style="float: right; font-size: 1em; color: #adadad99;">
+                                <i class="fa-solid fa-circle-xmark"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if results is defined and results is not none %}
                     {% set result_value = results[item.searchphrase|trim] %}
                     {% if result_value is not none %}
                     <div style="padding-bottom: 22px;" data-uuid="{{ search_set.uuid }}"
                         data-title="{{ search_set.title }}">
                         <div class="set-content ">
-                            <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ result_value }}</p>
+                            <p style="margin-left: 45px; font-weight: 700; " class="extraction-result">{{ result_value
+                                }}</p>
                         </div>
                     </div>
                     {% endif %}
-                {% endif %}
-            </div>
+                    {% endif %}
+                </div>
 
-            {% endfor %}
+                {% endfor %}
+            </div>
         </div>
     </div>
-    <br><br>
-    <hr>
-    <div class="extraction-tools-panel">
-        <p><i class="fa-solid fa-box-archive"
-                style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
-        <div class="extraction-tools-panel-content">
-            {% if can_edit_extraction %}
+
+    <!-- Tools Tab -->
+    <div id="tab-tools" class="extraction-tab-content">
+        <div class="extraction-tools-panel">
+            <p><i class="fa-solid fa-box-archive"
+                    style="margin-right: 10px; margin-bottom: 15px; margin-top: 0px;"></i><b>Tools</b></p>
+            <div class="extraction-tools-panel-content">
+                {% if can_edit_extraction %}
                 {% if search_set.extraction_items()|length == 0 %}
                 <a class="content-btn" id="build-extraction-from-document-btn" data-uuid="{{ search_set.uuid }}">
                     <div class="add-task">
@@ -106,7 +154,8 @@
                         </div>
                         <div class="add-task-content">
                             <div class="add-task-title">From Document</div>
-                            <div class="add-task-description">Build an extraction set out of your selected document with AI
+                            <div class="add-task-description">Build an extraction set out of your selected document with
+                                AI
                             </div>
                         </div>
                     </div>
@@ -130,7 +179,8 @@
                 </div>
                 {% endif %}
 
-                <input type="file" style="display: none;" id="fillable-pdf-input" name="fillable-pdf-input" accept=".pdf" />
+                <input type="file" style="display: none;" id="fillable-pdf-input" name="fillable-pdf-input"
+                    accept=".pdf" />
                 <a class="content-btn" id="delete-extraction-set" data-uuid="{{ search_set.uuid }}">
                     <div class="add-task">
                         <div class="add-task-icon-container">
@@ -142,27 +192,215 @@
                         </div>
                     </div>
                 </a>
-            {% else %}
+                {% else %}
                 <div style="font-size: 13px; color: #666;">
                     Editing tools are disabled for verified extractions.
                 </div>
-            {% endif %}
-            <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
-                <div class="add-task">
-                    <div class="add-task-icon-container">
-                        <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
+                {% endif %}
+                <a class="content-btn" id="clone" data-uuid="{{ search_set.uuid }}">
+                    <div class="add-task">
+                        <div class="add-task-icon-container">
+                            <i class="fa-solid fa-clone" style="font-size: 24px; color: #5DBB54;"></i>
+                        </div>
+                        <div class="add-task-content">
+                            <div class="add-task-title">Clone</div>
+                            <div class="add-task-description">Make a duplicate copy of the extraction set</div>
+                        </div>
                     </div>
-                    <div class="add-task-content">
-                        <div class="add-task-title">Clone</div>
-                        <div class="add-task-description">Make a duplicate copy of the extraction set</div>
-                    </div>
-                </div>
-            </a>
+                </a>
+            </div>
         </div>
     </div>
 
-    <hr>
-    {% include "_edit_history.html" %}
+    <!-- Advanced Tab -->
+    <div id="tab-advanced" class="extraction-tab-content">
+        <div style="margin-bottom: 16px; padding: 0 16px;">
+            <p style="user-select: none;">
+                <i class="fa-solid fa-sliders" style="margin-right: 10px;"></i><b>Advanced Settings</b>
+                <span style="font-size: 12px; color: #9ca3af; margin-left: 8px;">Per-extraction overrides</span>
+            </p>
+            {% if avg_runtime_seconds is defined and avg_runtime_seconds is not none and avg_runtime_sample_size is defined and avg_runtime_sample_size > 0 %}
+            <p style="font-size: 12px; color: #6b7280; margin: -8px 0 12px 0; user-select: none;">
+                Avg run time: {{ avg_runtime_seconds }}s (last {{ avg_runtime_sample_size }} completed run{% if
+                avg_runtime_sample_size != 1 %}s{% endif %})
+            </p>
+            {% endif %}
+
+            <div id="advanced-extraction-settings"
+                style="display: block; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; font-size: 13px;">
+
+                <!-- Use Defaults checkbox -->
+                <div style="margin-bottom: 12px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="checkbox" id="adv-use-defaults" {% if not has_custom_config %}checked{% endif %}
+                            onchange="document.getElementById('adv-override-fields').style.display = this.checked ? 'none' : 'block';">
+                        <span style="font-weight: 600;">Use system defaults</span>
+                    </label>
+                    <small style="color: #9ca3af;">Uncheck to customize settings for this extraction only.</small>
+                </div>
+
+                <div id="adv-override-fields"
+                    style="display: {% if has_custom_config %}block{% else %}none{% endif %};">
+
+                    <!-- Mode -->
+                    <div style="margin-bottom: 12px;">
+                        <label for="adv-mode" style="font-weight: 600; display: block; margin-bottom: 4px;">Mode</label>
+                        <select id="adv-mode"
+                            style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;"
+                            onchange="document.getElementById('adv-one-pass-cfg').style.display = this.value === 'one_pass' ? 'block' : 'none'; document.getElementById('adv-two-pass-cfg').style.display = this.value === 'two_pass' ? 'block' : 'none';">
+                            <option value="one_pass" {% if extraction_config.mode=='one_pass' %}selected{% endif %}>
+                                One-pass</option>
+                            <option value="two_pass" {% if extraction_config.mode=='two_pass' %}selected{% endif %}>
+                                Two-pass</option>
+                        </select>
+                    </div>
+
+                    <!-- One-pass settings -->
+                    <div id="adv-one-pass-cfg"
+                        style="display: {% if extraction_config.mode == 'one_pass' %}block{% else %}none{% endif %}; margin-left: 12px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 12px; background: white;">
+                        <div style="font-weight: 600; margin-bottom: 8px;">One-pass</div>
+                        <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="adv-op-thinking" {% if extraction_config.one_pass.thinking
+                                    %}checked{% endif %}>
+                                Thinking
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <input type="checkbox" id="adv-op-structured" {% if
+                                    extraction_config.one_pass.structured %}checked{% endif %}>
+                                Structured
+                            </label>
+                        </div>
+                        <select id="adv-op-model"
+                            style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                            <option value="">Use default model</option>
+                            {% for model in available_models %}
+                            <option value="{{ model.name }}" {% if extraction_config.one_pass.model==model.name
+                                %}selected{% endif %}>{{ model.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Two-pass settings -->
+                    <div id="adv-two-pass-cfg"
+                        style="display: {% if extraction_config.mode == 'two_pass' %}block{% else %}none{% endif %}; margin-left: 12px; margin-bottom: 12px;">
+                        <!-- Pass 1 -->
+                        <div
+                            style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 8px; background: white;">
+                            <div style="font-weight: 600; margin-bottom: 8px;">Pass 1 — Draft</div>
+                            <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="adv-tp-p1-thinking" {% if
+                                        extraction_config.two_pass.pass_1.thinking %}checked{% endif %}>
+                                    Thinking
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="adv-tp-p1-structured" {% if
+                                        extraction_config.two_pass.pass_1.structured %}checked{% endif %}>
+                                    Structured
+                                </label>
+                            </div>
+                            <select id="adv-tp-p1-model"
+                                style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                                <option value="">Use default model</option>
+                                {% for model in available_models %}
+                                <option value="{{ model.name }}" {% if
+                                    extraction_config.two_pass.pass_1.model==model.name %}selected{% endif %}>{{
+                                    model.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <!-- Pass 2 -->
+                        <div style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 6px; background: white;">
+                            <div style="font-weight: 600; margin-bottom: 8px;">Pass 2 — Final</div>
+                            <div style="display: flex; gap: 16px; margin-bottom: 8px;">
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="adv-tp-p2-thinking" {% if
+                                        extraction_config.two_pass.pass_2.thinking %}checked{% endif %}>
+                                    Thinking
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="checkbox" id="adv-tp-p2-structured" {% if
+                                        extraction_config.two_pass.pass_2.structured %}checked{% endif %}>
+                                    Structured
+                                </label>
+                            </div>
+                            <select id="adv-tp-p2-model"
+                                style="width: 100%; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                                <option value="">Use default model</option>
+                                {% for model in available_models %}
+                                <option value="{{ model.name }}" {% if
+                                    extraction_config.two_pass.pass_2.model==model.name %}selected{% endif %}>{{
+                                    model.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Chunking -->
+                    <div style="border-top: 1px solid #e5e7eb; padding-top: 12px; margin-bottom: 12px;">
+                        <label
+                            style="display: flex; align-items: center; gap: 8px; cursor: pointer; margin-bottom: 6px;">
+                            <input type="checkbox" id="adv-chunking-enabled" {% if extraction_config.chunking.enabled
+                                %}checked{% endif %}
+                                onchange="document.getElementById('adv-chunking-opts').style.display = this.checked ? 'block' : 'none';">
+                            <span style="font-weight: 600;">Key Chunking</span>
+                        </label>
+                        <div id="adv-chunking-opts"
+                            style="display: {% if extraction_config.chunking.enabled %}block{% else %}none{% endif %}; margin-left: 24px;">
+                            <label style="font-size: 12px; color: #6b7280;">Max keys per chunk</label>
+                            <input type="number" id="adv-chunking-max" min="1" max="100"
+                                value="{{ extraction_config.chunking.max_keys_per_chunk }}"
+                                style="width: 80px; padding: 4px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;">
+                        </div>
+                    </div>
+
+                    <!-- Repetition -->
+                    <div style="border-top: 1px solid #e5e7eb; padding-top: 12px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="adv-repetition-enabled" {% if
+                                extraction_config.repetition.enabled %}checked{% endif %}>
+                            <span style="font-weight: 600;">Repetition / Consensus</span>
+                        </label>
+                        <small style="color: #9ca3af; margin-left: 24px; display: block;">
+                            Runs extraction 2-3x and returns the majority vote.
+                        </small>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        <hr>
+        {% include "_edit_history.html" %}
+    </div>
+
+    <script>
+        document.querySelectorAll('.extraction-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.extraction-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.extraction-tab-content').forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById('tab-' + tabId).classList.add('active');
+
+                // Toggle Bottom Toolbar Visibility
+                // Try ID first, then class fallback
+                const bottomToolbar = document.getElementById('bottom-toolbar-extraction') || document.querySelector('.bottom-toolbar');
+                if (bottomToolbar) {
+                    if (tabId === 'design') {
+                        bottomToolbar.style.display = 'block';
+                    } else {
+                        bottomToolbar.style.display = 'none';
+                    }
+                }
+            });
+        });
+    </script>
+
+
 
     {% include "toolpanel/extractions/extraction_search_panel.html" %}
 
@@ -209,6 +447,77 @@
                 });
             }
             $('#extractionTitleInput').hide();
+        }
+
+        // --- Advanced Settings Auto-Save ---
+        const advSettingsContainer = document.getElementById('advanced-extraction-settings');
+        if (advSettingsContainer) {
+            const inputs = advSettingsContainer.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                input.addEventListener('change', saveAdvancedSettings);
+            });
+        }
+
+        function saveAdvancedSettings() {
+            // Build config object from inputs
+            const useDefaults = document.getElementById('adv-use-defaults').checked;
+
+            // If using defaults, we save an empty config (or explicit null/flag if needed)
+            // But logic says override_config = search_set.extraction_config or { }
+            // So empty dict means system defaults.
+            if (useDefaults) {
+                sendConfigUpdate({});
+                return;
+            }
+
+            const mode = document.getElementById('adv-mode').value;
+            const config = {
+                mode: mode,
+                one_pass: {
+                    thinking: document.getElementById('adv-op-thinking').checked,
+                    structured: document.getElementById('adv-op-structured').checked,
+                    model: document.getElementById('adv-op-model').value
+                },
+                two_pass: {
+                    pass_1: {
+                        thinking: document.getElementById('adv-tp-p1-thinking').checked,
+                        structured: document.getElementById('adv-tp-p1-structured').checked,
+                        model: document.getElementById('adv-tp-p1-model').value
+                    },
+                    pass_2: {
+                        thinking: document.getElementById('adv-tp-p2-thinking').checked,
+                        structured: document.getElementById('adv-tp-p2-structured').checked,
+                        model: document.getElementById('adv-tp-p2-model').value
+                    }
+                },
+                chunking: {
+                    enabled: document.getElementById('adv-chunking-enabled').checked,
+                    max_keys_per_chunk: parseInt(document.getElementById('adv-chunking-max').value) || 0
+                },
+                repetition: {
+                    enabled: document.getElementById('adv-repetition-enabled').checked
+                }
+            };
+
+            sendConfigUpdate(config);
+        }
+
+        function sendConfigUpdate(config) {
+            $.ajax({
+                url: '/tasks/extraction/update_config',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    extraction_uuid: "{{ search_set.uuid }}",
+                    config: config
+                }),
+                success: function (response) {
+                    console.log("Configuration saved", response);
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error saving configuration", error);
+                }
+            });
         }
     </script>
 
