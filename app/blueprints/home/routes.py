@@ -1,6 +1,7 @@
 """Handles primary routing for the home page and related functionalities."""
 
 import asyncio
+from copy import deepcopy
 import io
 import json
 import logging
@@ -48,12 +49,14 @@ from app.models import (
     SmartDocument,
     SmartFolder,
     Space,
+    SystemConfig,
     Team,
     TeamMembership,
     UrlAttachment,
     User,
     Workflow,
     WorkflowStep,
+    _deep_merge,
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
@@ -73,6 +76,7 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
 from app.utilities.edit_history import history_for
+from app.utilities.extraction_metrics import get_extraction_runtime_stats
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -347,12 +351,29 @@ def index() -> ResponseReturnValue:
                         # Switch to Library section and show the extraction panel
                         section = "Library"
                         # Render the extraction panel without results (user can re-run if needed)
+                        system_config = SystemConfig.get_config()
+                        merged_extraction_config = deepcopy(
+                            system_config.get_extraction_config()
+                        )
+                        _deep_merge(
+                            merged_extraction_config, search_set.extraction_config or {}
+                        )
+                        runtime_stats = get_extraction_runtime_stats(search_set.uuid)
                         extraction_panel_html = render_template(
                             "toolpanel/extractions/extraction_panel.html",
                             search_set=search_set,
                             documents=snapshot_documents or documents,
                             results=stored_results,
                             history_entries=history_for("searchset", search_set.uuid),
+                            extraction_config=merged_extraction_config,
+                            has_custom_config=bool(search_set.extraction_config),
+                            available_models=system_config.available_models or [],
+                            can_edit_extraction=user_can_modify_verified(
+                                current_user, search_set
+                            ),
+                            avg_runtime_seconds=runtime_stats["avg_runtime_seconds"],
+                            avg_runtime_sample_size=runtime_stats["sample_size"],
+                            avg_runtime_sample_limit=runtime_stats["sample_limit"],
                         )
 
     debug(activity)
@@ -365,12 +386,29 @@ def index() -> ResponseReturnValue:
             search_set = SearchSet.objects(uuid=search_set_uuid_param).first()
             if search_set:
                 section = "Library"
+                system_config = SystemConfig.get_config()
+                merged_extraction_config = deepcopy(
+                    system_config.get_extraction_config()
+                )
+                _deep_merge(
+                    merged_extraction_config, search_set.extraction_config or {}
+                )
+                runtime_stats = get_extraction_runtime_stats(search_set.uuid)
                 extraction_panel_html = render_template(
                     "toolpanel/extractions/extraction_panel.html",
                     search_set=search_set,
                     documents=documents,
                     results=None,
                     history_entries=history_for("searchset", search_set.uuid),
+                    extraction_config=merged_extraction_config,
+                    has_custom_config=bool(search_set.extraction_config),
+                    available_models=system_config.available_models or [],
+                    can_edit_extraction=user_can_modify_verified(
+                        current_user, search_set
+                    ),
+                    avg_runtime_seconds=runtime_stats["avg_runtime_seconds"],
+                    avg_runtime_sample_size=runtime_stats["sample_size"],
+                    avg_runtime_sample_limit=runtime_stats["sample_limit"],
                 )
 
     return render_template(

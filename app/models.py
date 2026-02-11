@@ -51,6 +51,47 @@ class UserModelConfig(me.Document):
     favorite_items = me.ListField(me.StringField(), default=[])
 
 
+DEFAULT_EXTRACTION_CONFIG = {
+    "mode": "two_pass",       # "one_pass" or "two_pass"
+    "model": "",              # global override; empty = user's model
+    "one_pass": {
+        "thinking": True,
+        "structured": True,
+        "model": "",          # empty = use global model above
+    },
+    "two_pass": {
+        "pass_1": {"thinking": True, "structured": False, "model": ""},
+        "pass_2": {"thinking": False, "structured": True, "model": ""},
+    },
+    "chunking": {"enabled": False, "max_keys_per_chunk": 10},
+    "repetition": {"enabled": False},
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base, modifying base in place."""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _apply_legacy_strategy(config: dict, strategy: str):
+    """Map old extraction_strategy string to new config structure."""
+    if strategy == "two_pass":
+        config["mode"] = "two_pass"
+    elif strategy == "one_pass_thinking":
+        config["mode"] = "one_pass"
+        config["one_pass"]["thinking"] = True
+        config["one_pass"]["structured"] = True
+    elif strategy == "one_pass_no_thinking":
+        config["mode"] = "one_pass"
+        config["one_pass"]["thinking"] = False
+        config["one_pass"]["structured"] = True
+
+
 class SystemConfig(me.Document):
     """System-wide configuration model. Only accessible to system administrators."""
 
@@ -90,18 +131,13 @@ class SystemConfig(me.Document):
             },
         ],
     )
-    # Extraction model configuration
-    # If empty, use user-selected or default model
+
+    # DEPRECATED: kept for backwards compatibility with existing DB documents
     extraction_model = me.StringField(default="", max_length=200)
-    # Extraction strategy configuration
-    # two_pass: thinking draft -> structured final (no thinking)
-    # one_pass_thinking: structured extraction with thinking enabled
-    # one_pass_no_thinking: structured extraction with thinking disabled
-    extraction_strategy = me.StringField(
-        default="two_pass",
-        choices=["two_pass", "one_pass_thinking", "one_pass_no_thinking"],
-        max_length=50,
-    )
+    extraction_strategy = me.StringField(default="", max_length=50)
+
+    # Extraction configuration (replaces extraction_model + extraction_strategy)
+    extraction_config = me.DictField(default={})
 
     # UI Configuration
     highlight_color = me.StringField(
@@ -142,6 +178,27 @@ class SystemConfig(me.Document):
         config = cls.objects.first()
         if not config:
             config = cls().save()
+        return config
+
+    def get_extraction_config(self) -> dict:
+        """Return extraction config with defaults merged in.
+
+        Handles legacy migration: if extraction_config is empty but old
+        extraction_model/extraction_strategy fields exist, maps them automatically.
+        """
+        from copy import deepcopy
+
+        config = deepcopy(DEFAULT_EXTRACTION_CONFIG)
+
+        if self.extraction_config:
+            _deep_merge(config, self.extraction_config)
+        else:
+            # Legacy migration from old scalar fields
+            if self.extraction_model:
+                config["model"] = self.extraction_model
+            if self.extraction_strategy:
+                _apply_legacy_strategy(config, self.extraction_strategy)
+
         return config
 
 
@@ -602,7 +659,9 @@ class SearchSet(me.Document):
     user = me.StringField(required=False, max_length=200)
     fillable_pdf_url = me.StringField(required=False, max_length=200)
     verified = me.BooleanField(default=False)
+    verified = me.BooleanField(default=False)
     created_by_user_id = me.StringField(required=False, max_length=200)
+    extraction_config = me.DictField(default=dict)
 
     def item_count(self) -> int:
         """Return the count of items associated with this search set."""
@@ -1288,6 +1347,7 @@ class ActivityEvent(me.Document):
     steps_total = me.IntField(default=0)  # workflow
     steps_completed = me.IntField(default=0)  # workflow
     error = me.StringField(required=False, max_length=2000)
+    progress_message = me.StringField(required=False, max_length=500)
 
     # Free-form details to inspect/debug without dereferencing
     meta_summary = me.DictField(

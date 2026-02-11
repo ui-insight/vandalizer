@@ -646,9 +646,10 @@ def admin_config():
     user = current_user
     if not user.is_admin:
         abort(403)
-        
+
     config = SystemConfig.get_config()
-    return render_template("admin/config.html", config=config)
+    extraction_config = config.get_extraction_config()
+    return render_template("admin/config.html", config=config, extraction_config=extraction_config)
 
 
 @admin.route("/config/update", methods=["POST"])
@@ -657,40 +658,61 @@ def admin_config_update():
     user = current_user
     if not user.is_admin:
         abort(403)
-        
+
     config = SystemConfig.get_config()
-    
-    # Update fields
+
+    # Update non-extraction fields
     config.ocr_endpoint = request.form.get("ocr_endpoint", "").strip()
     if "llm_endpoint" in request.form:
         config.llm_endpoint = request.form.get("llm_endpoint", "").strip()
     config.highlight_color = request.form.get("highlight_color", "#eab308").strip()
     config.ui_radius = request.form.get("ui_radius", "12px").strip()
-    config.extraction_strategy = request.form.get(
-        "extraction_strategy",
-        "two_pass",
-    ).strip()
-    config.extraction_model = request.form.get("extraction_model", "").strip()
-    allowed_strategies = {
-        "two_pass",
-        "one_pass_thinking",
-        "one_pass_no_thinking",
+
+    # Build extraction config from form
+    extraction_mode = request.form.get("extraction_mode", "two_pass").strip()
+    if extraction_mode not in ("one_pass", "two_pass"):
+        extraction_mode = "two_pass"
+
+    max_keys = 10
+    try:
+        max_keys = int(request.form.get("chunking_max_keys", "10") or "10")
+        max_keys = max(1, min(100, max_keys))
+    except (ValueError, TypeError):
+        pass
+
+    config.extraction_config = {
+        "mode": extraction_mode,
+        "model": request.form.get("extraction_model", "").strip(),
+        "one_pass": {
+            "thinking": request.form.get("one_pass_thinking") == "on",
+            "structured": request.form.get("one_pass_structured") == "on",
+            "model": request.form.get("one_pass_model", "").strip(),
+        },
+        "two_pass": {
+            "pass_1": {
+                "thinking": request.form.get("two_pass_p1_thinking") == "on",
+                "structured": request.form.get("two_pass_p1_structured") == "on",
+                "model": request.form.get("two_pass_p1_model", "").strip(),
+            },
+            "pass_2": {
+                "thinking": request.form.get("two_pass_p2_thinking") == "on",
+                "structured": request.form.get("two_pass_p2_structured") == "on",
+                "model": request.form.get("two_pass_p2_model", "").strip(),
+            },
+        },
+        "chunking": {
+            "enabled": request.form.get("chunking_enabled") == "on",
+            "max_keys_per_chunk": max_keys,
+        },
+        "repetition": {
+            "enabled": request.form.get("repetition_enabled") == "on",
+        },
     }
-    if config.extraction_strategy not in allowed_strategies:
-        config.extraction_strategy = "two_pass"
-    if config.extraction_model:
-        available_model_names = {
-            m.get("name")
-            for m in (config.available_models or [])
-            if isinstance(m, dict) and m.get("name")
-        }
-        if config.extraction_model not in available_model_names:
-            config.extraction_model = ""
-    
+
     config.updated_at = datetime.now()
     config.updated_by = user.email or user.name
     config.save()
-    
+
     flash("System configuration updated.")
     return redirect(url_for("admin.admin_config"))
 
