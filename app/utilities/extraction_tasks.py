@@ -99,6 +99,7 @@ def perform_extraction_task(
     keys: list,
     root_path: str,
     fillable_pdf_url: str = None,
+    extraction_config_override: dict = None,
 ):
     """
     Perform extraction task asynchronously.
@@ -128,7 +129,11 @@ def perform_extraction_task(
         # Perform extraction
         em = ExtractionManagerNonTyped()
         em.root_path = root_path
-        results = em.extract(keys, document_uuids, model=model_name)
+        results = em.extract(
+            keys, document_uuids, model=model_name,
+            extraction_config_override=extraction_config_override,
+            activity_id=activity_id,
+        )
         raw_results = deepcopy(results)
 
         result_count = (

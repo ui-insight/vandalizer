@@ -379,28 +379,37 @@ def get_user_model_name(
     return model_name
 
 
-def get_extraction_strategy() -> str:
-    """Get extraction strategy from database config or default settings."""
+def get_extraction_config() -> dict:
+    """Get the full extraction configuration dict (DB > env > defaults)."""
     try:
         from app.models import SystemConfig
         db_config = SystemConfig.get_config()
-        if db_config and db_config.extraction_strategy:
-            return db_config.extraction_strategy
+        if db_config:
+            return db_config.get_extraction_config()
     except Exception:
         pass
-    return settings.extraction_strategy
+    # Fallback: build from env-var settings
+    from copy import deepcopy
+    from app.models import DEFAULT_EXTRACTION_CONFIG, _apply_legacy_strategy
+    config = deepcopy(DEFAULT_EXTRACTION_CONFIG)
+    if hasattr(settings, "extraction_strategy") and settings.extraction_strategy:
+        _apply_legacy_strategy(config, settings.extraction_strategy)
+    if hasattr(settings, "extraction_model") and settings.extraction_model:
+        config["model"] = settings.extraction_model
+    return config
+
+
+def get_extraction_strategy() -> str:
+    """DEPRECATED: Use get_extraction_config() instead."""
+    config = get_extraction_config()
+    return config.get("mode", "two_pass")
 
 
 def get_extraction_model_name() -> str | None:
-    """Get extraction model name from database config or default settings."""
-    try:
-        from app.models import SystemConfig
-        db_config = SystemConfig.get_config()
-        if db_config and db_config.extraction_model:
-            return db_config.extraction_model
-    except Exception:
-        pass
-    return settings.extraction_model or None
+    """DEPRECATED: Use get_extraction_config() instead."""
+    config = get_extraction_config()
+    model = config.get("model", "")
+    return model or None
 
 
 def get_highlight_color() -> str:

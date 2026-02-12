@@ -2,8 +2,10 @@ import os
 import time
 import openai
 import json
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional, Any, List
-from pydantic import create_model, BaseModel, ConfigDict, model_validator
+from pydantic import create_model, BaseModel, ConfigDict, model_validator, Field
 from pydantic_ai import Agent
 from pydantic_ai._json_schema import InlineDefsJsonSchemaTransformer
 from app.utilities.agents import (
@@ -13,10 +15,9 @@ from app.utilities.agents import (
 )
 from app.utilities.config import (
     get_default_model_name,
-    get_extraction_model_name,
-    get_extraction_strategy,
+    get_extraction_config,
 )
-from app.models import SmartDocument
+from app.models import SmartDocument, ActivityEvent
 from devtools import debug
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -26,9 +27,9 @@ class ExtractionManagerNonTyped:
     root_path = ""
 
     def build_from_documents(self, document_uuids, model):
-        extraction_model = get_extraction_model_name()
-        if extraction_model:
-            model = extraction_model
+        config_model = get_extraction_config().get("model", "")
+        if config_model:
+            model = config_model
         openai.api_key = OPENAI_API_KEY
         doc_text = ""
         time.time()
@@ -39,13 +40,15 @@ class ExtractionManagerNonTyped:
         prompt = (
             """Your job is to build an extraction set from the following information. Take the information given, and the instructions to extract the important information from this text. You will create an array of entities that an LLM could use and faithly reproduce to extract the same values from this text every time. When asked to populate values for the entity types you return, it should give the user the important information from this document every time. Return an array formatted as json with the format {"entities": ["value1", "value2", "etc"]} containing entities for important information in the text. Do not nest values, keep the array flat and one-dimensional. Do not inclued the values, just the entity names in a single array of string values.
 
+Important: The entity names should be Human Readable. Do not use underscores or camelCase. Use spaces and Title Case. For example, use "Invoice Number" instead of "invoice_number".
+
           Passage:
 
         """
             + doc_text
         )
 
-        system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. "
+        system_prompt = "You are a data scientist working on a project to extract entities and their properties from a passage. You are tasked with extracting the entities and their properties from the following passage. Ensure all entity names are Human Readable with spaces, not underscores."
 
         chat_agent = create_chat_agent(model, system_prompt=system_prompt)
         result = chat_agent.run_sync(prompt)
@@ -59,120 +62,263 @@ class ExtractionManagerNonTyped:
             return json.loads(output.strip())
         return None
 
-    def extract(self, extract_keys, document_uuids, model=None, full_text=None):
-        # if extract_keys is string convert to list by splitting on comma
+    def extract(self, extract_keys, document_uuids, model=None, full_text=None,
+                extraction_config_override: dict | None = None, activity_id: str | None = None):
+        # Normalize keys
         if isinstance(extract_keys, str):
             fields_to_extract = extract_keys.split(",")
         else:
             fields_to_extract = extract_keys
-        
-        # Clean up keys
         fields_to_extract = [k.strip() for k in fields_to_extract]
 
-        # Determine extraction model (system override > provided > default)
-        extraction_model = get_extraction_model_name()
-        if extraction_model:
-            model = extraction_model
-        elif model is None:
-            model = get_default_model_name()
+        # Load system extraction config, then apply per-extraction overrides
+        extraction_cfg = self._resolve_config(extraction_config_override)
 
-        extraction_strategy = get_extraction_strategy()
+        # Determine model (config override > provided > default)
+        model = self._resolve_model(extraction_cfg, model)
 
-        time.time()
         openai.api_key = OPENAI_API_KEY
-        time.time()
-        extraction = []
-        
-        if full_text is None:
-            for document_uuid in document_uuids:
-                doc = SmartDocument.objects(uuid=document_uuid).first()
-                if not doc:
-                    debug(f"Document not found: {document_uuid}")
-                    continue
-                doc_text = doc.raw_text
-                if not doc_text or len(doc_text.strip()) == 0:
-                    debug(f"Document {document_uuid} has no text content (length: {len(doc_text) if doc_text else 0})")
-                    continue
-                debug(f"Extracting from document {document_uuid}, text length: {len(doc_text)}")
-                result = self._extract_nontyped(
-                    doc_text,
-                    fields_to_extract,
-                    model,
-                    strategy=extraction_strategy,
-                )
-                debug(
-                    f"Extraction result for document {document_uuid}: {len(result)} entities"
-                )
-                extraction.extend(result)
-        else:
-            doc_text = full_text
-            extraction = self._extract_nontyped(
-                doc_text,
-                fields_to_extract,
-                model,
-                strategy=extraction_strategy,
+
+        doc_texts = self._resolve_doc_texts(document_uuids, full_text)
+        key_chunks = self._resolve_key_chunks(fields_to_extract, extraction_cfg)
+        use_repetition = extraction_cfg.get("repetition", {}).get("enabled", False)
+
+        all_results = []
+        for doc_text in doc_texts:
+            doc_results = self._extract_document(
+                doc_text, key_chunks, model, extraction_config_override or {}, use_repetition, activity_id
             )
+            all_results.extend(doc_results)
 
-        return extraction
+        return all_results
 
-    def _extract_nontyped(
-        self,
-        text: str,
-        keys: list[str],
-        model_name: str,
-        strategy: str | None = None,
+    # ------------------------------------------------------------------
+    # Config / model / chunking resolution
+    # ------------------------------------------------------------------
+
+    def _resolve_config(self, override: dict | None = None) -> dict:
+        """Load system config and merge per-extraction overrides."""
+        cfg = get_extraction_config()
+        if override:
+            from app.models import _deep_merge
+            from copy import deepcopy
+            cfg = deepcopy(cfg)
+            _deep_merge(cfg, override)
+        return cfg
+
+    def _resolve_model(self, cfg: dict, model: str | None) -> str:
+        """Determine the model to use: config override > provided > default."""
+        config_model = cfg.get("model", "")
+        if config_model:
+            return config_model
+        if model:
+            return model
+        return get_default_model_name()
+
+    def _resolve_key_chunks(self, keys: list[str], cfg: dict) -> list[list[str]]:
+        """Split keys into chunks if chunking is enabled."""
+        chunking = cfg.get("chunking", {})
+        if chunking.get("enabled") and chunking.get("max_keys_per_chunk", 0) > 0:
+            return self._chunk_keys(keys, chunking["max_keys_per_chunk"])
+        return [keys]
+
+    def _extract_document(
+        self, doc_text: str, key_chunks: list[list[str]],
+        model: str, cfg: dict, use_repetition: bool, activity_id: str | None = None
     ) -> list:
-        strategy_to_use = (strategy or "two_pass").strip().lower()
+        """Run extraction (with optional chunking and repetition) for one document."""
+        doc_results = []
+        for chunk_keys in key_chunks:
+            if use_repetition:
+                chunk_result = self._extract_with_consensus(doc_text, chunk_keys, model, cfg)
+            else:
+                chunk_result = self._dispatch_extraction(doc_text, chunk_keys, model, cfg, activity_id)
+            doc_results.extend(chunk_result)
 
-        if strategy_to_use == "one_pass_thinking":
-            return self._extract_structured(
-                text,
-                keys,
-                model_name,
-                thinking_override=True,
+        if len(key_chunks) > 1:
+            return self._merge_chunk_results(doc_results)
+        return doc_results
+
+    # ------------------------------------------------------------------
+    # Document text resolution
+    # ------------------------------------------------------------------
+
+    def _resolve_doc_texts(self, document_uuids, full_text=None) -> list[str]:
+        """Return list of document text strings to extract from."""
+        if full_text is not None:
+            return [full_text]
+        texts = []
+        for document_uuid in document_uuids:
+            doc = SmartDocument.objects(uuid=document_uuid).first()
+            if not doc:
+                debug(f"Document not found: {document_uuid}")
+                continue
+            if not doc.raw_text or len(doc.raw_text.strip()) == 0:
+                debug(f"Document {document_uuid} has no text content")
+                continue
+            debug(f"Extracting from document {document_uuid}, text length: {len(doc.raw_text)}")
+            texts.append(doc.raw_text)
+        return texts
+
+    # ------------------------------------------------------------------
+    # Dispatch layer
+    # ------------------------------------------------------------------
+
+    def _dispatch_extraction(
+        self, text: str, keys: list[str], model_name: str, config: dict, activity_id: str | None = None
+    ) -> list:
+        """Route to the correct extraction method based on config."""
+        mode = config.get("mode", "two_pass")
+
+        if mode == "one_pass":
+            if activity_id:
+                ActivityEvent.objects(id=activity_id).update(set__progress_message="Starting single pass extraction...")
+            one_pass = config.get("one_pass", {})
+            thinking = one_pass.get("thinking", True)
+            structured = one_pass.get("structured", True)
+            pass_model = one_pass.get("model", "") or model_name
+            return self._execute_single_pass(text, keys, pass_model, thinking, structured)
+
+        # two_pass (default)
+        if activity_id:
+            ActivityEvent.objects(id=activity_id).update(set__progress_message="Starting Pass 1 of 2...")
+        two_pass = config.get("two_pass", {})
+        pass_1_cfg = two_pass.get("pass_1", {})
+        pass_2_cfg = two_pass.get("pass_2", {})
+        
+        result = self._execute_two_pass(text, keys, model_name, pass_1_cfg, pass_2_cfg, activity_id)
+        if activity_id:
+            ActivityEvent.objects(id=activity_id).update(set__progress_message="Extraction complete.")
+            
+        return result
+
+    def _execute_single_pass(
+        self, text: str, keys: list[str], model_name: str, thinking: bool, structured: bool
+    ) -> list:
+        """Execute a single extraction pass with the given thinking/structured settings."""
+        if structured:
+            return self._extract_structured(text, keys, model_name, thinking_override=thinking)
+        else:
+            return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking)
+
+    def _execute_two_pass(
+        self, text: str, keys: list[str], model_name: str,
+        pass_1_cfg: dict, pass_2_cfg: dict, activity_id: str | None = None
+    ) -> list:
+        """Execute two-pass extraction with independent per-pass configuration."""
+        p1_model = pass_1_cfg.get("model", "") or model_name
+        p1_thinking = pass_1_cfg.get("thinking", True)
+        p1_structured = pass_1_cfg.get("structured", False)
+
+        p2_model = pass_2_cfg.get("model", "") or model_name
+        p2_thinking = pass_2_cfg.get("thinking", False)
+        p2_structured = pass_2_cfg.get("structured", True)
+
+        # Pass 1
+        if p1_structured:
+            draft = self._extract_structured(text, keys, p1_model, thinking_override=p1_thinking)
+        else:
+            draft = self._extract_fallback_json(text, keys, p1_model, thinking_override=p1_thinking)
+
+        if activity_id:
+            ActivityEvent.objects(id=activity_id).update(set__progress_message="Pass 1 complete. Analyzing draft...")
+            
+        draft_hint = self._build_draft_hint(draft)
+
+        # Pass 2
+        if activity_id:
+            ActivityEvent.objects(id=activity_id).update(set__progress_message="Starting Pass 2 of 2...")
+        if p2_structured:
+            final = self._extract_structured(
+                text, keys, p2_model,
+                thinking_override=p2_thinking,
+                draft_hint=draft_hint,
+                allow_fallback=False,
             )
+        else:
+            final = self._extract_fallback_json(text, keys, p2_model, thinking_override=p2_thinking)
 
-        if strategy_to_use == "one_pass_no_thinking":
-            return self._extract_structured(
-                text,
-                keys,
-                model_name,
-                thinking_override=False,
-            )
-
-        if strategy_to_use == "two_pass":
-            return self._extract_two_pass(text, keys, model_name)
-
-        debug(f"Unknown extraction strategy '{strategy_to_use}', defaulting to two_pass")
-        return self._extract_two_pass(text, keys, model_name)
-
-    def _extract_two_pass(self, text: str, keys: list[str], model_name: str) -> list:
-        # Pass 1: thinking-enabled draft (unstructured)
-        draft_entities = self._extract_fallback_json(
-            text,
-            keys,
-            model_name,
-            thinking_override=True,
-        )
-        draft_hint = self._build_draft_hint(draft_entities)
-
-        # Pass 2: structured output with thinking disabled
-        final_entities = self._extract_structured(
-            text,
-            keys,
-            model_name,
-            thinking_override=False,
-            draft_hint=draft_hint,
-            allow_fallback=False,
-        )
-
-        if final_entities:
-            return final_entities
-
-        if draft_entities:
-            return draft_entities
-
+        if final:
+            return final
+        if draft:
+            return draft
         return []
+
+    # ------------------------------------------------------------------
+    # Chunking
+    # ------------------------------------------------------------------
+
+    def _chunk_keys(self, keys: list[str], max_per_chunk: int) -> list[list[str]]:
+        """Split extraction keys into chunks of max_per_chunk size."""
+        return [keys[i:i + max_per_chunk] for i in range(0, len(keys), max_per_chunk)]
+
+    def _merge_chunk_results(self, results: list) -> list:
+        """Merge results from multiple key-chunk extraction calls into unified entities."""
+        if not results:
+            return []
+        merged = {}
+        for item in results:
+            if isinstance(item, dict):
+                for k, v in item.items():
+                    if k not in merged or merged[k] in (None, "", [], {}):
+                        merged[k] = v
+        return [merged] if merged else []
+
+    # ------------------------------------------------------------------
+    # Repetition / Consensus
+    # ------------------------------------------------------------------
+
+    def _extract_with_consensus(
+        self, text: str, keys: list[str], model_name: str, config: dict
+    ) -> list:
+        """Run extraction twice in parallel; if not unanimous, run a third and majority-vote."""
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_1 = executor.submit(self._dispatch_extraction, text, keys, model_name, config)
+            future_2 = executor.submit(self._dispatch_extraction, text, keys, model_name, config)
+            result_1 = future_1.result()
+            result_2 = future_2.result()
+
+        norm_1 = self._normalize_to_dict(result_1)
+        norm_2 = self._normalize_to_dict(result_2)
+
+        if norm_1 == norm_2:
+            debug("Consensus reached on first two runs")
+            return result_1 if result_1 else result_2
+
+        debug("No consensus between first two runs, running third extraction")
+        result_3 = self._dispatch_extraction(text, keys, model_name, config)
+        norm_3 = self._normalize_to_dict(result_3)
+
+        consensus = self._majority_vote(keys, [norm_1, norm_2, norm_3])
+        return [consensus]
+
+    def _normalize_to_dict(self, results: list) -> dict:
+        """Flatten a list of entity dicts into a single merged dict for comparison."""
+        if not results:
+            return {}
+        if isinstance(results, dict):
+            return results
+        merged = {}
+        for item in results:
+            if isinstance(item, dict):
+                merged.update(item)
+        return merged
+
+    def _majority_vote(self, keys: list[str], results: list[dict]) -> dict:
+        """For each key, pick the value that appears most often across results."""
+        consensus = {}
+        for key in keys:
+            values = [r.get(key) for r in results]
+            counter = Counter(
+                json.dumps(v, ensure_ascii=False) if v is not None else "__NULL__"
+                for v in values
+            )
+            most_common_serialized, _ = counter.most_common(1)[0]
+            if most_common_serialized == "__NULL__":
+                consensus[key] = None
+            else:
+                consensus[key] = json.loads(most_common_serialized)
+        return consensus
 
     def _build_draft_hint(self, draft_entities: list | dict | None) -> dict | None:
         if not draft_entities:
@@ -209,10 +355,31 @@ class ExtractionManagerNonTyped:
         allow_fallback: bool = True,
     ) -> list:
         # Create a dynamic Pydantic model where all fields are Optional[str]
-        # This avoids type inference issues and forces the LLM to return strings
-        field_definitions = {key: (Optional[str], None) for key in keys}
+        # We sanitize keys to be valid Python identifiers and use aliases for the actual JSON keys
+        field_definitions = {}
+        for key in keys:
+            # Sanitize key to be a valid variable name (replace spaces/special chars)
+            safe_key = "".join(c if c.isalnum() else "_" for c in key)
+            if not safe_key:
+                safe_key = "field"  # Fallback for completely invalid keys
+            if safe_key[0].isdigit():
+                safe_key = f"_{safe_key}"
 
-        DynamicEntity = create_model("DynamicEntity", **field_definitions)
+            # Ensure uniqueness
+            original_safe_key = safe_key
+            counter = 1
+            while safe_key in field_definitions:
+                safe_key = f"{original_safe_key}_{counter}"
+                counter += 1
+
+            # Map sanitized name to original key via alias
+            field_definitions[safe_key] = (Optional[str], Field(default=None, alias=key))
+
+        DynamicEntity = create_model(
+            "DynamicEntity",
+            __config__=ConfigDict(extra="allow", populate_by_name=True),
+            **field_definitions
+        )
 
         # Define the output model as a list of these entities
         class ExtractionModel(BaseModel):
@@ -243,13 +410,13 @@ class ExtractionManagerNonTyped:
                 return value
 
         def _build_structured_output_schema() -> dict:
-            schema = ExtractionModel.model_json_schema()
+            schema = ExtractionModel.model_json_schema(by_alias=True)
             if "$defs" in schema:
                 schema = InlineDefsJsonSchemaTransformer(schema).walk()
             return schema
 
         api_protocol = get_model_api_protocol(model_name)
-        structured_retries = 1 if api_protocol == "vllm" else 3
+        structured_retries = 3 if api_protocol == "vllm" else 3
 
         system_prompt = (
             "You are a precise entity extraction assistant. Extract the requested information from the text. "
@@ -326,11 +493,18 @@ class ExtractionManagerNonTyped:
 
         except Exception as e:
             error_msg = str(e)
-            debug(f"Extraction failed: {e}")
-            import traceback
-            debug(f"Traceback: {traceback.format_exc()}")
+            debug(f"Structured extraction failed (will attempt fallback): {e}")
+            
+            # Log detailed validation errors if available
+            if hasattr(e, 'cause') and e.cause:
+                debug(f"Underlying cause: {e.cause}")
+            if hasattr(e, 'errors'): # Pydantic ValidationError
+                debug(f"Validation errors: {e.errors()}")
+            if hasattr(e, 'json'):
+                debug(f"Validation error JSON: {e.json()}")
+
             # Check if it's a validation error (common with VLLM)
-            if "output validation" in error_msg or "retries" in error_msg.lower():
+            if "output validation" in error_msg or "retries" in error_msg.lower() or "validation error" in error_msg.lower():
                 if allow_fallback:
                     debug("Output validation failed, attempting fallback with raw JSON parsing")
                     return self._extract_fallback_json(

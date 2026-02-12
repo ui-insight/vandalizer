@@ -1447,10 +1447,8 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                // Preserve existing URL parameters
-                const url = new URL(window.location.href);
-                url.searchParams.set('section', 'Library');
-                location.href = url.toString();
+                // Force redirect to library to close panel
+                window.location.href = "/?section=Library";
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -1560,10 +1558,8 @@
             dataType: 'json',
             async: true,
             success: function (msg) {
-                // Preserve existing URL parameters
-                const url = new URL(window.location.href);
-                url.searchParams.set('section', 'Library');
-                location.href = url.toString();
+                // Force redirect to library to close panel
+                window.location.href = "/?section=Library";
             },
             error: function (xhr, ajaxOptions, thrownError) {
                 console.log(xhr.status);
@@ -3677,6 +3673,41 @@
     }
 
 
+    function _buildExtractionConfigOverride() {
+        // If "Use system defaults" is checked (or the panel doesn't exist), return null
+        var useDefaults = document.getElementById('adv-use-defaults');
+        if (!useDefaults || useDefaults.checked) return null;
+
+        var mode = $('#adv-mode').val() || 'two_pass';
+        return {
+            mode: mode,
+            one_pass: {
+                thinking: !!$('#adv-op-thinking').prop('checked'),
+                structured: !!$('#adv-op-structured').prop('checked'),
+                model: $('#adv-op-model').val() || '',
+            },
+            two_pass: {
+                pass_1: {
+                    thinking: !!$('#adv-tp-p1-thinking').prop('checked'),
+                    structured: !!$('#adv-tp-p1-structured').prop('checked'),
+                    model: $('#adv-tp-p1-model').val() || '',
+                },
+                pass_2: {
+                    thinking: !!$('#adv-tp-p2-thinking').prop('checked'),
+                    structured: !!$('#adv-tp-p2-structured').prop('checked'),
+                    model: $('#adv-tp-p2-model').val() || '',
+                },
+            },
+            chunking: {
+                enabled: !!$('#adv-chunking-enabled').prop('checked'),
+                max_keys_per_chunk: parseInt($('#adv-chunking-max').val()) || 10,
+            },
+            repetition: {
+                enabled: !!$('#adv-repetition-enabled').prop('checked'),
+            },
+        };
+    }
+
     function performExtraction(search_set_uuid) {
 
         if (document_uuids == null || document_uuids == "") {
@@ -3690,10 +3721,15 @@
 
         showScanning();
         showWorking();
-        let data = JSON.stringify({
+        var payload = {
             search_set_uuid: search_set_uuid,
             document_uuids: document_uuids,
-        });
+        };
+        var configOverride = _buildExtractionConfigOverride();
+        if (configOverride) {
+            payload.extraction_config_override = configOverride;
+        }
+        let data = JSON.stringify(payload);
 
         console.log(data);
         if ($('#run-term-button').length > 0) {
@@ -3728,7 +3764,7 @@
                     showExtractionOverlay();
 
                     // Poll for completion
-                    pollExtractionStatus(data.activity_id, search_set_uuid);
+                    pollExtractionStatus(data.activity_id, search_set_uuid, Date.now());
                 } else {
                     hideWorking();
                     stopScanning();
@@ -4304,12 +4340,22 @@
         console.log("Remaining overlays:", panel.find(".extraction-loading-overlay").length);
     }
 
-    function pollExtractionStatus(activity_id, search_set_uuid) {
+    function pollExtractionStatus(activity_id, search_set_uuid, startTime) {
         let pollCount = 0;
         const maxPolls = 120; // 2 minutes max (120 * 1000ms)
+        startTime = startTime || Date.now();
 
         const intervalId = setInterval(function () {
             pollCount++;
+
+            // Update timer
+            if (startTime) {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                $("#extraction-timer").text(timeStr);
+            }
 
             $.ajax({
                 url: `/tasks/extraction_status/${activity_id}`,
@@ -4326,6 +4372,15 @@
                         checkActivityTitleUpdate(activity_id, { title: response.title });
                     }
 
+                    // Update status message
+                    if (response.progress_message) {
+                        $("#extraction-status-message").text(response.progress_message);
+                    } else if (response.status === "running") {
+                        $("#extraction-status-message").text("Extracting...");
+                    } else if (response.status === "queued") {
+                        $("#extraction-status-message").text("Queued...");
+                    }
+
                     if (response.status === "completed") {
                         clearInterval(intervalId);
                         hideWorking();
@@ -4334,6 +4389,8 @@
                         // Hide overlay and display results
                         hideExtractionOverlay();
                         $("#search-results-panel").empty();
+                        $("#extraction-status-message").text("");
+                        $("#extraction-timer").text("");
 
                         // Check if template exists in response
                         console.log("Checking for template in response...");
@@ -4433,6 +4490,8 @@
 
                         // Hide overlay and show error
                         hideExtractionOverlay();
+                        $("#extraction-status-message").text("Failed");
+                        $("#extraction-timer").text("");
 
                         // Update activity status in app rail
                         updateActivityItemStatus(activity_id, response.status);
@@ -4452,6 +4511,8 @@
                         stopScanning();
                         // Hide overlay and show timeout message
                         hideExtractionOverlay();
+                        $("#extraction-status-message").text("Timed out");
+                        $("#extraction-timer").text("");
                         $("#search-results-panel").html("<div style='padding: 20px; color: orange;'>Extraction is taking longer than expected. Check back later.</div>");
                         showToast("Extraction timeout");
                     }
