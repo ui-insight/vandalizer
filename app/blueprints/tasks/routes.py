@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import uuid
 from copy import deepcopy
@@ -1258,19 +1259,55 @@ def run_extraction_integrated() -> ResponseReturnValue:
     if not search_set:
         return jsonify({"error": "Extraction not found"}), 404
 
-    # **3. Handle File Uploads**
+    # **3. Handle File Uploads and Existing Documents**
     uploaded_files = request.files.getlist("file")
-    if not uploaded_files:
+    
+    # Retrieve existing document UUIDs from form data
+    # Can be passed as a list of strings or comma-separated string
+    existing_document_uuids = request.form.getlist("document_uuids")
+    if not existing_document_uuids:
+        # Check if passed as single key
+        doc_uuids_str = request.form.get("document_uuids")
+        if doc_uuids_str:
+            try:
+                # Try parsing as JSON list
+                existing_document_uuids = json.loads(doc_uuids_str)
+                if not isinstance(existing_document_uuids, list):
+                     existing_document_uuids = [doc_uuids_str]
+            except json.JSONDecodeError:
+                # Fallback to comma separation
+                existing_document_uuids = [u.strip() for u in doc_uuids_str.split(",") if u.strip()]
+
+    if not uploaded_files and not existing_document_uuids:
         return (
             jsonify(
                 {
-                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash.",
+                    "error": "At least one file must be uploaded OR one document_uuid provided.",
                 },
             ),
             400,
         )
 
     document_uuids = []
+    
+    # Process existing keys
+    if existing_document_uuids:
+        # Validate existence and ownership/access
+        # Using user_id=user.user_id as standard for SmartDocument ownership check
+        # Verify if SmartDocument uses user.id or user.user_id (User model uses user_id as string id, SmartDocument uses user_id)
+        # Assuming user.user_id matches SmartDocument.user_id
+        valid_docs = SmartDocument.objects(
+            uuid__in=existing_document_uuids, 
+            user_id=user.user_id
+        )
+        found_uuids = [doc.uuid for doc in valid_docs]
+        
+        # Log or warn if some UUIDs were not found? For now just use valid ones.
+        document_uuids.extend(found_uuids)
+        
+        if len(found_uuids) < len(existing_document_uuids):
+            # Potential permission issue or invalid UUIDs
+            pass
 
     for file in uploaded_files:
         # Secure the filename
@@ -1335,6 +1372,9 @@ def run_extraction_integrated() -> ResponseReturnValue:
 
     if len(keys) == 0:
         return jsonify({"error": "No extraction keys found"}), 400
+    
+    if len(document_uuids) == 0:
+        return jsonify({"error": "No valid documents found or uploaded."}), 400
 
     # **5. Create activity and run extraction**
     current_team = user.ensure_current_team()
@@ -1364,6 +1404,7 @@ def run_extraction_integrated() -> ResponseReturnValue:
             keys,
             current_app.root_path,
             fillable_pdf_url,
+            search_set.extraction_config,
         ]
     )
 

@@ -224,6 +224,26 @@ $(document).ready(function () {
     window.location.href = `/files/download_document?docid=${currentItemId}`;
   });
 
+  $("#copy-uuid-option").on("click", function () {
+    const uuid = currentItemId;
+    navigator.clipboard.writeText(uuid).then(function() {
+        // Show toast
+        const x = document.getElementById("snackbar");
+        if (x) {
+            x.className = "show";
+            x.innerText = "Copied UUID to clipboard";
+            setTimeout(function(){ x.className = x.className.replace("show", ""); }, 3000);
+        } else {
+            alert("Copied UUID: " + uuid);
+        }
+    }, function(err) {
+        console.error('Async: Could not copy text: ', err);
+        // Fallback or error handling
+        alert("Failed to copy UUID");
+    });
+    hidePopupMenu();
+  });
+
   $("#toggle-default-doc-option").on("click", function () {
     if (currentItemType !== "folder") {
       let redirectUrl = window.location.href.split("?")[1];
