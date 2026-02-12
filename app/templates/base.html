@@ -1,39 +1,78 @@
 {% extends "bootstrap/base.html" %} {%block title%}Vandalizer{%endblock%} {%
 block head %} {{super()}}
-<link
-  rel="shortcut icon"
-  href="{{ url_for('static', filename='images/favicon.ico') }}"
-/>
+<link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
 {% endblock %} {% block styles %} {{super()}}
-<link
-  rel="stylesheet"
-  href="{{url_for('static', filename='fontawesome/css/fontawesome.css')}}?"
-/>
-<link
-  rel="stylesheet"
-  href="{{url_for('static', filename='fontawesome/css/brands.css')}}?"
-/>
-<link
-  rel="stylesheet"
-  href="{{url_for('static', filename='fontawesome/css/solid.css')}}?"
-/>
+<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/fontawesome.css')}}?" />
+<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/brands.css')}}?" />
+<link rel="stylesheet" href="{{url_for('static', filename='fontawesome/css/solid.css')}}?" />
 
 <style>
   :root {
-    --highlight-color: {{ highlight_color|default('#eab308') }};
+    --highlight-color: {
+        {
+        highlight_color|default('#eab308')
+      }
+    }
+
+    ;
+
     /* Choose black or white text based on highlight brightness */
-    {% set h = highlight_color.lstrip('#') %}
-    {% set r = h[0:2]|int(base=16) if h|length >=6 else 0 %}
-    {% set g = h[2:4]|int(base=16) if h|length >=6 else 0 %}
-    {% set b = h[4:6]|int(base=16) if h|length >=6 else 0 %}
-    {% set luminance = (0.299*r + 0.587*g + 0.114*b)/255 %}
-    --highlight-text-color: {{ '#000000' if luminance > 0.6 else '#ffffff' }};
-    {% set rc = 255 - r %}
-    {% set gc = 255 - g %}
-    {% set bc = 255 - b %}
-    --highlight-complement: {{ '#{:02x}{:02x}{:02x}'.format(rc, gc, bc) }};
-    --ui-radius: {{ ui_radius|default('12px') }};
+      {
+      % set h=highlight_color.lstrip('#') %
+    }
+
+      {
+      % set r=h[0: 2]|int(base=16) if h|length >=6 else 0 %
+    }
+
+      {
+      % set g=h[2: 4]|int(base=16) if h|length >=6 else 0 %
+    }
+
+      {
+      % set b=h[4: 6]|int(base=16) if h|length >=6 else 0 %
+    }
+
+      {
+      % set luminance=(0.299*r + 0.587*g + 0.114*b)/255 %
+    }
+
+    --highlight-text-color: {
+        {
+        '#000000' if luminance>0.6 else '#ffffff'
+      }
+    }
+
+    ;
+
+      {
+      % set rc=255 - r %
+    }
+
+      {
+      % set gc=255 - g %
+    }
+
+      {
+      % set bc=255 - b %
+    }
+
+    --highlight-complement: {
+        {
+        '#{:02x}{:02x}{:02x}' .format(rc, gc, bc)
+      }
+    }
+
+    ;
+
+    --ui-radius: {
+        {
+        ui_radius|default('12px')
+      }
+    }
+
+    ;
   }
 
   .highlight {
@@ -52,17 +91,11 @@ block head %} {{super()}}
 
 {% endblock %} {% block scripts %} {{super()}}
 
-<script
-  src="https://cdn.socket.io/4.8.1/socket.io.min.js"
-  integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+"
-  crossorigin="anonymous"
-></script>
+<script src="{{ url_for('static', filename='javascript/socket.io.min.js') }}"
+  integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" crossorigin="anonymous"></script>
 
 <!-- Google tag (gtag.js) -->
-<script
-  async
-  src="https://www.googletagmanager.com/gtag/js?id=G-9YKGDDTQ94"
-></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-9YKGDDTQ94"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag() {
