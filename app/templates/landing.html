@@ -3,18 +3,16 @@
 <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
 
 {% endblock %} {% block styles %} {{super()}}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
-  integrity="sha512-hoalWLoI8r4UszCkZ5kL8vayOGVae1oxXe/2A4AO6J9+580uKHDO3JdHb7NzwwzK5xr/Fs0W40kiNHxM9vyTtQ=="
-  crossorigin="" />
+
 <link rel="stylesheet" href="{{url_for('static', filename='styles.css')}}" />
 
 <link rel="stylesheet" href="{{url_for('static', filename='styles/slick/slick.css')}}" />
 
 <link rel="stylesheet" href="{{url_for('static', filename='styles/slick/slick-theme.css')}}" />
-<script src="https://cdn.tailwindcss.com"></script>
+<script src="{{url_for('static', filename='javascript/tailwindcss.js')}}"></script>
 
 <!-- Lucide Icons -->
-<script src="https://unpkg.com/lucide@latest"></script>
+<script src="{{url_for('static', filename='javascript/lucide.js')}}"></script>
 <link rel="stylesheet" href="{{url_for('static', filename='styles/landing.css')}}" />
 <script>
   tailwind.config = {
@@ -125,20 +123,26 @@
             {% if azure_enabled %}
             <a class="action-button" href="{{ url_for('azure.login') }}">{{ azure_label }}</a>
             {% elif azure_configured %}
-            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>{{ azure_label }}</button>
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>{{ azure_label
+              }}</button>
             {% if azure_disabled_reason %}
             <p class="text-sm text-gray-200 mt-2">{{ azure_disabled_reason }}</p>
             {% elif not azure_config_complete %}
-            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but required fields are missing: {{ azure_missing_fields|join(', ') }}.</p>
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but required fields are missing: {{
+              azure_missing_fields|join(', ') }}.</p>
             {% elif not azure_blueprint_registered %}
-            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Restart the server after saving the provider settings.</p>
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Restart the server after
+              saving the provider settings.</p>
             {% else %}
-            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Please verify the client ID,
+            <p class="text-sm text-gray-200 mt-2">Azure sign-in is configured but not active. Please verify the client
+              ID,
               secret, and tenant are valid.</p>
             {% endif %}
             {% else %}
-            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>Azure sign-in unavailable</button>
-            <p class="text-sm text-gray-200 mt-2">Add and enable the Azure provider in System Configuration to allow SSO.</p>
+            <button class="action-button opacity-70 cursor-not-allowed" type="button" disabled>Azure sign-in
+              unavailable</button>
+            <p class="text-sm text-gray-200 mt-2">Add and enable the Azure provider in System Configuration to allow
+              SSO.</p>
             {% endif %}
           </div>
           {% endif %}

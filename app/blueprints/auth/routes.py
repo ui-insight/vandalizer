@@ -11,7 +11,6 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
-from flask_dance.contrib.azure import azure
 from flask_login import login_user
 from mongoengine.errors import NotUniqueError
 
@@ -19,6 +18,11 @@ from app import load_user
 from app.oauth import configure_azure_blueprint
 from app.models import TeamInvite, TeamMembership, User
 from app.utilities.config import get_auth_methods, get_oauth_provider_by_type
+from app.utilities.user_identity import (
+    find_identity_matches,
+    normalize_identity,
+    resolve_user_identity,
+)
 
 auth = Blueprint("auth", __name__)
 
@@ -107,10 +111,15 @@ def login() -> ResponseReturnValue:
         return redirect(url_for("auth.index"))
 
     if password_enabled:
-        email = request.form.get("email")
+        email = normalize_identity(request.form.get("email"))
         password = request.form.get("password")
 
-        user = User.objects(user_id=email).first()
+        user = resolve_user_identity(
+            user_id_hint=email,
+            email_hint=email,
+            create_if_missing=False,
+            auto_merge_duplicates=True,
+        )
 
         # Check that user exists and password is correct
         if user and user.check_password(password):
@@ -141,11 +150,15 @@ def register():
         return redirect(url_for("auth.index"))
     if request.method == "POST":
         name = (request.form.get("name") or "").strip()
-        email = (request.form.get("email") or "").strip()
+        email = normalize_identity(request.form.get("email"))
         password = request.form.get("password")
 
+        if not email:
+            flash("Email is required.", "danger")
+            return redirect(url_for("auth.register"))
+
         # Check if user already exists
-        if User.objects(user_id=email).first():
+        if find_identity_matches(user_id_hint=email, email_hint=email):
             flash("An account with that email already exists.", "warning")
             return redirect(url_for("auth.register"))
 
@@ -156,7 +169,7 @@ def register():
         # Check for pending invites BEFORE saving the user
         # This prevents the pre_save hook from creating a personal team
         # Normalize email to lowercase since invites are stored lowercased
-        pending_invites = list(TeamInvite.objects(email=email.lower(), accepted=False))
+        pending_invites = list(TeamInvite.objects(email=email, accepted=False))
 
         first_invited_team = None
         if pending_invites:
@@ -285,19 +298,22 @@ def saml_authorized():
     elif "displayName" in attributes:
         display_name = attributes["displayName"][0]
 
+    normalized_email = normalize_identity(email)
+    if not normalized_email:
+        flash("SAML response did not include a valid user identity.", "danger")
+        return redirect(url_for("auth.index"))
+
     # Login or create user
-    user = User.objects(user_id=email).first()
+    user = resolve_user_identity(
+        user_id_hint=normalized_email,
+        email_hint=normalized_email,
+        name_hint=display_name,
+        create_if_missing=True,
+        auto_merge_duplicates=True,
+    )
     if not user:
-        user = User(
-            user_id=email,
-            email=email,
-            name=display_name
-        ).save()
-    else:
-        # Update details potentially
-        if not user.email:
-            user.email = email
-            user.save()
+        flash("Could not resolve a user account from SAML identity.", "danger")
+        return redirect(url_for("auth.index"))
             
     login_user(user)
     
@@ -332,4 +348,3 @@ def saml_metadata():
         return resp
     else:
         return ", ".join(errors), 500
-

@@ -19,6 +19,7 @@ QUEUE_CONFIG=(
   "uploads:2:2:threads"      # 2 workers for uploads, 2 threads each
   "documents:3:2:threads"    # 3 workers for documents, 2 threads each
   "workflows:2:3:threads"    # 2 workers for workflows, 3 threads each
+  "passive:1:3:threads"      # 1 worker for passive/M365 intake, 3 threads
   "default:1:4:threads"      # 1 worker for default, 4 threads
 )
 

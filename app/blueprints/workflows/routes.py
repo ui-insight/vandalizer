@@ -34,9 +34,9 @@ from app.models import (
     SearchSet,
     SearchSetItem,
     SmartDocument,
+    SmartFolder,
     Space,
     User,
-    UserModelConfig,
     Workflow,
     WorkflowAttachment,
     WorkflowResult,
@@ -45,7 +45,7 @@ from app.models import (
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import ActivityType, activity_start
-from app.utilities.config import get_default_model_name, settings
+from app.utilities.config import get_user_model_name, settings
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.library_helpers import (
     _get_or_create_personal_library,
@@ -309,6 +309,148 @@ def update_workflow() -> ResponseReturnValue:
 
 
 @login_required
+@workflows.route("/edit_configuration", methods=["POST"])
+def edit_configuration() -> ResponseReturnValue:
+    """Edit workflow with configuration tabs (Input/Output)."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+    
+    data = request.get_json()
+    uuid = data["uuid"]
+    workflow = Workflow.objects(id=uuid).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
+    # Get available folders for the user
+    from app.models import SmartFolder
+    folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+    
+    # Build folder paths
+    available_folders = []
+    for folder in folders:
+        # Build folder path by traversing parents
+        path_parts = [folder.title]
+        current = folder
+        while current.parent_id and current.parent_id != "0":
+            parent = SmartFolder.objects(uuid=current.parent_id).only('title', 'parent_id').first()
+            if parent:
+                path_parts.insert(0, parent.title)
+                current = parent
+            else:
+                break
+        
+        available_folders.append({
+            'uuid': folder.uuid,
+            'title': folder.title,
+            'path': ' / '.join(path_parts)
+        })
+
+    # Prepare workflow config for JS
+    workflow_config = {
+        'workflow_id': str(workflow.id),
+        'input_config': workflow.input_config or {},
+        'output_config': workflow.output_config or {},
+        'available_folders': available_folders
+    }
+
+    template = render_template(
+        "workflows/edit_workflow_config.html",
+        workflow=workflow,
+        workflow_config=workflow_config
+    )
+    return {"template": template}
+
+
+@login_required
+@workflows.route("/save_configuration", methods=["POST"])
+def save_configuration() -> ResponseReturnValue:
+    """Save workflow input/output configuration."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+    
+    data = request.get_json()
+    workflow_id = data.get("workflow_id")
+    workflow = Workflow.objects(id=workflow_id).first()
+    
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    if not _workflow_is_editable(workflow):
+        return _verified_workflow_forbidden()
+
+    try:
+        # Update basic fields
+        if "name" in data:
+            workflow.name = data["name"]
+        if "description" in data:
+            workflow.description = data["description"]
+        
+        # Update input configuration
+        if "input_config" in data:
+            workflow.input_config = data["input_config"]
+        
+        # Update output configuration
+        if "output_config" in data:
+            workflow.output_config = data["output_config"]
+        
+        workflow.updated_at = datetime.datetime.now()
+        workflow.save()
+        
+        # Log the change
+        log_edit_history(
+            kind="workflow",
+            obj_id=str(workflow.id),
+            user=_workflow_user_or_none(),
+            action="update_configuration",
+            changes={
+                "input_config": "Updated",
+                "output_config": "Updated"
+            },
+        )
+        
+        return jsonify({"success": True, "workflow_id": str(workflow.id)})
+    
+    except Exception as e:
+        current_app.logger.error(f"Error saving workflow configuration: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@login_required
+@workflows.route("/search_documents", methods=["POST"])
+def search_documents() -> ResponseReturnValue:
+    """Search documents for fixed document picker."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    data = request.get_json()
+    query = (data.get("query") or "").strip()
+
+    filters = {"user_id": user.get_id()}
+    if query:
+        filters["title__icontains"] = query
+
+    docs = (
+        SmartDocument.objects(**filters)
+        .only("uuid", "title", "extension")
+        .order_by("-created_at")
+        .limit(50)
+    )
+
+    results = [
+        {"uuid": doc.uuid, "title": doc.title, "extension": doc.extension}
+        for doc in docs
+    ]
+
+    return jsonify({"documents": results})
+
+
+@login_required
 @workflows.route("/workflow/run", methods=["POST"])
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
@@ -323,6 +465,14 @@ def run_workflow() -> ResponseReturnValue:
     current_space_id = workflow_data.get("current_space_id", "None")
     document_uuids = workflow_data.get("document_uuids") or []
 
+    workflow = Workflow.objects(id=workflow_id).first()
+
+    # Merge fixed documents from input_config
+    from app.utilities.workflow import resolve_fixed_documents
+    fixed_docs = resolve_fixed_documents(workflow) if workflow else []
+    fixed_doc_uuids = [doc.uuid for doc in fixed_docs]
+    document_uuids = list(dict.fromkeys(document_uuids + fixed_doc_uuids))
+
     if not document_uuids:
         return (
             jsonify(
@@ -330,8 +480,6 @@ def run_workflow() -> ResponseReturnValue:
             ),
             400,
         )
-
-    workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     workflow_result.save()
     workflow = Workflow.objects(id=workflow_id).first()
@@ -357,10 +505,7 @@ def run_workflow() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user_id)
 
     workflow_id = str(workflow.id)
     workflow_result_id = str(workflow_result.id)
@@ -582,10 +727,7 @@ def test_workflow_step() -> ResponseReturnValue:
     )
     document_trigger_step.save()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user_id)
 
     task_data["user_id"] = user_id
     task_data["model"] = model
@@ -687,6 +829,12 @@ def run_workflow_integrated() -> ResponseReturnValue:
         document.save()
         document_uuids.append(uid)
 
+    # Merge fixed documents from input_config
+    from app.utilities.workflow import resolve_fixed_documents
+    fixed_docs = resolve_fixed_documents(workflow)
+    fixed_doc_uuids = [doc.uuid for doc in fixed_docs]
+    document_uuids = list(dict.fromkeys(document_uuids + fixed_doc_uuids))
+
     # **5. Prepare Workflow Execution**
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     workflow_result.save()
@@ -704,10 +852,7 @@ def run_workflow_integrated() -> ResponseReturnValue:
 
     workflow_trigger_step_id = str(document_trigger_step.id)
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    model = get_default_model_name()
-    if model_config:
-        model = model_config.name
+    model = get_user_model_name(user.user_id)
 
     # **6. Execute the Workflow**
     workflow_output = execute_workflow_task.delay(
@@ -764,6 +909,7 @@ def workflow_status() -> ResponseReturnValue:
         "output": final_output,
         "status": workflow_result.status,
         "activity_id": activity_id,
+        "workflow_result_id": str(workflow_result.id),
         "started_at": started_at,
         "finished_at": finished_at,
         "duration_seconds": duration_seconds,
@@ -900,11 +1046,7 @@ def workflow_download() -> ResponseReturnValue:
     if fmt == "pdf":
         formatted = final_output_str
     else:
-        model_config = UserModelConfig.objects(user_id=user.user_id).first()
-        if model_config:
-            model = model_config.name
-        else:
-            model = get_default_model_name()
+        model = get_user_model_name(user.user_id)
 
         chat_agent = create_chat_agent(model)
         # get current event loop
@@ -1005,10 +1147,41 @@ def fetch_workflow() -> ResponseReturnValue:
     workflow = Workflow.objects(id=workflow_id).first()
     can_customize = _workflow_is_editable(workflow)
 
+    # Get user and folders for Input/Output configuration
+    user = current_user
+    folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+    
+    # Build folder paths for dropdown
+    available_folders = []
+    for folder in folders:
+        path_parts = [folder.title]
+        current = folder
+        while current.parent_id:
+            parent = SmartFolder.objects(uuid=current.parent_id).first()
+            if parent:
+                path_parts.insert(0, parent.title)
+                current = parent
+            else:
+                break
+        available_folders.append({
+            'uuid': folder.uuid,
+            'title': folder.title,
+            'path': ' / '.join(path_parts)
+        })
+    
+    # Prepare workflow configuration for tabs
+    workflow_config = {
+        'workflow_id': str(workflow.id),
+        'input_config': workflow.input_config or {},
+        'output_config': workflow.output_config or {},
+        'available_folders': available_folders
+    }
+
     template = render_template(
         "workflows/workflow.html",
         workflow=workflow,
         can_customize_workflow=can_customize,
+        workflow_config=workflow_config,
     )
 
     response = {
@@ -1398,6 +1571,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         manual_input = data.get("manual_input", None)
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
@@ -1469,28 +1644,34 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
                             action="update_task",
                             changes=changes,
                         )
-                return jsonify({"response": "success"})
-            workflow_step_task = WorkflowStepTask(
-                name="Extraction",
-                data={"searchphrases": manual_input},
-            )
-            workflow_step_task.save()
-
-            if workflow_step.tasks is None:
-                workflow_step.tasks = []
-            workflow_step.tasks.append(workflow_step_task)
-            workflow_step.save()
-            changes = build_changes(
-                {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
-            )
-            if workflow:
-                log_edit_history(
-                    kind="workflow",
-                    obj_id=str(workflow.id),
-                    user=_workflow_user_or_none(),
-                    action="add_task",
-                    changes=changes,
+            else:
+                workflow_step_task = WorkflowStepTask(
+                    name="Extraction",
+                    data={"searchphrases": manual_input},
                 )
+                workflow_step_task.save()
+
+                if workflow_step.tasks is None:
+                    workflow_step.tasks = []
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
+
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
 
         return jsonify({"response": "success"})
     return None
@@ -1588,6 +1769,8 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
         task_id = data.get("workflow_task_id", None)
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
@@ -1677,6 +1860,12 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                         changes=changes,
                     )
 
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
+
         return jsonify({"response": "success"})
     return None
 
@@ -1729,6 +1918,8 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
@@ -1817,6 +2008,12 @@ def workflow_add_format_step() -> ResponseReturnValue:
                         action="add_task",
                         changes=changes,
                     )
+
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
 
         return jsonify({"response": "success"})
     return None
@@ -1999,7 +2196,7 @@ def add_browser_automation_step() -> ResponseReturnValue:
                 return jsonify({"success": True})
             else:
                 return jsonify({"success": False, "error": "Task not found"}), 404
-        
+
         # Create new task
         task = WorkflowStepTask(
             name="BrowserAutomation",
@@ -2055,7 +2252,7 @@ def _render_output_node_modal(node_type, node_type_name):
     data_str = next(iter(request.args.keys()))
     data = json.loads(data_str)
     workflow_step_id = data.get("workflow_step_id")
-    
+
     template = render_template(
         "workflows/workflow_steps/workflow_add_output_node_modal.html",
         node_type=node_type,
@@ -2107,5 +2304,167 @@ def save_output_step() -> ResponseReturnValue:
         step.tasks.append(task)
         step.is_output = True
         step.save()
-    
+
     return jsonify({"success": True})
+
+
+# =========================================================
+# @MARK: ~~ Evaluation / Self-Validation
+# =========================================================
+
+
+@login_required
+@workflows.route("/workflow/<workflow_id>/generate-eval-plan", methods=["POST"])
+def generate_eval_plan(workflow_id: str) -> ResponseReturnValue:
+    """Generate an evaluation plan for a workflow."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    workflow = Workflow.objects(id=workflow_id).first()
+    if not workflow:
+        return jsonify({"error": WORKFLOW_NOT_FOUND_MESSAGE}), 404
+
+    data = request.get_json() or {}
+    coverage_level = data.get("coverage_level", "standard")
+    if coverage_level not in ("quick", "standard", "exhaustive"):
+        coverage_level = "standard"
+
+    from app.utilities.evaluation_tasks import generate_evaluation_plan_task
+
+    async_result = generate_evaluation_plan_task.delay(
+        workflow_id=workflow_id,
+        coverage_level=coverage_level,
+        user_id=user.get_id(),
+    )
+
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
+
+
+@login_required
+@workflows.route("/workflow-runs/<run_id>/validate", methods=["POST"])
+def validate_workflow_run(run_id: str) -> ResponseReturnValue:
+    """Run validation against a completed workflow result."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    workflow_result = WorkflowResult.objects(id=run_id).first()
+    if not workflow_result:
+        return jsonify({"error": "Workflow result not found"}), 404
+
+    if workflow_result.status != "completed":
+        return (
+            jsonify({"error": "Workflow must be completed before validation"}),
+            400,
+        )
+
+    data = request.get_json() or {}
+    plan_id = data.get("plan_id")
+
+    if not plan_id:
+        from app.models import EvaluationPlan
+
+        plan = (
+            EvaluationPlan.objects(workflow=workflow_result.workflow)
+            .order_by("-created_at")
+            .first()
+        )
+        if not plan:
+            return (
+                jsonify(
+                    {"error": "No evaluation plan found. Generate one first."}
+                ),
+                404,
+            )
+        plan_id = str(plan.id)
+
+    from app.utilities.evaluation_tasks import run_validation_task
+
+    async_result = run_validation_task.delay(
+        plan_id=plan_id,
+        workflow_result_id=run_id,
+        user_id=user.get_id(),
+    )
+
+    return (
+        jsonify({"status": "accepted", "task_id": async_result.id}),
+        202,
+    )
+
+
+@login_required
+@workflows.route("/workflow-runs/<run_id>/validation-report", methods=["GET"])
+def get_validation_report(run_id: str) -> ResponseReturnValue:
+    """Get the validation report for a workflow run."""
+    from app.models import EvaluationRun
+
+    evaluation_run = (
+        EvaluationRun.objects(workflow_result=run_id)
+        .order_by("-created_at")
+        .first()
+    )
+
+    if not evaluation_run:
+        return jsonify({"error": "No validation report found"}), 404
+
+    return jsonify(
+        {
+            "uuid": evaluation_run.uuid,
+            "status": evaluation_run.status,
+            "overall_score": evaluation_run.overall_score,
+            "grade": evaluation_run.grade,
+            "num_passed": evaluation_run.num_passed,
+            "num_failed": evaluation_run.num_failed,
+            "num_warned": evaluation_run.num_warned,
+            "num_skipped": evaluation_run.num_skipped,
+            "check_results": evaluation_run.check_results,
+            "started_at": evaluation_run.started_at.isoformat()
+            if evaluation_run.started_at
+            else None,
+            "finished_at": evaluation_run.finished_at.isoformat()
+            if evaluation_run.finished_at
+            else None,
+            "model_used": evaluation_run.model_used,
+            "error": evaluation_run.error,
+        }
+    )
+
+
+@workflows.route("/eval-plan/status/<task_id>", methods=["GET"])
+def eval_plan_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of an evaluation plan generation task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {"task_id": task_id, "state": state}
+
+    if result.successful():
+        response["result"] = result.result
+    elif result.failed():
+        response["error"] = str(result.result)
+
+    return jsonify(response)
+
+
+@workflows.route("/validation/status/<task_id>", methods=["GET"])
+def validation_status(task_id: str) -> ResponseReturnValue:
+    """Poll the status of a validation run task."""
+    if not task_id:
+        return jsonify({"error": "task_id is required"}), 400
+
+    result = AsyncResult(task_id, app=celery_app)
+    state = result.state
+    response: dict[str, object] = {"task_id": task_id, "state": state}
+
+    if result.successful():
+        response["result"] = result.result
+    elif result.failed():
+        response["error"] = str(result.result)
+
+    return jsonify(response)

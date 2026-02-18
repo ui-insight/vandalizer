@@ -51,6 +51,47 @@ class UserModelConfig(me.Document):
     favorite_items = me.ListField(me.StringField(), default=[])
 
 
+DEFAULT_EXTRACTION_CONFIG = {
+    "mode": "two_pass",       # "one_pass" or "two_pass"
+    "model": "",              # global override; empty = user's model
+    "one_pass": {
+        "thinking": True,
+        "structured": True,
+        "model": "",          # empty = use global model above
+    },
+    "two_pass": {
+        "pass_1": {"thinking": True, "structured": False, "model": ""},
+        "pass_2": {"thinking": False, "structured": True, "model": ""},
+    },
+    "chunking": {"enabled": False, "max_keys_per_chunk": 10},
+    "repetition": {"enabled": False},
+}
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base, modifying base in place."""
+    for key, value in override.items():
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+            _deep_merge(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def _apply_legacy_strategy(config: dict, strategy: str):
+    """Map old extraction_strategy string to new config structure."""
+    if strategy == "two_pass":
+        config["mode"] = "two_pass"
+    elif strategy == "one_pass_thinking":
+        config["mode"] = "one_pass"
+        config["one_pass"]["thinking"] = True
+        config["one_pass"]["structured"] = True
+    elif strategy == "one_pass_no_thinking":
+        config["mode"] = "one_pass"
+        config["one_pass"]["thinking"] = False
+        config["one_pass"]["structured"] = True
+
+
 class SystemConfig(me.Document):
     """System-wide configuration model. Only accessible to system administrators."""
 
@@ -90,18 +131,13 @@ class SystemConfig(me.Document):
             },
         ],
     )
-    # Extraction model configuration
-    # If empty, use user-selected or default model
+
+    # DEPRECATED: kept for backwards compatibility with existing DB documents
     extraction_model = me.StringField(default="", max_length=200)
-    # Extraction strategy configuration
-    # two_pass: thinking draft -> structured final (no thinking)
-    # one_pass_thinking: structured extraction with thinking enabled
-    # one_pass_no_thinking: structured extraction with thinking disabled
-    extraction_strategy = me.StringField(
-        default="two_pass",
-        choices=["two_pass", "one_pass_thinking", "one_pass_no_thinking"],
-        max_length=50,
-    )
+    extraction_strategy = me.StringField(default="", max_length=50)
+
+    # Extraction configuration (replaces extraction_model + extraction_strategy)
+    extraction_config = me.DictField(default={})
 
     # UI Configuration
     highlight_color = me.StringField(
@@ -142,6 +178,27 @@ class SystemConfig(me.Document):
         config = cls.objects.first()
         if not config:
             config = cls().save()
+        return config
+
+    def get_extraction_config(self) -> dict:
+        """Return extraction config with defaults merged in.
+
+        Handles legacy migration: if extraction_config is empty but old
+        extraction_model/extraction_strategy fields exist, maps them automatically.
+        """
+        from copy import deepcopy
+
+        config = deepcopy(DEFAULT_EXTRACTION_CONFIG)
+
+        if self.extraction_config:
+            _deep_merge(config, self.extraction_config)
+        else:
+            # Legacy migration from old scalar fields
+            if self.extraction_model:
+                config["model"] = self.extraction_model
+            if self.extraction_strategy:
+                _apply_legacy_strategy(config, self.extraction_strategy)
+
         return config
 
 
@@ -292,6 +349,64 @@ class Workflow(me.Document):
     space = me.StringField(required=False, max_length=100)
     verified = me.BooleanField(default=False)
     created_by_user_id = me.StringField(required=False, max_length=200)
+    
+    # Passive Vandalizer: Input configuration (how workflow triggers)
+    input_config = me.DictField(required=False, default=lambda: {
+        'manual_enabled': True,  # Existing manual "Run" behavior
+        'fixed_documents': [],  # List of {uuid, title} dicts - always included in every run
+        'folder_watch': {
+            'enabled': False,
+            'folders': [],  # List of SmartFolder UUIDs to watch
+            'delay_seconds': 300,  # Wait 5 min after upload
+            'file_filters': {
+                'types': [],  # e.g., ['pdf', 'docx']
+                'exclude_patterns': []  # e.g., ['*_draft*']
+            },
+            'batch_mode': 'per_document'  # or 'collect_batch'
+        },
+        'conditions': []  # Optional document filters
+    })
+    
+    # Passive Vandalizer: Output configuration (what happens after completion)
+    output_config = me.DictField(required=False, default=lambda: {
+        'storage': {
+            'enabled': False,
+            'destination_folder': None,  # SmartFolder UUID
+            'file_naming': '{date}_{workflow_name}_results',
+            'format': 'csv',  # csv, json, xlsx
+            'append_mode': False
+        },
+        'notifications': []  # List of notification configs
+    })
+    
+    # Passive Vandalizer: Resource controls
+    resource_config = me.DictField(required=False, default=lambda: {
+        'budget': {
+            'daily_token_limit': None,
+            'monthly_token_limit': None
+        },
+        'throttling': {
+            'max_concurrent': 3,
+            'min_delay_between_runs': 60
+        },
+        'retry': {
+            'max_retries': 3,
+            'retry_delay_seconds': 300
+        }
+    })
+    
+    # Passive Vandalizer: Statistics tracking
+    stats = me.DictField(required=False, default=lambda: {
+        'total_runs': 0,
+        'manual_runs': 0,
+        'passive_runs': 0,
+        'successful_runs': 0,
+        'failed_runs': 0,
+        'documents_processed': 0,
+        'tokens_used': 0,
+        'last_run_at': None,
+        'last_passive_run_at': None
+    })
 
     # Self-healing versioning
     version = me.IntField(default=1)
@@ -312,6 +427,155 @@ class WorkflowResult(me.Document):
     current_step_name = me.StringField(required=False, max_length=500)
     current_step_detail = me.StringField(required=False, max_length=50000)
     current_step_preview = me.StringField(required=False)
+    
+    # Passive Vandalizer: Passive execution tracking
+    trigger_event = me.ReferenceField("WorkflowTriggerEvent", required=False)
+    trigger_type = me.StringField(required=False)  # Denormalized for queries: 'manual', 'folder_watch', etc.
+    is_passive = me.BooleanField(default=False)
+    input_context = me.DictField(required=False)  # For chained workflows, API metadata
+
+
+class WorkflowTriggerEvent(me.Document):
+    """Tracks pending and completed triggers for passive workflow execution."""
+    
+    uuid = me.StringField(required=True, max_length=200, unique=True)
+    workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE)
+    trigger_type = me.StringField(
+        required=True,
+        choices=["manual", "folder_watch", "schedule", "api", "chain", "m365_intake"]
+    )
+    status = me.StringField(
+        required=True,
+        choices=["pending", "queued", "running", "completed", "failed", "skipped"],
+        default="pending"
+    )
+
+    # Documents to process
+    documents = me.ListField(me.ReferenceField("SmartDocument"))
+    document_count = me.IntField(default=0)
+
+    # M365 work item reference (set when trigger_type == "m365_intake")
+    work_item = me.ReferenceField("WorkItem", required=False)
+
+    # Trigger context
+    trigger_context = me.DictField()  # folder ref, schedule name, etc.
+    
+    # Timing
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    process_after = me.DateTimeField()  # For delayed processing
+    queued_at = me.DateTimeField()
+    started_at = me.DateTimeField()
+    completed_at = me.DateTimeField()
+    duration_ms = me.IntField()
+    
+    # Results
+    workflow_result = me.ReferenceField("WorkflowResult")
+    documents_succeeded = me.IntField(default=0)
+    documents_failed = me.IntField(default=0)
+    tokens_used = me.IntField(default=0)
+    error = me.StringField()
+    
+    # Retry tracking
+    attempt_number = me.IntField(default=0)
+    max_attempts = me.IntField(default=3)
+    next_retry_at = me.DateTimeField()
+    
+    # Output delivery status
+    output_delivery = me.DictField(default=lambda: {
+        "storage_status": None,
+        "storage_path": None,
+        "notifications_sent": [],
+        "webhooks_called": [],
+        "chains_triggered": []
+    })
+    
+    meta = {
+        "collection": "workflow_trigger_events",
+        "indexes": [
+            "workflow",
+            "status",
+            "process_after",
+            "trigger_type",
+            "created_at"
+        ]
+    }
+
+
+class EvaluationPlan(me.Document):
+    """Evaluation plan generated for a workflow. Contains a checklist of validation checks."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    workflow = me.ReferenceField("Workflow", reverse_delete_rule=CASCADE, required=True)
+
+    coverage_level = me.StringField(
+        default="standard",
+        choices=["quick", "standard", "exhaustive"],
+        max_length=20,
+    )
+    model_used = me.StringField(required=False, max_length=200)
+
+    # Each check dict: check_id, check_type, target_step, target_field, description,
+    # severity (must/should/nice), weight, deterministic, validation_rule, llm_prompt
+    checks = me.ListField(me.DictField(), default=[])
+    num_checks = me.IntField(default=0)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(timezone.utc)
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "collection": "evaluation_plans",
+        "indexes": [
+            {"fields": ["workflow"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
+
+
+class EvaluationRun(me.Document):
+    """Execution of an evaluation plan against a specific workflow result."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    plan = me.ReferenceField("EvaluationPlan", reverse_delete_rule=CASCADE, required=True)
+    workflow_result = me.ReferenceField(
+        "WorkflowResult", reverse_delete_rule=CASCADE, required=True
+    )
+
+    status = me.StringField(
+        default="pending",
+        choices=["pending", "running", "completed", "failed"],
+        max_length=20,
+    )
+
+    # Each result dict: check_id, status, confidence, evidence, reasoning, fix_suggestion
+    check_results = me.ListField(me.DictField(), default=[])
+
+    overall_score = me.FloatField(default=0.0)
+    grade = me.StringField(default="", max_length=2)
+    num_passed = me.IntField(default=0)
+    num_failed = me.IntField(default=0)
+    num_warned = me.IntField(default=0)
+    num_skipped = me.IntField(default=0)
+
+    model_used = me.StringField(required=False, max_length=200)
+    started_at = me.DateTimeField(required=False)
+    finished_at = me.DateTimeField(required=False)
+    error = me.StringField(required=False, max_length=2000)
+
+    created_at = me.DateTimeField(
+        default=lambda: datetime.datetime.now(timezone.utc)
+    )
+    created_by_user_id = me.StringField(required=False, max_length=200)
+
+    meta = {
+        "collection": "evaluation_runs",
+        "indexes": [
+            {"fields": ["workflow_result"]},
+            {"fields": ["plan"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
 
 
 # Teams
@@ -417,6 +681,10 @@ class User(me.Document):
 
     # Browser Automation WebSocket Session (for cross-process communication)
     browser_automation_session_id = me.StringField(max_length=200, sparse=True)
+
+    # M365 integration opt-in
+    m365_enabled = me.BooleanField(default=False)
+    m365_connected_at = me.DateTimeField(required=False)
 
     @property
     def current_team_uuid(self) -> str | None:
@@ -713,7 +981,9 @@ class SearchSet(me.Document):
     user = me.StringField(required=False, max_length=200)
     fillable_pdf_url = me.StringField(required=False, max_length=200)
     verified = me.BooleanField(default=False)
+    verified = me.BooleanField(default=False)
     created_by_user_id = me.StringField(required=False, max_length=200)
+    extraction_config = me.DictField(default=dict)
 
     def item_count(self) -> int:
         """Return the count of items associated with this search set."""
@@ -1085,6 +1355,10 @@ class Library(me.Document):
     items = me.ListField(me.ReferenceField("LibraryItem", reverse_delete_rule=me.PULL))
 
     meta = {
+        # Production databases may already have equivalent library indexes under
+        # legacy names/options. Let migrations manage index changes explicitly to
+        # avoid request-time IndexOptionsConflict (Mongo code 85) on first query.
+        "auto_create_index": False,
         "indexes": [
             # PERSONAL: one per user
             {
@@ -1165,6 +1439,7 @@ class VerificationRequest(me.Document):
     summary = me.StringField(required=False, max_length=500)
     description = me.StringField(required=False, max_length=5000)
     example_inputs = me.ListField(me.StringField(max_length=500), default=[])
+    test_files = me.ListField(me.DictField(), default=[])
     expected_outputs = me.ListField(me.StringField(max_length=500), default=[])
     dependencies = me.ListField(me.StringField(max_length=300), default=[])
     run_instructions = me.StringField(required=False, max_length=5000)
@@ -1227,6 +1502,7 @@ class VerificationRequest(me.Document):
             "summary": self.summary or "",
             "description": self.description or "",
             "example_inputs": self.example_inputs or [],
+            "test_files": self.test_files or [],
             "expected_outputs": self.expected_outputs or [],
             "dependencies": self.dependencies or [],
             "run_instructions": self.run_instructions or "",
@@ -1393,6 +1669,7 @@ class ActivityEvent(me.Document):
     steps_total = me.IntField(default=0)  # workflow
     steps_completed = me.IntField(default=0)  # workflow
     error = me.StringField(required=False, max_length=2000)
+    progress_message = me.StringField(required=False, max_length=500)
 
     # Free-form details to inspect/debug without dereferencing
     meta_summary = me.DictField(
@@ -1485,17 +1762,212 @@ class DailyUsageAggregate(me.Document):
                 "fields": ["date", "scope", "user_id"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "user"},
+                "name": "daily_usage_user_unique_v2",
             },
             {
                 "fields": ["date", "scope", "team_id"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "team"},
+                "name": "daily_usage_team_unique_v2",
             },
             {
                 "fields": ["date", "scope"],
                 "unique": True,
                 "partialFilterExpression": {"scope": "global"},
+                "name": "daily_usage_global_unique_v2",
             },
             {"fields": ["-date", "scope"]},
         ]
+    }
+
+
+# ---------------------------------------------------------------------------
+# M365 Passive Workflow Models
+# ---------------------------------------------------------------------------
+
+
+class WorkItem(me.Document):
+    """Normalized intake item from any M365 source (email, OneDrive file, etc.)."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    source = me.StringField(
+        required=True,
+        choices=["outlook_shared", "outlook_folder", "onedrive_drop", "manual"],
+    )
+    status = me.StringField(
+        required=True,
+        default="received",
+        choices=[
+            "received",
+            "triaged",
+            "processing",
+            "awaiting_review",
+            "completed",
+            "failed",
+            "rejected",
+        ],
+    )
+
+    # Source identifiers (Graph API IDs)
+    graph_message_id = me.StringField(max_length=500)
+    graph_drive_item_id = me.StringField(max_length=500)
+    source_mailbox = me.StringField(max_length=320)
+    source_folder_path = me.StringField(max_length=500)
+
+    # Extracted metadata
+    subject = me.StringField(max_length=1000)
+    sender_email = me.StringField(max_length=320)
+    sender_name = me.StringField(max_length=200)
+    received_at = me.DateTimeField()
+    body_text = me.StringField()
+    body_html = me.StringField()
+
+    # Attachments (stored as SmartDocuments after download)
+    attachments = me.ListField(me.ReferenceField("SmartDocument"))
+    attachment_count = me.IntField(default=0)
+
+    # Triage results (populated by triage agent)
+    triage_category = me.StringField(max_length=200)
+    triage_confidence = me.FloatField()
+    triage_tags = me.ListField(me.StringField(max_length=100))
+    sensitivity_flags = me.ListField(me.StringField(max_length=100))
+    triage_summary = me.StringField(max_length=5000)
+
+    # Workflow binding
+    intake_config = me.ReferenceField("IntakeConfig", required=False)
+    matched_workflow = me.ReferenceField("Workflow", required=False)
+    trigger_event = me.ReferenceField("WorkflowTriggerEvent", required=False)
+    workflow_result = me.ReferenceField("WorkflowResult", required=False)
+
+    # OneDrive case folder (populated after output)
+    case_folder_url = me.StringField(max_length=1000)
+    case_folder_drive_path = me.StringField(max_length=500)
+
+    # Feedback (from Teams cards or UI)
+    feedback_action = me.StringField(
+        max_length=50, choices=["correct", "fix", "stop", "reassign", None]
+    )
+    feedback_by = me.StringField(max_length=200)
+    feedback_at = me.DateTimeField()
+    feedback_note = me.StringField(max_length=2000)
+
+    # Ownership / audit
+    owner_user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+    updated_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "work_items",
+        "indexes": [
+            "uuid",
+            "source",
+            "status",
+            "owner_user_id",
+            "team_id",
+            "graph_message_id",
+            "-created_at",
+            {"fields": ["source_mailbox", "status"]},
+        ],
+    }
+
+
+class GraphSubscription(me.Document):
+    """Tracks an active Microsoft Graph webhook subscription."""
+
+    subscription_id = me.StringField(required=True, unique=True, max_length=200)
+    resource = me.StringField(required=True, max_length=500)
+    change_type = me.StringField(required=True, max_length=50)
+    notification_url = me.StringField(required=True, max_length=500)
+    expiration = me.DateTimeField(required=True)
+    owner_user_id = me.StringField(required=True, max_length=200)
+    intake_config_id = me.StringField(max_length=200)
+    active = me.BooleanField(default=True)
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "graph_subscriptions",
+        "indexes": ["subscription_id", "expiration", "active"],
+    }
+
+
+class IntakeConfig(me.Document):
+    """Configuration for an M365 intake lane (shared mailbox, folder, OneDrive drop)."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    name = me.StringField(required=True, max_length=200)
+    intake_type = me.StringField(
+        required=True,
+        choices=["outlook_shared", "outlook_folder", "onedrive_drop"],
+    )
+    enabled = me.BooleanField(default=False)
+
+    # Source configuration (populate the ones relevant to intake_type)
+    mailbox_address = me.StringField(max_length=320)
+    outlook_folder_id = me.StringField(max_length=500)
+    drive_id = me.StringField(max_length=200)
+    folder_path = me.StringField(max_length=500)
+
+    # Routing — which workflow(s) to route to
+    default_workflow = me.ReferenceField("Workflow", required=False)
+    triage_enabled = me.BooleanField(default=True)
+    triage_rules = me.ListField(me.DictField(), default=[])
+
+    # File filters (reuse concept from passive_triggers)
+    file_filters = me.DictField(
+        default=lambda: {
+            "types": ["pdf", "docx", "xlsx"],
+            "exclude_patterns": [],
+            "max_size_bytes": 50_000_000,
+        }
+    )
+
+    # Teams notification configuration
+    teams_config = me.DictField(
+        default=lambda: {
+            "enabled": False,
+            "team_id": None,
+            "channel_id": None,
+            "notify_on_complete": True,
+            "notify_on_error": True,
+            "daily_digest": True,
+        }
+    )
+
+    # Graph subscription reference
+    subscription = me.ReferenceField("GraphSubscription", required=False)
+
+    # Ownership
+    owner_user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(max_length=200)
+
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+    updated_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "intake_configs",
+        "indexes": ["uuid", "intake_type", "owner_user_id", "enabled"],
+    }
+
+
+class M365AuditEntry(me.Document):
+    """Immutable audit log for M365 integration actions."""
+
+    uuid = me.StringField(required=True, unique=True, max_length=200)
+    action = me.StringField(required=True, max_length=50)
+    actor_user_id = me.StringField(max_length=200)
+    actor_type = me.StringField(
+        max_length=20, choices=["user", "system", "graph_webhook"]
+    )
+
+    work_item_id = me.StringField(max_length=200)
+    intake_config_id = me.StringField(max_length=200)
+    workflow_id = me.StringField(max_length=200)
+
+    detail = me.DictField()
+    created_at = me.DateTimeField(default=datetime.datetime.utcnow)
+
+    meta = {
+        "collection": "m365_audit_log",
+        "indexes": ["-created_at", "action", "work_item_id", "actor_user_id"],
     }

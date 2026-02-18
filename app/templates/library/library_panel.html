@@ -128,8 +128,6 @@
 
     <!-- Modals -->
     {% include "library/verification_modal.html" %}
-    <!-- Modals -->
-    {% include "library/verification_modal.html" %}
     <!-- Removed bottom panel per redesign -->
 
 
@@ -616,6 +614,13 @@
         $("#verification-status-helper").text("Please describe how this task works and how you validated it.");
         $("#verification-error").hide().text("");
         $("#verification-status-pill").hide();
+        const exampleFileInput = document.getElementById("verification-example-input-files");
+        if (exampleFileInput) exampleFileInput.value = "";
+        const exampleFileList = document.getElementById("verification-example-input-files-list");
+        if (exampleFileList) {
+            exampleFileList.innerHTML = "";
+            exampleFileList.style.display = "none";
+        }
 
         modal.data("verification-route", routeType);
         modal.show();
@@ -754,6 +759,29 @@
             });
         }
     };
+
+    window.openWorkflowConfig = function (workflowId) {
+        // Set flag to switch to Input tab after workflow loads
+        window._switchToInputTab = true;
+
+        // Fetch workflow normally
+        if (typeof fetchWorkflow === 'function') {
+            fetchWorkflow(workflowId);
+        } else {
+            console.error("fetchWorkflow function not found");
+            alert("Could not open workflow configuration.");
+        }
+    };
+
+    // Listen for when workflow loads, then switch to Input tab if flagged
+    $(document).on('DOMNodeInserted', '.workflow-tabs', function (e) {
+        if (window._switchToInputTab) {
+            window._switchToInputTab = false;
+            setTimeout(function () {
+                $('.workflow-tab[data-tab="input"]').click();
+            }, 150);
+        }
+    });
 
     window.toggleMenu = function (e, menuId) {
         e.stopPropagation();
@@ -1022,6 +1050,26 @@
 
     // Init Logic
     $(document).ready(function () {
+        function renderVerificationExampleFileList() {
+            const fileInput = document.getElementById("verification-example-input-files");
+            const fileList = document.getElementById("verification-example-input-files-list");
+            if (!fileInput || !fileList) return;
+
+            const files = Array.from(fileInput.files || []);
+            if (!files.length) {
+                fileList.innerHTML = "";
+                fileList.style.display = "none";
+                return;
+            }
+
+            fileList.innerHTML = files
+                .map(file => `<li>${$("<div>").text(file.name).html()}</li>`)
+                .join("");
+            fileList.style.display = "";
+        }
+
+        $("#verification-example-input-files").on("change", renderVerificationExampleFileList);
+
         // Tab Clicks
         $('.scope-tab-btn').on('click', function () {
             setLibraryScope($(this).data('scope'));
@@ -1049,43 +1097,81 @@
                 return;
             }
 
-            const payload = {
-                uuid: $("#verification-uuid").val(),
-                form: {
-                    submitter_name: $("#verification-submitter-name").val(),
-                    submitter_org: $("#verification-submitter-org").val(),
-                    item_title: $("#verification-item-title").val(),
-                    category: $("#verification-category").val(),
-                    summary: $("#verification-summary").val(),
-                    description: $("#verification-description").val(),
-                    run_instructions: $("#verification-run-instructions").val(),
-                    evaluation_notes: $("#verification-eval-notes").val(),
-                    example_inputs: $("#verification-example-inputs").val(),
-                    expected_outputs: $("#verification-expected-outputs").val(),
-                }
-            };
+            const exampleInputFiles = Array.from(
+                (document.getElementById("verification-example-input-files") || { files: [] }).files || []
+            );
 
             const submitBtn = $("#verification-submit-btn");
             submitBtn.prop("disabled", true).text("Submitting...");
 
-            $.ajax({
-                url: `/library/${routeType}/submit_for_verification`,
-                method: "POST",
-                data: JSON.stringify(payload),
-                contentType: "application/json",
-                success: function (res) {
-                    if (res && res.ok) {
-                        showToast("Verification request submitted");
+            const submitVerificationRequest = function (uploadedTestFiles) {
+                const payload = {
+                    uuid: $("#verification-uuid").val(),
+                    form: {
+                        submitter_name: $("#verification-submitter-name").val(),
+                        submitter_org: $("#verification-submitter-org").val(),
+                        item_title: $("#verification-item-title").val(),
+                        category: $("#verification-category").val(),
+                        summary: $("#verification-summary").val(),
+                        description: $("#verification-description").val(),
+                        run_instructions: $("#verification-run-instructions").val(),
+                        evaluation_notes: $("#verification-eval-notes").val(),
+                        example_inputs: exampleInputFiles.map(file => file.name),
+                        test_files: uploadedTestFiles || [],
+                        expected_outputs: $("#verification-expected-outputs").val(),
                     }
-                    closeVerificationModal();
-                    refreshResults();
+                };
+
+                $.ajax({
+                    url: `/library/${routeType}/submit_for_verification`,
+                    method: "POST",
+                    data: JSON.stringify(payload),
+                    contentType: "application/json",
+                    success: function (res) {
+                        if (res && res.ok) {
+                            showToast("Verification request submitted");
+                        }
+                        closeVerificationModal();
+                        refreshResults();
+                    },
+                    error: function (xhr) {
+                        const message =
+                            (xhr.responseJSON && xhr.responseJSON.error) || "Failed to submit verification request";
+                        $("#verification-error").text(message).show();
+                    },
+                    complete: function () {
+                        submitBtn.prop("disabled", false).text("Submit for verification");
+                    }
+                });
+            };
+
+            if (!exampleInputFiles.length) {
+                submitVerificationRequest([]);
+                return;
+            }
+
+            const uploadData = new FormData();
+            exampleInputFiles.forEach(file => uploadData.append("files", file));
+
+            $.ajax({
+                url: "/library/verification/upload_test_files",
+                method: "POST",
+                data: uploadData,
+                processData: false,
+                contentType: false,
+                success: function (res) {
+                    if (!res || !res.ok) {
+                        const message = (res && res.error) || "Failed to upload test files";
+                        $("#verification-error").text(message).show();
+                        submitBtn.prop("disabled", false).text("Submit for verification");
+                        return;
+                    }
+                    submitVerificationRequest(res.files || []);
                 },
                 error: function (xhr) {
                     const message =
-                        (xhr.responseJSON && xhr.responseJSON.error) || "Failed to submit verification request";
+                        (xhr.responseJSON && xhr.responseJSON.error) || "Failed to upload test files";
                     $("#verification-error").text(message).show();
-                },
-                complete: function () {
                     submitBtn.prop("disabled", false).text("Submit for verification");
                 }
             });

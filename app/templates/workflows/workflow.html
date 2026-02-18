@@ -1,5 +1,7 @@
 {% set can_customize_workflow = can_customize_workflow if can_customize_workflow is defined else True %}
-<div class="workflow-container">
+
+<!-- Header and Tabs Section (White Background) -->
+<div style="background: white; padding: 20px 30px 0; border-bottom: 1px solid #e5e7eb;">
     <div>
         <p style="font-size: 24px; font-weight: 600;">
             <span id="workflowTitle">{{ workflow.name }}</span>
@@ -97,96 +99,429 @@
     {% endif %}
     {% endif %}
 
+    <!-- Tab Navigation -->
+    <div class="workflow-tabs" style="display: flex; gap: 8px; margin-bottom: 24px; border-bottom: 2px solid #e5e7eb;">
+        <button class="workflow-tab active" data-tab="design"
+            style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid var(--highlight-color); font-weight: 600; color: var(--highlight-color); cursor: pointer; transition: all 0.2s;">
+            <i class="fa-solid fa-pen-ruler"></i> Design
+        </button>
+        <button class="workflow-tab" data-tab="input"
+            style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 500; color: #6b7280; cursor: pointer; transition: all 0.2s;">
+            <i class="fa-solid fa-bolt"></i> Input
+            <span id="input-tab-badge" class="tab-badge"
+                style="display: none; background: #fef3c7; color: #92400e; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; font-weight: 600;"></span>
+        </button>
+        <button class="workflow-tab" data-tab="output"
+            style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 500; color: #6b7280; cursor: pointer; transition: all 0.2s;">
+            <i class="fa-solid fa-paper-plane"></i> Output
+            <span id="output-tab-badge" class="tab-badge"
+                style="display: none; background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; font-weight: 600;"></span>
+        </button>
+        <button class="workflow-tab" data-tab="validate"
+            style="padding: 12px 20px; background: none; border: none; border-bottom: 3px solid transparent; font-weight: 500; color: #6b7280; cursor: pointer; transition: all 0.2s;">
+            <i class="fa-solid fa-clipboard-check"></i> Validate
+            <span id="validate-tab-badge" class="tab-badge"
+                style="display: none; padding: 2px 6px; border-radius: 10px; font-size: 11px; margin-left: 6px; font-weight: 600;"></span>
+        </button>
+    </div>
 
-    <div class="workflow-step workflow-output hidden">
-        <div class="step-connector top"></div>
+</div>
 
-        <div class="step-content">
-            <div class="add-task-icon-container">
-                <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
-            </div>
-            <div class="step-header">
+<!-- Design Tab Content (Checkerboard Background) -->
+<div id="tab-design" class="workflow-tab-content" style="min-height: calc(100vh - 200px);">
+    <div class="workflow-container" style="height: 100%; min-height: calc(100vh - 200px);">
+        <div class="trigger">Trigger</div>
 
-                <span>View output</span>
-
-                <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s
-                            elapsed</i></span></span>
-                <div class="workflow-active-step-status hidden" style="margin-top:8px;">
-                    <div id="workflow-active-step-label" class="workflow-progress-label"></div>
-                    <div id="workflow-active-step-preview" class="workflow-progress-detail"></div>
+        <div class="workflow-step active">
+            <div class="step-content">
+                <div class="add-task-icon-container">
+                    <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
                 </div>
-                <a id="closeWorkflowOutputBtn"
-                    style="position: absolute; right: 30px; color: #88888899; cursor: pointer;"><i
-                        class="fa-solid fa-circle-xmark"></i></a>
+                <div class="step-header">
+                    <span>Documents Selected</span>
+                    <span class="attachment-info"><span class="doc-selected-counter">None selected</span></span>
+                </div>
+            </div>
+            <div class="step-connector bottom active"></div>
+        </div>
+        <div class="step-connection-line"></div>
 
+        {% for step in workflow.steps %}
+
+
+        <div class="workflow-step">
+            <div class=" step-connector top"></div>
+            <div class="step-content {% if can_customize_workflow %}edit-workflow-step-btn{% endif %}"
+                data-step-id="{{ step.id }}" data-step-type="{{ step.name|lower }}">
+                <div class="add-task-icon-container" style="font-weight: 900; font-size: 18px; aspect-ratio: 1;">
+                    {{ loop.index }}
+                </div>
+                <div class="step-header">
+                    <span>{{ step.name }}</span>
+                    <span class="item-info">
+                        {{ step.tasks|length }} tasks
+                    </span>
+
+                </div>
+
+                <span class="workflow-loader" style="display: none;"></span>
+                <div class="step-icon">
+                    <i class=" fa-solid fa-sliders" style="font-size: 18px; font-weight: 300; color: #46464681;"></i>
+                </div>
+            </div>
+            <div class="step-connector bottom"></div>
+        </div>
+        <div class="step-connection-line"></div>
+        {% endfor %}
+
+        {% if can_customize_workflow %}
+        <div class="add-step">
+            <button id="add-workflow-step-btn">+ ADD STEP</button>
+        </div>
+        {% endif %}
+
+
+        <div class="workflow-step workflow-output hidden">
+            <div class="step-connector top"></div>
+
+            <div class="step-content">
+                <div class="add-task-icon-container">
+                    <i class="fa-regular fa-file-lines" style="font-size: 24px;"></i>
+                </div>
+                <div class="step-header">
+
+                    <span>View output</span>
+
+                    <span class="workflow-output-attachment-info"><span>Preparing</span> <span><i>0s
+                                elapsed</i></span></span>
+                    <div class="workflow-active-step-status hidden" style="margin-top:8px;">
+                        <div id="workflow-active-step-label" class="workflow-progress-label"></div>
+                        <div id="workflow-active-step-preview" class="workflow-progress-detail"></div>
+                    </div>
+                    <a id="closeWorkflowOutputBtn"
+                        style="position: absolute; right: 30px; color: #88888899; cursor: pointer;"><i
+                            class="fa-solid fa-circle-xmark"></i></a>
+
+                </div>
+
+            </div>
+            <div class="workflow-output-section"></div>
+            <div class="workflow-output-buttons hidden">
+                <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
             </div>
 
         </div>
-        <div class="workflow-output-section"></div>
-        <div class="workflow-output-buttons hidden">
-            <button id="downloadWorkflowBtn" class="workflow-output-button btn btn-primary">Download</button>
+        <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
+            <ul>
+                <li id="download-pdf-option">Download as PDF</li>
+                <li id="download-csv-option">Download as CSV</li>
+                <li id="download-text-option">Download as Text</li>
+            </ul>
         </div>
 
 
-    </div>
-    <div id="download-popup-menu" class="file-popup-menu" style="display: none;">
-        <ul>
-            <li id="download-pdf-option">Download as PDF</li>
-            <li id="download-csv-option">Download as CSV</li>
-            <li id="download-text-option">Download as Text</li>
-        </ul>
-    </div>
 
+        <script>
 
-
-    <script>
-
-        $('#editWorkflowTitleBtn').on("click", function (e) {
-            e.preventDefault();
-            $('#workflowTitle').hide();
-            $('#workflowTitleInput')
-                .val($('#workflowTitle').text())
-                .show()
-                .focus();
-        });
-
-        // Handle title input blur or Enter key
-        $('#workflowTitleInput')
-            .on("blur", updateWorkflowTitle)
-            .on("keypress", function (e) {
-                if (e.which === 13) {
-                    updateWorkflowTitle();
-                }
+            $('#editWorkflowTitleBtn').on("click", function (e) {
+                e.preventDefault();
+                $('#workflowTitle').hide();
+                $('#workflowTitleInput')
+                    .val($('#workflowTitle').text())
+                    .show()
+                    .focus();
             });
 
-        function updateWorkflowTitle() {
-            const newTitle = $('#workflowTitleInput').val().trim();
-            if (newTitle) {
-                // Update title text
-                $('#workflowTitle').text(newTitle).show();
-
-                // Send new title to the server
-                const data = JSON.stringify({ title: newTitle, uuid: "{{ workflow.id }}" });
-                $.ajax({
-                    url: `/workflows/update_title`,
-                    type: 'POST',
-                    data: data,
-                    contentType: 'application/json; charset=utf-8',
-                    dataType: 'json',
-                    success: function () {
-                        location.reload();
-                    },
-                    error: function (xhr, ajaxOptions, thrownError) {
-                        console.error(xhr.status, thrownError);
+            // Handle title input blur or Enter key
+            $('#workflowTitleInput')
+                .on("blur", updateWorkflowTitle)
+                .on("keypress", function (e) {
+                    if (e.which === 13) {
+                        updateWorkflowTitle();
                     }
                 });
+
+            function updateWorkflowTitle() {
+                const newTitle = $('#workflowTitleInput').val().trim();
+                if (newTitle) {
+                    // Update title text
+                    $('#workflowTitle').text(newTitle).show();
+
+                    // Send new title to the server
+                    const data = JSON.stringify({ title: newTitle, uuid: "{{ workflow.id }}" });
+                    $.ajax({
+                        url: `/workflows/update_title`,
+                        type: 'POST',
+                        data: data,
+                        contentType: 'application/json; charset=utf-8',
+                        dataType: 'json',
+                        success: function () {
+                            location.reload();
+                        },
+                        error: function (xhr, ajaxOptions, thrownError) {
+                            console.error(xhr.status, thrownError);
+                        }
+                    });
+                }
+                $('#workflowTitleInput').hide();
             }
-            $('#workflowTitleInput').hide();
+
+
+
+
+        </script>
+    </div> <!-- End workflow-container (checkerboard background) -->
+</div> <!-- End tab-design -->
+
+<!-- Input Tab Content (White Background) -->
+<div id="tab-input" class="workflow-tab-content"
+    style="display: none; background: white; padding: 30px; min-height: calc(100vh - 200px);">
+    {% include "workflows/tabs/input_config.html" %}
+</div>
+
+<!-- Output Tab Content (White Background) -->
+<div id="tab-output" class="workflow-tab-content"
+    style="display: none; background: white; padding: 30px; min-height: calc(100vh - 200px);">
+    {% include "workflows/tabs/output_config.html" %}
+</div>
+
+<!-- Validate Tab Content (White Background) -->
+<div id="tab-validate" class="workflow-tab-content"
+    style="display: none; background: white; padding: 30px; min-height: calc(100vh - 200px);">
+    <div class="config-tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+                <h3 style="margin: 0 0 4px; font-size: 18px; font-weight: 600;">Workflow Validation</h3>
+                <p style="margin: 0; font-size: 13px; color: #6b7280;">
+                    Run automated checks against the latest workflow output to verify quality and correctness.
+                </p>
+            </div>
+            <button id="validateWorkflowBtn" class="btn btn-primary"
+                style="white-space: nowrap;">
+                <i class="fa-solid fa-play" style="margin-right: 6px;"></i> Run Validation
+            </button>
+        </div>
+
+        <div id="validation-report-section" class="validation-report-section hidden">
+            <div class="validation-report-header">
+                <div class="validation-report-title">
+                    <span>Validation Report</span>
+                </div>
+                <div id="validation-grade-badge" class="validation-grade-badge"></div>
+            </div>
+            <div id="validation-summary" class="validation-summary"></div>
+            <div id="validation-checks" class="validation-checks"></div>
+        </div>
+
+        <div id="validation-empty-state" class="validation-empty-state">
+            <div style="text-align: center; padding: 60px 20px; color: #9ca3af;">
+                <i class="fa-solid fa-clipboard-check" style="font-size: 48px; margin-bottom: 16px; display: block;"></i>
+                <p style="font-size: 15px; font-weight: 500; color: #6b7280; margin: 0 0 8px;">No validation results yet</p>
+                <p style="font-size: 13px; margin: 0;">Run the workflow first, then click <b>Run Validation</b> to check the output.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include workflow configuration JavaScript -->
+<script src="{{ url_for('static', filename='js/workflow_config.js') }}"></script>
+
+<!-- Tab Switching and Configuration JavaScript -->
+<script>
+    // Tab switching
+    $('.workflow-tab').on('click', function () {
+        const tab = $(this).data('tab');
+
+        // Get the highlight color from CSS variable
+        const highlightColor = getComputedStyle(document.documentElement).getPropertyValue('--highlight-color').trim();
+
+        // Update tab buttons
+        $('.workflow-tab').removeClass('active').css({
+            'border-bottom-color': 'transparent',
+            'color': '#6b7280',
+            'font-weight': '500'
+        });
+        $(this).addClass('active').css({
+            'border-bottom-color': highlightColor,
+            'color': highlightColor,
+            'font-weight': '600'
+        });
+
+        // Show selected tab content
+        $('.workflow-tab-content').hide();
+        $('#tab-' + tab).show();
+    });
+
+    // Initialize workflow configuration (always passed from backend)
+    var workflowConfigData = {{ workflow_config | tojson | safe }};
+
+    $(document).ready(function () {
+        // Initialize config when Input/Output tabs are ready
+        if (typeof initializeWorkflowConfig === 'function') {
+            initializeWorkflowConfig(workflowConfigData);
         }
 
+        // Update badges
+        updateTabBadges();
+    });
+
+    function updateTabBadges() {
+        // Input badge - show folder count if folder watch enabled
+        const inputConfig = workflowConfigData.input_config || {};
+        if (inputConfig.folder_watch && inputConfig.folder_watch.enabled) {
+            const folderCount = (inputConfig.folder_watch.folders || []).length;
+            $('#input-tab-badge').text(folderCount).show();
+        } else {
+            $('#input-tab-badge').hide();
+        }
+
+        // Output badge - show notification count
+        const outputConfig = workflowConfigData.output_config || {};
+        const notificationCount = (outputConfig.notifications || []).length;
+        if (notificationCount > 0) {
+            $('#output-tab-badge').text(notificationCount).show();
+        } else {
+            $('#output-tab-badge').hide();
+        }
+    }
+</script>
 
 
-    </script>
 
-    {% include "workflows/workflows_bottom_panel.html" %}
+<!-- Workflow Tab Styling -->
+<style>
+    .workflow-tab:hover {
+        color: #1f2937;
+        background-color: #f9fafb;
+    }
+
+    /* Scope all config styles to workflow tabs only */
+    .workflow-tab-content .config-section {
+        background: #f9fafb;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+    }
+
+    .workflow-tab-content .config-section-header {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .workflow-tab-content .config-toggle {
+        position: relative;
+        display: inline-block;
+        width: 44px;
+        height: 24px;
+    }
+
+    .workflow-tab-content .config-toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .workflow-tab-content .config-toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: #cbd5e1;
+        transition: 0.4s;
+        border-radius: 24px;
+    }
+
+    .workflow-tab-content .config-toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: 0.4s;
+        border-radius: 50%;
+    }
+
+    .workflow-tab-content .config-toggle input:checked+.config-toggle-slider {
+        background-color: #eab308;
+    }
+
+    .workflow-tab-content .config-toggle input:checked+.config-toggle-slider:before {
+        transform: translateX(20px);
+    }
+
+    .workflow-tab-content .config-field {
+        margin-bottom: 15px;
+    }
+
+    .workflow-tab-content .config-field-label {
+        font-size: 13px;
+        font-weight: 500;
+        color: #374151;
+        margin-bottom: 6px;
+        display: block;
+    }
+
+    .workflow-tab-content .config-field-hint {
+        font-size: 12px;
+        color: #6b7280;
+        margin-top: 4px;
+    }
+
+    .workflow-tab-content .config-field input[type="text"],
+    .workflow-tab-content .config-field input[type="number"],
+    .workflow-tab-content .config-field select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 14px;
+    }
+
+    .workflow-tab-content .config-field input[type="checkbox"] {
+        margin-right: 8px;
+    }
+
+    .workflow-tab-content .config-badge {
+        display: inline-block;
+        background: #fef3c7;
+        color: #92400e;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .workflow-tab-content .notification-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+
+    .workflow-tab-content .btn-secondary {
+        background-color: #f3f4f6;
+        color: #374151;
+        border: 1px solid #d1d5db;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .workflow-tab-content .btn-secondary:hover {
+        background-color: #e5e7eb;
+    }
+</style>
+
+{% include "workflows/workflows_bottom_panel.html" %}
 </div>

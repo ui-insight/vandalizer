@@ -1,0 +1,269 @@
+<!-- Task-level Input/Output tabs - shared across all task type modals -->
+<!-- Expects: workflow_task (may be None for new tasks), is_editing -->
+
+{% set task_input_config = (workflow_task.data.get('input_config', {}) if is_editing and workflow_task else {}) %}
+{% set task_output_config = (workflow_task.data.get('output_config', {}) if is_editing and workflow_task else {}) %}
+{% set input_source = task_input_config.get('source', 'step_input') %}
+{% set input_doc_uuid = task_input_config.get('document_uuid', '') or '' %}
+{% set input_doc_title = task_input_config.get('document_title', '') or '' %}
+{% set post_process_prompt = task_output_config.get('post_process_prompt', '') or '' %}
+
+<!-- Tab Navigation -->
+<div class="task-io-tabs" style="display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin: 0 30px; padding-top: 10px;">
+    <button type="button" class="task-io-tab active" data-tab="design"
+        style="padding: 8px 20px; font-size: 13px; font-weight: 600; border: none; background: none; cursor: pointer; color: #374151; border-bottom: 2px solid #4f46e5; margin-bottom: -2px;">
+        Design
+    </button>
+    <button type="button" class="task-io-tab" data-tab="input"
+        style="padding: 8px 20px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: #9ca3af; border-bottom: 2px solid transparent; margin-bottom: -2px;">
+        Input
+    </button>
+    <button type="button" class="task-io-tab" data-tab="output"
+        style="padding: 8px 20px; font-size: 13px; font-weight: 500; border: none; background: none; cursor: pointer; color: #9ca3af; border-bottom: 2px solid transparent; margin-bottom: -2px;">
+        Output
+    </button>
+</div>
+
+<!-- INPUT TAB CONTENT -->
+<div class="task-io-tab-content" data-tab="input" style="display: none; padding: 20px 30px;">
+    <p style="font-size: 13px; color: #6b7280; margin: 0 0 20px 0;">
+        Choose what data this task receives as input.
+    </p>
+
+    <!-- Radio: Step Input -->
+    <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: white;"
+        class="task-input-source-label">
+        <input type="radio" name="task-input-source" value="step_input"
+            {% if input_source == 'step_input' %}checked{% endif %}
+            style="margin-top: 2px;">
+        <div>
+            <div style="font-size: 14px; font-weight: 500; color: #374151;">
+                <i class="fa-solid fa-arrow-right" style="color: #6b7280; margin-right: 4px;"></i> Step Input
+            </div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">
+                Use the output from the previous step (default behavior)
+            </div>
+        </div>
+    </label>
+
+    <!-- Radio: Select a Document -->
+    <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: white;"
+        class="task-input-source-label">
+        <input type="radio" name="task-input-source" value="document"
+            {% if input_source == 'document' %}checked{% endif %}
+            style="margin-top: 2px;">
+        <div style="flex: 1;">
+            <div style="font-size: 14px; font-weight: 500; color: #374151;">
+                <i class="fa-solid fa-file" style="color: #6b7280; margin-right: 4px;"></i> Select a Document
+            </div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">
+                Choose a specific document from your library
+            </div>
+        </div>
+    </label>
+
+    <!-- Document picker (shown when "document" is selected) -->
+    <div id="task-input-doc-picker" style="display: {% if input_source == 'document' %}block{% else %}none{% endif %}; margin-left: 34px; margin-bottom: 8px;">
+        <!-- Selected document display -->
+        <div id="task-input-doc-selected" style="display: {% if input_doc_uuid %}flex{% else %}none{% endif %}; align-items: center; justify-content: space-between; padding: 8px 12px; background: white; border: 1px solid #e5e7eb; border-radius: 6px; margin-bottom: 10px;">
+            <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                <i class="fa-solid fa-file" style="color: #6b7280; flex-shrink: 0;"></i>
+                <span id="task-input-doc-title-display" style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ input_doc_title }}</span>
+            </div>
+            <button type="button" id="task-input-doc-remove"
+                style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px; flex-shrink: 0;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <input type="hidden" id="task-input-doc-uuid" value="{{ input_doc_uuid }}">
+        <input type="hidden" id="task-input-doc-title" value="{{ input_doc_title }}">
+
+        <!-- Search panel -->
+        <div id="task-input-doc-search-panel" style="display: {% if not input_doc_uuid %}block{% else %}none{% endif %};">
+            <input type="text" id="task-input-doc-search"
+                placeholder="Search documents by title..."
+                style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; margin-bottom: 8px; box-sizing: border-box;">
+            <div id="task-input-doc-results"
+                style="max-height: 200px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                <div style="color: #9ca3af; font-size: 12px; text-align: center; padding: 15px;">
+                    Type to search documents...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Radio: Workflow Documents -->
+    <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: white;"
+        class="task-input-source-label">
+        <input type="radio" name="task-input-source" value="workflow_documents"
+            {% if input_source == 'workflow_documents' %}checked{% endif %}
+            style="margin-top: 2px;">
+        <div>
+            <div style="font-size: 14px; font-weight: 500; color: #374151;">
+                <i class="fa-solid fa-folder-open" style="color: #6b7280; margin-right: 4px;"></i> Workflow Documents
+            </div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">
+                Use the documents from the workflow's input (runtime-selected + fixed documents)
+            </div>
+        </div>
+    </label>
+</div>
+
+<!-- OUTPUT TAB CONTENT -->
+<div class="task-io-tab-content" data-tab="output" style="display: none; padding: 20px 30px;">
+    <p style="font-size: 13px; color: #6b7280; margin: 0 0 20px 0;">
+        Optionally transform this task's output before it passes to the next step.
+    </p>
+
+    <!-- Toggle: Post-process -->
+    <label style="display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 15px; cursor: pointer; background: white;">
+        <input type="checkbox" id="task-output-prompt-enabled"
+            {% if post_process_prompt %}checked{% endif %}>
+        <div>
+            <div style="font-size: 14px; font-weight: 500; color: #374151;">
+                Post-process output with a prompt
+            </div>
+            <div style="font-size: 12px; color: #9ca3af; margin-top: 2px;">
+                Run an additional AI prompt on this task's result
+            </div>
+        </div>
+    </label>
+
+    <!-- Post-process prompt textarea -->
+    <div id="task-output-prompt-container" style="display: {% if post_process_prompt %}block{% else %}none{% endif %};">
+        <textarea id="task-output-prompt" class="input-field" rows="6"
+            placeholder="e.g., Summarize the above results into bullet points..."
+            style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; box-sizing: border-box; resize: vertical;">{{ post_process_prompt }}</textarea>
+        <p style="font-size: 12px; color: #9ca3af; margin-top: 6px;">
+            <i class="fa-solid fa-info-circle"></i>
+            This prompt will be applied to the task's output before it passes to the next step.
+        </p>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Tab switching
+    $('.task-io-tab').off('click.taskio').on('click.taskio', function () {
+        const tab = $(this).data('tab');
+        // Update tab button styles
+        $('.task-io-tab').css({
+            'color': '#9ca3af',
+            'font-weight': '500',
+            'border-bottom-color': 'transparent'
+        });
+        $(this).css({
+            'color': '#374151',
+            'font-weight': '600',
+            'border-bottom-color': '#4f46e5'
+        });
+        // Show/hide tab content
+        if (tab === 'design') {
+            $('.workflow-content-body').show();
+            $('.task-io-tab-content').hide();
+        } else {
+            $('.workflow-content-body').hide();
+            $('.task-io-tab-content').hide();
+            $(`.task-io-tab-content[data-tab="${tab}"]`).show();
+        }
+    });
+
+    // Also hide the progress component when switching away from design
+    // and show it when coming back
+    $('.task-io-tab[data-tab="design"]').on('click.taskio-progress', function() {
+        $('.test-event-progress-container').show();
+    });
+    $('.task-io-tab[data-tab="input"], .task-io-tab[data-tab="output"]').on('click.taskio-progress', function() {
+        $('.test-event-progress-container').hide();
+    });
+
+    // Input source radio change
+    $('input[name="task-input-source"]').off('change.taskio').on('change.taskio', function () {
+        const source = $(this).val();
+        if (source === 'document') {
+            $('#task-input-doc-picker').show();
+        } else {
+            $('#task-input-doc-picker').hide();
+        }
+        // Highlight selected radio label
+        $('.task-input-source-label').css('border-color', '#e5e7eb');
+        $(this).closest('.task-input-source-label').css('border-color', '#4f46e5');
+    });
+    // Set initial highlight
+    $('input[name="task-input-source"]:checked').closest('.task-input-source-label').css('border-color', '#4f46e5');
+
+    // Document search (debounced)
+    let taskDocSearchTimeout = null;
+    $('#task-input-doc-search').off('input.taskio').on('input.taskio', function () {
+        const query = $(this).val();
+        clearTimeout(taskDocSearchTimeout);
+        taskDocSearchTimeout = setTimeout(function () {
+            $.ajax({
+                url: '/workflows/search_documents',
+                type: 'POST',
+                data: JSON.stringify({ query: query }),
+                contentType: 'application/json',
+                dataType: 'json',
+                success: function (response) {
+                    const docs = response.documents || [];
+                    const $results = $('#task-input-doc-results');
+                    $results.empty();
+                    if (docs.length === 0) {
+                        $results.html('<div style="color: #9ca3af; font-size: 12px; text-align: center; padding: 15px;">No documents found.</div>');
+                        return;
+                    }
+                    docs.forEach(function (doc) {
+                        const iconMap = {
+                            'pdf': 'fa-solid fa-file-pdf',
+                            'docx': 'fa-solid fa-file-word',
+                            'xlsx': 'fa-solid fa-file-excel',
+                            'xls': 'fa-solid fa-file-excel',
+                            'html': 'fa-solid fa-file-code'
+                        };
+                        const icon = iconMap[doc.extension] || 'fa-solid fa-file';
+                        $results.append(`
+                            <div class="task-input-doc-result" data-uuid="${doc.uuid}" data-title="${doc.title}"
+                                style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 8px;"
+                                onmouseover="this.style.background='#f9fafb'" onmouseout="this.style.background='white'">
+                                <i class="${icon}" style="color: #6b7280;"></i>
+                                <span style="font-size: 13px;">${doc.title}</span>
+                            </div>
+                        `);
+                    });
+                }
+            });
+        }, 300);
+    });
+
+    // Click search result to select document
+    $(document).off('click.taskio-select').on('click.taskio-select', '.task-input-doc-result', function () {
+        const uuid = $(this).data('uuid');
+        const title = $(this).data('title');
+        $('#task-input-doc-uuid').val(uuid);
+        $('#task-input-doc-title').val(title);
+        $('#task-input-doc-title-display').text(title);
+        $('#task-input-doc-selected').show();
+        $('#task-input-doc-search-panel').hide();
+    });
+
+    // Remove selected document
+    $('#task-input-doc-remove').off('click.taskio').on('click.taskio', function () {
+        $('#task-input-doc-uuid').val('');
+        $('#task-input-doc-title').val('');
+        $('#task-input-doc-title-display').text('');
+        $('#task-input-doc-selected').hide();
+        $('#task-input-doc-search-panel').show();
+        $('#task-input-doc-search').val('').trigger('input.taskio');
+    });
+
+    // Output post-process toggle
+    $('#task-output-prompt-enabled').off('change.taskio').on('change.taskio', function () {
+        if ($(this).is(':checked')) {
+            $('#task-output-prompt-container').show();
+            $('#task-output-prompt').focus();
+        } else {
+            $('#task-output-prompt-container').hide();
+        }
+    });
+})();
+</script>

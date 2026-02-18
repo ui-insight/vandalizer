@@ -1,0 +1,282 @@
+<div class="search-results-content">
+    <h2 class="search-results-header">
+        <span id="extractionTitle">Configure Workflow</span>
+        <span style="float: right; font-size: 1em; color: #191919;">
+            <a id="edit-prompt-close-button">
+                <i class="fa-solid fa-circle-xmark"></i>
+            </a>
+        </span>
+    </h2>
+
+    <!-- Tab Navigation -->
+    <div class="workflow-config-tabs" style="margin: 20px 30px 0 30px; border-bottom: 2px solid #e5e7eb;">
+        <button class="workflow-tab active" data-tab="general">
+            <i class="fa-solid fa-gear"></i> General
+        </button>
+        <button class="workflow-tab" data-tab="input">
+            <i class="fa-solid fa-bolt"></i> Input<span class="workflow-tab-badge" id="input-badge"
+                style="display: none;"></span>
+        </button>
+        <button class="workflow-tab" data-tab="output">
+            <i class="fa-solid fa-paper-plane"></i> Output<span class="workflow-tab-badge" id="output-badge"
+                style="display: none;"></span>
+        </button>
+    </div>
+
+    <div style="margin: 0px 30px; padding: 15px 0px;">
+        <!-- GENERAL TAB -->
+        <div class="workflow-tab-content" id="tab-general">
+            <input style="width: 100%; padding: 15px; height: 50px; margin-bottom: 15px;" type="text"
+                id="newWorkflowName" placeholder="Name your workflow" value="{{ workflow.name }}">
+
+            <p style="font-size: 12px; font-weight: 300; color: #00000077; margin-bottom: 10px;">
+                <i>A one sentence description of the workflow's purpose.</i>
+            </p>
+
+            <textarea id="newWorkflowDescription" placeholder="Describe what this workflow does..." rows="4"
+                style="width: 100%; padding: 15px;">{{ workflow.description }}</textarea>
+        </div>
+
+        <!-- INPUT TAB -->
+        <div class="workflow-tab-content" id="tab-input" style="display: none;">
+            {% include "workflows/tabs/input_config.html" %}
+        </div>
+
+        <!-- OUTPUT TAB -->
+        <div class="workflow-tab-content" id="tab-output" style="display: none;">
+            {% include "workflows/tabs/output_config.html" %}
+        </div>
+    </div>
+
+    <div style="margin: 0px 30px; padding-bottom: 15px;">
+        <a class="btn btn-primary" id="update-workflow-button" data-uuid="{{ workflow.id }}" style="float: right;">SAVE
+            WORKFLOW</a>
+        <a class="btn btn-important" id="delete-workflow-button" data-uuid="{{ workflow.id }}"
+            style="float: right; margin-right: 15px;">DELETE</a>
+    </div>
+
+    <div style="clear: both;"></div>
+    <hr style="margin: 20px 30px;">
+    {% include "_edit_history.html" %}
+
+    <style>
+        .workflow-config-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .workflow-tab {
+            background: none;
+            border: none;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #6b7280;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .workflow-tab:hover {
+            color: #1f2937;
+            background-color: #f9fafb;
+        }
+
+        .workflow-tab.active {
+            color: #eab308;
+            border-bottom-color: #eab308;
+        }
+
+        .workflow-tab-badge {
+            background-color: #eab308;
+            color: #000;
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 11px;
+            margin-left: 5px;
+            font-weight: 600;
+        }
+
+        .config-section {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .config-section-header {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .config-toggle {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .config-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .config-toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+
+        .config-toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        .config-toggle input:checked+.config-toggle-slider {
+            background-color: #eab308;
+        }
+
+        .config-toggle input:checked+.config-toggle-slider:before {
+            transform: translateX(20px);
+        }
+
+        .config-field {
+            margin-bottom: 15px;
+        }
+
+        .config-field-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .config-field-hint {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 4px;
+        }
+
+        .config-field input[type="text"],
+        .config-field input[type="number"],
+        .config-field select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .config-field input[type="checkbox"] {
+            margin-right: 8px;
+        }
+
+        .config-badge {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .notification-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+
+        .btn-secondary {
+            background-color: #f3f4f6;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .btn-secondary:hover {
+            background-color: #e5e7eb;
+        }
+    </style>
+
+    <script src="{{ url_for('static', filename='js/workflow_config.js') }}"></script>
+    <script>
+        // Tab switching
+        $('.workflow-tab').on('click', function () {
+            const tab = $(this).data('tab');
+            $('.workflow-tab').removeClass('active');
+            $(this).addClass('active');
+            $('.workflow-tab-content').hide();
+            $('#tab-' + tab).show();
+        });
+
+        $('#edit-prompt-close-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            $("#search-results-panel").hide();
+            $("#search-results-panel").empty();
+        });
+
+        $('#update-workflow-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            saveWorkflowConfiguration('{{ workflow.id }}');
+        });
+
+        $('#delete-workflow-button').off('click').on('click', function (e) {
+            e.preventDefault();
+            let uuid = $(this).attr("data-uuid");
+
+            if (typeof libraryScopeIsTeam === 'function' && libraryScopeIsTeam()) {
+                removeFromTeamLibrary('workflow', uuid);
+                return;
+            }
+
+            $.ajax({
+                url: '/workflows/delete_workflow',
+                type: 'POST',
+                data: JSON.stringify({ uuid: uuid }),
+                contentType: 'application/json; charset=utf-8',
+                dataType: 'json',
+                async: true,
+                success: function (data) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.set('section', 'Library');
+                    location.href = url.toString();
+                },
+                error: function (xhr, ajaxOptions, thrownError) {
+                    console.log(xhr.status);
+                    console.log(thrownError);
+                }
+            });
+        });
+
+        // Initialize configuration from backend
+        const workflowConfig = {{ workflow_config| tojson | safe }};
+        initializeWorkflowConfig(workflowConfig);
+    </script>
+</div>

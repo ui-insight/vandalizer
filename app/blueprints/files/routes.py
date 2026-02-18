@@ -25,7 +25,8 @@ from pypdf import PdfReader
 from werkzeug.utils import secure_filename
 
 from app import limiter
-from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder, UserModelConfig
+from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
+from app.utilities.config import get_user_model_name, is_external_model
 from app.utilities.security import safe_get_document, validate_json_request
 from app.utilities.document_manager import (
     DocumentManager,
@@ -203,15 +204,9 @@ def upload():
     )
     document.save()
 
-    # Check if the user's model is external
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    is_external_model = False
-    if model_config and model_config.available_models:
-        # Find the current model in available_models
-        for model in model_config.available_models:
-            if model.get("name") == model_config.name:
-                is_external_model = model.get("external", False)
-                break
+    # Check if the user's selected model is external.
+    model_name = get_user_model_name(user_id)
+    selected_model_is_external = is_external_model(model_name)
 
     # Kick off tasks
     extraction_task = perform_extraction_and_update.s(
@@ -223,7 +218,7 @@ def upload():
         document_path=str(file_path),
     )
 
-    if is_external_model:
+    if selected_model_is_external:
         # External model: Sequential flow (extraction -> validation)
         # Document not usable until both complete
         workflow = extraction_task | validation_task
@@ -252,6 +247,29 @@ def upload():
         validation_task_background.apply_async()
 
     document.save()
+
+    # Passive Vandalizer: Check for workflows watching this folder
+    try:
+        from app.models import Workflow
+        from app.utilities.passive_triggers import create_folder_watch_trigger
+        
+        # Find workflows with folder watch enabled for this folder
+        watching_workflows = Workflow.objects(
+            input_config__folder_watch__enabled=True
+        )
+        
+        for workflow in watching_workflows:
+            folder_watch_config = workflow.input_config.get("folder_watch", {})
+            watched_folders = folder_watch_config.get("folders", [])
+            
+            # Check if this folder is being watched
+            if str(target_folder) in watched_folders or target_folder in watched_folders:
+                # Create a pending trigger event
+                create_folder_watch_trigger(workflow, document)
+                
+    except Exception as e:
+        # Log error but don't fail the upload
+        current_app.logger.error(f"Error creating folder watch trigger: {e}")
 
     return jsonify({"complete": True, "uuid": uid}), 200
 

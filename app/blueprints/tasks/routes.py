@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import uuid
 from copy import deepcopy
@@ -34,12 +35,15 @@ from app.models import (
     SearchSetItem,
     SmartDocument,
     User,
-    UserModelConfig,
 )
 from app.utilities.document_helpers import save_excel_to_html
 from app.utilities.analytics_helper import ActivityType, activity_finish, activity_start
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import get_default_model_name, get_llm_models
+from app.utilities.config import (
+    get_user_model_name,
+    reconcile_user_model_config,
+    resolve_model_name,
+)
 from app.utilities.extraction_manager_nontyped import ExtractionManagerNonTyped
 from app.utilities.extraction_tasks import (
     ingest_extraction_recommendation_task,
@@ -51,6 +55,7 @@ from app.utilities.library_helpers import (
     add_object_to_library,
 )
 from app.utilities.edit_history import build_changes, history_for, log_edit_history
+from app.utilities.extraction_metrics import get_extraction_runtime_stats
 
 # SemanticRecommender is now accessed via singleton in workflows.routes
 from app.utilities.verification_helpers import user_can_modify_verified
@@ -89,10 +94,58 @@ def _can_edit_search_set(search_set: SearchSet | None) -> bool:
 
 
 def _render_extraction_panel(search_set: SearchSet, **context):
+    from app.models import SystemConfig
     context.setdefault("can_edit_extraction", _can_edit_search_set(search_set))
     context.setdefault("history_entries", history_for("searchset", search_set.uuid))
     context["search_set"] = search_set
+    sys_config = SystemConfig.get_config()
+    context.setdefault("available_models", sys_config.available_models or [])
+    
+    # Merge system config with search set specific config
+    base_config = sys_config.get_extraction_config()
+    override_config = search_set.extraction_config or {}
+    
+    from app.models import _deep_merge
+    # Deep copy to avoid mutating the cached system config
+    from copy import deepcopy
+    final_config = deepcopy(base_config)
+    _deep_merge(final_config, override_config)
+    
+    context.setdefault("extraction_config", final_config)
+    context.setdefault("has_custom_config", bool(search_set.extraction_config))
+    runtime_stats = get_extraction_runtime_stats(search_set.uuid)
+    context.setdefault("avg_runtime_seconds", runtime_stats["avg_runtime_seconds"])
+    context.setdefault("avg_runtime_sample_size", runtime_stats["sample_size"])
+    context.setdefault("avg_runtime_sample_limit", runtime_stats["sample_limit"])
     return render_template(EXTRACTION_PANEL_TEMPLATE, **context)
+
+
+@tasks.route("/extraction/update_config", methods=["POST"])
+@login_required
+def update_extraction_config():
+    """Update the extraction configuration for a specific search set."""
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+
+    extraction_uuid = data.get("extraction_uuid")
+    new_config = data.get("config")
+
+    if not extraction_uuid or new_config is None:
+        return jsonify({"error": "Missing extraction_uuid or config"}), 400
+
+    search_set = SearchSet.objects(uuid=extraction_uuid).first()
+    if not search_set:
+        return jsonify({"error": "Extraction set not found"}), 404
+
+    if not _can_edit_search_set(search_set):
+        return _verified_edit_forbidden_response()
+
+    # Update and save
+    search_set.extraction_config = new_config
+    search_set.save()
+
+    return jsonify({"message": "Configuration updated successfully"}), 200
 
 
 @login_required
@@ -104,43 +157,27 @@ def filter_models() -> ResponseReturnValue:
     validation_failed = False
     user = current_user
 
-    settings_models = get_llm_models()
-    default_model = get_default_model_name()
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-    if not model_config:
-        model_config = UserModelConfig(user_id=user.user_id, name=default_model)
-        model_config.available_models = settings_models
-        model_config.save()
+    _, settings_models, current_model = reconcile_user_model_config(
+        user_id=user.user_id,
+        create_if_missing=True,
+    )
 
-    model_config.available_models = settings_models
-    model_config.save()
-
-    # refresh the  model config
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
-
-    current_model = default_model
-    print(current_model)
     models = settings_models
     if len(uuids) == 0:
-        if model_config:
-            current_model = model_config.name
         return jsonify({"models": settings_models, "current_model": current_model})
+
     for uuid in uuids:
         doc = SmartDocument.objects(uuid=uuid).first()
         if doc is not None and not doc.valid:
             validation_failed = True
             break
+
     if validation_failed:
-        # filter out the external models
-        models = [m for m in model_config.available_models if not m.get("external")]
-        model_names = [m["name"] for m in models]
-        current_model = (
-            model_config.name
-            if model_config.name in model_names
-            else default_model
-        )
-    elif model_config:
-        current_model = model_config.name
+        # Document validation failures must only expose internal models.
+        models = [m for m in settings_models if not m.get("external")]
+        model_names = {m.get("name") for m in models if m.get("name")}
+        if current_model not in model_names:
+            current_model = resolve_model_name(None, models=models)
 
     return jsonify({"models": models, "current_model": current_model})
 
@@ -160,18 +197,21 @@ def update_model() -> ResponseReturnValue:
     ):
         return jsonify({"error": "login required"}), 401
 
-    model_config = UserModelConfig.objects(user_id=user.user_id).first()
+    model_config, settings_models, _ = reconcile_user_model_config(
+        user_id=user.user_id,
+        create_if_missing=True,
+    )
     if model_config is None:
-        model_config = UserModelConfig(
-            user_id=user.user_id, name=name, temperature=temperature, top_p=top_p
-        )
-    else:
-        model_config.name = name
-        model_config.temperature = temperature
-        model_config.top_p = top_p
+        return jsonify({"error": "failed to load model config"}), 500
+
+    resolved_name = resolve_model_name(name, models=settings_models)
+    model_config.name = resolved_name
+    model_config.temperature = temperature
+    model_config.top_p = top_p
+    model_config.available_models = settings_models
     model_config.save()
 
-    response = {"current_model": name}
+    response = {"current_model": resolved_name}
     return jsonify(response)
 
 
@@ -479,6 +519,7 @@ def begin_search() -> ResponseReturnValue:
     data = request.get_json()
     searchset_uuid = data["search_set_uuid"]
     document_uuids = data["document_uuids"]
+    extraction_config_override = data.get("extraction_config_override")
 
     debug(data)
 
@@ -494,10 +535,7 @@ def begin_search() -> ResponseReturnValue:
     search_set = SearchSet.objects(uuid=searchset_uuid).first()
     debug(f"Searching for search set: {searchset_uuid}")
 
-    user_model_config = UserModelConfig.objects(user_id=current_user.get_id()).first()
-    model = get_default_model_name()
-    if user_model_config is not None:
-        model = user_model_config.name
+    model = get_user_model_name(current_user.get_id())
 
     keys = []
     items = []
@@ -537,6 +575,7 @@ def begin_search() -> ResponseReturnValue:
                 keys,
                 current_app.root_path,
                 fillable_pdf_url,
+                extraction_config_override,
             ]
         )
 
@@ -580,6 +619,7 @@ def extraction_status(activity_id: str) -> ResponseReturnValue:
         "activity_id": str(activity.id),
         "status": activity.status,
         "title": activity.title,
+        "progress_message": activity.progress_message,
     }
 
     # If completed, include results
@@ -742,10 +782,7 @@ def begin_search_sync() -> ResponseReturnValue:
         em = ExtractionManagerNonTyped()
         em.root_path = current_app.root_path
         # get current model
-        user_config = UserModelConfig.objects(user_id=current_user.user_id).first()
-        model_name = get_default_model_name()
-        if user_config:
-            model_name = user_config.name
+        model_name = get_user_model_name(current_user.user_id)
 
         results = em.extract(keys, document_uuids, model=model_name)
         raw_results = deepcopy(results)
@@ -868,10 +905,7 @@ def build_extraction_from_document() -> ResponseReturnValue:
         return _verified_edit_forbidden_response()
 
     user_id = current_user.get_id()
-    user_model_config = UserModelConfig.objects(user_id=user_id).first()
-    model = get_default_model_name()
-    if user_model_config is not None:
-        model = user_model_config.name
+    model = get_user_model_name(user_id)
 
     em = ExtractionManagerNonTyped()
     em.root_path = current_app.root_path
@@ -969,6 +1003,8 @@ def clone_search_set() -> ResponseReturnValue:
     new_search_set.id = None
     new_search_set.uuid = uuid.uuid4().hex
     new_search_set.is_global = False
+    new_search_set.verified = False
+    new_search_set.user_id = user.user_id
     new_search_set.title = "Copy of " + new_search_set.title
     new_search_set.save()
 
@@ -1225,19 +1261,55 @@ def run_extraction_integrated() -> ResponseReturnValue:
     if not search_set:
         return jsonify({"error": "Extraction not found"}), 404
 
-    # **3. Handle File Uploads**
+    # **3. Handle File Uploads and Existing Documents**
     uploaded_files = request.files.getlist("file")
-    if not uploaded_files:
+    
+    # Retrieve existing document UUIDs from form data
+    # Can be passed as a list of strings or comma-separated string
+    existing_document_uuids = request.form.getlist("document_uuids")
+    if not existing_document_uuids:
+        # Check if passed as single key
+        doc_uuids_str = request.form.get("document_uuids")
+        if doc_uuids_str:
+            try:
+                # Try parsing as JSON list
+                existing_document_uuids = json.loads(doc_uuids_str)
+                if not isinstance(existing_document_uuids, list):
+                     existing_document_uuids = [doc_uuids_str]
+            except json.JSONDecodeError:
+                # Fallback to comma separation
+                existing_document_uuids = [u.strip() for u in doc_uuids_str.split(",") if u.strip()]
+
+    if not uploaded_files and not existing_document_uuids:
         return (
             jsonify(
                 {
-                    "error": "At least one file must be uploaded. Make sure the @ symbol precedes your path if using bash.",
+                    "error": "At least one file must be uploaded OR one document_uuid provided.",
                 },
             ),
             400,
         )
 
     document_uuids = []
+    
+    # Process existing keys
+    if existing_document_uuids:
+        # Validate existence and ownership/access
+        # Using user_id=user.user_id as standard for SmartDocument ownership check
+        # Verify if SmartDocument uses user.id or user.user_id (User model uses user_id as string id, SmartDocument uses user_id)
+        # Assuming user.user_id matches SmartDocument.user_id
+        valid_docs = SmartDocument.objects(
+            uuid__in=existing_document_uuids, 
+            user_id=user.user_id
+        )
+        found_uuids = [doc.uuid for doc in valid_docs]
+        
+        # Log or warn if some UUIDs were not found? For now just use valid ones.
+        document_uuids.extend(found_uuids)
+        
+        if len(found_uuids) < len(existing_document_uuids):
+            # Potential permission issue or invalid UUIDs
+            pass
 
     for file in uploaded_files:
         # Secure the filename
@@ -1302,6 +1374,9 @@ def run_extraction_integrated() -> ResponseReturnValue:
 
     if len(keys) == 0:
         return jsonify({"error": "No extraction keys found"}), 400
+    
+    if len(document_uuids) == 0:
+        return jsonify({"error": "No valid documents found or uploaded."}), 400
 
     # **5. Create activity and run extraction**
     current_team = user.ensure_current_team()
@@ -1331,6 +1406,7 @@ def run_extraction_integrated() -> ResponseReturnValue:
             keys,
             current_app.root_path,
             fillable_pdf_url,
+            search_set.extraction_config,
         ]
     )
 

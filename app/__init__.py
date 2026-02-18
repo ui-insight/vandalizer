@@ -12,7 +12,7 @@ import rollbar
 import rollbar.contrib.flask
 from celery import Celery, Task
 from dotenv import load_dotenv
-from flask import Flask, got_request_exception
+from flask import Flask, got_request_exception, send_from_directory
 from flask_bootstrap import Bootstrap
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -20,15 +20,15 @@ from flask_limiter.util import get_remote_address
 from flask_login import LoginManager, current_user
 from flask_mail import Mail
 
-from app.oauth import configure_azure_blueprint
+from app.oauth import configure_azure_blueprint, configure_graph_consent_blueprint
 from app.utilities.config import get_auth_methods, get_highlight_color, get_ui_radius
 
-CURRENT_RELEASE_VERSION = "2.3.01"  # Update this when you have a new release.
+CURRENT_RELEASE_VERSION = "3.2.02"  # Update this when you have a new release.
 RELEASE_NOTES = """
-Release 2.3.01:
-- Over 20 bug fixes and tweaks
-- Restored elegant formatting
-- Improved workflow speed and performance
+Release 3.2.01:
+- Nearly twice as fast!
+- New library improvements and customization
+- Bug fixes from your feedback!
 """
 
 # Load environment variables from .env file
@@ -62,6 +62,30 @@ def create_app() -> Flask:
                 "tasks.documents.*": {"queue": "documents"},
                 "tasks.workflow.*": {"queue": "workflows"},
                 "tasks.upload.*": {"queue": "uploads"},
+                "tasks.evaluation.*": {"queue": "workflows"},
+                # Passive Vandalizer: passive processing queue
+                "tasks.passive.*": {"queue": "passive"},
+            },
+            # Passive Vandalizer: Beat schedule for passive processing
+            "beat_schedule": {
+                "process-pending-triggers": {
+                    "task": "tasks.passive.process_pending_triggers",
+                    "schedule": 60.0,  # Every minute
+                },
+                "cleanup-old-trigger-events": {
+                    "task": "tasks.passive.cleanup_old_trigger_events",
+                    "schedule": 86400.0,  # Daily
+                },
+                # M365: renew Graph webhook subscriptions every 12 hours
+                "renew-graph-subscriptions": {
+                    "task": "tasks.passive.renew_graph_subscriptions",
+                    "schedule": 43200.0,  # 12 hours
+                },
+                # M365: daily digest summary to Teams channels
+                "send-daily-digest": {
+                    "task": "tasks.passive.send_daily_digest",
+                    "schedule": 86400.0,  # Daily
+                },
             },
         }
     )
@@ -162,7 +186,20 @@ def _load_user_by_id(user_id: str) -> User | None:
     """Loads user from DB for session management (used by flask_login)."""
     if not user_id:
         return None
-    return User.objects(user_id=user_id).first()
+    user = User.objects(user_id=user_id).first()
+    if user:
+        return user
+
+    # Backward compatibility: older sessions may store a user_id alias that was
+    # merged into a canonical user record.
+    from app.utilities.user_identity import resolve_user_identity
+
+    return resolve_user_identity(
+        user_id_hint=user_id,
+        email_hint=user_id,
+        create_if_missing=False,
+        auto_merge_duplicates=True,
+    )
 
 
 def load_user() -> User | None:
@@ -176,6 +213,7 @@ def load_user() -> User | None:
 from .blueprints.activity.routes import activity  # noqa: E402
 from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
+from .blueprints.automation.routes import automation  # noqa: E402
 from .blueprints.browser_automation.routes import browser_automation_bp  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
 from .blueprints.files.routes import files  # noqa: E402
@@ -199,12 +237,14 @@ app.register_blueprint(admin, url_prefix="/admin")
 app.register_blueprint(library, url_prefix="/library")
 app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
+app.register_blueprint(automation, url_prefix="/automation")
 app.register_blueprint(browser_automation_bp, url_prefix="/browser_automation")
 
 # Import Celery tasks so they're registered when app starts
 # This ensures tasks are discovered by Celery workers
 with app.app_context():
     from app.utilities import activity_description  # noqa: F401
+    from app.utilities import evaluation_tasks  # noqa: F401
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
@@ -234,7 +274,11 @@ azure_bp = configure_azure_blueprint(app)
 # Exempt OAuth endpoints from rate limiting to prevent authentication failures
 if azure_bp:
     from app.oauth import azure_blueprint
+
     limiter.exempt(azure_blueprint)
+
+# Register Graph consent blueprint for M365 integration (separate from login)
+graph_bp = configure_graph_consent_blueprint(app)
 
 # Point the login view to the local blueprint's login function (always available path)
 login_manager.login_view = "auth.login"
@@ -290,3 +334,11 @@ with app.app_context():
 
     # send exceptions from `app` to rollbar, using flask's signal system.
     got_request_exception.connect(rollbar.contrib.flask.report_exception, app)
+
+
+@app.route("/static/bootstrap/css/bootstrap.min.css.map")
+def serve_bootstrap_map():
+    return send_from_directory(
+        os.path.join(app.root_path, "static/bootstrap/css"),
+        "bootstrap.min.css.map"
+    )

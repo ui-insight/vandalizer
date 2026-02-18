@@ -305,16 +305,19 @@
                     <li id="rename-option">Rename</li>
                     <li id="delete-option">Delete</li>
                     <li id="download-option">Download</li>
+                    <li id="copy-uuid-option">Copy UUID</li>
                     <!-- Add more options as needed -->
                 </ul>
             </div>
 
             {% if show_release_panel %}
             <div id="release-panel">
-                <button onclick="dismissReleasePanel()"
-                    style="color: var(--highlight-color, #f1b300); font-size: 16px; font-weight: 400;">continue</button>
-                <h3>This is a new release!</h3>
-                <pre>{{ release_notes }}</pre>
+                <div id="release-panel-content">
+                    <h2>New Release!</h2>
+                    <p class="release-version">Version {{ current_release }}</p>
+                    <pre>{{ release_notes }}</pre>
+                    <button class="continue-btn" onclick="dismissReleasePanel()">Continue</button>
+                </div>
             </div>
             {% endif %}
         </div>

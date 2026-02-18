@@ -119,6 +119,46 @@
         margin-bottom: 12px;
     }
 
+    .vm-request-details {
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        background: #f9fafb;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+    }
+
+    .vm-request-details summary {
+        cursor: pointer;
+        color: #1f2937;
+        font-weight: 600;
+        font-size: 13px;
+    }
+
+    .vm-request-details-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 8px 12px;
+        font-size: 13px;
+        color: #374151;
+        margin-top: 10px;
+    }
+
+    .vm-request-details-block {
+        margin-top: 10px;
+        font-size: 13px;
+        color: #374151;
+    }
+
+    .vm-request-details-block p {
+        margin: 6px 0 0 0;
+        white-space: pre-wrap;
+    }
+
+    .vm-request-details-block ul {
+        margin: 6px 0 0 18px;
+        padding: 0;
+    }
+
     .vm-card-actions {
         display: flex;
         gap: 8px;
@@ -500,6 +540,115 @@
             {% if item.summary %}
             <div class="vm-card-summary">{{ item.summary }}</div>
             {% endif %}
+            <details class="vm-request-details">
+                <summary>View submission details</summary>
+                <div class="vm-request-details-grid">
+                    <div><strong>Request UUID:</strong> {{ data.uuid }}</div>
+                    <div><strong>Item Kind:</strong> {{ data.item_kind }}</div>
+                    <div><strong>Item Identifier:</strong> {{ data.item_identifier }}</div>
+                    {% if data.item_version_hash %}
+                    <div><strong>Version Hash:</strong> {{ data.item_version_hash }}</div>
+                    {% endif %}
+                    {% if data.category %}
+                    <div><strong>Category:</strong> {{ data.category }}</div>
+                    {% endif %}
+                    {% if data.submitter_name %}
+                    <div><strong>Submitter Name:</strong> {{ data.submitter_name }}</div>
+                    {% endif %}
+                    <div><strong>Submitter User ID:</strong> {{ data.submitter_user_id }}</div>
+                    {% if data.submitter_org %}
+                    <div><strong>Submitter Org:</strong> {{ data.submitter_org }}</div>
+                    {% endif %}
+                    {% if data.submitter_role %}
+                    <div><strong>Submitter Role:</strong> {{ data.submitter_role }}</div>
+                    {% endif %}
+                    {% if data.intended_use_tags %}
+                    <div><strong>Intended Use Tags:</strong> {{ data.intended_use_tags|join(', ') }}</div>
+                    {% endif %}
+                    {% if data.submitted_at %}
+                    <div><strong>Submitted At:</strong> {{ data.submitted_at }}</div>
+                    {% endif %}
+                    {% if data.updated_at %}
+                    <div><strong>Updated At:</strong> {{ data.updated_at }}</div>
+                    {% endif %}
+                </div>
+
+                {% if data.description %}
+                <div class="vm-request-details-block">
+                    <strong>Description</strong>
+                    <p>{{ data.description }}</p>
+                </div>
+                {% endif %}
+
+                {% if data.run_instructions %}
+                <div class="vm-request-details-block">
+                    <strong>Run Instructions</strong>
+                    <p>{{ data.run_instructions }}</p>
+                </div>
+                {% endif %}
+
+                {% if data.evaluation_notes %}
+                <div class="vm-request-details-block">
+                    <strong>Evaluation Notes</strong>
+                    <p>{{ data.evaluation_notes }}</p>
+                </div>
+                {% endif %}
+
+                {% if data.known_limitations %}
+                <div class="vm-request-details-block">
+                    <strong>Known Limitations</strong>
+                    <p>{{ data.known_limitations }}</p>
+                </div>
+                {% endif %}
+
+                {% if data.example_inputs %}
+                <div class="vm-request-details-block">
+                    <strong>Example Inputs</strong>
+                    <ul>
+                        {% for entry in data.example_inputs %}
+                        <li>{{ entry }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if data.test_files %}
+                <div class="vm-request-details-block">
+                    <strong>Test Files</strong>
+                    <ul>
+                        {% for file in data.test_files %}
+                        <li>
+                            <a href="{{ file.download_url }}" target="_blank" rel="noopener" download>
+                                {{ file.original_name or file.stored_name or file.path }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if data.expected_outputs %}
+                <div class="vm-request-details-block">
+                    <strong>Expected Outputs</strong>
+                    <ul>
+                        {% for entry in data.expected_outputs %}
+                        <li>{{ entry }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                {% if data.dependencies %}
+                <div class="vm-request-details-block">
+                    <strong>Dependencies</strong>
+                    <ul>
+                        {% for entry in data.dependencies %}
+                        <li>{{ entry }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </details>
             <div class="vm-card-actions">
                 <button class="btn btn-outline-secondary btn-sm"
                     onclick='reviewVerificationItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ item.title|tojson }})'>
@@ -584,8 +733,8 @@
                         <i class="fa-solid fa-paper-plane"></i> Send to User
                     </button>
                     <button class="btn btn-outline-danger btn-sm"
-                        onclick='removeVerifiedItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
-                        <i class="fa-solid fa-trash"></i> Remove
+                        onclick='unverifyCatalogItem({{ item.kind|tojson }}, {{ item.identifier|tojson }}, {{ (item.display_name or item.title)|tojson }})'>
+                        <i class="fa-solid fa-rotate-left"></i> Unverify
                     </button>
                 </div>
             </div>
@@ -956,8 +1105,10 @@
         });
     }
 
-    function removeVerifiedItem(kind, identifier, title) {
-        const label = title ? `Remove "${title}" from the verified catalog?` : 'Remove item from verified catalog?';
+    function unverifyCatalogItem(kind, identifier, title) {
+        const label = title
+            ? `Unverify "${title}" and move it back to the verification queue?`
+            : 'Unverify this item and move it back to the verification queue?';
         if (!confirm(label)) return;
 
         $.ajax({
@@ -969,11 +1120,11 @@
                 if (res.ok) {
                     location.reload();
                 } else {
-                    alert('Failed to remove: ' + (res.error || 'Unknown error'));
+                    alert('Failed to unverify: ' + (res.error || 'Unknown error'));
                 }
             },
             error: function () {
-                alert('Failed to remove item');
+                alert('Failed to unverify item');
             }
         });
     }

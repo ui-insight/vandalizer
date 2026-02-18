@@ -1,6 +1,7 @@
 """Handles primary routing for the home page and related functionalities."""
 
 import asyncio
+from copy import deepcopy
 import io
 import json
 import logging
@@ -48,13 +49,14 @@ from app.models import (
     SmartDocument,
     SmartFolder,
     Space,
+    SystemConfig,
     Team,
     TeamMembership,
     UrlAttachment,
     User,
-    UserModelConfig,
     Workflow,
     WorkflowStep,
+    _deep_merge,
 )
 from app.utilities.agents import create_chat_agent
 from app.utilities.analytics_helper import (
@@ -63,7 +65,7 @@ from app.utilities.analytics_helper import (
     activity_start,
 )
 from app.utilities.chat_manager import ChatManager
-from app.utilities.config import get_default_model_name, settings
+from app.utilities.config import get_user_model_name, is_external_model, settings
 from app.utilities.document_manager import (
     cleanup_document,
     perform_extraction_and_update,
@@ -74,6 +76,7 @@ from app.utilities.library_helpers import (
     _get_or_create_personal_library,
 )
 from app.utilities.edit_history import history_for
+from app.utilities.extraction_metrics import get_extraction_runtime_stats
 from app.utilities.upload_manager import (
     perform_document_validation,
 )
@@ -99,14 +102,9 @@ def verify_document(document: SmartDocument) -> None:
     print(document.absolute_path)
 
     if not document.raw_text or document.raw_text == "":
-        # Check if the user's model is external
-        model_config = UserModelConfig.objects(user_id=document.user_id).first()
-        is_external_model = False
-        if model_config and model_config.available_models:
-            for model in model_config.available_models:
-                if model.get("name") == model_config.name:
-                    is_external_model = model.get("external", False)
-                    break
+        # Check if the user's selected model is external.
+        model_name = get_user_model_name(document.user_id)
+        selected_model_is_external = is_external_model(model_name)
 
         extraction_task = perform_extraction_and_update.s(
             document_uuid=document.uuid,
@@ -118,7 +116,7 @@ def verify_document(document: SmartDocument) -> None:
             document_path=str(document.absolute_path),
         )
 
-        if is_external_model:
+        if selected_model_is_external:
             # External model: Sequential flow (extraction -> validation)
             # Document not usable until both complete
             workflow = extraction_task | validation_task
@@ -353,12 +351,29 @@ def index() -> ResponseReturnValue:
                         # Switch to Library section and show the extraction panel
                         section = "Library"
                         # Render the extraction panel without results (user can re-run if needed)
+                        system_config = SystemConfig.get_config()
+                        merged_extraction_config = deepcopy(
+                            system_config.get_extraction_config()
+                        )
+                        _deep_merge(
+                            merged_extraction_config, search_set.extraction_config or {}
+                        )
+                        runtime_stats = get_extraction_runtime_stats(search_set.uuid)
                         extraction_panel_html = render_template(
                             "toolpanel/extractions/extraction_panel.html",
                             search_set=search_set,
                             documents=snapshot_documents or documents,
                             results=stored_results,
                             history_entries=history_for("searchset", search_set.uuid),
+                            extraction_config=merged_extraction_config,
+                            has_custom_config=bool(search_set.extraction_config),
+                            available_models=system_config.available_models or [],
+                            can_edit_extraction=user_can_modify_verified(
+                                current_user, search_set
+                            ),
+                            avg_runtime_seconds=runtime_stats["avg_runtime_seconds"],
+                            avg_runtime_sample_size=runtime_stats["sample_size"],
+                            avg_runtime_sample_limit=runtime_stats["sample_limit"],
                         )
 
     debug(activity)
@@ -371,12 +386,29 @@ def index() -> ResponseReturnValue:
             search_set = SearchSet.objects(uuid=search_set_uuid_param).first()
             if search_set:
                 section = "Library"
+                system_config = SystemConfig.get_config()
+                merged_extraction_config = deepcopy(
+                    system_config.get_extraction_config()
+                )
+                _deep_merge(
+                    merged_extraction_config, search_set.extraction_config or {}
+                )
+                runtime_stats = get_extraction_runtime_stats(search_set.uuid)
                 extraction_panel_html = render_template(
                     "toolpanel/extractions/extraction_panel.html",
                     search_set=search_set,
                     documents=documents,
                     results=None,
                     history_entries=history_for("searchset", search_set.uuid),
+                    extraction_config=merged_extraction_config,
+                    has_custom_config=bool(search_set.extraction_config),
+                    available_models=system_config.available_models or [],
+                    can_edit_extraction=user_can_modify_verified(
+                        current_user, search_set
+                    ),
+                    avg_runtime_seconds=runtime_stats["avg_runtime_seconds"],
+                    avg_runtime_sample_size=runtime_stats["sample_size"],
+                    avg_runtime_sample_limit=runtime_stats["sample_limit"],
                 )
 
     return render_template(
@@ -535,10 +567,47 @@ def _render_workflow_bits(workflow_id: Any) -> tuple[str, str]:
         return "", ""
 
     can_customize = user_can_modify_verified(load_user(), workflow)
+
+    # Prepare workflow configuration for JS (Input/Output tabs)
+    user = load_user()
+    workflow_config = {}
+    
+    if user:
+        # Get available folders for the user
+        folders = SmartFolder.objects(user_id=user.get_id()).only('uuid', 'title', 'parent_id')
+        
+        # Build folder paths
+        available_folders = []
+        for folder in folders:
+            # Build folder path by traversing parents
+            path_parts = [folder.title]
+            current = folder
+            while current.parent_id and current.parent_id != "0":
+                parent = SmartFolder.objects(uuid=current.parent_id).only('title', 'parent_id').first()
+                if parent:
+                    path_parts.insert(0, parent.title)
+                    current = parent
+                else:
+                    break
+            
+            available_folders.append({
+                'uuid': folder.uuid,
+                'title': folder.title,
+                'path': ' / '.join(path_parts)
+            })
+
+        workflow_config = {
+            'workflow_id': str(workflow.id),
+            'input_config': workflow.input_config or {},
+            'output_config': workflow.output_config or {},
+            'available_folders': available_folders
+        }
+
     workflow_tpl = render_template(
         "workflows/workflow.html",
         workflow=workflow,
         can_customize_workflow=can_customize,
+        workflow_config=workflow_config,
     )
 
     step_tpl = ""
@@ -777,11 +846,7 @@ def chat() -> ResponseReturnValue:
     # default context docs
     docs = SmartDocument.objects(folder=folder, is_default=True).all()
 
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = get_default_model_name()
+    model = get_user_model_name(user_id)
 
     def generate():
         for chunk in ChatManager().ask_question_to_documents_stream(
@@ -1289,11 +1354,7 @@ def chat_download() -> ResponseReturnValue:
 
     user = load_user()
     user_id = user.get_id()
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    if model_config:
-        model = model_config.name
-    else:
-        model = get_default_model_name()
+    model = get_user_model_name(user_id)
 
     if fmt == "pdf":
         formatted = final_output

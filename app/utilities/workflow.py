@@ -83,6 +83,78 @@ def remove_document_from_workflow_step(document, workflow_step):
     return workflow_step
 
 
+def resolve_fixed_documents(workflow):
+    """Resolve fixed documents from workflow input_config to SmartDocument objects.
+
+    Returns:
+        List of SmartDocument objects (only those that still exist in the database)
+    """
+    fixed_entries = (workflow.input_config or {}).get('fixed_documents', [])
+    docs = []
+    for entry in fixed_entries:
+        uuid = entry.get('uuid')
+        if uuid:
+            doc = SmartDocument.objects(uuid=uuid).first()
+            if doc:
+                docs.append(doc)
+    return docs
+
+
+def apply_input_config(data, inputs):
+    """Apply task-level input_config to override the inputs for a task node.
+
+    Args:
+        data: The task's data dict (contains input_config)
+        inputs: The default inputs from the previous step
+
+    Returns:
+        The (possibly overridden) inputs dict
+    """
+    input_config = data.get("input_config", {})
+    source = input_config.get("source", "step_input")
+
+    if source == "document":
+        doc_uuid = input_config.get("document_uuid")
+        if doc_uuid:
+            return {"step_name": "Document", "output": [doc_uuid], "input": None}
+    elif source == "workflow_documents":
+        doc_uuids = data.get("_workflow_document_uuids", [])
+        if doc_uuids:
+            return {"step_name": "Document", "output": doc_uuids, "input": None}
+
+    return inputs
+
+
+def apply_output_postprocess(result, data, model):
+    """Apply output post-processing if configured on a task node.
+
+    Args:
+        result: The task's output dict (contains 'output' key)
+        data: The task's data dict (contains output_config)
+        model: The LLM model to use for post-processing
+
+    Returns:
+        The (possibly post-processed) result dict
+    """
+    output_config = data.get("output_config", {})
+    post_prompt = output_config.get("post_process_prompt", "")
+    if post_prompt:
+        result_text = result.get("output", "")
+        if isinstance(result_text, dict):
+            result_text = result_text.get("formatted_answer", "") or result_text.get("answer", "") or str(result_text)
+        elif isinstance(result_text, list):
+            result_text = "\n".join(str(x) for x in result_text)
+        post_processed = llm_chat_model(
+            model=model,
+            docs=[],
+            prompt=post_prompt,
+            data=result_text,
+            include_next_step=False,
+        )
+        result["output"] = post_processed
+    return result
+
+
 def format_llm_output(text: str) -> str:
     r"""Format raw LLM text output to clean up escape characters and extra whitespace.
     Returns clean text that can be safely placed in HTML elements on the frontend.
@@ -349,6 +421,9 @@ class FormatNode(Node):
         self.model = data.get("model")
 
     def process(self, inputs):
+        # Apply task-level input config override
+        inputs = apply_input_config(self.data, inputs)
+
         formatting_prompt = self.data.get("prompt", "")
 
         data = inputs.get("output", None)
@@ -367,7 +442,8 @@ class FormatNode(Node):
             text = data
 
         prompt, output = format_model(self.model, formatting_prompt, text)
-        return {"output": output, "input": prompt, "step_name": self.name}
+        result = {"output": output, "input": prompt, "step_name": self.name}
+        return apply_output_postprocess(result, self.data, self.model)
 
 
 class ExtractionNode(Node):
@@ -381,6 +457,9 @@ class ExtractionNode(Node):
         debug(self.user_id)
 
     def process(self, inputs):
+        # Apply task-level input config override
+        inputs = apply_input_config(self.data, inputs)
+
         data = self.data
         debug(data)
         keys = self.data.get("searchphrases", [])
@@ -450,12 +529,13 @@ class ExtractionNode(Node):
             else extraction_response
         )
 
-        return {
+        result = {
             "output": raw_output,  # Raw structured data for variable interpolation
             "formatted_output": formatted_output,  # Formatted markdown for display
             "input": step_input,
             "step_name": self.name,
         }
+        return apply_output_postprocess(result, self.data, self.model)
 
 
 
@@ -744,6 +824,9 @@ class PromptNode(Node):
         self.model = data.get("model")
 
     def process(self, inputs):
+        # Apply task-level input config override
+        inputs = apply_input_config(self.data, inputs)
+
         data = self.data
         prompt = data.get("prompt", "Enter prompt")
         print(f"INPUTS ARE {inputs}")
@@ -782,7 +865,8 @@ class PromptNode(Node):
                 progress_callback=_on_stream_update,
                 include_next_step=False,
             )
-        return {"output": chat_response, "input": prompt, "step_name": self.name}
+        result = {"output": chat_response, "input": prompt, "step_name": self.name}
+        return apply_output_postprocess(result, self.data, self.model)
 
 
 
@@ -1328,6 +1412,13 @@ def build_workflow_engine(steps, workflow, model, user_id=None, workflow_result=
     engine = WorkflowEngine()
     nodes = []
 
+    # Extract workflow document UUIDs from the Document trigger step
+    # so tasks with input_config.source == "workflow_documents" can use them
+    workflow_doc_uuids = []
+    if steps and steps[0].name == "Document":
+        docs = steps[0].data.get("docs", [])
+        workflow_doc_uuids = [doc.uuid for doc in docs if doc is not None]
+
     for idx, step in enumerate(steps):
         node = None
         debug(step.name, step.data)
@@ -1338,6 +1429,11 @@ def build_workflow_engine(steps, workflow, model, user_id=None, workflow_result=
             tasks = []
             for task in step.tasks:
                 debug(task)
+
+                # Inject workflow document UUIDs for tasks that need them
+                if task.data.get("input_config", {}).get("source") == "workflow_documents":
+                    task.data["_workflow_document_uuids"] = workflow_doc_uuids
+
                 if task.name == "Extraction":
                     if task.data.get("search_set_uuid"):
                         search_set = SearchSet.objects(

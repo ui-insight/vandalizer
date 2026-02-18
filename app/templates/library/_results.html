@@ -12,13 +12,30 @@
     {% set last_run = last_run_map.get(wf.id|string) %}
     {% set is_pinned = wf.id|string in user_pinned %}
     {% set is_fav = wf.id|string in user_favorites %}
+    {% set has_folder_watch = wf.input_config and wf.input_config.folder_watch and wf.input_config.folder_watch.enabled
+    %}
+    {% set watched_folder_count = wf.input_config.folder_watch.folders|length if has_folder_watch else 0 %}
     <div class="library-list-row" onclick="selectLibraryItem('workflow', '{{ wf.id }}')" draggable="true"
         ondragstart="dragLibraryItem(event, 'workflow', '{{ wf.id }}')">
         <div class="col-cell primary">
             <div class="row-title">
                 {{ wf.name }}
+                {% if has_folder_watch %}
+                <span class="workflow-passive-badge" title="Folder Watch Enabled"
+                    style="display: inline-block; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; margin-left: 8px;">
+                    <i class="fa-solid fa-bolt" style="font-size: 9px;"></i>
+                </span>
+                {% endif %}
             </div>
-            <div class="row-desc">Workflow</div>
+            <div class="row-desc">
+                Workflow
+                {% if has_folder_watch and watched_folder_count > 0 %}
+                <span style="color: #6b7280; font-size: 11px; margin-left: 8px;">
+                    <i class="fa-solid fa-folder"></i>
+                    Watching {{ watched_folder_count }} folder{% if watched_folder_count != 1 %}s{% endif %}
+                </span>
+                {% endif %}
+            </div>
             {% if wf.tags %}
             <div class="row-tags" style="margin-top:4px; display:flex; gap:4px;">
                 {% for tag in wf.tags[:3] %}
@@ -46,6 +63,10 @@
             <button class="icon-btn action-icon {% if is_pinned %}active{% endif %}"
                 onclick="event.stopPropagation(); togglePin('{{ wf.id }}');" title="Pin">
                 <i class="fa-solid fa-thumbtack"></i>
+            </button>
+            <button class="icon-btn action-icon" onclick="event.stopPropagation(); openWorkflowConfig('{{ wf.id }}');"
+                title="Configure Automation">
+                <i class="fa-solid fa-sliders"></i>
             </button>
             <div class="menu-anchor" style="position:relative; display:inline-block;" onclick="event.stopPropagation()">
                 <button class="icon-btn" type="button" aria-haspopup="true" aria-expanded="false"

@@ -23,11 +23,28 @@
                         <p class="set-title"
                             style="margin-left: 5px; padding: 0px 10px; float: left; font-weight: 500;">
 
-                            <b>{{
-                                workflow.name }}</b>
+                            <b>{{ workflow.name }}</b>
+
+                            {% if workflow.input_config and workflow.input_config.folder_watch and
+                            workflow.input_config.folder_watch.enabled %}
+                            <span class="workflow-passive-badge" title="Folder Watch Enabled">
+                                <i class="fa-solid fa-bolt"></i>
+                            </span>
+                            {% endif %}
+
                             <br>
                             <span style="color: #000000a2; font-weight: 500; font-size: 12px;">{{
                                 workflow.description }}</span>
+
+                            {% if workflow.input_config and workflow.input_config.folder_watch and
+                            workflow.input_config.folder_watch.enabled %}
+                            <br>
+                            <span style="color: #6b7280; font-size: 11px;">
+                                <i class="fa-solid fa-folder"></i>
+                                Watching {{ workflow.input_config.folder_watch.folders|length }} folder{% if
+                                workflow.input_config.folder_watch.folders|length != 1 %}s{% endif %}
+                            </span>
+                            {% endif %}
                         </p>
                         <p class="set-title"
                             style="margin-left: 5px; padding: 0px 10px; float: left; text-align: left; color: #0000007d; font-size: 12px; font-weight: 300;">
@@ -36,9 +53,9 @@
 
                         <p class="set-items" style="text-align: right; ">
                         <p class="set-items" style="text-align: right; ">
-                            <a class="edit-workflow-button" style="color: #adadad99;" data-uuid="{{workflow.id}}"
+                            <a class="edit-workflow-config-button" style="color: #adadad99;" data-uuid="{{workflow.id}}"
                                 data-type="workflow">
-                                <span><i class="fa-regular fa-pen-to-square"></i></span></a>
+                                <span><i class="fa-solid fa-sliders"></i></span></a>
 
                         </p>
                         </p>
@@ -50,7 +67,25 @@
     </div>
 </div>
 
+<style>
+    .workflow-passive-badge {
+        display: inline-block;
+        background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+        color: #92400e;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        margin-left: 8px;
+    }
+
+    .workflow-passive-badge i {
+        font-size: 10px;
+    }
+</style>
+
 <script>
+    // Original edit button (kept for legacy, but hidden)
     $(".edit-workflow-button").on("click", function (e) {
         e.preventDefault();
         e.stopPropagation();
@@ -63,6 +98,37 @@
 
         $.ajax({
             url: '/workflows/edit',
+            type: 'POST',
+            data: data,
+            contentType: 'application/json; charset=utf-8',
+            dataType: 'json',
+            async: true,
+            success: function (data) {
+                console.log(data.template);
+                $("#search-results-panel").show();
+                $("#search-results-panel").empty();
+                $(data.template).hide().appendTo("#search-results-panel").fadeIn();
+
+            },
+            error: function (xhr, ajaxOptions, thrownError) {
+                console.log(xhr.status);
+                console.log(thrownError);
+            }
+        });
+    });
+
+    // New configuration button (with Input/Output tabs)
+    $(".edit-workflow-config-button").on("click", function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $("#add-task-container").hide();
+        let uuid = $(this).attr("data-uuid");
+        const data = JSON.stringify({
+            uuid: uuid,
+        });
+
+        $.ajax({
+            url: '/workflows/edit_configuration',
             type: 'POST',
             data: data,
             contentType: 'application/json; charset=utf-8',

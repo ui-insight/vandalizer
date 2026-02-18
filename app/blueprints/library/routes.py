@@ -6,13 +6,15 @@ import json
 import uuid
 from copy import deepcopy
 from datetime import datetime, timezone
+from pathlib import Path
 
 from typing import Any
 
-from flask import Blueprint, jsonify, render_template, request, url_for
+from flask import Blueprint, current_app, jsonify, render_template, request, url_for
 from flask_login import login_required
 from mongoengine.errors import DoesNotExist
 from flask_mail import Message
+from werkzeug.utils import secure_filename
 
 from app import load_user, mail
 from app.utilities.security import validate_json_request
@@ -46,6 +48,7 @@ from app.utilities.library_helpers import (
     get_or_create_verified_library,
     sync_verification_flags_for_object,
 )
+from app.utilities.config import reconcile_user_model_config
 
 library = Blueprint("library", __name__)
 
@@ -972,11 +975,16 @@ def remove_verified_item():
     if not obj or not normalized_kind:
         return jsonify({"error": "not found"}), 404
 
+    item_identifier = _verification_identifier(normalized_kind, obj)
+    if not item_identifier:
+        return jsonify({"error": "identifier not found"}), 400
+
     verified_lib = get_or_create_verified_library()
     target_li = None
     if verified_lib:
         for li in list(verified_lib.items):
-            if li.kind == normalized_kind and li.obj == obj:
+            li_identifier = _verification_identifier(li.kind, li.obj)
+            if li.kind == normalized_kind and li_identifier == item_identifier:
                 target_li = li
                 break
 
@@ -991,19 +999,32 @@ def remove_verified_item():
         obj.save()
         sync_verification_flags_for_object(obj, None)
 
-    item_identifier = _verification_identifier(normalized_kind, obj)
-    if item_identifier:
-        VerifiedItemMetadata.objects(
-            item_kind=normalized_kind, item_identifier=item_identifier
-        ).delete()
-        req = VerificationRequest.objects(
-            item_kind=normalized_kind, item_identifier=item_identifier
-        ).first()
-        if req and req.library_item == target_li:
-            req.library_item = None
-            req.save()
+    req = VerificationRequest.objects(
+        item_kind=normalized_kind, item_identifier=item_identifier
+    ).first()
+    if not req:
+        team = _current_team_for_user(user)
+        req = VerificationRequest(
+            item_kind=normalized_kind,
+            item_identifier=item_identifier,
+            team=team,
+            status=VerificationStatus.SUBMITTED,
+            submitter_user_id=user.user_id,
+            submitter_name=user.name or user.user_id,
+            submitter_org=team.name if team else "",
+            submitter_role=user.role_in_team(team) if team else "",
+            item_title=_object_title(normalized_kind, obj) or item_identifier,
+            item_version_hash=_default_version_hash(obj),
+            category=_default_category_for_kind(normalized_kind),
+            summary="Moved from verified catalog for re-review.",
+        )
+    else:
+        req.status = VerificationStatus.SUBMITTED
 
-    return jsonify({"ok": True})
+    req.library_item = None
+    req.save()
+
+    return jsonify({"ok": True, "status": req.status.value})
 
 
 @library.route("/verified/item/send_to_user", methods=["POST"])
@@ -1234,6 +1255,7 @@ def get_verified_item_metadata():
     if verification_req:
         result.update({
             "example_inputs": verification_req.example_inputs or [],
+            "test_files": verification_req.test_files or [],
             "expected_outputs": verification_req.expected_outputs or [],
             "dependencies": verification_req.dependencies or [],
             "run_instructions": verification_req.run_instructions or "",
@@ -1428,6 +1450,7 @@ def get_verification_request():
         "summary": "",
         "description": "",
         "example_inputs": [],
+        "test_files": [],
         "expected_outputs": [],
         "dependencies": [],
         "run_instructions": "",
@@ -1654,9 +1677,12 @@ def toggle_pin():
     if not item_uuid:
         return jsonify({"error": "missing uuid"}), 400
 
-    config = UserModelConfig.objects(user_id=user.user_id).first()
+    config, _, _ = reconcile_user_model_config(
+        user.user_id,
+        create_if_missing=True,
+    )
     if not config:
-        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+        return jsonify({"error": "failed to load user config"}), 500
 
     if item_uuid in config.pinned_items:
         config.pinned_items.remove(item_uuid)
@@ -1682,9 +1708,12 @@ def toggle_favorite():
     if not item_uuid:
         return jsonify({"error": "missing uuid"}), 400
 
-    config = UserModelConfig.objects(user_id=user.user_id).first()
+    config, _, _ = reconcile_user_model_config(
+        user.user_id,
+        create_if_missing=True,
+    )
     if not config:
-        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+        return jsonify({"error": "failed to load user config"}), 500
 
     if item_uuid in config.favorite_items:
         config.favorite_items.remove(item_uuid)
@@ -1891,6 +1920,14 @@ def update_verification_status(request_uuid: str):
     now = datetime.now(timezone.utc)
 
     if new_status == VerificationStatus.APPROVED:
+        if not obj:
+            return jsonify({"error": "item not found"}), 404
+
+        verified_lib = get_or_create_verified_library()
+        li = add_object_to_library(obj, verified_lib, added_by_user_id=user.user_id)
+        req.library_item = li
+        req.save()
+
         if hasattr(obj, "verified"):
             setattr(obj, "verified", True)
             obj.save()
@@ -1951,6 +1988,55 @@ def remove_verification_request(request_uuid: str):
 
     req.delete()
     return jsonify({"ok": True})
+
+
+@library.route("/verification/upload_test_files", methods=["POST"])
+@login_required
+def upload_verification_test_files():
+    user = load_user()
+    if not user:
+        return jsonify({"error": "unauthenticated"}), 401
+
+    uploaded_files = request.files.getlist("files")
+    if not uploaded_files:
+        return jsonify({"error": "no files uploaded"}), 400
+
+    upload_dir = (
+        Path(current_app.root_path)
+        / "static"
+        / "uploads"
+        / str(user.user_id)
+        / "verification"
+    )
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    files_payload = []
+    for f in uploaded_files:
+        if not f or not f.filename:
+            continue
+
+        original_name = secure_filename(f.filename)
+        if not original_name:
+            continue
+
+        stored_name = f"{uuid.uuid4().hex}_{original_name}"
+        destination = upload_dir / stored_name
+        f.save(str(destination))
+
+        relative_path = f"uploads/{user.user_id}/verification/{stored_name}"
+        files_payload.append(
+            {
+                "original_name": original_name,
+                "stored_name": stored_name,
+                "path": relative_path,
+                "download_url": url_for("static", filename=relative_path),
+            }
+        )
+
+    if not files_payload:
+        return jsonify({"error": "no valid files uploaded"}), 400
+
+    return jsonify({"ok": True, "files": files_payload})
 
 
 def _submit_for_verification_route(kind: str):
@@ -2023,6 +2109,27 @@ def _submit_for_verification_route(kind: str):
     request_doc.summary = (form.get("summary") or "").strip()
     request_doc.description = (form.get("description") or "").strip()
     request_doc.example_inputs = _coerce_string_list(form.get("example_inputs"))
+    incoming_test_files = form.get("test_files")
+    if isinstance(incoming_test_files, list):
+        cleaned_test_files = []
+        for file_entry in incoming_test_files:
+            if not isinstance(file_entry, dict):
+                continue
+            original_name = (file_entry.get("original_name") or "").strip()
+            stored_name = (file_entry.get("stored_name") or "").strip()
+            path = (file_entry.get("path") or "").strip()
+            download_url = (file_entry.get("download_url") or "").strip()
+            if not path or not download_url:
+                continue
+            cleaned_test_files.append(
+                {
+                    "original_name": original_name,
+                    "stored_name": stored_name,
+                    "path": path,
+                    "download_url": download_url,
+                }
+            )
+        request_doc.test_files = cleaned_test_files
     request_doc.expected_outputs = _coerce_string_list(form.get("expected_outputs"))
     if "dependencies" in form:
         request_doc.dependencies = _coerce_string_list(form.get("dependencies"))

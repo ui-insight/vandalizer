@@ -530,3 +530,193 @@ textarea.input-field {
   min-height: 80px;
   resize: vertical;
 }
+
+/* Validation Report */
+.validation-report-section {
+  margin-top: 0;
+  padding: 20px;
+  background-color: #f9fafb;
+  border-radius: var(--ui-radius, 12px);
+  border: 1px solid #e5e7eb;
+}
+
+.validation-report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.validation-report-title {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+}
+
+.validation-grade-badge {
+  font-size: 20px;
+  font-weight: 800;
+  padding: 4px 14px;
+  border-radius: 8px;
+  color: #fff;
+}
+
+.validation-grade-badge.grade-a {
+  background-color: #16a34a;
+}
+
+.validation-grade-badge.grade-b {
+  background-color: #65a30d;
+}
+
+.validation-grade-badge.grade-c {
+  background-color: #ca8a04;
+}
+
+.validation-grade-badge.grade-d {
+  background-color: #ea580c;
+}
+
+.validation-grade-badge.grade-f {
+  background-color: #dc2626;
+}
+
+.validation-summary {
+  font-size: 13px;
+  color: #555;
+  margin-bottom: 12px;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.validation-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.validation-summary-item .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dot-pass {
+  background-color: #16a34a;
+}
+
+.dot-fail {
+  background-color: #dc2626;
+}
+
+.dot-warn {
+  background-color: #ca8a04;
+}
+
+.dot-skip {
+  background-color: #9ca3af;
+}
+
+.validation-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.validation-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  background-color: #fafafa;
+  border: 1px solid #f0f0f0;
+}
+
+.validation-check-row.check-pass {
+  border-left: 3px solid #16a34a;
+}
+
+.validation-check-row.check-fail {
+  border-left: 3px solid #dc2626;
+  background-color: #fef2f2;
+}
+
+.validation-check-row.check-warn {
+  border-left: 3px solid #ca8a04;
+  background-color: #fefce8;
+}
+
+.validation-check-row.check-skip {
+  border-left: 3px solid #9ca3af;
+  opacity: 0.7;
+}
+
+.validation-check-status {
+  font-weight: 700;
+  min-width: 40px;
+  text-transform: uppercase;
+  font-size: 11px;
+  padding-top: 1px;
+}
+
+.validation-check-status.status-pass {
+  color: #16a34a;
+}
+
+.validation-check-status.status-fail {
+  color: #dc2626;
+}
+
+.validation-check-status.status-warn {
+  color: #ca8a04;
+}
+
+.validation-check-status.status-skip {
+  color: #9ca3af;
+}
+
+.validation-check-body {
+  flex: 1;
+}
+
+.validation-check-desc {
+  font-weight: 600;
+  color: #333;
+}
+
+.validation-check-evidence {
+  color: #666;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.validation-check-severity {
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  font-weight: 600;
+  min-width: 48px;
+  text-align: right;
+}
+
+.validation-running {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 13px;
+  color: #555;
+}
+
+.validation-running .workflow-loader {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-width: 3px;
+  margin-right: 0;
+}
