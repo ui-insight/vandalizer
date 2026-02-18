@@ -1,14 +1,14 @@
 <div class="bottom-toolbar" id="bottom-toolbar-extraction">
     <div id="add-item-panel">
         <div class="input-container" style="position: relative; display: flex; align-items: center; height: 40px;">
-            
+
             <!-- Input Field Container -->
             <div class="ask-question" style="flex: 1; display: flex; position: relative; height: 40px;">
-                <input type="text" id="add-search-term-input" placeholder="Add term to extract..." 
+                <input type="text" id="add-search-term-input" placeholder="Add term to extract..."
                     style="width: 100%; padding-right: 60px; border-radius: var(--ui-radius, 12px); height: 40px; box-sizing: border-box;">
-                
+
                 <!-- Add Button hovering over the input's right edge -->
-                <button class="add-button-2 btn btn-primary" id="add-term-button" 
+                <button class="add-button-2 btn btn-primary" id="add-term-button"
                     style="position: absolute; right: 0; top: 0; height: 40px; background-color: #191919; color: white; border-radius: var(--ui-radius, 12px); box-sizing: border-box; display: flex; align-items: center; justify-content: center;">
                     Add
                 </button>
@@ -16,11 +16,15 @@
 
             <!-- Run Button and Integration Button Container -->
             <div style="display: flex; align-items: center; margin-left: 10px; height: 40px;">
+                <span id="extraction-status-message" style="font-size: 11px; color: #7b7b7b; margin-right: 8px;"></span>
+                <span id="extraction-timer"
+                    style="font-size: 11px; font-family: monospace; color: #7b7b7b; margin-right: 12px; min-width: 35px; text-align: right;"></span>
+
                 <button class="btn btn-primary" id="run-term-button" data-uuid="{{ search_set.uuid }}"
                     style="flex: 1; margin-right: 0.5rem; height: 40px; padding-left: 24px; padding-right: 24px; border-radius: var(--ui-radius, 12px); box-sizing: border-box; display: flex; align-items: center; justify-content: center;">
                     Run
                 </button>
-                <a class="btn btn-secondary integrate-extraction" data-uuid="{{ search_set.uuid }}" 
+                <a class="btn btn-secondary integrate-extraction" data-uuid="{{ search_set.uuid }}"
                     style="height: 40px; width: 40px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0;">
                     <i class="fa-solid fa-plug" style="font-size: 13px; font-weight: 400; color: #7b7b7b;"></i>
                 </a>

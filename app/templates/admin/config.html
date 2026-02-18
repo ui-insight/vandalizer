@@ -338,42 +338,161 @@
     <!-- Extraction Configuration -->
     <div class="config-section">
         <h2>Extraction Configuration</h2>
-        <p>Control structured output behavior for extraction runs.</p>
+        <p>Control extraction behavior, pass configuration, chunking, and consensus.</p>
 
-        {% set extraction_strategy = config.extraction_strategy or 'two_pass' %}
-        {% set extraction_model = config.extraction_model or '' %}
+        <!-- Global model override -->
         <div class="form-group">
-            <label for="extraction_model">Extraction Model</label>
+            <label for="extraction_model">Extraction Model Override</label>
             <select id="extraction_model" name="extraction_model">
-                <option value="" {% if extraction_model == '' %}selected{% endif %}>
+                <option value="" {% if extraction_config.model == '' %}selected{% endif %}>
                     Default (user selection)
                 </option>
                 {% for model in config.available_models %}
-                <option value="{{ model.name }}" {% if extraction_model == model.name %}selected{% endif %}>
+                <option value="{{ model.name }}" {% if extraction_config.model == model.name %}selected{% endif %}>
                     {{ model.name }}
                 </option>
                 {% endfor %}
             </select>
             <small style="color: #6b7280; font-size: 12px;">
-                Model settings (endpoint, protocol, thinking) are configured in Available Models.
+                System-wide override. Per-pass models below take priority if set.
             </small>
         </div>
-        <div class="form-group mb-0">
-            <label for="extraction_strategy">Extraction Strategy</label>
-            <select id="extraction_strategy" name="extraction_strategy">
-                <option value="two_pass" {% if extraction_strategy == 'two_pass' %}selected{% endif %}>
-                    Two-pass (thinking draft -> structured final)
+
+        <!-- Mode toggle -->
+        <div class="form-group">
+            <label for="extraction_mode">Extraction Mode</label>
+            <select id="extraction_mode" name="extraction_mode" onchange="toggleExtractionMode()">
+                <option value="one_pass" {% if extraction_config.mode == 'one_pass' %}selected{% endif %}>
+                    One-pass
                 </option>
-                <option value="one_pass_thinking" {% if extraction_strategy == 'one_pass_thinking' %}selected{% endif %}>
-                    One-pass (thinking enabled)
-                </option>
-                <option value="one_pass_no_thinking" {% if extraction_strategy == 'one_pass_no_thinking' %}selected{% endif %}>
-                    One-pass (thinking disabled)
+                <option value="two_pass" {% if extraction_config.mode == 'two_pass' %}selected{% endif %}>
+                    Two-pass
                 </option>
             </select>
-            <small style="color: #6b7280; font-size: 12px;">
-                Two-pass uses a thinking draft for reasoning, then a strict structured output pass.
-            </small>
+        </div>
+
+        <!-- One-pass settings -->
+        <div id="one_pass_settings" style="display: none; margin-left: 16px; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; margin-bottom: 16px;">
+            <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">One-pass Settings</h3>
+            <div style="display: flex; gap: 20px; margin-bottom: 12px;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="one_pass_thinking" name="one_pass_thinking"
+                        {% if extraction_config.one_pass.thinking %}checked{% endif %}>
+                    <label for="one_pass_thinking" style="margin: 0;">Thinking</label>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="one_pass_structured" name="one_pass_structured"
+                        {% if extraction_config.one_pass.structured %}checked{% endif %}>
+                    <label for="one_pass_structured" style="margin: 0;">Structured Output</label>
+                </div>
+            </div>
+            <div class="form-group" style="margin: 0;">
+                <label for="one_pass_model">Model</label>
+                <select id="one_pass_model" name="one_pass_model">
+                    <option value="">Use global extraction model</option>
+                    {% for model in config.available_models %}
+                    <option value="{{ model.name }}" {% if extraction_config.one_pass.model == model.name %}selected{% endif %}>
+                        {{ model.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Two-pass settings -->
+        <div id="two_pass_settings" style="display: none; margin-left: 16px; margin-bottom: 16px;">
+            <!-- Pass 1 -->
+            <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb; margin-bottom: 12px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Pass 1 — Draft</h3>
+                <div style="display: flex; gap: 20px; margin-bottom: 12px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="two_pass_p1_thinking" name="two_pass_p1_thinking"
+                            {% if extraction_config.two_pass.pass_1.thinking %}checked{% endif %}>
+                        <label for="two_pass_p1_thinking" style="margin: 0;">Thinking</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="two_pass_p1_structured" name="two_pass_p1_structured"
+                            {% if extraction_config.two_pass.pass_1.structured %}checked{% endif %}>
+                        <label for="two_pass_p1_structured" style="margin: 0;">Structured Output</label>
+                    </div>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="two_pass_p1_model">Model</label>
+                    <select id="two_pass_p1_model" name="two_pass_p1_model">
+                        <option value="">Use global extraction model</option>
+                        {% for model in config.available_models %}
+                        <option value="{{ model.name }}" {% if extraction_config.two_pass.pass_1.model == model.name %}selected{% endif %}>
+                            {{ model.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <!-- Pass 2 -->
+            <div style="padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px; background: #f9fafb;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">Pass 2 — Final</h3>
+                <div style="display: flex; gap: 20px; margin-bottom: 12px;">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="two_pass_p2_thinking" name="two_pass_p2_thinking"
+                            {% if extraction_config.two_pass.pass_2.thinking %}checked{% endif %}>
+                        <label for="two_pass_p2_thinking" style="margin: 0;">Thinking</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="two_pass_p2_structured" name="two_pass_p2_structured"
+                            {% if extraction_config.two_pass.pass_2.structured %}checked{% endif %}>
+                        <label for="two_pass_p2_structured" style="margin: 0;">Structured Output</label>
+                    </div>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                    <label for="two_pass_p2_model">Model</label>
+                    <select id="two_pass_p2_model" name="two_pass_p2_model">
+                        <option value="">Use global extraction model</option>
+                        {% for model in config.available_models %}
+                        <option value="{{ model.name }}" {% if extraction_config.two_pass.pass_2.model == model.name %}selected{% endif %}>
+                            {{ model.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chunking -->
+        <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 8px;">
+            <div class="form-group" style="margin-bottom: 8px;">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="chunking_enabled" name="chunking_enabled"
+                        {% if extraction_config.chunking.enabled %}checked{% endif %}
+                        onchange="toggleChunkingSettings()">
+                    <label for="chunking_enabled" style="margin: 0; font-weight: 600;">Enable Key Chunking</label>
+                </div>
+            </div>
+            <div id="chunking_settings" style="display: none; margin-left: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label for="chunking_max_keys">Max keys per chunk</label>
+                    <input type="number" id="chunking_max_keys" name="chunking_max_keys"
+                        min="1" max="100" value="{{ extraction_config.chunking.max_keys_per_chunk }}"
+                        style="width: 120px;">
+                    <small style="color: #6b7280; font-size: 12px;">
+                        If an extraction has more keys than this, they are split into separate extraction calls and merged.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Repetition / Consensus -->
+        <div style="border-top: 1px solid #e5e7eb; padding-top: 16px; margin-top: 16px;">
+            <div class="form-group mb-0">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="repetition_enabled" name="repetition_enabled"
+                        {% if extraction_config.repetition.enabled %}checked{% endif %}>
+                    <label for="repetition_enabled" style="margin: 0; font-weight: 600;">Enable Repetition / Consensus</label>
+                </div>
+                <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">
+                    Runs extraction twice in parallel. If results differ, runs a third time and returns the majority-vote consensus.
+                    This increases accuracy but doubles (or triples) LLM calls.
+                </small>
+            </div>
         </div>
     </div>
 
@@ -757,6 +876,24 @@
     </form>
 </div>
 
+<script>
+    // Extraction mode toggle
+    function toggleExtractionMode() {
+        const mode = document.getElementById('extraction_mode').value;
+        document.getElementById('one_pass_settings').style.display = mode === 'one_pass' ? 'block' : 'none';
+        document.getElementById('two_pass_settings').style.display = mode === 'two_pass' ? 'block' : 'none';
+    }
+
+    // Chunking settings toggle
+    function toggleChunkingSettings() {
+        const enabled = document.getElementById('chunking_enabled').checked;
+        document.getElementById('chunking_settings').style.display = enabled ? 'block' : 'none';
+    }
+
+    // Initialize on page load
+    toggleExtractionMode();
+    toggleChunkingSettings();
+</script>
 <script>
     // Update hex color preview when color picker changes
     const colorInput = document.getElementById('highlight_color');

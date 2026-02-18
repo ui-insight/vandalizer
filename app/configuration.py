@@ -9,6 +9,10 @@ class Config:
     DEBUG = False
     TESTING = False
     BOOTSTRAP_FONTAWESOME = True
+    # Default to CDN assets unless explicitly enabled via env var.
+    BOOTSTRAP_SERVE_LOCAL = (
+        os.getenv("BOOTSTRAP_SERVE_LOCAL", "false").strip().lower() == "true"
+    )
     SECRET_KEY = "***REMOVED***"
     SECURITY_PASSWORD_SALT = "***REMOVED***"
     CSRF_ENABLED = True
