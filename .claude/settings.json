@@ -1,0 +1,4 @@
+{
+  "apiKeyHelper": "security find-generic-password -a \"$USER\" -s \"ANTHROPIC_API_KEY\" -w",
+  "model": "claude-opus-4-6"
+}

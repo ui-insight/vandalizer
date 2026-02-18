@@ -24,7 +24,8 @@ from pypdf import PdfReader
 # Normalize filename/extension early
 from werkzeug.utils import secure_filename
 
-from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder, UserModelConfig
+from app.models import SearchSet, SearchSetItem, SmartDocument, SmartFolder
+from app.utilities.config import get_user_model_name, is_external_model
 from app.utilities.security import safe_get_document, validate_json_request
 from app.utilities.document_manager import (
     DocumentManager,
@@ -202,15 +203,9 @@ def upload():
     )
     document.save()
 
-    # Check if the user's model is external
-    model_config = UserModelConfig.objects(user_id=user_id).first()
-    is_external_model = False
-    if model_config and model_config.available_models:
-        # Find the current model in available_models
-        for model in model_config.available_models:
-            if model.get("name") == model_config.name:
-                is_external_model = model.get("external", False)
-                break
+    # Check if the user's selected model is external.
+    model_name = get_user_model_name(user_id)
+    selected_model_is_external = is_external_model(model_name)
 
     # Kick off tasks
     extraction_task = perform_extraction_and_update.s(
@@ -222,7 +217,7 @@ def upload():
         document_path=str(file_path),
     )
 
-    if is_external_model:
+    if selected_model_is_external:
         # External model: Sequential flow (extraction -> validation)
         # Document not usable until both complete
         workflow = extraction_task | validation_task

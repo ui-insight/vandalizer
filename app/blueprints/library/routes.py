@@ -48,6 +48,7 @@ from app.utilities.library_helpers import (
     get_or_create_verified_library,
     sync_verification_flags_for_object,
 )
+from app.utilities.config import reconcile_user_model_config
 
 library = Blueprint("library", __name__)
 
@@ -1676,9 +1677,12 @@ def toggle_pin():
     if not item_uuid:
         return jsonify({"error": "missing uuid"}), 400
 
-    config = UserModelConfig.objects(user_id=user.user_id).first()
+    config, _, _ = reconcile_user_model_config(
+        user.user_id,
+        create_if_missing=True,
+    )
     if not config:
-        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+        return jsonify({"error": "failed to load user config"}), 500
 
     if item_uuid in config.pinned_items:
         config.pinned_items.remove(item_uuid)
@@ -1704,9 +1708,12 @@ def toggle_favorite():
     if not item_uuid:
         return jsonify({"error": "missing uuid"}), 400
 
-    config = UserModelConfig.objects(user_id=user.user_id).first()
+    config, _, _ = reconcile_user_model_config(
+        user.user_id,
+        create_if_missing=True,
+    )
     if not config:
-        config = UserModelConfig(user_id=user.user_id, name=user.name or "User").save()
+        return jsonify({"error": "failed to load user config"}), 500
 
     if item_uuid in config.favorite_items:
         config.favorite_items.remove(item_uuid)

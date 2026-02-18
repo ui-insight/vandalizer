@@ -22,7 +22,6 @@ from pydantic_ai.messages import (
 from app.models import (
     ChatConversation,
     ChatRole,
-    UserModelConfig,
     ActivityEvent,
     ActivityStatus,
 )
@@ -31,7 +30,7 @@ from app.utilities.analytics_helper import (
     activity_finish,
 )
 from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
-from app.utilities.config import get_default_model_name, settings
+from app.utilities.config import get_user_model_name, settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
 from app.utilities.llm_helpers import (
@@ -111,10 +110,7 @@ class ChatManager:
                 + self.loaded_doc
             )
 
-        model = get_default_model_name()
-        model_config = UserModelConfig.objects(user_id=item.user_id).first()
-        if model_config is not None:
-            model = model_config.name
+        model = get_user_model_name(item.user_id)
         chat_agent = create_chat_agent(model)
         result = chat_agent.run_sync(
             messages=[{"role": "user", "content": prompt}],
