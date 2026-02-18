@@ -361,6 +361,36 @@ def save_configuration() -> ResponseReturnValue:
 
 
 @login_required
+@workflows.route("/search_documents", methods=["POST"])
+def search_documents() -> ResponseReturnValue:
+    """Search documents for fixed document picker."""
+    user = current_user
+    if user is None:
+        return redirect(url_for("auth.login"))
+
+    data = request.get_json()
+    query = (data.get("query") or "").strip()
+
+    filters = {"user_id": user.get_id()}
+    if query:
+        filters["title__icontains"] = query
+
+    docs = (
+        SmartDocument.objects(**filters)
+        .only("uuid", "title", "extension")
+        .order_by("-created_at")
+        .limit(50)
+    )
+
+    results = [
+        {"uuid": doc.uuid, "title": doc.title, "extension": doc.extension}
+        for doc in docs
+    ]
+
+    return jsonify({"documents": results})
+
+
+@login_required
 @workflows.route("/workflow/run", methods=["POST"])
 def run_workflow() -> ResponseReturnValue:
     """Run a workflow."""
@@ -375,6 +405,14 @@ def run_workflow() -> ResponseReturnValue:
     current_space_id = workflow_data.get("current_space_id", "None")
     document_uuids = workflow_data.get("document_uuids") or []
 
+    workflow = Workflow.objects(id=workflow_id).first()
+
+    # Merge fixed documents from input_config
+    from app.utilities.workflow import resolve_fixed_documents
+    fixed_docs = resolve_fixed_documents(workflow) if workflow else []
+    fixed_doc_uuids = [doc.uuid for doc in fixed_docs]
+    document_uuids = list(dict.fromkeys(document_uuids + fixed_doc_uuids))
+
     if not document_uuids:
         return (
             jsonify(
@@ -382,8 +420,6 @@ def run_workflow() -> ResponseReturnValue:
             ),
             400,
         )
-
-    workflow = Workflow.objects(id=workflow_id).first()
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
     workflow_result.save()
     workflow = Workflow.objects(id=workflow_id).first()
@@ -738,6 +774,12 @@ def run_workflow_integrated() -> ResponseReturnValue:
         )
         document.save()
         document_uuids.append(uid)
+
+    # Merge fixed documents from input_config
+    from app.utilities.workflow import resolve_fixed_documents
+    fixed_docs = resolve_fixed_documents(workflow)
+    fixed_doc_uuids = [doc.uuid for doc in fixed_docs]
+    document_uuids = list(dict.fromkeys(document_uuids + fixed_doc_uuids))
 
     # **5. Prepare Workflow Execution**
     workflow_result = WorkflowResult(workflow=workflow, session_id=session_id)
@@ -1444,6 +1486,8 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
         manual_input = data.get("manual_input", None)
         workflow_step_id = data.get("workflow_step_id", None)
         task_id = data.get("workflow_task_id", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow_step_task = None
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
@@ -1515,28 +1559,34 @@ def workflow_add_extraction_step() -> ResponseReturnValue:
                             action="update_task",
                             changes=changes,
                         )
-                return jsonify({"response": "success"})
-            workflow_step_task = WorkflowStepTask(
-                name="Extraction",
-                data={"searchphrases": manual_input},
-            )
-            workflow_step_task.save()
-
-            if workflow_step.tasks is None:
-                workflow_step.tasks = []
-            workflow_step.tasks.append(workflow_step_task)
-            workflow_step.save()
-            changes = build_changes(
-                {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
-            )
-            if workflow:
-                log_edit_history(
-                    kind="workflow",
-                    obj_id=str(workflow.id),
-                    user=_workflow_user_or_none(),
-                    action="add_task",
-                    changes=changes,
+            else:
+                workflow_step_task = WorkflowStepTask(
+                    name="Extraction",
+                    data={"searchphrases": manual_input},
                 )
+                workflow_step_task.save()
+
+                if workflow_step.tasks is None:
+                    workflow_step.tasks = []
+                workflow_step.tasks.append(workflow_step_task)
+                workflow_step.save()
+                changes = build_changes(
+                    {"task": ("", _task_summary("Extraction", workflow_step_task.data))}
+                )
+                if workflow:
+                    log_edit_history(
+                        kind="workflow",
+                        obj_id=str(workflow.id),
+                        user=_workflow_user_or_none(),
+                        action="add_task",
+                        changes=changes,
+                    )
+
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
 
         return jsonify({"response": "success"})
     return None
@@ -1634,6 +1684,8 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
         task_id = data.get("workflow_task_id", None)
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
@@ -1723,6 +1775,12 @@ def workflow_add_prompt_step() -> ResponseReturnValue:
                         changes=changes,
                     )
 
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
+
         return jsonify({"response": "success"})
     return None
 
@@ -1775,6 +1833,8 @@ def workflow_add_format_step() -> ResponseReturnValue:
 
         search_set_item_id = data.get("search_set_item_id", None)
         manual_input = data.get("manual_input", None)
+        task_input_config = data.get("input_config", {"source": "step_input"})
+        task_output_config = data.get("output_config", {"post_process_prompt": ""})
         workflow_step = WorkflowStep.objects(id=ObjectId(workflow_step_id)).first()
         workflow = _workflow_for_step(workflow_step) if workflow_step else None
 
@@ -1863,6 +1923,12 @@ def workflow_add_format_step() -> ResponseReturnValue:
                         action="add_task",
                         changes=changes,
                     )
+
+        # Persist task-level input/output config
+        if workflow_step_task:
+            workflow_step_task.data["input_config"] = task_input_config
+            workflow_step_task.data["output_config"] = task_output_config
+            workflow_step_task.save()
 
         return jsonify({"response": "success"})
     return None

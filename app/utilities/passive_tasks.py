@@ -146,6 +146,15 @@ def execute_workflow_passive(trigger_event_id):
         
         # Prepare document trigger step
         docs = list(event.documents)
+
+        # Merge fixed documents from input_config
+        from app.utilities.workflow import resolve_fixed_documents
+        fixed_docs = resolve_fixed_documents(workflow)
+        existing_uuids = {doc.uuid for doc in docs}
+        for fdoc in fixed_docs:
+            if fdoc.uuid not in existing_uuids:
+                docs.append(fdoc)
+
         document_trigger_step = WorkflowStep(
             name="Document",
             data={"docs": docs, "user_id": workflow.user_id}

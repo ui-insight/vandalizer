@@ -10,6 +10,44 @@
         </p>
     </div>
 
+    <!-- Fixed Documents -->
+    <div class="config-section">
+        <div class="config-section-header">
+            <i class="fa-solid fa-thumbtack"></i> Fixed Documents
+            <span class="config-badge" style="background: #dbeafe; color: #1e40af;"
+                id="fixed-docs-count">0 documents</span>
+        </div>
+        <p style="font-size: 13px; color: #6b7280; margin: 0 0 15px 0;">
+            These documents are automatically included in every workflow run,
+            in addition to any documents selected at run-time.
+        </p>
+
+        <!-- Selected fixed documents list -->
+        <div id="fixed-docs-list" style="margin-bottom: 15px;">
+            <div id="fixed-docs-empty" style="color: #9ca3af; font-size: 13px; font-style: italic;">
+                No fixed documents added yet. Click "Add Documents" to select.
+            </div>
+        </div>
+
+        <!-- Add button -->
+        <button type="button" class="btn btn-secondary" id="add-fixed-docs-btn" style="font-size: 13px; padding: 6px 14px;">
+            <i class="fa-solid fa-plus"></i> Add Documents
+        </button>
+
+        <!-- Inline search panel (hidden by default) -->
+        <div id="fixed-docs-search-panel" style="display: none; margin-top: 15px;">
+            <input type="text" id="fixed-docs-search-input"
+                placeholder="Search documents by title..."
+                style="width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; margin-bottom: 10px; box-sizing: border-box;">
+            <div id="fixed-docs-search-results"
+                style="max-height: 250px; overflow-y: auto; border: 1px solid #d1d5db; border-radius: 6px; background: white;">
+                <div style="color: #9ca3af; font-size: 13px; text-align: center; padding: 20px;">
+                    Type to search documents...
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Folder Watch -->
     <div class="config-section">
         <div class="config-section-header">
@@ -237,13 +275,60 @@ print(response.json())`;
     function updateInputBadge() {
         const folderWatchEnabled = $('#folder-watch-enabled').is(':checked');
         const numWatchedFolders = $('.folder-watch-checkbox:checked').length;
+        const numFixedDocs = fixedDocuments.length;
 
+        const parts = [];
         if (folderWatchEnabled && numWatchedFolders > 0) {
-            $('#input-badge').text(`${numWatchedFolders} folder${numWatchedFolders > 1 ? 's' : ''}`).show();
+            parts.push(`${numWatchedFolders} folder${numWatchedFolders > 1 ? 's' : ''}`);
+        }
+        if (numFixedDocs > 0) {
+            parts.push(`${numFixedDocs} fixed doc${numFixedDocs > 1 ? 's' : ''}`);
+        }
+
+        if (parts.length > 0) {
+            $('#input-badge').text(parts.join(', ')).show();
         } else {
             $('#input-badge').hide();
         }
     }
 
     $(document).on('change', '.folder-watch-checkbox', updateInputBadge);
+
+    // Fixed Documents: Toggle search panel
+    $('#add-fixed-docs-btn').on('click', function () {
+        $('#fixed-docs-search-panel').toggle();
+        if ($('#fixed-docs-search-panel').is(':visible')) {
+            $('#fixed-docs-search-input').val('').focus();
+            searchDocuments('');
+        }
+    });
+
+    // Fixed Documents: Search input
+    $('#fixed-docs-search-input').on('input', function () {
+        searchDocuments($(this).val());
+    });
+
+    // Fixed Documents: Click search result to add
+    $(document).on('click', '.fixed-doc-search-item', function () {
+        const uuid = $(this).data('uuid');
+        const title = $(this).data('title');
+        const extension = $(this).data('extension') || 'pdf';
+
+        if (fixedDocuments.some(d => d.uuid === uuid)) return;
+
+        fixedDocuments.push({ uuid, title, extension });
+        renderFixedDocsList();
+        searchDocuments($('#fixed-docs-search-input').val());
+    });
+
+    // Fixed Documents: Remove
+    $(document).on('click', '.remove-fixed-doc-btn', function (e) {
+        e.stopPropagation();
+        const uuid = $(this).data('uuid');
+        fixedDocuments = fixedDocuments.filter(d => d.uuid !== uuid);
+        renderFixedDocsList();
+        if ($('#fixed-docs-search-panel').is(':visible')) {
+            searchDocuments($('#fixed-docs-search-input').val());
+        }
+    });
 </script>

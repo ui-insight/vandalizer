@@ -5,6 +5,7 @@
 
 let workflowFolders = [];
 let currentWorkflowId = null;
+let fixedDocuments = []; // Array of {uuid, title, extension}
 
 /**
  * Initialize workflow configuration from backend data
@@ -75,6 +76,11 @@ function populateFolderSelects() {
  * Load input configuration into UI
  */
 function loadInputConfig(inputConfig) {
+    // Fixed documents
+    const fixedDocs = inputConfig.fixed_documents || [];
+    fixedDocuments = fixedDocs;
+    renderFixedDocsList();
+
     const folderWatch = inputConfig.folder_watch || {};
 
     // Folder watch enabled
@@ -164,6 +170,10 @@ function addNotificationFromData(notification) {
 function collectInputConfig() {
     const inputConfig = {
         manual_enabled: true, // Always enabled
+        fixed_documents: fixedDocuments.map(doc => ({
+            uuid: doc.uuid,
+            title: doc.title
+        })),
         folder_watch: {
             enabled: $('#folder-watch-enabled').is(':checked'),
             folders: $('.folder-watch-checkbox:checked').map(function () {
@@ -269,6 +279,125 @@ function saveWorkflowConfiguration(workflowId) {
             console.error('Save failed:', xhr.status, thrownError);
             alert('Failed to save configuration. Please try again.');
         }
+    });
+}
+
+/**
+ * Render the list of selected fixed documents
+ */
+function renderFixedDocsList() {
+    const $list = $('#fixed-docs-list');
+    $list.find('.fixed-doc-item').remove();
+
+    if (fixedDocuments.length === 0) {
+        $('#fixed-docs-empty').show();
+    } else {
+        $('#fixed-docs-empty').hide();
+        fixedDocuments.forEach(doc => {
+            const icon = getFileIcon(doc.extension || 'pdf');
+            const item = `
+                <div class="fixed-doc-item" data-uuid="${doc.uuid}"
+                    style="display: flex; align-items: center; justify-content: space-between;
+                           padding: 8px 12px; background: white; border: 1px solid #e5e7eb;
+                           border-radius: 6px; margin-bottom: 6px;">
+                    <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+                        <i class="${icon}" style="color: #6b7280; flex-shrink: 0;"></i>
+                        <span style="font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${doc.title}</span>
+                    </div>
+                    <button type="button" class="remove-fixed-doc-btn" data-uuid="${doc.uuid}"
+                        style="background: none; border: none; color: #9ca3af; cursor: pointer; padding: 4px; flex-shrink: 0;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            `;
+            $list.append(item);
+        });
+    }
+    updateFixedDocsBadge();
+}
+
+/**
+ * Get Font Awesome icon class for file extension
+ */
+function getFileIcon(ext) {
+    const icons = {
+        'pdf': 'fa-solid fa-file-pdf',
+        'docx': 'fa-solid fa-file-word',
+        'xlsx': 'fa-solid fa-file-excel',
+        'xls': 'fa-solid fa-file-excel',
+        'html': 'fa-solid fa-file-code',
+    };
+    return icons[ext] || 'fa-solid fa-file';
+}
+
+/**
+ * Update the fixed docs count badge
+ */
+function updateFixedDocsBadge() {
+    const count = fixedDocuments.length;
+    const $badge = $('#fixed-docs-count');
+    $badge.text(`${count} document${count !== 1 ? 's' : ''}`);
+    if (count > 0) {
+        $badge.css({ 'background': '#d1fae5', 'color': '#065f46' });
+    } else {
+        $badge.css({ 'background': '#dbeafe', 'color': '#1e40af' });
+    }
+    // Also update the main input tab badge
+    if (typeof updateInputBadge === 'function') {
+        updateInputBadge();
+    }
+}
+
+/**
+ * Search documents via AJAX
+ */
+let searchTimeout = null;
+function searchDocuments(query) {
+    clearTimeout(searchTimeout);
+    searchTimeout = setTimeout(() => {
+        $.ajax({
+            url: '/workflows/search_documents',
+            type: 'POST',
+            data: JSON.stringify({ query: query }),
+            contentType: 'application/json',
+            dataType: 'json',
+            success: function (response) {
+                renderSearchResults(response.documents || []);
+            }
+        });
+    }, 300);
+}
+
+/**
+ * Render search results in the dropdown
+ */
+function renderSearchResults(documents) {
+    const $results = $('#fixed-docs-search-results');
+    $results.empty();
+
+    if (documents.length === 0) {
+        $results.html('<div style="color: #9ca3af; font-size: 13px; text-align: center; padding: 20px;">No documents found.</div>');
+        return;
+    }
+
+    const existingUuids = fixedDocuments.map(d => d.uuid);
+
+    documents.forEach(doc => {
+        const isAlreadyAdded = existingUuids.includes(doc.uuid);
+        const icon = getFileIcon(doc.extension);
+        const item = `
+            <div class="fixed-doc-search-item" data-uuid="${doc.uuid}"
+                data-title="${doc.title}" data-extension="${doc.extension || 'pdf'}"
+                style="padding: 10px 12px; cursor: ${isAlreadyAdded ? 'default' : 'pointer'};
+                       border-bottom: 1px solid #f3f4f6; display: flex;
+                       align-items: center; gap: 8px;
+                       ${isAlreadyAdded ? 'opacity: 0.5;' : ''}">
+                <i class="${icon}" style="color: #6b7280;"></i>
+                <span style="font-size: 13px;">${doc.title}</span>
+                ${isAlreadyAdded ? '<span style="font-size: 11px; color: #9ca3af; margin-left: auto;">Added</span>' : ''}
+            </div>
+        `;
+        $results.append(item);
     });
 }
 

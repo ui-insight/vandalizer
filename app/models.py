@@ -210,6 +210,7 @@ class Workflow(me.Document):
     # Passive Vandalizer: Input configuration (how workflow triggers)
     input_config = me.DictField(required=False, default=lambda: {
         'manual_enabled': True,  # Existing manual "Run" behavior
+        'fixed_documents': [],  # List of {uuid, title} dicts - always included in every run
         'folder_watch': {
             'enabled': False,
             'folders': [],  # List of SmartFolder UUIDs to watch

@@ -2194,6 +2194,21 @@
             }
         }
 
+        // Collect task-level input config
+        const inputSource = $('input[name="task-input-source"]:checked').val() || 'step_input';
+        dict['input_config'] = {
+            source: inputSource,
+            document_uuid: inputSource === 'document' ? ($('#task-input-doc-uuid').val() || null) : null,
+            document_title: inputSource === 'document' ? ($('#task-input-doc-title').val() || null) : null,
+        };
+
+        // Collect task-level output config
+        dict['output_config'] = {
+            post_process_prompt: $('#task-output-prompt-enabled').is(':checked')
+                ? ($('#task-output-prompt').val() || '')
+                : '',
+        };
+
         let data = JSON.stringify(dict);
         console.log(data);
 
