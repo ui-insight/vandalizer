@@ -1,0 +1,268 @@
+import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
+import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
+import { getModels } from '../../api/config'
+import type { ModelInfo } from '../../types/workflow'
+
+interface Props {
+  onSend: (message: string) => void
+  onAttachFile?: (files: File[]) => void
+  onAttachLink?: (url: string) => void
+  disabled?: boolean
+  selectedModel?: string
+  onModelChange?: (model: string) => void
+  onExport?: (format: string) => void
+  hasMessages?: boolean
+}
+
+export function ChatInput({
+  onSend, onAttachFile, onAttachLink, disabled,
+  selectedModel, onModelChange, onExport, hasMessages,
+}: Props) {
+  const [message, setMessage] = useState('')
+  const [showAddMenu, setShowAddMenu] = useState(false)
+  const [showLinkInput, setShowLinkInput] = useState(false)
+  const [linkUrl, setLinkUrl] = useState('')
+  const [showModelMenu, setShowModelMenu] = useState(false)
+  const [showExportMenu, setShowExportMenu] = useState(false)
+  const [models, setModels] = useState<ModelInfo[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const addMenuRef = useRef<HTMLDivElement>(null)
+  const modelMenuRef = useRef<HTMLDivElement>(null)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setShowAddMenu(false)
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) setShowModelMenu(false)
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Fetch models on first open
+  useEffect(() => {
+    if (showModelMenu && models.length === 0) {
+      getModels().then(setModels).catch(() => {})
+    }
+  }, [showModelMenu, models.length])
+
+  const handleSend = () => {
+    const trimmed = message.trim()
+    if (!trimmed || disabled) return
+    onSend(trimmed)
+    setMessage('')
+  }
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) onAttachFile?.(files)
+    e.target.value = ''
+  }
+
+  const handleLinkSubmit = () => {
+    if (linkUrl.trim()) {
+      onAttachLink?.(linkUrl.trim())
+      setLinkUrl('')
+      setShowLinkInput(false)
+    }
+  }
+
+  const displayModel = selectedModel
+    ? models.find(m => m.name === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
+    : null
+
+  return (
+    <div
+      className="p-[15px] bg-white"
+      style={{ boxShadow: '0 0px 23px -8px rgb(211, 211, 211)', zIndex: 500 }}
+    >
+      {/* Link input row */}
+      {showLinkInput && (
+        <div className="mb-3 flex gap-2">
+          <input
+            type="url"
+            value={linkUrl}
+            onChange={(e) => setLinkUrl(e.target.value)}
+            placeholder="Enter URL..."
+            className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none"
+            onKeyDown={(e) => e.key === 'Enter' && handleLinkSubmit()}
+          />
+          <button
+            onClick={handleLinkSubmit}
+            className="rounded-[var(--ui-radius)] bg-highlight px-3 py-1.5 text-sm text-highlight-text font-bold hover:brightness-90"
+          >
+            Add
+          </button>
+          <button
+            onClick={() => setShowLinkInput(false)}
+            className="rounded-md px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Ask question container */}
+      <div
+        className="flex flex-col rounded-[var(--ui-radius)] p-2.5"
+        style={{ backgroundColor: '#19191913' }}
+      >
+        {/* Text input area */}
+        <div
+          className="overflow-y-auto cursor-text"
+          style={{ maxHeight: '25vh', padding: '8px 6px 12px 6px' }}
+        >
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask anything about this document..."
+            rows={1}
+            className="w-full resize-none border-0 bg-transparent text-base font-medium placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none"
+            style={{ fontSize: 16 }}
+            disabled={disabled}
+          />
+        </div>
+
+        {/* Controls toolbar */}
+        <div className="flex items-center gap-2.5 pt-1 px-1">
+          {/* + Add button */}
+          <div ref={addMenuRef} className="relative">
+            <button
+              onClick={() => setShowAddMenu(!showAddMenu)}
+              className="flex items-center gap-1 rounded-[30px] bg-[#2980b9] border-2 border-[#2980b9] px-2.5 py-1 text-xs font-bold text-white hover:brightness-90 transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+
+            {showAddMenu && (
+              <div
+                className="absolute left-0 z-[1000] min-w-[220px] rounded-[var(--ui-radius)] border bg-white p-1.5"
+                style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+              >
+                <button
+                  onClick={() => { fileInputRef.current?.click(); setShowAddMenu(false) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                  style={{ minHeight: 40 }}
+                >
+                  <FileUp className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                  <span>Add Document</span>
+                </button>
+                <button
+                  onClick={() => { setShowLinkInput(true); setShowAddMenu(false) }}
+                  className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                  style={{ minHeight: 40 }}
+                >
+                  <Globe className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                  <span>Add Website</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          {/* Model selector */}
+          {onModelChange && (
+            <div ref={modelMenuRef} className="relative">
+              <button
+                onClick={() => setShowModelMenu(!showModelMenu)}
+                className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+              >
+                <Cpu className="h-3 w-3" />
+                {displayModel || 'Model'}
+                <ChevronDown className="h-3 w-3" />
+              </button>
+
+              {showModelMenu && (
+                <div
+                  className="absolute left-0 z-[1000] min-w-[240px] rounded-[var(--ui-radius)] border bg-white p-1.5"
+                  style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)', maxHeight: 280, overflowY: 'auto' }}
+                >
+                  {models.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-gray-400">Loading models...</div>
+                  ) : (
+                    models.map(m => (
+                      <button
+                        key={m.name}
+                        onClick={() => { onModelChange(m.name); setShowModelMenu(false) }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                      >
+                        <Cpu className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-medium truncate">{m.tag || m.name}</div>
+                          {m.external && <span className="text-[10px] text-gray-400">External</span>}
+                        </div>
+                        {selectedModel === m.name && (
+                          <div className="h-2 w-2 rounded-full bg-highlight shrink-0" />
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Export button */}
+          {onExport && hasMessages && (
+            <div ref={exportMenuRef} className="relative">
+              <button
+                onClick={() => setShowExportMenu(!showExportMenu)}
+                className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                title="Export conversation"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+
+              {showExportMenu && (
+                <div
+                  className="absolute right-0 z-[1000] min-w-[140px] rounded-[var(--ui-radius)] border bg-white p-1.5"
+                  style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+                >
+                  {['PDF', 'CSV', 'Text'].map(fmt => (
+                    <button
+                      key={fmt}
+                      onClick={() => { onExport(fmt.toLowerCase()); setShowExportMenu(false) }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                    >
+                      <Download className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                      {fmt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Send button */}
+          <button
+            onClick={handleSend}
+            disabled={!message.trim() || disabled}
+            className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Send className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}

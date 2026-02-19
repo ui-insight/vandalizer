@@ -1,0 +1,466 @@
+"""Workflow engine — ported from app/utilities/workflow.py.
+
+All node processing is synchronous (runs in Celery workers).
+Progress reporting uses pymongo directly for sync context.
+"""
+
+import graphlib
+import json
+import multiprocessing
+import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import NoReturn, Optional
+
+from app.services.extraction_engine import ExtractionEngine
+from app.services.llm_service import create_chat_agent, get_agent_model
+
+
+# ---------------------------------------------------------------------------
+# Helper functions
+# ---------------------------------------------------------------------------
+
+def sanitize_step_name(name: str) -> str:
+    name = name.replace(".", "_").replace("$", "_").strip().strip("_")
+    name = re.sub(r"\s+", "_", name)
+    name = re.sub(r"__+", "_", name)
+    return name or "step"
+
+
+def format_extraction_results(data) -> str:
+    """Convert extraction JSON results into a markdown bullet list."""
+    if data is None:
+        return ""
+    if isinstance(data, dict):
+        items = [data]
+    elif isinstance(data, list):
+        items = data
+    else:
+        return str(data)
+
+    lines = []
+    for idx, item in enumerate(items, start=1):
+        if isinstance(item, dict):
+            if len(items) > 1:
+                lines.append(f"#### Result {idx}")
+            for key, value in item.items():
+                value_str = _stringify_value(value)
+                lines.append(f"- **{key}**: {value_str}")
+            lines.append("")
+        else:
+            lines.append(f"- {item}")
+    return "\n".join(line for line in lines if line is not None)
+
+
+def _stringify_value(value):
+    if value is None:
+        return "N/A"
+    if isinstance(value, (list, tuple)):
+        return ", ".join(_stringify_value(v) for v in value if v is not None)
+    if isinstance(value, dict):
+        return json.dumps(value, indent=2)
+    return str(value)
+
+
+# ---------------------------------------------------------------------------
+# LLM helper functions (sync, for nodes)
+# ---------------------------------------------------------------------------
+
+def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
+                   include_next_step: bool = True, system_config_doc: dict | None = None):
+    """Run a chat prompt via LLM. Sync context."""
+    full_text = json.dumps(data) if data is not None else ""
+    output_prompt = (
+        f"Follow the instruction and output your answer as a nicely formatted markdown "
+        f"to display in a web interface chat bot. Only show the markdown output and add "
+        f"no text before it.\n\nInstruction: {prompt}\n\n {full_text}"
+    )
+    chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
+    result = chat_agent.run_sync(output_prompt)
+    output = result.output
+    if progress_callback:
+        progress_callback(output)
+    return output
+
+
+def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | None = None,
+                          full_text: str | None = None, system_config_doc: dict | None = None):
+    """Run extraction and return {raw, formatted}. Sync context."""
+    engine = ExtractionEngine(system_config_doc=system_config_doc)
+    output = engine.extract(
+        extract_keys=keys,
+        model=model,
+        full_text=full_text,
+        doc_texts=doc_texts,
+    )
+    formatted_output = format_extraction_results(output)
+    return {"raw": output, "formatted": formatted_output}
+
+
+def format_model(model: str, formatting_prompt: str, text, system_config_doc: dict | None = None):
+    """Format text via LLM. Returns (prompt, formatted_text)."""
+    system_prompt = (
+        "Follow the instruction and output your answer as a nicely formatted markdown "
+        "to display in a web interface chat bot.\nCRITICAL:\n"
+        "- The formatted text should be a list of bullet points with the extracted data json data.\n"
+        "- The bullet points should be in a list format."
+    )
+    prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
+    chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
+    response = chat_agent.run_sync(prompt)
+    output = response.output
+    if output is None:
+        return None, None
+    format_spec_regex = r"```(.*?)\n(.*?)\n```"
+    match = re.search(format_spec_regex, output, re.DOTALL)
+    if match is not None:
+        formatted_text = match.group(2)
+        return prompt, formatted_text
+    return prompt, output
+
+
+# ---------------------------------------------------------------------------
+# Node base classes
+# ---------------------------------------------------------------------------
+
+class Node:
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self.inputs = {}
+        self.outputs = {}
+        self.tasks = []
+        self.progress_reporter = None
+        self._sys_cfg: dict | None = None
+
+    def process(self, inputs) -> NoReturn:
+        raise NotImplementedError
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(name={self.name})"
+
+    def report_progress(self, detail=None, preview=None):
+        if self.progress_reporter:
+            self.progress_reporter(detail, preview)
+
+
+class MultiTaskNode(Node):
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+        self.tasks = []
+        self.max_workers = multiprocessing.cpu_count()
+
+    def add_task(self, task) -> None:
+        self.tasks.append(task)
+
+    def add_tasks(self, tasks) -> None:
+        self.tasks.extend(tasks)
+
+    def process_task(self, task):
+        return task.process(task.inputs)
+
+    def process(self, inputs):
+        for task in self.tasks:
+            task.inputs = inputs
+        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
+            results = [future.result() for future in as_completed(task_futures)]
+
+        output = {"input": inputs.get("input"), "output": [], "step_name": self.name}
+        for result in results:
+            result_output = result.get("output")
+            if result_output is None:
+                continue
+            elif isinstance(result_output, str):
+                output["output"].append(result_output)
+            elif isinstance(result_output, dict):
+                output["output"].append(result_output)
+            elif isinstance(result_output, list):
+                output["output"].extend(result_output)
+            else:
+                output["output"].append(result_output)
+        return output
+
+
+# ---------------------------------------------------------------------------
+# Concrete nodes
+# ---------------------------------------------------------------------------
+
+class DocumentNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("Document")
+        self.doc_uuids = data.get("doc_uuids", [])
+
+    def process(self, inputs=None):
+        return {"step_name": self.name, "output": self.doc_uuids, "input": None}
+
+
+class ExtractionNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("Extraction")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        keys = self.data.get("searchphrases", [])
+        if not keys:
+            keys = self.data.get("keys", [])
+
+        prev_step_name = inputs.get("step_name")
+        doc_texts = None
+        full_text = None
+
+        self.report_progress("Extraction running")
+
+        if prev_step_name == "Document":
+            doc_uuids = inputs.get("output", [])
+            # doc_texts must be pre-loaded — for now we pass UUIDs in data
+            doc_texts = self.data.get("doc_texts")
+        elif prev_step_name == "Prompt":
+            step_input = inputs.get("output")
+            if isinstance(step_input, dict):
+                full_text = step_input.get("answer", str(step_input))
+            elif isinstance(step_input, list):
+                full_text = "\n".join(str(x) for x in step_input)
+            else:
+                full_text = str(step_input) if step_input else ""
+        elif prev_step_name in {"Extraction", "Formatter"}:
+            step_input = inputs.get("output")
+            if isinstance(step_input, str):
+                full_text = step_input
+            elif step_input:
+                full_text = json.dumps(step_input) if not isinstance(step_input, str) else step_input
+
+        extraction_response = data_extraction_model(
+            self.model, keys, doc_texts=doc_texts, full_text=full_text,
+            system_config_doc=self._sys_cfg,
+        )
+
+        raw_output = extraction_response.get("raw") if isinstance(extraction_response, dict) else extraction_response
+        formatted_output = extraction_response.get("formatted") if isinstance(extraction_response, dict) else extraction_response
+
+        return {
+            "output": raw_output,
+            "formatted_output": formatted_output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
+
+
+class PromptNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("Prompt")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        prompt = self.data.get("prompt", "Enter prompt")
+        prev_step_name = inputs.get("step_name")
+        self.report_progress(f"Prompt: {prompt}")
+
+        if prev_step_name == "Document":
+            # Get doc texts from data (pre-loaded by engine)
+            doc_texts = self.data.get("doc_texts", [])
+            full_text = "\n".join(doc_texts) if doc_texts else ""
+            chat_response = llm_chat_model(
+                model=self.model, prompt=prompt, data=full_text,
+                include_next_step=False, system_config_doc=self._sys_cfg,
+            )
+        else:
+            data = inputs.get("output")
+            chat_response = llm_chat_model(
+                model=self.model, prompt=prompt, data=data,
+                include_next_step=False, system_config_doc=self._sys_cfg,
+            )
+
+        return {"output": chat_response, "input": prompt, "step_name": self.name}
+
+
+class FormatNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("Formatter")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        formatting_prompt = self.data.get("prompt", "")
+        data = inputs.get("output")
+        prev_step_name = inputs.get("step_name")
+        self.report_progress(f"Formatter: {formatting_prompt}")
+
+        if prev_step_name == "Prompt":
+            text = data.get("formatted_answer", "") if isinstance(data, dict) else data
+        elif prev_step_name == "Document":
+            # Use pre-loaded doc texts
+            doc_texts = self.data.get("doc_texts", [])
+            text = "\n".join(doc_texts)
+        else:
+            text = data
+
+        _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg)
+        return {"output": output, "input": formatting_prompt, "step_name": self.name}
+
+
+# ---------------------------------------------------------------------------
+# Workflow Engine
+# ---------------------------------------------------------------------------
+
+class WorkflowEngine:
+    def __init__(self) -> None:
+        self.nodes: list[Node] = []
+        self.connections = []
+        self.graph = graphlib.TopologicalSorter()
+
+    def add_node(self, node: Node) -> None:
+        self.graph.add(node)
+
+    def connect(self, from_node: Node, to_node: Node) -> None:
+        self.graph.add(from_node, to_node)
+
+    def get_topological_order(self) -> list[Node]:
+        return list(reversed(tuple(self.graph.static_order())))
+
+    def execute(self, workflow_result_updater=None):
+        """Execute workflow. Returns (final_output, step_data_list).
+
+        Args:
+            workflow_result_updater: Optional callable(update_dict) for progress.
+        """
+        data = []
+        nodes = self.get_topological_order()
+
+        latest_output = None
+        for idx, node in enumerate(nodes):
+            if workflow_result_updater:
+                workflow_result_updater({
+                    "current_step_name": node.name,
+                    "current_step_detail": f"Starting {node.name}",
+                })
+
+            if idx == 0:
+                output = node.process({})
+            else:
+                if isinstance(node, MultiTaskNode):
+                    for task in node.tasks:
+                        task.progress_reporter = (
+                            lambda detail=None, preview=None, step=node.name:
+                                workflow_result_updater({
+                                    "current_step_name": step,
+                                    "current_step_detail": detail,
+                                    "current_step_preview": preview,
+                                }) if workflow_result_updater else None
+                        )
+                output = node.process(latest_output)
+
+            latest_output = output
+
+            if workflow_result_updater:
+                step_name = sanitize_step_name(node.name)
+                workflow_result_updater({
+                    f"steps_output.{step_name}": output,
+                    "num_steps_completed": idx,
+                })
+
+            data.append({
+                "name": node.name,
+                "output": latest_output.get("output"),
+                "input": latest_output.get("input"),
+            })
+
+        if latest_output is None:
+            return None, data
+
+        display_value = latest_output.get("formatted_output") or latest_output.get("output")
+        final_value = self._format_final_output(display_value)
+        return final_value, data
+
+    def _format_final_output(self, value):
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            if len(value) == 1 and isinstance(value[0], dict):
+                return self._format_final_output(value[0])
+            formatted = [
+                self._format_final_output(item) if isinstance(item, (list, dict))
+                else str(item)
+                for item in value
+            ]
+            formatted = [f for f in formatted if f]
+            if len(formatted) <= 1:
+                return formatted[0] if formatted else ""
+            blocks = []
+            for i, item in enumerate(formatted, start=1):
+                if isinstance(item, str) and item.lstrip().startswith("#"):
+                    blocks.append(item)
+                else:
+                    blocks.append(f"### Result {i}\n{item}")
+            return "\n\n".join(blocks)
+        if isinstance(value, dict):
+            if value.get("type") == "file_download":
+                return value
+            try:
+                return json.dumps(value, indent=2)
+            except Exception:
+                return str(value)
+        return str(value)
+
+
+# ---------------------------------------------------------------------------
+# Factory
+# ---------------------------------------------------------------------------
+
+def build_workflow_engine(
+    steps_data: list[dict],
+    model: str,
+    user_id: str | None = None,
+    system_config_doc: dict | None = None,
+) -> WorkflowEngine:
+    """Build a WorkflowEngine from step data dicts.
+
+    Args:
+        steps_data: List of step dicts, each with 'name', 'tasks' (list of task dicts), 'data'.
+                    First step should be 'Document' trigger with 'doc_uuids'.
+        model: LLM model name.
+        user_id: User ID for extraction nodes.
+        system_config_doc: Pre-fetched SystemConfig as dict.
+    """
+    engine = WorkflowEngine()
+    nodes = []
+
+    for idx, step in enumerate(steps_data):
+        step_name = step.get("name", "")
+        step_data = step.get("data", {})
+
+        if step_name == "Document":
+            node = DocumentNode(step_data)
+            nodes.append(node)
+        else:
+            tasks = []
+            for task in step.get("tasks", []):
+                task_name = task.get("name", "")
+                task_data = task.get("data", {})
+                task_data["user_id"] = user_id
+                task_data["model"] = model
+
+                if task_name == "Extraction":
+                    n = ExtractionNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "Prompt":
+                    n = PromptNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "Formatter":
+                    n = FormatNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+
+            node = MultiTaskNode(step_name)
+            node.add_tasks(tasks)
+            nodes.append(node)
+
+        engine.add_node(node)
+
+    # Connect sequentially
+    for i in range(1, len(nodes)):
+        engine.connect(nodes[i - 1], nodes[i])
+
+    return engine
