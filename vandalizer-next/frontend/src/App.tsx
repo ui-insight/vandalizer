@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { RouterProvider } from '@tanstack/react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { TeamProvider } from './contexts/TeamContext'
+import { ToastProvider } from './contexts/ToastContext'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
 
@@ -25,7 +26,9 @@ export default function App() {
   return (
     <AuthProvider>
       <TeamProvider>
-        <RouterProvider router={router} />
+        <ToastProvider>
+          <RouterProvider router={router} />
+        </ToastProvider>
       </TeamProvider>
     </AuthProvider>
   )

@@ -3,6 +3,7 @@ import { ArrowLeft, FileText } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { RawTextModal } from '../files/RawTextModal'
+import { GlobalSearch } from '../files/GlobalSearch'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function LeftPanel() {
@@ -50,14 +51,21 @@ export function LeftPanel() {
         </div>
 
         {/* Right controls */}
-        <div style={{ paddingRight: 15, width: 50 }}>
-          {viewingDoc && (
+        <div style={{ paddingRight: 15, width: 50, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+          {viewingDoc ? (
             <button
               onClick={() => setShowRawText(true)}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
               <FileText className="h-5 w-5 text-white" />
             </button>
+          ) : (
+            <GlobalSearch
+              onDocClick={(doc) => {
+                setViewingDoc({ uuid: doc.uuid, title: doc.title })
+                setSelectedDocUuids([doc.uuid])
+              }}
+            />
           )}
         </div>
       </div>

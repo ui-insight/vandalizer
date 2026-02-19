@@ -21,7 +21,7 @@ from app.models.user_config import UserModelConfig
 from app.models.chat import ChatMessage, FileAttachment, UrlAttachment, ChatConversation
 from app.models.activity import ActivityEvent
 from app.models.library import LibraryFolder, LibraryItem, Library
-from app.models.feedback import ExtractionQualityRecord
+from app.models.feedback import ChatFeedback, ExtractionQualityRecord
 from app.models.verification import VerificationRequest
 from app.models.office import IntakeConfig, WorkItem
 
@@ -51,6 +51,7 @@ ALL_MODELS = [
     LibraryFolder,
     LibraryItem,
     Library,
+    ChatFeedback,
     ExtractionQualityRecord,
     VerificationRequest,
     IntakeConfig,

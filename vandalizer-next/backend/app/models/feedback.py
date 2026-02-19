@@ -7,6 +7,18 @@ from beanie import Document
 from pydantic import Field
 
 
+class ChatFeedback(Document):
+    conversation_uuid: Optional[str] = None
+    message_index: Optional[int] = None
+    rating: str = "up"  # "up" or "down"
+    comment: Optional[str] = None
+    user_id: Optional[str] = None
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+
+    class Settings:
+        name = "chat_feedback"
+
+
 class ExtractionQualityRecord(Document):
     pdf_title: str
     star_rating: int = Field(ge=1, le=5)
