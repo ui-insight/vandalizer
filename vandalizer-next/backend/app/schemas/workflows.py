@@ -80,3 +80,23 @@ class TestStepRequest(BaseModel):
     task_data: dict
     document_uuids: list[str]
     model: Optional[str] = None
+
+
+class ReorderStepsRequest(BaseModel):
+    step_ids: list[str]
+
+
+class ValidateWorkflowRequest(BaseModel):
+    eval_plan: Optional[str] = None
+
+
+class ValidationCheckResult(BaseModel):
+    name: str
+    status: str  # PASS, FAIL, WARN, SKIP
+    detail: Optional[str] = None
+
+
+class ValidateWorkflowResponse(BaseModel):
+    grade: str  # A-F
+    summary: str
+    checks: list[ValidationCheckResult]

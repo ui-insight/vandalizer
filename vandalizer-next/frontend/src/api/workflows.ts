@@ -86,3 +86,33 @@ export function getTestStepStatus(taskId: string) {
 export function downloadResults(sessionId: string, format: string = 'json') {
   return `/api/workflows/download?session_id=${encodeURIComponent(sessionId)}&format=${format}`
 }
+
+// Step reordering
+
+export function reorderSteps(workflowId: string, stepIds: string[]) {
+  return apiFetch<{ ok: boolean }>(`/api/workflows/${workflowId}/reorder-steps`, {
+    method: 'POST',
+    body: JSON.stringify({ step_ids: stepIds }),
+  })
+}
+
+// Validation
+
+export interface ValidationCheck {
+  name: string
+  status: 'PASS' | 'FAIL' | 'WARN' | 'SKIP'
+  detail: string | null
+}
+
+export interface ValidationResult {
+  grade: string
+  summary: string
+  checks: ValidationCheck[]
+}
+
+export function validateWorkflow(workflowId: string, evalPlan?: string) {
+  return apiFetch<ValidationResult>(`/api/workflows/${workflowId}/validate`, {
+    method: 'POST',
+    body: JSON.stringify({ eval_plan: evalPlan }),
+  })
+}

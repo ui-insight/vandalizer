@@ -4,13 +4,17 @@ import {
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, Send, ClipboardCheck, Flag,
-  AlertTriangle, ChevronDown,
+  AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
+  Circle, Hand, Keyboard, Sparkles, ShieldCheck,
+  ArrowRight, Pause, ChevronRight,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
+  reorderSteps, validateWorkflow,
 } from '../../api/workflows'
+import type { ValidationCheck, ValidationResult } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { listContents } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
@@ -233,6 +237,21 @@ export function WorkflowEditorPanel() {
     refresh()
   }
 
+  const handleToggleOutput = async (stepId: string, isOutput: boolean) => {
+    await updateStep(stepId, { is_output: isOutput })
+    refresh()
+  }
+
+  const handleMoveStep = async (stepIndex: number, direction: 'up' | 'down') => {
+    if (!workflow || !openWorkflowId) return
+    const steps = [...workflow.steps]
+    const newIndex = direction === 'up' ? stepIndex - 1 : stepIndex + 1
+    if (newIndex < 0 || newIndex >= steps.length) return
+    ;[steps[stepIndex], steps[newIndex]] = [steps[newIndex], steps[stepIndex]]
+    await reorderSteps(openWorkflowId, steps.map(s => s.id))
+    refresh()
+  }
+
   const handleRun = async () => {
     if (!openWorkflowId) return
     const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
@@ -378,12 +397,13 @@ export function WorkflowEditorPanel() {
             setShowDownloadPopup={setShowDownloadPopup}
             onClickStep={setEditingStepId}
             onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
+            onMoveStep={handleMoveStep}
           />
         )}
 
-        {activeTab === 'input' && <InputTab />}
-        {activeTab === 'output' && <OutputTab />}
-        {activeTab === 'validate' && <ValidateTab />}
+        {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
+        {activeTab === 'output' && <OutputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
+        {activeTab === 'validate' && <ValidateTab workflowId={openWorkflowId} />}
       </div>
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
@@ -426,6 +446,7 @@ export function WorkflowEditorPanel() {
           onEditTask={handleEditTask}
           onDeleteTask={handleDeleteTask}
           onStepNameSave={handleStepNameSave}
+          onToggleOutput={handleToggleOutput}
           showTaskPicker={showTaskPicker}
           taskPickerCategory={taskPickerCategory}
           setTaskPickerCategory={setTaskPickerCategory}
@@ -551,6 +572,7 @@ function DesignCanvas({
   setShowDownloadPopup,
   onClickStep,
   onAddStep,
+  onMoveStep,
 }: {
   workflow: Workflow
   selectedDocCount: number
@@ -562,6 +584,7 @@ function DesignCanvas({
   setShowDownloadPopup: (v: boolean) => void
   onClickStep: (stepId: string) => void
   onAddStep: () => void
+  onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
 }) {
   return (
     <div style={{
@@ -604,8 +627,11 @@ function DesignCanvas({
           <StepCard
             step={step}
             index={idx}
+            totalSteps={workflow.steps.length}
             isActive={runnerRunning && runnerStatus?.current_step_name === step.name}
             onClick={() => onClickStep(step.id)}
+            onMoveUp={() => onMoveStep(idx, 'up')}
+            onMoveDown={() => onMoveStep(idx, 'down')}
           />
         </div>
       ))}
@@ -685,11 +711,14 @@ function Connector({ position }: { position: 'top' | 'bottom' }) {
 // Step card
 // ---------------------------------------------------------------------------
 
-function StepCard({ step, index, isActive, onClick }: {
+function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMoveDown }: {
   step: WorkflowStep
   index: number
+  totalSteps: number
   isActive: boolean
   onClick: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
 }) {
   const isOutput = step.is_output
   return (
@@ -738,6 +767,33 @@ function StepCard({ step, index, isActive, onClick }: {
             {isOutput ? step.name : `${step.tasks.length} task${step.tasks.length !== 1 ? 's' : ''}`}
           </div>
         </div>
+        {/* Move up/down buttons */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+          <button
+            onClick={onMoveUp}
+            disabled={index === 0}
+            style={{
+              background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer',
+              padding: 2, display: 'flex',
+              color: isOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              opacity: index === 0 ? 0.3 : 1,
+            }}
+          >
+            <ArrowUp style={{ width: 14, height: 14 }} />
+          </button>
+          <button
+            onClick={onMoveDown}
+            disabled={index === totalSteps - 1}
+            style={{
+              background: 'none', border: 'none', cursor: index === totalSteps - 1 ? 'default' : 'pointer',
+              padding: 2, display: 'flex',
+              color: isOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              opacity: index === totalSteps - 1 ? 0.3 : 1,
+            }}
+          >
+            <ArrowDown style={{ width: 14, height: 14 }} />
+          </button>
+        </div>
         <SlidersHorizontal style={{
           width: 16, height: 16,
           color: isOutput ? 'rgba(255,255,255,0.6)' : '#9ca3af',
@@ -754,7 +810,7 @@ function StepCard({ step, index, isActive, onClick }: {
 
 function EditStepOverlay({
   step, onClose, onDeleteStep, onAddTask, onEditTask, onDeleteTask,
-  onStepNameSave,
+  onStepNameSave, onToggleOutput,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
 }: {
@@ -765,6 +821,7 @@ function EditStepOverlay({
   onEditTask: (task: WorkflowTask) => void
   onDeleteTask: (taskId: string) => void
   onStepNameSave: (stepId: string, newName: string) => void
+  onToggleOutput: (stepId: string, isOutput: boolean) => void
   showTaskPicker: boolean
   taskPickerCategory: TaskCategory
   setTaskPickerCategory: (cat: TaskCategory) => void
@@ -839,6 +896,29 @@ function EditStepOverlay({
         }}>
           Basic Setup
         </div>
+
+        {/* Output step toggle */}
+        <label style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
+          cursor: 'pointer', padding: '10px 14px',
+          border: step.is_output ? '2px solid #7c3aed' : '1px solid #e5e7eb',
+          borderRadius: 8, backgroundColor: step.is_output ? '#f5f3ff' : '#fff',
+        }}>
+          <input
+            type="checkbox"
+            checked={step.is_output}
+            onChange={e => onToggleOutput(step.id, e.target.checked)}
+            style={{ accentColor: '#7c3aed' }}
+          />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: step.is_output ? '#7c3aed' : '#374151' }}>
+              Output Step
+            </div>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
+              Mark this as the final output step of the workflow
+            </div>
+          </div>
+        </label>
 
         {/* Task list in checkerboard container */}
         <div style={{
@@ -1426,6 +1506,10 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
               </div>
             )}
 
+            {task.name === 'Browser' && (
+              <BrowserAutomationDesign taskData={taskData} setTextValue={setTextValue} getTextValue={getTextValue} setTaskData={setTaskData} />
+            )}
+
             {/* Test result display */}
             {testResult !== null && (
               <div style={{ marginTop: 16 }}>
@@ -1854,11 +1938,275 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
 }
 
 // ---------------------------------------------------------------------------
-// Input Tab — trigger configuration
+// Browser Automation task design UI
 // ---------------------------------------------------------------------------
 
-function InputTab() {
+const BROWSER_ACTION_TYPES = [
+  { type: 'navigate', label: 'Navigate', icon: ArrowRight, color: '#2563eb', description: 'Go to a URL' },
+  { type: 'click', label: 'Click', icon: Hand, color: '#7c3aed', description: 'Click an element' },
+  { type: 'fill_form', label: 'Fill Form', icon: Keyboard, color: '#16a34a', description: 'Enter text into fields' },
+  { type: 'extract', label: 'Extract', icon: Download, color: '#ea580c', description: 'Extract data from page' },
+  { type: 'smart_action', label: 'Smart Action', icon: Sparkles, color: '#ec4899', description: 'AI-driven action' },
+  { type: 'login_pause', label: 'Login Pause', icon: Pause, color: '#ca8a04', description: 'Wait for manual login' },
+  { type: 'verify', label: 'Verify', icon: ShieldCheck, color: '#0d9488', description: 'Assert a condition' },
+] as const
+
+function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTaskData }: {
+  taskData: Record<string, unknown>
+  setTextValue: (key: string, value: string) => void
+  getTextValue: (key: string) => string
+  setTaskData: React.Dispatch<React.SetStateAction<Record<string, unknown>>>
+}) {
+  const [baTab, setBaTab] = useState<'record' | 'manual'>('manual')
+  const actions = (taskData.actions as Array<{ type: string; config: Record<string, string> }>) || []
+
+  const addAction = (type: string) => {
+    const newActions = [...actions, { type, config: {} }]
+    setTaskData(prev => ({ ...prev, actions: newActions }))
+  }
+
+  const removeAction = (idx: number) => {
+    const newActions = actions.filter((_, i) => i !== idx)
+    setTaskData(prev => ({ ...prev, actions: newActions }))
+  }
+
+  const updateActionConfig = (idx: number, key: string, value: string) => {
+    const newActions = [...actions]
+    newActions[idx] = { ...newActions[idx], config: { ...newActions[idx].config, [key]: value } }
+    setTaskData(prev => ({ ...prev, actions: newActions }))
+  }
+
+  const summarizeEnabled = !!(taskData.summarization as Record<string, unknown>)?.enabled
+  const summaryPrompt = ((taskData.summarization as Record<string, unknown>)?.prompt_template as string) || ''
+
+  return (
+    <div>
+      {/* Tab bar */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: 16, borderBottom: '1px solid #e5e7eb' }}>
+        {([
+          { key: 'record' as const, label: 'Record Actions' },
+          { key: 'manual' as const, label: 'Build Manually' },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setBaTab(t.key)}
+            style={{
+              padding: '8px 16px', fontSize: 12, fontWeight: baTab === t.key ? 700 : 500,
+              fontFamily: 'inherit', background: 'none', border: 'none',
+              borderBottom: baTab === t.key ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
+              color: baTab === t.key ? 'var(--highlight-color, #eab308)' : '#6b7280',
+              cursor: 'pointer',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {baTab === 'record' && (
+        <div>
+          {/* Connection status */}
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: 12,
+            border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 12,
+          }}>
+            <Circle style={{ width: 10, height: 10, fill: '#d1d5db', color: '#d1d5db' }} />
+            <span style={{ fontSize: 13, color: '#6b7280' }}>Extension not connected</span>
+          </div>
+          <div style={{
+            padding: 16, backgroundColor: '#fafafa', border: '1px solid #e5e7eb',
+            borderRadius: 8, textAlign: 'center',
+          }}>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+              Install the Chrome extension and connect to start recording browser actions.
+            </div>
+            <button
+              disabled
+              style={{
+                padding: '8px 20px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 6, border: 'none',
+                backgroundColor: '#e5e7eb', color: '#9ca3af', cursor: 'not-allowed',
+              }}
+            >
+              Start Recording
+            </button>
+          </div>
+        </div>
+      )}
+
+      {baTab === 'manual' && (
+        <div>
+          {/* Starting URL */}
+          <div style={{ marginBottom: 12 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+              Starting URL (optional)
+            </label>
+            <input
+              type="text"
+              value={getTextValue('start_url')}
+              onChange={e => setTextValue('start_url', e.target.value)}
+              placeholder="https://example.com"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Allowed domains */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+              Allowed Domains (comma-separated, optional)
+            </label>
+            <input
+              type="text"
+              value={getTextValue('allowed_domains')}
+              onChange={e => setTextValue('allowed_domains', e.target.value)}
+              placeholder="example.com, app.example.com"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Actions list */}
+          <div style={{
+            fontSize: 12, fontWeight: 600, color: '#6b7280',
+            textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8,
+          }}>
+            Actions ({actions.length})
+          </div>
+
+          {actions.map((action, idx) => {
+            const def = BROWSER_ACTION_TYPES.find(a => a.type === action.type)
+            const Icon = def?.icon || Globe
+            return (
+              <div key={idx} style={{
+                display: 'flex', alignItems: 'flex-start', gap: 10, padding: 10,
+                border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 8, backgroundColor: '#fff',
+              }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 6,
+                  backgroundColor: (def?.color || '#6b7280') + '15',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2,
+                }}>
+                  <Icon style={{ width: 14, height: 14, color: def?.color || '#6b7280' }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                    {idx + 1}. {def?.label || action.type}
+                  </div>
+                  {(action.type === 'navigate' || action.type === 'click' || action.type === 'fill_form' || action.type === 'extract' || action.type === 'smart_action' || action.type === 'verify') && (
+                    <input
+                      type="text"
+                      value={action.config.value || ''}
+                      onChange={e => updateActionConfig(idx, 'value', e.target.value)}
+                      placeholder={
+                        action.type === 'navigate' ? 'URL to navigate to' :
+                        action.type === 'click' ? 'CSS selector or description' :
+                        action.type === 'fill_form' ? 'selector=value (e.g., #email=test@example.com)' :
+                        action.type === 'extract' ? 'CSS selector or description' :
+                        action.type === 'smart_action' ? 'Describe what to do in natural language' :
+                        'Condition to verify'
+                      }
+                      style={{
+                        width: '100%', padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
+                        border: '1px solid #e5e7eb', borderRadius: 4, outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                  )}
+                </div>
+                <button onClick={() => removeAction(idx)} style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex', flexShrink: 0,
+                }}>
+                  <Trash2 style={{ width: 13, height: 13 }} />
+                </button>
+              </div>
+            )
+          })}
+
+          {/* Add action buttons */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {BROWSER_ACTION_TYPES.map(at => {
+              const Icon = at.icon
+              return (
+                <button
+                  key={at.type}
+                  onClick={() => addAction(at.type)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+                    fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    border: '1px solid #e5e7eb', borderRadius: 6, backgroundColor: '#fff',
+                    cursor: 'pointer', color: '#374151',
+                  }}
+                >
+                  <Icon style={{ width: 12, height: 12, color: at.color }} />
+                  {at.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* AI summarization */}
+          <div style={{ marginTop: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 8 }}>
+              <input
+                type="checkbox"
+                checked={summarizeEnabled}
+                onChange={e => setTaskData(prev => ({
+                  ...prev,
+                  summarization: { enabled: e.target.checked, prompt_template: summaryPrompt },
+                }))}
+              />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Summarize results with AI</span>
+            </label>
+            {summarizeEnabled && (
+              <textarea
+                value={summaryPrompt}
+                onChange={e => setTaskData(prev => ({
+                  ...prev,
+                  summarization: { enabled: true, prompt_template: e.target.value },
+                }))}
+                placeholder="Summarize the extracted data focusing on..."
+                rows={2}
+                style={{
+                  width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                  border: '1px solid #d1d5db', borderRadius: 6, outline: 'none',
+                  resize: 'vertical', boxSizing: 'border-box',
+                }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Input Tab — trigger configuration with folder watch
+// ---------------------------------------------------------------------------
+
+const FILE_TYPE_OPTIONS = [
+  { value: 'pdf', label: 'PDF' },
+  { value: 'docx', label: 'DOCX' },
+  { value: 'xlsx', label: 'XLSX' },
+  { value: 'html', label: 'HTML' },
+  { value: 'txt', label: 'TXT' },
+]
+
+function InputTab({ workflow, openWorkflowId, onRefresh }: {
+  workflow: Workflow
+  openWorkflowId: string | null
+  onRefresh: () => void
+}) {
   const [triggerType, setTriggerType] = useState('manual')
+  const [folderWatchEnabled, setFolderWatchEnabled] = useState(false)
+  const [watchFolder, setWatchFolder] = useState('')
+  const [fileTypes, setFileTypes] = useState<string[]>(['pdf', 'docx', 'xlsx'])
+  const [excludePatterns, setExcludePatterns] = useState('')
+  const [batchMode, setBatchMode] = useState('individual')
 
   return (
     <div style={{ padding: 24 }}>
@@ -1885,11 +2233,10 @@ function InputTab() {
           </select>
         </div>
 
-        {/* Context-dependent sections */}
+        {/* Manual */}
         {triggerType === 'manual' && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-            backgroundColor: '#fafafa',
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Fixed Documents
@@ -1906,27 +2253,112 @@ function InputTab() {
           </div>
         )}
 
+        {/* Folder Watch */}
         {triggerType === 'folder_watch' && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-            backgroundColor: '#fafafa',
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
           }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-              Watch Folder
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Folder Watch</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  Automatically run when new documents are added.
+                </div>
+              </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <span style={{ fontSize: 12, color: folderWatchEnabled ? '#16a34a' : '#9ca3af', fontWeight: 600 }}>
+                  {folderWatchEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+                <input
+                  type="checkbox"
+                  checked={folderWatchEnabled}
+                  onChange={e => setFolderWatchEnabled(e.target.checked)}
+                  style={{ accentColor: '#16a34a' }}
+                />
+              </label>
             </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Automatically run the workflow when new documents are added to a folder.
-            </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>
-              Select a folder to watch from the file browser.
-            </div>
+
+            {folderWatchEnabled && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                    Watch Folder Path
+                  </label>
+                  <input
+                    type="text"
+                    value={watchFolder}
+                    onChange={e => setWatchFolder(e.target.value)}
+                    placeholder="Select or enter folder path..."
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    File Types
+                  </label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {FILE_TYPE_OPTIONS.map(ft => (
+                      <label key={ft.value} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={fileTypes.includes(ft.value)}
+                          onChange={e => {
+                            if (e.target.checked) setFileTypes(prev => [...prev, ft.value])
+                            else setFileTypes(prev => prev.filter(v => v !== ft.value))
+                          }}
+                        />
+                        <span style={{ fontSize: 12, color: '#374151' }}>{ft.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                    Exclude Patterns
+                  </label>
+                  <input
+                    type="text"
+                    value={excludePatterns}
+                    onChange={e => setExcludePatterns(e.target.value)}
+                    placeholder="e.g., draft_*, temp_*"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                    Batch Mode
+                  </label>
+                  <select
+                    value={batchMode}
+                    onChange={e => setBatchMode(e.target.value)}
+                    style={{
+                      width: '100%', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 12px',
+                      backgroundColor: '#fff', color: '#374151',
+                    }}
+                  >
+                    <option value="individual">Process individually (one document per run)</option>
+                    <option value="batch">Batch (all new documents per run)</option>
+                  </select>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
+        {/* API */}
         {triggerType === 'api' && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-            backgroundColor: '#fafafa',
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               API Endpoint
@@ -1935,19 +2367,27 @@ function InputTab() {
               Trigger this workflow programmatically via the API.
             </div>
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
               backgroundColor: '#f3f4f6', borderRadius: 6, padding: '8px 12px',
-              fontSize: 12, fontFamily: 'monospace', color: '#374151',
+              fontSize: 12, fontFamily: 'monospace', color: '#374151', marginBottom: 8,
             }}>
-              POST /api/workflows/run
+              POST /api/workflows/{openWorkflowId}/run
+            </div>
+            <div style={{
+              backgroundColor: '#f3f4f6', borderRadius: 6, padding: '8px 12px',
+              fontSize: 11, fontFamily: 'monospace', color: '#6b7280', whiteSpace: 'pre',
+            }}>
+{`{
+  "document_uuids": ["uuid1", "uuid2"],
+  "model": "optional-model-name"
+}`}
             </div>
           </div>
         )}
 
+        {/* Schedule */}
         {triggerType === 'schedule' && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-            backgroundColor: '#fafafa',
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
           }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Schedule
@@ -1966,15 +2406,25 @@ function InputTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Output Tab — storage & delivery configuration
+// Output Tab — storage, delivery, & notification configuration
 // ---------------------------------------------------------------------------
 
-function OutputTab() {
+function OutputTab({ workflow, openWorkflowId, onRefresh }: {
+  workflow: Workflow
+  openWorkflowId: string | null
+  onRefresh: () => void
+}) {
   const [format, setFormat] = useState('json')
+  const [fileNaming, setFileNaming] = useState('{workflow_name}_{date}')
   const [savePlatform, setSavePlatform] = useState(true)
   const [exportCloud, setExportCloud] = useState(false)
+  const [cloudDestination, setCloudDestination] = useState('')
   const [sendWebhook, setSendWebhook] = useState(false)
+  const [webhookUrl, setWebhookUrl] = useState('')
   const [emailNotify, setEmailNotify] = useState(false)
+  const [emailRecipients, setEmailRecipients] = useState('')
+  const [notifyOnFail, setNotifyOnFail] = useState(true)
+  const [notifyOnComplete, setNotifyOnComplete] = useState(true)
 
   return (
     <div style={{ padding: 24 }}>
@@ -2001,10 +2451,27 @@ function OutputTab() {
           </select>
         </div>
 
+        {/* File naming */}
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>File Naming Pattern</div>
+          <input
+            type="text"
+            value={fileNaming}
+            onChange={e => setFileNaming(e.target.value)}
+            placeholder="{workflow_name}_{date}"
+            style={{
+              width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+            Variables: {'{workflow_name}'}, {'{date}'}, {'{timestamp}'}, {'{document_name}'}
+          </div>
+        </div>
+
         {/* Storage destinations */}
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-          backgroundColor: '#fafafa',
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
             Storage Destinations
@@ -2012,26 +2479,55 @@ function OutputTab() {
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
             Configure where workflow results are saved automatically.
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
               <input type="checkbox" checked={savePlatform} onChange={e => setSavePlatform(e.target.checked)} />
               <span style={{ fontSize: 13, color: '#374151' }}>Save to platform (default)</span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={exportCloud} onChange={e => setExportCloud(e.target.checked)} />
-              <span style={{ fontSize: 13, color: '#374151' }}>Export to cloud storage</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={sendWebhook} onChange={e => setSendWebhook(e.target.checked)} />
-              <span style={{ fontSize: 13, color: '#374151' }}>Send via webhook</span>
-            </label>
+
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={exportCloud} onChange={e => setExportCloud(e.target.checked)} />
+                <span style={{ fontSize: 13, color: '#374151' }}>Export to cloud storage</span>
+              </label>
+              {exportCloud && (
+                <input
+                  type="text"
+                  value={cloudDestination}
+                  onChange={e => setCloudDestination(e.target.value)}
+                  placeholder="e.g., s3://bucket/path or OneDrive folder"
+                  style={{
+                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
+                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              )}
+            </div>
+
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={sendWebhook} onChange={e => setSendWebhook(e.target.checked)} />
+                <span style={{ fontSize: 13, color: '#374151' }}>Send via webhook</span>
+              </label>
+              {sendWebhook && (
+                <input
+                  type="text"
+                  value={webhookUrl}
+                  onChange={e => setWebhookUrl(e.target.value)}
+                  placeholder="https://your-webhook-url.com/endpoint"
+                  style={{
+                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
+                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
 
         {/* Notifications */}
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-          backgroundColor: '#fafafa',
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
             Notifications
@@ -2039,10 +2535,36 @@ function OutputTab() {
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
             Get notified when a workflow run completes or fails.
           </div>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={emailNotify} onChange={e => setEmailNotify(e.target.checked)} />
-            <span style={{ fontSize: 13, color: '#374151' }}>Email notification on completion</span>
-          </label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input type="checkbox" checked={emailNotify} onChange={e => setEmailNotify(e.target.checked)} />
+                <span style={{ fontSize: 13, color: '#374151' }}>Email notification</span>
+              </label>
+              {emailNotify && (
+                <input
+                  type="text"
+                  value={emailRecipients}
+                  onChange={e => setEmailRecipients(e.target.value)}
+                  placeholder="email@example.com, another@example.com"
+                  style={{
+                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
+                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={notifyOnComplete} onChange={e => setNotifyOnComplete(e.target.checked)} />
+                <span style={{ fontSize: 12, color: '#374151' }}>On completion</span>
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+                <input type="checkbox" checked={notifyOnFail} onChange={e => setNotifyOnFail(e.target.checked)} />
+                <span style={{ fontSize: 12, color: '#374151' }}>On failure</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -2050,11 +2572,45 @@ function OutputTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Validate Tab — evaluation plan
+// Validate Tab — run validation with grade + check results
 // ---------------------------------------------------------------------------
 
-function ValidateTab() {
+const GRADE_COLORS: Record<string, { bg: string; text: string }> = {
+  A: { bg: '#dcfce7', text: '#16a34a' },
+  B: { bg: '#dbeafe', text: '#2563eb' },
+  C: { bg: '#fef3c7', text: '#ca8a04' },
+  D: { bg: '#fed7aa', text: '#ea580c' },
+  F: { bg: '#fee2e2', text: '#dc2626' },
+}
+
+const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  PASS: { bg: '#dcfce7', text: '#16a34a', label: 'PASS' },
+  FAIL: { bg: '#fee2e2', text: '#dc2626', label: 'FAIL' },
+  WARN: { bg: '#fef3c7', text: '#ca8a04', label: 'WARN' },
+  SKIP: { bg: '#f3f4f6', text: '#6b7280', label: 'SKIP' },
+}
+
+function ValidateTab({ workflowId }: { workflowId: string | null }) {
   const [evalPlan, setEvalPlan] = useState('')
+  const [validating, setValidating] = useState(false)
+  const [result, setResult] = useState<ValidationResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleValidate = async () => {
+    if (!workflowId) return
+    setValidating(true)
+    setError(null)
+    try {
+      const res = await validateWorkflow(workflowId, evalPlan || undefined)
+      setResult(res)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Validation failed')
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  const gradeStyle = result ? GRADE_COLORS[result.grade] || GRADE_COLORS.F : null
 
   return (
     <div style={{ padding: 24 }}>
@@ -2064,22 +2620,20 @@ function ValidateTab() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {/* Evaluation plan */}
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-          backgroundColor: '#fafafa',
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
             Evaluation Plan
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Define criteria for validating workflow output quality. An AI-generated eval plan will assess
-            each run against your criteria.
+            Define criteria for validating workflow output quality (optional).
           </div>
           <textarea
             value={evalPlan}
             onChange={e => setEvalPlan(e.target.value)}
             placeholder="Describe what a successful workflow output looks like..."
             style={{
-              width: '100%', minHeight: 100, fontSize: 13, fontFamily: 'inherit',
+              width: '100%', minHeight: 80, fontSize: 13, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px',
               backgroundColor: '#fff', resize: 'vertical', boxSizing: 'border-box',
               color: '#374151', outline: 'none',
@@ -2087,10 +2641,105 @@ function ValidateTab() {
           />
         </div>
 
+        {/* Run validation button */}
+        <button
+          onClick={handleValidate}
+          disabled={validating || !workflowId}
+          style={{
+            padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+            border: 'none', borderRadius: 6, cursor: validating ? 'not-allowed' : 'pointer',
+            backgroundColor: 'var(--highlight-color, #eab308)',
+            color: 'var(--highlight-text-color, #000)',
+            opacity: validating ? 0.6 : 1,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+          }}
+        >
+          {validating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+          {validating ? 'Validating...' : 'Run Validation'}
+        </button>
+
+        {error && (
+          <div style={{
+            padding: 12, backgroundColor: '#fee2e2', border: '1px solid #fca5a5',
+            borderRadius: 8, fontSize: 13, color: '#dc2626',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* Validation result */}
+        {result && (
+          <>
+            {/* Grade badge */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 16, padding: 16,
+              border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff',
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 12,
+                backgroundColor: gradeStyle?.bg,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 28, fontWeight: 800, color: gradeStyle?.text }}>
+                  {result.grade}
+                </span>
+              </div>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
+                  Validation Grade
+                </div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                  {result.summary}
+                </div>
+              </div>
+            </div>
+
+            {/* Check results table */}
+            <div style={{
+              border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 16px', backgroundColor: '#f9fafb',
+                borderBottom: '1px solid #e5e7eb',
+                fontSize: 12, fontWeight: 600, color: '#374151',
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                Validation Checks
+              </div>
+              {result.checks.map((check, idx) => {
+                const statusStyle = CHECK_STATUS_STYLES[check.status] || CHECK_STATUS_STYLES.SKIP
+                return (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                      borderBottom: idx < result.checks.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    }}
+                  >
+                    <span style={{
+                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
+                      fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                      backgroundColor: statusStyle.bg, color: statusStyle.text,
+                    }}>
+                      {statusStyle.label}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
+                      {check.detail && (
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{check.detail}</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+
         {/* Test documents */}
         <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-          backgroundColor: '#fafafa',
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
         }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
             Test Documents
@@ -2103,19 +2752,6 @@ function ValidateTab() {
             textAlign: 'center', color: '#9ca3af', fontSize: 13,
           }}>
             No test documents added yet
-          </div>
-        </div>
-
-        {/* Validation history */}
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-          backgroundColor: '#fafafa',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Validation History
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280' }}>
-            No validation runs yet. Configure an evaluation plan and test documents to begin.
           </div>
         </div>
       </div>

@@ -327,3 +327,120 @@ def get_test_status(task_id: str) -> dict:
     if result.ready():
         return {"status": "completed", "result": result.result}
     return {"status": result.state}
+
+
+# ---------------------------------------------------------------------------
+# Step reordering
+# ---------------------------------------------------------------------------
+
+async def reorder_steps(workflow_id: str, step_ids: list[str]) -> bool:
+    """Reorder steps in a workflow by providing the full ordered list of step IDs."""
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        return False
+
+    # Validate that all provided step_ids belong to this workflow
+    existing_ids = {str(s) for s in wf.steps}
+    provided_ids = set(step_ids)
+    if existing_ids != provided_ids:
+        return False
+
+    wf.steps = [PydanticObjectId(sid) for sid in step_ids]
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+async def validate_workflow(workflow_id: str, eval_plan: str | None = None) -> dict:
+    """Run validation checks on a workflow and return grade + check results."""
+    wf_data = await get_workflow(workflow_id)
+    if not wf_data:
+        raise ValueError("Workflow not found")
+
+    checks = []
+    steps = wf_data.get("steps", [])
+
+    # Check 1: Has at least one step
+    if len(steps) > 0:
+        checks.append({"name": "Has steps", "status": "PASS", "detail": f"{len(steps)} step(s) defined"})
+    else:
+        checks.append({"name": "Has steps", "status": "FAIL", "detail": "No steps defined"})
+
+    # Check 2: All steps have at least one task
+    empty_steps = [s["name"] for s in steps if len(s.get("tasks", [])) == 0]
+    if not empty_steps:
+        checks.append({"name": "Steps have tasks", "status": "PASS", "detail": "All steps have at least one task"})
+    elif steps:
+        checks.append({"name": "Steps have tasks", "status": "WARN", "detail": f"Empty steps: {', '.join(empty_steps)}"})
+    else:
+        checks.append({"name": "Steps have tasks", "status": "SKIP", "detail": "No steps to check"})
+
+    # Check 3: Has an output step
+    output_steps = [s for s in steps if s.get("is_output")]
+    if output_steps:
+        checks.append({"name": "Output step defined", "status": "PASS", "detail": f"Output step: {output_steps[0]['name']}"})
+    else:
+        checks.append({"name": "Output step defined", "status": "WARN", "detail": "No output step designated"})
+
+    # Check 4: Has been executed at least once
+    if wf_data.get("num_executions", 0) > 0:
+        checks.append({"name": "Has been tested", "status": "PASS", "detail": f"Executed {wf_data['num_executions']} time(s)"})
+    else:
+        checks.append({"name": "Has been tested", "status": "WARN", "detail": "Never executed"})
+
+    # Check 5: Last run succeeded (check most recent result)
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    last_result = await WorkflowResult.find(
+        WorkflowResult.workflow == wf.id
+    ).sort("-_id").limit(1).to_list()
+
+    if last_result:
+        result = last_result[0]
+        if result.status == "completed":
+            checks.append({"name": "Last run succeeded", "status": "PASS", "detail": "Last execution completed successfully"})
+        elif result.status in ("error", "failed"):
+            checks.append({"name": "Last run succeeded", "status": "FAIL", "detail": f"Last execution status: {result.status}"})
+        else:
+            checks.append({"name": "Last run succeeded", "status": "SKIP", "detail": f"Last execution status: {result.status}"})
+    else:
+        checks.append({"name": "Last run succeeded", "status": "SKIP", "detail": "No execution history"})
+
+    # Check 6: Extraction tasks have search set configured
+    for step in steps:
+        for task in step.get("tasks", []):
+            if task["name"] == "Extraction":
+                if task.get("data", {}).get("search_set_uuid") or task.get("data", {}).get("extractions"):
+                    checks.append({"name": f"Extraction configured ({step['name']})", "status": "PASS", "detail": "Extraction fields defined"})
+                else:
+                    checks.append({"name": f"Extraction configured ({step['name']})", "status": "WARN", "detail": "No extraction fields configured"})
+            elif task["name"] == "Prompt":
+                if task.get("data", {}).get("prompt"):
+                    checks.append({"name": f"Prompt configured ({step['name']})", "status": "PASS", "detail": "Prompt text defined"})
+                else:
+                    checks.append({"name": f"Prompt configured ({step['name']})", "status": "WARN", "detail": "No prompt text"})
+
+    # Calculate grade
+    statuses = [c["status"] for c in checks]
+    fail_count = statuses.count("FAIL")
+    warn_count = statuses.count("WARN")
+    pass_count = statuses.count("PASS")
+    total = len(checks)
+
+    if fail_count == 0 and warn_count == 0:
+        grade = "A"
+    elif fail_count == 0 and warn_count <= 1:
+        grade = "B"
+    elif fail_count == 0:
+        grade = "C"
+    elif fail_count == 1:
+        grade = "D"
+    else:
+        grade = "F"
+
+    summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"
+
+    return {"grade": grade, "summary": summary, "checks": checks}

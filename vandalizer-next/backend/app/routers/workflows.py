@@ -15,11 +15,14 @@ from app.schemas.workflows import (
     AddStepRequest,
     AddTaskRequest,
     CreateWorkflowRequest,
+    ReorderStepsRequest,
     RunWorkflowRequest,
     TestStepRequest,
     UpdateStepRequest,
     UpdateTaskRequest,
     UpdateWorkflowRequest,
+    ValidateWorkflowRequest,
+    ValidateWorkflowResponse,
     WorkflowResponse,
     WorkflowStatusResponse,
 )
@@ -238,3 +241,20 @@ async def test_step(req: TestStepRequest, user: User = Depends(get_current_user)
         req.task_name, req.task_data, req.document_uuids, user.user_id, req.model
     )
     return {"task_id": task_id}
+
+
+@router.post("/{workflow_id}/reorder-steps")
+async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)):
+    ok = await svc.reorder_steps(workflow_id, req.step_ids)
+    if not ok:
+        raise HTTPException(status_code=400, detail="Invalid step IDs or workflow not found")
+    return {"ok": True}
+
+
+@router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
+async def validate_workflow(workflow_id: str, req: ValidateWorkflowRequest, user: User = Depends(get_current_user)):
+    try:
+        result = await svc.validate_workflow(workflow_id, req.eval_plan)
+        return ValidateWorkflowResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
