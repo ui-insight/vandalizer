@@ -4,7 +4,24 @@
       "Bash(find:*)",
       "Bash(git log:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(done)",
+      "Bash(npm create:*)",
+      "Bash(curl:*)",
+      "Bash(.venv/bin/python -c:*)",
+      "Bash(.venv/bin/python:*)",
+      "Bash(npx tsc:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)",
+      "Bash(uv sync)",
+      "Bash(python3.11:*)",
+      "Bash(python3.12:*)",
+      "Bash(echo:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm ls:*)",
+      "Bash(git add:*)"
     ]
   }
 }
