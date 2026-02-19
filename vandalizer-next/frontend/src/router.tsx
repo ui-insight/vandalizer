@@ -20,6 +20,7 @@ const Account = lazy(() => import('./pages/Account'))
 const Automation = lazy(() => import('./pages/Automation'))
 const Office = lazy(() => import('./pages/Office'))
 const BrowserAutomation = lazy(() => import('./pages/BrowserAutomation'))
+const Spaces = lazy(() => import('./pages/Spaces'))
 
 // ---------------------------------------------------------------------------
 // Route tree
@@ -159,6 +160,16 @@ const browserAutomationRoute = createRoute({
   ),
 })
 
+const spacesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/spaces',
+  component: () => (
+    <ProtectedRoute>
+      <Spaces />
+    </ProtectedRoute>
+  ),
+})
+
 const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
@@ -173,6 +184,7 @@ const routeTree = rootRoute.addChildren([
   automationRoute,
   officeRoute,
   browserAutomationRoute,
+  spacesRoute,
 ])
 
 export const router = createRouter({ routeTree })

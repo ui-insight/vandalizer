@@ -1,4 +1,4 @@
-import { BookOpen, Cloud, FileText, Globe, MessageSquare, Shield, Users, Workflow, Zap } from 'lucide-react'
+import { BookOpen, Cloud, FileText, FolderOpen, Globe, MessageSquare, Shield, Users, Workflow, Zap } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
@@ -11,6 +11,7 @@ export function Sidebar() {
     { href: '/', label: 'Documents', icon: FileText },
     { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/library', label: 'Library', icon: BookOpen },
+    { href: '/spaces', label: 'Spaces', icon: FolderOpen },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
     { href: '/automation', label: 'Automation', icon: Zap },
     { href: '/office', label: 'Office 365', icon: Cloud },
