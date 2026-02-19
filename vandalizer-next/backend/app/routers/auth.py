@@ -1,3 +1,6 @@
+import datetime
+import secrets
+
 from fastapi import APIRouter, Depends, HTTPException, Response, Cookie, status
 
 from app.config import Settings
@@ -98,6 +101,34 @@ async def logout(response: Response):
 @router.get("/me")
 async def me(user: User = Depends(get_current_user)):
     return await _user_response(user)
+
+
+@router.post("/api-token/generate")
+async def generate_api_token(user: User = Depends(get_current_user)):
+    """Generate a new API token for the current user."""
+    token = secrets.token_urlsafe(32)
+    user.api_token = token
+    user.api_token_created_at = datetime.datetime.now(datetime.timezone.utc)
+    await user.save()
+    return {"api_token": token, "created_at": user.api_token_created_at.isoformat()}
+
+
+@router.post("/api-token/revoke")
+async def revoke_api_token(user: User = Depends(get_current_user)):
+    """Revoke the current user's API token."""
+    user.api_token = None
+    user.api_token_created_at = None
+    await user.save()
+    return {"ok": True}
+
+
+@router.get("/api-token/status")
+async def api_token_status(user: User = Depends(get_current_user)):
+    """Check if the current user has an active API token."""
+    return {
+        "has_token": user.api_token is not None,
+        "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,
+    }
 
 
 @router.post("/refresh")

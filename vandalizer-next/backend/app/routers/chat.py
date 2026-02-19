@@ -337,6 +337,28 @@ async def remove_document(
     return {"success": True}
 
 
+@router.get("/conversations")
+async def list_conversations(
+    limit: int = 50,
+    user: User = Depends(get_current_user),
+):
+    """List the user's chat conversations, most recent first."""
+    conversations = await ChatConversation.find(
+        ChatConversation.user_id == user.user_id,
+    ).sort(-ChatConversation.updated_at).limit(limit).to_list()
+
+    return [
+        {
+            "uuid": c.uuid,
+            "title": c.title,
+            "message_count": len(c.messages),
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+        }
+        for c in conversations
+    ]
+
+
 @router.get("/history/{conversation_uuid}")
 async def get_chat_history(
     conversation_uuid: str,

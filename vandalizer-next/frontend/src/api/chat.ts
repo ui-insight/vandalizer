@@ -121,6 +121,18 @@ export function removeDocument(attachmentId: string) {
   })
 }
 
+export interface ConversationSummary {
+  uuid: string
+  title: string
+  message_count: number
+  created_at: string | null
+  updated_at: string | null
+}
+
+export function listConversations(limit: number = 50) {
+  return apiFetch<ConversationSummary[]>(`/api/chat/conversations?limit=${limit}`)
+}
+
 export function getHistory(conversationUuid: string) {
   return apiFetch<{
     messages: ChatMessage[]

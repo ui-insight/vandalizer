@@ -26,3 +26,23 @@ async def create_space(title: str, user_id: str | None = None) -> Space:
     )
     await space.insert()
     return space
+
+
+async def update_space(space_uuid: str, title: str | None = None) -> Space | None:
+    """Update a space."""
+    space = await Space.find_one(Space.uuid == space_uuid)
+    if not space:
+        return None
+    if title is not None:
+        space.title = title
+    await space.save()
+    return space
+
+
+async def delete_space(space_uuid: str) -> bool:
+    """Delete a space."""
+    space = await Space.find_one(Space.uuid == space_uuid)
+    if not space:
+        return False
+    await space.delete()
+    return True

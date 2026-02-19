@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings
 from app.database import init_db
-from app.routers import activity, auth, chat, config, documents, extractions, feedback, files, folders, library, office, spaces, teams, verification, workflows
+from app.routers import activity, admin, auth, chat, config, documents, extractions, feedback, files, folders, library, office, spaces, teams, verification, workflows
 
 
 @lru_cache
@@ -32,6 +32,7 @@ app.add_middleware(
     expose_headers=["X-Conversation-UUID", "X-Activity-ID"],
 )
 
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(folders.router, prefix="/api/folders", tags=["folders"])
