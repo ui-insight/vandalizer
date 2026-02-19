@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.dependencies import get_current_user
 from app.models.user import User
-from app.models.feedback import ExtractionQualityRecord
+from app.models.feedback import ChatFeedback, ExtractionQualityRecord
 
 router = APIRouter()
 
@@ -29,6 +29,26 @@ async def submit_rating(req: SubmitRatingRequest, user: User = Depends(get_curre
         result_json=json.dumps(req.result_json) if req.result_json else None,
         user_id=user.user_id,
         search_set_uuid=req.search_set_uuid,
+    )
+    await record.insert()
+    return {"complete": True}
+
+
+class ChatFeedbackRequest(BaseModel):
+    conversation_uuid: Optional[str] = None
+    message_index: Optional[int] = None
+    rating: str  # "up" or "down"
+    comment: Optional[str] = None
+
+
+@router.post("/chat")
+async def submit_chat_feedback(req: ChatFeedbackRequest, user: User = Depends(get_current_user)):
+    record = ChatFeedback(
+        conversation_uuid=req.conversation_uuid,
+        message_index=req.message_index,
+        rating=req.rating,
+        comment=req.comment,
+        user_id=user.user_id,
     )
     await record.insert()
     return {"complete": True}

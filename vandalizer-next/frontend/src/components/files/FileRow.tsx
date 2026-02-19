@@ -5,9 +5,11 @@ interface FileRowProps {
   doc: Document
   onClick?: () => void
   onContextMenu: (e: React.MouseEvent) => void
+  selected?: boolean
+  onToggleSelect?: (uuid: string) => void
 }
 
-export function FileRow({ doc, onClick, onContextMenu }: FileRowProps) {
+export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect }: FileRowProps) {
   return (
     <tr
       className="hover:bg-[#a6b5c945]"
@@ -15,6 +17,17 @@ export function FileRow({ doc, onClick, onContextMenu }: FileRowProps) {
       onContextMenu={onContextMenu}
       style={{ borderBottom: '1px solid #dddddd', cursor: 'pointer' }}
     >
+      {onToggleSelect && (
+        <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect(doc.uuid)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
+          />
+        </td>
+      )}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center min-w-0">
           {/* Icon */}

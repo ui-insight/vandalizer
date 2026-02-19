@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
+from app.models.document import SmartDocument
 from app.models.user import User
 from app.models.team import Team
 from app.services import document_service
@@ -24,6 +25,48 @@ async def list_documents(
     return await document_service.list_contents(
         space, folder, user_id=user.user_id, team_uuid=team_uuid
     )
+
+
+@router.get("/search")
+async def search_documents(
+    q: str = Query(..., min_length=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(get_current_user),
+):
+    """Search documents by title or content text."""
+    import re
+    regex = re.compile(re.escape(q), re.IGNORECASE)
+    results = await SmartDocument.find(
+        {
+            "$or": [
+                {"title": {"$regex": regex.pattern, "$options": "i"}},
+                {"raw_text": {"$regex": regex.pattern, "$options": "i"}},
+            ],
+            "user_id": user.user_id,
+        }
+    ).sort(-SmartDocument.created_at).limit(limit).to_list()
+
+    items = []
+    for doc in results:
+        # Extract snippet around match in raw_text
+        snippet = ""
+        if doc.raw_text:
+            match = regex.search(doc.raw_text)
+            if match:
+                start = max(0, match.start() - 80)
+                end = min(len(doc.raw_text), match.end() + 80)
+                snippet = ("..." if start > 0 else "") + doc.raw_text[start:end] + ("..." if end < len(doc.raw_text) else "")
+
+        items.append({
+            "uuid": doc.uuid,
+            "title": doc.title,
+            "extension": doc.extension,
+            "snippet": snippet,
+            "num_pages": doc.num_pages,
+            "created_at": doc.created_at.isoformat() if doc.created_at else None,
+        })
+
+    return {"items": items, "total": len(items)}
 
 
 @router.get("/poll_status")

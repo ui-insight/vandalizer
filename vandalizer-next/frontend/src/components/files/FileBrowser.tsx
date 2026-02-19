@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useEffect } from 'react'
-import { Plus, Folder as FolderIcon, Upload, Search, X } from 'lucide-react'
+import { Plus, Folder as FolderIcon, Upload, Search, X, Trash2, Download } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
@@ -30,6 +30,15 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
   const { uploads, upload } = useUpload(space, currentFolder, refresh)
 
+  // Bulk selection
+  const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // Clear selection when navigating folders
+  useEffect(() => {
+    setSelectedUuids(new Set())
+  }, [currentFolder])
+
   // Search
   const [searchQuery, setSearchQuery] = useState('')
   const filteredFolders = useMemo(() => {
@@ -42,6 +51,48 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
     const q = searchQuery.toLowerCase()
     return documents.filter(d => d.title.toLowerCase().includes(q))
   }, [documents, searchQuery])
+
+  const handleToggleSelect = useCallback((uuid: string) => {
+    setSelectedUuids(prev => {
+      const next = new Set(prev)
+      if (next.has(uuid)) next.delete(uuid)
+      else next.add(uuid)
+      return next
+    })
+  }, [])
+
+  const handleToggleAll = useCallback(() => {
+    const allUuids = [...filteredFolders.map(f => f.uuid), ...filteredDocuments.map(d => d.uuid)]
+    setSelectedUuids(prev => {
+      const allSelected = allUuids.every(u => prev.has(u))
+      return allSelected ? new Set() : new Set(allUuids)
+    })
+  }, [filteredFolders, filteredDocuments])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedUuids.size === 0) return
+    setBulkDeleting(true)
+    try {
+      const promises: Promise<unknown>[] = []
+      for (const uuid of selectedUuids) {
+        const isFolder = folders.some(f => f.uuid === uuid)
+        if (isFolder) promises.push(deleteFolder(uuid))
+        else promises.push(deleteFile(uuid))
+      }
+      await Promise.all(promises)
+      setSelectedUuids(new Set())
+      refresh()
+    } finally {
+      setBulkDeleting(false)
+    }
+  }, [selectedUuids, folders, refresh])
+
+  const handleBulkDownload = useCallback(() => {
+    const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
+    for (const uuid of docUuids) {
+      window.open(downloadFileUrl(uuid), '_blank')
+    }
+  }, [selectedUuids, documents])
 
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{
@@ -226,6 +277,42 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
         )}
       </div>
 
+      {/* Bulk action toolbar */}
+      {selectedUuids.size > 0 && (
+        <div
+          className="mt-2.5 flex items-center gap-2 rounded-lg px-3 py-2"
+          style={{ backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)', border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)' }}
+        >
+          <span className="text-sm font-medium" style={{ color: '#374151' }}>
+            {selectedUuids.size} selected
+          </span>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handleBulkDownload}
+              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 disabled:opacity-50 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {bulkDeleting ? 'Deleting...' : 'Delete'}
+            </button>
+            <button
+              onClick={() => setSelectedUuids(new Set())}
+              className="text-xs text-gray-500 hover:text-gray-700 px-1.5"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* File table - matches Flask .styled-table */}
       <div
         className="mt-2.5 rounded-[12px] overflow-hidden"
@@ -238,6 +325,9 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
           onFolderContextMenu={handleFolderContextMenu}
           onDocContextMenu={handleDocContextMenu}
           onDocClick={onDocClick}
+          selectedUuids={selectedUuids}
+          onToggleSelect={handleToggleSelect}
+          onToggleAll={handleToggleAll}
         />
       </div>
 

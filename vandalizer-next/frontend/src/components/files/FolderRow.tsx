@@ -5,9 +5,11 @@ interface FolderRowProps {
   folder: Folder
   onClick: () => void
   onContextMenu: (e: React.MouseEvent) => void
+  selected?: boolean
+  onToggleSelect?: (uuid: string) => void
 }
 
-export function FolderRow({ folder, onClick, onContextMenu }: FolderRowProps) {
+export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect }: FolderRowProps) {
   // Team folders get teal color, personal folders get gray
   const iconColor = folder.is_shared_team_root ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
 
@@ -18,6 +20,17 @@ export function FolderRow({ folder, onClick, onContextMenu }: FolderRowProps) {
       onContextMenu={onContextMenu}
       style={{ borderBottom: '1px solid #dddddd' }}
     >
+      {onToggleSelect && (
+        <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect(folder.uuid)}
+            onClick={(e) => e.stopPropagation()}
+            className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
+          />
+        </td>
+      )}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center">
           <FolderIcon className="h-4 w-4 shrink-0" style={{ color: iconColor }} />

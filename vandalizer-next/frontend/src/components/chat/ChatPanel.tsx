@@ -20,6 +20,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     thinkingContent,
     isStreaming,
     activityId,
+    conversationUuid,
     error,
     send,
     loadHistory,
@@ -222,7 +223,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} />
+          <ChatMessage key={i} message={msg} messageIndex={i} conversationUuid={conversationUuid || undefined} />
         ))}
 
         {/* Streaming content */}

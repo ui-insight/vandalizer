@@ -12,3 +12,15 @@ export async function submitRating(data: {
     body: JSON.stringify(data),
   })
 }
+
+export async function submitChatFeedback(data: {
+  conversation_uuid?: string
+  message_index?: number
+  rating: 'up' | 'down'
+  comment?: string
+}): Promise<{ complete: boolean }> {
+  return apiFetch('/api/feedback/chat', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
