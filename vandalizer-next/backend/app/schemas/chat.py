@@ -11,6 +11,7 @@ class ChatRequest(BaseModel):
     document_uuids: list[str] = []
     current_space_id: Optional[str] = None
     folder_uuid: Optional[str] = None
+    model: Optional[str] = None
 
 
 class AddLinkRequest(BaseModel):

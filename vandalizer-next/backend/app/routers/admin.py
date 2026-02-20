@@ -1,4 +1,4 @@
-"""Admin API routes — usage stats, leaderboards, system config management."""
+"""Admin API routes  - usage stats, leaderboards, system config management."""
 
 import datetime
 import math
@@ -26,6 +26,28 @@ async def _require_admin(user: User) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
+
+
+async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
+    """Allow global admins (no scope) or team admins/owners (scoped to current team).
+
+    Returns (user, team_id) where team_id is None for global admins or the
+    stringified team ObjectId for team admins.
+    """
+    if user.is_admin:
+        return user, None
+
+    if not user.current_team:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    membership = await TeamMembership.find_one(
+        TeamMembership.team == user.current_team,
+        TeamMembership.user_id == user.user_id,
+    )
+    if not membership or membership.role not in ("owner", "admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return user, str(user.current_team)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +120,7 @@ class ModelAddRequest(BaseModel):
     thinking: bool = False
     endpoint: Optional[str] = ""
     api_protocol: Optional[str] = ""
+    api_key: Optional[str] = ""
 
 
 class OAuthProviderRequest(BaseModel):
@@ -119,7 +142,7 @@ class AuthMethodsRequest(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# 1. GET /usage — Usage stats dashboard
+# 1. GET /usage  - Usage stats dashboard
 # ---------------------------------------------------------------------------
 
 @router.get("/usage", response_model=UsageStatsResponse)
@@ -127,12 +150,13 @@ async def usage_stats(
     days: int = Query(default=30, ge=1),
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    _, team_scope = await _require_admin_or_team_admin(user)
 
     cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
-    events = await ActivityEvent.find(
-        ActivityEvent.started_at >= cutoff
-    ).to_list()
+    query_filter: dict = {"started_at": {"$gte": cutoff}}
+    if team_scope:
+        query_filter["team_id"] = team_scope
+    events = await ActivityEvent.find(query_filter).to_list()
 
     conversations = 0
     search_runs = 0
@@ -176,16 +200,19 @@ async def usage_stats(
 
 
 # ---------------------------------------------------------------------------
-# 2. GET /users — User leaderboard
+# 2. GET /users  - User leaderboard
 # ---------------------------------------------------------------------------
 
 @router.get("/users", response_model=list[UserLeaderboardItem])
 async def user_leaderboard(
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    _, team_scope = await _require_admin_or_team_admin(user)
 
-    events = await ActivityEvent.find().to_list()
+    query_filter: dict = {}
+    if team_scope:
+        query_filter["team_id"] = team_scope
+    events = await ActivityEvent.find(query_filter).to_list()
 
     # Aggregate per user
     user_agg: dict[str, dict] = {}
@@ -226,16 +253,19 @@ async def user_leaderboard(
 
 
 # ---------------------------------------------------------------------------
-# 3. GET /teams — Team leaderboard
+# 3. GET /teams  - Team leaderboard
 # ---------------------------------------------------------------------------
 
 @router.get("/teams", response_model=list[TeamLeaderboardItem])
 async def team_leaderboard(
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    _, team_scope = await _require_admin_or_team_admin(user)
 
-    events = await ActivityEvent.find().to_list()
+    query_filter: dict = {}
+    if team_scope:
+        query_filter["team_id"] = team_scope
+    events = await ActivityEvent.find(query_filter).to_list()
 
     # Aggregate per team
     team_agg: dict[str, dict] = {}
@@ -259,7 +289,7 @@ async def team_leaderboard(
                 delta_ms = int((ev.finished_at - ev.started_at).total_seconds() * 1000)
                 agg["latencies"].append(delta_ms)
 
-    # Fetch team records — map by str(id)
+    # Fetch team records  - map by str(id)
     all_teams = await Team.find().to_list()
     team_map = {str(t.id): t for t in all_teams}
 
@@ -286,7 +316,7 @@ async def team_leaderboard(
 
 
 # ---------------------------------------------------------------------------
-# 4. GET /workflows — Paginated workflow events
+# 4. GET /workflows  - Paginated workflow events
 # ---------------------------------------------------------------------------
 
 @router.get("/workflows", response_model=PaginatedWorkflowResponse)
@@ -296,9 +326,11 @@ async def workflow_events(
     per_page: int = Query(default=50, ge=1, le=200),
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    _, team_scope = await _require_admin_or_team_admin(user)
 
-    query_filter = {"type": "workflow_run"}
+    query_filter: dict = {"type": "workflow_run"}
+    if team_scope:
+        query_filter["team_id"] = team_scope
     if status:
         query_filter["status"] = status
 
@@ -341,7 +373,7 @@ async def workflow_events(
 
 
 # ---------------------------------------------------------------------------
-# 5. GET /config — Full system config
+# 5. GET /config  - Full system config
 # ---------------------------------------------------------------------------
 
 @router.get("/config")
@@ -364,7 +396,7 @@ async def get_config(
 
 
 # ---------------------------------------------------------------------------
-# 6. PUT /config — Update system config
+# 6. PUT /config  - Update system config
 # ---------------------------------------------------------------------------
 
 @router.put("/config")
@@ -391,7 +423,7 @@ async def update_config(
 
 
 # ---------------------------------------------------------------------------
-# 7. POST /config/models — Add a model
+# 7. POST /config/models  - Add a model
 # ---------------------------------------------------------------------------
 
 @router.post("/config/models")
@@ -410,6 +442,7 @@ async def add_model(
             "thinking": body.thinking,
             "endpoint": body.endpoint or "",
             "api_protocol": body.api_protocol or "",
+            "api_key": body.api_key or "",
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -420,7 +453,7 @@ async def add_model(
 
 
 # ---------------------------------------------------------------------------
-# 8. DELETE /config/models/{index} — Remove a model by index
+# 8. DELETE /config/models/{index}  - Remove a model by index
 # ---------------------------------------------------------------------------
 
 @router.delete("/config/models/{index}")
@@ -443,7 +476,7 @@ async def delete_model(
 
 
 # ---------------------------------------------------------------------------
-# 9. POST /config/auth/providers — Add OAuth provider
+# 9. POST /config/auth/providers  - Add OAuth provider
 # ---------------------------------------------------------------------------
 
 @router.post("/config/auth/providers")
@@ -464,7 +497,7 @@ async def add_oauth_provider(
 
 
 # ---------------------------------------------------------------------------
-# 10. PUT /config/auth/providers/{index} — Update OAuth provider
+# 10. PUT /config/auth/providers/{index}  - Update OAuth provider
 # ---------------------------------------------------------------------------
 
 @router.put("/config/auth/providers/{index}")
@@ -488,7 +521,7 @@ async def update_oauth_provider(
 
 
 # ---------------------------------------------------------------------------
-# 11. DELETE /config/auth/providers/{index} — Remove OAuth provider
+# 11. DELETE /config/auth/providers/{index}  - Remove OAuth provider
 # ---------------------------------------------------------------------------
 
 @router.delete("/config/auth/providers/{index}")
@@ -511,7 +544,7 @@ async def delete_oauth_provider(
 
 
 # ---------------------------------------------------------------------------
-# 12. PUT /config/auth/methods — Update auth methods
+# 12. PUT /config/auth/methods  - Update auth methods
 # ---------------------------------------------------------------------------
 
 @router.put("/config/auth/methods")

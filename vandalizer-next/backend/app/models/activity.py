@@ -1,4 +1,4 @@
-"""Activity tracking models — ActivityEvent and related enums."""
+"""Activity tracking models  - ActivityEvent and related enums."""
 
 import datetime
 from enum import Enum

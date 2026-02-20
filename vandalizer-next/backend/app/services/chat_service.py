@@ -1,4 +1,4 @@
-"""Chat service — streaming chat with RAG, ported from ChatManager."""
+"""Chat service  - streaming chat with RAG, ported from ChatManager."""
 
 import asyncio
 import json
@@ -19,6 +19,7 @@ from pydantic_ai.messages import (
 from app.models.activity import ActivityEvent, ActivityStatus
 from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
+from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
 from app.services.document_manager import DocumentManager
 from app.services.llm_service import (
@@ -38,11 +39,23 @@ async def chat_stream(
     space: Optional[str] = None,
     activity_id: Optional[str] = None,
     settings=None,
+    model_override: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
-    # Resolve model
-    model_name = await get_user_model_name(user_id)
+    # Resolve model — prefer per-request override, fall back to user config
+    if model_override:
+        from app.services.config_service import resolve_model_name
+        model_name = await resolve_model_name(model_override)
+    else:
+        model_name = await get_user_model_name(user_id)
+
+    # Fetch system config so agent creation can read per-model settings (api_key, endpoint, etc.)
+    cfg = await SystemConfig.get_config()
+    sys_config_doc = {
+        "available_models": cfg.available_models,
+        "llm_endpoint": cfg.llm_endpoint,
+    }
 
     # Load conversation
     conversation = await ChatConversation.find_one(
@@ -100,10 +113,10 @@ async def chat_stream(
 
     if len(full_text) < max_context_length:
         prompt += f"\n\n# Query: {message}\n\n# Context: \n{full_text}"
-        agent = create_chat_agent(model_name)
+        agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
     else:
         prompt += f"\n\n# Document(s): {[doc.uuid for doc in documents]}\n"
-        agent = create_rag_agent(model_name)
+        agent = create_rag_agent(model_name, system_config_doc=sys_config_doc)
 
     # Add attachment context
     if attachment_context:
@@ -114,7 +127,7 @@ async def chat_stream(
 
     try:
         if len(full_text) >= max_context_length:
-            # RAG path — needs deps, run in thread for sync ChromaDB calls
+            # RAG path  - needs deps, run in thread for sync ChromaDB calls
             doc_manager = DocumentManager(
                 persist_directory=settings.chromadb_persist_dir if settings else "data/chromadb"
             )
@@ -142,7 +155,7 @@ async def chat_stream(
                         usage, activity_id, user_id,
                     )
         else:
-            # Direct path — full text in prompt
+            # Direct path  - full text in prompt
             async with agent.iter(
                 prompt, message_history=previous_messages
             ) as agent_run:

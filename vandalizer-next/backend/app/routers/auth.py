@@ -58,6 +58,7 @@ async def _user_response(user: User) -> UserResponse:
         email=user.email,
         name=user.name,
         is_admin=user.is_admin,
+        is_examiner=user.is_examiner,
         current_team=str(user.current_team) if user.current_team else None,
         current_team_uuid=current_team_uuid,
     )
@@ -176,7 +177,7 @@ def _get_azure_provider(config: SystemConfig) -> dict | None:
 
 @router.get("/config")
 async def auth_config():
-    """Public endpoint — returns which auth methods are available."""
+    """Public endpoint  - returns which auth methods are available."""
     config = await SystemConfig.get_config()
     providers = []
     if "oauth" in config.auth_methods:

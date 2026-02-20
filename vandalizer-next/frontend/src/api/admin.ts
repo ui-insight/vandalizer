@@ -85,7 +85,7 @@ export interface SystemConfigData {
   extraction_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string }[]
+  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string }[]
   ocr_endpoint: string
   llm_endpoint: string
   highlight_color: string
@@ -102,7 +102,7 @@ export function updateSystemConfig(data: { extraction_config?: Record<string, un
 
 // Models
 
-export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string }) {
+export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string }) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),

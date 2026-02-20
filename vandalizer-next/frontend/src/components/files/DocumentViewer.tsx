@@ -1,17 +1,258 @@
-import { useCallback, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, RotateCw, Maximize2, ChevronLeft, ChevronRight, Search } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
+import * as pdfjsLib from 'pdfjs-dist'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.mjs',
+  import.meta.url,
+).toString()
 
 interface DocumentViewerProps {
   docUuid: string
+  highlightTerms?: string[]
 }
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
+const HIGHLIGHT_COLOR = '#eab308'
 
-export function DocumentViewer({ docUuid }: DocumentViewerProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 1 (100%)
-  const [showToolbar, setShowToolbar] = useState(true)
+export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerProps) {
+  const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
+  const [isPdf, setIsPdf] = useState(true)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
+  const renderingRef = useRef(false)
+  const [totalHighlights, setTotalHighlights] = useState(0)
+  const [currentHighlight, setCurrentHighlight] = useState(0)
+
+  const zoomLevel = ZOOM_LEVELS[zoom]
+  const url = downloadFileUrl(docUuid)
+
+  // Detect PDF by fetching headers
+  useEffect(() => {
+    let cancelled = false
+    fetch(url, { method: 'HEAD' }).then(resp => {
+      if (cancelled) return
+      const ct = resp.headers.get('content-type') || ''
+      setIsPdf(ct.includes('pdf'))
+    }).catch(() => {
+      if (!cancelled) setIsPdf(false)
+    })
+    return () => { cancelled = true }
+  }, [url])
+
+  // Load PDF document
+  useEffect(() => {
+    if (!isPdf) return
+    let cancelled = false
+
+    const loadTask = pdfjsLib.getDocument(url)
+    loadTask.promise.then(doc => {
+      if (cancelled) {
+        doc.destroy()
+        return
+      }
+      pdfDocRef.current = doc
+      renderAllPages(doc)
+    }).catch(() => {
+      // If PDF loading fails, fall back to iframe
+      if (!cancelled) setIsPdf(false)
+    })
+
+    return () => {
+      cancelled = true
+      loadTask.destroy?.()
+      if (pdfDocRef.current) {
+        pdfDocRef.current.destroy()
+        pdfDocRef.current = null
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, isPdf])
+
+  // Re-render pages when zoom changes
+  useEffect(() => {
+    if (!isPdf || !pdfDocRef.current) return
+    renderAllPages(pdfDocRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomLevel])
+
+  // Re-apply highlights when terms change
+  useEffect(() => {
+    if (!isPdf || !pdfDocRef.current) return
+    applyHighlights(pdfDocRef.current, highlightTerms)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightTerms])
+
+  const renderAllPages = useCallback(async (doc: pdfjsLib.PDFDocumentProxy) => {
+    if (renderingRef.current) return
+    renderingRef.current = true
+
+    const container = containerRef.current
+    if (!container) { renderingRef.current = false; return }
+
+    // Clear existing pages
+    container.innerHTML = ''
+    const dpr = window.devicePixelRatio || 1
+
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i)
+      const unscaled = page.getViewport({ scale: 1 })
+      const scale = zoomLevel
+      const viewport = page.getViewport({ scale })
+
+      // Page wrapper
+      const wrapper = document.createElement('div')
+      wrapper.style.position = 'relative'
+      wrapper.style.width = `${Math.floor(viewport.width)}px`
+      wrapper.style.margin = '10px auto'
+      wrapper.style.boxShadow = '0 2px 8px rgba(0,0,0,0.15)'
+      wrapper.style.backgroundColor = '#fff'
+      wrapper.dataset.pageNum = String(i)
+
+      // Canvas
+      const canvas = document.createElement('canvas')
+      canvas.width = Math.floor(viewport.width * dpr)
+      canvas.height = Math.floor(viewport.height * dpr)
+      canvas.style.width = `${Math.floor(viewport.width)}px`
+      canvas.style.height = `${Math.floor(viewport.height)}px`
+      canvas.style.display = 'block'
+
+      // Overlay for highlights
+      const overlay = document.createElement('div')
+      overlay.className = 'pdf-overlay'
+      overlay.style.position = 'absolute'
+      overlay.style.left = '0'
+      overlay.style.top = '0'
+      overlay.style.width = canvas.style.width
+      overlay.style.height = canvas.style.height
+      overlay.style.pointerEvents = 'none'
+
+      wrapper.appendChild(canvas)
+      wrapper.appendChild(overlay)
+      container.appendChild(wrapper)
+
+      // Render page on canvas
+      const ctx = canvas.getContext('2d')!
+      await page.render({
+        canvasContext: ctx,
+        viewport,
+        transform: [dpr, 0, 0, dpr, 0, 0],
+      }).promise
+    }
+
+    renderingRef.current = false
+
+    // Apply highlights after rendering
+    if (highlightTerms.length > 0) {
+      applyHighlights(doc, highlightTerms)
+    }
+  }, [zoomLevel, highlightTerms])
+
+  const applyHighlights = useCallback(async (doc: pdfjsLib.PDFDocumentProxy, terms: string[]) => {
+    const container = containerRef.current
+    if (!container) return
+
+    // Clear all existing highlights
+    container.querySelectorAll('.pdf-highlight').forEach(el => el.remove())
+
+    if (terms.length === 0) {
+      setTotalHighlights(0)
+      setCurrentHighlight(0)
+      return
+    }
+
+    let count = 0
+
+    for (let i = 1; i <= doc.numPages; i++) {
+      const page = await doc.getPage(i)
+      const viewport = page.getViewport({ scale: zoomLevel })
+      const textContent = await page.getTextContent()
+      const wrapper = container.querySelector(`[data-page-num="${i}"]`)
+      const overlay = wrapper?.querySelector('.pdf-overlay')
+      if (!overlay) continue
+
+      for (const item of textContent.items) {
+        if (!('str' in item)) continue
+        const textItem = item as { str: string; transform: number[]; width: number; height: number }
+        const textStr = textItem.str
+        if (!textStr) continue
+
+        const textLower = textStr.toLowerCase()
+        const matched = terms.some(t => t && textLower.includes(t.toLowerCase()))
+        if (!matched) continue
+
+        const scale = viewport.scale
+        const [, , , , tx, ty] = textItem.transform
+        const x = tx * scale
+        const y = viewport.height - (ty * scale) - (textItem.height * scale)
+
+        const hl = document.createElement('div')
+        hl.className = 'pdf-highlight'
+        hl.dataset.highlightIndex = String(count)
+        Object.assign(hl.style, {
+          position: 'absolute',
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${textItem.width * scale}px`,
+          height: `${textItem.height * scale}px`,
+          backgroundColor: HIGHLIGHT_COLOR,
+          opacity: '0.45',
+          pointerEvents: 'none',
+          borderRadius: '2px',
+        })
+        overlay.appendChild(hl)
+        count++
+      }
+    }
+
+    setTotalHighlights(count)
+    if (count > 0) {
+      setCurrentHighlight(0)
+      // Scroll to first highlight
+      setTimeout(() => scrollToHighlightByIndex(0), 150)
+    }
+  }, [zoomLevel])
+
+  const scrollToHighlightByIndex = (index: number) => {
+    const container = containerRef.current
+    if (!container) return
+
+    const highlights = container.querySelectorAll('.pdf-highlight')
+    if (highlights.length === 0 || index < 0 || index >= highlights.length) return
+
+    // Update opacity on all highlights
+    highlights.forEach((hl, idx) => {
+      ;(hl as HTMLElement).style.opacity = idx === index ? '0.75' : '0.45'
+    })
+
+    const target = highlights[index] as HTMLElement
+    const scrollParent = container.parentElement
+    if (!scrollParent) return
+
+    const targetRect = target.getBoundingClientRect()
+    const parentRect = scrollParent.getBoundingClientRect()
+    const scrollTop = scrollParent.scrollTop + (targetRect.top - parentRect.top) - 150
+
+    scrollParent.scrollTo({
+      top: Math.max(0, scrollTop),
+      behavior: 'smooth',
+    })
+  }
+
+  const goToHighlight = useCallback((direction: 'next' | 'prev') => {
+    if (totalHighlights === 0) return
+    setCurrentHighlight(prev => {
+      let next: number
+      if (direction === 'next') {
+        next = prev + 1 >= totalHighlights ? 0 : prev + 1
+      } else {
+        next = prev - 1 < 0 ? totalHighlights - 1 : prev - 1
+      }
+      setTimeout(() => scrollToHighlightByIndex(next), 50)
+      return next
+    })
+  }, [totalHighlights])
 
   const zoomIn = useCallback(() => {
     setZoom(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))
@@ -22,10 +263,8 @@ export function DocumentViewer({ docUuid }: DocumentViewerProps) {
   }, [])
 
   const resetZoom = useCallback(() => {
-    setZoom(2) // 100%
+    setZoom(2)
   }, [])
-
-  const zoomLevel = ZOOM_LEVELS[zoom]
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -34,10 +273,10 @@ export function DocumentViewer({ docUuid }: DocumentViewerProps) {
     fontSize: 13, fontWeight: 500,
   }
 
-  return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
-      {/* Toolbar */}
-      {showToolbar && (
+  // Non-PDF fallback: iframe
+  if (!isPdf) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
@@ -53,38 +292,124 @@ export function DocumentViewer({ docUuid }: DocumentViewerProps) {
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-          <button
-            onClick={() => {
-              // Open in new tab for full screen
-              window.open(downloadFileUrl(docUuid), '_blank')
-            }}
-            style={btnStyle}
-            title="Open in new tab"
-          >
+          <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
             <Maximize2 size={16} />
           </button>
         </div>
-      )}
-
-      {/* Document */}
-      <div style={{
-        flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center',
-        backgroundColor: '#525659',
-      }}>
         <div style={{
-          transform: `scale(${zoomLevel})`,
-          transformOrigin: 'top center',
-          width: `${100 / zoomLevel}%`,
-          height: `${100 / zoomLevel}%`,
-          minHeight: '100%',
+          flex: 1, overflow: 'auto', display: 'flex', justifyContent: 'center',
+          backgroundColor: '#525659',
         }}>
-          <iframe
-            ref={iframeRef}
-            src={downloadFileUrl(docUuid)}
-            style={{ width: '100%', height: '100%', border: 'none' }}
-            title="Document viewer"
-          />
+          <div style={{
+            transform: `scale(${zoomLevel})`,
+            transformOrigin: 'top center',
+            width: `${100 / zoomLevel}%`,
+            height: `${100 / zoomLevel}%`,
+            minHeight: '100%',
+          }}>
+            <iframe
+              src={url}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              title="Document viewer"
+            />
+          </div>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {/* Toolbar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+        flexShrink: 0,
+      }}>
+        <button onClick={zoomOut} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+          <ZoomOut size={16} />
+        </button>
+        <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+          {Math.round(zoomLevel * 100)}%
+        </button>
+        <button onClick={zoomIn} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+          <ZoomIn size={16} />
+        </button>
+        <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
+          <Maximize2 size={16} />
+        </button>
+      </div>
+
+      {/* PDF pages container */}
+      <div style={{
+        flex: 1, overflow: 'auto', backgroundColor: '#525659',
+        position: 'relative',
+      }}>
+        <div ref={containerRef} style={{ paddingBottom: 20 }} />
+
+        {/* Highlight navigation bar */}
+        {totalHighlights > 0 && (
+          <div style={{
+            position: 'sticky',
+            bottom: 12,
+            left: 0,
+            right: 0,
+            margin: '0 24px',
+            height: 48,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '0 8px',
+            borderRadius: 10,
+            border: '1px solid #e5e7eb',
+            backdropFilter: 'blur(12px)',
+            backgroundColor: 'rgba(255,255,255,0.85)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.12)',
+            zIndex: 100,
+          }}>
+            <button
+              onClick={() => goToHighlight('prev')}
+              style={{
+                ...btnStyle,
+                width: 34, height: 34,
+                border: 'none',
+                background: 'none',
+              }}
+              title="Previous highlight"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <div style={{
+              flex: 1,
+              textAlign: 'center',
+              fontSize: 14,
+              color: '#374151',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}>
+              <span style={{ fontWeight: 700 }}>
+                &ldquo;{highlightTerms[0]}&rdquo;
+              </span>
+              <span style={{ marginLeft: 6, color: '#9ca3af', fontWeight: 400 }}>
+                {currentHighlight + 1} of {totalHighlights}
+              </span>
+            </div>
+            <button
+              onClick={() => goToHighlight('next')}
+              style={{
+                ...btnStyle,
+                width: 34, height: 34,
+                border: 'none',
+                background: 'none',
+              }}
+              title="Next highlight"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

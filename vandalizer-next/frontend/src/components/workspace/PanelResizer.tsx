@@ -4,7 +4,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 export function PanelResizer() {
   const { setPanelSplit } = useWorkspace()
   const [dragging, setDragging] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const rafRef = useRef(0)
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
@@ -14,16 +14,30 @@ export function PanelResizer() {
       const parentEl = (e.target as HTMLElement).parentElement
       if (!parentEl) return
 
+      // Disable text selection while dragging
+      document.body.style.userSelect = 'none'
+      document.body.style.cursor = 'col-resize'
+
       const onMove = (moveE: MouseEvent) => {
-        const rect = parentEl.getBoundingClientRect()
-        const pct = ((moveE.clientX - rect.left) / rect.width) * 100
-        setPanelSplit(pct)
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = requestAnimationFrame(() => {
+          const rect = parentEl.getBoundingClientRect()
+          const pct = ((moveE.clientX - rect.left) / rect.width) * 100
+          setPanelSplit(pct, true)
+        })
       }
 
-      const onUp = () => {
+      const onUp = (upE: MouseEvent) => {
+        cancelAnimationFrame(rafRef.current)
         setDragging(false)
+        document.body.style.userSelect = ''
+        document.body.style.cursor = ''
         document.removeEventListener('mousemove', onMove)
         document.removeEventListener('mouseup', onUp)
+        // Persist final position to localStorage
+        const rect = parentEl.getBoundingClientRect()
+        const pct = ((upE.clientX - rect.left) / rect.width) * 100
+        setPanelSplit(pct, false)
       }
 
       document.addEventListener('mousemove', onMove)
@@ -34,7 +48,6 @@ export function PanelResizer() {
 
   return (
     <div
-      ref={containerRef}
       onMouseDown={handleMouseDown}
       className="shrink-0 cursor-col-resize"
       style={{

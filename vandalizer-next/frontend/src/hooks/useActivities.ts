@@ -4,7 +4,7 @@ import type { ActivityEvent } from '../types/chat'
 
 const POLL_INTERVAL = 3000
 
-export function useActivities() {
+export function useActivities(externalSignal?: number) {
   const [activities, setActivities] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -20,10 +20,10 @@ export function useActivities() {
     }
   }, [])
 
-  // Initial fetch
+  // Initial fetch + re-fetch on external signal
   useEffect(() => {
     refresh()
-  }, [refresh])
+  }, [refresh, externalSignal])
 
   // Auto-poll when there are running/queued activities
   useEffect(() => {

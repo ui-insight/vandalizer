@@ -1,4 +1,4 @@
-"""Feedback API routes — extraction quality ratings."""
+"""Feedback API routes  - extraction quality ratings."""
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field

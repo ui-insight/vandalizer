@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
+import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
 import {
@@ -499,7 +500,8 @@ function ConfigTab() {
 
   // Add model form
   const [showAddModel, setShowAddModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '' })
+  const [addingModel, setAddingModel] = useState(false)
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
 
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
@@ -576,7 +578,16 @@ function ConfigTab() {
   }
 
   const handleAddModel = async () => {
-    if (!newModel.name || !newModel.tag) return
+    if (!newModel.name.trim()) {
+      setError('Model name is required')
+      return
+    }
+    if (!newModel.tag.trim()) {
+      setError('Tag is required')
+      return
+    }
+    setAddingModel(true)
+    setError(null)
     try {
       const res = await addModel(newModel)
       if (cfg) setCfg({ ...cfg, available_models: res.models })
@@ -584,6 +595,8 @@ function ConfigTab() {
       setShowAddModel(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to add model')
+    } finally {
+      setAddingModel(false)
     }
   }
 
@@ -970,6 +983,12 @@ function ConfigTab() {
                     {m.thinking && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>Thinking</span>
                     )}
+                    {m.api_protocol && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>{m.api_protocol}</span>
+                    )}
+                    {m.api_key && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#d1fae5', color: '#065f46', fontWeight: 600 }}>API Key</span>
+                    )}
                     {m.endpoint && (
                       <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
                     )}
@@ -993,44 +1012,56 @@ function ConfigTab() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Model Name</label>
-                  <input value={newModel.name} onChange={e => setNewModel({ ...newModel, name: e.target.value })} placeholder="gpt-4o" style={inputStyle} />
+                  <input value={newModel.name} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, name: v })) }} placeholder="gpt-4o" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Tag</label>
-                  <input value={newModel.tag} onChange={e => setNewModel({ ...newModel, tag: e.target.value })} placeholder="openai" style={inputStyle} />
+                  <input value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="openai" style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>Endpoint (optional)</label>
-                  <input value={newModel.endpoint} onChange={e => setNewModel({ ...newModel, endpoint: e.target.value })} placeholder="https://..." style={inputStyle} />
+                  <input value={newModel.endpoint} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, endpoint: v })) }} placeholder="https://..." style={inputStyle} />
                 </div>
                 <div>
                   <label style={labelStyle}>API Protocol</label>
-                  <select value={newModel.api_protocol} onChange={e => setNewModel({ ...newModel, api_protocol: e.target.value })} style={inputStyle}>
-                    <option value="">Default</option>
+                  <select value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
+                    <option value="">Auto-detect</option>
                     <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
+                    <option value="ollama">Ollama</option>
+                    <option value="vllm">VLLM</option>
                   </select>
+                </div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={labelStyle}>API Key (optional)</label>
+                  <input type="password" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={newModel.external} onChange={e => setNewModel({ ...newModel, external: e.target.checked })} style={checkStyle} />
+                  <input type="checkbox" checked={newModel.external} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, external: v })) }} style={checkStyle} />
                   External
                 </label>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={newModel.thinking} onChange={e => setNewModel({ ...newModel, thinking: e.target.checked })} style={checkStyle} />
+                  <input type="checkbox" checked={newModel.thinking} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, thinking: v })) }} style={checkStyle} />
                   Thinking
                 </label>
               </div>
+              {error && (
+                <div style={{ marginTop: 12, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+                  {error}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button
                   onClick={handleAddModel}
+                  disabled={addingModel}
                   style={{
                     padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                     background: 'var(--highlight-color, #eab308)', color: '#000', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    opacity: addingModel ? 0.6 : 1,
                   }}
                 >
-                  Add Model
+                  {addingModel ? 'Adding...' : 'Add Model'}
                 </button>
                 <button
                   onClick={() => setShowAddModel(false)}
@@ -1104,16 +1135,24 @@ function ConfigTab() {
 
 export default function Admin() {
   const { user } = useAuth()
+  const { currentTeam } = useTeams()
   const [activeTab, setActiveTab] = useState<Tab>('usage')
 
-  if (!user?.is_admin) {
+  const isGlobalAdmin = !!user?.is_admin
+  const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
+  const hasAccess = isGlobalAdmin || isTeamAdmin
+
+  // Only global admins see the Config tab
+  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config')
+
+  if (!hasAccess) {
     return (
       <PageLayout>
         <div style={{ maxWidth: 480, margin: '60px auto', textAlign: 'center' }}>
           <Shield size={40} color="#d1d5db" style={{ marginBottom: 16 }} />
           <h2 style={{ fontSize: 18, fontWeight: 600, color: '#111827' }}>Access Denied</h2>
           <p style={{ fontSize: 14, color: '#6b7280', marginTop: 8 }}>
-            You must be an administrator to view this page.
+            You must be a team admin or system administrator to view this page.
           </p>
         </div>
       </PageLayout>
@@ -1126,14 +1165,16 @@ export default function Admin() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
           <Shield size={22} color="#6b7280" />
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>Admin Panel</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700 }}>
+            {isGlobalAdmin ? 'Admin Panel' : 'Team Admin'}
+          </h1>
         </div>
 
         {/* Tab bar */}
         <div style={{
           display: 'flex', gap: 0, borderBottom: '1px solid #e5e7eb', marginBottom: 24,
         }}>
-          {TABS.map(tab => {
+          {visibleTabs.map(tab => {
             const Icon = tab.icon
             const isActive = activeTab === tab.key
             return (
@@ -1162,7 +1203,7 @@ export default function Admin() {
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'teams' && <TeamsTab />}
         {activeTab === 'workflows' && <WorkflowsTab />}
-        {activeTab === 'config' && <ConfigTab />}
+        {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
       </div>
     </PageLayout>
   )

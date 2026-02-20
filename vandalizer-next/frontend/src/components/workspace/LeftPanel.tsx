@@ -7,7 +7,7 @@ import { GlobalSearch } from '../files/GlobalSearch'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids } = useWorkspace()
+  const { setSelectedDocUuids, highlightTerms } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{ uuid: string; title: string } | null>(null)
   const [showRawText, setShowRawText] = useState(false)
 
@@ -73,7 +73,7 @@ export function LeftPanel() {
       {/* Content area */}
       {viewingDoc ? (
         <div style={{ height: 'calc(100% - 50px)' }}>
-          <DocumentViewer docUuid={viewingDoc.uuid} />
+          <DocumentViewer docUuid={viewingDoc.uuid} highlightTerms={highlightTerms} />
         </div>
       ) : (
         <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>

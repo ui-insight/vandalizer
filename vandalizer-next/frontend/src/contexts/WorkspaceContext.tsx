@@ -10,7 +10,7 @@ interface WorkspaceContextValue {
   railDocked: boolean
   toggleRailDocked: () => void
   panelSplit: number
-  setPanelSplit: (pct: number) => void
+  setPanelSplit: (pct: number, skipPersist?: boolean) => void
   /** Load a conversation by its activity ID in the assistant tab */
   loadConversationId: string | null
   setLoadConversationId: (id: string | null) => void
@@ -29,6 +29,12 @@ interface WorkspaceContextValue {
   pendingChatMessage: string | null
   sendChatMessage: (message: string) => void
   clearPendingChatMessage: () => void
+  /** Terms to highlight in the PDF viewer */
+  highlightTerms: string[]
+  setHighlightTerms: (terms: string[]) => void
+  /** Bumped to signal the activity rail to re-fetch */
+  activitySignal: number
+  bumpActivitySignal: () => void
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -64,6 +70,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [openWorkflowId, setOpenWorkflowId] = useState<string | null>(null)
   const [openExtractionId, setOpenExtractionId] = useState<string | null>(null)
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null)
+  const [highlightTerms, setHighlightTerms] = useState<string[]>([])
+  const [activitySignal, setActivitySignal] = useState(0)
+
+  const bumpActivitySignal = useCallback(() => {
+    setActivitySignal(prev => prev + 1)
+  }, [])
 
   const sendChatMessage = useCallback((message: string) => {
     setOpenWorkflowId(null)
@@ -109,10 +121,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const setPanelSplit = useCallback((pct: number) => {
+  const setPanelSplit = useCallback((pct: number, skipPersist?: boolean) => {
     const clamped = Math.min(80, Math.max(20, pct))
     _setPanelSplit(clamped)
-    localStorage.setItem('workspace:panelSplit', String(clamped))
+    if (!skipPersist) {
+      localStorage.setItem('workspace:panelSplit', String(clamped))
+    }
   }, [])
 
   return (
@@ -139,6 +153,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         pendingChatMessage,
         sendChatMessage,
         clearPendingChatMessage,
+        highlightTerms,
+        setHighlightTerms,
+        activitySignal,
+        bumpActivitySignal,
       }}
     >
       {children}

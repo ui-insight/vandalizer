@@ -1,12 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { User, Users, Settings, LogOut, IdCard } from 'lucide-react'
+import { User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -81,6 +81,36 @@ export function TeamsDropdown() {
             <IdCard className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>My Account</span>
           </Link>
+
+          {/* Admin: System Configuration */}
+          {user?.is_admin && (
+            <>
+              <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
+              <Link
+                to="/admin"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+              >
+                <Shield className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                <span>System Configuration</span>
+              </Link>
+            </>
+          )}
+
+          {/* Examiner: Verification Management */}
+          {user?.is_examiner && (
+            <>
+              {!user?.is_admin && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
+              <Link
+                to="/verification"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+              >
+                <ClipboardCheck className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                <span>Verification Management</span>
+              </Link>
+            </>
+          )}
 
           {/* Divider */}
           <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />

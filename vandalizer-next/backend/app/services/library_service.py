@@ -1,4 +1,4 @@
-"""Library CRUD service — libraries, items, folders, clone/fork, search."""
+"""Library CRUD service  - libraries, items, folders, clone/fork, search."""
 
 import datetime
 import uuid as uuid_mod

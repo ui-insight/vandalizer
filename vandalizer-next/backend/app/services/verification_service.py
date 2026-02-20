@@ -1,4 +1,4 @@
-"""Verification queue service — submit, review, approve, reject."""
+"""Verification queue service  - submit, review, approve, reject."""
 
 import datetime
 from typing import Optional

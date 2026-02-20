@@ -6,9 +6,11 @@ from app.utils.security import hash_password, verify_password
 
 
 async def authenticate(user_id: str, password: str) -> User | None:
-    user = await User.find_one(User.user_id == user_id)
+    # Normalize to lowercase to match Flask's normalize_identity behavior
+    normalized = user_id.strip().lower()
+    user = await User.find_one(User.user_id == normalized)
     if not user:
-        user = await User.find_one(User.email == user_id)
+        user = await User.find_one(User.email == normalized)
     if not user or not user.password_hash:
         return None
     if not verify_password(password, user.password_hash):
@@ -77,6 +79,10 @@ async def resolve_oauth_user(
 
 
 async def register(user_id: str, email: str, password: str, name: str | None = None) -> User:
+    # Normalize to lowercase to match Flask behavior
+    user_id = user_id.strip().lower()
+    email = email.strip().lower()
+
     existing = await User.find_one(User.user_id == user_id)
     if existing:
         raise ValueError("User ID already taken")
