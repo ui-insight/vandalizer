@@ -16,6 +16,66 @@ async def authenticate(user_id: str, password: str) -> User | None:
     return user
 
 
+async def resolve_oauth_user(
+    user_principal_name: str,
+    email: str | None,
+    display_name: str | None,
+) -> User:
+    """Find or create a user from OAuth claims.
+
+    Lookup priority: user_id == upn, then email == mail, then user_id == mail.
+    If not found, creates an OAuth-only user (password_hash=None) with a personal team.
+    """
+    user = await User.find_one(User.user_id == user_principal_name)
+    if not user and email:
+        user = await User.find_one(User.email == email)
+    if not user and email:
+        user = await User.find_one(User.user_id == email)
+
+    if user:
+        # Update name/email if changed
+        changed = False
+        if display_name and user.name != display_name:
+            user.name = display_name
+            changed = True
+        if email and user.email != email:
+            user.email = email
+            changed = True
+        if changed:
+            await user.save()
+        return user
+
+    # Create new OAuth-only user
+    uid = user_principal_name
+    user = User(
+        user_id=uid,
+        email=email or uid,
+        password_hash=None,
+        name=display_name or uid,
+    )
+    await user.insert()
+
+    team_uuid = uuid.uuid4().hex
+    team = Team(
+        uuid=team_uuid,
+        name=f"{uid}'s Team",
+        owner_user_id=uid,
+    )
+    await team.insert()
+
+    membership = TeamMembership(
+        team=team.id,
+        user_id=uid,
+        role="owner",
+    )
+    await membership.insert()
+
+    user.current_team = team.id
+    await user.save()
+
+    return user
+
+
 async def register(user_id: str, email: str, password: str, name: str | None = None) -> User:
     existing = await User.find_one(User.user_id == user_id)
     if existing:

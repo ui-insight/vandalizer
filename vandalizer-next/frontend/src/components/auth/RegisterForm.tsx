@@ -3,9 +3,8 @@ import { useAuth } from '../../hooks/useAuth'
 
 export function RegisterForm() {
   const { register } = useAuth()
-  const [userId, setUserId] = useState('')
-  const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +14,8 @@ export function RegisterForm() {
     setError('')
     setLoading(true)
     try {
-      await register(userId, email, password, name || undefined)
+      // user_id = email, matching Flask behavior
+      await register(email, email, password, name || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -29,15 +29,14 @@ export function RegisterForm() {
         <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
       )}
       <div>
-        <label htmlFor="userId" className="block text-sm font-medium text-gray-700">
-          Username
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+          Name
         </label>
         <input
-          id="userId"
+          id="name"
           type="text"
-          required
-          value={userId}
-          onChange={(e) => setUserId(e.target.value)}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
         />
       </div>
@@ -51,18 +50,6 @@ export function RegisterForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
-        />
-      </div>
-      <div>
-        <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-          Name (optional)
-        </label>
-        <input
-          id="name"
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
           className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
         />
       </div>

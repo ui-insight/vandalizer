@@ -3,14 +3,14 @@ import {
   createRootRoute,
   createRoute,
   createRouter,
+  Navigate,
   Outlet,
 } from '@tanstack/react-router'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
-import { Login } from './pages/Login'
-import { Register } from './pages/Register'
 import { Workspace } from './pages/Workspace'
 import { TeamSettings } from './pages/TeamSettings'
 
+const Landing = lazy(() => import('./pages/Landing'))
 const Workflows = lazy(() => import('./pages/Workflows'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'))
 const Library = lazy(() => import('./pages/Library'))
@@ -34,16 +34,25 @@ const rootRoute = createRootRoute({
   ),
 })
 
+const landingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/landing',
+  validateSearch: (search: Record<string, unknown>) => ({
+    error: (search.error as string) || undefined,
+  }),
+  component: Landing,
+})
+
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: Login,
+  component: () => <Navigate to="/landing" />,
 })
 
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
-  component: Register,
+  component: () => <Navigate to="/landing" />,
 })
 
 const indexRoute = createRoute({
@@ -171,6 +180,7 @@ const spacesRoute = createRoute({
 })
 
 const routeTree = rootRoute.addChildren([
+  landingRoute,
   loginRoute,
   registerRoute,
   indexRoute,

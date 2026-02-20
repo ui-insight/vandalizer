@@ -1,6 +1,33 @@
 import { apiFetch } from './client'
 import type { User } from '../types/user'
 
+// ---------------------------------------------------------------------------
+// Auth config (public, pre-login)
+// ---------------------------------------------------------------------------
+
+export interface OAuthProvider {
+  provider: string
+  display_name: string
+  configured: boolean
+}
+
+export interface AuthConfig {
+  auth_methods: string[]
+  oauth_providers: OAuthProvider[]
+}
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const res = await fetch('/api/auth/config')
+  if (!res.ok) {
+    return { auth_methods: ['password'], oauth_providers: [] }
+  }
+  return res.json()
+}
+
+// ---------------------------------------------------------------------------
+// Password auth
+// ---------------------------------------------------------------------------
+
 export function login(user_id: string, password: string) {
   return apiFetch<User>('/api/auth/login', {
     method: 'POST',
