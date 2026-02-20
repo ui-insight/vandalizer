@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
   Shield, BarChart3, Users, Building2, Workflow, Settings,
-  Palette, Cpu, Lock, Globe, Plus, Trash2, ChevronLeft,
+  Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
   ChevronRight, RefreshCw, MessageSquare, Search, Zap,
   CheckCircle2, XCircle, Clock, UserCircle,
 } from 'lucide-react'
@@ -13,7 +13,7 @@ import type { ThemeConfig } from '../api/config'
 import {
   getUsageStats, getUserLeaderboard, getTeamLeaderboard,
   getWorkflowEvents, getSystemConfig, updateSystemConfig,
-  addModel, deleteModel, addOAuthProvider, updateOAuthProvider,
+  addModel, updateModel, deleteModel, addOAuthProvider, updateOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
 } from '../api/admin'
 import type {
@@ -492,15 +492,15 @@ function ConfigTab() {
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
-  const [llmEndpoint, setLlmEndpoint] = useState('')
 
   // Auth
   const [authMethods, setAuthMethods] = useState<string[]>(['password'])
   const [authSaving, setAuthSaving] = useState(false)
 
-  // Add model form
-  const [showAddModel, setShowAddModel] = useState(false)
-  const [addingModel, setAddingModel] = useState(false)
+  // Add/edit model form
+  const [showModelForm, setShowModelForm] = useState(false)
+  const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
+  const [savingModel, setSavingModel] = useState(false)
   const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
 
   // Add provider form
@@ -514,7 +514,6 @@ function ConfigTab() {
       setThemeColor(c.highlight_color || '#eab308')
       setThemeRadius(parseInt(c.ui_radius) || 12)
       setOcrEndpoint(c.ocr_endpoint || '')
-      setLlmEndpoint(c.llm_endpoint || '')
       setAuthMethods(c.auth_methods || ['password'])
       // Extraction config
       const ec = c.extraction_config || {}
@@ -553,7 +552,6 @@ function ConfigTab() {
           repetition: { enabled: repetitionEnabled },
         },
         ocr_endpoint: ocrEndpoint,
-        llm_endpoint: llmEndpoint,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -577,7 +575,7 @@ function ConfigTab() {
     }
   }
 
-  const handleAddModel = async () => {
+  const handleSaveModel = async () => {
     if (!newModel.name.trim()) {
       setError('Model name is required')
       return
@@ -586,18 +584,40 @@ function ConfigTab() {
       setError('Tag is required')
       return
     }
-    setAddingModel(true)
+    setSavingModel(true)
     setError(null)
     try {
-      const res = await addModel(newModel)
+      let res
+      if (editingModelIndex !== null) {
+        res = await updateModel(editingModelIndex, newModel)
+      } else {
+        res = await addModel(newModel)
+      }
       if (cfg) setCfg({ ...cfg, available_models: res.models })
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '' })
-      setShowAddModel(false)
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
+      setShowModelForm(false)
+      setEditingModelIndex(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add model')
+      setError(e instanceof Error ? e.message : 'Failed to save model')
     } finally {
-      setAddingModel(false)
+      setSavingModel(false)
     }
+  }
+
+  const handleEditModel = (index: number) => {
+    const m = cfg?.available_models[index]
+    if (!m) return
+    setNewModel({
+      name: m.name,
+      tag: m.tag,
+      external: m.external,
+      thinking: m.thinking,
+      endpoint: m.endpoint || '',
+      api_protocol: m.api_protocol || '',
+      api_key: m.api_key || '',
+    })
+    setEditingModelIndex(index)
+    setShowModelForm(true)
   }
 
   const handleDeleteModel = async (index: number) => {
@@ -767,21 +787,12 @@ function ConfigTab() {
           <Globe size={18} color="#6b7280" /> Endpoints
         </div>
         <div style={sectionBodyStyle}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
-            <div>
-              <label style={labelStyle}>OCR Endpoint</label>
-              <input
-                type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
-                placeholder="https://..." style={inputStyle}
-              />
-            </div>
-            <div>
-              <label style={labelStyle}>LLM Endpoint</label>
-              <input
-                type="url" value={llmEndpoint} onChange={e => setLlmEndpoint(e.target.value)}
-                placeholder="https://..." style={inputStyle}
-              />
-            </div>
+          <div>
+            <label style={labelStyle}>OCR Endpoint</label>
+            <input
+              type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
+              placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
+            />
           </div>
         </div>
       </div>
@@ -955,7 +966,11 @@ function ConfigTab() {
           <Cpu size={18} color="#6b7280" /> Available Models
           <div style={{ flex: 1 }} />
           <button
-            onClick={() => setShowAddModel(!showAddModel)}
+            onClick={() => {
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
+              setEditingModelIndex(null)
+              setShowModelForm(!showModelForm)
+            }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
               borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
@@ -993,12 +1008,22 @@ function ConfigTab() {
                       <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleDeleteModel(i)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      onClick={() => handleEditModel(i)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                      title="Edit model"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteModel(i)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                      title="Delete model"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1006,9 +1031,9 @@ function ConfigTab() {
             <div style={{ fontSize: 13, color: '#9ca3af' }}>No models configured.</div>
           )}
 
-          {showAddModel && (
+          {showModelForm && (
             <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>New Model</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingModelIndex !== null ? 'Edit Model' : 'New Model'}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
                   <label style={labelStyle}>Model Name</label>
@@ -1053,18 +1078,18 @@ function ConfigTab() {
               )}
               <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button
-                  onClick={handleAddModel}
-                  disabled={addingModel}
+                  onClick={handleSaveModel}
+                  disabled={savingModel}
                   style={{
                     padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                     background: 'var(--highlight-color, #eab308)', color: '#000', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    opacity: addingModel ? 0.6 : 1,
+                    opacity: savingModel ? 0.6 : 1,
                   }}
                 >
-                  {addingModel ? 'Adding...' : 'Add Model'}
+                  {savingModel ? 'Saving...' : editingModelIndex !== null ? 'Save Changes' : 'Add Model'}
                 </button>
                 <button
-                  onClick={() => setShowAddModel(false)}
+                  onClick={() => { setShowModelForm(false); setEditingModelIndex(null) }}
                   style={{
                     padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
                     background: '#fff', fontSize: 13, cursor: 'pointer',

@@ -47,6 +47,7 @@ class LibraryItemResponse(BaseModel):
     verified: bool = False
     added_by_user_id: str
     created_at: Optional[str] = None
+    last_used_at: Optional[str] = None
 
 
 class AddItemRequest(BaseModel):

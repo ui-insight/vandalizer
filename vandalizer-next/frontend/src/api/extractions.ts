@@ -47,8 +47,24 @@ export function listItems(searchSetUuid: string) {
   return apiFetch<SearchSetItem[]>(`/api/extractions/search-sets/${searchSetUuid}/items`)
 }
 
+export function updateItem(itemId: string, data: { searchphrase?: string; title?: string }) {
+  return apiFetch<SearchSetItem>(`/api/extractions/items/${itemId}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
 export function deleteItem(itemId: string) {
   return apiFetch<{ ok: boolean }>(`/api/extractions/items/${itemId}`, { method: 'DELETE' })
+}
+
+// Build from document (AI field generation)
+
+export function buildFromDocument(searchSetUuid: string, documentUuids: string[], model?: string) {
+  return apiFetch<{ entities: string[] }>(`/api/extractions/search-sets/${searchSetUuid}/build-from-document`, {
+    method: 'POST',
+    body: JSON.stringify({ document_uuids: documentUuids, model }),
+  })
 }
 
 // Run extraction

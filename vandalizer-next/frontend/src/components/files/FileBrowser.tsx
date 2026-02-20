@@ -28,7 +28,17 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
   const [currentFolder, setCurrentFolder] = useState<string | null>(null)
   const { documents, folders, loading, refresh } = useDocuments(space, currentFolder, currentTeam?.uuid)
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
-  const { uploads, upload } = useUpload(space, currentFolder, refresh)
+  const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(space, currentFolder, refresh)
+
+  // Auto-open the first document after upload
+  useEffect(() => {
+    if (!lastUploadedUuid || documents.length === 0) return
+    const doc = documents.find(d => d.uuid === lastUploadedUuid)
+    if (doc) {
+      onDocClick?.(doc)
+      clearLastUploaded()
+    }
+  }, [lastUploadedUuid, documents, onDocClick, clearLastUploaded])
 
   // Bulk selection
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set())

@@ -6,6 +6,7 @@ import {
   Copy,
   Share2,
   Trash2,
+  Pencil,
 } from 'lucide-react'
 import type { LibraryItem } from '../../types/library'
 
@@ -18,9 +19,10 @@ interface Props {
   onShare: (id: string) => void
   onRemove: (id: string) => void
   onOpen?: (item: LibraryItem) => void
+  onEdit?: (item: LibraryItem) => void
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen }: Props) {
+export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit }: Props) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -105,9 +107,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
         )}
       </div>
 
-      {/* Added column */}
+      {/* Last used column */}
       <div style={{ fontSize: 12, color: '#9aa0a6', overflow: 'hidden', paddingRight: 16 }}>
-        {item.created_at ? relativeTime(item.created_at) : 'Unknown'}
+        {item.last_used_at ? relativeTime(item.last_used_at) : item.created_at ? relativeTime(item.created_at) : 'Never'}
       </div>
 
       {/* Actions column */}
@@ -226,6 +228,16 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   setMenuOpen(false)
                 }}
               />
+              {onEdit && (item.set_type === 'prompt' || item.set_type === 'formatter') && (
+                <MenuItem
+                  icon={<Pencil size={14} />}
+                  label="Edit"
+                  onClick={() => {
+                    onEdit(item)
+                    setMenuOpen(false)
+                  }}
+                />
+              )}
               <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
               {scope === 'mine' ? (
                 <>

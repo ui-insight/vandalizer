@@ -47,6 +47,7 @@ class LibraryItem(Document):
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )
+    last_used_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "library_item"

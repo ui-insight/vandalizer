@@ -11,16 +11,38 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 interface DocumentViewerProps {
   docUuid: string
   highlightTerms?: string[]
+  processing?: boolean
+  taskStatus?: string | null
 }
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 const HIGHLIGHT_COLOR = '#eab308'
 
-export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerProps) {
+const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
+  layout: {
+    title: 'Converting & Preparing Your Document...',
+    message: "We're converting your document so it can be read and analyzed accurately.",
+  },
+  ocr: {
+    title: 'Extracting Text From Your Document...',
+    message: 'Running OCR to extract text content from your document.',
+  },
+  security: {
+    title: 'Scanning Your Document for Security...',
+    message: "Please hang tight — we're checking for any sensitive information.",
+  },
+  readying: {
+    title: 'Preparing Your Document...',
+    message: 'Almost done — indexing your document for search and analysis.',
+  },
+}
+
+export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskStatus }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
-  const [isPdf, setIsPdf] = useState(true)
+  const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
+  const pdfDataRef = useRef<ArrayBuffer | null>(null)
   const renderingRef = useRef(false)
   const [totalHighlights, setTotalHighlights] = useState(0)
   const [currentHighlight, setCurrentHighlight] = useState(0)
@@ -28,36 +50,50 @@ export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerP
   const zoomLevel = ZOOM_LEVELS[zoom]
   const url = downloadFileUrl(docUuid)
 
-  // Detect PDF by fetching headers
+  // Fetch PDF data with credentials and detect content type
   useEffect(() => {
     let cancelled = false
-    fetch(url, { method: 'HEAD' }).then(resp => {
-      if (cancelled) return
-      const ct = resp.headers.get('content-type') || ''
-      setIsPdf(ct.includes('pdf'))
-    }).catch(() => {
-      if (!cancelled) setIsPdf(false)
-    })
+    setIsPdf(null)
+    pdfDataRef.current = null
+
+    fetch(url, { credentials: 'include' })
+      .then(async (resp) => {
+        if (cancelled) return
+        const ct = resp.headers.get('content-type') || ''
+        if (ct.includes('pdf')) {
+          const data = await resp.arrayBuffer()
+          if (cancelled) return
+          pdfDataRef.current = data
+          setIsPdf(true)
+        } else {
+          setIsPdf(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setIsPdf(false)
+      })
+
     return () => { cancelled = true }
   }, [url])
 
-  // Load PDF document
+  // Load PDF document from fetched data
   useEffect(() => {
-    if (!isPdf) return
+    if (isPdf !== true || !pdfDataRef.current) return
     let cancelled = false
 
-    const loadTask = pdfjsLib.getDocument(url)
-    loadTask.promise.then(doc => {
-      if (cancelled) {
-        doc.destroy()
-        return
-      }
-      pdfDocRef.current = doc
-      renderAllPages(doc)
-    }).catch(() => {
-      // If PDF loading fails, fall back to iframe
-      if (!cancelled) setIsPdf(false)
-    })
+    const loadTask = pdfjsLib.getDocument({ data: pdfDataRef.current.slice(0) })
+    loadTask.promise
+      .then((doc) => {
+        if (cancelled) {
+          doc.destroy()
+          return
+        }
+        pdfDocRef.current = doc
+        renderAllPages(doc)
+      })
+      .catch(() => {
+        if (!cancelled) setIsPdf(false)
+      })
 
     return () => {
       cancelled = true
@@ -68,18 +104,18 @@ export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerP
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [url, isPdf])
+  }, [isPdf])
 
   // Re-render pages when zoom changes
   useEffect(() => {
-    if (!isPdf || !pdfDocRef.current) return
+    if (isPdf !== true || !pdfDocRef.current) return
     renderAllPages(pdfDocRef.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoomLevel])
 
   // Re-apply highlights when terms change
   useEffect(() => {
-    if (!isPdf || !pdfDocRef.current) return
+    if (isPdf !== true || !pdfDocRef.current) return
     applyHighlights(pdfDocRef.current, highlightTerms)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightTerms])
@@ -97,9 +133,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerP
 
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i)
-      const unscaled = page.getViewport({ scale: 1 })
-      const scale = zoomLevel
-      const viewport = page.getViewport({ scale })
+      const viewport = page.getViewport({ scale: zoomLevel })
 
       // Page wrapper
       const wrapper = document.createElement('div')
@@ -273,10 +307,82 @@ export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerP
     fontSize: 13, fontWeight: 500,
   }
 
+  // Processing overlay - shown when document is still being processed
+  const processingOverlay = processing ? (
+    <div style={{
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 50,
+      display: 'flex',
+      justifyContent: 'center',
+      padding: '20px 24px',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: 420,
+        padding: '20px 24px',
+        borderRadius: 'var(--ui-radius, 12px)',
+        background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
+        color: '#fff',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
+              {STATUS_MESSAGES[taskStatus || '']?.title || 'Processing Your Document...'}
+            </div>
+            <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
+              {STATUS_MESSAGES[taskStatus || '']?.message || 'Please wait while we prepare your document.'}
+            </div>
+          </div>
+        </div>
+        {/* Progress bar */}
+        <div style={{
+          marginTop: 14,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: 'rgba(255,255,255,0.2)',
+          overflow: 'hidden',
+        }}>
+          <div
+            className="animate-pulse"
+            style={{
+              height: '100%',
+              borderRadius: 2,
+              backgroundColor: 'rgba(255,255,255,0.7)',
+              width: taskStatus === 'layout' ? '20%'
+                : taskStatus === 'ocr' ? '45%'
+                : taskStatus === 'security' ? '65%'
+                : taskStatus === 'readying' ? '85%'
+                : '10%',
+              transition: 'width 0.5s ease',
+            }}
+          />
+        </div>
+      </div>
+    </div>
+  ) : null
+
+  // Loading state
+  if (isPdf === null) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {processingOverlay}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#525659' }}>
+          <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
+        </div>
+      </div>
+    )
+  }
+
   // Non-PDF fallback: iframe
   if (!isPdf) {
     return (
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {processingOverlay}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
           padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
@@ -320,6 +426,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [] }: DocumentViewerP
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {processingOverlay}
+
       {/* Toolbar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

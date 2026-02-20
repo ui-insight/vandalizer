@@ -36,6 +36,14 @@ async def upload(
     return result
 
 
+MEDIA_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xls": "application/vnd.ms-excel",
+}
+
+
 @router.get("/download")
 async def download(
     docid: str,
@@ -45,7 +53,13 @@ async def download(
     path = await file_service.download_document(docid, settings)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path, filename=path.name)
+    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return FileResponse(
+        path,
+        filename=path.name,
+        media_type=media_type,
+        content_disposition_type="inline",
+    )
 
 
 @router.delete("/{doc_uuid}")

@@ -8,6 +8,7 @@ import {
   cloneSearchSet,
   deleteSearchSet,
   runExtractionSync,
+  buildFromDocument,
 } from '../../api/extractions'
 import { getModels } from '../../api/config'
 import { submitRating } from '../../api/feedback'
@@ -125,6 +126,19 @@ export function ExtractionEditorPanel() {
     if (!openExtractionId) return
     await deleteSearchSet(openExtractionId)
     closeExtraction()
+  }
+
+  const [buildingFromDoc, setBuildingFromDoc] = useState(false)
+  const handleBuildFromDocument = async () => {
+    if (!openExtractionId || selectedDocUuids.length === 0) return
+    setBuildingFromDoc(true)
+    try {
+      await buildFromDocument(openExtractionId, selectedDocUuids)
+      refreshItems()
+      setActiveTab('design')
+    } finally {
+      setBuildingFromDoc(false)
+    }
   }
 
   // --- Advanced config ---
@@ -309,6 +323,9 @@ export function ExtractionEditorPanel() {
             onClone={handleClone}
             onDelete={handleDelete}
             onAddToLibrary={() => setShowAddToLibrary(true)}
+            onBuildFromDocument={handleBuildFromDocument}
+            buildingFromDoc={buildingFromDoc}
+            hasDocuments={selectedDocUuids.length > 0}
           />
         )}
         {activeTab === 'advanced' && (
@@ -724,10 +741,16 @@ function ToolsTab({
   onClone,
   onDelete,
   onAddToLibrary,
+  onBuildFromDocument,
+  buildingFromDoc,
+  hasDocuments,
 }: {
   onClone: () => void
   onDelete: () => void
   onAddToLibrary: () => void
+  onBuildFromDocument: () => void
+  buildingFromDoc: boolean
+  hasDocuments: boolean
 }) {
   return (
     <div style={{ padding: 24 }}>
@@ -740,11 +763,14 @@ function ToolsTab({
       >
         {/* From Document */}
         <ToolCard
-          title="From Document"
-          description="Build extraction from a selected document using AI"
-          onClick={() => {
-            alert('AI-powered field generation from documents is coming soon. For now, add fields manually in the Fields tab.')
-          }}
+          title={buildingFromDoc ? 'Building...' : 'From Document'}
+          description={
+            !hasDocuments
+              ? 'Select a document first, then use AI to generate extraction fields'
+              : 'Build extraction from a selected document using AI'
+          }
+          onClick={onBuildFromDocument}
+          disabled={buildingFromDoc || !hasDocuments}
         />
         {/* Clone */}
         <ToolCard

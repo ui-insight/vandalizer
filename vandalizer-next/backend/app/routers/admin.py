@@ -453,6 +453,38 @@ async def add_model(
 
 
 # ---------------------------------------------------------------------------
+# 7b. PUT /config/models/{index}  - Update an existing model
+# ---------------------------------------------------------------------------
+
+@router.put("/config/models/{index}")
+async def update_model(
+    index: int,
+    body: ModelAddRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+
+    cfg = await SystemConfig.get_config()
+    if index < 0 or index >= len(cfg.available_models):
+        raise HTTPException(status_code=404, detail="Model index out of range")
+
+    cfg.available_models[index] = {
+        "name": body.name,
+        "tag": body.tag,
+        "external": body.external,
+        "thinking": body.thinking,
+        "endpoint": body.endpoint or "",
+        "api_protocol": body.api_protocol or "",
+        "api_key": body.api_key or "",
+    }
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+
+    return {"status": "ok", "models": cfg.available_models}
+
+
+# ---------------------------------------------------------------------------
 # 8. DELETE /config/models/{index}  - Remove a model by index
 # ---------------------------------------------------------------------------
 

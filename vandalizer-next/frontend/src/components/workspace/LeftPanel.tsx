@@ -1,15 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { ArrowLeft, FileText } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { RawTextModal } from '../files/RawTextModal'
 import { GlobalSearch } from '../files/GlobalSearch'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { pollStatus } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, highlightTerms } = useWorkspace()
-  const [viewingDoc, setViewingDoc] = useState<{ uuid: string; title: string } | null>(null)
+  const { setSelectedDocUuids, highlightTerms, setProcessingDoc } = useWorkspace()
+  const [viewingDoc, setViewingDoc] = useState<{
+    uuid: string
+    title: string
+    processing?: boolean
+    taskStatus?: string | null
+  } | null>(null)
   const [showRawText, setShowRawText] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  // Sync processing state to workspace context so ChatPanel can show it
+  useEffect(() => {
+    if (viewingDoc?.processing) {
+      setProcessingDoc({ title: viewingDoc.title, status: viewingDoc.taskStatus ?? null })
+    } else {
+      setProcessingDoc(null)
+    }
+  }, [viewingDoc?.processing, viewingDoc?.taskStatus, viewingDoc?.title, setProcessingDoc])
+
+  // Poll processing status for the currently viewed document
+  const checkStatus = useCallback(async () => {
+    if (!viewingDoc?.processing) return
+    try {
+      const status = await pollStatus(viewingDoc.uuid)
+      if (status.complete) {
+        setViewingDoc(prev => prev ? { ...prev, processing: false, taskStatus: 'complete' } : prev)
+      } else if (status.status !== viewingDoc.taskStatus) {
+        setViewingDoc(prev => prev ? { ...prev, taskStatus: status.status } : prev)
+      }
+    } catch {
+      // ignore poll errors
+    }
+  }, [viewingDoc?.uuid, viewingDoc?.processing, viewingDoc?.taskStatus])
+
+  useEffect(() => {
+    if (!viewingDoc?.processing) {
+      if (pollRef.current) clearInterval(pollRef.current)
+      return
+    }
+    // Poll immediately, then every 3 seconds
+    checkStatus()
+    pollRef.current = setInterval(checkStatus, 3000)
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [viewingDoc?.processing, checkStatus])
 
   return (
     <div className="h-full overflow-hidden bg-panel-bg relative">
@@ -73,13 +117,23 @@ export function LeftPanel() {
       {/* Content area */}
       {viewingDoc ? (
         <div style={{ height: 'calc(100% - 50px)' }}>
-          <DocumentViewer docUuid={viewingDoc.uuid} highlightTerms={highlightTerms} />
+          <DocumentViewer
+            docUuid={viewingDoc.uuid}
+            highlightTerms={highlightTerms}
+            processing={viewingDoc.processing}
+            taskStatus={viewingDoc.taskStatus}
+          />
         </div>
       ) : (
         <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
           <FileBrowser
             onDocClick={(doc) => {
-              setViewingDoc({ uuid: doc.uuid, title: doc.title })
+              setViewingDoc({
+                uuid: doc.uuid,
+                title: doc.title,
+                processing: doc.processing,
+                taskStatus: doc.task_status,
+              })
               setSelectedDocUuids([doc.uuid])
             }}
           />

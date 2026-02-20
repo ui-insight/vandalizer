@@ -145,10 +145,11 @@ export function ChatInput({
           <div ref={addMenuRef} className="relative">
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
-              className="flex items-center gap-1 rounded-[30px] bg-[#2980b9] border-2 border-[#2980b9] px-2.5 py-1 text-xs font-bold text-white hover:brightness-90 transition-all"
+              className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
               Add
+              <ChevronDown className="h-3 w-3" />
             </button>
 
             {showAddMenu && (

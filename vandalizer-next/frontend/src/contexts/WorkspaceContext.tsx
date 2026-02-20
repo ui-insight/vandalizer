@@ -35,6 +35,9 @@ interface WorkspaceContextValue {
   /** Bumped to signal the activity rail to re-fetch */
   activitySignal: number
   bumpActivitySignal: () => void
+  /** Track document currently being processed (shown in chat panel) */
+  processingDoc: { title: string; status: string | null } | null
+  setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -72,6 +75,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
+  const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
 
   const bumpActivitySignal = useCallback(() => {
     setActivitySignal(prev => prev + 1)
@@ -157,6 +161,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setHighlightTerms,
         activitySignal,
         bumpActivitySignal,
+        processingDoc,
+        setProcessingDoc,
       }}
     >
       {children}

@@ -125,6 +125,13 @@ async def update_item(
     return LibraryItemResponse(**item)
 
 
+@router.post("/items/{item_id}/touch")
+async def touch_item(item_id: str, user: User = Depends(get_current_user)):
+    """Record that a library item was just used."""
+    await svc.touch_item(item_id)
+    return {"ok": True}
+
+
 @router.delete("/{library_id}/items/{item_id}")
 async def remove_item(
     library_id: str,

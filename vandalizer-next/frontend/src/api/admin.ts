@@ -109,6 +109,13 @@ export function addModel(data: { name: string; tag: string; external?: boolean; 
   })
 }
 
+export function updateModel(index: number, data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string }) {
+  return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${index}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
 export function deleteModel(index: number) {
   return apiFetch<{ status: string }>(`/api/admin/config/models/${index}`, { method: 'DELETE' })
 }

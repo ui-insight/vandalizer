@@ -18,6 +18,30 @@ from app.models.team import Team
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 
 
+async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
+    """Resolve a team identifier (ObjectId string or UUID) to a PydanticObjectId.
+
+    The Flask app stores team UUIDs (32-char hex) in some fields while Beanie
+    expects 24-char BSON ObjectIds.  This helper tries both lookups.
+    """
+    # Try as a BSON ObjectId first (24-char hex)
+    if len(team_id) == 24:
+        try:
+            oid = PydanticObjectId(team_id)
+            team = await Team.get(oid)
+            if team:
+                return oid
+        except Exception:
+            pass
+
+    # Fall back to UUID lookup
+    team = await Team.find_one(Team.uuid == team_id)
+    if team:
+        return team.id
+
+    raise ValueError(f"Team not found: {team_id}")
+
+
 # ---------------------------------------------------------------------------
 # Library CRUD
 # ---------------------------------------------------------------------------
@@ -43,7 +67,7 @@ async def get_or_create_personal_library(user_id: str) -> Library:
 
 
 async def get_or_create_team_library(user_id: str, team_id: str) -> Library:
-    team_oid = PydanticObjectId(team_id)
+    team_oid = await _resolve_team_oid(team_id)
     lib = await Library.find_one(
         Library.scope == LibraryScope.TEAM,
         Library.team == team_oid,
@@ -188,6 +212,16 @@ async def update_item(
     return await _dereference_item(item)
 
 
+async def touch_item(item_id: str) -> bool:
+    """Update the last_used_at timestamp for a library item."""
+    item = await LibraryItem.get(PydanticObjectId(item_id))
+    if not item:
+        return False
+    item.last_used_at = datetime.datetime.now(datetime.timezone.utc)
+    await item.save()
+    return True
+
+
 async def get_library_items(
     library_id: str,
     user_id: str,
@@ -277,13 +311,14 @@ async def create_folder(
     parent_id: str | None = None,
     team_id: str | None = None,
 ) -> dict:
+    team_oid = await _resolve_team_oid(team_id) if team_id else None
     folder = LibraryFolder(
         uuid=str(uuid_mod.uuid4()),
         name=name,
         parent_id=parent_id,
         scope=LibraryScope(scope),
         owner_user_id=user_id,
-        team=PydanticObjectId(team_id) if team_id else None,
+        team=team_oid,
     )
     await folder.insert()
     return _folder_to_dict(folder)
@@ -332,7 +367,7 @@ async def list_folders(
 ) -> list[dict]:
     query: dict = {"scope": scope, "owner_user_id": user_id}
     if team_id:
-        query["team"] = PydanticObjectId(team_id)
+        query["team"] = await _resolve_team_oid(team_id)
     folders = await LibraryFolder.find(query).to_list()
     return [_folder_to_dict(f) for f in folders]
 
@@ -424,6 +459,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "verified": item.verified,
         "added_by_user_id": item.added_by_user_id,
         "created_at": item.created_at.isoformat() if item.created_at else None,
+        "last_used_at": item.last_used_at.isoformat() if item.last_used_at else None,
     }
 
 

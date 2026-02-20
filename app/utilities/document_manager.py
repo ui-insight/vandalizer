@@ -145,6 +145,9 @@ def perform_extraction_and_update(document_uuid, extension):
 )
 def update_document_fields(document_uuid: str):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug(f"Document with UUID {document_uuid} not found, skipping update.")
+        return
     document.task_id = None
     document.task_status = "complete"
     document.save()
@@ -161,6 +164,9 @@ def cleanup_document(document_uuid: str):
     Delete the document record and its file when validation or ingestion fails.
     """
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug(f"Document with UUID {document_uuid} not found, skipping cleanup.")
+        return
 
     document.task_id = None
     document.task_status = "error"
@@ -176,6 +182,9 @@ def cleanup_document(document_uuid: str):
 )
 def perform_semantic_ingestion(raw_text, document_uuid, user_id):
     document = SmartDocument.objects(uuid=document_uuid).first()
+    if not document:
+        debug(f"Document with UUID {document_uuid} not found, skipping semantic ingestion.")
+        return
     document.task_status = "readying"
     document.save()
     debug(document.path)

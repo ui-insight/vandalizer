@@ -25,13 +25,20 @@ class ChatRole(str, Enum):
 class ChatMessage(Document):
     role: ChatRole
     message: str
+    thinking: Optional[str] = None
+    thinking_duration: Optional[float] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
         name = "chat_message"
 
     def to_dict(self) -> dict:
-        return {"role": self.role.value, "content": self.message}
+        d = {"role": self.role.value, "content": self.message}
+        if self.thinking:
+            d["thinking"] = self.thinking
+        if self.thinking_duration is not None:
+            d["thinking_duration"] = self.thinking_duration
+        return d
 
     def to_model_message(self) -> ModelMessage:
         if self.role == ChatRole.USER:
@@ -98,8 +105,19 @@ class ChatConversation(Document):
     class Settings:
         name = "chat_conversation"
 
-    async def add_message(self, role: ChatRole, content: str) -> ChatMessage:
-        msg = ChatMessage(role=role, message=content)
+    async def add_message(
+        self,
+        role: ChatRole,
+        content: str,
+        thinking: Optional[str] = None,
+        thinking_duration: Optional[float] = None,
+    ) -> ChatMessage:
+        msg = ChatMessage(
+            role=role,
+            message=content,
+            thinking=thinking or None,
+            thinking_duration=thinking_duration,
+        )
         await msg.insert()
         self.messages.append(msg.id)
         self.updated_at = datetime.datetime.now()

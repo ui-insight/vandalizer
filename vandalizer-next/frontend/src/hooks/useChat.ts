@@ -6,6 +6,7 @@ export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
   const [thinkingContent, setThinkingContent] = useState('')
+  const [thinkingDuration, setThinkingDuration] = useState<number | null>(null)
   const [isStreaming, setIsStreaming] = useState(false)
   const [conversationUuid, setConversationUuid] = useState<string | null>(null)
   const [activityId, setActivityId] = useState<string | null>(null)
@@ -13,6 +14,7 @@ export function useChat() {
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
+  const thinkingDurationRef = useRef<number | null>(null)
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string) => {
@@ -20,8 +22,10 @@ export function useChat() {
       setIsStreaming(true)
       setStreamingContent('')
       setThinkingContent('')
+      setThinkingDuration(null)
       streamingRef.current = ''
       thinkingRef.current = ''
+      thinkingDurationRef.current = null
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -39,6 +43,9 @@ export function useChat() {
             } else if (chunk.kind === 'thinking') {
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
+            } else if (chunk.kind === 'thinking_done') {
+              thinkingDurationRef.current = chunk.duration ?? null
+              setThinkingDuration(chunk.duration ?? null)
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
             }
@@ -51,10 +58,17 @@ export function useChat() {
 
         // Add assistant message from accumulated stream
         if (streamingRef.current) {
-          setMessages((prev) => [
-            ...prev,
-            { role: 'assistant', content: streamingRef.current },
-          ])
+          const assistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: streamingRef.current,
+          }
+          if (thinkingRef.current) {
+            assistantMsg.thinking = thinkingRef.current
+            if (thinkingDurationRef.current != null) {
+              assistantMsg.thinking_duration = thinkingDurationRef.current
+            }
+          }
+          setMessages((prev) => [...prev, assistantMsg])
         }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Chat failed')
@@ -62,6 +76,7 @@ export function useChat() {
         setIsStreaming(false)
         setStreamingContent('')
         setThinkingContent('')
+        setThinkingDuration(null)
       }
     },
     [activityId],
@@ -81,6 +96,7 @@ export function useChat() {
     setMessages([])
     setStreamingContent('')
     setThinkingContent('')
+    setThinkingDuration(null)
     setIsStreaming(false)
     setConversationUuid(null)
     setActivityId(null)
@@ -91,6 +107,7 @@ export function useChat() {
     messages,
     streamingContent,
     thinkingContent,
+    thinkingDuration,
     isStreaming,
     conversationUuid,
     activityId,

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.extractions import (
+    BuildFromDocumentRequest,
     CreateSearchSetRequest,
     ExtractionStatusResponse,
     RunExtractionSyncRequest,
@@ -12,6 +13,7 @@ from app.schemas.extractions import (
     SearchSetItemResponse,
     SearchSetResponse,
     UpdateSearchSetRequest,
+    UpdateSearchSetItemRequest,
 )
 from app.services import search_set_service as svc
 
@@ -124,6 +126,17 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
     ]
 
 
+@router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
+async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)):
+    item = await svc.update_item(item_id, searchphrase=req.searchphrase, title=req.title)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return SearchSetItemResponse(
+        id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
+        searchtype=item.searchtype, title=item.title,
+    )
+
+
 @router.delete("/items/{item_id}")
 async def delete_item(item_id: str, user: User = Depends(get_current_user)):
     ok = await svc.delete_item(item_id)
@@ -135,6 +148,21 @@ async def delete_item(item_id: str, user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 # Extraction execution
 # ---------------------------------------------------------------------------
+
+@router.post("/search-sets/{uuid}/build-from-document")
+async def build_from_document(uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)):
+    """Use AI to analyze selected documents and generate extraction fields."""
+    try:
+        entities = await svc.build_from_documents(
+            search_set_uuid=uuid,
+            document_uuids=req.document_uuids,
+            user_id=user.user_id,
+            model=req.model,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"entities": entities}
+
 
 @router.post("/run-sync")
 async def run_extraction_sync(req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):

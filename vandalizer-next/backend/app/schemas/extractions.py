@@ -26,6 +26,16 @@ class SearchSetItemRequest(BaseModel):
     title: Optional[str] = None
 
 
+class UpdateSearchSetItemRequest(BaseModel):
+    searchphrase: Optional[str] = None
+    title: Optional[str] = None
+
+
+class BuildFromDocumentRequest(BaseModel):
+    document_uuids: list[str]
+    model: Optional[str] = None
+
+
 class SearchSetResponse(BaseModel):
     id: str
     title: str

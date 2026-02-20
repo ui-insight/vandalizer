@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileInput } from 'lucide-react'
+import { FileInput, Loader2 } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -20,6 +20,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     messages,
     streamingContent,
     thinkingContent,
+    thinkingDuration,
     isStreaming,
     activityId,
     conversationUuid,
@@ -28,7 +29,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     loadHistory,
   } = useChat()
 
-  const { bumpActivitySignal } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids } = useWorkspace()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -74,13 +75,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
       pendingHandled.current = pendingMessage
-      send(pendingMessage, [])
+      send(pendingMessage, selectedDocUuids)
       onPendingMessageConsumed?.()
     }
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
 
   const handleSend = (message: string) => {
-    send(message, [], selectedModel || undefined)
+    send(message, selectedDocUuids, selectedModel || undefined)
   }
 
   const handleAttachFile = async (files: File[]) => {
@@ -194,22 +195,55 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               />
               <div className="relative z-[1] flex items-center gap-4">
                 <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                  <FileInput className="h-7 w-7 opacity-90" />
+                  {processingDoc ? (
+                    <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
+                  ) : (
+                    <FileInput className="h-7 w-7 opacity-90" />
+                  )}
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    Ready to get started?
+                    {processingDoc
+                      ? processingDoc.status === 'layout' ? 'Converting & Preparing Your Document...'
+                        : processingDoc.status === 'ocr' ? 'Extracting Text From Your Document...'
+                        : processingDoc.status === 'security' ? 'Scanning Your Document...'
+                        : processingDoc.status === 'readying' ? 'Almost Ready...'
+                        : 'Processing Your Document...'
+                      : 'Ready to get started?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    Upload or select one or more documents, or simply ask me a question.
+                    {processingDoc
+                      ? processingDoc.status === 'layout' ? "We're converting your document so it can be read and analyzed accurately."
+                        : processingDoc.status === 'ocr' ? 'Running OCR to extract text content from your document.'
+                        : processingDoc.status === 'security' ? "Checking for any sensitive information in your document."
+                        : processingDoc.status === 'readying' ? 'Indexing your document for search and analysis.'
+                        : 'Please wait while we prepare your document.'
+                      : 'Upload or select one or more documents, or simply ask me a question.'}
                   </div>
                 </div>
               </div>
+              {/* Processing progress bar */}
+              {processingDoc && (
+                <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
+                  <div
+                    className="animate-pulse"
+                    style={{
+                      height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.7)',
+                      width: processingDoc.status === 'layout' ? '20%'
+                        : processingDoc.status === 'ocr' ? '45%'
+                        : processingDoc.status === 'security' ? '65%'
+                        : processingDoc.status === 'readying' ? '85%'
+                        : '10%',
+                      transition: 'width 0.5s ease',
+                    }}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Recommendation chips */}
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(fileAttachments.length > 0 || urlAttachments.length > 0 ? [
+              {(fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 ? [
                 'Summarize this document',
                 'What are the key findings?',
                 'Extract important dates and names',
@@ -252,20 +286,31 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {messages.map((msg, i) => (
-          <ChatMessage key={i} message={msg} messageIndex={i} conversationUuid={conversationUuid || undefined} />
+          <ChatMessage
+            key={i}
+            message={msg}
+            messageIndex={i}
+            conversationUuid={conversationUuid || undefined}
+          />
         ))}
 
-        {/* Streaming content */}
-        {isStreaming && streamingContent && (
-          <ChatMessage message={{ role: 'assistant', content: streamingContent }} />
+        {/* Streaming: thinking-only phase (no text yet) */}
+        {isStreaming && thinkingContent && !streamingContent && (
+          <ChatMessage
+            message={{ role: 'assistant', content: '' }}
+            streamingThinking={thinkingContent}
+            isStreaming
+          />
         )}
 
-        {/* Thinking indicator */}
-        {isStreaming && thinkingContent && (
-          <div className="flex items-center gap-2 py-2 text-xs text-gray-400">
-            <div className="chat-loader" style={{ width: 30 }} />
-            <span className="italic">Thinking...</span>
-          </div>
+        {/* Streaming: text phase (with or without thinking) */}
+        {isStreaming && streamingContent && (
+          <ChatMessage
+            message={{ role: 'assistant', content: streamingContent }}
+            streamingThinking={thinkingContent || undefined}
+            thinkingDuration={thinkingDuration}
+            isStreaming
+          />
         )}
 
         {/* Loading indicator */}
@@ -293,7 +338,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onModelChange={handleModelChange}
         onExport={handleExport}
         hasMessages={messages.length > 0}
-        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0}
+        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0}
       />
     </div>
   )

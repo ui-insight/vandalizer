@@ -72,6 +72,19 @@
   }
 }
 
+/* Thinking trace collapse/expand animation */
+.thinking-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.2s ease-out;
+}
+.thinking-collapse.open {
+  grid-template-rows: 1fr;
+}
+.thinking-collapse > div {
+  overflow: hidden;
+}
+
 /* Chat markdown styles */
 .chat-markdown p { margin: 0 0 0.5em; }
 .chat-markdown p:last-child { margin-bottom: 0; }

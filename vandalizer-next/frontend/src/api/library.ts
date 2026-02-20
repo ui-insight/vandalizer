@@ -43,6 +43,10 @@ export function removeItem(libraryId: string, itemId: string) {
   return apiFetch<{ ok: boolean }>(`/api/library/${libraryId}/items/${itemId}`, { method: 'DELETE' })
 }
 
+export function touchItem(itemId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/library/items/${itemId}/touch`, { method: 'POST' })
+}
+
 // Clone / Share
 
 export function cloneToPersonal(itemId: string) {

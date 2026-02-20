@@ -1,6 +1,8 @@
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant'
   content: string
+  thinking?: string
+  thinking_duration?: number
 }
 
 export interface FileAttachment {
@@ -45,6 +47,7 @@ export interface ActivityEvent {
 }
 
 export interface StreamChunk {
-  kind: 'text' | 'thinking' | 'error'
+  kind: 'text' | 'thinking' | 'thinking_done' | 'error'
   content: string
+  duration?: number
 }

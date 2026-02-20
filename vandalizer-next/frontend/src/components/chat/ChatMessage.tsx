@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ThumbsUp, ThumbsDown, Copy, Check } from 'lucide-react'
+import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight } from 'lucide-react'
 import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import type { ChatMessage as ChatMessageType } from '../../types/chat'
@@ -10,15 +10,27 @@ interface Props {
   message: ChatMessageType
   messageIndex?: number
   conversationUuid?: string
+  /** Live thinking content during streaming (before thinking is finalized) */
+  streamingThinking?: string
+  /** Duration in seconds (from thinking_done event or persisted) */
+  thinkingDuration?: number | null
+  /** Whether this message is currently streaming */
+  isStreaming?: boolean
 }
 
-export function ChatMessage({ message, messageIndex, conversationUuid }: Props) {
+export function ChatMessage({ message, messageIndex, conversationUuid, streamingThinking, thinkingDuration, isStreaming: isStreamingProp }: Props) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
   const [showComment, setShowComment] = useState(false)
   const [comment, setComment] = useState('')
   const [commentSent, setCommentSent] = useState(false)
+  const [thinkingExpanded, setThinkingExpanded] = useState(false)
+
+  // Resolve thinking content: streaming thinking > persisted thinking
+  const thinkingText = streamingThinking || message.thinking || ''
+  const duration = thinkingDuration ?? message.thinking_duration ?? null
+  const hasThinking = thinkingText.length > 0
 
   const renderedHtml = useMemo(() => {
     if (isUser) return null
@@ -74,14 +86,75 @@ export function ChatMessage({ message, messageIndex, conversationUuid }: Props) 
         </div>
       ) : (
         <>
-          <div
-            className="select-text chat-markdown"
-            style={{ fontSize: 14, lineHeight: 1.6 }}
-            dangerouslySetInnerHTML={{ __html: renderedHtml! }}
-          />
+          {/* Collapsible thinking trace */}
+          {hasThinking && (
+            <div style={{ marginBottom: 10 }}>
+              <button
+                onClick={() => setThinkingExpanded(!thinkingExpanded)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px 0',
+                  fontSize: 12,
+                  color: '#9ca3af',
+                  fontFamily: 'inherit',
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#6b7280' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af' }}
+              >
+                <ChevronRight
+                  size={14}
+                  style={{
+                    transition: 'transform 0.2s ease',
+                    transform: thinkingExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                  }}
+                />
+                {duration != null
+                  ? `Thought for ${duration < 1 ? 'less than a second' : `${Math.round(duration)} second${Math.round(duration) !== 1 ? 's' : ''}`}`
+                  : 'Thinking\u2026'}
+              </button>
+              <div className={`thinking-collapse${thinkingExpanded ? ' open' : ''}`}>
+                <div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      padding: '10px 12px',
+                      backgroundColor: '#f9fafb',
+                      borderLeft: '3px solid var(--highlight-color, #eab308)',
+                      borderRadius: 4,
+                      fontSize: 13,
+                      lineHeight: 1.6,
+                      color: '#6b7280',
+                      fontStyle: 'italic',
+                      maxHeight: 400,
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}
+                    className="hide-scrollbar"
+                  >
+                    {thinkingText}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          {/* Feedback bar */}
-          <div style={{
+          {message.content && (
+            <div
+              className="select-text chat-markdown"
+              style={{ fontSize: 14, lineHeight: 1.6 }}
+              dangerouslySetInnerHTML={{ __html: renderedHtml! }}
+            />
+          )}
+
+          {/* Feedback bar - hidden during streaming */}
+          {!isStreamingProp && message.content && <div style={{
             display: 'flex', alignItems: 'center', gap: 4, marginTop: 10,
             paddingTop: 8, borderTop: '1px solid #00000010',
           }}>
@@ -124,10 +197,10 @@ export function ChatMessage({ message, messageIndex, conversationUuid }: Props) 
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
-          </div>
+          </div>}
 
           {/* Comment form for negative feedback */}
-          {showComment && !commentSent && (
+          {!isStreamingProp && showComment && !commentSent && (
             <div style={{
               marginTop: 8, display: 'flex', gap: 8, alignItems: 'flex-start',
             }}>

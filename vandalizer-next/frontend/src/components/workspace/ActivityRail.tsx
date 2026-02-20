@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import {
-  PenSquare,
+  MessageSquare,
   Workflow,
   ListChecks,
   Trash2,
@@ -23,13 +23,13 @@ import type { ActivityEvent } from '../../types/chat'
 function activityIcon(type: ActivityEvent['type']) {
   switch (type) {
     case 'conversation':
-      return PenSquare
+      return MessageSquare
     case 'workflow_run':
       return Workflow
     case 'search_set_run':
       return ListChecks
     default:
-      return PenSquare
+      return MessageSquare
   }
 }
 

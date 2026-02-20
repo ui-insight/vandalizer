@@ -12,6 +12,7 @@ celery = Celery(
 
 celery.conf.task_default_queue = "default"
 celery.conf.task_routes = {
+    "tasks.document.*": {"queue": "documents"},
     "tasks.documents.*": {"queue": "documents"},
     "tasks.workflow.*": {"queue": "workflows"},
     "tasks.workflow_next.*": {"queue": "workflows"},

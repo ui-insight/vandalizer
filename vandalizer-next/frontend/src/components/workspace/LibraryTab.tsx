@@ -3,9 +3,9 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
-import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary } from '../../api/library'
+import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem } from '../../api/library'
 import { createWorkflow } from '../../api/workflows'
-import { createSearchSet } from '../../api/extractions'
+import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem } from '../../api/extractions'
 import {
   Search,
   Layers,
@@ -120,6 +120,58 @@ export function LibraryTab() {
     setCreateName('')
     setCreateDesc('')
     setCreateError(null)
+  }
+
+  // Edit modal state (prompts / formatters)
+  const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editContent, setEditContent] = useState('')
+  const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+
+  const openEditModal = async (item: import('../../types/library').LibraryItem) => {
+    setEditingItem(item)
+    setEditTitle(item.name)
+    setEditContent(item.description || '')
+    setEditError(null)
+    setEditItemId(null)
+    // Load the SearchSetItem content (the actual prompt text)
+    if (item.item_uuid) {
+      try {
+        const items = await listSearchSetItems(item.item_uuid)
+        if (items.length > 0) {
+          setEditContent(items[0].searchphrase)
+          setEditItemId(items[0].id)
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  const closeEditModal = () => {
+    setEditingItem(null)
+    setEditTitle('')
+    setEditContent('')
+    setEditItemId(null)
+    setEditError(null)
+  }
+
+  const handleEditSave = async () => {
+    if (!editingItem?.item_uuid) return
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      await updateSearchSet(editingItem.item_uuid, { title: editTitle.trim() })
+      if (editItemId) {
+        await updateSearchSetItem(editItemId, { searchphrase: editContent, title: editTitle.trim() })
+      }
+      closeEditModal()
+      refreshItems()
+    } catch (e) {
+      setEditError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   const handleCreate = async () => {
@@ -299,12 +351,12 @@ export function LibraryTab() {
                   alignItems: 'center',
                   gap: 4,
                   borderRadius: 30,
-                  backgroundColor: '#2980b9',
-                  border: '2px solid #2980b9',
+                  backgroundColor: 'var(--highlight-color, #eab308)',
+                  border: 'none',
                   padding: '6px 14px',
                   fontSize: 13,
                   fontWeight: 700,
-                  color: '#fff',
+                  color: 'var(--highlight-text-color, #000)',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
                   transition: 'filter 0.15s',
@@ -540,7 +592,9 @@ export function LibraryTab() {
                   onClone={handleClone}
                   onShare={handleShare}
                   onRemove={handleRemove}
+                  onEdit={openEditModal}
                   onOpen={(it) => {
+                    touchItem(it.id).then(() => refreshItems()).catch(() => {})
                     if (it.kind === 'workflow') {
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
@@ -665,6 +719,117 @@ export function LibraryTab() {
                 }}
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal (prompts / formatters) */}
+      {editingItem && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            paddingTop: '8%',
+            backgroundColor: 'rgba(0,0,0,0.4)',
+          }}
+          onClick={closeEditModal}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: 'var(--ui-radius, 12px)',
+              padding: '28px 32px',
+              width: '90%',
+              maxWidth: 480,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+            }}
+          >
+            <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124' }}>
+              Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
+            </h2>
+            <div style={{ marginBottom: 16 }}>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Title"
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  border: '1px solid #dadce0',
+                  borderRadius: 8,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <textarea
+                value={editContent}
+                onChange={(e) => setEditContent(e.target.value)}
+                placeholder={editingItem.set_type === 'formatter' ? 'Write your formatting instructions here' : 'Write your prompt here'}
+                rows={10}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  border: '1px solid #dadce0',
+                  borderRadius: 8,
+                  outline: 'none',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            {editError && (
+              <div style={{ marginBottom: 12, padding: '10px 14px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                {editError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={handleEditSave}
+                disabled={editSaving || !editTitle.trim()}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  borderRadius: 8,
+                  border: 'none',
+                  backgroundColor: 'var(--highlight-color, #eab308)',
+                  color: 'var(--highlight-text-color, #000)',
+                  cursor: editSaving || !editTitle.trim() ? 'not-allowed' : 'pointer',
+                  opacity: editSaving || !editTitle.trim() ? 0.5 : 1,
+                }}
+              >
+                {editSaving ? 'Saving...' : 'Update'}
+              </button>
+              <button
+                onClick={closeEditModal}
+                style={{
+                  padding: '10px 20px',
+                  fontSize: 14,
+                  fontFamily: 'inherit',
+                  borderRadius: 8,
+                  border: '1px solid #dadce0',
+                  backgroundColor: '#fff',
+                  color: '#5f6368',
+                  cursor: 'pointer',
+                }}
+              >
+                Cancel
               </button>
             </div>
           </div>

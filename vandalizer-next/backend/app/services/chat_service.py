@@ -1,8 +1,8 @@
-"""Chat service  - streaming chat with RAG, ported from ChatManager."""
+"""Chat service  - streaming chat with full document context."""
 
-import asyncio
 import json
 import logging
+import time
 from typing import AsyncGenerator, Optional
 
 from pydantic_ai.agent import Agent
@@ -21,12 +21,7 @@ from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
-from app.services.document_manager import DocumentManager
-from app.services.llm_service import (
-    RagDeps,
-    create_chat_agent,
-    create_rag_agent,
-)
+from app.services.llm_service import create_chat_agent
 
 logger = logging.getLogger(__name__)
 
@@ -95,85 +90,66 @@ async def chat_stream(
     # Load message history
     previous_messages: list[ModelMessage] = await conversation.to_model_messages()
 
-    # Build prompt
-    max_context_length = settings.max_context_length if settings else 100000
-
-    prompt = ""
-    if documents:
-        prompt = "You are given the following document(s). "
-    prompt += (
-        "Answer the query clearly and concisely, formatting your response in "
-        "well-structured markdown. Do not restate or include the original query "
-        "in your answer."
-    )
-
-    # Decide direct vs RAG
+    # Build prompt — keep it clean; system prompt handles behavior
     full_text = _get_full_text(documents)
-    agent: Agent
+    agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
 
-    if len(full_text) < max_context_length:
-        prompt += f"\n\n# Query: {message}\n\n# Context: \n{full_text}"
-        agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
-    else:
-        prompt += f"\n\n# Document(s): {[doc.uuid for doc in documents]}\n"
-        agent = create_rag_agent(model_name, system_config_doc=sys_config_doc)
-
-    # Add attachment context
+    parts: list[str] = []
+    if full_text:
+        parts.append(full_text)
     if attachment_context:
-        prompt = f"{prompt}\n\n---\n# Attached Context:{attachment_context}\n---\n"
+        parts.append(attachment_context)
+
+    if parts:
+        prompt = f"{message}\n\n---\n\n{''.join(parts)}"
+    else:
+        prompt = message
 
     # Stream the response
     full_response: list[str] = []
+    full_thinking: list[str] = []
+    thinking_started_at: float | None = None
+    thinking_duration: float | None = None
+    thinking_done_emitted = False
 
     try:
-        if len(full_text) >= max_context_length:
-            # RAG path  - needs deps, run in thread for sync ChromaDB calls
-            doc_manager = DocumentManager(
-                persist_directory=settings.chromadb_persist_dir if settings else "data/chromadb"
-            )
-            deps = RagDeps(
-                doc_manager=doc_manager,
-                user_id=user_id,
-                documents=documents,
-            )
-            async with agent.iter(
-                prompt, message_history=previous_messages, deps=deps
-            ) as agent_run:
-                async for node in agent_run:
-                    if Agent.is_model_request_node(node):
-                        async with node.stream(agent_run.ctx) as stream:
-                            async for event in stream:
-                                chunk = _event_to_chunk(event, full_response)
-                                if chunk:
-                                    yield chunk
+        async with agent.iter(
+            prompt, message_history=previous_messages
+        ) as agent_run:
+            async for node in agent_run:
+                if Agent.is_model_request_node(node):
+                    async with node.stream(agent_run.ctx) as stream:
+                        async for event in stream:
+                            chunk, is_thinking, is_text = _event_to_chunk(
+                                event, full_response, full_thinking,
+                            )
+                            # Start thinking timer on first thinking chunk
+                            if is_thinking and thinking_started_at is None:
+                                thinking_started_at = time.monotonic()
+                            # Emit thinking_done when first text arrives after thinking
+                            if is_text and thinking_started_at and not thinking_done_emitted:
+                                thinking_duration = round(
+                                    time.monotonic() - thinking_started_at, 1
+                                )
+                                thinking_done_emitted = True
+                                yield json.dumps({
+                                    "kind": "thinking_done",
+                                    "content": "",
+                                    "duration": thinking_duration,
+                                }) + "\n"
+                            if chunk:
+                                yield chunk
 
-                if agent_run.result:
-                    usage = agent_run.result.usage()
-                    assistant_message = agent_run.result.output
-                    await _finalize(
-                        conversation, assistant_message, documents,
-                        usage, activity_id, user_id,
-                    )
-        else:
-            # Direct path  - full text in prompt
-            async with agent.iter(
-                prompt, message_history=previous_messages
-            ) as agent_run:
-                async for node in agent_run:
-                    if Agent.is_model_request_node(node):
-                        async with node.stream(agent_run.ctx) as stream:
-                            async for event in stream:
-                                chunk = _event_to_chunk(event, full_response)
-                                if chunk:
-                                    yield chunk
-
-                if agent_run.result:
-                    usage = agent_run.result.usage()
-                    assistant_message = agent_run.result.output
-                    await _finalize(
-                        conversation, assistant_message, documents,
-                        usage, activity_id, user_id,
-                    )
+            if agent_run.result:
+                usage = agent_run.result.usage()
+                assistant_message = agent_run.result.output
+                thinking_text = "".join(full_thinking) or None
+                await _finalize(
+                    conversation, assistant_message, documents,
+                    usage, activity_id, user_id,
+                    thinking=thinking_text,
+                    thinking_duration=thinking_duration,
+                )
 
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
@@ -187,23 +163,32 @@ async def chat_stream(
                 await ev.save()
 
 
-def _event_to_chunk(event, full_response: list[str]) -> Optional[str]:
-    """Convert a pydantic-ai stream event to a JSON chunk string."""
+def _event_to_chunk(
+    event, full_response: list[str], full_thinking: list[str],
+) -> tuple[Optional[str], bool, bool]:
+    """Convert a pydantic-ai stream event to a JSON chunk string.
+
+    Returns (chunk_json, is_thinking, is_text).
+    """
     if isinstance(event, PartStartEvent):
         if isinstance(event.part, TextPart):
             content = event.part.content or ""
             full_response.append(content)
-            return json.dumps({"kind": "text", "content": content}) + "\n"
+            return json.dumps({"kind": "text", "content": content}) + "\n", False, True
         elif isinstance(event.part, ThinkingPart):
-            return json.dumps({"kind": "thinking", "content": event.part.content or ""}) + "\n"
+            content = event.part.content or ""
+            full_thinking.append(content)
+            return json.dumps({"kind": "thinking", "content": content}) + "\n", True, False
     elif isinstance(event, PartDeltaEvent):
         if isinstance(event.delta, TextPartDelta):
             content = event.delta.content_delta or ""
             full_response.append(content)
-            return json.dumps({"kind": "text", "content": content}) + "\n"
+            return json.dumps({"kind": "text", "content": content}) + "\n", False, True
         elif isinstance(event.delta, ThinkingPartDelta):
-            return json.dumps({"kind": "thinking", "content": event.delta.content_delta or ""}) + "\n"
-    return None
+            content = event.delta.content_delta or ""
+            full_thinking.append(content)
+            return json.dumps({"kind": "thinking", "content": content}) + "\n", True, False
+    return None, False, False
 
 
 def _get_full_text(documents: list[SmartDocument]) -> str:
@@ -222,9 +207,16 @@ async def _finalize(
     usage,
     activity_id: Optional[str],
     user_id: str,
+    thinking: Optional[str] = None,
+    thinking_duration: Optional[float] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
-    await conversation.add_message(ChatRole.ASSISTANT, assistant_message)
+    await conversation.add_message(
+        ChatRole.ASSISTANT,
+        assistant_message,
+        thinking=thinking,
+        thinking_duration=thinking_duration,
+    )
 
     if activity_id:
         ev = await ActivityEvent.get(activity_id)

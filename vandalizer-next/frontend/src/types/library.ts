@@ -29,6 +29,7 @@ export interface LibraryItem {
   verified: boolean
   added_by_user_id: string
   created_at: string | null
+  last_used_at: string | null
 }
 
 export interface LibraryFolder {
