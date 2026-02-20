@@ -1,4 +1,4 @@
-"""Office/M365 API routes — intake configs and work items."""
+"""Office/M365 API routes  - intake configs and work items."""
 
 import datetime
 from typing import Optional

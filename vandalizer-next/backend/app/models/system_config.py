@@ -1,4 +1,4 @@
-"""SystemConfig model — singleton for runtime-editable settings."""
+"""SystemConfig model  - singleton for runtime-editable settings."""
 
 import datetime
 from copy import deepcopy
@@ -53,24 +53,7 @@ class SystemConfig(Document):
 
     ocr_endpoint: str = "https://processpdf.insight.uidaho.edu"
     llm_endpoint: str = "https://mindrouter-api.nkn.uidaho.edu/v1"
-    available_models: list[dict] = [
-        {
-            "name": "gpt-oss-32k:120b",
-            "tag": "University of Idaho - Private",
-            "external": False,
-            "thinking": False,
-            "endpoint": "",
-            "api_protocol": "",
-        },
-        {
-            "name": "openai/gpt-5",
-            "tag": "Cloud",
-            "external": True,
-            "thinking": False,
-            "endpoint": "",
-            "api_protocol": "",
-        },
-    ]
+    available_models: list[dict] = []
 
     # Legacy fields kept for backwards compatibility
     extraction_model: str = ""

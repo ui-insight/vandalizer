@@ -113,6 +113,7 @@ async def chat(
             space=body.current_space_id,
             activity_id=str(activity.id) if activity else None,
             settings=settings,
+            model_override=body.model,
         ):
             yield chunk
 

@@ -1,4 +1,4 @@
-"""Configuration service — async helpers for SystemConfig and UserModelConfig."""
+"""Configuration service  - async helpers for SystemConfig and UserModelConfig."""
 
 from copy import deepcopy
 

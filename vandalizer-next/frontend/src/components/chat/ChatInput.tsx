@@ -12,11 +12,12 @@ interface Props {
   onModelChange?: (model: string) => void
   onExport?: (format: string) => void
   hasMessages?: boolean
+  hasDocuments?: boolean
 }
 
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, disabled,
-  selectedModel, onModelChange, onExport, hasMessages,
+  selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
 }: Props) {
   const [message, setMessage] = useState('')
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -32,20 +33,23 @@ export function ChatInput({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (addMenuRef.current && !addMenuRef.current.contains(e.target as Node)) setShowAddMenu(false)
-      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) setShowModelMenu(false)
-      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) setShowExportMenu(false)
+      const target = e.target as Node
+      if (addMenuRef.current && !addMenuRef.current.contains(target)) setShowAddMenu(false)
+      if (modelMenuRef.current && !modelMenuRef.current.contains(target)) setShowModelMenu(false)
+      if (exportMenuRef.current && !exportMenuRef.current.contains(target)) setShowExportMenu(false)
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    // Use 'click' instead of 'mousedown' so the handler fires AFTER React
+    // onClick on dropdown items, avoiding event-ordering conflicts.
+    document.addEventListener('click', handler)
+    return () => document.removeEventListener('click', handler)
   }, [])
 
-  // Fetch models on first open
+  // Fetch models eagerly so the button label resolves immediately
   useEffect(() => {
-    if (showModelMenu && models.length === 0) {
+    if (models.length === 0) {
       getModels().then(setModels).catch(() => {})
     }
-  }, [showModelMenu, models.length])
+  }, [models.length])
 
   const handleSend = () => {
     const trimmed = message.trim()
@@ -75,8 +79,11 @@ export function ChatInput({
     }
   }
 
+  // Deduplicate models by name (backend stores selection by name, so dupes are redundant)
+  const uniqueModels = models.filter((m, i, arr) => arr.findIndex(x => x.name === m.name) === i)
+
   const displayModel = selectedModel
-    ? models.find(m => m.name === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
+    ? uniqueModels.find(m => m.name === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
     : null
 
   return (
@@ -124,7 +131,7 @@ export function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything about this document..."
+            placeholder={hasDocuments ? "Ask anything about this document..." : "Ask Vandalizer anything..."}
             rows={1}
             className="w-full resize-none border-0 bg-transparent text-base font-medium placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none"
             style={{ fontSize: 16 }}
@@ -197,7 +204,7 @@ export function ChatInput({
                   {models.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-gray-400">Loading models...</div>
                   ) : (
-                    models.map(m => (
+                    uniqueModels.map(m => (
                       <button
                         key={m.name}
                         onClick={() => { onModelChange(m.name); setShowModelMenu(false) }}

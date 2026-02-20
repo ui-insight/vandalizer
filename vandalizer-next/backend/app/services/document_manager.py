@@ -1,4 +1,4 @@
-"""Document Manager — ChromaDB-backed document ingestion and semantic search for RAG."""
+"""Document Manager  - ChromaDB-backed document ingestion and semantic search for RAG."""
 
 import logging
 from datetime import datetime
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class DocumentManager:
-    """Synchronous document manager — safe to call from asyncio.to_thread()."""
+    """Synchronous document manager  - safe to call from asyncio.to_thread()."""
 
     def __init__(self, persist_directory: str = "data/chromadb") -> None:
         self.persist_directory = persist_directory

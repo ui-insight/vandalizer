@@ -1,4 +1,4 @@
-"""Extraction API routes — SearchSet CRUD and extraction execution."""
+"""Extraction API routes  - SearchSet CRUD and extraction execution."""
 
 from fastapi import APIRouter, Depends, HTTPException
 

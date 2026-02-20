@@ -1,4 +1,4 @@
-"""Config API routes — model listing, user config, theme, and automation stats."""
+"""Config API routes  - model listing, user config, theme, and automation stats."""
 
 import datetime
 

@@ -1,4 +1,4 @@
-"""LLM service — provider classes and agent creation, ported from agents.py."""
+"""LLM service  - provider classes and agent creation, ported from agents.py."""
 
 import os
 from dataclasses import dataclass
@@ -18,7 +18,7 @@ from pydantic_ai.tools import RunContext
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 # ---------------------------------------------------------------------------
-# Agent caches — prevent context leaks across requests
+# Agent caches  - prevent context leaks across requests
 # ---------------------------------------------------------------------------
 _chat_agent_cache: dict[str, Agent] = {}
 _extraction_agent_cache: dict[str, Agent] = {}
@@ -140,7 +140,7 @@ class VLLMProvider(OpenRouterProvider):
 
 
 # ---------------------------------------------------------------------------
-# Sync helpers — used in Celery workers & extraction engine
+# Sync helpers  - used in Celery workers & extraction engine
 # ---------------------------------------------------------------------------
 
 def _get_model_config_sync(model_name: str, system_config_doc: dict | None = None) -> Optional[dict]:
@@ -192,26 +192,34 @@ def get_agent_model(
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ) -> OpenAIModel:
-    """Get the appropriate model instance. Sync — safe for Celery workers."""
+    """Get the appropriate model instance. Sync  - safe for Celery workers."""
     model_config = _get_model_config_sync(agent_model, system_config_doc)
     thinking_enabled = model_config.get("thinking", False) if model_config else False
     if thinking_override is not None:
         thinking_enabled = thinking_override
 
-    # Handle external OpenAI models
-    if "openai" in agent_model and model_config and model_config.get("external", False):
-        model_name = agent_model.split("/")[-1]
-        return OpenAIModel(model_name=model_name)
+    # Resolve per-model API key, falling back to env var or placeholder
+    api_key = (model_config.get("api_key", "") if model_config else "") or OPENAI_API_KEY or "no-api-key"
 
     endpoint = _get_model_endpoint_sync(agent_model, system_config_doc)
     api_protocol = detect_api_protocol(agent_model, model_config)
 
+    # Handle external models with OpenAI protocol (use OpenAI SDK directly)
+    if model_config and model_config.get("external", False) and api_protocol == "openai":
+        model_name = agent_model.split("/")[-1] if "/" in agent_model else agent_model
+        from openai import AsyncOpenAI
+        client_kwargs: dict = {"api_key": api_key}
+        if endpoint:
+            client_kwargs["base_url"] = endpoint
+        client = AsyncOpenAI(**client_kwargs)
+        return OpenAIModel(model_name=model_name, openai_client=client)
+
     if api_protocol == "ollama":
-        provider = OllamaProvider(api_key="no-api-key", endpoint=endpoint, thinking_enabled=thinking_enabled)
+        provider = OllamaProvider(api_key=api_key, endpoint=endpoint, thinking_enabled=thinking_enabled)
     elif api_protocol == "vllm":
-        provider = VLLMProvider(api_key="no-api-key", endpoint=endpoint, thinking_enabled=thinking_enabled)
+        provider = VLLMProvider(api_key=api_key, endpoint=endpoint, thinking_enabled=thinking_enabled)
     else:
-        provider = InsightAIProvider(api_key="no-api-key", thinking_enabled=thinking_enabled, endpoint=endpoint)
+        provider = InsightAIProvider(api_key=api_key, thinking_enabled=thinking_enabled, endpoint=endpoint)
 
     return OpenAIModel(model_name=agent_model, provider=provider)
 

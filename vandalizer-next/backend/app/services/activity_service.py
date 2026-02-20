@@ -1,4 +1,4 @@
-"""Activity service — start, finish, update, list, and delete activity events."""
+"""Activity service  - start, finish, update, list, and delete activity events."""
 
 import logging
 from datetime import datetime, timezone

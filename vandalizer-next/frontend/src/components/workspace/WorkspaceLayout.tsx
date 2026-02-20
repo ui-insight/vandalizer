@@ -42,7 +42,6 @@ export function WorkspaceLayout() {
             className="overflow-hidden"
             style={{
               width: `${panelSplit}%`,
-              transition: 'width 0.3s ease',
             }}
           >
             <LeftPanel />

@@ -1,4 +1,4 @@
-"""Library models — Library, LibraryItem, LibraryFolder, and related enums."""
+"""Library models  - Library, LibraryItem, LibraryFolder, and related enums."""
 
 import datetime
 from enum import Enum

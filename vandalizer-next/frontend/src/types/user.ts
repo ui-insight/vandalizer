@@ -4,6 +4,7 @@ export interface User {
   email: string | null
   name: string | null
   is_admin: boolean
+  is_examiner: boolean
   current_team: string | null
   current_team_uuid: string | null
 }

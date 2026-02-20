@@ -38,7 +38,7 @@ async def list_contents(
         if current_folder and current_folder.team_id:
             is_team_folder = True
 
-    # Build document query — team folders show all docs, personal folders filter by user
+    # Build document query  - team folders show all docs, personal folders filter by user
     if is_team_folder:
         documents = await SmartDocument.find(
             SmartDocument.space == space,

@@ -1,11 +1,16 @@
-import { BookOpen, Cloud, FileText, FolderOpen, Globe, MessageSquare, Shield, Users, Workflow, Zap } from 'lucide-react'
+import { BookOpen, ClipboardCheck, Cloud, FileText, FolderOpen, Globe, MessageSquare, Settings, Shield, Users, Workflow, Zap } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
+import { useTeams } from '../../hooks/useTeams'
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user } = useAuth()
+  const { currentTeam } = useTeams()
+
+  const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
+  const showAdmin = !!user?.is_admin || isTeamAdmin
 
   const links = [
     { href: '/', label: 'Documents', icon: FileText },
@@ -17,7 +22,8 @@ export function Sidebar() {
     { href: '/office', label: 'Office 365', icon: Cloud },
     { href: '/browser-automation', label: 'Browser', icon: Globe },
     { href: '/teams', label: 'Teams', icon: Users },
-    ...(user?.is_admin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
+    ...(user?.is_examiner ? [{ href: '/verification', label: 'Verification', icon: ClipboardCheck }] : []),
+    ...(showAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ] as const
 
   return (

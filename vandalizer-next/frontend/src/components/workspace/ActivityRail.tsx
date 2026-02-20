@@ -62,8 +62,8 @@ function statusMetaClass(status: ActivityEvent['status']) {
 }
 
 export function ActivityRail() {
-  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction } = useWorkspace()
-  const { activities, refresh } = useActivities()
+  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, activitySignal } = useWorkspace()
+  const { activities, refresh } = useActivities(activitySignal)
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {

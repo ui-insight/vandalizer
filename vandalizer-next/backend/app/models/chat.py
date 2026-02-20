@@ -1,4 +1,4 @@
-"""Chat models — ChatMessage, FileAttachment, UrlAttachment, ChatConversation."""
+"""Chat models  - ChatMessage, FileAttachment, UrlAttachment, ChatConversation."""
 
 import datetime
 from enum import Enum

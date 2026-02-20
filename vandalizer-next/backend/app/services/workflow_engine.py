@@ -1,4 +1,4 @@
-"""Workflow engine — ported from app/utilities/workflow.py.
+"""Workflow engine  - ported from app/utilities/workflow.py.
 
 All node processing is synchronous (runs in Celery workers).
 Progress reporting uses pymongo directly for sync context.
@@ -212,7 +212,7 @@ class ExtractionNode(Node):
 
         if prev_step_name == "Document":
             doc_uuids = inputs.get("output", [])
-            # doc_texts must be pre-loaded — for now we pass UUIDs in data
+            # doc_texts must be pre-loaded  - for now we pass UUIDs in data
             doc_texts = self.data.get("doc_texts")
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output")

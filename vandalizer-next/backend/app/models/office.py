@@ -1,4 +1,4 @@
-"""Office/M365 models — IntakeConfig and WorkItem."""
+"""Office/M365 models  - IntakeConfig and WorkItem."""
 
 import datetime
 import uuid as uuid_mod

@@ -21,6 +21,7 @@ const Automation = lazy(() => import('./pages/Automation'))
 const Office = lazy(() => import('./pages/Office'))
 const BrowserAutomation = lazy(() => import('./pages/BrowserAutomation'))
 const Spaces = lazy(() => import('./pages/Spaces'))
+const Verification = lazy(() => import('./pages/Verification'))
 
 // ---------------------------------------------------------------------------
 // Route tree
@@ -179,6 +180,16 @@ const spacesRoute = createRoute({
   ),
 })
 
+const verificationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/verification',
+  component: () => (
+    <ProtectedRoute>
+      <Verification />
+    </ProtectedRoute>
+  ),
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
   loginRoute,
@@ -195,6 +206,7 @@ const routeTree = rootRoute.addChildren([
   officeRoute,
   browserAutomationRoute,
   spacesRoute,
+  verificationRoute,
 ])
 
 export const router = createRouter({ routeTree })

@@ -20,5 +20,6 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     name: Optional[str] = None
     is_admin: bool = False
+    is_examiner: bool = False
     current_team: Optional[str] = None
     current_team_uuid: Optional[str] = None

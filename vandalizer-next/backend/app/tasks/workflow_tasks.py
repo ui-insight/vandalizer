@@ -1,6 +1,6 @@
 """Celery tasks for workflow execution.
 
-Uses pymongo (sync) for DB access — same pattern as Flask Celery workers.
+Uses pymongo (sync) for DB access  - same pattern as Flask Celery workers.
 Task names use 'tasks.workflow_next.*' to coexist with Flask's 'tasks.workflow.*'.
 """
 

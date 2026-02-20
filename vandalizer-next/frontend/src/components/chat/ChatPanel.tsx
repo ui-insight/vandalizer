@@ -4,7 +4,9 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { useChat } from '../../hooks/useChat'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { addLink, addDocument, removeDocument } from '../../api/chat'
+import { getUserConfig, updateUserConfig } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 
 interface ChatPanelProps {
@@ -26,16 +28,38 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     loadHistory,
   } = useChat()
 
+  const { bumpActivitySignal } = useWorkspace()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const lastLoadedConvo = useRef<string | null>(null)
+  const prevStreamingRef = useRef(false)
+
+  // Load saved model preference on mount
+  useEffect(() => {
+    getUserConfig().then(cfg => {
+      if (cfg.model) setSelectedModel(cfg.model)
+    }).catch(() => {})
+  }, [])
+
+  const handleModelChange = (model: string) => {
+    setSelectedModel(model)
+    updateUserConfig({ model }).catch(() => {})
+  }
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
+
+  // Bump activity signal when streaming starts or ends so the rail picks up new/updated activities
+  useEffect(() => {
+    if (isStreaming !== prevStreamingRef.current) {
+      prevStreamingRef.current = isStreaming
+      bumpActivitySignal()
+    }
+  }, [isStreaming, bumpActivitySignal])
 
   // Load conversation history when requested from workspace context
   useEffect(() => {
@@ -177,7 +201,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     Ready to get started?
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    Add or select a document to begin.
+                    Upload or select one or more documents, or simply ask me a question.
                   </div>
                 </div>
               </div>
@@ -185,12 +209,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
             {/* Recommendation chips */}
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[
+              {(fileAttachments.length > 0 || urlAttachments.length > 0 ? [
                 'Summarize this document',
                 'What are the key findings?',
                 'Extract important dates and names',
                 'List the main topics covered',
-              ].map(suggestion => (
+              ] : [
+                'What can you help me with?',
+                'How do workflows work?',
+                'Tell me about document extraction',
+                'Help me get started',
+              ]).map(suggestion => (
                 <button
                   key={suggestion}
                   onClick={() => handleSend(suggestion)}
@@ -261,9 +290,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onAttachLink={handleAttachLink}
         disabled={isStreaming}
         selectedModel={selectedModel}
-        onModelChange={setSelectedModel}
+        onModelChange={handleModelChange}
         onExport={handleExport}
         hasMessages={messages.length > 0}
+        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0}
       />
     </div>
   )

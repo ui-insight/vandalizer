@@ -30,7 +30,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
-  const { openExtractionId, closeExtraction, selectedDocUuids } = useWorkspace()
+  const { openExtractionId, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal } = useWorkspace()
   const { currentTeam } = useTeams()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
@@ -106,6 +106,7 @@ export function ExtractionEditorPanel() {
       setResults(map)
     } finally {
       setRunning(false)
+      bumpActivitySignal()
     }
   }
 
@@ -300,6 +301,7 @@ export function ExtractionEditorPanel() {
             onRemoveItem={remove}
             pdfTitle={searchSet?.title ?? ''}
             searchSetUuid={openExtractionId ?? undefined}
+            onHighlightValue={setHighlightTerms}
           />
         )}
         {activeTab === 'tools' && (
@@ -427,6 +429,7 @@ function DesignTab({
   onRemoveItem,
   pdfTitle,
   searchSetUuid,
+  onHighlightValue,
 }: {
   items: { id: string; searchphrase: string }[]
   itemsLoading: boolean
@@ -436,6 +439,7 @@ function DesignTab({
   onRemoveItem: (id: string) => void
   pdfTitle: string
   searchSetUuid?: string
+  onHighlightValue: (terms: string[]) => void
 }) {
   return (
     <div style={{ padding: 24 }}>
@@ -531,13 +535,32 @@ function DesignTab({
                 </div>
                 {resultVal !== undefined && (
                   <div
+                    onClick={() => {
+                      if (resultVal && resultVal !== 'N/A') {
+                        onHighlightValue([resultVal])
+                        navigator.clipboard.writeText(resultVal).catch(() => {})
+                      }
+                    }}
                     style={{
                       marginLeft: 45,
                       marginTop: 4,
                       fontSize: 13,
                       fontWeight: 600,
                       color: '#202124',
+                      cursor: resultVal && resultVal !== 'N/A' ? 'pointer' : 'default',
+                      borderRadius: 4,
+                      padding: '2px 4px',
+                      margin: '4px 0 0 41px',
+                      transition: 'background-color 0.15s',
                     }}
+                    onMouseEnter={e => {
+                      if (resultVal && resultVal !== 'N/A')
+                        (e.currentTarget as HTMLElement).style.backgroundColor = '#fef9c3'
+                    }}
+                    onMouseLeave={e => {
+                      (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'
+                    }}
+                    title={resultVal && resultVal !== 'N/A' ? 'Click to highlight in PDF' : undefined}
                   >
                     {resultVal}
                   </div>

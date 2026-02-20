@@ -1,4 +1,4 @@
-"""Extraction engine — ported from ExtractionManagerNonTyped.
+"""Extraction engine  - ported from ExtractionManagerNonTyped.
 
 All methods are synchronous so they can run in Celery workers or via asyncio.to_thread.
 The caller must pre-fetch any async data (SystemConfig, document texts) and pass it in.
@@ -52,7 +52,7 @@ class ExtractionEngine:
 
         Args:
             extract_keys: Fields to extract (list or comma-separated string).
-            document_uuids: Not used directly — caller should pass doc_texts.
+            document_uuids: Not used directly  - caller should pass doc_texts.
             model: Model name override.
             full_text: Single document text (shortcut for doc_texts=[full_text]).
             extraction_config_override: Per-extraction config overrides.
