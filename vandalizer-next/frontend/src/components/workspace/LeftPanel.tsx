@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { ArrowLeft, FileText } from 'lucide-react'
+import { ArrowLeft, FileText, Search, X } from 'lucide-react'
 import { FileBrowser } from '../files/FileBrowser'
+import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { RawTextModal } from '../files/RawTextModal'
-import { GlobalSearch } from '../files/GlobalSearch'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { pollStatus } from '../../api/documents'
+import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
   const { setSelectedDocUuids, highlightTerms, setProcessingDoc } = useWorkspace()
@@ -16,6 +16,11 @@ export function LeftPanel() {
     taskStatus?: string | null
   } | null>(null)
   const [showRawText, setShowRawText] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [contentMatches, setContentMatches] = useState<ContentMatch[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   // Sync processing state to workspace context so ChatPanel can show it
@@ -55,6 +60,52 @@ export function LeftPanel() {
     }
   }, [viewingDoc?.processing, checkStatus])
 
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  // Close search when navigating to a doc
+  useEffect(() => {
+    if (viewingDoc) {
+      setSearchOpen(false)
+      setSearchQuery('')
+      setContentMatches([])
+    }
+  }, [viewingDoc])
+
+  // Debounced content search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!searchQuery.trim()) {
+      setContentMatches([])
+      return
+    }
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const data = await searchDocuments(searchQuery.trim())
+        setContentMatches(
+          data.items.map(item => ({
+            uuid: item.uuid,
+            title: item.title,
+            snippet: item.snippet,
+          }))
+        )
+      } catch {
+        setContentMatches([])
+      }
+    }, 300)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [searchQuery])
+
+  const handleCloseSearch = () => {
+    setSearchOpen(false)
+    setSearchQuery('')
+    setContentMatches([])
+  }
+
   return (
     <div className="h-full overflow-hidden bg-panel-bg relative">
       {/* Black header bar - matches Flask .main-panel .header */}
@@ -79,19 +130,42 @@ export function LeftPanel() {
           )}
         </div>
 
-        {/* Title - centered */}
+        {/* Title or search input - centered */}
         <div className="flex-1 text-center">
-          <p
-            className="m-0 truncate text-white"
-            style={{
-              fontSize: 18,
-              fontWeight: 600,
-              maxWidth: 'calc(100% - 60px)',
-              margin: '0 auto',
-            }}
-          >
-            {viewingDoc ? viewingDoc.title : 'Select or Upload PDFs'}
-          </p>
+          {searchOpen && !viewingDoc ? (
+            <div className="flex items-center gap-2 mx-auto" style={{ maxWidth: 'calc(100% - 60px)' }}>
+              <Search className="h-4 w-4 text-gray-400 shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search files and content..."
+                style={{
+                  flex: 1, border: 'none', background: 'none', outline: 'none',
+                  fontSize: 15, color: '#fff',
+                }}
+              />
+              <button
+                onClick={handleCloseSearch}
+                className="bg-transparent border-0 p-0 cursor-pointer"
+              >
+                <X className="h-4 w-4 text-gray-400 hover:text-white" />
+              </button>
+            </div>
+          ) : (
+            <p
+              className="m-0 truncate text-white"
+              style={{
+                fontSize: 18,
+                fontWeight: 600,
+                maxWidth: 'calc(100% - 60px)',
+                margin: '0 auto',
+              }}
+            >
+              {viewingDoc ? viewingDoc.title : 'Select or Upload PDFs'}
+            </p>
+          )}
         </div>
 
         {/* Right controls */}
@@ -103,14 +177,19 @@ export function LeftPanel() {
             >
               <FileText className="h-5 w-5 text-white" />
             </button>
-          ) : (
-            <GlobalSearch
-              onDocClick={(doc) => {
-                setViewingDoc({ uuid: doc.uuid, title: doc.title })
-                setSelectedDocUuids([doc.uuid])
+          ) : !searchOpen ? (
+            <button
+              onClick={() => setSearchOpen(true)}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 32, height: 32, borderRadius: 6, border: 'none',
+                background: 'none', cursor: 'pointer', color: '#fff',
               }}
-            />
-          )}
+              title="Search files"
+            >
+              <Search size={16} />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -127,6 +206,8 @@ export function LeftPanel() {
       ) : (
         <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>
           <FileBrowser
+            searchQuery={searchQuery}
+            contentMatches={contentMatches}
             onDocClick={(doc) => {
               setViewingDoc({
                 uuid: doc.uuid,

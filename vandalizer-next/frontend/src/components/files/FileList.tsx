@@ -13,6 +13,7 @@ interface FileListProps {
   selectedUuids?: Set<string>
   onToggleSelect?: (uuid: string) => void
   onToggleAll?: () => void
+  snippets?: Map<string, string>
 }
 
 export function FileList({
@@ -25,6 +26,7 @@ export function FileList({
   selectedUuids,
   onToggleSelect,
   onToggleAll,
+  snippets,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
     return (
@@ -88,6 +90,7 @@ export function FileList({
             }}
             selected={selectedUuids?.has(doc.uuid)}
             onToggleSelect={onToggleSelect}
+            snippet={snippets?.get(doc.uuid)}
           />
         ))}
       </tbody>

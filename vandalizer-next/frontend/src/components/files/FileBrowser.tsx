@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useEffect } from 'react'
-import { Plus, Folder as FolderIcon, Upload, Search, X, Trash2, Download } from 'lucide-react'
+import { Plus, Folder as FolderIcon, Upload, Trash2, Download } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
@@ -16,11 +16,19 @@ import { deleteFile, renameFile, downloadFileUrl } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
 import type { Document, Folder } from '../../types/document'
 
-interface FileBrowserProps {
-  onDocClick?: (doc: Document) => void
+export interface ContentMatch {
+  uuid: string
+  title: string
+  snippet: string
 }
 
-export function FileBrowser({ onDocClick }: FileBrowserProps) {
+interface FileBrowserProps {
+  onDocClick?: (doc: Document) => void
+  searchQuery?: string
+  contentMatches?: ContentMatch[]
+}
+
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches }: FileBrowserProps) {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
   const space = user?.user_id || ''
@@ -49,18 +57,37 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
     setSelectedUuids(new Set())
   }, [currentFolder])
 
-  // Search
-  const [searchQuery, setSearchQuery] = useState('')
+  // Search (query provided via prop, content matches from API)
   const filteredFolders = useMemo(() => {
     if (!searchQuery.trim()) return folders
     const q = searchQuery.toLowerCase()
     return folders.filter(f => f.title.toLowerCase().includes(q))
   }, [folders, searchQuery])
+
+  // Build a set of content-matched UUIDs and a snippet map
+  const contentMatchUuids = useMemo(() => {
+    if (!contentMatches) return new Set<string>()
+    return new Set(contentMatches.map(m => m.uuid))
+  }, [contentMatches])
+
+  const snippetMap = useMemo(() => {
+    const map = new Map<string, string>()
+    if (contentMatches) {
+      for (const m of contentMatches) {
+        if (m.snippet) map.set(m.uuid, m.snippet)
+      }
+    }
+    return map
+  }, [contentMatches])
+
   const filteredDocuments = useMemo(() => {
     if (!searchQuery.trim()) return documents
     const q = searchQuery.toLowerCase()
-    return documents.filter(d => d.title.toLowerCase().includes(q))
-  }, [documents, searchQuery])
+    // Include docs matching by title OR by content
+    return documents.filter(d =>
+      d.title.toLowerCase().includes(q) || contentMatchUuids.has(d.uuid)
+    )
+  }, [documents, searchQuery, contentMatchUuids])
 
   const handleToggleSelect = useCallback((uuid: string) => {
     setSelectedUuids(prev => {
@@ -267,26 +294,6 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
       {/* Breadcrumbs - matches Flask _breadcrumbs.html */}
       <Breadcrumbs items={breadcrumbs} onNavigate={setCurrentFolder} />
 
-      {/* Search bar */}
-      <div className="relative mt-3 mb-2">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search files and folders..."
-          className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-
       {/* Bulk action toolbar */}
       {selectedUuids.size > 0 && (
         <div
@@ -338,6 +345,7 @@ export function FileBrowser({ onDocClick }: FileBrowserProps) {
           selectedUuids={selectedUuids}
           onToggleSelect={handleToggleSelect}
           onToggleAll={handleToggleAll}
+          snippets={searchQuery.trim() ? snippetMap : undefined}
         />
       </div>
 

@@ -59,7 +59,7 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 32, height: 32, borderRadius: 6, border: 'none',
-          background: 'rgba(255,255,255,0.15)', cursor: 'pointer', color: '#fff',
+          background: 'none', cursor: 'pointer', color: '#fff',
         }}
         title="Search documents"
       >

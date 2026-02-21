@@ -7,9 +7,10 @@ interface FileRowProps {
   onContextMenu: (e: React.MouseEvent) => void
   selected?: boolean
   onToggleSelect?: (uuid: string) => void
+  snippet?: string
 }
 
-export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect }: FileRowProps) {
+export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect, snippet }: FileRowProps) {
   return (
     <tr
       className="hover:bg-[#a6b5c945]"
@@ -39,20 +40,43 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect 
             <FileText className="h-4 w-4 shrink-0" style={{ color: 'rgb(206, 206, 206)' }} />
           )}
 
-          {/* File name */}
-          <span
+          {/* File name + snippet */}
+          <div
             style={{
-              maxWidth: 300,
               paddingLeft: 10,
               paddingRight: 10,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              color: '#17181abb',
+              minWidth: 0,
+              flex: 1,
             }}
           >
-            {doc.title}
-          </span>
+            <span
+              style={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                color: '#17181abb',
+              }}
+            >
+              {doc.title}
+            </span>
+            {snippet && (
+              <span
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  fontSize: '0.78em',
+                  color: '#6b7280',
+                  lineHeight: 1.4,
+                  marginTop: 2,
+                }}
+              >
+                {snippet}
+              </span>
+            )}
+          </div>
 
           {/* Date / status */}
           <span
