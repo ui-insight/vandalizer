@@ -1,5 +1,6 @@
 """Workflow API routes."""
 
+import asyncio
 import base64
 import csv
 import io
@@ -62,6 +63,46 @@ async def get_workflow_status(session_id: str, user: User = Depends(get_current_
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
     return WorkflowStatusResponse(**status)
+
+
+@router.get("/status/stream")
+async def stream_workflow_status(session_id: str, user: User = Depends(get_current_user)):
+    """SSE endpoint that streams workflow status updates until completion."""
+
+    async def event_generator():
+        last_json = ""
+        not_found_retries = 0
+        while True:
+            status = await svc.get_workflow_status(session_id)
+            if not status:
+                not_found_retries += 1
+                # Allow a few retries for the workflow result to appear in the DB
+                if not_found_retries > 10:
+                    yield f"data: {json.dumps({'error': 'not_found'})}\n\n"
+                    return
+                await asyncio.sleep(1.0)
+                continue
+
+            current_json = json.dumps(status, default=str)
+            # Only send if something changed
+            if current_json != last_json:
+                last_json = current_json
+                yield f"data: {current_json}\n\n"
+
+            if status.get("status") in ("completed", "error", "failed"):
+                return
+
+            await asyncio.sleep(1.5)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("/steps/test/{task_id}")

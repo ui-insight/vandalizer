@@ -1,3 +1,4 @@
+import { MessageSquare, BookOpen } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { AssistantTab } from './AssistantTab'
 import { LibraryTab } from './LibraryTab'
@@ -37,13 +38,13 @@ export function RightPanel() {
             key={tab}
             onClick={() => setActiveRightTab(tab)}
             className={cn(
-              'flex-1 text-center py-4 text-sm cursor-pointer transition-colors',
+              'flex-1 flex items-center justify-center gap-2 py-4 text-sm cursor-pointer transition-colors',
               activeRightTab === tab
                 ? 'bg-highlight text-highlight-text font-black'
                 : 'text-white font-black hover:bg-[#363636]',
             )}
           >
-            {tab === 'assistant' ? 'Assistant' : 'Library'}
+            {tab === 'assistant' ? <><MessageSquare className="h-4 w-4" /> Assistant</> : <><BookOpen className="h-4 w-4" /> Library</>}
           </button>
         ))}
       </div>

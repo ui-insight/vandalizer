@@ -3,7 +3,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
+from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
+from app.services import activity_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
@@ -166,11 +168,35 @@ async def build_from_document(uuid: str, req: BuildFromDocumentRequest, user: Us
 
 @router.post("/run-sync")
 async def run_extraction_sync(req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):
-    results = await svc.run_extraction_sync(
-        search_set_uuid=req.search_set_uuid,
-        document_uuids=req.document_uuids,
+    # Look up the search set for the activity title
+    ss = await svc.get_search_set(req.search_set_uuid)
+    title = ss.title if ss else req.search_set_uuid
+
+    # Create activity event
+    activity = await activity_service.activity_start(
+        type=ActivityType.SEARCH_SET_RUN,
+        title=title,
         user_id=user.user_id,
-        model=req.model,
-        extraction_config_override=req.extraction_config_override,
+        team_id=str(user.current_team) if user.current_team else None,
+        search_set_uuid=req.search_set_uuid,
     )
-    return {"results": results}
+
+    try:
+        results = await svc.run_extraction_sync(
+            search_set_uuid=req.search_set_uuid,
+            document_uuids=req.document_uuids,
+            user_id=user.user_id,
+            model=req.model,
+            extraction_config_override=req.extraction_config_override,
+        )
+        await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        await activity_service.activity_update(
+            activity.id,
+            documents_touched=len(req.document_uuids),
+        )
+        return {"results": results}
+    except Exception as e:
+        await activity_service.activity_finish(
+            activity.id, ActivityStatus.FAILED, error=str(e),
+        )
+        raise

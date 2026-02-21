@@ -30,9 +30,8 @@ export function useWorkflowRunner() {
     const { session_id } = await runWorkflow(workflowId, { document_uuids: documentUuids, model })
     setSessionId(session_id)
     // Start polling
-    intervalRef.current = setInterval(() => poll(session_id), 1500)
-    // Initial poll
     poll(session_id)
+    intervalRef.current = setInterval(() => poll(session_id), 2000)
   }, [poll])
 
   const reset = useCallback(() => {
