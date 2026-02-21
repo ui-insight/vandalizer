@@ -1,7 +1,8 @@
 import { useState, useEffect, type FormEvent } from 'react'
-import { Navigate, useSearch } from '@tanstack/react-router'
+import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
+import { Footer } from '../components/layout/Footer'
 import {
   FileText,
   Cpu,
@@ -23,6 +24,7 @@ import {
   PenTool,
   GraduationCap,
   Mail,
+  Github,
 } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
@@ -252,6 +254,30 @@ export default function Landing() {
 
   return (
     <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen relative">
+      {/* Fixed top nav */}
+      <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+          <span className="text-xl font-bold text-white">Vandalizer</span>
+          <div className="flex items-center gap-4">
+            <Link
+              to="/docs"
+              className="text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
+            >
+              Docs
+            </Link>
+            <a
+              href="https://github.com/ui-insight/vandalizer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
+            >
+              <Github className="w-4 h-4" />
+              GitHub
+            </a>
+          </div>
+        </div>
+      </nav>
+
       {/* Background Ambient Glow */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-yellow-600/10 rounded-full blur-[120px] animate-pulse" />
@@ -262,7 +288,7 @@ export default function Landing() {
       </div>
 
       {/* Hero */}
-      <div className="relative z-10 pt-16 pb-8 border-t border-white/5">
+      <div className="relative z-10 pt-32 pb-8 border-t border-white/5">
         {/* Tech Wave Background */}
         <div className="absolute top-[150px] left-0 w-full h-[350px] z-0 pointer-events-none opacity-25">
           <svg
@@ -810,6 +836,8 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      <Footer />
     </div>
   )
 }
