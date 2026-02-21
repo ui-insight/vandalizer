@@ -345,6 +345,72 @@ class DocumentManager:
             raise
             # close the client
 
+    # --- Knowledge Base methods ---
+
+    def get_kb_collection(self, kb_uuid: str) -> chromadb.Collection:
+        """Get or create a ChromaDB collection for a knowledge base."""
+        collection_name = f"kb_{kb_uuid}"
+        return self.client.get_or_create_collection(name=collection_name)
+
+    def add_to_kb(
+        self,
+        kb_uuid: str,
+        source_id: str,
+        source_name: str,
+        raw_text: str,
+    ) -> int:
+        """Chunk text, embed, and add to a KB collection. Returns chunk count."""
+        text_splits = self.text_splitter.split_text(raw_text)
+        splits = self.text_splitter.create_documents(text_splits)
+
+        for i, split in enumerate(splits):
+            if split.metadata is None:
+                split.metadata = {}
+            split.metadata.update(
+                {
+                    "source_id": source_id,
+                    "source_name": source_name,
+                    "chunk_index": i,
+                    "total_chunks": len(splits),
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+
+        collection = self.get_kb_collection(kb_uuid)
+        collection.add_documents(splits)
+        return len(splits)
+
+    def query_kb(
+        self,
+        kb_uuid: str,
+        query: str,
+        k: int = 8,
+    ) -> list[dict[str, Any]]:
+        """Similarity search on a KB collection."""
+        collection = self.get_kb_collection(kb_uuid)
+        results = collection.similarity_search(query, k=k)
+        return [
+            {"content": doc.page_content, "metadata": doc.metadata}
+            for doc in results
+        ]
+
+    def delete_kb_collection(self, kb_uuid: str) -> None:
+        """Drop an entire KB collection."""
+        collection_name = f"kb_{kb_uuid}"
+        try:
+            self.client.delete_collection(name=collection_name)
+        except Exception as e:
+            debug(f"Error deleting KB collection {collection_name}: {e}")
+
+    def delete_kb_source(self, kb_uuid: str, source_id: str) -> None:
+        """Remove all chunks for a single source from a KB collection."""
+        collection_name = f"kb_{kb_uuid}"
+        try:
+            collection = self.client.get_or_create_collection(name=collection_name)
+            collection.delete(where={"source_id": source_id})
+        except Exception as e:
+            debug(f"Error deleting KB source {source_id}: {e}")
+
     def list_user_documents(self, user_id: str) -> list[dict[str, Any]]:
         """List all documents in a user's collection with metadata."""
         collection = self.client.get_collection(name=f"user_{user_id}_docs")

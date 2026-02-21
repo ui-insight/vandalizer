@@ -114,6 +114,7 @@ async def chat(
             activity_id=str(activity.id) if activity else None,
             settings=settings,
             model_override=body.model,
+            kb_uuid=body.knowledge_base_uuid,
         ):
             yield chunk
 

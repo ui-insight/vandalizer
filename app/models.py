@@ -1950,6 +1950,98 @@ class IntakeConfig(me.Document):
     }
 
 
+# ---------------------------------------------------------------------------
+# Knowledge Bases
+# ---------------------------------------------------------------------------
+
+
+class KnowledgeBaseSource(me.Document):
+    """A single source (document or URL) within a knowledge base."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    knowledge_base = me.ReferenceField("KnowledgeBase", reverse_delete_rule=CASCADE)
+    source_type = me.StringField(
+        required=True, choices=["document", "url"]
+    )
+    document = me.ReferenceField("SmartDocument", required=False)
+    document_uuid = me.StringField(required=False, max_length=200)
+    url = me.StringField(required=False, max_length=2000)
+    url_title = me.StringField(required=False, max_length=500)
+    content = me.StringField(required=False)
+    status = me.StringField(
+        default="pending",
+        choices=["pending", "processing", "ready", "error"],
+    )
+    error_message = me.StringField(required=False, max_length=2000)
+    chunk_count = me.IntField(default=0)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    processed_at = me.DateTimeField(required=False)
+
+    meta = {
+        "collection": "knowledge_base_sources",
+        "indexes": [
+            "knowledge_base",
+            "uuid",
+        ],
+    }
+
+
+class KnowledgeBase(me.Document):
+    """A curated knowledge base built from documents and URLs."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    title = me.StringField(required=True, max_length=300)
+    description = me.StringField(required=False, max_length=5000)
+    user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(required=False, max_length=200)
+    space = me.StringField(required=False, max_length=200)
+    sources = me.ListField(
+        me.ReferenceField("KnowledgeBaseSource", reverse_delete_rule=PULL)
+    )
+    status = me.StringField(
+        default="empty",
+        choices=["empty", "building", "ready", "error"],
+    )
+    total_sources = me.IntField(default=0)
+    sources_ready = me.IntField(default=0)
+    sources_failed = me.IntField(default=0)
+    total_chunks = me.IntField(default=0)
+    collection_name = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "collection": "knowledge_bases",
+        "indexes": [
+            {"fields": ["user_id", "-created_at"]},
+            {"fields": ["team_id", "-created_at"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
+
+    def save(self, *args, **kwargs):
+        if not self.collection_name:
+            self.collection_name = f"kb_{self.uuid}"
+        self.updated_at = datetime.datetime.now()
+        return super().save(*args, **kwargs)
+
+    def recalculate_stats(self):
+        """Recalculate source stats from the actual source documents."""
+        sources = KnowledgeBaseSource.objects(knowledge_base=self)
+        self.total_sources = sources.count()
+        self.sources_ready = sources.filter(status="ready").count()
+        self.sources_failed = sources.filter(status="error").count()
+        self.total_chunks = sum(s.chunk_count for s in sources.filter(status="ready"))
+        # Update KB status
+        if self.total_sources == 0:
+            self.status = "empty"
+        elif self.sources_ready + self.sources_failed >= self.total_sources:
+            self.status = "error" if self.sources_failed > 0 and self.sources_ready == 0 else "ready"
+        else:
+            self.status = "building"
+        self.save()
+
+
 class M365AuditEntry(me.Document):
     """Immutable audit log for M365 integration actions."""
 

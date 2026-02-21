@@ -764,6 +764,7 @@ def chat() -> ResponseReturnValue:
 
     document_uuids = data["document_uuids"]
     folder = data["folder_uuid"]
+    knowledge_base_uuid = data.get("knowledge_base_uuid", None)
     documents = []
     user = current_user
     user_id = user.get_id()
@@ -859,6 +860,7 @@ def chat() -> ResponseReturnValue:
             default_docs=docs,
             user_id=user_id,
             session=session,
+            kb_uuid=knowledge_base_uuid,
         ):
             # You can yield raw text, HTML, JSON, or Server-Sent Events.
             yield chunk

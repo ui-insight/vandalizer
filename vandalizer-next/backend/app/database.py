@@ -25,6 +25,7 @@ from app.models.feedback import ChatFeedback, ExtractionQualityRecord
 from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
 from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 
 ALL_MODELS = [
     User,
@@ -60,6 +61,8 @@ ALL_MODELS = [
     IntakeConfig,
     WorkItem,
     Automation,
+    KnowledgeBase,
+    KnowledgeBaseSource,
 ]
 
 

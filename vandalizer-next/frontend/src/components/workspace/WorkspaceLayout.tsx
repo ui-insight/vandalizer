@@ -7,6 +7,7 @@ import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
 import { AutomationsPanel } from './AutomationsPanel'
+import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function WorkspaceLayout() {
@@ -28,6 +29,7 @@ export function WorkspaceLayout() {
 
   const isChat = workspaceMode === 'chat'
   const isAutomations = workspaceMode === 'automations'
+  const isKnowledge = workspaceMode === 'knowledge'
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
@@ -42,7 +44,7 @@ export function WorkspaceLayout() {
             transition: 'margin-right 0.3s ease',
           }}
         >
-          {/* Left panel area — hidden in chat mode, placeholder in automations */}
+          {/* Left panel area — hidden in chat mode, drawer in automations/knowledge */}
           <div
             className="overflow-hidden"
             style={{
@@ -51,7 +53,7 @@ export function WorkspaceLayout() {
               transition: 'width 0.3s ease',
             }}
           >
-            {isAutomations ? <AutomationsPanel /> : <LeftPanel />}
+            {isAutomations ? <AutomationsPanel /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
           {/* Resizer — hidden in chat mode */}

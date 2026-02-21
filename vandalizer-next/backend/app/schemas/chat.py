@@ -12,6 +12,7 @@ class ChatRequest(BaseModel):
     current_space_id: Optional[str] = None
     folder_uuid: Optional[str] = None
     model: Optional[str] = None
+    knowledge_base_uuid: Optional[str] = None
 
 
 class AddLinkRequest(BaseModel):

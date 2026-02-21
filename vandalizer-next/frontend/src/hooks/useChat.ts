@@ -17,7 +17,7 @@ export function useChat() {
   const thinkingDurationRef = useRef<number | null>(null)
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string) => {
       setError(null)
       setIsStreaming(true)
       setStreamingContent('')
@@ -51,6 +51,7 @@ export function useChat() {
             }
           },
           model,
+          knowledgeBaseUuid,
         )
 
         setConversationUuid(result.conversationUuid)

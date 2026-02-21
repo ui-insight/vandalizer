@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { X, Loader2 } from 'lucide-react'
+import { marked } from 'marked'
 import { pollStatus } from '../../api/documents'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 interface RawTextModalProps {
   docUuid: string
@@ -10,6 +13,11 @@ interface RawTextModalProps {
 export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
+
+  const renderedHtml = useMemo(() => {
+    if (!text) return ''
+    return marked.parse(text) as string
+  }, [text])
 
   useEffect(() => {
     let cancelled = false
@@ -93,19 +101,15 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
               />
             </div>
           ) : (
-            <pre
+            <div
+              className="chat-markdown"
               style={{
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                fontFamily: 'monospace',
-                fontSize: 13,
-                lineHeight: 1.6,
-                margin: 0,
+                fontSize: 14,
+                lineHeight: 1.7,
                 color: '#333',
               }}
-            >
-              {text}
-            </pre>
+              dangerouslySetInnerHTML={{ __html: renderedHtml }}
+            />
           )}
         </div>
       </div>

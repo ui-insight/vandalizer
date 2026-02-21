@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import Settings
 from app.database import init_db
-from app.routers import activity, admin, auth, automations, chat, config, documents, extractions, feedback, files, folders, library, office, spaces, teams, verification, workflows
+from app.routers import activity, admin, auth, automations, chat, config, documents, extractions, feedback, files, folders, knowledge, library, office, spaces, teams, verification, workflows
 
 
 @lru_cache
@@ -49,6 +49,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(verification.router, prefix="/api/verification", tags=["verification"])
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
+app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
 
 
 @app.get("/api/health")

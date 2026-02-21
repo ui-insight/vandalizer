@@ -18,7 +18,7 @@ class DocumentManager:
 
     def __init__(self, persist_directory: str = "data/chromadb") -> None:
         self.persist_directory = persist_directory
-        self.embeddings = OpenAIEmbeddings()
+        self._embeddings = None
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200,
@@ -31,6 +31,12 @@ class DocumentManager:
             path=persist_directory,
             settings=ChromaSettings(anonymized_telemetry=False, is_persistent=True),
         )
+
+    @property
+    def embeddings(self):
+        if self._embeddings is None:
+            self._embeddings = OpenAIEmbeddings()
+        return self._embeddings
 
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
         collection_name = f"user_{user_id}_docs"
@@ -113,3 +119,74 @@ class DocumentManager:
             return
         collection = self.get_user_collection(user_id)
         collection.delete(where={"document_id": document_id})
+
+    # --- Knowledge Base methods ---
+
+    def get_kb_collection(self, kb_uuid: str) -> chromadb.Collection:
+        """Get or create a ChromaDB collection for a knowledge base."""
+        collection_name = f"kb_{kb_uuid}"
+        return self.client.get_or_create_collection(name=collection_name)
+
+    def add_to_kb(
+        self,
+        kb_uuid: str,
+        source_id: str,
+        source_name: str,
+        raw_text: str,
+    ) -> int:
+        """Chunk text, embed, and add to a KB collection. Returns chunk count."""
+        text_splits = self.text_splitter.split_text(raw_text)
+        if not text_splits:
+            return 0
+
+        collection = self.get_kb_collection(kb_uuid)
+
+        ids = []
+        documents = []
+        metadatas = []
+        for i, chunk in enumerate(text_splits):
+            ids.append(f"{source_id}_chunk_{i}")
+            documents.append(chunk)
+            metadatas.append({
+                "source_id": source_id,
+                "source_name": source_name,
+                "chunk_index": i,
+                "total_chunks": len(text_splits),
+                "timestamp": datetime.now().isoformat(),
+            })
+
+        collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        return len(text_splits)
+
+    def query_kb(
+        self,
+        kb_uuid: str,
+        query: str,
+        k: int = 8,
+    ) -> list[dict[str, Any]]:
+        """Similarity search on a KB collection."""
+        collection = self.get_kb_collection(kb_uuid)
+        results = collection.query(query_texts=[query], n_results=k)
+
+        output = []
+        if results and results.get("documents"):
+            for i, doc in enumerate(results["documents"][0]):
+                metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
+                output.append({"content": doc, "metadata": metadata})
+        return output
+
+    def delete_kb_collection(self, kb_uuid: str) -> None:
+        """Drop an entire KB collection."""
+        collection_name = f"kb_{kb_uuid}"
+        try:
+            self.client.delete_collection(name=collection_name)
+        except Exception as e:
+            logger.error(f"Error deleting KB collection {collection_name}: {e}")
+
+    def delete_kb_source(self, kb_uuid: str, source_id: str) -> None:
+        """Remove all chunks for a single source from a KB collection."""
+        try:
+            collection = self.get_kb_collection(kb_uuid)
+            collection.delete(where={"source_id": source_id})
+        except Exception as e:
+            logger.error(f"Error deleting KB source {source_id}: {e}")
