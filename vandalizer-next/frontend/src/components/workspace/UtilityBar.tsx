@@ -1,10 +1,11 @@
-import { MessageSquare, FolderOpen, Workflow } from 'lucide-react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
   { mode: 'chat', icon: MessageSquare, label: 'Chat' },
   { mode: 'files', icon: FolderOpen, label: 'Files' },
   { mode: 'automations', icon: Workflow, label: 'Automations' },
+  { mode: 'knowledge', icon: BookOpen, label: 'Knowledge' },
 ]
 
 export function UtilityBar() {

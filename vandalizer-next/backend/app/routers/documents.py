@@ -1,3 +1,5 @@
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
@@ -29,29 +31,34 @@ async def list_documents(
 
 @router.get("/search")
 async def search_documents(
-    q: str = Query(..., min_length=1),
+    q: str = Query(default="", min_length=0),
     limit: int = Query(default=20, ge=1, le=100),
     user: User = Depends(get_current_user),
 ):
-    """Search documents by title or content text."""
-    import re
-    regex = re.compile(re.escape(q), re.IGNORECASE)
-    results = await SmartDocument.find(
-        {
-            "$or": [
-                {"title": {"$regex": regex.pattern, "$options": "i"}},
-                {"raw_text": {"$regex": regex.pattern, "$options": "i"}},
-            ],
-            "user_id": user.user_id,
-        }
-    ).sort(-SmartDocument.created_at).limit(limit).to_list()
+    """Search documents by title or content text. Returns recent docs when q is empty."""
+    if not q.strip():
+        results = await SmartDocument.find(
+            {"user_id": user.user_id},
+        ).sort(-SmartDocument.created_at).limit(limit).to_list()
+    else:
+        regex = re.compile(re.escape(q), re.IGNORECASE)
+        results = await SmartDocument.find(
+            {
+                "$or": [
+                    {"title": {"$regex": regex.pattern, "$options": "i"}},
+                    {"raw_text": {"$regex": regex.pattern, "$options": "i"}},
+                ],
+                "user_id": user.user_id,
+            }
+        ).sort(-SmartDocument.created_at).limit(limit).to_list()
 
     items = []
     for doc in results:
         # Extract snippet around match in raw_text
         snippet = ""
-        if doc.raw_text:
-            match = regex.search(doc.raw_text)
+        if q.strip() and doc.raw_text:
+            rgx = re.compile(re.escape(q), re.IGNORECASE)
+            match = rgx.search(doc.raw_text)
             if match:
                 start = max(0, match.start() - 80)
                 end = min(len(doc.raw_text), match.end() + 80)

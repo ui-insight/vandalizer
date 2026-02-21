@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 
 type RightTab = 'assistant' | 'library'
-export type WorkspaceMode = 'chat' | 'files' | 'automations'
+export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge'
 
 interface WorkspaceContextValue {
   workspaceMode: WorkspaceMode
@@ -45,6 +45,11 @@ interface WorkspaceContextValue {
   /** Track document currently being processed (shown in chat panel) */
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
+  /** Active knowledge base for chat */
+  activeKBUuid: string | null
+  activeKBTitle: string | null
+  activateKB: (uuid: string, title: string) => void
+  deactivateKB: () => void
   /** Reset workspace to default home state */
   resetToHome: () => void
 }
@@ -84,7 +89,7 @@ function getStoredNumber(key: string, fallback: number): number {
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaceMode, _setWorkspaceMode] = useState<WorkspaceMode>(() =>
-    getStoredString('workspace:mode', 'files', ['chat', 'files', 'automations']),
+    getStoredString('workspace:mode', 'files', ['chat', 'files', 'automations', 'knowledge']),
   )
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
     _setWorkspaceMode(mode)
@@ -104,6 +109,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
+  const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
+  const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
 
   const bumpActivitySignal = useCallback(() => {
     setActivitySignal(prev => prev + 1)
@@ -159,6 +166,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setOpenExtractionId(null)
   }, [])
 
+  const activateKB = useCallback((uuid: string, title: string) => {
+    setActiveKBUuid(uuid)
+    setActiveKBTitle(title)
+    _setWorkspaceMode('chat')
+    localStorage.setItem('workspace:mode', 'chat')
+    setActiveRightTab('assistant')
+  }, [])
+
+  const deactivateKB = useCallback(() => {
+    setActiveKBUuid(null)
+    setActiveKBTitle(null)
+  }, [])
+
   const resetToHome = useCallback(() => {
     setOpenWorkflowId(null)
     setOpenExtractionId(null)
@@ -168,6 +188,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setLoadConversationId(null)
     setPendingChatMessage(null)
     setHighlightTerms([])
+    setActiveKBUuid(null)
+    setActiveKBTitle(null)
     _setWorkspaceMode('chat')
     localStorage.setItem('workspace:mode', 'chat')
   }, [])
@@ -223,6 +245,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         bumpActivitySignal,
         processingDoc,
         setProcessingDoc,
+        activeKBUuid,
+        activeKBTitle,
+        activateKB,
+        deactivateKB,
         resetToHome,
       }}
     >

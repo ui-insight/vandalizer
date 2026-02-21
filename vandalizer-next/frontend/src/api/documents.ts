@@ -21,8 +21,10 @@ export interface SearchResult {
   created_at: string | null
 }
 
-export function searchDocuments(query: string, limit: number = 20) {
+export function searchDocuments(query: string = '', limit: number = 20) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (query) params.set('q', query)
   return apiFetch<{ items: SearchResult[]; total: number }>(
-    `/api/documents/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    `/api/documents/search?${params}`
   )
 }

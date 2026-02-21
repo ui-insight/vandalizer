@@ -371,6 +371,7 @@ def get_agent_model(agent_model, thinking_override: Optional[bool] = None):
 # These MUST be defined before any agent creation functions are called
 _chat_agent_cache = {}
 _rag_agent_cache = {}
+_kb_rag_agent_cache = {}
 _prompt_agent_cache = {}
 _upload_agent_cache = {}
 _extraction_agent_cache = {}
@@ -415,6 +416,44 @@ def create_rag_agent(agent_model):
         )
 
     return _rag_agent_cache[cache_key]
+
+
+@dataclass
+class KBRagDeps:
+    doc_manager: DocumentManager
+    user_id: str
+    kb_uuid: str
+    documents: list[SmartDocument]
+
+
+def create_kb_rag_agent(agent_model):
+    """Create or retrieve a cached KB RAG agent."""
+    cache_key = f"kb_rag_{agent_model}"
+
+    if cache_key not in _kb_rag_agent_cache:
+        model = get_agent_model(agent_model)
+        _kb_rag_agent_cache[cache_key] = Agent(
+            model,
+            deps_type=KBRagDeps,
+            system_prompt="""You are a specialized knowledge assistant powered by retrieval-augmented generation, drawing from a curated knowledge base.
+
+When responding to queries:
+1. Carefully analyze the retrieved context from the knowledge base for relevance
+2. Synthesize information across multiple sources when appropriate
+3. Attribute information to its source (e.g., "According to [source name]...")
+4. Maintain the original meaning and nuance from source material
+5. Identify and reconcile any contradictions between different sources
+6. Distinguish between facts from the knowledge base and your own reasoning
+
+Response guidelines:
+- Begin with a direct answer when possible
+- Structure complex answers with clear headings or numbered points
+- Acknowledge information gaps explicitly
+- If the knowledge base doesn't contain sufficient information, clearly state so
+- Never fabricate information beyond what is provided in the context""",
+        )
+
+    return _kb_rag_agent_cache[cache_key]
 
 
 def create_chat_agent(
@@ -591,6 +630,62 @@ def retrieve(
         if result.get("metadata") is not None:
             content += f"Document title: {result['metadata'].get('document_name')}\n"
         content += f"Document content: {result['content']}\n\n"
+    return content
+
+
+kb_rag_agent = create_kb_rag_agent(get_default_model_name())
+
+
+@kb_rag_agent.tool
+def kb_retrieve(
+    context: RunContext[KBRagDeps],
+    question: str,
+):
+    """Retrieve relevant content from the knowledge base for a given question.
+
+    Args:
+        context: The call context
+        question: The question to search the knowledge base for
+
+    Returns:
+        Relevant content from the knowledge base
+    """
+    prompt_response = prompt_agent.run_sync(
+        f"Generate a prompt for the following user question: {question}",
+    )
+    prompt = prompt_response.output
+
+    # Query the KB collection
+    kb_results = context.deps.doc_manager.query_kb(
+        context.deps.kb_uuid,
+        prompt,
+        k=8,
+    )
+
+    # Optionally also query user's selected documents
+    doc_results = []
+    if context.deps.documents:
+        doc_ids = [doc.uuid for doc in context.deps.documents]
+        doc_results = context.deps.doc_manager.query_documents(
+            context.deps.user_id,
+            prompt,
+            doc_ids,
+            k=4,
+        )
+
+    content = "Knowledge Base Context:\n"
+    for result in kb_results:
+        source_name = result.get("metadata", {}).get("source_name", "Unknown")
+        content += f"Source: {source_name}\n"
+        content += f"Content: {result['content']}\n\n"
+
+    if doc_results:
+        content += "\nAdditional Document Context:\n"
+        for result in doc_results:
+            doc_name = result.get("metadata", {}).get("document_name", "Unknown")
+            content += f"Document: {doc_name}\n"
+            content += f"Content: {result['content']}\n\n"
+
     return content
 
 

@@ -29,7 +29,7 @@ from app.models import (
 from app.utilities.analytics_helper import (
     activity_finish,
 )
-from app.utilities.agents import RagDeps, create_chat_agent, create_rag_agent
+from app.utilities.agents import KBRagDeps, RagDeps, create_chat_agent, create_kb_rag_agent, create_rag_agent
 from app.utilities.config import get_user_model_name, settings
 from app.utilities.document_manager import DocumentManager
 from app.utilities.document_readers import extract_text_from_doc
@@ -150,6 +150,7 @@ class ChatManager:
         user_id=None,
         default_docs=None,
         include_next_step=True,
+        kb_uuid=None,
     ):
         if default_docs is None:
             default_docs = []
@@ -162,10 +163,32 @@ class ChatManager:
         docs_ids_string = "_".join([str(doc.id) for doc in docs])
         prompt = ""
 
+        # When a KB is active, always use KB RAG mode
+        if kb_uuid:
+            if len(docs) > 0:
+                prompt = "You are given a knowledge base and additional document(s). "
+            else:
+                prompt = "You are given a knowledge base. "
+            prompt += """Answer the query clearly and concisely, formatting your response in well-structured markdown.
+Do not restate or include the original query in your answer."""
+            if include_next_step:
+                prompt += """
+At the end of your response, provide a short, relevant suggestion for a logical next step related to the query, and phrase it as a question asking if the user would like to do that specific suggestion."""
+            prompt += f"""\n\n# Query: {question}\n"""
+            agent = create_kb_rag_agent(model)
+            return {
+                "agent": agent,
+                "prompt": prompt,
+                "previous_messages": previous_messages,
+                "user_id": user_id,
+                "full_text": "",
+                "kb_uuid": kb_uuid,
+            }
+
         if len(docs) > 0:
             prompt = "You are given the following document(s). "
 
-        prompt += """Answer the query clearly and concisely, formatting your response in well-structured markdown. 
+        prompt += """Answer the query clearly and concisely, formatting your response in well-structured markdown.
 Do not restate or include the original query in your answer."""
         if include_next_step:
             prompt += """
@@ -184,7 +207,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             prompt += f"""\n\n# Query: {question}\n\n# Context: \n{full_text}"""
             agent = create_chat_agent(model, include_next_step=include_next_step)
         else:
-            prompt += f"""\n\n# Document(s): {[doc.uuid for doc in documents]}\n""" 
+            prompt += f"""\n\n# Document(s): {[doc.uuid for doc in documents]}\n"""
             agent = create_rag_agent(model)
             debug("Rag chat", prompt)
 
@@ -332,6 +355,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
         user_id=None,
         default_docs=None,
         include_next_step=True,
+        kb_uuid=None,
     ):
         prepared_data = self._prepare_chat(
             model=model,
@@ -342,6 +366,7 @@ At the end of your response, provide a short, relevant suggestion for a logical 
             user_id=user_id,
             default_docs=default_docs,
             include_next_step=include_next_step,
+            kb_uuid=kb_uuid,
         )
         agent = prepared_data["agent"]
         prompt = prepared_data["prompt"]
@@ -382,9 +407,20 @@ At the end of your response, provide a short, relevant suggestion for a logical 
 
         full_response = []
 
+        # Build deps for KB RAG mode
+        active_kb_uuid = prepared_data.get("kb_uuid")
+        iter_kwargs = {"message_history": previous_messages}
+        if active_kb_uuid:
+            iter_kwargs["deps"] = KBRagDeps(
+                doc_manager=DocumentManager(),
+                user_id=user_id or "0",
+                kb_uuid=active_kb_uuid,
+                documents=list(documents),
+            )
+
         async def streamer():
             async with agent.iter(
-                prompt, message_history=previous_messages
+                prompt, **iter_kwargs
             ) as agent_run:
                 async for node in agent_run:
                     if Agent.is_model_request_node(node):

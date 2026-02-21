@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileInput, Loader2 } from 'lucide-react'
+import { FileInput, Loader2, BookOpen, X } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -29,7 +29,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     loadHistory,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -81,7 +81,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
 
   const handleSend = (message: string) => {
-    send(message, selectedDocUuids, selectedModel || undefined)
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined)
   }
 
   const handleAttachFile = async (files: File[]) => {
@@ -327,6 +327,40 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* KB active badge */}
+      {activeKBUuid && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '6px 16px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--highlight-color, #eab308)',
+            backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+            borderTop: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)',
+          }}
+        >
+          <BookOpen size={14} />
+          <span style={{ flex: 1 }}>Knowledge Base: {activeKBTitle}</span>
+          <button
+            onClick={deactivateKB}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              color: 'inherit',
+              opacity: 0.7,
+            }}
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Input */}
       <ChatInput

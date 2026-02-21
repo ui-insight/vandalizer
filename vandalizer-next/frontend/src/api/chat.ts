@@ -8,6 +8,7 @@ export async function streamChat(
   currentSpaceId?: string | null,
   onChunk?: (chunk: StreamChunk) => void,
   model?: string,
+  knowledgeBaseUuid?: string,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -18,6 +19,7 @@ export async function streamChat(
       document_uuids: documentUuids,
       activity_id: activityId || null,
       current_space_id: currentSpaceId || null,
+      knowledge_base_uuid: knowledgeBaseUuid || null,
       ...(model ? { model } : {}),
     }),
   })

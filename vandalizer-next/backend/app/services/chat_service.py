@@ -35,6 +35,7 @@ async def chat_stream(
     activity_id: Optional[str] = None,
     settings=None,
     model_override: Optional[str] = None,
+    kb_uuid: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -95,6 +96,20 @@ async def chat_stream(
     agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
 
     parts: list[str] = []
+
+    # KB context: query ChromaDB for relevant chunks
+    if kb_uuid:
+        import asyncio
+        from app.services.document_manager import DocumentManager
+        dm = DocumentManager()
+        kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
+        if kb_results:
+            kb_text = "\n\n## Knowledge Base Context:\n"
+            for r in kb_results:
+                src = r.get("metadata", {}).get("source_name", "Unknown")
+                kb_text += f"\n**Source: {src}**\n{r['content']}\n"
+            parts.append(kb_text)
+
     if full_text:
         parts.append(full_text)
     if attachment_context:

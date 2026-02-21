@@ -26,6 +26,7 @@ from app.models.library import LibraryScope, LibraryItemKind, LibraryFolder, Lib
 from app.models.feedback import ExtractionQualityRecord
 from app.models.verification import VerificationStatus, VerificationRequest
 from app.models.office import IntakeConfig, WorkItem
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 
 __all__ = [
     "User",
@@ -63,4 +64,6 @@ __all__ = [
     "VerificationRequest",
     "IntakeConfig",
     "WorkItem",
+    "KnowledgeBase",
+    "KnowledgeBaseSource",
 ]

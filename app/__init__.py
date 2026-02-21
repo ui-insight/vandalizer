@@ -215,6 +215,7 @@ from .blueprints.admin.routes import admin  # noqa: E402
 from .blueprints.auth.routes import auth  # noqa: E402
 from .blueprints.automation.routes import automation  # noqa: E402
 from .blueprints.browser_automation.routes import browser_automation_bp  # noqa: E402
+from .blueprints.knowledge.routes import knowledge  # noqa: E402
 from .blueprints.feedback.routes import feedback  # noqa: E402
 from .blueprints.files.routes import files  # noqa: E402
 from .blueprints.home.routes import home  # noqa: E402
@@ -239,12 +240,14 @@ app.register_blueprint(teams, url_prefix="/teams")
 app.register_blueprint(activity, url_prefix="/activity")
 app.register_blueprint(automation, url_prefix="/automation")
 app.register_blueprint(browser_automation_bp, url_prefix="/browser_automation")
+app.register_blueprint(knowledge, url_prefix="/knowledge")
 
 # Import Celery tasks so they're registered when app starts
 # This ensures tasks are discovered by Celery workers
 with app.app_context():
     from app.utilities import activity_description  # noqa: F401
     from app.utilities import evaluation_tasks  # noqa: F401
+    from app.utilities import knowledge_base_tasks  # noqa: F401
 
 # --- 4. CONDITIONAL AUTHENTICATION SETUP ---
 auth_methods = get_auth_methods()
