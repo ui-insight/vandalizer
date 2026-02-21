@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+html {
+  scroll-behavior: smooth;
+}
+
 @theme {
   --color-highlight: var(--highlight-color, #eab308);
   --color-highlight-text: var(--highlight-text-color, #000000);

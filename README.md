@@ -1,116 +1,93 @@
-# Document Review with LLM Models
+# Vandalizer
 
-A Flask-based application for document review and processing using large language models.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
+[![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
+[![NSF Award #2427549](https://img.shields.io/badge/NSF-2427549-blue.svg)](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2427549)
 
-Wee!
+**AI-powered document intelligence for research administration.**
+
+Vandalizer is an open-source platform built at the University of Idaho for AI-powered document review, extraction, and chat. Upload documents, run LLM-powered extraction workflows, chat with your documents via RAG, and collaborate in teams.
 
 ## Features
 
-- Document upload and storage
-- AI-powered document analysis and grading
-- Background task processing with Celery
-- Azure-based OAuth authentication
-- Rollbar error tracking
-- Email notifications
+- **Structured Extraction** - Pull dates, budgets, requirements, and more from PDFs into clean structured data
+- **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution
+- **RAG Chat** - Ask questions against your document collection with citation-backed answers
+- **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
+- **Self-Hosted** - Run on your own infrastructure with full control over your data
 
-## Displaying Release Notes
-1. You can show release notes to the users by updating __init__.py
-2. Simply iterate the CURRENT_RELEASE_VERSION to a higher number
-3. Update RELEASE_NOTES with your text
-
-## Deployment
-
-Before deploying to each environment, update the configuration by:
-
-1. Setting `FLASK_ENV` to `Development`, `Testing`, or `Production`.
-2. Setting the `OPENAI_API_KEY` environment variable appropriately for the deployment.
-3. Restarting the Flask and Celery services. Restart Celery by running `./run_celery.sh start`
-4. To see the logs run `./run_celery.sh logs`. For a specific queues run `./run_celery.sh logs <queue_name>`.
-5. Installing `Pandoc` with `pdflatex` for Docx to PDF conversion:
-- 5.a MacOS: 
-```bash
-brew install --cask mactex
-brew install pandoc
-```
-
-- 5.b Debian/Ubuntu: 
-```bash
-sudo apt-get update 
-sudo apt-get install pandoc texlive-latex
-```
-
-- 5.c Rocky Linux/CentOS:
+## Quickstart
 
 ```bash
-sudo dnf update 
-sudo dnf install pandoc texlive-latex
+# Clone the repository
+git clone https://github.com/ui-insight/vandalizer.git
+cd vandalizer
+
+# Start infrastructure (Redis, MongoDB, ChromaDB)
+docker compose up -d redis mongo chromadb
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your OPENAI_API_KEY and other settings
+
+# Install backend dependencies and run
+uv sync
+python run.py
+
+# In another terminal - start the frontend
+cd vandalizer-next/frontend
+npm install
+npm run dev
+
+# In another terminal - start Celery workers
+./run_celery.sh start
 ```
 
+## Environment Variables
 
-## Installation
+Copy `.env.example` to `.env`. Key variables:
 
-### Prerequisites
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | Yes | API key for LLM provider |
+| `FLASK_ENV` | Yes | `development` / `testing` / `production` |
+| `SECRET_KEY` | Yes | Flask secret key for sessions |
+| `SECURITY_PASSWORD_SALT` | Yes | Salt for password hashing |
+| `MONGO_HOST` | Yes | MongoDB connection host |
+| `redis_host` | Yes | Redis connection host |
 
-- Python 3.9+
-- Redis server (for Celery broker and backend)
-- MongoDB server
-- Mail server accessible by SMTP
+See `.env.example` for the full list.
 
-### Installation
+## Architecture
 
-1. Clone the repository:
+```
+React Frontend  -->  Flask Backend  -->  MongoDB
+                         |
+                    Celery Workers
+                         |
+              Redis / ChromaDB / LLM APIs
+```
 
-   ```bash
-   git clone git@github.com:your-org/your-repo.git
-   cd your-repo
-   ```
+- **Backend**: Flask with app factory pattern, MongoEngine models, pydantic-ai agents
+- **Frontend**: React 19, Tailwind CSS v4, TanStack Router
+- **Task Queues**: Celery with 4 named queues (uploads, documents, workflows, default)
+- **Vector Store**: ChromaDB for document embeddings and RAG
+- **Package Manager**: `uv` (Python), `npm` (frontend)
 
-2. Create and activate a virtual environment:
+## Documentation
 
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   ```
+- [Full Documentation](/docs) (when running locally)
+- [Contributing Guide](CONTRIBUTING.md)
+- [Code of Conduct](CODE_OF_CONDUCT.md)
+- [Security Policy](SECURITY.md)
 
-3. Install dependencies:
+## License
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+This project is licensed under the GNU General Public License v3.0. See [LICENSE.MD](LICENSE.MD) for details.
 
-4. Copy `.env.example` to `.env` and fill in the required secrets.
+## Acknowledgments
 
-## Necessary Secrets
+This material is based upon work supported by the **National Science Foundation** under Award No. **2427549**. Any opinions, findings, and conclusions or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation.
 
-The following environment variables must be set:
-
-- `SECRET_KEY`: Flask secret key
-- `SECURITY_PASSWORD_SALT`: Salt for security-related operations
-- `CLIENT_ID`, `CLIENT_SECRET`, `TENANT_NAME`: Azure OAuth credentials
-- `MONGODB_SETTINGS__DB`: Mongo database name (e.g. `osp_dev`, `osp_prod`, etc.)
-- `MONGODB_SETTINGS__HOST`, `MONGODB_SETTINGS__PORT`: Mongo host and port if not default
-- `REDIS_BROKER_URL`, `REDIS_RESULT_BACKEND`: Redis connection URLs for Celery (optional, override defaults)
-- `ROLLBAR_ACCESS_TOKEN`: Rollbar API token
-- `MAIL_SERVER`, `MAIL_PORT`, `MAIL_DEFAULT_SENDER`: Mail server settings if different from defaults
-
-## Testing
-
-We have End-to-End tests written in pytest and Selenium.
-
-- To run against the dev server:
-
-  ```bash
-  tox run
-  ```
-
-  This uses `https://vandalizer-dev.nkn.uidaho.edu` and runs in a headless browser.
-
-- To run locally:
-
-  ```bash
-  pytest
-  ```
-
-
-
-
+Developed by the [Artificial Intelligence for Research Administration (AI4RA)](https://ai4ra.uidaho.edu) team at the **University of Idaho**.
