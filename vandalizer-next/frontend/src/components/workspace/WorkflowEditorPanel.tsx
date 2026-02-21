@@ -636,24 +636,27 @@ function DesignCanvas({
         </div>
       ))}
 
-      <ConnectionLine />
-
-      {/* +ADD STEP */}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <button
-          onClick={onAddStep}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '10px 24px',
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            border: 'none', borderRadius: 'var(--ui-radius, 8px)',
-            fontSize: 13, fontWeight: 700, cursor: 'pointer',
-          }}
-        >
-          <Plus style={{ width: 16, height: 16 }} />
-          ADD STEP
-        </button>
-      </div>
+      {/* +ADD STEP — hidden when the last step is an output step */}
+      {!(workflow.steps.length > 0 && workflow.steps[workflow.steps.length - 1].is_output) && (
+        <>
+          <ConnectionLine />
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <button
+              onClick={onAddStep}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '10px 24px',
+                backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)',
+                border: 'none', borderRadius: 'var(--ui-radius, 8px)',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              <Plus style={{ width: 16, height: 16 }} />
+              ADD STEP
+            </button>
+          </div>
+        </>
+      )}
 
       {/* Workflow output (during/after run) */}
       {(runnerRunning || runnerStatus) && (

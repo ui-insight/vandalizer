@@ -17,7 +17,6 @@ from app.models.workflow import (
     WorkflowStepTask,
 )
 from app.services.config_service import get_user_model_name
-from app.tasks.workflow_tasks import execute_task_step_test, execute_workflow_task
 
 
 # ---------------------------------------------------------------------------
@@ -271,11 +270,15 @@ async def run_workflow(workflow_id: str, document_uuids: list[str], user_id: str
 
     trigger_step_data = {"doc_uuids": document_uuids}
 
-    execute_workflow_task.delay(
-        workflow_result_id=str(result.id),
-        workflow_id=str(wf.id),
-        trigger_step_data=trigger_step_data,
-        model=model,
+    celery_app.send_task(
+        "tasks.workflow_next.execution",
+        kwargs={
+            "workflow_result_id": str(result.id),
+            "workflow_id": str(wf.id),
+            "trigger_step_data": trigger_step_data,
+            "model": model,
+        },
+        queue="workflows",
     )
 
     return session_id
@@ -313,10 +316,14 @@ async def test_step(task_name: str, task_data: dict, document_uuids: list[str], 
         ).to_list()
         task_data["keys"] = [item.searchphrase for item in items]
 
-    result = execute_task_step_test.delay(
-        task_name=task_name,
-        task_data=task_data,
-        doc_uuids=document_uuids,
+    result = celery_app.send_task(
+        "tasks.workflow_next.execution_step_test",
+        kwargs={
+            "task_name": task_name,
+            "task_data": task_data,
+            "doc_uuids": document_uuids,
+        },
+        queue="workflows",
     )
     return result.id
 
