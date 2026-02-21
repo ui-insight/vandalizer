@@ -29,4 +29,4 @@ class ExtractionQualityRecord(Document):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
 
     class Settings:
-        name = "extraction_quality_records"
+        name = "extraction_quality_record"

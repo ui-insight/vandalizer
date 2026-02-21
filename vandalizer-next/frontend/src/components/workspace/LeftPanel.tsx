@@ -122,7 +122,7 @@ export function LeftPanel() {
         <div style={{ paddingLeft: 15, width: 50 }}>
           {viewingDoc && (
             <button
-              onClick={() => setViewingDoc(null)}
+              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]) }}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
               <ArrowLeft className="h-6 w-6 text-white" />
