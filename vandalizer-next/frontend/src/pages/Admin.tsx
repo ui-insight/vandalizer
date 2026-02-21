@@ -1,23 +1,28 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Shield, BarChart3, Users, Building2, Workflow, Settings,
   Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
   ChevronRight, RefreshCw, MessageSquare, Search, Zap,
-  CheckCircle2, XCircle, Clock, UserCircle,
+  CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
+  ChevronDown, ChevronUp, ArrowUpDown,
 } from 'lucide-react'
+import {
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+} from 'recharts'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
 import {
-  getUsageStats, getUserLeaderboard, getTeamLeaderboard,
+  getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getWorkflowEvents, getSystemConfig, updateSystemConfig,
   addModel, updateModel, deleteModel, addOAuthProvider, updateOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
 } from '../api/admin'
 import type {
-  UsageStats, UserLeaderboardItem, TeamLeaderboardItem,
+  UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
   WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
 } from '../api/admin'
 
@@ -37,6 +42,8 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
+const CHART_COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4']
+
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
   if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K'
@@ -54,13 +61,29 @@ function formatDateTime(d: string | null): string {
 }
 
 function formatDuration(ms: number | null): string {
-  if (ms === null) return '-'
+  if (ms === null || ms === undefined) return '-'
   if (ms < 1000) return `${ms}ms`
   const secs = ms / 1000
   if (secs < 60) return `${secs.toFixed(1)}s`
   const mins = Math.floor(secs / 60)
   const remainSecs = Math.round(secs % 60)
   return `${mins}m ${remainSecs}s`
+}
+
+function downloadCSV(filename: string, headers: string[], rows: (string | number | null)[][]) {
+  const escape = (v: string | number | null) => {
+    if (v === null || v === undefined) return ''
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [headers.join(','), ...rows.map(r => r.map(escape).join(','))].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -83,7 +106,41 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function KpiCard({ label, value, icon: Icon, color }: { label: string; value: string | number; icon: typeof BarChart3; color: string }) {
+function RoleBadge({ role }: { role: string }) {
+  const colors: Record<string, { bg: string; text: string }> = {
+    admin: { bg: '#fef3c7', text: '#92400e' },
+    examiner: { bg: '#dbeafe', text: '#1e40af' },
+  }
+  const c = colors[role] || { bg: '#f3f4f6', text: '#374151' }
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 9999,
+      fontSize: 10, fontWeight: 700, backgroundColor: c.bg, color: c.text,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    }}>
+      {role}
+    </span>
+  )
+}
+
+function TrendDelta({ current, previous, invert }: { current: number; previous: number; invert?: boolean }) {
+  if (previous === 0 && current === 0) return null
+  const pct = previous === 0 ? 100 : Math.round(((current - previous) / previous) * 100)
+  const isUp = pct > 0
+  const isGood = invert ? !isUp : isUp
+  if (pct === 0) return <span style={{ fontSize: 11, color: '#9ca3af' }}>0%</span>
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 11, fontWeight: 600, color: isGood ? '#16a34a' : '#dc2626' }}>
+      {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+      {isUp ? '+' : ''}{pct}%
+    </span>
+  )
+}
+
+function KpiCard({ label, value, icon: Icon, color, trend }: {
+  label: string; value: string | number; icon: typeof BarChart3; color: string
+  trend?: { current: number; previous: number; invert?: boolean }
+}) {
   return (
     <div style={{
       background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
@@ -97,7 +154,10 @@ function KpiCard({ label, value, icon: Icon, color }: { label: string; value: st
       </div>
       <div>
         <div style={{ fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 500 }}>{label}</div>
-        <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{value}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{value}</div>
+          {trend && <TrendDelta current={trend.current} previous={trend.previous} invert={trend.invert} />}
+        </div>
       </div>
     </div>
   )
@@ -116,21 +176,94 @@ function UserAvatar({ name }: { name: string | null }) {
   )
 }
 
+function SortableHeader({ label, sortKey, currentSort, onSort }: {
+  label: string; sortKey: string
+  currentSort: { key: string; dir: 'asc' | 'desc' }
+  onSort: (key: string) => void
+}) {
+  const active = currentSort.key === sortKey
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      style={{
+        padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280',
+        textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+        {label}
+        {active ? (currentSort.dir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : <ArrowUpDown size={10} style={{ opacity: 0.4 }} />}
+      </span>
+    </th>
+  )
+}
+
+function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+  return (
+    <div style={{ position: 'relative', maxWidth: 300 }}>
+      <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+      <input
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{
+          width: '100%', padding: '7px 12px 7px 32px', borderRadius: 'var(--ui-radius, 12px)',
+          border: '1px solid #e5e7eb', fontSize: 13, outline: 'none',
+        }}
+      />
+    </div>
+  )
+}
+
+function ExportButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+        borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+        fontSize: 12, fontWeight: 500, cursor: 'pointer', background: '#fff', color: '#374151',
+      }}
+    >
+      <Download size={13} /> Export CSV
+    </button>
+  )
+}
+
 // ──────────────────────────────────────────
 // Usage Tab
 // ──────────────────────────────────────────
 
 function UsageTab() {
   const [stats, setStats] = useState<UsageStats | null>(null)
+  const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
 
   const load = useCallback(() => {
     setLoading(true)
-    getUsageStats(days).then(setStats).finally(() => setLoading(false))
+    Promise.all([getUsageStats(days), getUsageTimeseries(days)])
+      .then(([s, ts]) => { setStats(s); setTimeseries(ts) })
+      .finally(() => setLoading(false))
   }, [days])
 
   useEffect(() => { load() }, [load])
+
+  const prev = timeseries?.previous_period
+
+  // Token donut data
+  const tokenDonut = stats ? [
+    { name: 'Input', value: stats.tokens_in },
+    { name: 'Output', value: stats.tokens_out },
+  ] : []
+
+  // Workflow status donut
+  const workflowDonut = stats ? [
+    { name: 'Completed', value: stats.workflows_completed },
+    { name: 'Failed', value: stats.workflows_failed },
+    { name: 'Other', value: Math.max(0, stats.workflows_started - stats.workflows_completed - stats.workflows_failed) },
+  ].filter(d => d.value > 0) : []
 
   if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading usage data...</div>
 
@@ -160,32 +293,86 @@ function UsageTab() {
 
       {stats && (
         <>
-          {/* KPI Grid */}
+          {/* KPI Grid with trend deltas */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            <KpiCard label="Conversations" value={formatNumber(stats.conversations)} icon={MessageSquare} color="#3b82f6" />
-            <KpiCard label="Search Runs" value={formatNumber(stats.search_runs)} icon={Search} color="#8b5cf6" />
-            <KpiCard label="Workflows Started" value={formatNumber(stats.workflows_started)} icon={Zap} color="#f59e0b" />
-            <KpiCard label="Completed" value={formatNumber(stats.workflows_completed)} icon={CheckCircle2} color="#22c55e" />
-            <KpiCard label="Failed" value={formatNumber(stats.workflows_failed)} icon={XCircle} color="#ef4444" />
-            <KpiCard label="Active Users" value={formatNumber(stats.active_users)} icon={Users} color="#06b6d4" />
+            <KpiCard label="Conversations" value={formatNumber(stats.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: stats.conversations, previous: prev.conversations } : undefined} />
+            <KpiCard label="Search Runs" value={formatNumber(stats.search_runs)} icon={Search} color="#8b5cf6" trend={prev ? { current: stats.search_runs, previous: prev.search_runs } : undefined} />
+            <KpiCard label="Workflows Started" value={formatNumber(stats.workflows_started)} icon={Zap} color="#f59e0b" trend={prev ? { current: stats.workflows_started, previous: prev.workflows_started } : undefined} />
+            <KpiCard label="Completed" value={formatNumber(stats.workflows_completed)} icon={CheckCircle2} color="#22c55e" trend={prev ? { current: stats.workflows_completed, previous: prev.workflows_completed } : undefined} />
+            <KpiCard label="Failed" value={formatNumber(stats.workflows_failed)} icon={XCircle} color="#ef4444" trend={prev ? { current: stats.workflows_failed, previous: prev.workflows_failed, invert: true } : undefined} />
+            <KpiCard label="Active Users" value={formatNumber(stats.active_users)} icon={Users} color="#06b6d4" trend={prev ? { current: stats.active_users, previous: prev.active_users } : undefined} />
           </div>
 
-          {/* Token Usage */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Token Usage</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24 }}>
-              <div>
-                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Input Tokens</div>
-                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_in)}</div>
+          {/* Daily Activity Chart */}
+          {timeseries && timeseries.days.length > 0 && (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Daily Activity</div>
+              <ResponsiveContainer width="100%" height={280}>
+                <AreaChart data={timeseries.days}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
+                  <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+                  <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
+                  <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
+                  <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
+                  <Area type="monotone" dataKey="search_runs" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.15} name="Searches" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Token + Workflow donut charts side by side */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Token Breakdown</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Input Tokens</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_in)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Output Tokens</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_out)}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Output Tokens</div>
-                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_out)}</div>
+              {(stats.tokens_in + stats.tokens_out) > 0 && (
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={tokenDonut} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                      {tokenDonut.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
+                    </Pie>
+                    <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Workflow Status</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Success Rate</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>
+                    {stats.workflows_started > 0 ? `${Math.round((stats.workflows_completed / stats.workflows_started) * 100)}%` : '-'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Total</div>
+                  <div style={{ fontSize: 22, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_in + stats.tokens_out)}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 12, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>Total Tokens</div>
-                <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(stats.tokens_in + stats.tokens_out)}</div>
-              </div>
+              {workflowDonut.length > 0 && (
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie data={workflowDonut} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+                      {workflowDonut.map((_, i) => <Cell key={i} fill={[CHART_COLORS[1], CHART_COLORS[3], CHART_COLORS[5]][i]} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
@@ -193,12 +380,18 @@ function UsageTab() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Active Teams</div>
-              <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_teams}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_teams}</div>
+                {prev && <TrendDelta current={stats.active_teams} previous={prev.active_teams} />}
+              </div>
               <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {days} days</div>
             </div>
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Active Users</div>
-              <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_users}</div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                <div style={{ fontSize: 36, fontWeight: 700, color: 'var(--highlight-color, #eab308)' }}>{stats.active_users}</div>
+                {prev && <TrendDelta current={stats.active_users} previous={prev.active_users} />}
+              </div>
               <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>in the last {days} days</div>
             </div>
           </div>
@@ -212,66 +405,124 @@ function UsageTab() {
 // Users Tab
 // ──────────────────────────────────────────
 
+type UserSortKey = 'tokens_total' | 'workflows_run' | 'conversations' | 'last_active' | 'name'
+
 function UsersTab() {
   const [users, setUsers] = useState<UserLeaderboardItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
 
   useEffect(() => {
     getUserLeaderboard().then(setUsers).finally(() => setLoading(false))
   }, [])
 
+  const handleSort = (key: string) => {
+    setSort(prev => ({
+      key: key as UserSortKey,
+      dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc',
+    }))
+  }
+
+  const filtered = useMemo(() => {
+    let list = users
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(u =>
+        (u.name || '').toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q)
+      )
+    }
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'name': cmp = (a.name || '').localeCompare(b.name || ''); break
+        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
+        case 'workflows_run': cmp = a.workflows_run - b.workflows_run; break
+        case 'conversations': cmp = a.conversations - b.conversations; break
+        case 'last_active': cmp = (a.last_active || '').localeCompare(b.last_active || ''); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [users, search, sort])
+
+  const maxTokens = users.length > 0 ? Math.max(...users.map(u => u.tokens_total), 1) : 1
+
+  const handleExport = () => {
+    downloadCSV('users.csv',
+      ['#', 'Name', 'Email', 'Roles', 'Tokens', 'Workflows', 'Conversations', 'Last Active'],
+      filtered.map((u, i) => [
+        i + 1, u.name, u.email,
+        [u.is_admin ? 'admin' : '', u.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '),
+        u.tokens_total, u.workflows_run, u.conversations, u.last_active,
+      ])
+    )
+  }
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading users...</div>
 
-  const maxTokens = users.length > 0 ? users[0].tokens_total : 1
-
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-        User Leaderboard ({users.length})
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={handleExport} />
       </div>
-      {users.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No activity recorded yet.</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Token Usage</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflows</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Last Active</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u, i) => (
-              <tr key={u.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <UserAvatar name={u.name || u.email} />
-                    <div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{u.name || 'Unknown'}</div>
-                      <div style={{ fontSize: 12, color: '#6b7280' }}>{u.email || u.user_id}</div>
-                    </div>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${(u.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
-                      {formatNumber(u.tokens_total)}
-                    </span>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{u.workflows_run}</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDate(u.last_active)}</td>
+
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+          User Leaderboard ({filtered.length})
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No users found.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
+                <SortableHeader label="User" sortKey="name" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Workflows" sortKey="workflows_run" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Chats" sortKey="conversations" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Last Active" sortKey="last_active" currentSort={sort} onSort={handleSort} />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {filtered.map((u, i) => (
+                <tr key={u.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <UserAvatar name={u.name || u.email} />
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 14, fontWeight: 500 }}>{u.name || 'Unknown'}</span>
+                          {u.is_admin && <RoleBadge role="admin" />}
+                          {u.is_examiner && <RoleBadge role="examiner" />}
+                        </div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{u.email || u.user_id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(u.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
+                        {formatNumber(u.tokens_total)}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{u.workflows_run}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{u.conversations}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDate(u.last_active)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
@@ -280,68 +531,117 @@ function UsersTab() {
 // Teams Tab
 // ──────────────────────────────────────────
 
+type TeamSortKey = 'name' | 'tokens_total' | 'workflows_completed' | 'active_users' | 'member_count' | 'avg_latency_ms'
+
 function TeamsTab() {
   const [teams, setTeams] = useState<TeamLeaderboardItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [sort, setSort] = useState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
 
   useEffect(() => {
     getTeamLeaderboard().then(setTeams).finally(() => setLoading(false))
   }, [])
 
+  const handleSort = (key: string) => {
+    setSort(prev => ({
+      key: key as TeamSortKey,
+      dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc',
+    }))
+  }
+
+  const filtered = useMemo(() => {
+    let list = teams
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      list = list.filter(t => t.name.toLowerCase().includes(q))
+    }
+    const sorted = [...list].sort((a, b) => {
+      let cmp = 0
+      switch (sort.key) {
+        case 'name': cmp = a.name.localeCompare(b.name); break
+        case 'tokens_total': cmp = a.tokens_total - b.tokens_total; break
+        case 'workflows_completed': cmp = a.workflows_completed - b.workflows_completed; break
+        case 'active_users': cmp = a.active_users - b.active_users; break
+        case 'member_count': cmp = a.member_count - b.member_count; break
+        case 'avg_latency_ms': cmp = (a.avg_latency_ms || 0) - (b.avg_latency_ms || 0); break
+      }
+      return sort.dir === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [teams, search, sort])
+
+  const maxTokens = teams.length > 0 ? Math.max(...teams.map(t => t.tokens_total), 1) : 1
+
+  const handleExport = () => {
+    downloadCSV('teams.csv',
+      ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
+      filtered.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
+    )
+  }
+
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading teams...</div>
 
-  const maxTokens = teams.length > 0 ? teams[0].tokens_total : 1
-
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-      <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-        Team Leaderboard ({teams.length})
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <SearchInput value={search} onChange={setSearch} placeholder="Search teams..." />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={handleExport} />
       </div>
-      {teams.length === 0 ? (
-        <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No team activity recorded.</div>
-      ) : (
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Team</th>
-              <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Token Usage</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflows</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Active Users</th>
-              <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Avg Latency</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map((t) => (
-              <tr key={t.team_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{
-                      width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                    }}>
-                      <Building2 size={16} color="#7c3aed" />
-                    </div>
-                    <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
-                      <div style={{ width: `${(t.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
-                    </div>
-                    <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
-                      {formatNumber(t.tokens_total)}
-                    </span>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.workflows_completed}</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.active_users}</td>
-                <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(t.avg_latency_ms)}</td>
+
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+          Team Leaderboard ({filtered.length})
+        </div>
+        {filtered.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No teams found.</div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} />
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {filtered.map((t) => (
+                <tr key={t.team_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                      }}>
+                        <Building2 size={16} color="#7c3aed" />
+                      </div>
+                      <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(t.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
+                        {formatNumber(t.tokens_total)}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.workflows_completed}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.active_users}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.member_count}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(t.avg_latency_ms)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
@@ -354,21 +654,64 @@ function WorkflowsTab() {
   const [data, setData] = useState<PaginatedWorkflows | null>(null)
   const [page, setPage] = useState(1)
   const [status, setStatus] = useState<string>('')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const searchDebounce = useRef<ReturnType<typeof setTimeout>>()
 
   const load = useCallback(() => {
     setLoading(true)
-    getWorkflowEvents(page, status || undefined).then(setData).finally(() => setLoading(false))
-  }, [page, status])
+    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).finally(() => setLoading(false))
+  }, [page, status, search])
 
   useEffect(() => { load() }, [load])
 
-  const filters = ['', 'completed', 'running', 'failed']
+  const handleSearchChange = (v: string) => {
+    if (searchDebounce.current) clearTimeout(searchDebounce.current)
+    searchDebounce.current = setTimeout(() => { setSearch(v); setPage(1) }, 400)
+  }
+
+  const filters = ['', 'completed', 'running', 'failed', 'queued', 'canceled']
+
+  const handleExport = () => {
+    if (!data) return
+    downloadCSV('workflows.csv',
+      ['Status', 'Workflow', 'User', 'Team', 'Steps', 'Tokens', 'Duration (ms)', 'Started'],
+      data.items.map(ev => [
+        ev.status, ev.title, ev.user_name || ev.user_id, ev.team_name || ev.team_id,
+        `${ev.steps_completed}/${ev.steps_total}`, ev.tokens_in + ev.tokens_out,
+        ev.duration_ms, ev.started_at,
+      ])
+    )
+  }
+
+  const summary = data?.summary
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Status filters */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      {/* Summary stats row */}
+      {summary && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
+          {[
+            { label: 'Total', value: formatNumber(summary.total), color: '#374151' },
+            { label: 'Success Rate', value: `${summary.success_rate}%`, color: '#16a34a' },
+            { label: 'Avg Duration', value: formatDuration(summary.avg_duration_ms), color: '#3b82f6' },
+            { label: 'Failed', value: formatNumber(summary.failed), color: '#dc2626' },
+            { label: 'Total Tokens', value: formatNumber(summary.total_tokens), color: '#8b5cf6' },
+          ].map(s => (
+            <div key={s.label} style={{
+              background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
+              padding: '14px 16px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 11, color: '#6b7280', textTransform: 'uppercase', marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: s.color, fontFamily: 'ui-monospace, monospace' }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Filters + search */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {filters.map(f => (
           <button
             key={f}
@@ -383,6 +726,9 @@ function WorkflowsTab() {
             {f || 'All'}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <SearchInput value="" onChange={handleSearchChange} placeholder="Search workflows..." />
+        <ExportButton onClick={handleExport} />
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
@@ -395,6 +741,7 @@ function WorkflowsTab() {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ padding: '10px 8px', width: 28 }} />
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflow</th>
                   <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
@@ -405,21 +752,84 @@ function WorkflowsTab() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map(ev => (
-                  <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
-                    <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
-                    <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>{ev.title || 'Untitled'}</td>
-                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{ev.user_id.slice(0, 8)}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13 }}>{ev.steps_completed}/{ev.steps_total}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>
-                      {formatNumber(ev.tokens_in + ev.tokens_out)}
-                    </td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(ev.duration_ms)}</td>
-                    <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDateTime(ev.started_at)}</td>
-                  </tr>
-                ))}
+                {data.items.map(ev => {
+                  const isExpanded = expandedId === ev.id
+                  return (
+                    <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : ev.id)}>
+                      <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                        {isExpanded ? <ChevronDown size={14} color="#6b7280" /> : <ChevronRight size={14} color="#9ca3af" />}
+                      </td>
+                      <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
+                      <td style={{ padding: '10px 16px', fontSize: 14, fontWeight: 500 }}>{ev.title || 'Untitled'}</td>
+                      <td style={{ padding: '10px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <UserAvatar name={ev.user_name || ev.user_email} />
+                          <div>
+                            <div style={{ fontSize: 13, fontWeight: 500 }}>{ev.user_name || 'Unknown'}</div>
+                            {ev.team_name && <div style={{ fontSize: 11, color: '#9ca3af' }}>{ev.team_name}</div>}
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13 }}>{ev.steps_completed}/{ev.steps_total}</td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>
+                        {formatNumber(ev.tokens_in + ev.tokens_out)}
+                      </td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(ev.duration_ms)}</td>
+                      <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDateTime(ev.started_at)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
+
+            {/* Expanded detail - rendered below table as an info panel */}
+            {expandedId && (() => {
+              const ev = data.items.find(e => e.id === expandedId)
+              if (!ev) return null
+              return (
+                <div style={{ padding: '16px 20px', borderTop: '1px solid #e5e7eb', background: '#f9fafb' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, fontSize: 13 }}>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>User ID</div>
+                      <div style={{ fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{ev.user_id}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Email</div>
+                      <div>{ev.user_email || '-'}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Team</div>
+                      <div>{ev.team_name || ev.team_id || '-'}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Finished</div>
+                      <div>{formatDateTime(ev.finished_at)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Input Tokens</div>
+                      <div style={{ fontFamily: 'ui-monospace, monospace' }}>{formatNumber(ev.tokens_in)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Output Tokens</div>
+                      <div style={{ fontFamily: 'ui-monospace, monospace' }}>{formatNumber(ev.tokens_out)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Duration</div>
+                      <div>{formatDuration(ev.duration_ms)}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#6b7280', fontWeight: 500, marginBottom: 4 }}>Steps</div>
+                      <div>{ev.steps_completed} / {ev.steps_total}</div>
+                    </div>
+                  </div>
+                  {ev.error && (
+                    <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8, color: '#991b1b', fontSize: 13 }}>
+                      {ev.error}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Pagination */}
             {data.pages > 1 && (

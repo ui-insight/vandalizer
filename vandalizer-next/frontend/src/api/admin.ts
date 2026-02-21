@@ -18,14 +18,40 @@ export function getUsageStats(days: number = 30) {
   return apiFetch<UsageStats>(`/api/admin/usage?days=${days}`)
 }
 
+// Timeseries
+
+export interface TimeseriesDayItem {
+  date: string
+  conversations: number
+  search_runs: number
+  workflows_started: number
+  workflows_completed: number
+  workflows_failed: number
+  tokens_in: number
+  tokens_out: number
+  active_users: number
+}
+
+export interface TimeseriesResponse {
+  days: TimeseriesDayItem[]
+  previous_period: UsageStats
+}
+
+export function getUsageTimeseries(days: number = 30) {
+  return apiFetch<TimeseriesResponse>(`/api/admin/usage/timeseries?days=${days}`)
+}
+
 // Users
 
 export interface UserLeaderboardItem {
   user_id: string
   name: string | null
   email: string | null
+  is_admin: boolean
+  is_examiner: boolean
   tokens_total: number
   workflows_run: number
+  conversations: number
   last_active: string | null
 }
 
@@ -42,6 +68,7 @@ export interface TeamLeaderboardItem {
   tokens_total: number
   workflows_completed: number
   active_users: number
+  member_count: number
   avg_latency_ms: number | null
 }
 
@@ -56,7 +83,10 @@ export interface WorkflowEventItem {
   status: string
   title: string | null
   user_id: string
+  user_name: string | null
+  user_email: string | null
   team_id: string | null
+  team_name: string | null
   started_at: string | null
   finished_at: string | null
   duration_ms: number | null
@@ -64,6 +94,17 @@ export interface WorkflowEventItem {
   tokens_out: number
   steps_completed: number
   steps_total: number
+  error: string | null
+}
+
+export interface WorkflowSummaryStats {
+  total: number
+  completed: number
+  failed: number
+  running: number
+  success_rate: number
+  avg_duration_ms: number | null
+  total_tokens: number
 }
 
 export interface PaginatedWorkflows {
@@ -71,11 +112,13 @@ export interface PaginatedWorkflows {
   total: number
   page: number
   pages: number
+  summary: WorkflowSummaryStats | null
 }
 
-export function getWorkflowEvents(page: number = 1, status?: string) {
+export function getWorkflowEvents(page: number = 1, status?: string, search?: string) {
   let url = `/api/admin/workflows?page=${page}&per_page=50`
   if (status) url += `&status=${encodeURIComponent(status)}`
+  if (search) url += `&search=${encodeURIComponent(search)}`
   return apiFetch<PaginatedWorkflows>(url)
 }
 

@@ -54,7 +54,7 @@ class VerificationRequest(Document):
     reviewed_at: Optional[datetime.datetime] = None
 
     class Settings:
-        name = "verification_requests"
+        name = "verification_request"
 
 
 class VerifiedItemMetadata(Document):
@@ -86,4 +86,4 @@ class VerifiedCollection(Document):
     )
 
     class Settings:
-        name = "verified_collections"
+        name = "verified_collection"

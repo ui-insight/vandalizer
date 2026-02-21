@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     openai_api_key: str = ""
     insight_endpoint: str = "https://mindrouter-api.nkn.uidaho.edu/v1"
-    chromadb_persist_dir: str = "data/chromadb"
+    chromadb_persist_dir: str = "../app/static/db"
     max_context_length: int = 100000
 
     @property
