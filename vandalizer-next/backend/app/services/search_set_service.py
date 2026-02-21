@@ -128,7 +128,22 @@ async def add_item(search_set_uuid: str, searchphrase: str, searchtype: str = "e
 
 
 async def list_items(search_set_uuid: str) -> list[SearchSetItem]:
-    return await SearchSetItem.find(SearchSetItem.searchset == search_set_uuid).to_list()
+    items = await SearchSetItem.find(SearchSetItem.searchset == search_set_uuid).to_list()
+    # Respect item_order if set on the parent SearchSet
+    ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
+    if ss and ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items.sort(key=lambda it: order_map.get(str(it.id), len(order_map)))
+    return items
+
+
+async def reorder_items(search_set_uuid: str, item_ids: list[str]) -> bool:
+    ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
+    if not ss:
+        return False
+    ss.item_order = item_ids
+    await ss.save()
+    return True
 
 
 async def delete_item(item_id: str) -> bool:

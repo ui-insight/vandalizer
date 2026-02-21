@@ -67,5 +67,21 @@ export function useSearchSetItems(searchSetUuid: string | null) {
     setItems(prev => prev.filter(i => i.id !== itemId))
   }
 
-  return { items, loading, refresh, add, remove }
+  const update = async (itemId: string, data: { searchphrase?: string; title?: string }) => {
+    const updated = await api.updateItem(itemId, data)
+    setItems(prev => prev.map(i => i.id === itemId ? updated : i))
+    return updated
+  }
+
+  const reorder = async (itemIds: string[]) => {
+    if (!searchSetUuid) return
+    // Optimistically reorder locally
+    setItems(prev => {
+      const map = new Map(prev.map(i => [i.id, i]))
+      return itemIds.map(id => map.get(id)).filter(Boolean) as SearchSetItem[]
+    })
+    await api.reorderItems(searchSetUuid, itemIds)
+  }
+
+  return { items, loading, refresh, add, remove, update, reorder }
 }

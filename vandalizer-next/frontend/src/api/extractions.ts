@@ -58,6 +58,15 @@ export function deleteItem(itemId: string) {
   return apiFetch<{ ok: boolean }>(`/api/extractions/items/${itemId}`, { method: 'DELETE' })
 }
 
+// Reorder items
+
+export function reorderItems(searchSetUuid: string, itemIds: string[]) {
+  return apiFetch<{ ok: boolean }>(`/api/extractions/search-sets/${searchSetUuid}/reorder-items`, {
+    method: 'POST',
+    body: JSON.stringify({ item_ids: itemIds }),
+  })
+}
+
 // Build from document (AI field generation)
 
 export function buildFromDocument(searchSetUuid: string, documentUuids: string[], model?: string) {

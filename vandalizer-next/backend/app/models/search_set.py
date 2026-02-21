@@ -38,6 +38,7 @@ class SearchSet(Document):
     verified: bool = False
     created_by_user_id: Optional[str] = None
     extraction_config: dict = {}
+    item_order: list[str] = []
 
     class Settings:
         name = "search_set"

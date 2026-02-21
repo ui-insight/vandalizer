@@ -1,8 +1,11 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 
 type RightTab = 'assistant' | 'library'
+export type WorkspaceMode = 'chat' | 'files' | 'automations'
 
 interface WorkspaceContextValue {
+  workspaceMode: WorkspaceMode
+  setWorkspaceMode: (mode: WorkspaceMode) => void
   selectedDocUuids: string[]
   setSelectedDocUuids: (uuids: string[]) => void
   activeRightTab: RightTab
@@ -25,6 +28,10 @@ interface WorkspaceContextValue {
   openExtractionId: string | null
   openExtraction: (uuid: string) => void
   closeExtraction: () => void
+  /** Automation open in the right pane */
+  openAutomationId: string | null
+  openAutomation: (id: string) => void
+  closeAutomation: () => void
   /** Pending message to send in the assistant chat */
   pendingChatMessage: string | null
   sendChatMessage: (message: string) => void
@@ -38,6 +45,8 @@ interface WorkspaceContextValue {
   /** Track document currently being processed (shown in chat panel) */
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
+  /** Reset workspace to default home state */
+  resetToHome: () => void
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -47,6 +56,16 @@ function getStoredBool(key: string, fallback: boolean): boolean {
     const v = localStorage.getItem(key)
     if (v === null) return fallback
     return v === 'true'
+  } catch {
+    return fallback
+  }
+}
+
+function getStoredString<T extends string>(key: string, fallback: T, valid: T[]): T {
+  try {
+    const v = localStorage.getItem(key)
+    if (v !== null && valid.includes(v as T)) return v as T
+    return fallback
   } catch {
     return fallback
   }
@@ -64,6 +83,14 @@ function getStoredNumber(key: string, fallback: number): number {
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const [workspaceMode, _setWorkspaceMode] = useState<WorkspaceMode>(() =>
+    getStoredString('workspace:mode', 'files', ['chat', 'files', 'automations']),
+  )
+  const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
+    _setWorkspaceMode(mode)
+    localStorage.setItem('workspace:mode', mode)
+  }, [])
+
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
   const [activeRightTab, setActiveRightTab] = useState<RightTab>('assistant')
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
@@ -72,6 +99,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [newChatSignal, setNewChatSignal] = useState(0)
   const [openWorkflowId, setOpenWorkflowId] = useState<string | null>(null)
   const [openExtractionId, setOpenExtractionId] = useState<string | null>(null)
+  const [openAutomationId, setOpenAutomationId] = useState<string | null>(null)
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
@@ -84,6 +112,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const sendChatMessage = useCallback((message: string) => {
     setOpenWorkflowId(null)
     setOpenExtractionId(null)
+    setOpenAutomationId(null)
     setActiveRightTab('assistant')
     setPendingChatMessage(message)
   }, [])
@@ -96,11 +125,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setNewChatSignal(prev => prev + 1)
     setOpenWorkflowId(null)
     setOpenExtractionId(null)
+    setOpenAutomationId(null)
     setActiveRightTab('assistant')
   }, [])
 
   const openWorkflow = useCallback((id: string) => {
     setOpenExtractionId(null)
+    setOpenAutomationId(null)
     setOpenWorkflowId(id)
   }, [])
 
@@ -110,11 +141,35 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const openExtraction = useCallback((uuid: string) => {
     setOpenWorkflowId(null)
+    setOpenAutomationId(null)
     setOpenExtractionId(uuid)
+  }, [])
+
+  const openAutomation = useCallback((id: string) => {
+    setOpenWorkflowId(null)
+    setOpenExtractionId(null)
+    setOpenAutomationId(id)
+  }, [])
+
+  const closeAutomation = useCallback(() => {
+    setOpenAutomationId(null)
   }, [])
 
   const closeExtraction = useCallback(() => {
     setOpenExtractionId(null)
+  }, [])
+
+  const resetToHome = useCallback(() => {
+    setOpenWorkflowId(null)
+    setOpenExtractionId(null)
+    setOpenAutomationId(null)
+    setActiveRightTab('assistant')
+    setNewChatSignal(prev => prev + 1)
+    setLoadConversationId(null)
+    setPendingChatMessage(null)
+    setHighlightTerms([])
+    _setWorkspaceMode('chat')
+    localStorage.setItem('workspace:mode', 'chat')
   }, [])
 
   const toggleRailDocked = useCallback(() => {
@@ -136,6 +191,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   return (
     <WorkspaceContext.Provider
       value={{
+        workspaceMode,
+        setWorkspaceMode,
         selectedDocUuids,
         setSelectedDocUuids,
         activeRightTab,
@@ -154,6 +211,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         openExtractionId,
         openExtraction,
         closeExtraction,
+        openAutomationId,
+        openAutomation,
+        closeAutomation,
         pendingChatMessage,
         sendChatMessage,
         clearPendingChatMessage,
@@ -163,6 +223,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         bumpActivitySignal,
         processingDoc,
         setProcessingDoc,
+        resetToHome,
       }}
     >
       {children}
@@ -174,4 +235,8 @@ export function useWorkspace() {
   const ctx = useContext(WorkspaceContext)
   if (!ctx) throw new Error('useWorkspace must be used within WorkspaceProvider')
   return ctx
+}
+
+export function useOptionalWorkspace() {
+  return useContext(WorkspaceContext)
 }

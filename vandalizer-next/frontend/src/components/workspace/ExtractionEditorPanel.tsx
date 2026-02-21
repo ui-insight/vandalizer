@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { X, Pencil, Loader2, Copy, Trash2, Star } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, Star, GripVertical } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
@@ -44,7 +44,7 @@ export function ExtractionEditorPanel() {
   const [showAddToLibrary, setShowAddToLibrary] = useState(false)
   const { libraries } = useLibraries(currentTeam?.uuid)
 
-  const { items, loading: itemsLoading, refresh: refreshItems, add, remove } =
+  const { items, loading: itemsLoading, refresh: refreshItems, add, remove, update, reorder } =
     useSearchSetItems(openExtractionId)
 
   const refresh = useCallback(async () => {
@@ -276,67 +276,75 @@ export function ExtractionEditorPanel() {
           display: 'flex',
           gap: 0,
           borderBottom: '1px solid #e5e7eb',
-          padding: '0 24px',
-          backgroundColor: '#fff',
+          paddingLeft: 24,
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'advanced'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: '10px 16px',
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              background: 'none',
-              border: 'none',
-              borderBottom: activeTab === tab ? '2px solid #000' : '2px solid transparent',
-              color: activeTab === tab ? '#000' : '#6b7280',
-              cursor: 'pointer',
-              textTransform: 'capitalize',
-            }}
-          >
-            {tab}
-          </button>
-        ))}
+        {(['design', 'tools', 'advanced'] as const).map((tab) => {
+          const isActive = activeTab === tab
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              style={{
+                padding: '10px 16px',
+                fontSize: 13,
+                fontWeight: isActive ? 600 : 400,
+                fontFamily: 'inherit',
+                color: isActive ? '#202124' : '#5f6368',
+                background: 'none',
+                border: 'none',
+                borderBottom: isActive ? '2px solid #202124' : '2px solid transparent',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+                transition: 'color 0.15s',
+              }}
+            >
+              {tab}
+            </button>
+          )
+        })}
       </div>
 
       {/* Tab content */}
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-        {activeTab === 'design' && (
-          <DesignTab
-            items={items}
-            itemsLoading={itemsLoading}
-            results={results}
-            hasResults={hasResults}
-            onExport={handleExport}
-            onRemoveItem={remove}
-            pdfTitle={searchSet?.title ?? ''}
-            searchSetUuid={openExtractionId ?? undefined}
-            onHighlightValue={setHighlightTerms}
-          />
-        )}
-        {activeTab === 'tools' && (
-          <ToolsTab
-            onClone={handleClone}
-            onDelete={handleDelete}
-            onAddToLibrary={() => setShowAddToLibrary(true)}
-            onBuildFromDocument={handleBuildFromDocument}
-            buildingFromDoc={buildingFromDoc}
-            hasDocuments={selectedDocUuids.length > 0}
-          />
-        )}
-        {activeTab === 'advanced' && (
-          <AdvancedTab
-            config={config}
-            useDefaults={useDefaults}
-            onSetUseDefaults={setUseDefaults}
-            onSaveConfig={saveConfig}
-          />
-        )}
-      </div>
+          {activeTab === 'design' && (
+            <DesignTab
+              items={items}
+              itemsLoading={itemsLoading}
+              results={results}
+              hasResults={hasResults}
+              running={running}
+              config={config}
+              docCount={selectedDocUuids.length}
+              onExport={handleExport}
+              onRemoveItem={remove}
+              onUpdateItem={update}
+              onReorder={reorder}
+              pdfTitle={searchSet?.title ?? ''}
+              searchSetUuid={openExtractionId ?? undefined}
+              onHighlightValue={setHighlightTerms}
+            />
+          )}
+          {activeTab === 'tools' && (
+            <ToolsTab
+              onClone={handleClone}
+              onDelete={handleDelete}
+              onAddToLibrary={() => setShowAddToLibrary(true)}
+              onBuildFromDocument={handleBuildFromDocument}
+              buildingFromDoc={buildingFromDoc}
+              hasDocuments={selectedDocUuids.length > 0}
+            />
+          )}
+          {activeTab === 'advanced' && (
+            <AdvancedTab
+              config={config}
+              useDefaults={useDefaults}
+              onSetUseDefaults={setUseDefaults}
+              onSaveConfig={saveConfig}
+            />
+          )}
+        </div>
 
       {/* Bottom toolbar (Design tab only) */}
       {activeTab === 'design' && (
@@ -437,13 +445,54 @@ export function ExtractionEditorPanel() {
 
 /* ── Design Tab ── */
 
+const AI_TIPS: { text: string; condition?: (ctx: { mode: string; chunking: boolean; repetition: boolean; docCount: number; itemCount: number }) => boolean }[] = [
+  { text: 'The AI is reading through your documents and identifying the requested fields...' },
+  { text: 'Each extraction field is matched against the document content using natural language understanding.' },
+  { text: 'Two-pass mode uses a draft pass to reason about the document, then a structured pass to produce clean results.', condition: (c) => c.mode === 'two_pass' },
+  { text: 'Pass 1 lets the model "think" freely about the document before committing to final values.', condition: (c) => c.mode === 'two_pass' },
+  { text: 'Key chunking splits large field lists into smaller batches so the AI can focus on each group.', condition: (c) => c.chunking },
+  { text: 'Repetition mode runs the extraction multiple times and uses consensus to improve accuracy.', condition: (c) => c.repetition },
+  { text: 'Structured output mode constrains the AI to return valid JSON, reducing formatting errors.' },
+  { text: 'The AI processes each document independently so results stay isolated and accurate.', condition: (c) => c.docCount > 1 },
+  { text: 'Longer documents may take more time — the AI is reading the full text to find your fields.' },
+  { text: 'Tip: You can customize thinking and structured modes per extraction in the Advanced tab.' },
+  { text: 'The model maps each field name to the most relevant passage in your document.' },
+  { text: 'Extraction results are generated in a single structured response for consistency.' },
+]
+
+function useRotatingTip(running: boolean, config: ExtractionConfig, docCount: number, itemCount: number) {
+  const [tipIdx, setTipIdx] = useState(0)
+
+  const mode = config.mode ?? 'one_pass'
+  const chunking = config.key_chunking?.enabled ?? false
+  const repetition = config.repetition?.enabled ?? false
+  const ctx = { mode, chunking, repetition, docCount, itemCount }
+
+  const applicable = AI_TIPS.filter(t => !t.condition || t.condition(ctx))
+
+  useEffect(() => {
+    if (!running) { setTipIdx(0); return }
+    const interval = setInterval(() => {
+      setTipIdx(prev => (prev + 1) % applicable.length)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [running, applicable.length])
+
+  return running && applicable.length > 0 ? applicable[tipIdx % applicable.length].text : null
+}
+
 function DesignTab({
   items,
   itemsLoading,
   results,
   hasResults,
+  running,
+  config,
+  docCount,
   onExport,
   onRemoveItem,
+  onUpdateItem,
+  onReorder,
   pdfTitle,
   searchSetUuid,
   onHighlightValue,
@@ -452,12 +501,51 @@ function DesignTab({
   itemsLoading: boolean
   results: Record<string, string>
   hasResults: boolean
+  running: boolean
+  config: ExtractionConfig
+  docCount: number
   onExport: () => void
   onRemoveItem: (id: string) => void
+  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string }) => void
+  onReorder: (itemIds: string[]) => void
   pdfTitle: string
   searchSetUuid?: string
   onHighlightValue: (terms: string[]) => void
 }) {
+  const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [overIdx, setOverIdx] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const tip = useRotatingTip(running, config, docCount, items.length)
+
+  const handleDragStart = (idx: number) => {
+    setDragIdx(idx)
+  }
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault()
+    setOverIdx(idx)
+  }
+
+  const handleDrop = (idx: number) => {
+    if (dragIdx === null || dragIdx === idx) {
+      setDragIdx(null)
+      setOverIdx(null)
+      return
+    }
+    const reordered = [...items]
+    const [moved] = reordered.splice(dragIdx, 1)
+    reordered.splice(idx, 0, moved)
+    onReorder(reordered.map(i => i.id))
+    setDragIdx(null)
+    setOverIdx(null)
+  }
+
+  const handleDragEnd = () => {
+    setDragIdx(null)
+    setOverIdx(null)
+  }
+
   return (
     <div style={{ padding: 24 }}>
       {/* Section header */}
@@ -492,6 +580,50 @@ function DesignTab({
         )}
       </div>
 
+      {/* Running status banner */}
+      {running && tip && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+            padding: '14px 16px',
+            marginBottom: 16,
+            backgroundColor: '#f0f4ff',
+            border: '1px solid #dbeafe',
+            borderRadius: 8,
+          }}
+        >
+          <Loader2
+            style={{
+              width: 16,
+              height: 16,
+              color: '#3b82f6',
+              animation: 'spin 1s linear infinite',
+              flexShrink: 0,
+              marginTop: 1,
+            }}
+          />
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e40af', marginBottom: 3 }}>
+              Extracting...
+            </div>
+            <div
+              key={tip}
+              style={{
+                fontSize: 13,
+                color: '#3b5998',
+                lineHeight: 1.45,
+                animation: 'fadeIn 0.4s ease',
+              }}
+            >
+              {tip}
+            </div>
+          </div>
+          <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        </div>
+      )}
+
       {itemsLoading ? (
         <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
           Loading...
@@ -511,30 +643,85 @@ function DesignTab({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {items.map((item, idx) => {
             const resultVal = results[item.searchphrase]
+            const isDragging = dragIdx === idx
+            const isOver = overIdx === idx && dragIdx !== idx
             return (
               <div
                 key={item.id}
+                draggable
+                onDragStart={() => handleDragStart(idx)}
+                onDragOver={(e) => handleDragOver(e, idx)}
+                onDrop={() => handleDrop(idx)}
+                onDragEnd={handleDragEnd}
                 style={{
                   padding: '10px 0',
                   borderBottom: '1px solid #f0f0f0',
+                  opacity: isDragging ? 0.4 : 1,
+                  borderTop: isOver ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
+                  transition: 'opacity 0.15s',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <GripVertical
+                    style={{
+                      width: 14,
+                      height: 14,
+                      color: '#d1d5db',
+                      cursor: 'grab',
+                      flexShrink: 0,
+                    }}
+                  />
                   <span
                     style={{
                       fontSize: 12,
                       fontWeight: 500,
                       color: '#9ca3af',
-                      width: 24,
+                      width: 20,
                       textAlign: 'right',
                       flexShrink: 0,
+                      marginRight: 4,
                     }}
                   >
                     {idx + 1}
                   </span>
-                  <span style={{ fontSize: 14, color: '#202124', flex: 1 }}>
-                    {item.searchphrase}
-                  </span>
+                  {editingId === item.id ? (
+                    <input
+                      autoFocus
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onBlur={() => {
+                        const trimmed = editDraft.trim()
+                        if (trimmed && trimmed !== item.searchphrase) {
+                          onUpdateItem(item.id, { searchphrase: trimmed, title: trimmed })
+                        }
+                        setEditingId(null)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        if (e.key === 'Escape') setEditingId(null)
+                      }}
+                      style={{
+                        flex: 1,
+                        fontSize: 14,
+                        fontFamily: 'inherit',
+                        color: '#202124',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 4,
+                        padding: '2px 6px',
+                        outline: 'none',
+                      }}
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={() => {
+                        setEditingId(item.id)
+                        setEditDraft(item.searchphrase)
+                      }}
+                      style={{ fontSize: 14, color: '#202124', flex: 1, cursor: 'text' }}
+                    >
+                      {item.searchphrase}
+                    </span>
+                  )}
                   <button
                     onClick={() => onRemoveItem(item.id)}
                     style={{
@@ -559,15 +746,14 @@ function DesignTab({
                       }
                     }}
                     style={{
-                      marginLeft: 45,
                       marginTop: 4,
+                      marginLeft: 42,
                       fontSize: 13,
                       fontWeight: 600,
                       color: '#202124',
                       cursor: resultVal && resultVal !== 'N/A' ? 'pointer' : 'default',
                       borderRadius: 4,
                       padding: '2px 4px',
-                      margin: '4px 0 0 41px',
                       transition: 'background-color 0.15s',
                     }}
                     onMouseEnter={e => {
@@ -1074,7 +1260,7 @@ function PassSettings({
           >
             <option value="">System Default</option>
             {models.map(m => (
-              <option key={m.name} value={m.name}>
+              <option key={m.tag} value={m.name}>
                 {m.tag || m.name}{m.external ? ' (External)' : ''}
               </option>
             ))}

@@ -10,6 +10,7 @@ from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
     ExtractionStatusResponse,
+    ReorderItemsRequest,
     RunExtractionSyncRequest,
     SearchSetItemRequest,
     SearchSetItemResponse,
@@ -137,6 +138,14 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
     )
+
+
+@router.post("/search-sets/{uuid}/reorder-items")
+async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depends(get_current_user)):
+    ok = await svc.reorder_items(uuid, req.item_ids)
+    if not ok:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+    return {"ok": True}
 
 
 @router.delete("/items/{item_id}")

@@ -79,8 +79,8 @@ export function ChatInput({
     }
   }
 
-  // Deduplicate models by name (backend stores selection by name, so dupes are redundant)
-  const uniqueModels = models.filter((m, i, arr) => arr.findIndex(x => x.name === m.name) === i)
+  // Deduplicate models by tag (multiple models can share a name but have unique tags)
+  const uniqueModels = models.filter((m, i, arr) => arr.findIndex(x => x.tag === m.tag) === i)
 
   const displayModel = selectedModel
     ? uniqueModels.find(m => m.name === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
@@ -207,7 +207,7 @@ export function ChatInput({
                   ) : (
                     uniqueModels.map(m => (
                       <button
-                        key={m.name}
+                        key={m.tag}
                         onClick={() => { onModelChange(m.name); setShowModelMenu(false) }}
                         className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                       >

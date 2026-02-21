@@ -148,7 +148,7 @@ export default function Account() {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
                   >
                     {models.map(m => (
-                      <option key={m.name} value={m.name}>{m.name}</option>
+                      <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
                     ))}
                   </select>
                 </div>

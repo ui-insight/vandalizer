@@ -22,8 +22,9 @@ from app.models.chat import ChatMessage, FileAttachment, UrlAttachment, ChatConv
 from app.models.activity import ActivityEvent
 from app.models.library import LibraryFolder, LibraryItem, Library
 from app.models.feedback import ChatFeedback, ExtractionQualityRecord
-from app.models.verification import VerificationRequest
+from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
 from app.models.office import IntakeConfig, WorkItem
+from app.models.automation import Automation
 
 ALL_MODELS = [
     User,
@@ -54,8 +55,11 @@ ALL_MODELS = [
     ChatFeedback,
     ExtractionQualityRecord,
     VerificationRequest,
+    VerifiedItemMetadata,
+    VerifiedCollection,
     IntakeConfig,
     WorkItem,
+    Automation,
 ]
 
 

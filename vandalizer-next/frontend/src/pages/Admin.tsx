@@ -487,8 +487,13 @@ function ConfigTab() {
   const [repetitionEnabled, setRepetitionEnabled] = useState(false)
   const [onePassThinking, setOnePassThinking] = useState(true)
   const [onePassStructured, setOnePassStructured] = useState(true)
+  const [onePassModel, setOnePassModel] = useState('')
   const [twoPassP1Thinking, setTwoPassP1Thinking] = useState(true)
+  const [twoPassP1Structured, setTwoPassP1Structured] = useState(false)
+  const [twoPassP1Model, setTwoPassP1Model] = useState('')
+  const [twoPassP2Thinking, setTwoPassP2Thinking] = useState(false)
   const [twoPassP2Structured, setTwoPassP2Structured] = useState(true)
+  const [twoPassP2Model, setTwoPassP2Model] = useState('')
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
@@ -524,12 +529,17 @@ function ConfigTab() {
       setRepetitionEnabled(!!((ec as Record<string, unknown>).repetition as Record<string, unknown>)?.enabled)
       const onePass = (ec as Record<string, unknown>).one_pass as Record<string, unknown> || {}
       setOnePassThinking(onePass.thinking !== false)
-      setOnePassStructured(onePass.structured_output !== false)
+      setOnePassStructured((onePass.structured_output ?? onePass.structured) !== false)
+      setOnePassModel((onePass.model as string) || '')
       const twoPass = (ec as Record<string, unknown>).two_pass as Record<string, unknown> || {}
-      const pass1 = (twoPass.pass1 as Record<string, unknown>) || {}
-      const pass2 = (twoPass.pass2 as Record<string, unknown>) || {}
+      const pass1 = (twoPass.pass1 as Record<string, unknown> ?? twoPass.pass_1 as Record<string, unknown>) || {}
+      const pass2 = (twoPass.pass2 as Record<string, unknown> ?? twoPass.pass_2 as Record<string, unknown>) || {}
       setTwoPassP1Thinking(pass1.thinking !== false)
-      setTwoPassP2Structured(pass2.structured_output !== false)
+      setTwoPassP1Structured(!!(pass1.structured_output ?? pass1.structured))
+      setTwoPassP1Model((pass1.model as string) || '')
+      setTwoPassP2Thinking(!!(pass2.thinking))
+      setTwoPassP2Structured((pass2.structured_output ?? pass2.structured) !== false)
+      setTwoPassP2Model((pass2.model as string) || '')
     }).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
@@ -546,8 +556,11 @@ function ConfigTab() {
       await updateSystemConfig({
         extraction_config: {
           mode: extractionMode,
-          one_pass: { thinking: onePassThinking, structured_output: onePassStructured },
-          two_pass: { pass1: { thinking: twoPassP1Thinking }, pass2: { structured_output: twoPassP2Structured } },
+          one_pass: { thinking: onePassThinking, structured: onePassStructured, model: onePassModel || '' },
+          two_pass: {
+            pass_1: { thinking: twoPassP1Thinking, structured: twoPassP1Structured, model: twoPassP1Model || '' },
+            pass_2: { thinking: twoPassP2Thinking, structured: twoPassP2Structured, model: twoPassP2Model || '' },
+          },
           chunking: { enabled: chunkingEnabled, max_keys_per_chunk: maxKeysPerChunk },
           repetition: { enabled: repetitionEnabled },
         },
@@ -725,12 +738,21 @@ function ConfigTab() {
                 <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>One-Pass Settings</div>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                   <input type="checkbox" checked={onePassThinking} onChange={e => setOnePassThinking(e.target.checked)} style={checkStyle} />
-                  Enable Thinking
+                  Thinking
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
                   <input type="checkbox" checked={onePassStructured} onChange={e => setOnePassStructured(e.target.checked)} style={checkStyle} />
-                  Structured Output
+                  Structured
                 </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                  <select value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
+                    <option value="">Default</option>
+                    {cfg?.available_models?.map(m => (
+                      <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             ) : (
               <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
@@ -738,17 +760,43 @@ function ConfigTab() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 1 (Draft)</div>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
                       <input type="checkbox" checked={twoPassP1Thinking} onChange={e => setTwoPassP1Thinking(e.target.checked)} style={checkStyle} />
-                      Enable Thinking
+                      Thinking
                     </label>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP1Structured} onChange={e => setTwoPassP1Structured(e.target.checked)} style={checkStyle} />
+                      Structured
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                      <select value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                        <option value="">Default</option>
+                        {cfg?.available_models?.map(m => (
+                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 2 (Final)</div>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={twoPassP2Structured} onChange={e => setTwoPassP2Structured(e.target.checked)} style={checkStyle} />
-                      Structured Output
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP2Thinking} onChange={e => setTwoPassP2Thinking(e.target.checked)} style={checkStyle} />
+                      Thinking
                     </label>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP2Structured} onChange={e => setTwoPassP2Structured(e.target.checked)} style={checkStyle} />
+                      Structured
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                      <select value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                        <option value="">Default</option>
+                        {cfg?.available_models?.map(m => (
+                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1186,49 +1234,57 @@ export default function Admin() {
 
   return (
     <PageLayout>
-      <div style={{ maxWidth: 1100, margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-          <Shield size={22} color="#6b7280" />
-          <h1 style={{ fontSize: 22, fontWeight: 700 }}>
-            {isGlobalAdmin ? 'Admin Panel' : 'Team Admin'}
-          </h1>
-        </div>
-
-        {/* Tab bar */}
-        <div style={{
-          display: 'flex', gap: 0, borderBottom: '1px solid #e5e7eb', marginBottom: 24,
+      <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
+        {/* Sidebar */}
+        <nav style={{
+          width: 220, flexShrink: 0,
+          borderRight: '1px solid #e5e7eb',
+          backgroundColor: '#fff',
+          padding: '20px 0',
+          borderRadius: 'var(--ui-radius, 12px) 0 0 var(--ui-radius, 12px)',
         }}>
-          {visibleTabs.map(tab => {
-            const Icon = tab.icon
-            const isActive = activeTab === tab.key
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: 14, fontWeight: isActive ? 700 : 500,
-                  color: isActive ? 'var(--highlight-color, #eab308)' : '#6b7280',
-                  borderBottom: isActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
-                  marginBottom: -1,
-                  transition: 'color 0.15s, border-color 0.15s',
-                }}
-              >
-                <Icon size={16} />
-                {tab.label}
-              </button>
-            )
-          })}
-        </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
+            <Shield size={20} color="#6b7280" />
+            <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
+              {isGlobalAdmin ? 'Admin' : 'Team Admin'}
+            </h1>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
+            {visibleTabs.map(tab => {
+              const Icon = tab.icon
+              const isActive = activeTab === tab.key
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => setActiveTab(tab.key)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '10px 14px', border: 'none', cursor: 'pointer',
+                    fontSize: 14, fontWeight: isActive ? 600 : 400,
+                    color: isActive ? '#111827' : '#6b7280',
+                    backgroundColor: isActive ? '#f3f4f6' : 'transparent',
+                    borderRadius: 8, fontFamily: 'inherit',
+                    transition: 'background-color 0.15s, color 0.15s',
+                    width: '100%', textAlign: 'left',
+                    borderLeft: isActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
+                  }}
+                >
+                  <Icon size={18} style={{ flexShrink: 0 }} />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+        </nav>
 
-        {/* Tab content */}
-        {activeTab === 'usage' && <UsageTab />}
-        {activeTab === 'users' && <UsersTab />}
-        {activeTab === 'teams' && <TeamsTab />}
-        {activeTab === 'workflows' && <WorkflowsTab />}
-        {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
+        {/* Content */}
+        <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
+          {activeTab === 'usage' && <UsageTab />}
+          {activeTab === 'users' && <UsersTab />}
+          {activeTab === 'teams' && <TeamsTab />}
+          {activeTab === 'workflows' && <WorkflowsTab />}
+          {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
+        </div>
       </div>
     </PageLayout>
   )

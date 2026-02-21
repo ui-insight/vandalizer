@@ -4,12 +4,22 @@ import { AssistantTab } from './AssistantTab'
 import { LibraryTab } from './LibraryTab'
 import { WorkflowEditorPanel } from './WorkflowEditorPanel'
 import { ExtractionEditorPanel } from './ExtractionEditorPanel'
+import { AutomationEditorPanel } from './AutomationEditorPanel'
 import { cn } from '../../lib/cn'
 
 const TABS = ['assistant', 'library'] as const
 
 export function RightPanel() {
-  const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId } = useWorkspace()
+  const { activeRightTab, setActiveRightTab, openWorkflowId, openExtractionId, openAutomationId } = useWorkspace()
+
+  // If an automation is open, show the automation editor instead of tabs
+  if (openAutomationId) {
+    return (
+      <div className="flex h-full flex-col" style={{ boxShadow: '-7px 20px 25px -16px rgb(211, 211, 211)' }}>
+        <AutomationEditorPanel />
+      </div>
+    )
+  }
 
   // If an extraction is open, show the extraction editor instead of tabs
   if (openExtractionId) {

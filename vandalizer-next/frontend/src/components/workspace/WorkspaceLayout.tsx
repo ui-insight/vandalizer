@@ -5,10 +5,12 @@ import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
+import { UtilityBar } from './UtilityBar'
+import { AutomationsPanel } from './AutomationsPanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, openWorkflow, openExtraction } = useWorkspace()
+  const { railDocked, panelSplit, openWorkflow, openExtraction, workspaceMode } = useWorkspace()
   const search = useSearch({ from: '/' })
   const navigate = useNavigate()
 
@@ -24,13 +26,15 @@ export function WorkspaceLayout() {
   }, [search, navigate, openWorkflow, openExtraction])
   const railWidth = railDocked ? 64 : 220
 
-  // Layout matches Flask: [LeftPanel] [Resizer] [RightPanel] [ActivityRail(right)]
-  // Left panel width: panelSplit% of space remaining after rail
-  // Right panel: margin-right accommodates the fixed-width rail
+  const isChat = workspaceMode === 'chat'
+  const isAutomations = workspaceMode === 'automations'
+
+  // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
     <div className="flex h-screen flex-col">
       <Header />
       <div className="flex flex-1 overflow-hidden">
+        <UtilityBar />
         <div
           className="flex flex-1 overflow-hidden"
           style={{
@@ -38,18 +42,30 @@ export function WorkspaceLayout() {
             transition: 'margin-right 0.3s ease',
           }}
         >
+          {/* Left panel area — hidden in chat mode, placeholder in automations */}
           <div
             className="overflow-hidden"
             style={{
-              width: `${panelSplit}%`,
+              width: isChat ? '0%' : `${panelSplit}%`,
+              minWidth: isChat ? 0 : undefined,
+              transition: 'width 0.3s ease',
             }}
           >
-            <LeftPanel />
+            {isAutomations ? <AutomationsPanel /> : <LeftPanel />}
           </div>
-          <PanelResizer />
+
+          {/* Resizer — hidden in chat mode */}
           <div
-            className="overflow-hidden flex-1"
+            style={{
+              opacity: isChat ? 0 : 1,
+              pointerEvents: isChat ? 'none' : 'auto',
+              transition: 'opacity 0.3s ease',
+            }}
           >
+            <PanelResizer />
+          </div>
+
+          <div className="overflow-hidden flex-1">
             <RightPanel />
           </div>
         </div>
@@ -71,3 +87,4 @@ export function WorkspaceLayout() {
     </div>
   )
 }
+

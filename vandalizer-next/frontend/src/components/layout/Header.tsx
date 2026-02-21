@@ -1,8 +1,17 @@
 import { CircleHelp } from 'lucide-react'
-import { Link } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
+import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 
 export function Header() {
+  const navigate = useNavigate()
+  const workspace = useOptionalWorkspace()
+
+  const handleLogoClick = () => {
+    navigate({ to: '/' })
+    workspace?.resetToHome()
+  }
+
   return (
     <header
       className="flex items-center justify-between bg-white shrink-0"
@@ -14,7 +23,7 @@ export function Header() {
     >
       {/* Left: Logo images - matches Flask navbar-header */}
       <div className="flex items-center">
-        <Link to="/" className="flex items-center">
+        <button onClick={handleLogoClick} className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           {/* Joe Vandal icon */}
           <img
             src="/images/joevandal.png"
@@ -27,7 +36,7 @@ export function Header() {
             alt="Vandalizer"
             style={{ width: 200, height: 50, marginLeft: 4 }}
           />
-        </Link>
+        </button>
       </div>
 
       {/* Right: Support + Teams dropdown */}

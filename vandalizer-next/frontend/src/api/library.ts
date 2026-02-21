@@ -1,5 +1,9 @@
 import { apiFetch } from './client'
-import type { Library, LibraryItem, LibraryFolder, LibraryItemKind, VerificationRequest } from '../types/library'
+import type {
+  Library, LibraryItem, LibraryFolder, LibraryItemKind,
+  VerificationRequest, VerifiedCatalogItem, VerifiedItemMetadata,
+  VerifiedCollection, ExaminerUser,
+} from '../types/library'
 
 // Library CRUD
 
@@ -87,7 +91,7 @@ export function searchLibraries(query: string, kind?: LibraryItemKind, teamId?: 
   })
 }
 
-// Verification
+// Verification - Queue
 
 export function submitForVerification(data: {
   item_kind: string
@@ -96,6 +100,14 @@ export function submitForVerification(data: {
   summary?: string
   description?: string
   category?: string
+  submitter_org?: string
+  run_instructions?: string
+  evaluation_notes?: string
+  known_limitations?: string
+  example_inputs?: string[]
+  expected_outputs?: string[]
+  dependencies?: string[]
+  intended_use_tags?: string[]
 }) {
   return apiFetch<VerificationRequest>('/api/verification/submit', {
     method: 'POST',
@@ -119,4 +131,85 @@ export function updateVerificationStatus(requestUuid: string, status: string, re
     method: 'PATCH',
     body: JSON.stringify({ status, reviewer_notes: reviewerNotes }),
   })
+}
+
+// Verification - Verified Catalog
+
+export function listVerifiedItems(kind?: string, search?: string) {
+  const params = new URLSearchParams()
+  if (kind) params.set('kind', kind)
+  if (search) params.set('search', search)
+  const qs = params.toString()
+  return apiFetch<{ items: VerifiedCatalogItem[] }>(`/api/verification/verified${qs ? `?${qs}` : ''}`)
+}
+
+export function getItemMetadata(itemKind: string, itemId: string) {
+  return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`)
+}
+
+export function updateItemMetadata(itemKind: string, itemId: string, data: { display_name?: string; description?: string; markdown?: string }) {
+  return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function unverifyItem(itemKind: string, itemId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/verification/verified/${itemKind}/${itemId}/unverify`, {
+    method: 'POST',
+  })
+}
+
+// Verification - Collections
+
+export function listCollections() {
+  return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections')
+}
+
+export function createCollection(data: { title: string; description?: string }) {
+  return apiFetch<VerifiedCollection>('/api/verification/collections', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateCollection(id: string, data: { title?: string; description?: string }) {
+  return apiFetch<VerifiedCollection>(`/api/verification/collections/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteCollection(id: string) {
+  return apiFetch<{ ok: boolean }>(`/api/verification/collections/${id}`, { method: 'DELETE' })
+}
+
+export function addToCollection(collectionId: string, itemId: string) {
+  return apiFetch<VerifiedCollection>(`/api/verification/collections/${collectionId}/items`, {
+    method: 'POST',
+    body: JSON.stringify({ item_id: itemId }),
+  })
+}
+
+export function removeFromCollection(collectionId: string, itemId: string) {
+  return apiFetch<VerifiedCollection>(`/api/verification/collections/${collectionId}/items/${itemId}`, {
+    method: 'DELETE',
+  })
+}
+
+// Verification - Examiners
+
+export function listExaminers() {
+  return apiFetch<{ examiners: ExaminerUser[] }>('/api/verification/examiners')
+}
+
+export function setExaminer(userId: string, isExaminer: boolean) {
+  return apiFetch<ExaminerUser>('/api/verification/examiners', {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, is_examiner: isExaminer }),
+  })
+}
+
+export function searchUsersForExaminer(query: string) {
+  return apiFetch<{ users: ExaminerUser[] }>(`/api/verification/examiners/search?q=${encodeURIComponent(query)}`)
 }

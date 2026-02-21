@@ -31,6 +31,10 @@ class UpdateSearchSetItemRequest(BaseModel):
     title: Optional[str] = None
 
 
+class ReorderItemsRequest(BaseModel):
+    item_ids: list[str]
+
+
 class BuildFromDocumentRequest(BaseModel):
     document_uuids: list[str]
     model: Optional[str] = None
