@@ -5,7 +5,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
+from app.models.library import Library, LibraryScope
 from app.models.user import User
+from app.services import group_service
 from app.schemas.library import (
     AddItemRequest,
     CloneRequest,
@@ -100,8 +102,18 @@ async def list_items(
     search: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
 ):
+    # Check if this is a verified-scope library; if so, apply group filtering
+    from beanie import PydanticObjectId
+    user_group_uuids = None
+    try:
+        lib = await Library.get(PydanticObjectId(library_id))
+        if lib and lib.scope == LibraryScope.VERIFIED:
+            user_group_uuids = await group_service.get_user_group_uuids(user.user_id)
+    except Exception:
+        pass
     items = await svc.get_library_items(
-        library_id, user.user_id, kind=kind, folder=folder, search=search
+        library_id, user.user_id, kind=kind, folder=folder, search=search,
+        user_group_uuids=user_group_uuids,
     )
     return [LibraryItemResponse(**i) for i in items]
 

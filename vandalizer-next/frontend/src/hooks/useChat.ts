@@ -2,6 +2,9 @@ import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
 import type { ChatMessage, StreamChunk } from '../types/chat'
 
+const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
+const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
+
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
@@ -39,7 +42,11 @@ export function useChat() {
           (chunk: StreamChunk) => {
             if (chunk.kind === 'text') {
               streamingRef.current += chunk.content
-              setStreamingContent(streamingRef.current)
+              // Strip any residual think tags the backend parser missed
+              const display = streamingRef.current
+                .replace(THINK_BLOCK_RE, '')
+                .replace(THINK_TRAILING_RE, '')
+              setStreamingContent(display)
             } else if (chunk.kind === 'thinking') {
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
@@ -58,10 +65,11 @@ export function useChat() {
         setActivityId(result.activityId)
 
         // Add assistant message from accumulated stream
-        if (streamingRef.current) {
+        const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
+        if (finalContent) {
           const assistantMsg: ChatMessage = {
             role: 'assistant',
-            content: streamingRef.current,
+            content: finalContent,
           }
           if (thinkingRef.current) {
             assistantMsg.thinking = thinkingRef.current

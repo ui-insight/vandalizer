@@ -25,6 +25,8 @@ def _to_response(auto) -> AutomationResponse:
         action_type=auto.action_type,
         action_id=auto.action_id,
         user_id=auto.user_id,
+        team_id=auto.team_id,
+        shared_with_team=auto.shared_with_team,
         space=auto.space,
         created_at=auto.created_at.isoformat(),
         updated_at=auto.updated_at.isoformat(),
@@ -33,16 +35,21 @@ def _to_response(auto) -> AutomationResponse:
 
 @router.post("", response_model=AutomationResponse)
 async def create_automation(req: CreateAutomationRequest, user: User = Depends(get_current_user)):
+    team_id = str(user.current_team) if user.current_team else None
     auto = await svc.create_automation(
         req.name, user.user_id, req.space, req.description,
         req.trigger_type, req.action_type, req.action_id,
+        team_id=team_id, shared_with_team=req.shared_with_team,
     )
     return _to_response(auto)
 
 
 @router.get("", response_model=list[AutomationResponse])
 async def list_automations(space: str | None = None, user: User = Depends(get_current_user)):
-    automations = await svc.list_automations(space=space)
+    team_id = str(user.current_team) if user.current_team else None
+    automations = await svc.list_automations(
+        user_id=user.user_id, team_id=team_id, space=space,
+    )
     return [_to_response(a) for a in automations]
 
 
@@ -65,6 +72,7 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
         trigger_config=req.trigger_config,
         action_type=req.action_type,
         action_id=req.action_id,
+        shared_with_team=req.shared_with_team,
     )
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")

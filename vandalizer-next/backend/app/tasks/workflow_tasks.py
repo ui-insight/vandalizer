@@ -157,11 +157,22 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         doc_uuids: List of document UUIDs for the trigger step.
     """
     from app.services.workflow_engine import (
+        APICallNode,
+        AddDocumentNode,
+        CodeExecutionNode,
+        CrawlerNode,
+        DataExportNode,
+        DescribeImageNode,
         DocumentNode,
+        DocumentRendererNode,
         ExtractionNode,
         FormatNode,
+        FormFillerNode,
         MultiTaskNode,
+        PackageBuilderNode,
         PromptNode,
+        ResearchNode,
+        WebsiteNode,
         WorkflowEngine,
     )
 
@@ -189,6 +200,28 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = PromptNode(data=task_data)
     elif task_name == "Formatter":
         process_node = FormatNode(data=task_data)
+    elif task_name == "AddWebsite":
+        process_node = WebsiteNode(data=task_data)
+    elif task_name == "AddDocument":
+        process_node = AddDocumentNode(data=task_data)
+    elif task_name == "DescribeImage":
+        process_node = DescribeImageNode(data=task_data)
+    elif task_name == "CodeNode":
+        process_node = CodeExecutionNode(data=task_data)
+    elif task_name == "CrawlerNode":
+        process_node = CrawlerNode(data=task_data)
+    elif task_name == "ResearchNode":
+        process_node = ResearchNode(data=task_data)
+    elif task_name == "APINode":
+        process_node = APICallNode(data=task_data)
+    elif task_name == "DocumentRenderer":
+        process_node = DocumentRendererNode(data=task_data)
+    elif task_name == "FormFiller":
+        process_node = FormFillerNode(data=task_data)
+    elif task_name == "DataExport":
+        process_node = DataExportNode(data=task_data)
+    elif task_name == "PackageBuilder":
+        process_node = PackageBuilderNode(data=task_data)
     else:
         return {"error": f"Unknown task type: {task_name}"}
 

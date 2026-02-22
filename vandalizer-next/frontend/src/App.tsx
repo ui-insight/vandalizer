@@ -5,6 +5,7 @@ import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
+import { getContrastTextColor, getComplementaryColor } from './utils/color'
 
 function useThemeLoader() {
   useEffect(() => {
@@ -13,6 +14,8 @@ function useThemeLoader() {
         const root = document.documentElement
         root.style.setProperty('--highlight-color', theme.highlight_color)
         root.style.setProperty('--ui-radius', theme.ui_radius)
+        root.style.setProperty('--highlight-text-color', getContrastTextColor(theme.highlight_color))
+        root.style.setProperty('--highlight-complement', getComplementaryColor(theme.highlight_color))
       })
       .catch(() => {
         // Use CSS defaults if theme fetch fails (e.g. not logged in)

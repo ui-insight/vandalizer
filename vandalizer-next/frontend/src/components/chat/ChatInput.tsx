@@ -83,7 +83,7 @@ export function ChatInput({
   const uniqueModels = models.filter((m, i, arr) => arr.findIndex(x => x.tag === m.tag) === i)
 
   const displayModel = selectedModel
-    ? uniqueModels.find(m => m.name === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
+    ? uniqueModels.find(m => m.tag === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel
     : null
 
   return (
@@ -208,7 +208,7 @@ export function ChatInput({
                     uniqueModels.map(m => (
                       <button
                         key={m.tag}
-                        onClick={() => { onModelChange(m.name); setShowModelMenu(false) }}
+                        onClick={() => { onModelChange(m.tag); setShowModelMenu(false) }}
                         className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                       >
                         <Cpu className="h-3.5 w-3.5 shrink-0 text-gray-400" />
@@ -216,7 +216,7 @@ export function ChatInput({
                           <div className="text-sm font-medium truncate">{m.tag || m.name}</div>
                           {m.external && <span className="text-[10px] text-gray-400">External</span>}
                         </div>
-                        {selectedModel === m.name && (
+                        {selectedModel === m.tag && (
                           <div className="h-2 w-2 rounded-full bg-highlight shrink-0" />
                         )}
                       </button>

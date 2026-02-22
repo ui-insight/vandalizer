@@ -88,6 +88,7 @@ class ReorderStepsRequest(BaseModel):
 
 class ValidateWorkflowRequest(BaseModel):
     eval_plan: Optional[str] = None
+    text_input: Optional[str] = None
 
 
 class ValidationCheckResult(BaseModel):

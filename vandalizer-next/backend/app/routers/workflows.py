@@ -7,10 +7,10 @@ import io
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 
-from app.dependencies import get_current_user
+from app.dependencies import get_api_key_user, get_current_user
 from app.models.user import User
 from app.schemas.workflows import (
     AddStepRequest,
@@ -295,7 +295,89 @@ async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User =
 @router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
 async def validate_workflow(workflow_id: str, req: ValidateWorkflowRequest, user: User = Depends(get_current_user)):
     try:
-        result = await svc.validate_workflow(workflow_id, req.eval_plan)
+        result = await svc.validate_workflow(workflow_id, req.eval_plan, req.text_input)
         return ValidateWorkflowResponse(**result)
     except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# External API integration endpoints (x-api-key auth)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/run-integrated")
+async def run_workflow_integrated(
+    workflow_id: str = Form(...),
+    files: list[UploadFile] = File(default=[]),
+    user: User = Depends(get_api_key_user),
+):
+    """Run a workflow via external API with file uploads."""
+    import uuid as _uuid
+    from pathlib import Path
+    from app.config import Settings
+    from app.models.document import SmartDocument
+    from app.tasks.upload_tasks import dispatch_upload_tasks
+    from app.models.activity import ActivityType
+    from app.services import activity_service
+
+    settings = Settings()
+    doc_uuids: list[str] = []
+
+    for upload in files:
+        if not upload.filename:
+            continue
+        uid = _uuid.uuid4().hex.upper()
+        ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
+        relative_path = Path(user.user_id) / f"{uid}.{ext}"
+        upload_dir = Path(settings.upload_dir) / user.user_id
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        file_path = upload_dir / f"{uid}.{ext}"
+        file_data = await upload.read()
+        file_path.write_bytes(file_data)
+
+        doc = SmartDocument(
+            title=upload.filename,
+            processing=True,
+            valid=True,
+            raw_text="",
+            downloadpath=str(relative_path),
+            path=str(relative_path),
+            extension=ext,
+            uuid=uid,
+            user_id=user.user_id,
+            space="default",
+            folder="0",
+        )
+        await doc.insert()
+
+        task_id = dispatch_upload_tasks(
+            document_uuid=uid, extension=ext, document_path=str(file_path),
+        )
+        doc.task_id = task_id
+        await doc.save()
+        doc_uuids.append(uid)
+
+    if not doc_uuids:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    # Create activity
+    activity = await activity_service.activity_start(
+        type=ActivityType.WORKFLOW_RUN,
+        title=f"API Workflow {workflow_id}",
+        user_id=user.user_id,
+    )
+
+    try:
+        session_id = await svc.run_workflow(
+            workflow_id, doc_uuids, user.user_id,
+        )
+        return {
+            "status": "queued",
+            "activity_id": str(activity.id),
+            "session_id": session_id,
+        }
+    except ValueError as e:
+        from app.models.activity import ActivityStatus
+        await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))

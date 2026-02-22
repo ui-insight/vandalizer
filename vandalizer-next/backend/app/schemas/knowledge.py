@@ -13,6 +13,8 @@ class CreateKBRequest(BaseModel):
 class UpdateKBRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    shared_with_team: Optional[bool] = None
+    group_ids: Optional[list[str]] = None
 
 
 class AddDocumentsRequest(BaseModel):
@@ -21,6 +23,9 @@ class AddDocumentsRequest(BaseModel):
 
 class AddUrlsRequest(BaseModel):
     urls: list[str]
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    allowed_domains: str = ""  # comma-separated
 
 
 class KBSourceResponse(BaseModel):
@@ -40,6 +45,9 @@ class KBResponse(BaseModel):
     title: str
     description: Optional[str] = None
     status: str
+    shared_with_team: bool = False
+    verified: bool = False
+    group_ids: list[str] = []
     total_sources: int = 0
     sources_ready: int = 0
     sources_failed: int = 0

@@ -17,6 +17,8 @@ class Automation(Document):
     action_type: str = "workflow"  # workflow | extraction | task
     action_id: Optional[str] = None
     user_id: str
+    team_id: Optional[str] = None
+    shared_with_team: bool = False
     space: Optional[str] = None
     created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
     updated_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)

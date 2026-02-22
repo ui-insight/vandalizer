@@ -84,3 +84,70 @@ class ExtractionStatusResponse(BaseModel):
     task_id: str
     status: str
     result: Optional[list] = None
+
+
+# ---------------------------------------------------------------------------
+# Extraction test cases & validation
+# ---------------------------------------------------------------------------
+
+class CreateTestCaseRequest(BaseModel):
+    search_set_uuid: str
+    label: str
+    source_type: str  # "text" | "document"
+    source_text: Optional[str] = None
+    document_uuid: Optional[str] = None
+    expected_values: dict[str, str] = {}
+
+
+class UpdateTestCaseRequest(BaseModel):
+    label: Optional[str] = None
+    source_type: Optional[str] = None
+    source_text: Optional[str] = None
+    document_uuid: Optional[str] = None
+    expected_values: Optional[dict[str, str]] = None
+
+
+class TestCaseResponse(BaseModel):
+    id: str
+    uuid: str
+    search_set_uuid: str
+    label: str
+    source_type: str
+    source_text: Optional[str] = None
+    document_uuid: Optional[str] = None
+    expected_values: dict[str, str] = {}
+    user_id: str
+    created_at: str
+
+
+class RunValidationRequest(BaseModel):
+    search_set_uuid: str
+    test_case_uuids: list[str] = []
+    num_runs: int = 3
+    model: Optional[str] = None
+
+
+class FieldValidationResult(BaseModel):
+    field_name: str
+    expected: Optional[str] = None
+    extracted_values: list[Optional[str]] = []
+    most_common_value: Optional[str] = None
+    consistency: float = 0.0
+    accuracy: Optional[float] = None
+    accuracy_method: Optional[str] = None
+
+
+class TestCaseValidationResult(BaseModel):
+    test_case_uuid: str
+    label: str
+    fields: list[FieldValidationResult] = []
+    overall_accuracy: Optional[float] = None
+    overall_consistency: float = 0.0
+
+
+class ValidationResponse(BaseModel):
+    search_set_uuid: str
+    num_runs: int
+    test_cases: list[TestCaseValidationResult] = []
+    aggregate_accuracy: Optional[float] = None
+    aggregate_consistency: float = 0.0

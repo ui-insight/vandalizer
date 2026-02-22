@@ -36,6 +36,27 @@ export function updateThemeConfig(data: { highlight_color?: string; ui_radius?: 
   })
 }
 
+// Onboarding status
+
+export interface OnboardingStatus {
+  has_documents: boolean
+  has_workflows: boolean
+  has_run_workflow: boolean
+  has_extraction_sets: boolean
+  has_library_items: boolean
+  has_pinned_item: boolean
+  has_favorited_item: boolean
+  has_team_members: boolean
+  has_automations: boolean
+  has_enabled_automation: boolean
+  has_knowledge_base: boolean
+  has_ready_knowledge_base: boolean
+}
+
+export function getOnboardingStatus() {
+  return apiFetch<OnboardingStatus>('/api/config/onboarding-status')
+}
+
 // Automation stats
 
 export interface AutomationStats {

@@ -1,4 +1,4 @@
-import { Folder as FolderIcon, MoreVertical } from 'lucide-react'
+import { Folder as FolderIcon, Users, MoreVertical } from 'lucide-react'
 import type { Folder } from '../../types/document'
 
 interface FolderRowProps {
@@ -10,8 +10,8 @@ interface FolderRowProps {
 }
 
 export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect }: FolderRowProps) {
-  // Team folders get teal color, personal folders get gray
-  const iconColor = folder.is_shared_team_root ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
+  const isTeam = !!folder.team_id || folder.is_shared_team_root
+  const iconColor = isTeam ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
 
   return (
     <tr
@@ -33,7 +33,11 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       )}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center">
-          <FolderIcon className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
+          {isTeam ? (
+            <Users className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
+          ) : (
+            <FolderIcon className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
+          )}
           <span
             style={{
               paddingRight: 10,
@@ -47,6 +51,15 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
           >
             {folder.title}
           </span>
+          {isTeam && (
+            <span style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+              marginLeft: 6, whiteSpace: 'nowrap',
+            }}>
+              Team
+            </span>
+          )}
 
           <button
             onClick={(e) => {

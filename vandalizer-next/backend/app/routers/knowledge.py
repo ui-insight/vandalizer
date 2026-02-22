@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.services import group_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
     AddUrlsRequest,
@@ -25,6 +26,9 @@ def _kb_response(kb) -> KBResponse:
         title=kb.title,
         description=kb.description or "",
         status=kb.status,
+        shared_with_team=kb.shared_with_team,
+        verified=kb.verified,
+        group_ids=kb.group_ids,
         total_sources=kb.total_sources,
         sources_ready=kb.sources_ready,
         sources_failed=kb.sources_failed,
@@ -50,7 +54,11 @@ def _source_response(s) -> KBSourceResponse:
 
 @router.get("/list", response_model=list[KBResponse])
 async def list_knowledge_bases(user: User = Depends(get_current_user)):
-    kbs = await svc.list_knowledge_bases(user.user_id)
+    team_id = str(user.current_team) if user.current_team else None
+    user_group_uuids = await group_service.get_user_group_uuids(user.user_id)
+    kbs = await svc.list_knowledge_bases(
+        user.user_id, team_id=team_id, user_group_uuids=user_group_uuids,
+    )
     return [_kb_response(kb) for kb in kbs]
 
 
@@ -80,10 +88,21 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
 
 @router.post("/{uuid}/update")
 async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = Depends(get_current_user)):
-    kb = await svc.update_knowledge_base(uuid, user.user_id, title=req.title, description=req.description)
+    kb = await svc.update_knowledge_base(
+        uuid, user.user_id, title=req.title, description=req.description,
+        shared_with_team=req.shared_with_team, group_ids=req.group_ids,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True}
+
+
+@router.post("/{uuid}/share")
+async def share_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
+    kb = await svc.share_with_team(uuid, user.user_id)
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    return {"ok": True, "shared_with_team": kb.shared_with_team}
 
 
 @router.delete("/{uuid}")
@@ -116,7 +135,12 @@ async def add_urls(uuid: str, req: AddUrlsRequest, user: User = Depends(get_curr
         raise HTTPException(status_code=400, detail="No URLs provided")
     kb.status = "building"
     await kb.save()
-    added = await svc.add_urls(kb, req.urls)
+    added = await svc.add_urls(
+        kb, req.urls,
+        crawl_enabled=req.crawl_enabled,
+        max_crawl_pages=req.max_crawl_pages,
+        allowed_domains=req.allowed_domains,
+    )
     return {"ok": True, "added": added}
 
 

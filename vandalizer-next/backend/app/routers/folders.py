@@ -13,17 +13,29 @@ async def create(
     body: CreateFolderRequest,
     user: User = Depends(get_current_user),
 ):
+    # Resolve team_id when creating a team folder
+    team_id: str | None = None
+    if body.folder_type == "team" and user.current_team:
+        from app.models.team import Team
+
+        team = await Team.get(user.current_team)
+        if team:
+            team_id = team.uuid
+
     folder = await folder_service.create_folder(
         name=body.name,
         parent_id=body.parent_id,
         space=body.space,
         user_id=user.user_id,
+        team_id=team_id,
     )
     return {
         "id": str(folder.id),
         "uuid": folder.uuid,
         "title": folder.title,
         "parent_id": folder.parent_id,
+        "is_shared_team_root": folder.is_shared_team_root,
+        "team_id": folder.team_id,
     }
 
 

@@ -13,6 +13,7 @@ from app.models.verification import (
     VerifiedCollection,
     VerifiedItemMetadata,
 )
+from app.models.knowledge import KnowledgeBase
 from app.models.workflow import Workflow
 from app.models.search_set import SearchSet
 
@@ -38,15 +39,20 @@ async def submit_for_verification(
     test_files: list[dict] | None = None,
 ) -> dict:
     """Create a verification request for a library item."""
-    obj_id = PydanticObjectId(item_id)
-
-    # Verify the item exists
-    if item_kind == "workflow":
-        obj = await Workflow.get(obj_id)
+    # For knowledge bases, look up by uuid string; for others, by ObjectId
+    if item_kind == "knowledge_base":
+        obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+        if not obj:
+            raise ValueError("Item not found")
+        obj_id = obj.id
     else:
-        obj = await SearchSet.get(obj_id)
-    if not obj:
-        raise ValueError("Item not found")
+        obj_id = PydanticObjectId(item_id)
+        if item_kind == "workflow":
+            obj = await Workflow.get(obj_id)
+        else:
+            obj = await SearchSet.get(obj_id)
+        if not obj:
+            raise ValueError("Item not found")
 
     # Check for existing pending request
     existing = await VerificationRequest.find_one(
@@ -137,7 +143,10 @@ async def update_status(
 
     # If approved, mark the library item as verified
     if new_status == VerificationStatus.APPROVED.value:
-        await _mark_item_verified(req.item_id, req.item_kind)
+        if req.item_kind == "knowledge_base":
+            await _mark_kb_verified(req.item_id)
+        else:
+            await _mark_item_verified(req.item_id, req.item_kind)
 
     return _request_to_dict(req)
 
@@ -166,8 +175,9 @@ async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
 async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
+    user_group_uuids: list[str] | None = None,
 ) -> list[dict]:
-    """List all verified library items, optionally filtered by kind and search."""
+    """List all verified library items, optionally filtered by kind, search, and groups."""
     query: dict = {"verified": True}
     if kind_filter:
         query["kind"] = kind_filter
@@ -186,6 +196,12 @@ async def list_verified_items(
             VerifiedItemMetadata.item_id == str(item.item_id),
         )
 
+        # Group filtering: if item has groups and user doesn't match, skip
+        meta_group_ids = meta.group_ids if meta else []
+        if user_group_uuids is not None and meta_group_ids:
+            if not set(meta_group_ids) & set(user_group_uuids):
+                continue
+
         results.append({
             "id": str(item.id),
             "item_id": str(item.item_id),
@@ -197,6 +213,7 @@ async def list_verified_items(
             "display_name": meta.display_name if meta else None,
             "description": meta.description if meta else None,
             "markdown": meta.markdown if meta else None,
+            "group_ids": meta_group_ids,
         })
     return results
 
@@ -216,6 +233,7 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "display_name": meta.display_name,
         "description": meta.description,
         "markdown": meta.markdown,
+        "group_ids": meta.group_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
     }
@@ -228,6 +246,7 @@ async def update_item_metadata(
     display_name: str | None = None,
     description: str | None = None,
     markdown: str | None = None,
+    group_ids: list[str] | None = None,
 ) -> dict:
     """Upsert metadata for a verified item."""
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -242,6 +261,8 @@ async def update_item_metadata(
             meta.description = description
         if markdown is not None:
             meta.markdown = markdown
+        if group_ids is not None:
+            meta.group_ids = group_ids
         meta.updated_at = now
         meta.updated_by_user_id = user_id
         await meta.save()
@@ -252,6 +273,7 @@ async def update_item_metadata(
             display_name=display_name,
             description=description,
             markdown=markdown,
+            group_ids=group_ids or [],
             updated_at=now,
             updated_by_user_id=user_id,
         )
@@ -264,6 +286,7 @@ async def update_item_metadata(
         "display_name": meta.display_name,
         "description": meta.description,
         "markdown": meta.markdown,
+        "group_ids": meta.group_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
     }
@@ -419,6 +442,14 @@ async def search_users(query: str, limit: int = 20) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 
+async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
+    """Set verified=True on a KnowledgeBase by its MongoDB _id."""
+    kb = await KnowledgeBase.get(item_id)
+    if kb:
+        kb.verified = True
+        await kb.save()
+
+
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
     """Set verified=True on all LibraryItem records pointing to this object."""
     items = await LibraryItem.find(
@@ -434,6 +465,9 @@ async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
     if item_kind == "workflow":
         wf = await Workflow.get(item_id)
         return wf.name if wf else "Unknown workflow"
+    elif item_kind == "knowledge_base":
+        kb = await KnowledgeBase.get(item_id)
+        return kb.title if kb else "Unknown knowledge base"
     else:
         ss = await SearchSet.get(item_id)
         return ss.title if ss else "Unknown extraction"

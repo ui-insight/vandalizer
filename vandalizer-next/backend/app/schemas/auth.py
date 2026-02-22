@@ -14,6 +14,11 @@ class RegisterRequest(BaseModel):
     name: Optional[str] = None
 
 
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+
+
 class UserResponse(BaseModel):
     id: str
     user_id: str

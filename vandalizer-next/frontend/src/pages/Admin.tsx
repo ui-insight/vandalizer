@@ -280,7 +280,7 @@ function UsageTab() {
               padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
               fontSize: 13, fontWeight: 500, cursor: 'pointer',
               backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
-              color: days === d ? '#000' : '#374151',
+              color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
             }}
           >
             {d}d
@@ -720,7 +720,7 @@ function WorkflowsTab() {
               padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
               fontSize: 13, fontWeight: 500, cursor: 'pointer', textTransform: 'capitalize',
               backgroundColor: status === f ? 'var(--highlight-color, #eab308)' : '#fff',
-              color: status === f ? '#000' : '#374151',
+              color: status === f ? 'var(--highlight-text-color, #000)' : '#374151',
             }}
           >
             {f || 'All'}
@@ -1133,7 +1133,7 @@ function ConfigTab() {
                       padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
                       fontSize: 13, fontWeight: 500, cursor: 'pointer', textTransform: 'capitalize',
                       backgroundColor: extractionMode === mode ? 'var(--highlight-color, #eab308)' : '#fff',
-                      color: extractionMode === mode ? '#000' : '#374151',
+                      color: extractionMode === mode ? 'var(--highlight-text-color, #000)' : '#374151',
                     }}
                   >
                     {mode.replace('_', '-')}
@@ -1397,7 +1397,7 @@ function ConfigTab() {
                     onClick={handleAddProvider}
                     style={{
                       padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                      background: 'var(--highlight-color, #eab308)', color: '#000', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                     }}
                   >
                     Add Provider
@@ -1540,7 +1540,7 @@ function ConfigTab() {
                   disabled={savingModel}
                   style={{
                     padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                    background: 'var(--highlight-color, #eab308)', color: '#000', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                     opacity: savingModel ? 0.6 : 1,
                   }}
                 >
@@ -1585,7 +1585,7 @@ function ConfigTab() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
-            <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: '#000', fontWeight: 600, fontSize: 13 }}>
+            <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: 'var(--highlight-text-color, #000)', fontWeight: 600, fontSize: 13 }}>
               Sample Button
             </div>
             <div style={{ border: `2px solid ${themeColor}`, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: themeColor, fontWeight: 600, fontSize: 13 }}>

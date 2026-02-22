@@ -16,6 +16,8 @@ async def create_automation(
     trigger_type: str | None = None,
     action_type: str | None = None,
     action_id: str | None = None,
+    team_id: str | None = None,
+    shared_with_team: bool = False,
 ) -> Automation:
     auto = Automation(
         name=name,
@@ -25,16 +27,30 @@ async def create_automation(
         trigger_type=trigger_type or "folder_watch",
         action_type=action_type or "workflow",
         action_id=action_id,
+        team_id=team_id,
+        shared_with_team=shared_with_team,
     )
     await auto.insert()
     return auto
 
 
-async def list_automations(space: str | None = None) -> list[Automation]:
-    query = {}
+async def list_automations(
+    user_id: str,
+    team_id: str | None = None,
+    space: str | None = None,
+) -> list[Automation]:
+    # Return user's own automations OR team-shared ones
+    user_query: dict = {"user_id": user_id}
     if space:
-        query["space"] = space
-    return await Automation.find(query).to_list()
+        user_query["space"] = space
+
+    if team_id:
+        team_query: dict = {"shared_with_team": True, "team_id": team_id}
+        if space:
+            team_query["space"] = space
+        return await Automation.find({"$or": [user_query, team_query]}).to_list()
+
+    return await Automation.find(user_query).to_list()
 
 
 async def get_automation(automation_id: str) -> Automation | None:
@@ -50,6 +66,7 @@ async def update_automation(
     trigger_config: dict | None = None,
     action_type: str | None = None,
     action_id: str | None = None,
+    shared_with_team: bool | None = None,
 ) -> Automation | None:
     auto = await Automation.get(PydanticObjectId(automation_id))
     if not auto:
@@ -68,6 +85,8 @@ async def update_automation(
         auto.action_type = action_type
     if action_id is not None:
         auto.action_id = action_id
+    if shared_with_team is not None:
+        auto.shared_with_team = shared_with_team
     auto.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await auto.save()
     return auto

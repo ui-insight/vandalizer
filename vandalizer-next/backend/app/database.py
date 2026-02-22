@@ -26,6 +26,8 @@ from app.models.verification import VerificationRequest, VerifiedItemMetadata, V
 from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.group import Group, GroupMembership
+from app.models.extraction_test_case import ExtractionTestCase
 
 ALL_MODELS = [
     User,
@@ -63,6 +65,9 @@ ALL_MODELS = [
     Automation,
     KnowledgeBase,
     KnowledgeBaseSource,
+    Group,
+    GroupMembership,
+    ExtractionTestCase,
 ]
 
 

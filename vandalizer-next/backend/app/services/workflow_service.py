@@ -362,7 +362,11 @@ async def reorder_steps(workflow_id: str, step_ids: list[str]) -> bool:
 # Validation
 # ---------------------------------------------------------------------------
 
-async def validate_workflow(workflow_id: str, eval_plan: str | None = None) -> dict:
+async def validate_workflow(
+    workflow_id: str,
+    eval_plan: str | None = None,
+    text_input: str | None = None,
+) -> dict:
     """Run validation checks on a workflow and return grade + check results."""
     wf_data = await get_workflow(workflow_id)
     if not wf_data:
@@ -430,6 +434,11 @@ async def validate_workflow(workflow_id: str, eval_plan: str | None = None) -> d
                 else:
                     checks.append({"name": f"Prompt configured ({step['name']})", "status": "WARN", "detail": "No prompt text"})
 
+    # LLM-powered checks from eval_plan
+    if eval_plan and eval_plan.strip():
+        llm_checks = await _generate_llm_checks(wf_data, eval_plan, text_input)
+        checks.extend(llm_checks)
+
     # Calculate grade
     statuses = [c["status"] for c in checks]
     fail_count = statuses.count("FAIL")
@@ -451,3 +460,110 @@ async def validate_workflow(workflow_id: str, eval_plan: str | None = None) -> d
     summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"
 
     return {"grade": grade, "summary": summary, "checks": checks}
+
+
+async def _generate_llm_checks(
+    wf_data: dict,
+    eval_plan: str,
+    text_input: str | None = None,
+) -> list[dict]:
+    """Use an LLM to generate validation checks based on the eval plan."""
+    import json as _json
+    from app.services.llm_service import create_chat_agent
+    from app.models.system_config import SystemConfig
+
+    # Build workflow summary for the LLM
+    steps_summary = []
+    for step in wf_data.get("steps", []):
+        tasks_desc = []
+        for task in step.get("tasks", []):
+            task_info = f"  - Task: {task['name']}"
+            data = task.get("data", {})
+            if task["name"] == "Prompt" and data.get("prompt"):
+                task_info += f" (prompt: {data['prompt'][:200]})"
+            elif task["name"] == "Extraction" and data.get("extractions"):
+                task_info += f" (fields: {', '.join(e.get('key', '') for e in data['extractions'][:10])})"
+            tasks_desc.append(task_info)
+        step_desc = f"Step: {step['name']}" + (" [OUTPUT]" if step.get("is_output") else "")
+        steps_summary.append(step_desc + "\n" + "\n".join(tasks_desc))
+
+    workflow_desc = (
+        f"Workflow: {wf_data.get('name', 'Unnamed')}\n"
+        f"Description: {wf_data.get('description', 'No description')}\n\n"
+        + "\n\n".join(steps_summary)
+    )
+
+    system_prompt = (
+        "You are a workflow validation assistant. Given a workflow definition and an evaluation plan, "
+        "generate validation checks that assess whether the workflow meets the criteria described in the evaluation plan.\n\n"
+        "Return ONLY a JSON array of check objects. Each object must have:\n"
+        '- "name": short check name (string)\n'
+        '- "status": one of "PASS", "FAIL", "WARN", or "SKIP" (string)\n'
+        '- "detail": explanation of the check result (string)\n\n'
+        "Assess the workflow structure against the evaluation criteria. "
+        "Use PASS when a criterion is clearly met, FAIL when clearly not met, "
+        "WARN when partially met or uncertain, and SKIP when not applicable.\n\n"
+        "Return ONLY the JSON array, no other text."
+    )
+
+    user_prompt = f"## Workflow\n{workflow_desc}\n\n## Evaluation Plan\n{eval_plan}"
+    if text_input and text_input.strip():
+        user_prompt += f"\n\n## Sample Input Text\nThe following is sample text that this workflow should be able to handle:\n{text_input[:50000]}"
+
+    # Resolve model — use a default model for validation
+    model = await get_user_model_name(wf_data.get("user_id", ""))
+
+    sys_config = await SystemConfig.get_config()
+    sys_config_doc = sys_config.model_dump() if sys_config else {}
+
+    agent = create_chat_agent(
+        model,
+        system_prompt=system_prompt,
+        system_config_doc=sys_config_doc,
+    )
+
+    try:
+        result = await agent.run(user_prompt)
+    except Exception:
+        return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "LLM call failed — could not generate eval checks"}]
+
+    # Parse JSON from response
+    text = result.output.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    text = text.strip()
+
+    try:
+        parsed = _json.loads(text)
+    except _json.JSONDecodeError:
+        start = text.find("[")
+        end = text.rfind("]") + 1
+        if start >= 0 and end > start:
+            try:
+                parsed = _json.loads(text[start:end])
+            except _json.JSONDecodeError:
+                return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Could not parse LLM response"}]
+        else:
+            return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Could not parse LLM response"}]
+
+    if not isinstance(parsed, list):
+        return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Unexpected LLM response format"}]
+
+    # Normalize and validate each check
+    valid_statuses = {"PASS", "FAIL", "WARN", "SKIP"}
+    llm_checks = []
+    for item in parsed:
+        if not isinstance(item, dict) or "name" not in item:
+            continue
+        status = str(item.get("status", "SKIP")).upper()
+        if status not in valid_statuses:
+            status = "SKIP"
+        llm_checks.append({
+            "name": str(item["name"]),
+            "status": status,
+            "detail": str(item.get("detail", "")),
+        })
+
+    return llm_checks

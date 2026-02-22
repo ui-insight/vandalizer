@@ -50,6 +50,15 @@ export function getMe() {
   return apiFetch<User>('/api/auth/me')
 }
 
+// Profile update
+
+export function updateProfile(data: { name?: string; email?: string }) {
+  return apiFetch<User>('/api/auth/profile', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
 // API Token management
 
 export function generateApiToken() {

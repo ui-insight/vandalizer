@@ -1,23 +1,30 @@
 """Extraction API routes  - SearchSet CRUD and extraction execution."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
 
-from app.dependencies import get_current_user
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+
+from app.dependencies import get_api_key_user, get_current_user
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
 from app.services import activity_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
+    CreateTestCaseRequest,
     ExtractionStatusResponse,
     ReorderItemsRequest,
     RunExtractionSyncRequest,
+    RunValidationRequest,
     SearchSetItemRequest,
     SearchSetItemResponse,
     SearchSetResponse,
+    TestCaseResponse,
     UpdateSearchSetRequest,
     UpdateSearchSetItemRequest,
+    UpdateTestCaseRequest,
 )
+from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
 
 router = APIRouter()
@@ -209,3 +216,191 @@ async def run_extraction_sync(req: RunExtractionSyncRequest, user: User = Depend
             activity.id, ActivityStatus.FAILED, error=str(e),
         )
         raise
+
+
+# ---------------------------------------------------------------------------
+# External API integration endpoints (x-api-key auth)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/run-integrated")
+async def run_extraction_integrated(
+    search_set_uuid: str = Form(...),
+    document_uuids: Optional[str] = Form(None),
+    files: list[UploadFile] = File(default=[]),
+    user: User = Depends(get_api_key_user),
+):
+    """Run extraction via external API. Accepts optional file uploads and/or existing document UUIDs."""
+    import uuid as _uuid
+    from pathlib import Path
+    from app.config import Settings
+    from app.models.document import SmartDocument
+    from app.tasks.upload_tasks import dispatch_upload_tasks
+
+    settings = Settings()
+    all_doc_uuids: list[str] = []
+
+    # Parse existing document UUIDs
+    if document_uuids:
+        all_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
+
+    # Handle file uploads
+    for upload in files:
+        if not upload.filename:
+            continue
+        uid = _uuid.uuid4().hex.upper()
+        ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
+        relative_path = Path(user.user_id) / f"{uid}.{ext}"
+        upload_dir = Path(settings.upload_dir) / user.user_id
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        file_path = upload_dir / f"{uid}.{ext}"
+        file_data = await upload.read()
+        file_path.write_bytes(file_data)
+
+        doc = SmartDocument(
+            title=upload.filename,
+            processing=True,
+            valid=True,
+            raw_text="",
+            downloadpath=str(relative_path),
+            path=str(relative_path),
+            extension=ext,
+            uuid=uid,
+            user_id=user.user_id,
+            space="default",
+            folder="0",
+        )
+        await doc.insert()
+
+        task_id = dispatch_upload_tasks(
+            document_uuid=uid, extension=ext, document_path=str(file_path),
+        )
+        doc.task_id = task_id
+        await doc.save()
+        all_doc_uuids.append(uid)
+
+    if not all_doc_uuids:
+        raise HTTPException(status_code=400, detail="No documents or files provided")
+
+    # Look up the search set
+    ss = await svc.get_search_set(search_set_uuid)
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+
+    # Create activity
+    activity = await activity_service.activity_start(
+        type=ActivityType.SEARCH_SET_RUN,
+        title=ss.title,
+        user_id=user.user_id,
+        search_set_uuid=search_set_uuid,
+    )
+
+    try:
+        results = await svc.run_extraction_sync(
+            search_set_uuid=search_set_uuid,
+            document_uuids=all_doc_uuids,
+            user_id=user.user_id,
+        )
+        await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        await activity_service.activity_update(activity.id, documents_touched=len(all_doc_uuids))
+        return {"status": "completed", "activity_id": str(activity.id), "results": results}
+    except Exception as e:
+        await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
+        raise
+
+
+@router.get("/status/{activity_id}")
+async def get_extraction_status(
+    activity_id: str,
+    user: User = Depends(get_api_key_user),
+):
+    """Check extraction status by activity ID."""
+    activity = await activity_service.get_activity(activity_id, user.user_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return {
+        "status": activity.status,
+        "title": activity.title,
+        "started_at": activity.started_at.isoformat() if activity.started_at else None,
+        "finished_at": activity.finished_at.isoformat() if activity.finished_at else None,
+        "error": activity.error,
+        "documents_touched": activity.documents_touched,
+        "result_snapshot": activity.result_snapshot,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Extraction test cases & validation
+# ---------------------------------------------------------------------------
+
+def _tc_response(tc) -> TestCaseResponse:
+    return TestCaseResponse(
+        id=str(tc.id),
+        uuid=tc.uuid,
+        search_set_uuid=tc.search_set_uuid,
+        label=tc.label,
+        source_type=tc.source_type,
+        source_text=tc.source_text,
+        document_uuid=tc.document_uuid,
+        expected_values=tc.expected_values,
+        user_id=tc.user_id,
+        created_at=tc.created_at.isoformat(),
+    )
+
+
+@router.post("/test-cases", response_model=TestCaseResponse)
+async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_current_user)):
+    tc = await val_svc.create_test_case(
+        search_set_uuid=req.search_set_uuid,
+        label=req.label,
+        source_type=req.source_type,
+        user_id=user.user_id,
+        source_text=req.source_text,
+        document_uuid=req.document_uuid,
+        expected_values=req.expected_values,
+    )
+    return _tc_response(tc)
+
+
+@router.get("/test-cases", response_model=list[TestCaseResponse])
+async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)):
+    tcs = await val_svc.list_test_cases(search_set_uuid)
+    return [_tc_response(tc) for tc in tcs]
+
+
+@router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
+async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = Depends(get_current_user)):
+    tc = await val_svc.update_test_case(
+        uuid,
+        label=req.label,
+        source_type=req.source_type,
+        source_text=req.source_text,
+        document_uuid=req.document_uuid,
+        expected_values=req.expected_values,
+    )
+    if not tc:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    return _tc_response(tc)
+
+
+@router.delete("/test-cases/{uuid}")
+async def delete_test_case(uuid: str, user: User = Depends(get_current_user)):
+    ok = await val_svc.delete_test_case(uuid)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    return {"ok": True}
+
+
+@router.post("/validate")
+async def run_validation(req: RunValidationRequest, user: User = Depends(get_current_user)):
+    try:
+        result = await val_svc.run_validation(
+            search_set_uuid=req.search_set_uuid,
+            user_id=user.user_id,
+            test_case_uuids=req.test_case_uuids or None,
+            num_runs=req.num_runs,
+            model=req.model,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

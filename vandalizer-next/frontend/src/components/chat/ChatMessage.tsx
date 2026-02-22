@@ -1,8 +1,40 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight } from 'lucide-react'
 import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import type { ChatMessage as ChatMessageType } from '../../types/chat'
+
+const THINKING_WORDS = [
+  'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
+  'Processing', 'Brewing', 'Crunching', 'Conjuring',
+]
+
+function ThinkingLabel() {
+  const [index, setIndex] = useState(0)
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setIndex(i => (i + 1) % THINKING_WORDS.length)
+        setFade(true)
+      }, 200)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <span style={{
+      opacity: fade ? 1 : 0,
+      transition: 'opacity 0.2s ease',
+      display: 'inline-block',
+      minWidth: 80,
+    }}>
+      {THINKING_WORDS[index]}&hellip;
+    </span>
+  )
+}
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -34,7 +66,9 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
 
   const renderedHtml = useMemo(() => {
     if (isUser) return null
-    return marked.parse(message.content) as string
+    // Strip any residual <think>/<thinking> blocks the backend didn't catch
+    const cleaned = message.content.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g, '')
+    return marked.parse(cleaned) as string
   }, [message.content, isUser])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
@@ -116,7 +150,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 />
                 {duration != null
                   ? `Thought for ${duration < 1 ? 'less than a second' : `${Math.round(duration)} second${Math.round(duration) !== 1 ? 's' : ''}`}`
-                  : 'Thinking\u2026'}
+                  : <ThinkingLabel />}
               </button>
               <div className={`thinking-collapse${thinkingExpanded ? ' open' : ''}`}>
                 <div>

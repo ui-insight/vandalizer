@@ -72,7 +72,7 @@ export function AutomationsPanel() {
             fontSize: 13,
             fontWeight: 600,
             fontFamily: 'inherit',
-            color: '#000',
+            color: 'var(--highlight-text-color, #000)',
             backgroundColor: 'var(--highlight-color, #eab308)',
             border: 'none',
             borderRadius: 6,
@@ -145,7 +145,7 @@ export function AutomationsPanel() {
                       {auto.name}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <span
                       style={{
                         fontSize: 11,
@@ -158,6 +158,14 @@ export function AutomationsPanel() {
                     >
                       {badge.label}
                     </span>
+                    {auto.shared_with_team && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                        color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+                      }}>
+                        Team
+                      </span>
+                    )}
                   </div>
                   <div style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {getActionName(auto)}

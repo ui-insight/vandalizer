@@ -44,17 +44,17 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true },
   { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true },
   { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: true },
-  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#6b7280', categories: ['all', 'files'], enabled: false },
-  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'APINode', label: 'API Node', icon: Zap, color: '#6b7280', categories: ['all', 'web'], enabled: false },
-  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#6b7280', categories: ['all', 'output'], enabled: false },
-  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#6b7280', categories: ['all', 'output'], enabled: false },
-  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#6b7280', categories: ['all', 'output'], enabled: false },
-  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6b7280', categories: ['all', 'output'], enabled: false },
+  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true },
+  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true },
+  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: true },
+  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: true },
+  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true },
+  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true },
+  { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true },
+  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true },
+  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
+  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true },
+  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: true },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -77,16 +77,16 @@ const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
 // ---------------------------------------------------------------------------
 
 function getTaskColor(name: string): string {
-  if (name === 'Extraction') return '#dc2626'
-  if (name === 'Prompt') return '#2563eb'
-  if (name === 'Formatter' || name === 'Format') return '#16a34a'
+  const found = TASK_TYPES.find(t => t.name === name)
+  if (found) return found.color
+  if (name === 'Format') return '#16a34a'
   return '#6b7280'
 }
 
 function getTaskIcon(name: string) {
-  if (name === 'Extraction') return Filter
-  if (name === 'Prompt') return MousePointerClick
-  if (name === 'Formatter' || name === 'Format') return Outdent
+  const found = TASK_TYPES.find(t => t.name === name)
+  if (found) return found.icon
+  if (name === 'Format') return Outdent
   return FileText
 }
 
@@ -958,6 +958,17 @@ function EditStepOverlay({
                     {task.name === 'Extraction' ? 'Structured data extraction'
                       : task.name === 'Prompt' ? 'LLM prompt task'
                       : task.name === 'Formatter' || task.name === 'Format' ? 'Format output'
+                      : task.name === 'AddWebsite' ? 'Fetch URL text'
+                      : task.name === 'AddDocument' ? 'Add document text'
+                      : task.name === 'DescribeImage' ? 'AI image description'
+                      : task.name === 'CodeNode' ? 'Run Python code'
+                      : task.name === 'CrawlerNode' ? 'Web crawler'
+                      : task.name === 'ResearchNode' ? 'Deep AI research'
+                      : task.name === 'APINode' ? 'HTTP API request'
+                      : task.name === 'DocumentRenderer' ? 'Render document'
+                      : task.name === 'FormFiller' ? 'Fill template'
+                      : task.name === 'DataExport' ? 'Export data'
+                      : task.name === 'PackageBuilder' ? 'Build zip package'
                       : task.name}
                   </div>
                 </div>
@@ -1348,6 +1359,17 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                 {task.name === 'Extraction' ? 'Extract specific information from text using AI'
                   : task.name === 'Prompt' ? 'Uses AI to perform your instructions on text'
                   : task.name === 'Formatter' || task.name === 'Format' ? 'Format and structure output data'
+                  : task.name === 'AddWebsite' ? 'Fetch a URL and pass its text downstream'
+                  : task.name === 'AddDocument' ? 'Insert a document\'s text mid-workflow'
+                  : task.name === 'DescribeImage' ? 'Describe an image using AI'
+                  : task.name === 'CodeNode' ? 'Run Python code on input data'
+                  : task.name === 'CrawlerNode' ? 'Crawl multiple pages from a starting URL'
+                  : task.name === 'ResearchNode' ? 'Deep multi-pass AI analysis'
+                  : task.name === 'APINode' ? 'Make HTTP API requests'
+                  : task.name === 'DocumentRenderer' ? 'Render output as a downloadable file'
+                  : task.name === 'FormFiller' ? 'Fill a template with data'
+                  : task.name === 'DataExport' ? 'Export structured data as a file'
+                  : task.name === 'PackageBuilder' ? 'Bundle outputs into a zip'
                   : 'Configure this task'}
               </div>
             </div>
@@ -1511,6 +1533,386 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
 
             {task.name === 'Browser' && (
               <BrowserAutomationDesign taskData={taskData} setTextValue={setTextValue} getTextValue={getTextValue} setTaskData={setTaskData} />
+            )}
+
+            {task.name === 'AddWebsite' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  URL
+                </label>
+                <input
+                  type="text"
+                  value={getTextValue('url')}
+                  onChange={e => setTextValue('url', e.target.value)}
+                  placeholder="https://example.com"
+                  style={{
+                    width: '100%', padding: '8px 12px', fontSize: 13,
+                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            )}
+
+            {task.name === 'AddDocument' && (
+              <div>
+                <div style={{
+                  padding: 12, backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
+                  borderRadius: 6, fontSize: 13, color: '#0369a1', lineHeight: 1.5,
+                }}>
+                  The document for this task is selected in the <strong>Input</strong> sub-tab.
+                  Choose "Select a Document" to pick a specific document, or "Step Input"
+                  to use text from the previous step.
+                </div>
+              </div>
+            )}
+
+            {task.name === 'DescribeImage' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Image URL
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('image_url')}
+                    onChange={e => setTextValue('image_url', e.target.value)}
+                    placeholder="https://example.com/image.png"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Description Prompt
+                  </label>
+                  <textarea
+                    value={getTextValue('prompt')}
+                    onChange={e => setTextValue('prompt', e.target.value)}
+                    placeholder="Describe this image in detail."
+                    rows={4}
+                    style={{
+                      width: '100%', padding: '10px 12px', fontSize: 14,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {task.name === 'CodeNode' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Python Code
+                </label>
+                <textarea
+                  value={getTextValue('code')}
+                  onChange={e => setTextValue('code', e.target.value)}
+                  placeholder={'# Input data is available as `data`\n# Set `result` to your output\n\nresult = str(data).upper()'}
+                  rows={12}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: 13,
+                    fontFamily: 'monospace', border: '1px solid #d1d5db', borderRadius: 6,
+                    outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                  }}
+                />
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                  The input from the previous step is available as <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>data</code>.
+                  Set the <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>result</code> variable to produce output.
+                  Available modules: json, re, math, datetime.
+                </div>
+              </div>
+            )}
+
+            {task.name === 'CrawlerNode' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Starting URL
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('start_url')}
+                    onChange={e => setTextValue('start_url', e.target.value)}
+                    placeholder="https://example.com"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Max Pages
+                  </label>
+                  <input
+                    type="number"
+                    value={getTextValue('max_pages') || '5'}
+                    onChange={e => setTextValue('max_pages', e.target.value)}
+                    min={1}
+                    max={50}
+                    style={{
+                      width: 100, padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Allowed Domains
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('allowed_domains')}
+                    onChange={e => setTextValue('allowed_domains', e.target.value)}
+                    placeholder="example.com, docs.example.com"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                    Comma-separated list. Defaults to the starting URL's domain.
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {task.name === 'ResearchNode' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Research Question / Topic
+                </label>
+                <textarea
+                  value={getTextValue('question')}
+                  onChange={e => setTextValue('question', e.target.value)}
+                  placeholder="e.g., What are the main themes and conclusions in this data?"
+                  rows={6}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: 14,
+                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                    outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                  }}
+                />
+              </div>
+            )}
+
+            {task.name === 'APINode' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    URL
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('url')}
+                    onChange={e => setTextValue('url', e.target.value)}
+                    placeholder="https://api.example.com/endpoint"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    HTTP Method
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={getTextValue('method') || 'GET'}
+                      onChange={e => setTextValue('method', e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Headers (JSON)
+                  </label>
+                  <textarea
+                    value={getTextValue('headers')}
+                    onChange={e => setTextValue('headers', e.target.value)}
+                    placeholder={'{"Authorization": "Bearer ...", "Content-Type": "application/json"}'}
+                    rows={3}
+                    style={{
+                      width: '100%', padding: '10px 12px', fontSize: 13,
+                      fontFamily: 'monospace', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Request Body
+                  </label>
+                  <textarea
+                    value={getTextValue('body')}
+                    onChange={e => setTextValue('body', e.target.value)}
+                    placeholder={'{"key": "value"}'}
+                    rows={4}
+                    style={{
+                      width: '100%', padding: '10px 12px', fontSize: 13,
+                      fontFamily: 'monospace', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {task.name === 'DocumentRenderer' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Output Format
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={getTextValue('format') || 'md'}
+                      onChange={e => setTextValue('format', e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="md">Markdown (.md)</option>
+                      <option value="txt">Plain Text (.txt)</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Filename
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('filename') || 'output'}
+                    onChange={e => setTextValue('filename', e.target.value)}
+                    placeholder="output"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {task.name === 'FormFiller' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Template
+                </label>
+                <textarea
+                  value={getTextValue('template')}
+                  onChange={e => setTextValue('template', e.target.value)}
+                  placeholder={'Dear {{name}},\n\nThank you for your {{item}}.\n\nBest regards,\n{{sender}}'}
+                  rows={10}
+                  style={{
+                    width: '100%', padding: '10px 12px', fontSize: 14,
+                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                    outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                  }}
+                />
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                  Use <code style={{ backgroundColor: '#f3f4f6', padding: '1px 4px', borderRadius: 3 }}>{'{{placeholder}}'}</code> syntax.
+                  AI will fill placeholders from the input data.
+                </div>
+              </div>
+            )}
+
+            {task.name === 'DataExport' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Export Format
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={getTextValue('format') || 'json'}
+                      onChange={e => setTextValue('format', e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="json">JSON (.json)</option>
+                      <option value="csv">CSV (.csv)</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Filename
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('filename') || 'export'}
+                    onChange={e => setTextValue('filename', e.target.value)}
+                    placeholder="export"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {task.name === 'PackageBuilder' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Package Name
+                </label>
+                <input
+                  type="text"
+                  value={getTextValue('package_name') || 'package'}
+                  onChange={e => setTextValue('package_name', e.target.value)}
+                  placeholder="package"
+                  style={{
+                    width: '100%', padding: '8px 12px', fontSize: 13,
+                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                  Creates a .zip containing output.json and output.txt from the input data.
+                </div>
+              </div>
             )}
 
             {/* Test result display */}
@@ -2593,19 +2995,60 @@ const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: str
   SKIP: { bg: '#f3f4f6', text: '#6b7280', label: 'SKIP' },
 }
 
+const STATUS_OPTIONS: Array<ValidationCheck['status']> = ['PASS', 'FAIL', 'WARN', 'SKIP']
+
+function computeGrade(checks: ValidationCheck[]): { grade: string; summary: string } {
+  const statuses = checks.map(c => c.status)
+  const failCount = statuses.filter(s => s === 'FAIL').length
+  const warnCount = statuses.filter(s => s === 'WARN').length
+  const passCount = statuses.filter(s => s === 'PASS').length
+  const total = checks.length
+
+  let grade: string
+  if (failCount === 0 && warnCount === 0) grade = 'A'
+  else if (failCount === 0 && warnCount <= 1) grade = 'B'
+  else if (failCount === 0) grade = 'C'
+  else if (failCount === 1) grade = 'D'
+  else grade = 'F'
+
+  const summary = `${passCount}/${total} checks passed, ${warnCount} warnings, ${failCount} failures`
+  return { grade, summary }
+}
+
 function ValidateTab({ workflowId }: { workflowId: string | null }) {
   const [evalPlan, setEvalPlan] = useState('')
+  const [textInput, setTextInput] = useState('')
   const [validating, setValidating] = useState(false)
-  const [result, setResult] = useState<ValidationResult | null>(null)
+  const [checks, setChecks] = useState<ValidationCheck[]>([])
+  const [gradeInfo, setGradeInfo] = useState<{ grade: string; summary: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDetail, setEditDetail] = useState('')
+  const [addingCheck, setAddingCheck] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newStatus, setNewStatus] = useState<ValidationCheck['status']>('PASS')
+  const [newDetail, setNewDetail] = useState('')
+
+  const updateGrade = (updatedChecks: ValidationCheck[]) => {
+    setChecks(updatedChecks)
+    if (updatedChecks.length > 0) {
+      setGradeInfo(computeGrade(updatedChecks))
+    } else {
+      setGradeInfo(null)
+    }
+  }
 
   const handleValidate = async () => {
     if (!workflowId) return
     setValidating(true)
     setError(null)
+    setEditingIdx(null)
+    setAddingCheck(false)
     try {
-      const res = await validateWorkflow(workflowId, evalPlan || undefined)
-      setResult(res)
+      const res = await validateWorkflow(workflowId, evalPlan || undefined, textInput || undefined)
+      setChecks(res.checks)
+      setGradeInfo({ grade: res.grade, summary: res.summary })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Validation failed')
     } finally {
@@ -2613,7 +3056,43 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     }
   }
 
-  const gradeStyle = result ? GRADE_COLORS[result.grade] || GRADE_COLORS.F : null
+  const handleDeleteCheck = (idx: number) => {
+    const updated = checks.filter((_, i) => i !== idx)
+    if (editingIdx === idx) setEditingIdx(null)
+    else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1)
+    updateGrade(updated)
+  }
+
+  const handleStartEdit = (idx: number) => {
+    setEditingIdx(idx)
+    setEditName(checks[idx].name)
+    setEditDetail(checks[idx].detail || '')
+  }
+
+  const handleSaveEdit = (idx: number) => {
+    const updated = [...checks]
+    updated[idx] = { ...updated[idx], name: editName, detail: editDetail }
+    setEditingIdx(null)
+    updateGrade(updated)
+  }
+
+  const handleStatusChange = (idx: number, status: ValidationCheck['status']) => {
+    const updated = [...checks]
+    updated[idx] = { ...updated[idx], status }
+    updateGrade(updated)
+  }
+
+  const handleAddCheck = () => {
+    if (!newName.trim()) return
+    const updated = [...checks, { name: newName.trim(), status: newStatus, detail: newDetail.trim() || null }]
+    setNewName('')
+    setNewStatus('PASS')
+    setNewDetail('')
+    setAddingCheck(false)
+    updateGrade(updated)
+  }
+
+  const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
 
   return (
     <div style={{ padding: 24 }}>
@@ -2629,12 +3108,35 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
             Evaluation Plan
           </div>
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Define criteria for validating workflow output quality (optional).
+            Define criteria for validating workflow output quality. When provided, the LLM will generate additional checks based on your criteria.
           </div>
           <textarea
             value={evalPlan}
             onChange={e => setEvalPlan(e.target.value)}
             placeholder="Describe what a successful workflow output looks like..."
+            style={{
+              width: '100%', minHeight: 80, fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px',
+              backgroundColor: '#fff', resize: 'vertical', boxSizing: 'border-box',
+              color: '#374151', outline: 'none',
+            }}
+          />
+        </div>
+
+        {/* Test text input */}
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+            Test Text
+          </div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+            Paste sample text to validate the workflow against.
+          </div>
+          <textarea
+            value={textInput}
+            onChange={e => setTextInput(e.target.value)}
+            placeholder="Paste sample document text here..."
             style={{
               width: '100%', minHeight: 80, fontSize: 13, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px',
@@ -2671,7 +3173,7 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
         )}
 
         {/* Validation result */}
-        {result && (
+        {gradeInfo && (
           <>
             {/* Grade badge */}
             <div style={{
@@ -2685,7 +3187,7 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
                 flexShrink: 0,
               }}>
                 <span style={{ fontSize: 28, fontWeight: 800, color: gradeStyle?.text }}>
-                  {result.grade}
+                  {gradeInfo.grade}
                 </span>
               </div>
               <div>
@@ -2693,7 +3195,7 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
                   Validation Grade
                 </div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  {result.summary}
+                  {gradeInfo.summary}
                 </div>
               </div>
             </div>
@@ -2710,53 +3212,186 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
               }}>
                 Validation Checks
               </div>
-              {result.checks.map((check, idx) => {
+              {checks.map((check, idx) => {
                 const statusStyle = CHECK_STATUS_STYLES[check.status] || CHECK_STATUS_STYLES.SKIP
+                const isEditing = editingIdx === idx
                 return (
                   <div
                     key={idx}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
-                      borderBottom: idx < result.checks.length - 1 ? '1px solid #f3f4f6' : 'none',
+                      borderBottom: idx < checks.length - 1 ? '1px solid #f3f4f6' : 'none',
                     }}
                   >
-                    <span style={{
-                      display: 'inline-block', padding: '2px 8px', borderRadius: 4,
-                      fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-                      backgroundColor: statusStyle.bg, color: statusStyle.text,
-                    }}>
-                      {statusStyle.label}
-                    </span>
+                    {/* Status badge — clickable dropdown when editing */}
+                    <select
+                      value={check.status}
+                      onChange={e => handleStatusChange(idx, e.target.value as ValidationCheck['status'])}
+                      style={{
+                        padding: '2px 4px', borderRadius: 4,
+                        fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                        backgroundColor: statusStyle.bg, color: statusStyle.text,
+                        border: '1px solid transparent', cursor: 'pointer',
+                        appearance: 'auto', minWidth: 60,
+                      }}
+                    >
+                      {STATUS_OPTIONS.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
-                      {check.detail && (
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{check.detail}</div>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <input
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            style={{
+                              fontSize: 13, fontWeight: 500, color: '#202124',
+                              border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px',
+                              fontFamily: 'inherit', outline: 'none', width: '100%',
+                              boxSizing: 'border-box',
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(idx) }}
+                          />
+                          <input
+                            value={editDetail}
+                            onChange={e => setEditDetail(e.target.value)}
+                            placeholder="Detail..."
+                            style={{
+                              fontSize: 11, color: '#6b7280',
+                              border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 8px',
+                              fontFamily: 'inherit', outline: 'none', width: '100%',
+                              boxSizing: 'border-box',
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(idx) }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
+                          {check.detail && (
+                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{check.detail}</div>
+                          )}
+                        </>
                       )}
+                    </div>
+                    {/* Action buttons */}
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {isEditing ? (
+                        <button
+                          onClick={() => handleSaveEdit(idx)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                            color: '#16a34a', display: 'flex',
+                          }}
+                          title="Save"
+                        >
+                          <CheckCircle style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartEdit(idx)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                            color: '#9ca3af', display: 'flex',
+                          }}
+                          title="Edit check"
+                        >
+                          <Pencil style={{ width: 13, height: 13 }} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeleteCheck(idx)}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer', padding: 4,
+                          color: '#9ca3af', display: 'flex',
+                        }}
+                        title="Remove check"
+                      >
+                        <X style={{ width: 14, height: 14 }} />
+                      </button>
                     </div>
                   </div>
                 )
               })}
+
+              {/* Add check row */}
+              {addingCheck ? (
+                <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <select
+                      value={newStatus}
+                      onChange={e => setNewStatus(e.target.value as ValidationCheck['status'])}
+                      style={{
+                        padding: '4px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                        border: '1px solid #d1d5db', cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      {STATUS_OPTIONS.map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <input
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder="Check name..."
+                      autoFocus
+                      style={{
+                        flex: 1, fontSize: 13, border: '1px solid #d1d5db', borderRadius: 4,
+                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddCheck() }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      value={newDetail}
+                      onChange={e => setNewDetail(e.target.value)}
+                      placeholder="Detail (optional)..."
+                      style={{
+                        flex: 1, fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4,
+                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddCheck() }}
+                    />
+                    <button
+                      onClick={handleAddCheck}
+                      disabled={!newName.trim()}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        border: 'none', borderRadius: 4, cursor: newName.trim() ? 'pointer' : 'not-allowed',
+                        backgroundColor: '#16a34a', color: '#fff', opacity: newName.trim() ? 1 : 0.5,
+                      }}
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => { setAddingCheck(false); setNewName(''); setNewDetail(''); setNewStatus('PASS') }}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer',
+                        backgroundColor: '#fff', color: '#374151',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingCheck(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px',
+                    width: '100%', background: 'none', border: 'none', borderTop: '1px solid #f3f4f6',
+                    cursor: 'pointer', fontSize: 12, color: '#6b7280', fontFamily: 'inherit',
+                  }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} /> Add Check
+                </button>
+              )}
             </div>
           </>
         )}
-
-        {/* Test documents */}
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Test Documents
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Add known-good test documents with expected results to validate workflow accuracy.
-          </div>
-          <div style={{
-            border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
-            textAlign: 'center', color: '#9ca3af', fontSize: 13,
-          }}>
-            No test documents added yet
-          </div>
-        </div>
       </div>
     </div>
   )

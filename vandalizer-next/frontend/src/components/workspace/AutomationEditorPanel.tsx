@@ -82,6 +82,11 @@ export function AutomationEditorPanel() {
     await save({ enabled: !automation.enabled })
   }
 
+  const handleToggleShared = async () => {
+    if (!automation) return
+    await save({ shared_with_team: !automation.shared_with_team })
+  }
+
   const handleTriggerTypeChange = async (type: TriggerType) => {
     await save({ trigger_type: type, trigger_config: {} })
   }
@@ -162,6 +167,20 @@ export function AutomationEditorPanel() {
                 backgroundColor: automation.enabled ? '#22c55e' : '#9ca3af',
               }} />
               {automation.enabled ? 'Enabled' : 'Disabled'}
+            </button>
+            {/* Visible to team toggle */}
+            <button
+              onClick={handleToggleShared}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
+                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                color: automation.shared_with_team ? 'rgb(0, 128, 128)' : '#6b7280',
+                backgroundColor: automation.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#f3f4f6',
+                border: '1px solid ' + (automation.shared_with_team ? 'rgba(0, 128, 128, 0.3)' : '#e5e7eb'),
+                borderRadius: 16, cursor: 'pointer',
+              }}
+            >
+              {automation.shared_with_team ? 'Visible to team' : 'Private'}
             </button>
             {/* Delete */}
             <button

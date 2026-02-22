@@ -4,12 +4,20 @@ All node processing is synchronous (runs in Celery workers).
 Progress reporting uses pymongo directly for sync context.
 """
 
+import base64
+import csv
 import graphlib
+import io
 import json
 import multiprocessing
 import re
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NoReturn, Optional
+from urllib.parse import urljoin, urlparse
+
+import httpx
+from bs4 import BeautifulSoup
 
 from app.services.extraction_engine import ExtractionEngine
 from app.services.llm_service import create_chat_agent, get_agent_model
@@ -24,6 +32,17 @@ def sanitize_step_name(name: str) -> str:
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"__+", "_", name)
     return name or "step"
+
+
+def _extract_text_from_html(html: str) -> str:
+    """Extract clean text from HTML using BeautifulSoup."""
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside", "form"]):
+        tag.decompose()
+    text = soup.get_text(separator="\n")
+    text = re.sub(r"[ \t]+", " ", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def format_extraction_results(data) -> str:
@@ -228,6 +247,12 @@ class ExtractionNode(Node):
                 full_text = step_input
             elif step_input:
                 full_text = json.dumps(step_input) if not isinstance(step_input, str) else step_input
+        else:
+            step_input = inputs.get("output")
+            if isinstance(step_input, str):
+                full_text = step_input
+            elif step_input:
+                full_text = json.dumps(step_input) if not isinstance(step_input, str) else step_input
 
         extraction_response = data_extraction_model(
             self.model, keys, doc_texts=doc_texts, full_text=full_text,
@@ -297,6 +322,312 @@ class FormatNode(Node):
 
         _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg)
         return {"output": output, "input": formatting_prompt, "step_name": self.name}
+
+
+class WebsiteNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("AddWebsite")
+        self.data = data
+
+    def process(self, inputs):
+        url = self.data.get("url", "")
+        if not url:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+        self.report_progress(f"Fetching {url}")
+        with httpx.Client(timeout=30, follow_redirects=True) as client:
+            resp = client.get(url)
+            resp.raise_for_status()
+        text = _extract_text_from_html(resp.text)
+        return {"output": text, "input": inputs.get("output"), "step_name": self.name}
+
+
+class AddDocumentNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("AddDocument")
+        self.data = data
+
+    def process(self, inputs):
+        doc_texts = self.data.get("doc_texts", [])
+        text = "\n".join(doc_texts) if doc_texts else ""
+        self.report_progress("Adding document text")
+        return {"output": text, "input": inputs.get("output"), "step_name": self.name}
+
+
+class DescribeImageNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("DescribeImage")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        image_url = self.data.get("image_url", "")
+        prompt = self.data.get("prompt", "Describe this image in detail.")
+        self.report_progress(f"Describing image: {image_url}")
+        full_prompt = f"Describe this image: {image_url}\n\nAdditional instructions: {prompt}"
+        response = llm_chat_model(
+            model=self.model, prompt=full_prompt, data=inputs.get("output"),
+            include_next_step=False, system_config_doc=self._sys_cfg,
+        )
+        return {"output": response, "input": inputs.get("output"), "step_name": self.name}
+
+
+class CodeExecutionNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("CodeNode")
+        self.data = data
+
+    def process(self, inputs):
+        code = self.data.get("code", "")
+        if not code:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+        self.report_progress("Running code")
+
+        import datetime
+        import math
+
+        safe_builtins = {
+            "json": json, "re": re, "math": math, "datetime": datetime,
+            "str": str, "int": int, "float": float, "list": list, "dict": dict,
+            "len": len, "range": range, "enumerate": enumerate, "sorted": sorted,
+            "min": min, "max": max, "sum": sum, "round": round, "abs": abs,
+            "isinstance": isinstance, "type": type, "print": print,
+            "True": True, "False": False, "None": None,
+        }
+        local_vars = {"data": inputs.get("output"), "result": None}
+        exec(code, {"__builtins__": safe_builtins}, local_vars)  # noqa: S102
+        return {"output": local_vars.get("result", ""), "input": inputs.get("output"), "step_name": self.name}
+
+
+class CrawlerNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("CrawlerNode")
+        self.data = data
+
+    def process(self, inputs):
+        start_url = self.data.get("start_url", "")
+        max_pages = int(self.data.get("max_pages", 5))
+        allowed_domains = self.data.get("allowed_domains", "")
+        if not start_url:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        self.report_progress(f"Crawling from {start_url}")
+        parsed_start = urlparse(start_url)
+        allowed = {d.strip() for d in allowed_domains.split(",") if d.strip()} if allowed_domains else {parsed_start.netloc}
+
+        visited = set()
+        to_visit = [start_url]
+        all_text = []
+
+        with httpx.Client(timeout=30, follow_redirects=True) as client:
+            while to_visit and len(visited) < max_pages:
+                url = to_visit.pop(0)
+                if url in visited:
+                    continue
+                visited.add(url)
+                self.report_progress(f"Crawling page {len(visited)}/{max_pages}: {url}")
+                try:
+                    resp = client.get(url)
+                    resp.raise_for_status()
+                except Exception:
+                    continue
+                text = _extract_text_from_html(resp.text)
+                all_text.append(f"--- {url} ---\n{text}")
+                soup = BeautifulSoup(resp.text, "html.parser")
+                for link in soup.find_all("a", href=True):
+                    abs_url = urljoin(url, link["href"])
+                    parsed = urlparse(abs_url)
+                    if parsed.netloc in allowed and abs_url not in visited:
+                        to_visit.append(abs_url)
+
+        return {"output": "\n\n".join(all_text), "input": inputs.get("output"), "step_name": self.name}
+
+
+class ResearchNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("ResearchNode")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        question = self.data.get("question", "")
+        input_data = inputs.get("output")
+        self.report_progress("Pass 1: Analyzing data")
+
+        analysis_prompt = (
+            f"Analyze the following data and generate structured findings related to this question: {question}\n\n"
+            "Provide your analysis as a structured list of key findings, evidence, and observations."
+        )
+        findings = llm_chat_model(
+            model=self.model, prompt=analysis_prompt, data=input_data,
+            include_next_step=False, system_config_doc=self._sys_cfg,
+        )
+
+        self.report_progress("Pass 2: Synthesizing report")
+        synthesis_prompt = (
+            f"Based on the following analysis findings, create a comprehensive research report about: {question}\n\n"
+            "Structure the report with clear sections: Executive Summary, Key Findings, "
+            "Detailed Analysis, and Conclusions.\n\n"
+            f"Findings:\n{findings}"
+        )
+        report = llm_chat_model(
+            model=self.model, prompt=synthesis_prompt, data=input_data,
+            include_next_step=False, system_config_doc=self._sys_cfg,
+        )
+        return {"output": report, "input": inputs.get("output"), "step_name": self.name}
+
+
+class APICallNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("APINode")
+        self.data = data
+
+    def process(self, inputs):
+        url = self.data.get("url", "")
+        method = self.data.get("method", "GET").upper()
+        headers_raw = self.data.get("headers", "")
+        body_raw = self.data.get("body", "")
+        if not url:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        self.report_progress(f"{method} {url}")
+        headers = {}
+        if headers_raw:
+            try:
+                headers = json.loads(headers_raw)
+            except json.JSONDecodeError:
+                pass
+
+        body = None
+        if body_raw and method in ("POST", "PUT", "PATCH"):
+            try:
+                body = json.loads(body_raw)
+            except json.JSONDecodeError:
+                body = body_raw
+
+        with httpx.Client(timeout=30, follow_redirects=True) as client:
+            resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+            resp.raise_for_status()
+
+        try:
+            output = resp.json()
+        except Exception:
+            output = resp.text
+
+        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+
+
+class DocumentRendererNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("DocumentRenderer")
+        self.data = data
+
+    def process(self, inputs):
+        fmt = self.data.get("format", "md")
+        filename = self.data.get("filename", "output")
+        input_data = inputs.get("output", "")
+        self.report_progress(f"Rendering as {fmt}")
+
+        text = input_data if isinstance(input_data, str) else json.dumps(input_data, indent=2)
+        ext = "md" if fmt == "md" else "txt"
+        full_filename = f"{filename}.{ext}"
+        data_b64 = base64.b64encode(text.encode("utf-8")).decode("utf-8")
+
+        return {
+            "output": {"type": "file_download", "data_b64": data_b64, "file_type": ext, "filename": full_filename},
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
+
+
+class FormFillerNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("FormFiller")
+        self.data = data
+        self.model = data.get("model")
+
+    def process(self, inputs):
+        template = self.data.get("template", "")
+        input_data = inputs.get("output")
+        self.report_progress("Filling template")
+
+        prompt = (
+            f"Fill all {{{{placeholders}}}} in the following template using the provided data. "
+            f"Return only the filled template with no extra commentary.\n\n"
+            f"Template:\n{template}"
+        )
+        filled = llm_chat_model(
+            model=self.model, prompt=prompt, data=input_data,
+            include_next_step=False, system_config_doc=self._sys_cfg,
+        )
+        return {"output": filled, "input": inputs.get("output"), "step_name": self.name}
+
+
+class DataExportNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("DataExport")
+        self.data = data
+
+    def process(self, inputs):
+        fmt = self.data.get("format", "json")
+        filename = self.data.get("filename", "export")
+        input_data = inputs.get("output", "")
+        self.report_progress(f"Exporting as {fmt}")
+
+        if fmt == "csv":
+            buf = io.StringIO()
+            if isinstance(input_data, list) and input_data and isinstance(input_data[0], dict):
+                headers = list(input_data[0].keys())
+                writer = csv.DictWriter(buf, fieldnames=headers)
+                writer.writeheader()
+                for row in input_data:
+                    writer.writerow({k: str(v) for k, v in row.items()})
+            elif isinstance(input_data, dict):
+                headers = list(input_data.keys())
+                writer = csv.DictWriter(buf, fieldnames=headers)
+                writer.writeheader()
+                writer.writerow({k: str(v) for k, v in input_data.items()})
+            else:
+                buf.write(str(input_data))
+            content = buf.getvalue()
+            ext = "csv"
+        else:
+            content = json.dumps(input_data, indent=2) if not isinstance(input_data, str) else input_data
+            ext = "json"
+
+        full_filename = f"{filename}.{ext}"
+        data_b64 = base64.b64encode(content.encode("utf-8")).decode("utf-8")
+        return {
+            "output": {"type": "file_download", "data_b64": data_b64, "file_type": ext, "filename": full_filename},
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
+
+
+class PackageBuilderNode(Node):
+    def __init__(self, data: dict) -> None:
+        super().__init__("PackageBuilder")
+        self.data = data
+
+    def process(self, inputs):
+        package_name = self.data.get("package_name", "package")
+        input_data = inputs.get("output", "")
+        self.report_progress("Building package")
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            json_content = json.dumps(input_data, indent=2) if not isinstance(input_data, str) else input_data
+            zf.writestr("output.json", json_content)
+            text_content = input_data if isinstance(input_data, str) else json.dumps(input_data, indent=2)
+            zf.writestr("output.txt", text_content)
+        buf.seek(0)
+
+        full_filename = f"{package_name}.zip"
+        data_b64 = base64.b64encode(buf.read()).decode("utf-8")
+        return {
+            "output": {"type": "file_download", "data_b64": data_b64, "file_type": "zip", "filename": full_filename},
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -451,6 +782,42 @@ def build_workflow_engine(
                 elif task_name == "Formatter":
                     n = FormatNode(data=task_data)
                     n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "AddWebsite":
+                    n = WebsiteNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "AddDocument":
+                    n = AddDocumentNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "DescribeImage":
+                    n = DescribeImageNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "CodeNode":
+                    n = CodeExecutionNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "CrawlerNode":
+                    n = CrawlerNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "ResearchNode":
+                    n = ResearchNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "APINode":
+                    n = APICallNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "DocumentRenderer":
+                    n = DocumentRendererNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "FormFiller":
+                    n = FormFillerNode(data=task_data)
+                    n._sys_cfg = system_config_doc
+                    tasks.append(n)
+                elif task_name == "DataExport":
+                    n = DataExportNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "PackageBuilder":
+                    n = PackageBuilderNode(data=task_data)
                     tasks.append(n)
 
             node = MultiTaskNode(step_name)

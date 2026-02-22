@@ -44,20 +44,27 @@ async def get_llm_model_names() -> set[str]:
 
 
 async def get_llm_model_by_name(model_name: str | None) -> dict | None:
-    """Return a model config dict by name."""
+    """Return a model config dict by name or tag."""
     if not model_name:
         return None
     models = await get_llm_models()
+    # Try exact name match first
     for m in models:
         if isinstance(m, dict) and m.get("name") == model_name:
+            return m
+    # Fall back to tag match
+    for m in models:
+        if isinstance(m, dict) and m.get("tag") == model_name:
             return m
     return None
 
 
 async def resolve_model_name(model_name: str | None) -> str:
-    """Resolve a model name, falling back to first configured model if stale."""
-    if model_name and await get_llm_model_by_name(model_name):
-        return model_name
+    """Resolve a model name or tag to the actual model name for LLM calls."""
+    if model_name:
+        model = await get_llm_model_by_name(model_name)
+        if model:
+            return model.get("name", model_name)
     return await get_default_model_name()
 
 
@@ -91,7 +98,7 @@ async def get_extraction_config() -> dict:
 # ---------------------------------------------------------------------------
 
 async def get_user_model_name(user_id: str | None) -> str:
-    """Return a valid current model name for the user (auto-heals stale values)."""
+    """Return a valid current model name for the user (resolves tag→name for LLM calls)."""
     if not user_id:
         return await get_default_model_name()
 
@@ -99,18 +106,18 @@ async def get_user_model_name(user_id: str | None) -> str:
     if not user_config:
         return await get_default_model_name()
 
+    # Resolve stored value (could be tag or name) to actual model name
     resolved = await resolve_model_name(user_config.name)
 
-    # Auto-heal if stale
+    # Sync available_models list if stale
     models = await get_llm_models()
-    needs_save = False
-    if user_config.name != resolved:
-        user_config.name = resolved
-        needs_save = True
     if user_config.available_models != models:
         user_config.available_models = models
-        needs_save = True
-    if needs_save:
+        await user_config.save()
+
+    # If stored value doesn't match any model, reset to default
+    if not await get_llm_model_by_name(user_config.name):
+        user_config.name = resolved
         await user_config.save()
 
     return resolved
@@ -141,7 +148,8 @@ async def reconcile_user_model_config(
     resolved = await resolve_model_name(user_config.name)
 
     needs_save = False
-    if user_config.name != resolved:
+    # Only reset stored value if it doesn't match any model at all
+    if not await get_llm_model_by_name(user_config.name):
         user_config.name = resolved
         needs_save = True
     if user_config.available_models != models:

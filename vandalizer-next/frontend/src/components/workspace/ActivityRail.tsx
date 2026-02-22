@@ -163,7 +163,7 @@ export function ActivityRail() {
                 }
               >
                 {/* Type icon */}
-                <div className={cn('shrink-0 w-4 text-center', running ? 'text-white' : 'text-[#333]')}>
+                <div className={cn('shrink-0 w-4 text-center', running ? 'text-white' : railDocked ? 'text-[#999]' : 'text-[#333]')}>
                   <Icon className="h-4 w-4" />
                 </div>
 

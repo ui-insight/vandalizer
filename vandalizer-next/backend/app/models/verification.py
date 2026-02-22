@@ -63,6 +63,7 @@ class VerifiedItemMetadata(Document):
     display_name: Optional[str] = None
     description: Optional[str] = None
     markdown: Optional[str] = None
+    group_ids: list[str] = Field(default_factory=list)  # Group uuid strings
     updated_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )

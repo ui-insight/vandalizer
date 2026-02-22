@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import uuid4
 
 from beanie import Document
+from pydantic import Field
 
 
 class KnowledgeBaseSource(Document):
@@ -20,6 +21,11 @@ class KnowledgeBaseSource(Document):
     status: str = "pending"  # pending | processing | ready | error
     error_message: Optional[str] = None
     chunk_count: int = 0
+    # Crawl fields
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    parent_source_uuid: Optional[str] = None  # links crawled children to parent
+    crawled_urls: Optional[list[str]] = None  # list of discovered URLs (on parent)
     created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
     processed_at: Optional[datetime.datetime] = None
 
@@ -41,6 +47,9 @@ class KnowledgeBase(Document):
     user_id: str
     team_id: Optional[str] = None
     space: Optional[str] = None
+    shared_with_team: bool = False
+    verified: bool = False
+    group_ids: list[str] = Field(default_factory=list)  # Group uuid strings
     status: str = "empty"  # empty | building | ready | error
     total_sources: int = 0
     sources_ready: int = 0

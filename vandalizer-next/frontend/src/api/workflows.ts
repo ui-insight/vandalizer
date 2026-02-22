@@ -172,9 +172,9 @@ export interface ValidationResult {
   checks: ValidationCheck[]
 }
 
-export function validateWorkflow(workflowId: string, evalPlan?: string) {
+export function validateWorkflow(workflowId: string, evalPlan?: string, textInput?: string) {
   return apiFetch<ValidationResult>(`/api/workflows/${workflowId}/validate`, {
     method: 'POST',
-    body: JSON.stringify({ eval_plan: evalPlan }),
+    body: JSON.stringify({ eval_plan: evalPlan, text_input: textInput }),
   })
 }

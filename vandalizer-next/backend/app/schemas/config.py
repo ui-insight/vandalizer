@@ -35,3 +35,18 @@ class ThemeConfigResponse(BaseModel):
 class UpdateThemeConfigRequest(BaseModel):
     highlight_color: Optional[str] = None
     ui_radius: Optional[str] = None
+
+
+class OnboardingStatusResponse(BaseModel):
+    has_documents: bool = False
+    has_workflows: bool = False
+    has_run_workflow: bool = False
+    has_extraction_sets: bool = False
+    has_library_items: bool = False
+    has_pinned_item: bool = False
+    has_favorited_item: bool = False
+    has_team_members: bool = False
+    has_automations: bool = False
+    has_enabled_automation: bool = False
+    has_knowledge_base: bool = False
+    has_ready_knowledge_base: bool = False

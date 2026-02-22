@@ -10,7 +10,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.system_config import SystemConfig
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, UserResponse
+from app.schemas.auth import LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
 from app.services import auth_service
 from app.utils.security import (
     create_access_token,
@@ -105,6 +105,19 @@ async def logout(response: Response):
 
 @router.get("/me")
 async def me(user: User = Depends(get_current_user)):
+    return await _user_response(user)
+
+
+@router.put("/profile")
+async def update_profile(
+    body: UpdateProfileRequest,
+    user: User = Depends(get_current_user),
+):
+    if body.name is not None:
+        user.name = body.name
+    if body.email is not None:
+        user.email = body.email
+    await user.save()
     return await _user_response(user)
 
 

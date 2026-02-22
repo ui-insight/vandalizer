@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Search, ShieldCheck, X, Pencil, ShieldOff } from 'lucide-react'
-import { listVerifiedItems, updateItemMetadata, unverifyItem } from '../../api/library'
-import type { VerifiedCatalogItem } from '../../types/library'
+import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag } from 'lucide-react'
+import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups } from '../../api/library'
+import type { VerifiedCatalogItem, Group } from '../../types/library'
 
 type KindFilter = '' | 'workflow' | 'search_set'
 
@@ -28,8 +28,20 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
   const [displayName, setDisplayName] = useState(item.display_name || '')
   const [description, setDescription] = useState(item.description || '')
   const [markdown, setMarkdown] = useState(item.markdown || '')
+  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(item.group_ids || [])
+  const [allGroups, setAllGroups] = useState<Group[]>([])
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+
+  useEffect(() => {
+    listGroups().then(data => setAllGroups(data.groups)).catch(() => {})
+  }, [])
+
+  const toggleGroup = (uuid: string) => {
+    setSelectedGroupIds(prev =>
+      prev.includes(uuid) ? prev.filter(id => id !== uuid) : [...prev, uuid]
+    )
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -38,6 +50,7 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
         display_name: displayName || undefined,
         description: description || undefined,
         markdown: markdown || undefined,
+        group_ids: selectedGroupIds,
       })
       onSaved()
       onClose()
@@ -104,6 +117,30 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
               />
             )}
           </div>
+          {allGroups.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Groups (visibility restriction)</label>
+              <p className="text-xs text-gray-500 mb-2">
+                No groups selected = visible to everyone. Selected groups restrict visibility to group members only.
+              </p>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {allGroups.map(group => (
+                  <label key={group.uuid} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedGroupIds.includes(group.uuid)}
+                      onChange={() => toggleGroup(group.uuid)}
+                      className="rounded border-gray-300"
+                    />
+                    <span className="text-sm text-gray-700">{group.name}</span>
+                    {group.description && (
+                      <span className="text-xs text-gray-400 truncate">{group.description}</span>
+                    )}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-200">
           <button
@@ -131,6 +168,18 @@ export function VerifiedCatalog() {
   const [searchQuery, setSearchQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('')
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
+  const [groupMap, setGroupMap] = useState<Record<string, string>>({})
+
+  // Load groups for displaying badges
+  useEffect(() => {
+    listGroups()
+      .then(data => {
+        const map: Record<string, string> = {}
+        for (const g of data.groups) map[g.uuid] = g.name
+        setGroupMap(map)
+      })
+      .catch(() => {})
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -225,6 +274,16 @@ export function VerifiedCatalog() {
                       {item.tags.map((tag, i) => (
                         <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
                           {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {item.group_ids?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {item.group_ids.map(gid => (
+                        <span key={gid} className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                          <Tag className="h-3 w-3" />
+                          {groupMap[gid] || gid}
                         </span>
                       ))}
                     </div>

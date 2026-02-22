@@ -1,13 +1,46 @@
-import { useEffect, useRef, useState } from 'react'
-import { FileInput, Loader2, BookOpen, X } from 'lucide-react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { Sparkles, FileInput, Loader2, BookOpen, X, ArrowDown } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { useChat } from '../../hooks/useChat'
+import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { addLink, addDocument, removeDocument } from '../../api/chat'
 import { getUserConfig, updateUserConfig } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
+
+const LOADING_WORDS = [
+  'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
+  'Processing', 'Brewing', 'Crunching', 'Conjuring',
+]
+
+function StreamingLabel() {
+  const [index, setIndex] = useState(0)
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setIndex(i => (i + 1) % LOADING_WORDS.length)
+        setFade(true)
+      }, 200)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <span style={{
+      opacity: fade ? 1 : 0,
+      transition: 'opacity 0.2s ease',
+      fontSize: 13,
+      color: '#9ca3af',
+    }}>
+      {LOADING_WORDS[index]}&hellip;
+    </span>
+  )
+}
 
 interface ChatPanelProps {
   conversationToLoad?: string | null
@@ -30,13 +63,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   } = useChat()
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const onboardingPills = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
+  const [showScrollDown, setShowScrollDown] = useState(false)
+  // Snapshot of scroll position, updated ONLY by handleScroll (user or programmatic scroll events).
+  // When we skip a programmatic scroll, no scroll event fires, so this stays frozen at "scrolled up".
+  const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
 
   // Load saved model preference on mount
   useEffect(() => {
@@ -50,9 +88,60 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     updateUserConfig({ model }).catch(() => {})
   }
 
+  // Save scroll info on every scroll event (user scrolls OR our programmatic scroll).
+  // This is NOT used to decide whether to auto-scroll — only to record position.
+  const handleScroll = useCallback(() => {
+    const el = scrollContainerRef.current
+    if (!el) return
+    prevScrollInfo.current = {
+      scrollHeight: el.scrollHeight,
+      scrollTop: el.scrollTop,
+      clientHeight: el.clientHeight,
+    }
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    setShowScrollDown(distFromBottom > 80)
+  }, [])
+
+  // When content grows, just show the down arrow if there's overflow — never auto-scroll.
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = scrollContainerRef.current
+    if (!el) return
+    const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distFromBottom > 80) {
+      setShowScrollDown(true)
+    }
   }, [messages, streamingContent])
+
+  // Reset scroll state when conversation UUID changes (new send or history load)
+  const prevConvoRef = useRef(conversationUuid)
+  useEffect(() => {
+    if (conversationUuid !== prevConvoRef.current) {
+      prevConvoRef.current = conversationUuid
+      prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
+      setShowScrollDown(false)
+    }
+  }, [conversationUuid])
+
+  // Scroll to bottom when user sends a new message
+  const prevMsgCount = useRef(messages.length)
+  useEffect(() => {
+    if (messages.length > prevMsgCount.current) {
+      const lastMsg = messages[messages.length - 1]
+      if (lastMsg?.role === 'user') {
+        prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
+        setShowScrollDown(false)
+        const el = scrollContainerRef.current
+        if (el) el.scrollTop = el.scrollHeight
+      }
+    }
+    prevMsgCount.current = messages.length
+  }, [messages])
+
+  const scrollToBottom = useCallback(() => {
+    setShowScrollDown(false)
+    const el = scrollContainerRef.current
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+  }, [])
 
   // Bump activity signal when streaming starts or ends so the rail picks up new/updated activities
   useEffect(() => {
@@ -66,7 +155,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
-      loadHistory(conversationToLoad)
+      loadHistory(conversationToLoad).then(() => {
+        // Scroll to bottom after history renders
+        setTimeout(() => {
+          const el = scrollContainerRef.current
+          if (el) el.scrollTop = el.scrollHeight
+        }, 50)
+      })
     }
   }, [conversationToLoad, loadHistory])
 
@@ -79,6 +174,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       onPendingMessageConsumed?.()
     }
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
+
+  const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0
 
   const handleSend = (message: string) => {
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined)
@@ -170,12 +267,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
       {/* Messages area */}
       <div
+        ref={scrollContainerRef}
+        onScroll={handleScroll}
         className="flex-1 overflow-y-auto hide-scrollbar"
-        style={{ padding: '20px 20px 180px 20px' }}
+        style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* Empty state: gradient helper box + recommendations */}
+        {/* Empty state: animated banner + suggestions */}
         {messages.length === 0 && !isStreaming && (
-          <>
+          <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"
               style={{
@@ -197,8 +296,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
                   {processingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
+                  ) : activeKBUuid ? (
+                    <BookOpen className="h-7 w-7 opacity-90" />
                   ) : (
-                    <FileInput className="h-7 w-7 opacity-90" />
+                    <Sparkles className="h-7 w-7 opacity-90" />
                   )}
                 </div>
                 <div>
@@ -209,7 +310,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         : processingDoc.status === 'security' ? 'Scanning Your Document...'
                         : processingDoc.status === 'readying' ? 'Almost Ready...'
                         : 'Processing Your Document...'
-                      : 'Ready to get started?'}
+                      : activeKBUuid
+                        ? `Knowledge Base: ${activeKBTitle}`
+                        : hasDocContext
+                          ? 'Documents ready for analysis'
+                          : 'What would you like to work on?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     {processingDoc
@@ -218,7 +323,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         : processingDoc.status === 'security' ? "Checking for any sensitive information in your document."
                         : processingDoc.status === 'readying' ? 'Indexing your document for search and analysis.'
                         : 'Please wait while we prepare your document.'
-                      : 'Upload or select one or more documents, or simply ask me a question.'}
+                      : activeKBUuid
+                        ? 'Ask questions grounded in your indexed documents and sources.'
+                        : hasDocContext
+                          ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
+                          : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
                   </div>
                 </div>
               </div>
@@ -241,48 +350,48 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            {/* Recommendation chips */}
-            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 ? [
-                'Summarize this document',
-                'What are the key findings?',
-                'Extract important dates and names',
-                'List the main topics covered',
-              ] : [
-                'What can you help me with?',
-                'How do workflows work?',
-                'Tell me about document extraction',
-                'Help me get started',
-              ]).map(suggestion => (
-                <button
-                  key={suggestion}
-                  onClick={() => handleSend(suggestion)}
-                  style={{
-                    padding: '8px 14px',
-                    fontSize: 13,
-                    fontWeight: 500,
-                    fontFamily: 'inherit',
-                    border: '1px solid #e5e7eb',
-                    borderRadius: 20,
-                    backgroundColor: '#fff',
-                    color: '#374151',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
-                    e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = '#e5e7eb'
-                    e.currentTarget.style.backgroundColor = '#fff'
-                  }}
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-          </>
+            {/* Contextual suggestion chips */}
+            {!processingDoc && (
+              <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {(activeKBUuid ? [
+                  'Summarize the key points across all sources',
+                  'What are the most important facts and figures?',
+                  'List every topic covered',
+                ] : hasDocContext ? [
+                  'Summarize this in 5 bullet points',
+                  'Extract all names, dates, and numbers',
+                  'List every action item and deadline',
+                ] : onboardingPills).map(suggestion => (
+                  <button
+                    key={suggestion}
+                    onClick={() => handleSend(suggestion)}
+                    style={{
+                      padding: '8px 14px',
+                      fontSize: 13,
+                      fontWeight: 500,
+                      fontFamily: 'inherit',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 20,
+                      backgroundColor: '#fff',
+                      color: '#374151',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                      e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)'
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.borderColor = '#e5e7eb'
+                      e.currentTarget.style.backgroundColor = '#fff'
+                    }}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
 
         {messages.map((msg, i) => (
@@ -315,8 +424,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && (
-          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
+          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <div className="chat-loader" />
+            <StreamingLabel />
           </div>
         )}
 
@@ -325,8 +435,44 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
         )}
 
-        <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollDown && (
+        <div style={{ display: 'flex', justifyContent: 'center', position: 'relative' }}>
+          <button
+            onClick={scrollToBottom}
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              border: '1px solid #d1d5db',
+              backgroundColor: '#fff',
+              color: '#374151',
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+              zIndex: 10,
+              transition: 'background-color 0.15s, box-shadow 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6'
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.18)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = '#fff'
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'
+            }}
+            title="Scroll to bottom"
+          >
+            <ArrowDown size={18} />
+          </button>
+        </div>
+      )}
 
       {/* KB active badge */}
       {activeKBUuid && (
@@ -386,3 +532,4 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click()
   URL.revokeObjectURL(url)
 }
+

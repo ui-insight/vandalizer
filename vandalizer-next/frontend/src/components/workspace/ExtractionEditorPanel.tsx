@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { X, Pencil, Loader2, Copy, Trash2, Star, GripVertical } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, Star, GripVertical, Plus, ChevronDown, ChevronRight, Play } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
@@ -9,7 +9,13 @@ import {
   deleteSearchSet,
   runExtractionSync,
   buildFromDocument,
+  listTestCases,
+  createTestCase,
+  updateTestCase,
+  deleteTestCase,
+  runValidation,
 } from '../../api/extractions'
+import type { TestCase, ValidationResult } from '../../api/extractions'
 import { getModels } from '../../api/config'
 import { submitRating } from '../../api/feedback'
 import { useLibraries } from '../../hooks/useLibrary'
@@ -17,7 +23,7 @@ import { useTeams } from '../../hooks/useTeams'
 import { AddToLibraryDialog } from '../library/AddToLibraryDialog'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 
-type Tab = 'design' | 'tools' | 'advanced'
+type Tab = 'design' | 'tools' | 'validate' | 'advanced'
 
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
@@ -280,7 +286,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'advanced'] as const).map((tab) => {
+        {(['design', 'tools', 'validate', 'advanced'] as const).map((tab) => {
           const isActive = activeTab === tab
           return (
             <button
@@ -334,6 +340,12 @@ export function ExtractionEditorPanel() {
               onBuildFromDocument={handleBuildFromDocument}
               buildingFromDoc={buildingFromDoc}
               hasDocuments={selectedDocUuids.length > 0}
+            />
+          )}
+          {activeTab === 'validate' && openExtractionId && (
+            <ValidateTab
+              searchSetUuid={openExtractionId}
+              items={items}
             />
           )}
           {activeTab === 'advanced' && (
@@ -1266,6 +1278,474 @@ function PassSettings({
             ))}
           </select>
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Validate Tab ── */
+
+function ValidateTab({
+  searchSetUuid,
+  items,
+}: {
+  searchSetUuid: string
+  items: { id: string; searchphrase: string }[]
+}) {
+  const [testCases, setTestCases] = useState<TestCase[]>([])
+  const [loading, setLoading] = useState(true)
+  const [numRuns, setNumRuns] = useState(3)
+  const [validating, setValidating] = useState(false)
+  const [results, setResults] = useState<ValidationResult | null>(null)
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [expandedCase, setExpandedCase] = useState<string | null>(null)
+  const [editingCase, setEditingCase] = useState<string | null>(null)
+
+  const loadTestCases = useCallback(async () => {
+    setLoading(true)
+    try {
+      const tcs = await listTestCases(searchSetUuid)
+      setTestCases(tcs)
+    } finally {
+      setLoading(false)
+    }
+  }, [searchSetUuid])
+
+  useEffect(() => {
+    loadTestCases()
+  }, [loadTestCases])
+
+  const handleDelete = async (uuid: string) => {
+    await deleteTestCase(uuid)
+    setTestCases(prev => prev.filter(tc => tc.uuid !== uuid))
+  }
+
+  const handleRunValidation = async () => {
+    setValidating(true)
+    try {
+      const res = await runValidation({
+        search_set_uuid: searchSetUuid,
+        num_runs: numRuns,
+      })
+      setResults(res)
+    } finally {
+      setValidating(false)
+    }
+  }
+
+  const handleSaveTestCase = async (data: {
+    label: string
+    source_type: string
+    source_text?: string
+    document_uuid?: string
+    expected_values: Record<string, string>
+  }) => {
+    if (editingCase) {
+      await updateTestCase(editingCase, data)
+    } else {
+      await createTestCase({ search_set_uuid: searchSetUuid, ...data })
+    }
+    setShowCreateForm(false)
+    setEditingCase(null)
+    loadTestCases()
+  }
+
+  const startEdit = (tc: TestCase) => {
+    setEditingCase(tc.uuid)
+    setShowCreateForm(true)
+  }
+
+  const editingTestCase = editingCase ? testCases.find(tc => tc.uuid === editingCase) : undefined
+
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Test Cases Section */}
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Test Cases</div>
+          <button
+            onClick={() => { setEditingCase(null); setShowCreateForm(true) }}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+              borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+              color: '#202124', cursor: 'pointer',
+            }}
+          >
+            <Plus style={{ width: 12, height: 12 }} /> Add Test Case
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '16px 0' }}>Loading...</div>
+        ) : testCases.length === 0 ? (
+          <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0', border: '1px dashed #d1d5db', borderRadius: 8 }}>
+            No test cases yet. Add one to start validating.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            {testCases.map(tc => {
+              const expectedCount = Object.values(tc.expected_values).filter(v => v).length
+              return (
+                <div key={tc.uuid} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14, color: '#202124', flex: 1 }}>{tc.label}</span>
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                      backgroundColor: tc.source_type === 'text' ? '#eff6ff' : '#fef3c7',
+                      color: tc.source_type === 'text' ? '#1d4ed8' : '#92400e',
+                    }}>
+                      {tc.source_type}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#5f6368' }}>
+                      {expectedCount} of {items.length} fields
+                    </span>
+                    <button
+                      onClick={() => startEdit(tc)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                    >
+                      <Pencil style={{ width: 12, height: 12 }} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(tc.uuid)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                    >
+                      <Trash2 style={{ width: 12, height: 12 }} />
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Create/Edit Form */}
+      {showCreateForm && (
+        <TestCaseForm
+          items={items}
+          initial={editingTestCase}
+          onSave={handleSaveTestCase}
+          onCancel={() => { setShowCreateForm(false); setEditingCase(null) }}
+        />
+      )}
+
+      {/* Run Controls */}
+      {!showCreateForm && testCases.length > 0 && (
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 12 }}>Run Validation</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <label style={{ fontSize: 13, color: '#5f6368' }}>Runs:</label>
+            <input
+              type="number"
+              min={1}
+              max={5}
+              value={numRuns}
+              onChange={e => setNumRuns(Math.min(5, Math.max(1, parseInt(e.target.value) || 1)))}
+              style={{
+                width: 50, fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px',
+              }}
+            />
+            <button
+              onClick={handleRunValidation}
+              disabled={validating}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                borderRadius: 8, border: 'none',
+                backgroundColor: '#191919', color: '#fff',
+                cursor: validating ? 'not-allowed' : 'pointer',
+                opacity: validating ? 0.5 : 1,
+              }}
+            >
+              {validating ? (
+                <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
+              ) : (
+                <><Play style={{ width: 14, height: 14 }} /> Run Validation</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {results && !showCreateForm && (
+        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+          {/* Aggregate banner */}
+          <div style={{
+            display: 'flex', gap: 16, padding: '12px 16px', marginBottom: 16,
+            borderRadius: 8, backgroundColor: '#f9fafb', border: '1px solid #e5e7eb',
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Accuracy</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: _scoreColor(results.aggregate_accuracy) }}>
+                {results.aggregate_accuracy !== null ? `${Math.round(results.aggregate_accuracy * 100)}%` : 'N/A'}
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Consistency</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: _scoreColor(results.aggregate_consistency) }}>
+                {Math.round(results.aggregate_consistency * 100)}%
+              </div>
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: '#5f6368', marginBottom: 2 }}>Runs</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: '#202124' }}>{results.num_runs}</div>
+            </div>
+          </div>
+
+          {/* Per-test-case results */}
+          {results.test_cases.map(tcr => (
+            <div key={tcr.test_case_uuid} style={{ marginBottom: 8, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
+              <button
+                onClick={() => setExpandedCase(expandedCase === tcr.test_case_uuid ? null : tcr.test_case_uuid)}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '10px 14px', border: 'none', backgroundColor: '#fafafa',
+                  cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                }}
+              >
+                {expandedCase === tcr.test_case_uuid
+                  ? <ChevronDown style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} />
+                  : <ChevronRight style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} />
+                }
+                <span style={{ fontSize: 13, fontWeight: 600, color: '#202124', flex: 1 }}>{tcr.label}</span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(tcr.overall_accuracy), color: _scoreColor(tcr.overall_accuracy) }}>
+                  {tcr.overall_accuracy !== null ? `${Math.round(tcr.overall_accuracy * 100)}% acc` : 'N/A'}
+                </span>
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(tcr.overall_consistency), color: _scoreColor(tcr.overall_consistency) }}>
+                  {Math.round(tcr.overall_consistency * 100)}% cons
+                </span>
+              </button>
+
+              {expandedCase === tcr.test_case_uuid && (
+                <div style={{ padding: '0 14px 14px' }}>
+                  <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Field</th>
+                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Expected</th>
+                        <th style={{ textAlign: 'left', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Extracted</th>
+                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Consistency</th>
+                        <th style={{ textAlign: 'center', padding: '6px 4px', color: '#5f6368', fontWeight: 600 }}>Accuracy</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tcr.fields.map(f => (
+                        <tr key={f.field_name} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                          <td style={{ padding: '6px 4px', color: '#202124', fontWeight: 500 }}>{f.field_name}</td>
+                          <td style={{ padding: '6px 4px', color: '#5f6368' }}>{f.expected ?? '-'}</td>
+                          <td style={{ padding: '6px 4px', color: '#202124', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {f.most_common_value ?? 'null'}
+                          </td>
+                          <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                            <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.consistency), color: _scoreColor(f.consistency), fontSize: 11 }}>
+                              {Math.round(f.consistency * 100)}%
+                            </span>
+                          </td>
+                          <td style={{ padding: '6px 4px', textAlign: 'center' }}>
+                            {f.accuracy !== null ? (
+                              <span style={{ padding: '1px 6px', borderRadius: 4, backgroundColor: _scoreBg(f.accuracy), color: _scoreColor(f.accuracy), fontSize: 11 }}>
+                                {Math.round(f.accuracy * 100)}%
+                              </span>
+                            ) : (
+                              <span style={{ color: '#9ca3af', fontSize: 11 }}>N/A</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function _scoreColor(score: number | null): string {
+  if (score === null) return '#9ca3af'
+  if (score >= 0.9) return '#059669'
+  if (score >= 0.7) return '#d97706'
+  return '#dc2626'
+}
+
+function _scoreBg(score: number | null): string {
+  if (score === null) return '#f3f4f6'
+  if (score >= 0.9) return '#ecfdf5'
+  if (score >= 0.7) return '#fffbeb'
+  return '#fef2f2'
+}
+
+function TestCaseForm({
+  items,
+  initial,
+  onSave,
+  onCancel,
+}: {
+  items: { id: string; searchphrase: string }[]
+  initial?: TestCase
+  onSave: (data: {
+    label: string
+    source_type: string
+    source_text?: string
+    document_uuid?: string
+    expected_values: Record<string, string>
+  }) => void
+  onCancel: () => void
+}) {
+  const [label, setLabel] = useState(initial?.label ?? '')
+  const [sourceType, setSourceType] = useState<string>(initial?.source_type ?? 'text')
+  const [sourceText, setSourceText] = useState(initial?.source_text ?? '')
+  const [documentUuid, setDocumentUuid] = useState(initial?.document_uuid ?? '')
+  const [expectedValues, setExpectedValues] = useState<Record<string, string>>(
+    initial?.expected_values ?? {}
+  )
+
+  const handleSubmit = () => {
+    if (!label.trim()) return
+    onSave({
+      label: label.trim(),
+      source_type: sourceType,
+      source_text: sourceType === 'text' ? sourceText : undefined,
+      document_uuid: sourceType === 'document' ? documentUuid : undefined,
+      expected_values: expectedValues,
+    })
+  }
+
+  return (
+    <div style={{ border: '1px solid #d1d5db', borderRadius: 8, padding: 16, backgroundColor: '#fafafa' }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 12 }}>
+        {initial ? 'Edit Test Case' : 'New Test Case'}
+      </div>
+
+      {/* Label */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, fontWeight: 500, color: '#5f6368', display: 'block', marginBottom: 4 }}>Label</label>
+        <input
+          value={label}
+          onChange={e => setLabel(e.target.value)}
+          placeholder="e.g. Invoice sample 1"
+          style={{
+            width: '100%', fontSize: 13, fontFamily: 'inherit',
+            border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
+            outline: 'none', boxSizing: 'border-box',
+          }}
+        />
+      </div>
+
+      {/* Source type toggle */}
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ fontSize: 12, fontWeight: 500, color: '#5f6368', display: 'block', marginBottom: 4 }}>Source</label>
+        <div style={{ display: 'flex', gap: 0, border: '1px solid #d1d5db', borderRadius: 6, overflow: 'hidden', width: 'fit-content' }}>
+          {(['text', 'document'] as const).map(st => (
+            <button
+              key={st}
+              onClick={() => setSourceType(st)}
+              style={{
+                padding: '6px 16px', fontSize: 12, fontWeight: sourceType === st ? 600 : 400,
+                fontFamily: 'inherit', border: 'none',
+                backgroundColor: sourceType === st ? '#191919' : '#fff',
+                color: sourceType === st ? '#fff' : '#202124',
+                cursor: 'pointer', textTransform: 'capitalize',
+              }}
+            >
+              {st}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Source input */}
+      {sourceType === 'text' ? (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: '#5f6368', display: 'block', marginBottom: 4 }}>Source Text</label>
+          <textarea
+            value={sourceText}
+            onChange={e => setSourceText(e.target.value)}
+            placeholder="Paste the text to extract from..."
+            rows={4}
+            style={{
+              width: '100%', fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
+              resize: 'vertical', outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      ) : (
+        <div style={{ marginBottom: 12 }}>
+          <label style={{ fontSize: 12, fontWeight: 500, color: '#5f6368', display: 'block', marginBottom: 4 }}>Document UUID</label>
+          <input
+            value={documentUuid}
+            onChange={e => setDocumentUuid(e.target.value)}
+            placeholder="Paste a document UUID"
+            style={{
+              width: '100%', fontSize: 13, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
+              outline: 'none', boxSizing: 'border-box',
+            }}
+          />
+        </div>
+      )}
+
+      {/* Expected values */}
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ fontSize: 12, fontWeight: 500, color: '#5f6368', display: 'block', marginBottom: 6 }}>
+          Expected Values <span style={{ fontWeight: 400 }}>(leave blank to skip accuracy check)</span>
+        </label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {items.map(item => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: 12, color: '#374151', width: 140, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.searchphrase}
+              </span>
+              <input
+                value={expectedValues[item.searchphrase] ?? ''}
+                onChange={e => setExpectedValues(prev => ({
+                  ...prev,
+                  [item.searchphrase]: e.target.value,
+                }))}
+                placeholder="Expected value"
+                style={{
+                  flex: 1, fontSize: 12, fontFamily: 'inherit',
+                  border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px',
+                  outline: 'none',
+                }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          onClick={onCancel}
+          style={{
+            padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
+            borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+            color: '#374151', cursor: 'pointer',
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleSubmit}
+          disabled={!label.trim()}
+          style={{
+            padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+            borderRadius: 6, border: 'none',
+            backgroundColor: label.trim() ? '#191919' : '#e5e7eb',
+            color: label.trim() ? '#fff' : '#9ca3af',
+            cursor: label.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          {initial ? 'Update' : 'Save'}
+        </button>
       </div>
     </div>
   )

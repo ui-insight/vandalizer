@@ -11,6 +11,8 @@ export interface Automation {
   action_type: ActionType
   action_id: string | null
   user_id: string
+  team_id: string | null
+  shared_with_team: boolean
   space: string | null
   created_at: string
   updated_at: string

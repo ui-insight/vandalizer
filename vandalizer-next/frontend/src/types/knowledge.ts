@@ -3,6 +3,10 @@ export interface KnowledgeBase {
   title: string
   description: string
   status: 'empty' | 'building' | 'ready' | 'error'
+  shared_with_team: boolean
+  verified: boolean
+  group_ids: string[]
+  team_id: string | null
   total_sources: number
   sources_ready: number
   sources_failed: number

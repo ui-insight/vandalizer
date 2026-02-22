@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearch, useNavigate } from '@tanstack/react-router'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
@@ -14,6 +14,8 @@ export function WorkspaceLayout() {
   const { railDocked, panelSplit, openWorkflow, openExtraction, workspaceMode } = useWorkspace()
   const search = useSearch({ from: '/' })
   const navigate = useNavigate()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
 
   // Handle deep-link query params (e.g. /?openWorkflow=123)
   useEffect(() => {
@@ -38,6 +40,7 @@ export function WorkspaceLayout() {
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar />
         <div
+          ref={containerRef}
           className="flex flex-1 overflow-hidden"
           style={{
             marginRight: `${railWidth}px`,
@@ -50,22 +53,20 @@ export function WorkspaceLayout() {
             style={{
               width: isChat ? '0%' : `${panelSplit}%`,
               minWidth: isChat ? 0 : undefined,
-              transition: 'width 0.3s ease',
+              transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
             {isAutomations ? <AutomationsPanel /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
           {/* Resizer — hidden in chat mode */}
-          <div
-            style={{
-              opacity: isChat ? 0 : 1,
-              pointerEvents: isChat ? 'none' : 'auto',
-              transition: 'opacity 0.3s ease',
-            }}
-          >
-            <PanelResizer />
-          </div>
+          {!isChat && (
+            <PanelResizer
+              containerRef={containerRef}
+              onDragStart={() => setIsDragging(true)}
+              onDragEnd={() => setIsDragging(false)}
+            />
+          )}
 
           <div className="overflow-hidden flex-1">
             <RightPanel />

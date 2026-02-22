@@ -18,6 +18,7 @@ export interface Folder {
   uuid: string
   parent_id: string
   is_shared_team_root: boolean
+  team_id?: string | null
 }
 
 export interface ListContentsResponse {

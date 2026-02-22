@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import time
 from typing import AsyncGenerator, Optional
 
@@ -21,9 +22,106 @@ from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
-from app.services.llm_service import create_chat_agent
+from app.services.llm_service import create_chat_agent, VANDALIZER_CONTEXT
 
 logger = logging.getLogger(__name__)
+
+
+_THINK_OPEN_RE = re.compile(r"<think(?:ing)?>")
+_THINK_CLOSE_RE = re.compile(r"</think(?:ing)?>")
+_THINK_BLOCK_RE = re.compile(r"<think(?:ing)?>[\s\S]*?</think(?:ing)?>\n?")
+# Longest possible opening / closing tag
+_MAX_OPEN = len("<thinking>")   # 10
+_MAX_CLOSE = len("</thinking>")  # 11
+
+
+class _ThinkTagParser:
+    """Detect ``<think>``/``<thinking>`` blocks in streaming text.
+
+    At most ``_MAX_OPEN - 1`` or ``_MAX_CLOSE - 1`` characters are held back
+    between calls to handle tags split across chunks.
+    """
+
+    def __init__(self) -> None:
+        self.in_think = False
+        self.pending = ""
+
+    def feed(self, text: str) -> list[tuple[str, str]]:
+        """Return list of (kind, content) pairs — kind is 'text' or 'thinking'."""
+        self.pending += text
+        results: list[tuple[str, str]] = []
+
+        while self.pending:
+            if not self.in_think:
+                m = _THINK_OPEN_RE.search(self.pending)
+                if m:
+                    if m.start() > 0:
+                        results.append(("text", self.pending[: m.start()]))
+                    self.pending = self.pending[m.end() :]
+                    self.in_think = True
+                else:
+                    safe = self._safe_emit(self.pending, _MAX_OPEN)
+                    if safe > 0:
+                        results.append(("text", self.pending[:safe]))
+                        self.pending = self.pending[safe:]
+                    break
+            else:
+                m = _THINK_CLOSE_RE.search(self.pending)
+                if m:
+                    if m.start() > 0:
+                        results.append(("thinking", self.pending[: m.start()]))
+                    self.pending = self.pending[m.end() :]
+                    if self.pending.startswith("\n"):
+                        self.pending = self.pending[1:]
+                    self.in_think = False
+                else:
+                    safe = self._safe_emit(self.pending, _MAX_CLOSE)
+                    if safe > 0:
+                        results.append(("thinking", self.pending[:safe]))
+                        self.pending = self.pending[safe:]
+                    break
+
+        return results
+
+    def flush(self) -> list[tuple[str, str]]:
+        if not self.pending:
+            return []
+        kind = "thinking" if self.in_think else "text"
+        result = [(kind, self.pending)]
+        self.pending = ""
+        return result
+
+    @staticmethod
+    def _safe_emit(text: str, max_tag_len: int) -> int:
+        """How many leading chars of *text* can be emitted?
+
+        Hold back at most ``max_tag_len - 1`` characters that could be
+        the start of an opening or closing tag (anything beginning with ``<``).
+        """
+        # Find the last '<' in the holdback zone
+        holdback = min(max_tag_len - 1, len(text))
+        last_lt = text.rfind("<", len(text) - holdback)
+        if last_lt == -1:
+            return len(text)
+        return last_lt
+
+
+def _extract_event_content(event) -> tuple[str | None, bool]:
+    """Extract content from a pydantic-ai stream event.
+
+    Returns (content, is_api_thinking).  content is None for unrecognised events.
+    """
+    if isinstance(event, PartStartEvent):
+        if isinstance(event.part, TextPart):
+            return event.part.content or "", False
+        if isinstance(event.part, ThinkingPart):
+            return event.part.content or "", True
+    elif isinstance(event, PartDeltaEvent):
+        if isinstance(event.delta, TextPartDelta):
+            return event.delta.content_delta or "", False
+        if isinstance(event.delta, ThinkingPartDelta):
+            return event.delta.content_delta or "", True
+    return None, False
 
 
 async def chat_stream(
@@ -118,7 +216,11 @@ async def chat_stream(
     if parts:
         prompt = f"{message}\n\n---\n\n{''.join(parts)}"
     else:
-        prompt = message
+        # No documents or KB context — inject Vandalizer context directly into
+        # the user prompt so the model answers as the Vandalizer assistant even
+        # when the system prompt is ignored by the underlying model/provider.
+        # Place context BEFORE the question so the model sees it first.
+        prompt = f"{VANDALIZER_CONTEXT}\n\nUser question: {message}"
 
     # Stream the response
     full_response: list[str] = []
@@ -128,6 +230,8 @@ async def chat_stream(
     thinking_done_emitted = False
 
     try:
+        think_parser = _ThinkTagParser()
+
         async with agent.iter(
             prompt, message_history=previous_messages
         ) as agent_run:
@@ -135,29 +239,51 @@ async def chat_stream(
                 if Agent.is_model_request_node(node):
                     async with node.stream(agent_run.ctx) as stream:
                         async for event in stream:
-                            chunk, is_thinking, is_text = _event_to_chunk(
-                                event, full_response, full_thinking,
-                            )
-                            # Start thinking timer on first thinking chunk
-                            if is_thinking and thinking_started_at is None:
-                                thinking_started_at = time.monotonic()
-                            # Emit thinking_done when first text arrives after thinking
-                            if is_text and thinking_started_at and not thinking_done_emitted:
-                                thinking_duration = round(
-                                    time.monotonic() - thinking_started_at, 1
-                                )
-                                thinking_done_emitted = True
-                                yield json.dumps({
-                                    "kind": "thinking_done",
-                                    "content": "",
-                                    "duration": thinking_duration,
-                                }) + "\n"
-                            if chunk:
-                                yield chunk
+                            content, is_api_thinking = _extract_event_content(event)
+                            if content is None:
+                                continue
+
+                            if is_api_thinking:
+                                # Native API-level thinking (e.g. Claude extended thinking)
+                                full_thinking.append(content)
+                                if thinking_started_at is None:
+                                    thinking_started_at = time.monotonic()
+                                yield json.dumps({"kind": "thinking", "content": content}) + "\n"
+                            else:
+                                # Text — parse for embedded <think> tags
+                                for kind, text in think_parser.feed(content):
+                                    if kind == "thinking":
+                                        full_thinking.append(text)
+                                        if thinking_started_at is None:
+                                            thinking_started_at = time.monotonic()
+                                        yield json.dumps({"kind": "thinking", "content": text}) + "\n"
+                                    else:
+                                        if thinking_started_at and not thinking_done_emitted:
+                                            thinking_duration = round(
+                                                time.monotonic() - thinking_started_at, 1
+                                            )
+                                            thinking_done_emitted = True
+                                            yield json.dumps({
+                                                "kind": "thinking_done",
+                                                "content": "",
+                                                "duration": thinking_duration,
+                                            }) + "\n"
+                                        full_response.append(text)
+                                        yield json.dumps({"kind": "text", "content": text}) + "\n"
+
+                    # Flush any remaining buffered content from the parser
+                    for kind, text in think_parser.flush():
+                        if kind == "thinking":
+                            full_thinking.append(text)
+                            yield json.dumps({"kind": "thinking", "content": text}) + "\n"
+                        else:
+                            full_response.append(text)
+                            yield json.dumps({"kind": "text", "content": text}) + "\n"
 
             if agent_run.result:
                 usage = agent_run.result.usage()
-                assistant_message = agent_run.result.output
+                # Safety-net: strip any residual think tags the parser missed
+                assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 thinking_text = "".join(full_thinking) or None
                 await _finalize(
                     conversation, assistant_message, documents,
@@ -177,33 +303,6 @@ async def chat_stream(
                 ev.error = str(e)[:2000]
                 await ev.save()
 
-
-def _event_to_chunk(
-    event, full_response: list[str], full_thinking: list[str],
-) -> tuple[Optional[str], bool, bool]:
-    """Convert a pydantic-ai stream event to a JSON chunk string.
-
-    Returns (chunk_json, is_thinking, is_text).
-    """
-    if isinstance(event, PartStartEvent):
-        if isinstance(event.part, TextPart):
-            content = event.part.content or ""
-            full_response.append(content)
-            return json.dumps({"kind": "text", "content": content}) + "\n", False, True
-        elif isinstance(event.part, ThinkingPart):
-            content = event.part.content or ""
-            full_thinking.append(content)
-            return json.dumps({"kind": "thinking", "content": content}) + "\n", True, False
-    elif isinstance(event, PartDeltaEvent):
-        if isinstance(event.delta, TextPartDelta):
-            content = event.delta.content_delta or ""
-            full_response.append(content)
-            return json.dumps({"kind": "text", "content": content}) + "\n", False, True
-        elif isinstance(event.delta, ThinkingPartDelta):
-            content = event.delta.content_delta or ""
-            full_thinking.append(content)
-            return json.dumps({"kind": "thinking", "content": content}) + "\n", True, False
-    return None, False, False
 
 
 def _get_full_text(documents: list[SmartDocument]) -> str:

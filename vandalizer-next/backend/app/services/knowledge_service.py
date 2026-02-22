@@ -25,10 +25,38 @@ def _get_dm() -> DocumentManager:
     return _dm
 
 
-async def list_knowledge_bases(user_id: str) -> list[KnowledgeBase]:
-    return await KnowledgeBase.find(
-        KnowledgeBase.user_id == user_id,
-    ).sort(-KnowledgeBase.created_at).to_list()
+async def list_knowledge_bases(
+    user_id: str,
+    team_id: str | None = None,
+    user_group_uuids: list[str] | None = None,
+) -> list[KnowledgeBase]:
+    if team_id:
+        kbs = await KnowledgeBase.find(
+            {"$or": [
+                {"user_id": user_id},
+                {"shared_with_team": True, "team_id": team_id},
+                {"verified": True},
+            ]},
+        ).sort(-KnowledgeBase.created_at).to_list()
+    else:
+        kbs = await KnowledgeBase.find(
+            {"$or": [
+                {"user_id": user_id},
+                {"verified": True},
+            ]},
+        ).sort(-KnowledgeBase.created_at).to_list()
+
+    # Group filtering: exclude KBs with groups the user doesn't belong to
+    # Never filter out user's own KBs
+    if user_group_uuids is not None:
+        kbs = [
+            kb for kb in kbs
+            if kb.user_id == user_id
+            or not kb.group_ids
+            or bool(set(kb.group_ids) & set(user_group_uuids))
+        ]
+
+    return kbs
 
 
 async def create_knowledge_base(
@@ -61,6 +89,8 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
 async def update_knowledge_base(
     uuid: str, user_id: str,
     title: str | None = None, description: str | None = None,
+    shared_with_team: bool | None = None,
+    group_ids: list[str] | None = None,
 ) -> KnowledgeBase | None:
     kb = await get_knowledge_base(uuid, user_id)
     if not kb:
@@ -71,6 +101,21 @@ async def update_knowledge_base(
             kb.title = t[:300]
     if description is not None:
         kb.description = description[:5000] or None
+    if shared_with_team is not None:
+        kb.shared_with_team = shared_with_team
+    if group_ids is not None:
+        kb.group_ids = group_ids
+    kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await kb.save()
+    return kb
+
+
+async def share_with_team(uuid: str, user_id: str) -> KnowledgeBase | None:
+    """Toggle shared_with_team for a KB owned by user_id."""
+    kb = await get_knowledge_base(uuid, user_id)
+    if not kb:
+        return None
+    kb.shared_with_team = not kb.shared_with_team
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
     return kb
@@ -154,7 +199,12 @@ def _normalize_url(url: str) -> str:
     return url
 
 
-async def add_urls(kb: KnowledgeBase, urls: list[str]) -> int:
+async def add_urls(
+    kb: KnowledgeBase, urls: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+) -> int:
     """Add URLs to a KB and ingest them. Returns count added."""
     added = 0
     for url in urls:
@@ -173,12 +223,19 @@ async def add_urls(kb: KnowledgeBase, urls: list[str]) -> int:
             knowledge_base_uuid=kb.uuid,
             source_type="url",
             url=url[:2000],
+            crawl_enabled=crawl_enabled,
+            max_crawl_pages=max_crawl_pages,
         )
         await source.insert()
         added += 1
 
         # Ingest inline
-        await _ingest_url_source(source, kb)
+        parent_html = await _ingest_url_source(source, kb)
+
+        # Crawl child pages if enabled
+        if crawl_enabled and parent_html:
+            crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, parent_html)
+            added += crawled
 
     if added:
         await recalculate_stats(kb)
@@ -200,6 +257,125 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
     await source.delete()
     await recalculate_stats(kb)
     return True
+
+
+# --- Crawling ---
+
+
+def _normalize_crawl_url(url: str) -> str:
+    """Normalize a URL for deduplication: strip fragments, trailing slashes."""
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    path = parsed.path.rstrip("/") or "/"
+    clean = f"{parsed.scheme}://{parsed.netloc}{path}"
+    if parsed.query:
+        clean += f"?{parsed.query}"
+    return clean
+
+
+def _extract_links(html: str, base_url: str) -> list[str]:
+    """Extract absolute HTTP(S) links from HTML."""
+    from urllib.parse import urljoin, urlparse
+
+    soup = BeautifulSoup(html, "html.parser")
+    seen: set[str] = set()
+    links: list[str] = []
+    for a in soup.find_all("a", href=True):
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
+            continue
+        absolute = urljoin(base_url, href)
+        parsed = urlparse(absolute)
+        if parsed.scheme not in ("http", "https"):
+            continue
+        normalized = _normalize_crawl_url(absolute)
+        if normalized not in seen:
+            seen.add(normalized)
+            links.append(normalized)
+    return links
+
+
+async def _crawl_from_source(
+    parent: KnowledgeBaseSource,
+    kb: KnowledgeBase,
+    max_pages: int,
+    allowed_domains: str,
+    parent_html: str,
+) -> int:
+    """BFS crawl from parent URL, creating child sources. Returns count added."""
+    from urllib.parse import urlparse
+
+    max_pages = max(1, min(max_pages, 50))
+
+    # Build allowed domain set
+    parent_domain = urlparse(parent.url).netloc.lower()
+    domain_set: set[str] = {parent_domain}
+    if allowed_domains:
+        for d in allowed_domains.split(","):
+            d = d.strip().lower()
+            if d:
+                domain_set.add(d)
+
+    parent_normalized = _normalize_crawl_url(parent.url)
+    visited: set[str] = {parent_normalized}
+    queue: list[str] = []
+    added = 0
+
+    # Extract seed links from already-fetched parent HTML
+    seed_links = _extract_links(parent_html, parent.url)
+    logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent.url}")
+    for link in seed_links:
+        if link not in visited:
+            parsed = urlparse(link)
+            if parsed.netloc.lower() in domain_set:
+                queue.append(link)
+                visited.add(link)
+
+    logger.info(f"Crawl: {len(queue)} same-domain links queued (max_pages={max_pages}, domains={domain_set})")
+
+    crawled_urls: list[str] = []
+
+    while queue and added < max_pages:
+        url = queue.pop(0)
+
+        # Skip if already in this KB
+        existing = await KnowledgeBaseSource.find_one(
+            KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+            KnowledgeBaseSource.url == url,
+        )
+        if existing:
+            logger.debug(f"Crawl: skipping duplicate URL {url}")
+            continue
+
+        child = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type="url",
+            url=url[:2000],
+            parent_source_uuid=parent.uuid,
+        )
+        await child.insert()
+        # _ingest_url_source returns the HTML on success
+        child_html = await _ingest_url_source(child, kb)
+        added += 1
+        crawled_urls.append(url)
+        logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
+
+        # Extract more links from this page for BFS
+        if child_html and added < max_pages:
+            for link in _extract_links(child_html, url):
+                if link not in visited:
+                    parsed = urlparse(link)
+                    if parsed.netloc.lower() in domain_set:
+                        queue.append(link)
+                        visited.add(link)
+
+    # Update parent with crawled URL list
+    parent.crawled_urls = crawled_urls
+    await parent.save()
+
+    logger.info(f"Crawl complete for {parent.url}: {added} child pages added")
+    return added
 
 
 # --- Ingestion helpers ---
@@ -253,7 +429,10 @@ def _extract_title_from_html(html: str, url: str) -> str:
     return urlparse(url).netloc
 
 
-async def _ingest_url_source(source: KnowledgeBaseSource, kb: KnowledgeBase) -> None:
+async def _ingest_url_source(
+    source: KnowledgeBaseSource, kb: KnowledgeBase,
+) -> str | None:
+    """Ingest a URL source. Returns the raw HTML on success (for crawling), None on failure."""
     source.status = "processing"
     await source.save()
     try:
@@ -267,7 +446,7 @@ async def _ingest_url_source(source: KnowledgeBaseSource, kb: KnowledgeBase) -> 
             source.status = "error"
             source.error_message = "Failed to extract text from URL"
             await source.save()
-            return
+            return None
 
         source.content = raw_text[:500000]
         source.url_title = _extract_title_from_html(raw_html, source.url)
@@ -281,8 +460,10 @@ async def _ingest_url_source(source: KnowledgeBaseSource, kb: KnowledgeBase) -> 
         source.status = "ready"
         source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await source.save()
+        return raw_html
     except Exception as e:
         logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
         source.error_message = str(e)[:2000]
         await source.save()
+        return None
