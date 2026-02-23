@@ -129,6 +129,7 @@ class PaginatedWorkflowResponse(BaseModel):
 
 class ConfigUpdateRequest(BaseModel):
     extraction_config: Optional[dict] = None
+    quality_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     llm_endpoint: Optional[str] = None
 
@@ -590,6 +591,7 @@ async def get_config(
     cfg = await SystemConfig.get_config()
     return {
         "extraction_config": cfg.get_extraction_config(),
+        "quality_config": cfg.get_quality_config(),
         "auth_methods": cfg.auth_methods,
         "oauth_providers": cfg.oauth_providers,
         "available_models": cfg.available_models,
@@ -615,6 +617,8 @@ async def update_config(
 
     if body.extraction_config is not None:
         cfg.extraction_config = body.extraction_config
+    if body.quality_config is not None:
+        cfg.quality_config = body.quality_config
     if body.ocr_endpoint is not None:
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.llm_endpoint is not None:
@@ -798,3 +802,43 @@ async def update_auth_methods(
     await cfg.save()
 
     return {"status": "ok", "auth_methods": cfg.auth_methods}
+
+
+# ---------------------------------------------------------------------------
+# 13. GET /quality/summary  - Quality dashboard summary
+# ---------------------------------------------------------------------------
+
+@router.get("/quality/summary")
+async def quality_summary(user: User = Depends(get_current_user)):
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_summary
+    return await get_quality_summary()
+
+
+# ---------------------------------------------------------------------------
+# 14. GET /quality/timeline  - Quality timeline for charts
+# ---------------------------------------------------------------------------
+
+@router.get("/quality/timeline")
+async def quality_timeline(
+    days: int = 90,
+    item_kind: str | None = None,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_timeline
+    return {"timeline": await get_quality_timeline(days, item_kind)}
+
+
+# ---------------------------------------------------------------------------
+# 15. POST /quality/regression-suite  - Run regression on all verified items
+# ---------------------------------------------------------------------------
+
+@router.post("/quality/regression-suite")
+async def regression_suite(
+    model: str | None = None,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.services.quality_service import run_regression_suite
+    return await run_regression_suite(user.user_id, model)

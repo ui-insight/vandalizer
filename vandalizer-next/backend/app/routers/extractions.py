@@ -391,6 +391,29 @@ async def delete_test_case(uuid: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.get("/search-sets/{uuid}/quality-history")
+async def get_extraction_quality_history(
+    uuid: str, limit: int = 50, user: User = Depends(get_current_user),
+):
+    from app.services.quality_service import get_quality_history
+    return {"runs": await get_quality_history("search_set", uuid, limit)}
+
+
+@router.post("/search-sets/{uuid}/improvement-suggestions")
+async def get_extraction_suggestions(
+    uuid: str, user: User = Depends(get_current_user),
+):
+    """Use LLM to suggest improvements based on the latest validation run."""
+    from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
+
+    latest = await get_latest_validation("search_set", uuid)
+    if not latest:
+        raise HTTPException(status_code=404, detail="No validation runs found for this search set")
+    result_snapshot = latest.get("result_snapshot", latest)
+    suggestions = await generate_improvement_suggestions("search_set", uuid, result_snapshot)
+    return {"suggestions": suggestions}
+
+
 @router.post("/validate")
 async def run_validation(req: RunValidationRequest, user: User = Depends(get_current_user)):
     try:

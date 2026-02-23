@@ -48,6 +48,8 @@ class LibraryItemResponse(BaseModel):
     added_by_user_id: str
     created_at: Optional[str] = None
     last_used_at: Optional[str] = None
+    quality_tier: Optional[str] = None
+    quality_score: Optional[float] = None
 
 
 class AddItemRequest(BaseModel):

@@ -178,3 +178,28 @@ export function validateWorkflow(workflowId: string, evalPlan?: string, textInpu
     body: JSON.stringify({ eval_plan: evalPlan, text_input: textInput }),
   })
 }
+
+// Quality history
+
+export interface QualityHistoryRun {
+  uuid: string
+  score: number
+  accuracy: number | null
+  consistency: number | null
+  grade: string | null
+  model: string | null
+  created_at: string
+  num_checks: number
+  checks_passed: number
+  checks_failed: number
+}
+
+export function getWorkflowQualityHistory(workflowId: string) {
+  return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/workflows/${workflowId}/quality-history`)
+}
+
+export function getWorkflowImprovementSuggestions(workflowId: string) {
+  return apiFetch<{ suggestions: string }>(`/api/workflows/${workflowId}/improvement-suggestions`, {
+    method: 'POST',
+  })
+}

@@ -7,6 +7,21 @@ from typing import Optional
 from beanie import Document
 
 
+DEFAULT_QUALITY_CONFIG = {
+    "verification_gates": {
+        "require_validation": False,
+        "min_extraction_accuracy": 0.7,
+        "min_extraction_consistency": 0.8,
+        "min_workflow_grade": "C",
+    },
+    "quality_tiers": {
+        "excellent": {"min_score": 90},
+        "good": {"min_score": 70},
+        "fair": {"min_score": 50},
+    },
+}
+
+
 DEFAULT_EXTRACTION_CONFIG = {
     "mode": "two_pass",
     "model": "",
@@ -62,6 +77,9 @@ class SystemConfig(Document):
     # New extraction configuration
     extraction_config: dict = {}
 
+    # Quality configuration
+    quality_config: dict = {}
+
     # UI Configuration
     highlight_color: str = "#eab308"
     ui_radius: str = "12px"
@@ -99,4 +117,11 @@ class SystemConfig(Document):
             if self.extraction_strategy:
                 _apply_legacy_strategy(config, self.extraction_strategy)
 
+        return config
+
+    def get_quality_config(self) -> dict:
+        """Return quality config with defaults merged in."""
+        config = deepcopy(DEFAULT_QUALITY_CONFIG)
+        if self.quality_config:
+            _deep_merge(config, self.quality_config)
         return config

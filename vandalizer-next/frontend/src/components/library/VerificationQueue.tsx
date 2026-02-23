@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText } from 'lucide-react'
+import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText, RotateCcw } from 'lucide-react'
 import { listVerificationQueue, myVerificationRequests, updateVerificationStatus } from '../../api/library'
 import type { VerificationRequest, VerificationStatus } from '../../types/library'
 
 type QueueView = 'pending' | 'mine'
-type StatusFilter = '' | 'submitted' | 'in_review'
+type StatusFilter = '' | 'submitted' | 'in_review' | 'returned'
 
 function statusBadge(status: VerificationStatus) {
   switch (status) {
@@ -16,8 +16,19 @@ function statusBadge(status: VerificationStatus) {
       return { label: 'Approved', className: 'bg-green-50 text-green-700 border-green-200' }
     case 'rejected':
       return { label: 'Rejected', className: 'bg-red-50 text-red-700 border-red-200' }
+    case 'returned':
+      return { label: 'Returned', className: 'bg-orange-50 text-orange-700 border-orange-200' }
     default:
       return { label: status, className: 'bg-gray-50 text-gray-700 border-gray-200' }
+  }
+}
+
+function tierBadgeClass(tier: string | null | undefined) {
+  switch (tier) {
+    case 'excellent': return 'bg-green-50 text-green-700 border-green-200'
+    case 'good': return 'bg-blue-50 text-blue-700 border-blue-200'
+    case 'fair': return 'bg-yellow-50 text-yellow-700 border-yellow-200'
+    default: return 'bg-gray-50 text-gray-500 border-gray-200'
   }
 }
 
@@ -72,24 +83,28 @@ export function VerificationQueue() {
     refresh()
   }, [refresh])
 
-  const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review') => {
+  const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review' | 'returned') => {
     await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined)
     setReviewingId(null)
     setReviewNotes('')
     refresh()
   }
 
-  const filtered = searchQuery
-    ? requests.filter(r => {
-        const q = searchQuery.toLowerCase()
-        return (
-          (r.item_name || '').toLowerCase().includes(q) ||
-          (r.summary || '').toLowerCase().includes(q) ||
-          (r.submitter_name || '').toLowerCase().includes(q) ||
-          (r.description || '').toLowerCase().includes(q)
-        )
-      })
-    : requests
+  const filtered = requests.filter(r => {
+    // Client-side status filtering for "mine" view
+    if (view === 'mine' && statusFilter && r.status !== statusFilter) return false
+    // Search filtering
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      return (
+        (r.item_name || '').toLowerCase().includes(q) ||
+        (r.summary || '').toLowerCase().includes(q) ||
+        (r.submitter_name || '').toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q)
+      )
+    }
+    return true
+  })
 
   return (
     <div>
@@ -130,9 +145,9 @@ export function VerificationQueue() {
       </div>
 
       {/* Status filter chips */}
-      {view === 'pending' && (
+      {(view === 'pending' || view === 'mine') && (
         <div className="flex items-center gap-2 mb-4">
-          {([['', 'All'], ['submitted', 'Submitted'], ['in_review', 'In Review']] as [StatusFilter, string][]).map(([val, label]) => (
+          {([['', 'All'], ['submitted', 'Submitted'], ['in_review', 'In Review'], ...(view === 'mine' ? [['returned' as StatusFilter, 'Returned'] as [StatusFilter, string]] : [])] as [StatusFilter, string][]).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setStatusFilter(val)}
@@ -185,6 +200,11 @@ export function VerificationQueue() {
                         >
                           {badge.label}
                         </span>
+                        {req.validation_score != null && (
+                          <span className={`text-xs px-2 py-0.5 rounded border shrink-0 ${tierBadgeClass(req.validation_tier)}`}>
+                            {Math.round(req.validation_score)}%
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 space-x-3 ml-9">
                         <span>{req.item_kind === 'workflow' ? 'Workflow' : 'Extraction'}</span>
@@ -236,6 +256,13 @@ export function VerificationQueue() {
                               >
                                 <XCircle className="h-4 w-4" />
                               </button>
+                              <button
+                                onClick={() => setReviewingId(req.uuid)}
+                                className="p-1.5 rounded hover:bg-orange-50 text-orange-600"
+                                title="Return for Improvement"
+                              >
+                                <RotateCcw className="h-4 w-4" />
+                              </button>
                             </>
                           ) : (
                             <div className="flex flex-col gap-2">
@@ -260,6 +287,12 @@ export function VerificationQueue() {
                                   Reject
                                 </button>
                                 <button
+                                  onClick={() => handleAction(req.uuid, 'returned')}
+                                  className="flex-1 px-2 py-1 text-xs font-medium rounded bg-orange-500 text-white hover:bg-orange-600"
+                                >
+                                  Return
+                                </button>
+                                <button
                                   onClick={() => {
                                     setReviewingId(null)
                                     setReviewNotes('')
@@ -280,6 +313,37 @@ export function VerificationQueue() {
                 {isExpanded && (
                   <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-9">
+                      {req.validation_snapshot && (
+                        <DetailSection label="Validation Results">
+                          {req.item_kind === 'search_set' || req.item_kind === 'search-set' ? (
+                            <div className="space-y-1">
+                              {(req.validation_snapshot as Record<string, unknown>).aggregate_accuracy != null && (
+                                <div className="text-xs">Accuracy: <span className="font-medium">{Math.round(((req.validation_snapshot as Record<string, unknown>).aggregate_accuracy as number) * 100)}%</span></div>
+                              )}
+                              {(req.validation_snapshot as Record<string, unknown>).aggregate_consistency != null && (
+                                <div className="text-xs">Consistency: <span className="font-medium">{Math.round(((req.validation_snapshot as Record<string, unknown>).aggregate_consistency as number) * 100)}%</span></div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              {(req.validation_snapshot as Record<string, unknown>).grade && (
+                                <div className="text-xs">Grade: <span className="font-semibold">{(req.validation_snapshot as Record<string, unknown>).grade as string}</span></div>
+                              )}
+                              {(req.validation_snapshot as Record<string, unknown>).summary && (
+                                <div className="text-xs">{(req.validation_snapshot as Record<string, unknown>).summary as string}</div>
+                              )}
+                            </div>
+                          )}
+                          {req.validation_score != null && (
+                            <div className="text-xs mt-1">Quality Score: <span className="font-medium">{Math.round(req.validation_score)}%</span> ({req.validation_tier || 'unrated'})</div>
+                          )}
+                        </DetailSection>
+                      )}
+                      {req.return_guidance && (
+                        <DetailSection label="Improvement Guidance">
+                          <p className="whitespace-pre-wrap text-orange-700">{req.return_guidance}</p>
+                        </DetailSection>
+                      )}
                       {req.description && (
                         <DetailSection label="Description">
                           <p className="whitespace-pre-wrap">{req.description}</p>

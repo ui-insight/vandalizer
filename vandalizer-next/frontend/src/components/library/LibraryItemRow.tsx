@@ -8,6 +8,7 @@ import {
   Trash2,
   Pencil,
 } from 'lucide-react'
+import { QualityBadge } from './QualityBadge'
 import type { LibraryItem } from '../../types/library'
 
 interface Props {
@@ -20,9 +21,11 @@ interface Props {
   onRemove: (id: string) => void
   onOpen?: (item: LibraryItem) => void
   onEdit?: (item: LibraryItem) => void
+  qualityTier?: string | null
+  qualityScore?: number | null
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit }: Props) {
+export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, qualityTier, qualityScore }: Props) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -80,6 +83,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           }}
         >
           {item.name}
+          {qualityTier !== undefined && <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />}
         </div>
         <div style={{ fontSize: 12, color: '#70757a', marginTop: 4 }}>{kindLabel}</div>
         {item.tags.length > 0 && (

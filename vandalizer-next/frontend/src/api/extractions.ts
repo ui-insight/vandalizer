@@ -177,3 +177,26 @@ export function runValidation(data: {
     body: JSON.stringify(data),
   })
 }
+
+// Quality history
+
+export interface QualityHistoryRun {
+  uuid: string
+  score: number
+  accuracy: number | null
+  consistency: number | null
+  grade: string | null
+  model: string | null
+  created_at: string
+  num_test_cases: number
+}
+
+export function getExtractionQualityHistory(uuid: string) {
+  return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/extractions/search-sets/${uuid}/quality-history`)
+}
+
+export function getExtractionImprovementSuggestions(uuid: string) {
+  return apiFetch<{ suggestions: string }>(`/api/extractions/search-sets/${uuid}/improvement-suggestions`, {
+    method: 'POST',
+  })
+}

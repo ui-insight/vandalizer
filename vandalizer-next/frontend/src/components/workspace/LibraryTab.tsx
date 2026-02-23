@@ -593,6 +593,7 @@ export function LibraryTab() {
                   onShare={handleShare}
                   onRemove={handleRemove}
                   onEdit={openEditModal}
+                  {...(scope === 'explore' ? { qualityTier: item.quality_tier, qualityScore: item.quality_score } : {})}
                   onOpen={(it) => {
                     touchItem(it.id).then(() => refreshItems()).catch(() => {})
                     if (it.kind === 'workflow') {

@@ -6,15 +6,16 @@ import {
   MousePointerClick, PenTool, Send, ClipboardCheck, Flag,
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck,
-  ArrowRight, Pause, ChevronRight,
+  ArrowRight, Pause, ChevronRight, TrendingUp,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow,
+  getWorkflowQualityHistory, getWorkflowImprovementSuggestions,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationResult } from '../../api/workflows'
+import type { ValidationCheck, ValidationResult, QualityHistoryRun } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { listContents } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
@@ -3029,6 +3030,9 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
   const [newName, setNewName] = useState('')
   const [newStatus, setNewStatus] = useState<ValidationCheck['status']>('PASS')
   const [newDetail, setNewDetail] = useState('')
+  const [qualityHistory, setQualityHistory] = useState<QualityHistoryRun[]>([])
+  const [suggestions, setSuggestions] = useState<string | null>(null)
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
   const updateGrade = (updatedChecks: ValidationCheck[]) => {
     setChecks(updatedChecks)
@@ -3039,16 +3043,41 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     }
   }
 
+  useEffect(() => {
+    if (!workflowId) return
+    getWorkflowQualityHistory(workflowId)
+      .then(r => setQualityHistory(r.runs))
+      .catch(() => {})
+  }, [workflowId])
+
+  const handleGetSuggestions = async () => {
+    if (!workflowId) return
+    setLoadingSuggestions(true)
+    try {
+      const res = await getWorkflowImprovementSuggestions(workflowId)
+      setSuggestions(res.suggestions)
+    } catch {
+      setSuggestions('Failed to generate suggestions. Please try again.')
+    } finally {
+      setLoadingSuggestions(false)
+    }
+  }
+
   const handleValidate = async () => {
     if (!workflowId) return
     setValidating(true)
     setError(null)
     setEditingIdx(null)
     setAddingCheck(false)
+    setSuggestions(null)
     try {
       const res = await validateWorkflow(workflowId, evalPlan || undefined, textInput || undefined)
       setChecks(res.checks)
       setGradeInfo({ grade: res.grade, summary: res.summary })
+      // Refresh quality history after new validation run
+      getWorkflowQualityHistory(workflowId)
+        .then(r => setQualityHistory(r.runs))
+        .catch(() => {})
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Validation failed')
     } finally {
@@ -3172,6 +3201,47 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
           </div>
         )}
 
+        {/* Quality History Chart — visible even before running validation */}
+        {qualityHistory.length > 1 && (
+          <div style={{
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
+            backgroundColor: '#fff',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+              <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
+              <span style={{ fontSize: 11, color: '#9ca3af' }}>({qualityHistory.length} runs)</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 60 }}>
+              {[...qualityHistory].reverse().map((run, i) => {
+                const gc = run.grade ? (GRADE_COLORS[run.grade] || GRADE_COLORS.F) : GRADE_COLORS.F
+                const barHeight = Math.max(4, Math.round(run.score * 0.6))
+                return (
+                  <div
+                    key={run.uuid}
+                    title={`Run ${i + 1}: Grade ${run.grade || '?'} (Score ${Math.round(run.score)}) | ${run.checks_passed}/${run.checks_passed + run.checks_failed} passed | ${new Date(run.created_at).toLocaleDateString()}`}
+                    style={{
+                      flex: 1, maxWidth: 24, height: barHeight,
+                      backgroundColor: gc.text, borderRadius: 2,
+                      opacity: i === [...qualityHistory].length - 1 ? 1 : 0.6,
+                      transition: 'height 0.2s',
+                      cursor: 'default',
+                    }}
+                  />
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+              <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                {new Date(qualityHistory[qualityHistory.length - 1].created_at).toLocaleDateString()}
+              </span>
+              <span style={{ fontSize: 10, color: '#9ca3af' }}>
+                {new Date(qualityHistory[0].created_at).toLocaleDateString()}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Validation result */}
         {gradeInfo && (
           <>
@@ -3199,6 +3269,45 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
                 </div>
               </div>
             </div>
+
+            {/* LLM Improvement Suggestions — show when grade is below A */}
+            {gradeInfo.grade !== 'A' && (
+              <div style={{
+                border: '1px solid #fde68a', borderRadius: 8, padding: 16,
+                backgroundColor: '#fffbeb',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
+                  </div>
+                  {!suggestions && (
+                    <button
+                      onClick={handleGetSuggestions}
+                      disabled={loadingSuggestions}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
+                        color: '#92400e', cursor: loadingSuggestions ? 'not-allowed' : 'pointer',
+                        opacity: loadingSuggestions ? 0.6 : 1,
+                      }}
+                    >
+                      {loadingSuggestions ? (
+                        <><Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> Analyzing...</>
+                      ) : (
+                        'Get AI Suggestions'
+                      )}
+                    </button>
+                  )}
+                </div>
+                {suggestions && (
+                  <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                    {suggestions}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Check results table */}
             <div style={{

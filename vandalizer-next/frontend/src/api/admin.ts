@@ -126,6 +126,7 @@ export function getWorkflowEvents(page: number = 1, status?: string, search?: st
 
 export interface SystemConfigData {
   extraction_config: Record<string, unknown>
+  quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
   available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string }[]
@@ -139,7 +140,7 @@ export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -179,4 +180,52 @@ export function deleteOAuthProvider(index: number) {
 
 export function updateAuthMethods(methods: string[]) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/methods', { method: 'PUT', body: JSON.stringify({ methods }) })
+}
+
+// Quality
+
+export interface QualitySummary {
+  avg_score: number
+  total_runs: number
+  items_validated: number
+  total_verified: number
+  items_below_threshold: number
+}
+
+export interface QualityTimelinePoint {
+  date: string
+  avg_score: number
+  run_count: number
+  items_validated: number
+}
+
+export interface RegressionResult {
+  total_items: number
+  succeeded: number
+  failed: number
+  results: {
+    item_id: string
+    kind: string
+    name: string
+    score: number | null
+    grade: string | null
+    prev_score: number | null
+    delta: number | null
+    status: string
+  }[]
+}
+
+export function getQualitySummary() {
+  return apiFetch<QualitySummary>('/api/admin/quality/summary')
+}
+
+export function getQualityTimeline(days = 90, itemKind?: string) {
+  let url = `/api/admin/quality/timeline?days=${days}`
+  if (itemKind) url += `&item_kind=${encodeURIComponent(itemKind)}`
+  return apiFetch<{ timeline: QualityTimelinePoint[] }>(url)
+}
+
+export function runRegressionSuite(model?: string) {
+  const params = model ? `?model=${encodeURIComponent(model)}` : ''
+  return apiFetch<RegressionResult>(`/api/admin/quality/regression-suite${params}`, { method: 'POST' })
 }

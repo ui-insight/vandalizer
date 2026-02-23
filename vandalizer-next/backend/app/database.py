@@ -28,6 +28,7 @@ from app.models.automation import Automation
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.group import Group, GroupMembership
 from app.models.extraction_test_case import ExtractionTestCase
+from app.models.validation_run import ValidationRun
 
 ALL_MODELS = [
     User,
@@ -68,6 +69,7 @@ ALL_MODELS = [
     Group,
     GroupMembership,
     ExtractionTestCase,
+    ValidationRun,
 ]
 
 

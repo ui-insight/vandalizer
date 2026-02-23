@@ -14,6 +14,7 @@ from app.models.verification import (
     VerifiedItemMetadata,
 )
 from app.models.knowledge import KnowledgeBase
+from app.models.system_config import SystemConfig
 from app.models.workflow import Workflow
 from app.models.search_set import SearchSet
 
@@ -54,7 +55,7 @@ async def submit_for_verification(
         if not obj:
             raise ValueError("Item not found")
 
-    # Check for existing pending request
+    # Check for existing pending request (returned items can be resubmitted)
     existing = await VerificationRequest.find_one(
         VerificationRequest.item_id == obj_id,
         VerificationRequest.status.is_in([  # type: ignore[attr-defined]
@@ -64,6 +65,24 @@ async def submit_for_verification(
     )
     if existing:
         raise ValueError("A verification request is already pending for this item")
+
+    # Fetch latest validation for quality gate checks
+    from app.services.quality_service import get_latest_validation, compute_quality_tier
+
+    item_ref = str(getattr(obj, 'uuid', '')) if item_kind == "search_set" and hasattr(obj, 'uuid') else str(obj_id)
+    latest = await get_latest_validation(item_kind, item_ref)
+
+    sys_cfg = await SystemConfig.get_config()
+    qc = sys_cfg.get_quality_config()
+    gates = qc.get("verification_gates", {})
+
+    # Quality gate: require validation before submission
+    if gates.get("require_validation") and not latest:
+        raise ValueError("This item must be validated before submitting for verification. Run validation first.")
+
+    validation_snapshot = latest.get("result_snapshot") if latest else None
+    validation_score = latest.get("score") if latest else None
+    validation_tier = compute_quality_tier(validation_score, qc) if validation_score is not None else None
 
     req = VerificationRequest(
         item_kind=item_kind,
@@ -84,6 +103,9 @@ async def submit_for_verification(
         dependencies=dependencies or [],
         intended_use_tags=intended_use_tags or [],
         test_files=test_files or [],
+        validation_snapshot=validation_snapshot,
+        validation_score=validation_score,
+        validation_tier=validation_tier,
     )
     await req.insert()
     return _request_to_dict(req)
@@ -140,6 +162,11 @@ async def update_status(
     req.reviewer_notes = reviewer_notes
     req.reviewed_at = now
     await req.save()
+
+    # If returned, store guidance for the submitter
+    if new_status == VerificationStatus.RETURNED.value:
+        req.return_guidance = reviewer_notes
+        await req.save()
 
     # If approved, mark the library item as verified
     if new_status == VerificationStatus.APPROVED.value:
@@ -214,6 +241,11 @@ async def list_verified_items(
             "description": meta.description if meta else None,
             "markdown": meta.markdown if meta else None,
             "group_ids": meta_group_ids,
+            "quality_score": meta.quality_score if meta else None,
+            "quality_tier": meta.quality_tier if meta else None,
+            "quality_grade": meta.quality_grade if meta else None,
+            "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
+            "validation_run_count": meta.validation_run_count if meta else 0,
         })
     return results
 
@@ -236,6 +268,11 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "group_ids": meta.group_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
+        "quality_score": meta.quality_score,
+        "quality_tier": meta.quality_tier,
+        "quality_grade": meta.quality_grade,
+        "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
+        "validation_run_count": meta.validation_run_count,
     }
 
 
@@ -500,6 +537,10 @@ def _request_to_dict(req: VerificationRequest) -> dict:
         "reviewer_notes": req.reviewer_notes,
         "submitted_at": req.submitted_at.isoformat() if req.submitted_at else None,
         "reviewed_at": req.reviewed_at.isoformat() if req.reviewed_at else None,
+        "validation_snapshot": req.validation_snapshot,
+        "validation_score": req.validation_score,
+        "validation_tier": req.validation_tier,
+        "return_guidance": req.return_guidance,
     }
 
 

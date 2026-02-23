@@ -15,6 +15,7 @@ class VerificationStatus(str, Enum):
     IN_REVIEW = "in_review"
     APPROVED = "approved"
     REJECTED = "rejected"
+    RETURNED = "returned"
 
 
 class VerificationRequest(Document):
@@ -43,6 +44,12 @@ class VerificationRequest(Document):
     intended_use_tags: list[str] = Field(default_factory=list)
     test_files: list[dict] = Field(default_factory=list)  # [{original_name, stored_name, path}]
 
+    # Validation snapshot (attached at submission time)
+    validation_snapshot: Optional[dict] = None
+    validation_score: Optional[float] = None
+    validation_tier: Optional[str] = None
+    return_guidance: Optional[str] = None
+
     # Reviewer info
     reviewer_user_id: Optional[str] = None
     reviewer_notes: Optional[str] = None
@@ -64,6 +71,14 @@ class VerifiedItemMetadata(Document):
     description: Optional[str] = None
     markdown: Optional[str] = None
     group_ids: list[str] = Field(default_factory=list)  # Group uuid strings
+
+    # Quality fields (populated by quality_service)
+    quality_score: Optional[float] = None
+    quality_tier: Optional[str] = None
+    quality_grade: Optional[str] = None
+    last_validated_at: Optional[datetime.datetime] = None
+    validation_run_count: int = 0
+
     updated_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )

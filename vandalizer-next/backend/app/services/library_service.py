@@ -253,14 +253,17 @@ async def get_library_items(
                 tags_str = " ".join(deref.get("tags", [])).lower()
                 if search.lower() not in name_lower and search.lower() not in tags_str:
                     continue
-            # Group filtering for verified items
-            if user_group_uuids is not None and lib.scope == LibraryScope.VERIFIED and item.verified:
+            # Group filtering and quality metadata for verified items
+            if lib.scope == LibraryScope.VERIFIED and item.verified:
                 meta = await VerifiedItemMetadata.find_one(
                     VerifiedItemMetadata.item_kind == item.kind.value,
                     VerifiedItemMetadata.item_id == str(item.item_id),
                 )
-                if meta and meta.group_ids and not (set(meta.group_ids) & set(user_group_uuids)):
+                if user_group_uuids is not None and meta and meta.group_ids and not (set(meta.group_ids) & set(user_group_uuids)):
                     continue
+                if meta:
+                    deref["quality_tier"] = meta.quality_tier
+                    deref["quality_score"] = meta.quality_score
             results.append(deref)
 
     return results

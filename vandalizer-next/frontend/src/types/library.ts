@@ -30,6 +30,8 @@ export interface LibraryItem {
   added_by_user_id: string
   created_at: string | null
   last_used_at: string | null
+  quality_tier?: string | null
+  quality_score?: number | null
 }
 
 export interface LibraryFolder {
@@ -39,7 +41,7 @@ export interface LibraryFolder {
   scope: LibraryScope
 }
 
-export type VerificationStatus = 'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected'
+export type VerificationStatus = 'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'returned'
 
 export interface VerificationRequest {
   id: string
@@ -64,6 +66,10 @@ export interface VerificationRequest {
   dependencies?: string[]
   intended_use_tags?: string[]
   test_files?: { original_name: string; stored_name: string; path: string }[]
+  validation_snapshot?: Record<string, unknown> | null
+  validation_score?: number | null
+  validation_tier?: string | null
+  return_guidance?: string | null
   reviewer_user_id: string | null
   reviewer_notes: string | null
   submitted_at: string | null
@@ -79,6 +85,11 @@ export interface VerifiedItemMetadata {
   group_ids: string[]
   updated_at?: string | null
   updated_by_user_id?: string | null
+  quality_score?: number | null
+  quality_tier?: string | null
+  quality_grade?: string | null
+  last_validated_at?: string | null
+  validation_run_count?: number
 }
 
 export interface VerifiedCatalogItem {
@@ -93,6 +104,11 @@ export interface VerifiedCatalogItem {
   description: string | null
   markdown: string | null
   group_ids: string[]
+  quality_score: number | null
+  quality_tier: string | null
+  quality_grade: string | null
+  last_validated_at: string | null
+  validation_run_count: number
 }
 
 export interface VerifiedCollection {

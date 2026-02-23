@@ -459,7 +459,20 @@ async def validate_workflow(
 
     summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"
 
-    return {"grade": grade, "summary": summary, "checks": checks}
+    result_dict = {"grade": grade, "summary": summary, "checks": checks}
+
+    # Persist validation run for quality tracking
+    from app.services.quality_service import persist_validation_run
+    await persist_validation_run(
+        item_kind="workflow",
+        item_id=workflow_id,
+        item_name=wf_data.get("name", ""),
+        run_type="workflow",
+        result=result_dict,
+        user_id=wf_data.get("user_id", ""),
+    )
+
+    return result_dict
 
 
 async def _generate_llm_checks(

@@ -292,6 +292,29 @@ async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User =
     return {"ok": True}
 
 
+@router.get("/{workflow_id}/quality-history")
+async def get_workflow_quality_history(
+    workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
+):
+    from app.services.quality_service import get_quality_history
+    return {"runs": await get_quality_history("workflow", workflow_id, limit)}
+
+
+@router.post("/{workflow_id}/improvement-suggestions")
+async def get_workflow_suggestions(
+    workflow_id: str, user: User = Depends(get_current_user),
+):
+    """Use LLM to suggest improvements based on the latest validation run."""
+    from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
+
+    latest = await get_latest_validation("workflow", workflow_id)
+    if not latest:
+        raise HTTPException(status_code=404, detail="No validation runs found for this workflow")
+    result_snapshot = latest.get("result_snapshot", latest)
+    suggestions = await generate_improvement_suggestions("workflow", workflow_id, result_snapshot)
+    return {"suggestions": suggestions}
+
+
 @router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
 async def validate_workflow(workflow_id: str, req: ValidateWorkflowRequest, user: User = Depends(get_current_user)):
     try:

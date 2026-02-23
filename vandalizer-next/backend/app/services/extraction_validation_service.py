@@ -130,7 +130,7 @@ async def run_validation(
         if tcr["overall_accuracy"] is not None:
             all_accuracies.append(tcr["overall_accuracy"])
 
-    return {
+    result_dict = {
         "search_set_uuid": search_set_uuid,
         "num_runs": num_runs,
         "test_cases": tc_results,
@@ -141,6 +141,20 @@ async def run_validation(
             sum(all_consistencies) / len(all_consistencies) if all_consistencies else 0.0
         ),
     }
+
+    # Persist validation run for quality tracking
+    from app.services.quality_service import persist_validation_run
+    await persist_validation_run(
+        item_kind="search_set",
+        item_id=search_set_uuid,
+        item_name=ss.title if ss else "",
+        run_type="extraction",
+        result=result_dict,
+        user_id=user_id,
+        model=model,
+    )
+
+    return result_dict
 
 
 async def _validate_test_case(

@@ -1,14 +1,15 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Shield, BarChart3, Users, Building2, Workflow, Settings,
+  Shield, ShieldCheck, BarChart3, Users, Building2, Workflow, Settings,
   Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
   ChevronRight, RefreshCw, MessageSquare, Search, Zap,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
-  ChevronDown, ChevronUp, ArrowUpDown,
+  ChevronDown, ChevronUp, ArrowUpDown, Play,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
+  LineChart, Line,
 } from 'recharts'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -20,10 +21,12 @@ import {
   getWorkflowEvents, getSystemConfig, updateSystemConfig,
   addModel, updateModel, deleteModel, addOAuthProvider, updateOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
+  getQualitySummary, getQualityTimeline, runRegressionSuite,
 } from '../api/admin'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
   WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
+  QualitySummary, QualityTimelinePoint, RegressionResult,
 } from '../api/admin'
 
 function applyThemeToDOM(theme: ThemeConfig) {
@@ -32,13 +35,14 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'workflows' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'workflows' | 'quality' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
   { key: 'users', label: 'Users', icon: Users },
   { key: 'teams', label: 'Teams', icon: Building2 },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
+  { key: 'quality', label: 'Quality', icon: ShieldCheck },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -874,6 +878,189 @@ function WorkflowsTab() {
 }
 
 // ──────────────────────────────────────────
+// Quality Tab
+// ──────────────────────────────────────────
+
+function QualityTab() {
+  const [summary, setSummary] = useState<QualitySummary | null>(null)
+  const [timeline, setTimeline] = useState<QualityTimelinePoint[]>([])
+  const [days, setDays] = useState(90)
+  const [loading, setLoading] = useState(true)
+  const [regressionResult, setRegressionResult] = useState<RegressionResult | null>(null)
+  const [regressionRunning, setRegressionRunning] = useState(false)
+  const [regressionModel, setRegressionModel] = useState('')
+  const [cfg, setCfg] = useState<SystemConfigData | null>(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    Promise.all([
+      getQualitySummary(),
+      getQualityTimeline(days),
+      getSystemConfig(),
+    ]).then(([s, t, c]) => {
+      setSummary(s)
+      setTimeline(t.timeline)
+      setCfg(c)
+    }).finally(() => setLoading(false))
+  }, [days])
+
+  useEffect(() => { load() }, [load])
+
+  const handleRunRegression = async () => {
+    setRegressionRunning(true)
+    try {
+      const result = await runRegressionSuite(regressionModel || undefined)
+      setRegressionResult(result)
+    } finally {
+      setRegressionRunning(false)
+    }
+  }
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading quality data...</div>
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Summary KPI Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+        <KpiCard label="Avg Quality Score" value={summary ? `${summary.avg_score}%` : '-'} icon={ShieldCheck} color="#22c55e" />
+        <KpiCard label="Total Runs" value={summary?.total_runs ?? '-'} icon={BarChart3} color="#3b82f6" />
+        <KpiCard label="Items Validated" value={summary ? `${summary.items_validated}/${summary.total_verified}` : '-'} icon={CheckCircle2} color="#8b5cf6" />
+        <KpiCard label="Below Threshold" value={summary?.items_below_threshold ?? '-'} icon={XCircle} color="#ef4444" />
+      </div>
+
+      {/* Quality Timeline Chart */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Quality Timeline</h3>
+          <select
+            value={days}
+            onChange={e => setDays(Number(e.target.value))}
+            style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+          >
+            <option value={30}>30 days</option>
+            <option value={60}>60 days</option>
+            <option value={90}>90 days</option>
+            <option value={180}>180 days</option>
+          </select>
+        </div>
+        {timeline.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
+            No validation data yet. Run validation on items to see the timeline.
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={timeline}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+              <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
+              <Tooltip
+                contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
+                formatter={(value: number) => [`${value}%`, 'Avg Score']}
+              />
+              <Line type="monotone" dataKey="avg_score" stroke="#22c55e" strokeWidth={2} dot={false} name="Avg Score" />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {/* Regression Suite Panel */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 12px' }}>Regression Suite</h3>
+        <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 16px' }}>
+          Run validation on all verified items to detect quality regressions after model or configuration changes.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+          <select
+            value={regressionModel}
+            onChange={e => setRegressionModel(e.target.value)}
+            style={{ padding: '6px 12px', fontSize: 13, borderRadius: 6, border: '1px solid #e5e7eb', minWidth: 200 }}
+          >
+            <option value="">Default Model</option>
+            {cfg?.available_models?.map((m, i) => (
+              <option key={i} value={m.name}>{m.name} ({m.tag})</option>
+            ))}
+          </select>
+          <button
+            onClick={handleRunRegression}
+            disabled={regressionRunning}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)',
+              border: 'none', background: '#111827', color: '#fff',
+              fontSize: 13, fontWeight: 600, cursor: regressionRunning ? 'wait' : 'pointer',
+              opacity: regressionRunning ? 0.6 : 1,
+            }}
+          >
+            {regressionRunning ? (
+              <><RefreshCw size={14} style={{ animation: 'spin 1s linear infinite' }} /> Running...</>
+            ) : (
+              <><Play size={14} /> Run Regression Suite</>
+            )}
+          </button>
+        </div>
+
+        {regressionResult && (
+          <div>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13 }}>
+              <span style={{ color: '#6b7280' }}>Total: <strong>{regressionResult.total_items}</strong></span>
+              <span style={{ color: '#16a34a' }}>Succeeded: <strong>{regressionResult.succeeded}</strong></span>
+              <span style={{ color: '#dc2626' }}>Failed: <strong>{regressionResult.failed}</strong></span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Name</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Kind</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Score</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Grade</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Delta</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 600, color: '#6b7280', fontSize: 11, textTransform: 'uppercase' }}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {regressionResult.results.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 500 }}>{r.name}</td>
+                      <td style={{ padding: '8px 12px' }}>
+                        <span style={{
+                          fontSize: 11, padding: '1px 8px', borderRadius: 9999,
+                          background: r.kind === 'workflow' ? '#f3e8ff' : '#e0f2fe',
+                          color: r.kind === 'workflow' ? '#7c3aed' : '#0369a1',
+                        }}>{r.kind}</span>
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>
+                        {r.score != null ? `${r.score}%` : '-'}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 700 }}>
+                        {r.grade || '-'}
+                      </td>
+                      <td style={{
+                        padding: '8px 12px', textAlign: 'right', fontWeight: 600,
+                        color: r.delta == null ? '#9ca3af' : r.delta > 0 ? '#16a34a' : r.delta < 0 ? '#dc2626' : '#9ca3af',
+                      }}>
+                        {r.delta == null ? '-' : r.delta > 0 ? `+${r.delta}` : r.delta}
+                      </td>
+                      <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                        {r.status === 'ok' ? (
+                          <CheckCircle2 size={16} color="#16a34a" />
+                        ) : (
+                          <span style={{ fontSize: 11, color: '#dc2626' }}>{r.status}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────
 // Config Tab
 // ──────────────────────────────────────────
 
@@ -904,6 +1091,15 @@ function ConfigTab() {
   const [twoPassP2Thinking, setTwoPassP2Thinking] = useState(false)
   const [twoPassP2Structured, setTwoPassP2Structured] = useState(true)
   const [twoPassP2Model, setTwoPassP2Model] = useState('')
+
+  // Quality config
+  const [requireValidation, setRequireValidation] = useState(false)
+  const [minAccuracy, setMinAccuracy] = useState(70)
+  const [minConsistency, setMinConsistency] = useState(80)
+  const [minWorkflowGrade, setMinWorkflowGrade] = useState('C')
+  const [excellentThreshold, setExcellentThreshold] = useState(90)
+  const [goodThreshold, setGoodThreshold] = useState(70)
+  const [fairThreshold, setFairThreshold] = useState(50)
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
@@ -950,6 +1146,17 @@ function ConfigTab() {
       setTwoPassP2Thinking(!!(pass2.thinking))
       setTwoPassP2Structured((pass2.structured_output ?? pass2.structured) !== false)
       setTwoPassP2Model((pass2.model as string) || '')
+      // Quality config
+      const qc = (c.quality_config || {}) as Record<string, unknown>
+      const gates = (qc.verification_gates || {}) as Record<string, unknown>
+      setRequireValidation(!!gates.require_validation)
+      setMinAccuracy(Math.round(((gates.min_extraction_accuracy as number) ?? 0.7) * 100))
+      setMinConsistency(Math.round(((gates.min_extraction_consistency as number) ?? 0.8) * 100))
+      setMinWorkflowGrade((gates.min_workflow_grade as string) || 'C')
+      const tiers = (qc.quality_tiers || {}) as Record<string, Record<string, unknown>>
+      setExcellentThreshold((tiers.excellent?.min_score as number) ?? 90)
+      setGoodThreshold((tiers.good?.min_score as number) ?? 70)
+      setFairThreshold((tiers.fair?.min_score as number) ?? 50)
     }).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
@@ -973,6 +1180,19 @@ function ConfigTab() {
           },
           chunking: { enabled: chunkingEnabled, max_keys_per_chunk: maxKeysPerChunk },
           repetition: { enabled: repetitionEnabled },
+        },
+        quality_config: {
+          verification_gates: {
+            require_validation: requireValidation,
+            min_extraction_accuracy: minAccuracy / 100,
+            min_extraction_consistency: minConsistency / 100,
+            min_workflow_grade: minWorkflowGrade,
+          },
+          quality_tiers: {
+            excellent: { min_score: excellentThreshold },
+            good: { min_score: goodThreshold },
+            fair: { min_score: fairThreshold },
+          },
         },
         ocr_endpoint: ocrEndpoint,
       })
@@ -1251,6 +1471,60 @@ function ConfigTab() {
               type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
               placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Quality & Verification Gates */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <ShieldCheck size={18} color="#6b7280" /> Quality &amp; Verification Gates
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
+              Require validation before verification submission
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Min Extraction Accuracy (%)</label>
+                <input type="number" min={0} max={100} value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Extraction Consistency (%)</label>
+                <input type="number" min={0} max={100} value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Workflow Grade</label>
+                <select value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="F">F</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={labelStyle}>Excellent threshold</label>
+                  <input type="number" min={0} max={100} value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Good threshold</label>
+                  <input type="number" min={0} max={100} value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fair threshold</label>
+                  <input type="number" min={0} max={100} value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1625,8 +1899,8 @@ export default function Admin() {
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
   const hasAccess = isGlobalAdmin || isTeamAdmin
 
-  // Only global admins see the Config tab
-  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config')
+  // Only global admins see the Config and Quality tabs
+  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config' && t.key !== 'quality')
 
   if (!hasAccess) {
     return (
@@ -1693,6 +1967,7 @@ export default function Admin() {
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
+          {activeTab === 'quality' && <QualityTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

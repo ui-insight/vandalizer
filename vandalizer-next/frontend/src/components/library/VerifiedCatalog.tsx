@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag } from 'lucide-react'
+import { QualityBadge } from './QualityBadge'
 import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups } from '../../api/library'
 import type { VerifiedCatalogItem, Group } from '../../types/library'
 
 type KindFilter = '' | 'workflow' | 'search_set'
+type QualityFilter = '' | 'excellent' | 'good' | 'fair'
+
+function meetsQualityFilter(tier: string | null, filter: QualityFilter): boolean {
+  if (!filter) return true
+  if (!tier) return false
+  const order = ['fair', 'good', 'excellent']
+  return order.indexOf(tier) >= order.indexOf(filter)
+}
 
 function KindBadge({ kind }: { kind: string }) {
   const isWorkflow = kind === 'workflow'
@@ -167,6 +176,7 @@ export function VerifiedCatalog() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('')
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
   const [groupMap, setGroupMap] = useState<Record<string, string>>({})
 
@@ -235,6 +245,16 @@ export function VerifiedCatalog() {
             </button>
           ))}
         </div>
+        <select
+          value={qualityFilter}
+          onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
+          className="px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+        >
+          <option value="">All Quality</option>
+          <option value="excellent">Excellent</option>
+          <option value="good">Good or better</option>
+          <option value="fair">Fair or better</option>
+        </select>
       </div>
 
       {loading ? (
@@ -245,7 +265,7 @@ export function VerifiedCatalog() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {items.map((item) => (
+          {items.filter(i => meetsQualityFilter(i.quality_tier, qualityFilter)).map((item) => (
             <div
               key={item.id}
               className="border border-gray-200 rounded-lg p-4 bg-white hover:border-gray-300 transition-colors"
@@ -260,6 +280,7 @@ export function VerifiedCatalog() {
                   </div>
                   <div className="flex items-center gap-2 mb-2">
                     <KindBadge kind={item.kind} />
+                    <QualityBadge tier={item.quality_tier} score={item.quality_score} />
                     {item.created_at && (
                       <span className="text-xs text-gray-500">
                         {new Date(item.created_at).toLocaleDateString()}
