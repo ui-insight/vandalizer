@@ -42,3 +42,4 @@ htmlcov/
 /logs/
 /pids/
 *.db
+vandalizer-next/backend/data/chromadb/
