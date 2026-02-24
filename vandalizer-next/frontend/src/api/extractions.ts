@@ -36,7 +36,7 @@ export function cloneSearchSet(uuid: string) {
 
 // Items
 
-export function addItem(searchSetUuid: string, data: { searchphrase: string; searchtype?: string; title?: string }) {
+export function addItem(searchSetUuid: string, data: { searchphrase: string; searchtype?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) {
   return apiFetch<SearchSetItem>(`/api/extractions/search-sets/${searchSetUuid}/items`, {
     method: 'POST',
     body: JSON.stringify({ searchtype: 'extraction', ...data }),
@@ -47,7 +47,7 @@ export function listItems(searchSetUuid: string) {
   return apiFetch<SearchSetItem[]>(`/api/extractions/search-sets/${searchSetUuid}/items`)
 }
 
-export function updateItem(itemId: string, data: { searchphrase?: string; title?: string }) {
+export function updateItem(itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) {
   return apiFetch<SearchSetItem>(`/api/extractions/items/${itemId}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -114,6 +114,7 @@ export interface FieldValidationResult {
   consistency: number
   accuracy: number | null
   accuracy_method: string | null
+  enum_compliance: number | null
 }
 
 export interface TestCaseValidationResult {
@@ -209,6 +210,7 @@ export interface SourceFieldResult {
   consistency: number
   accuracy: number | null
   accuracy_method: string | null
+  enum_compliance: number | null
   error_types: Record<string, number>
 }
 
@@ -270,6 +272,42 @@ export interface QualityHistoryRun {
 
 export function getExtractionQualityHistory(uuid: string) {
   return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/extractions/search-sets/${uuid}/quality-history`)
+}
+
+export interface SparklinePoint {
+  score: number
+  created_at: string
+}
+
+export function getQualitySparkline(uuid: string, limit = 10) {
+  return apiFetch<{ scores: SparklinePoint[] }>(`/api/extractions/search-sets/${uuid}/quality-sparkline?limit=${limit}`)
+}
+
+export interface QualityStatus {
+  status: 'validated' | 'unvalidated'
+  score: number | null
+  tier: string | null
+  last_validated_at?: string | null
+  config_changed: boolean
+  stale: boolean
+}
+
+export function getQualityStatus(uuid: string) {
+  return apiFetch<QualityStatus>(`/api/extractions/search-sets/${uuid}/quality-status`)
+}
+
+export interface QualityContractStatus {
+  status: string
+  tier: string | null
+  score: number | null
+  last_validated_at: string | null
+  is_stale: boolean
+  has_alerts: boolean
+  monitored: boolean
+}
+
+export function getQualityContract(uuid: string) {
+  return apiFetch<QualityContractStatus>(`/api/extractions/search-sets/${uuid}/quality-contract`)
 }
 
 export function getExtractionImprovementSuggestions(uuid: string) {

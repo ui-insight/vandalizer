@@ -19,6 +19,13 @@ DEFAULT_QUALITY_CONFIG = {
         "good": {"min_score": 70},
         "fair": {"min_score": 50},
     },
+    "monitoring": {
+        "auto_revalidate": True,
+        "revalidate_interval_days": 7,
+        "stale_threshold_days": 14,
+        "degradation_alert_threshold": 10,
+        "auto_review_on_degradation": True,
+    },
 }
 
 

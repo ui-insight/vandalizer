@@ -12,7 +12,7 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
-from app.services.search_set_service import get_extraction_keys, get_search_set
+from app.services.search_set_service import get_extraction_field_metadata, get_extraction_keys, get_search_set
 
 
 # ---------------------------------------------------------------------------
@@ -115,11 +115,16 @@ async def run_validation(
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
 
+    # Fetch field metadata for optional/enum awareness
+    field_metadata = await get_extraction_field_metadata(search_set_uuid)
+    meta_map = {m["key"]: m for m in field_metadata}
+
     # Process each test case
     tc_results = []
     for tc in test_cases:
         tc_result = await _validate_test_case(
             tc, keys, model, sys_config_doc, extraction_config_override, num_runs,
+            field_metadata=field_metadata, meta_map=meta_map,
         )
         tc_results.append(tc_result)
 
@@ -166,6 +171,8 @@ async def _validate_test_case(
     sys_config_doc: dict,
     extraction_config_override: Optional[dict],
     num_runs: int,
+    field_metadata: list[dict] | None = None,
+    meta_map: dict[str, dict] | None = None,
 ) -> dict:
     """Run extraction N times against a test case and compute metrics."""
     # Resolve source text
@@ -194,6 +201,7 @@ async def _validate_test_case(
             model=model,
             doc_texts=[source_text],
             extraction_config_override=extraction_config_override,
+            field_metadata=field_metadata,
         )
         # Flatten to single dict
         flat = {}
@@ -210,6 +218,7 @@ async def _validate_test_case(
             [r.get(field_name) for r in run_results],
             tc.expected_values.get(field_name),
             sys_config_doc, model,
+            field_meta=(meta_map or {}).get(field_name),
         )
         for field_name in keys
     )))
@@ -237,24 +246,51 @@ async def _compute_field_metrics(
     expected: Optional[str],
     sys_config_doc: dict,
     model: str,
+    field_meta: dict | None = None,
 ) -> dict:
     """Compute consistency and accuracy for a single field across runs."""
-    # Consistency: how often the most common value appears
     str_values = [str(v) if v is not None else None for v in extracted_values]
-    counter = Counter(str_values)
+
+    # For consistency, treat all "not found" sentinel values as equivalent
+    normalized_for_consistency = [
+        None if _is_not_found(v) else v for v in str_values
+    ]
+    counter = Counter(normalized_for_consistency)
     most_common_value, most_common_count = counter.most_common(1)[0]
-    consistency = most_common_count / len(str_values) if str_values else 0.0
+    consistency = most_common_count / len(normalized_for_consistency) if normalized_for_consistency else 0.0
+
+    is_optional = (field_meta or {}).get("is_optional", False)
+    enum_vals = (field_meta or {}).get("enum_values", [])
 
     # Accuracy — pure normalization, no LLM calls
     accuracy = None
     accuracy_method = None
-    if expected is not None and expected != "":
+    expected_is_not_found = _is_not_found(expected)
+
+    # Skip accuracy for optional fields with no expected value (no penalty)
+    if is_optional and (expected is None or expected == "" or expected_is_not_found):
+        accuracy = None
+        accuracy_method = None
+    elif expected is not None and expected != "":
         match_count = 0
         for val in str_values:
-            if val is not None and _values_match(val, expected):
+            if expected_is_not_found and _is_not_found(val):
+                # Both are "not found" sentinels — that's a match
                 match_count += 1
+            elif val is not None and not _is_not_found(val) and not expected_is_not_found and _values_match(val, expected):
+                match_count += 1
+            # If one is sentinel and the other isn't, it's a mismatch (count stays 0)
         accuracy = match_count / len(str_values) if str_values else 0.0
         accuracy_method = "normalized"
+
+    # Enum compliance: fraction of non-null extracted values within allowed set
+    enum_compliance = None
+    if enum_vals:
+        enum_set_lower = {v.lower().strip() for v in enum_vals}
+        non_null = [v for v in str_values if v is not None and not _is_not_found(v)]
+        if non_null:
+            compliant = sum(1 for v in non_null if v.strip().lower() in enum_set_lower)
+            enum_compliance = compliant / len(non_null)
 
     return {
         "field_name": field_name,
@@ -264,6 +300,7 @@ async def _compute_field_metrics(
         "consistency": consistency,
         "accuracy": accuracy,
         "accuracy_method": accuracy_method,
+        "enum_compliance": enum_compliance,
     }
 
 
@@ -274,6 +311,21 @@ async def _compute_field_metrics(
 _CURRENCY_RE = re.compile(r'^[\s$€£¥₹]+|[\s$€£¥₹]+$')
 _WHITESPACE_RE = re.compile(r'\s+')
 _PAREN_NEG_RE = re.compile(r'^\((.+)\)$')
+
+# Sentinel values that all mean "not found / not applicable"
+_NOT_FOUND_VARIANTS = frozenset({
+    "", "n/a", "na", "n.a.", "not found", "not available",
+    "not applicable", "none", "null", "nil", "unknown", "-", "--", "---",
+    "nan", "no data", "no value", "not provided", "not specified",
+})
+
+
+def _is_not_found(value) -> bool:
+    """Return True if a value is a 'not found' sentinel."""
+    if value is None:
+        return True
+    s = str(value).strip().lower()
+    return s in _NOT_FOUND_VARIANTS
 
 # Month name → number for date normalization
 _MONTH_MAP: dict[str, int] = {}
@@ -297,6 +349,10 @@ def _values_match(extracted: str, expected: str) -> bool:
     4. Date comparison (parse common date formats, compare)
     """
     a, b = extracted.strip(), expected.strip()
+
+    # Level 0: sentinel equivalence — all "not found" values match each other
+    if _is_not_found(a) and _is_not_found(b):
+        return True
 
     # Level 1: case-insensitive exact
     if a.lower() == b.lower():
@@ -413,7 +469,7 @@ def _try_parse_date(value: str) -> Optional[tuple[int, int, int]]:
 
 def _classify_error(extracted: Optional[str], expected: str) -> str:
     """Classify the type of extraction error."""
-    if extracted is None or extracted.strip() == "" or extracted.lower() == "nan":
+    if _is_not_found(extracted):
         return "missing"
     # Check truncation: one is a substantial prefix of the other
     e_lower = extracted.lower().strip()
@@ -438,10 +494,12 @@ async def _validate_source(
     sys_config_doc: dict,
     extraction_config_override: Optional[dict],
     num_runs: int,
+    field_metadata: list[dict] | None = None,
+    meta_map: dict[str, dict] | None = None,
 ) -> dict:
     """Run extraction N times against a source and compute metrics."""
-    run_results: list[dict] = []
-    for _ in range(num_runs):
+
+    async def _single_run() -> dict:
         engine = ExtractionEngine(system_config_doc=sys_config_doc)
         result = await asyncio.to_thread(
             engine.extract,
@@ -449,13 +507,16 @@ async def _validate_source(
             model=model,
             doc_texts=[source_text],
             extraction_config_override=extraction_config_override,
+            field_metadata=field_metadata,
         )
         flat: dict = {}
         if result and isinstance(result, list) and len(result) > 0:
             for item in result:
                 if isinstance(item, dict):
                     flat.update(item)
-        run_results.append(flat)
+        return flat
+
+    run_results: list[dict] = list(await asyncio.gather(*(_single_run() for _ in range(num_runs))))
 
     # Per-field metrics — run all fields concurrently
     field_results_raw = await asyncio.gather(*(
@@ -464,6 +525,7 @@ async def _validate_source(
             [r.get(field_name) for r in run_results],
             expected_values.get(field_name),
             sys_config_doc, model,
+            field_meta=(meta_map or {}).get(field_name),
         )
         for field_name in keys
     ))
@@ -475,8 +537,12 @@ async def _validate_source(
         # Error types
         exp = field_result["expected"]
         error_types: dict[str, int] = {}
+        exp_is_nf = _is_not_found(exp)
         if exp is not None and exp != "":
             for val in str_vals:
+                # Both are "not found" sentinels — not an error
+                if exp_is_nf and _is_not_found(val):
+                    continue
                 if val is not None and not _values_match(val, exp):
                     err = _classify_error(val, exp)
                     error_types[err] = error_types.get(err, 0) + 1
@@ -490,11 +556,18 @@ async def _validate_source(
     for run_idx, run_data in enumerate(run_results):
         correct = 0
         for field_name in keys:
+            fm = (meta_map or {}).get(field_name, {})
             exp = expected_values.get(field_name)
+            # Skip optional fields with no expected value
+            if fm.get("is_optional") and (exp is None or exp == "" or _is_not_found(exp)):
+                continue
             if exp is None or exp == "":
                 continue
             val = run_data.get(field_name)
-            if val is not None and _values_match(str(val), exp):
+            exp_is_nf = _is_not_found(exp)
+            if exp_is_nf and _is_not_found(val):
+                correct += 1
+            elif val is not None and not _is_not_found(val) and not exp_is_nf and _values_match(str(val), exp):
                 correct += 1
         per_run_correct.append(correct)
 
@@ -612,6 +685,10 @@ async def run_validation_v2(
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
 
+    # Fetch field metadata for optional/enum awareness
+    field_metadata = await get_extraction_field_metadata(search_set_uuid)
+    meta_map = {m["key"]: m for m in field_metadata}
+
     # Resolve document texts
     resolved_sources: list[dict] = []
     for i, src in enumerate(sources):
@@ -641,10 +718,9 @@ async def run_validation_v2(
     if not resolved_sources:
         raise ValueError("No sources with available text")
 
-    # Validate each source
-    source_results = []
-    for rs in resolved_sources:
-        sr = await _validate_source(
+    # Validate all sources concurrently
+    source_results = list(await asyncio.gather(*(
+        _validate_source(
             source_label=rs["label"],
             source_type=rs["source_type"],
             source_text=rs["source_text"],
@@ -654,8 +730,11 @@ async def run_validation_v2(
             sys_config_doc=sys_config_doc,
             extraction_config_override=extraction_config_override,
             num_runs=num_runs,
+            field_metadata=field_metadata,
+            meta_map=meta_map,
         )
-        source_results.append(sr)
+        for rs in resolved_sources
+    )))
 
     # Executive summary
     executive_summary = _compute_executive_summary(source_results, keys)

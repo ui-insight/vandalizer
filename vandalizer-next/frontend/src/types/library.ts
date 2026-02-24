@@ -32,6 +32,7 @@ export interface LibraryItem {
   last_used_at: string | null
   quality_tier?: string | null
   quality_score?: number | null
+  last_validated_at?: string | null
 }
 
 export interface LibraryFolder {
@@ -48,6 +49,7 @@ export interface VerificationRequest {
   uuid: string
   item_kind: LibraryItemKind
   item_id: string
+  item_uuid?: string | null
   item_name?: string
   status: VerificationStatus
   submitter_user_id: string

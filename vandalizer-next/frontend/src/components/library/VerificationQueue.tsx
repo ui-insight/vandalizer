@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText, RotateCcw } from 'lucide-react'
-import { listVerificationQueue, myVerificationRequests, updateVerificationStatus } from '../../api/library'
-import type { VerificationRequest, VerificationStatus } from '../../types/library'
+import { useNavigate } from '@tanstack/react-router'
+import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText, RotateCcw, ExternalLink } from 'lucide-react'
+import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listGroups, listCollections } from '../../api/library'
+import type { VerificationRequest, VerificationStatus, Group, VerifiedCollection } from '../../types/library'
 
 type QueueView = 'pending' | 'mine'
 type StatusFilter = '' | 'submitted' | 'in_review' | 'returned'
@@ -55,6 +56,7 @@ function ListDetail({ label, items }: { label: string; items?: string[] }) {
 }
 
 export function VerificationQueue() {
+  const navigate = useNavigate()
   const [view, setView] = useState<QueueView>('pending')
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -63,6 +65,16 @@ export function VerificationQueue() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
+  const [groups, setGroups] = useState<Group[]>([])
+  const [collections, setCollections] = useState<VerifiedCollection[]>([])
+  const [reviewGroupIds, setReviewGroupIds] = useState<string[]>([])
+  const [reviewCollectionIds, setReviewCollectionIds] = useState<string[]>([])
+
+  // Load groups and collections for assignment at approval time
+  useEffect(() => {
+    listGroups().then(d => setGroups(d.groups)).catch(() => {})
+    listCollections().then(d => setCollections(d.collections)).catch(() => {})
+  }, [])
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -84,10 +96,22 @@ export function VerificationQueue() {
   }, [refresh])
 
   const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review' | 'returned') => {
-    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined)
+    const gIds = action === 'approved' && reviewGroupIds.length > 0 ? reviewGroupIds : undefined
+    const cIds = action === 'approved' && reviewCollectionIds.length > 0 ? reviewCollectionIds : undefined
+    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined, gIds, cIds)
     setReviewingId(null)
     setReviewNotes('')
+    setReviewGroupIds([])
+    setReviewCollectionIds([])
     refresh()
+  }
+
+  const handleOpen = (req: VerificationRequest) => {
+    if (req.item_kind === 'workflow') {
+      navigate({ to: '/', search: { openWorkflow: req.item_id } })
+    } else if (req.item_uuid) {
+      navigate({ to: '/', search: { openExtraction: req.item_uuid } })
+    }
   }
 
   const filtered = requests.filter(r => {
@@ -191,6 +215,13 @@ export function VerificationQueue() {
                         >
                           {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </button>
+                        <button
+                          onClick={() => handleOpen(req)}
+                          className="p-0.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 shrink-0"
+                          title="Open item"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </button>
                         <ShieldCheck className="h-4 w-4 text-gray-400 shrink-0" />
                         <span className="text-sm font-semibold text-gray-900 truncate">
                           {req.item_name || req.summary || 'Untitled'}
@@ -236,7 +267,7 @@ export function VerificationQueue() {
                           {!isReviewing ? (
                             <>
                               <button
-                                onClick={() => setReviewingId(req.uuid)}
+                                onClick={() => { setReviewingId(req.uuid); setReviewGroupIds([]); setReviewCollectionIds([]) }}
                                 className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
                                 title="Review"
                               >
@@ -257,7 +288,7 @@ export function VerificationQueue() {
                                 <XCircle className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => setReviewingId(req.uuid)}
+                                onClick={() => { setReviewingId(req.uuid); setReviewGroupIds([]); setReviewCollectionIds([]) }}
                                 className="p-1.5 rounded hover:bg-orange-50 text-orange-600"
                                 title="Return for Improvement"
                               >
@@ -265,14 +296,60 @@ export function VerificationQueue() {
                               </button>
                             </>
                           ) : (
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 w-56">
                               <textarea
                                 value={reviewNotes}
                                 onChange={(e) => setReviewNotes(e.target.value)}
                                 placeholder="Review notes (optional)..."
                                 rows={2}
-                                className="text-xs border border-gray-300 rounded p-2 w-48 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
+                                className="text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                               />
+                              {/* Groups assignment */}
+                              {groups.length > 0 && (
+                                <div>
+                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Groups</div>
+                                  <div className="max-h-24 overflow-y-auto space-y-0.5">
+                                    {groups.map(g => (
+                                      <label key={g.uuid} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                                        <input
+                                          type="checkbox"
+                                          checked={reviewGroupIds.includes(g.uuid)}
+                                          onChange={(e) => {
+                                            setReviewGroupIds(prev =>
+                                              e.target.checked ? [...prev, g.uuid] : prev.filter(id => id !== g.uuid)
+                                            )
+                                          }}
+                                          className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                                        />
+                                        <span className="truncate">{g.name}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Collections assignment */}
+                              {collections.length > 0 && (
+                                <div>
+                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Collections</div>
+                                  <div className="max-h-24 overflow-y-auto space-y-0.5">
+                                    {collections.map(c => (
+                                      <label key={c.id} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                                        <input
+                                          type="checkbox"
+                                          checked={reviewCollectionIds.includes(c.id)}
+                                          onChange={(e) => {
+                                            setReviewCollectionIds(prev =>
+                                              e.target.checked ? [...prev, c.id] : prev.filter(id => id !== c.id)
+                                            )
+                                          }}
+                                          className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
+                                        />
+                                        <span className="truncate">{c.title}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                               <div className="flex gap-1">
                                 <button
                                   onClick={() => handleAction(req.uuid, 'approved')}
@@ -296,6 +373,8 @@ export function VerificationQueue() {
                                   onClick={() => {
                                     setReviewingId(null)
                                     setReviewNotes('')
+                                    setReviewGroupIds([])
+                                    setReviewCollectionIds([])
                                   }}
                                   className="px-2 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
                                 >

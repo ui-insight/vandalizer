@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
-import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups } from '../../api/library'
-import type { VerifiedCatalogItem, Group } from '../../types/library'
+import { QualityContractBadge } from './QualityContractBadge'
+import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups, listCollections, addToCollection } from '../../api/library'
+import type { VerifiedCatalogItem, VerifiedCollection, Group } from '../../types/library'
 
 type KindFilter = '' | 'workflow' | 'search_set'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
@@ -171,6 +172,68 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
   )
 }
 
+function CollectionPicker({
+  itemId,
+  collections,
+  onAdded,
+}: {
+  itemId: string
+  collections: VerifiedCollection[]
+  onAdded: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  const handleAdd = async (colId: string) => {
+    await addToCollection(colId, itemId)
+    onAdded()
+    setOpen(false)
+  }
+
+  // Filter to collections that don't already contain this item
+  const available = collections.filter(c => !c.item_ids.includes(itemId))
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+        title="Add to Collection"
+      >
+        <FolderPlus className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-white border border-gray-200 rounded-lg shadow-lg py-1">
+          {available.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-500">
+              {collections.length === 0 ? 'No collections exist' : 'Already in all collections'}
+            </div>
+          ) : (
+            available.map(col => (
+              <button
+                key={col.id}
+                onClick={() => handleAdd(col.id)}
+                className="w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-50 truncate"
+              >
+                {col.title}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function VerifiedCatalog() {
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -179,8 +242,9 @@ export function VerifiedCatalog() {
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
   const [groupMap, setGroupMap] = useState<Record<string, string>>({})
+  const [collections, setCollections] = useState<VerifiedCollection[]>([])
 
-  // Load groups for displaying badges
+  // Load groups and collections
   useEffect(() => {
     listGroups()
       .then(data => {
@@ -189,7 +253,12 @@ export function VerifiedCatalog() {
         setGroupMap(map)
       })
       .catch(() => {})
+    refreshCollections()
   }, [])
+
+  const refreshCollections = () => {
+    listCollections().then(d => setCollections(d.collections)).catch(() => {})
+  }
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -278,9 +347,16 @@ export function VerifiedCatalog() {
                       {item.display_name || item.name}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <KindBadge kind={item.kind} />
-                    <QualityBadge tier={item.quality_tier} score={item.quality_score} />
+                    <QualityContractBadge
+                      status={item.last_validated_at ? 'monitored' : 'unmonitored'}
+                      tier={item.quality_tier}
+                      score={item.quality_score}
+                      lastValidatedAt={item.last_validated_at}
+                      isStale={item.last_validated_at ? (Date.now() - new Date(item.last_validated_at).getTime()) > 14 * 86400000 : false}
+                      monitored={true}
+                    />
                     {item.created_at && (
                       <span className="text-xs text-gray-500">
                         {new Date(item.created_at).toLocaleDateString()}
@@ -311,6 +387,11 @@ export function VerifiedCatalog() {
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
+                  <CollectionPicker
+                    itemId={item.item_id}
+                    collections={collections}
+                    onAdded={refreshCollections}
+                  />
                   <button
                     onClick={() => setEditingItem(item)}
                     className="p-1.5 rounded hover:bg-gray-100 text-gray-500"

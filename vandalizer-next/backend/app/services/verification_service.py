@@ -58,10 +58,7 @@ async def submit_for_verification(
     # Check for existing pending request (returned items can be resubmitted)
     existing = await VerificationRequest.find_one(
         VerificationRequest.item_id == obj_id,
-        VerificationRequest.status.is_in([  # type: ignore[attr-defined]
-            VerificationStatus.SUBMITTED.value,
-            VerificationStatus.IN_REVIEW.value,
-        ]),
+        {"status": {"$in": [VerificationStatus.SUBMITTED.value, VerificationStatus.IN_REVIEW.value]}},
     )
     if existing:
         raise ValueError("A verification request is already pending for this item")
@@ -108,7 +105,7 @@ async def submit_for_verification(
         validation_tier=validation_tier,
     )
     await req.insert()
-    return _request_to_dict(req)
+    return await _request_to_dict(req)
 
 
 async def list_queue(
@@ -128,7 +125,7 @@ async def list_queue(
     requests = await VerificationRequest.find(query).sort("-submitted_at").limit(limit).to_list()
     results = []
     for req in requests:
-        d = _request_to_dict(req)
+        d = await _request_to_dict(req)
         # Attach item name
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
@@ -140,7 +137,7 @@ async def get_request(request_uuid: str) -> dict | None:
     req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
     if not req:
         return None
-    d = _request_to_dict(req)
+    d = await _request_to_dict(req)
     d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
     return d
 
@@ -150,6 +147,8 @@ async def update_status(
     new_status: str,
     reviewer_user_id: str,
     reviewer_notes: str | None = None,
+    group_ids: list[str] | None = None,
+    collection_ids: list[str] | None = None,
 ) -> dict | None:
     """Approve or reject a verification request."""
     req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
@@ -175,7 +174,21 @@ async def update_status(
         else:
             await _mark_item_verified(req.item_id, req.item_kind)
 
-    return _request_to_dict(req)
+        # Assign groups if provided
+        if group_ids is not None:
+            await update_item_metadata(
+                item_kind=req.item_kind,
+                item_id=str(req.item_id),
+                user_id=reviewer_user_id,
+                group_ids=group_ids,
+            )
+
+        # Add to collections if provided
+        if collection_ids:
+            for cid in collection_ids:
+                await add_to_collection(cid, str(req.item_id))
+
+    return await _request_to_dict(req)
 
 
 async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
@@ -188,7 +201,7 @@ async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
     )
     results = []
     for req in requests:
-        d = _request_to_dict(req)
+        d = await _request_to_dict(req)
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
     return results
@@ -330,7 +343,9 @@ async def update_item_metadata(
 
 
 async def unverify_item(item_id: str, item_kind: str) -> dict:
-    """Remove verified status from a library item."""
+    """Remove verified status from a library item and remove from verified library."""
+    from app.services.library_service import get_or_create_verified_library
+
     obj_id = PydanticObjectId(item_id)
     items = await LibraryItem.find(
         LibraryItem.item_id == obj_id,
@@ -339,6 +354,21 @@ async def unverify_item(item_id: str, item_kind: str) -> dict:
     for item in items:
         item.verified = False
         await item.save()
+
+    # Remove from the global verified library
+    verified_lib = await get_or_create_verified_library()
+    verified_items = await LibraryItem.find(
+        {"_id": {"$in": verified_lib.items}},
+        LibraryItem.item_id == obj_id,
+        LibraryItem.kind == LibraryItemKind(item_kind),
+    ).to_list()
+    for vi in verified_items:
+        verified_lib.items = [i for i in verified_lib.items if i != vi.id]
+        await vi.delete()
+    if verified_items:
+        verified_lib.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        await verified_lib.save()
+
     return {"ok": True, "unverified_count": len(items)}
 
 
@@ -488,7 +518,9 @@ async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
 
 
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
-    """Set verified=True on all LibraryItem records pointing to this object."""
+    """Set verified=True on all LibraryItem records and add to verified library."""
+    from app.services.library_service import get_or_create_verified_library
+
     items = await LibraryItem.find(
         LibraryItem.item_id == item_id,
         LibraryItem.kind == LibraryItemKind(item_kind),
@@ -496,6 +528,28 @@ async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None
     for item in items:
         item.verified = True
         await item.save()
+
+    # Add a verified LibraryItem to the global verified library (if not already present)
+    verified_lib = await get_or_create_verified_library()
+    existing_in_verified = await LibraryItem.find(
+        {"_id": {"$in": verified_lib.items}},
+        LibraryItem.item_id == item_id,
+        LibraryItem.kind == LibraryItemKind(item_kind),
+    ).to_list()
+    if not existing_in_verified:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        new_item = LibraryItem(
+            item_id=item_id,
+            kind=LibraryItemKind(item_kind),
+            added_by_user_id="system",
+            verified=True,
+            tags=[],
+            created_at=now,
+        )
+        await new_item.insert()
+        verified_lib.items.append(new_item.id)
+        verified_lib.updated_at = now
+        await verified_lib.save()
 
 
 async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
@@ -510,12 +564,20 @@ async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
         return ss.title if ss else "Unknown extraction"
 
 
-def _request_to_dict(req: VerificationRequest) -> dict:
+async def _request_to_dict(req: VerificationRequest) -> dict:
+    # Resolve item_uuid for search_set items so the frontend can open them
+    item_uuid = None
+    if req.item_kind == "search_set":
+        ss = await SearchSet.get(req.item_id)
+        if ss and hasattr(ss, "uuid"):
+            item_uuid = ss.uuid
+
     return {
         "id": str(req.id),
         "uuid": req.uuid,
         "item_kind": req.item_kind,
         "item_id": str(req.item_id),
+        "item_uuid": item_uuid,
         "status": req.status,
         "submitter_user_id": req.submitter_user_id,
         "submitter_name": req.submitter_name,

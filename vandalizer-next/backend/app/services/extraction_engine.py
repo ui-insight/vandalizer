@@ -9,7 +9,7 @@ import os
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic_ai import Agent
@@ -47,6 +47,7 @@ class ExtractionEngine:
         full_text: str | None = None,
         extraction_config_override: dict | None = None,
         doc_texts: list[str] | None = None,
+        field_metadata: list[dict] | None = None,
     ) -> list:
         """Run extraction. Returns list of entity dicts.
 
@@ -57,6 +58,7 @@ class ExtractionEngine:
             full_text: Single document text (shortcut for doc_texts=[full_text]).
             extraction_config_override: Per-extraction config overrides.
             doc_texts: Pre-loaded document texts.
+            field_metadata: Per-field metadata (is_optional, enum_values) from search set items.
         """
         # Normalize keys
         if isinstance(extract_keys, str):
@@ -69,6 +71,11 @@ class ExtractionEngine:
         key_chunks = self._resolve_key_chunks(fields_to_extract, extraction_cfg)
         use_repetition = extraction_cfg.get("repetition", {}).get("enabled", False)
 
+        # Build metadata map
+        meta_map: dict[str, dict] = {}
+        if field_metadata:
+            meta_map = {m["key"]: m for m in field_metadata}
+
         # Resolve document texts
         texts = doc_texts or []
         if full_text is not None:
@@ -79,7 +86,7 @@ class ExtractionEngine:
         all_results = []
         for doc_text in texts:
             doc_results = self._extract_document(
-                doc_text, key_chunks, model, extraction_config_override or {}, use_repetition
+                doc_text, key_chunks, model, extraction_config_override or {}, use_repetition, meta_map
             )
             all_results.extend(doc_results)
 
@@ -167,13 +174,14 @@ class ExtractionEngine:
     def _extract_document(
         self, doc_text: str, key_chunks: list[list[str]],
         model: str, cfg: dict, use_repetition: bool,
+        meta_map: dict[str, dict] | None = None,
     ) -> list:
         doc_results = []
         for chunk_keys in key_chunks:
             if use_repetition:
-                chunk_result = self._extract_with_consensus(doc_text, chunk_keys, model, cfg)
+                chunk_result = self._extract_with_consensus(doc_text, chunk_keys, model, cfg, meta_map)
             else:
-                chunk_result = self._dispatch_extraction(doc_text, chunk_keys, model, cfg)
+                chunk_result = self._dispatch_extraction(doc_text, chunk_keys, model, cfg, meta_map)
             doc_results.extend(chunk_result)
 
         if len(key_chunks) > 1:
@@ -184,7 +192,7 @@ class ExtractionEngine:
     # Dispatch layer
     # ------------------------------------------------------------------
 
-    def _dispatch_extraction(self, text: str, keys: list[str], model_name: str, config: dict) -> list:
+    def _dispatch_extraction(self, text: str, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
         mode = config.get("mode", "two_pass")
 
         if mode == "one_pass":
@@ -192,23 +200,24 @@ class ExtractionEngine:
             thinking = one_pass.get("thinking", True)
             structured = one_pass.get("structured", True)
             pass_model = one_pass.get("model", "") or model_name
-            return self._execute_single_pass(text, keys, pass_model, thinking, structured)
+            return self._execute_single_pass(text, keys, pass_model, thinking, structured, meta_map)
 
         # two_pass (default)
         two_pass = config.get("two_pass", {})
         pass_1_cfg = two_pass.get("pass_1", {})
         pass_2_cfg = two_pass.get("pass_2", {})
-        return self._execute_two_pass(text, keys, model_name, pass_1_cfg, pass_2_cfg)
+        return self._execute_two_pass(text, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map)
 
-    def _execute_single_pass(self, text: str, keys: list[str], model_name: str, thinking: bool, structured: bool) -> list:
+    def _execute_single_pass(self, text: str, keys: list[str], model_name: str, thinking: bool, structured: bool, meta_map: dict[str, dict] | None = None) -> list:
         if structured:
-            return self._extract_structured(text, keys, model_name, thinking_override=thinking)
+            return self._extract_structured(text, keys, model_name, thinking_override=thinking, meta_map=meta_map)
         else:
-            return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking)
+            return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking, meta_map=meta_map)
 
     def _execute_two_pass(
         self, text: str, keys: list[str], model_name: str,
         pass_1_cfg: dict, pass_2_cfg: dict,
+        meta_map: dict[str, dict] | None = None,
     ) -> list:
         p1_model = pass_1_cfg.get("model", "") or model_name
         p1_thinking = pass_1_cfg.get("thinking", True)
@@ -220,9 +229,9 @@ class ExtractionEngine:
 
         # Pass 1
         if p1_structured:
-            draft = self._extract_structured(text, keys, p1_model, thinking_override=p1_thinking)
+            draft = self._extract_structured(text, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
         else:
-            draft = self._extract_fallback_json(text, keys, p1_model, thinking_override=p1_thinking)
+            draft = self._extract_fallback_json(text, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
 
         draft_hint = self._build_draft_hint(draft)
 
@@ -233,9 +242,10 @@ class ExtractionEngine:
                 thinking_override=p2_thinking,
                 draft_hint=draft_hint,
                 allow_fallback=False,
+                meta_map=meta_map,
             )
         else:
-            final = self._extract_fallback_json(text, keys, p2_model, thinking_override=p2_thinking)
+            final = self._extract_fallback_json(text, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map)
 
         return final or draft or []
 
@@ -261,10 +271,10 @@ class ExtractionEngine:
     # Repetition / Consensus
     # ------------------------------------------------------------------
 
-    def _extract_with_consensus(self, text: str, keys: list[str], model_name: str, config: dict) -> list:
+    def _extract_with_consensus(self, text: str, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
         with ThreadPoolExecutor(max_workers=2) as executor:
-            future_1 = executor.submit(self._dispatch_extraction, text, keys, model_name, config)
-            future_2 = executor.submit(self._dispatch_extraction, text, keys, model_name, config)
+            future_1 = executor.submit(self._dispatch_extraction, text, keys, model_name, config, meta_map)
+            future_2 = executor.submit(self._dispatch_extraction, text, keys, model_name, config, meta_map)
             result_1 = future_1.result()
             result_2 = future_2.result()
 
@@ -274,7 +284,7 @@ class ExtractionEngine:
         if norm_1 == norm_2:
             return result_1 if result_1 else result_2
 
-        result_3 = self._dispatch_extraction(text, keys, model_name, config)
+        result_3 = self._dispatch_extraction(text, keys, model_name, config, meta_map)
         norm_3 = self._normalize_to_dict(result_3)
 
         consensus = self._majority_vote(keys, [norm_1, norm_2, norm_3])
@@ -332,6 +342,27 @@ class ExtractionEngine:
         return None
 
     # ------------------------------------------------------------------
+    # Prompt helpers
+    # ------------------------------------------------------------------
+
+    def _build_fields_prompt(self, keys: list[str], meta_map: dict[str, dict] | None = None) -> str:
+        """Build a fields description string with enum/optional annotations."""
+        parts = []
+        for key in keys:
+            fm = (meta_map or {}).get(key, {})
+            desc = key
+            annotations = []
+            enum_vals = fm.get("enum_values", [])
+            if enum_vals:
+                annotations.append(f"allowed values: {', '.join(enum_vals)}")
+            if fm.get("is_optional"):
+                annotations.append("optional")
+            if annotations:
+                desc = f"{key} ({'; '.join(annotations)})"
+            parts.append(desc)
+        return ", ".join(parts)
+
+    # ------------------------------------------------------------------
     # Structured extraction
     # ------------------------------------------------------------------
 
@@ -343,6 +374,7 @@ class ExtractionEngine:
         thinking_override: Optional[bool] = None,
         draft_hint: dict | None = None,
         allow_fallback: bool = True,
+        meta_map: dict[str, dict] | None = None,
     ) -> list:
         # Build dynamic Pydantic model
         field_definitions = {}
@@ -357,7 +389,15 @@ class ExtractionEngine:
             while safe_key in field_definitions:
                 safe_key = f"{original_safe_key}_{counter}"
                 counter += 1
-            field_definitions[safe_key] = (Optional[str], Field(default=None, alias=key))
+
+            # Use Literal type for enum fields
+            fm = (meta_map or {}).get(key, {})
+            enum_vals = fm.get("enum_values", [])
+            if enum_vals:
+                field_type = Optional[Literal[tuple(enum_vals)]]  # type: ignore[valid-type]
+            else:
+                field_type = Optional[str]
+            field_definitions[safe_key] = (field_type, Field(default=None, alias=key))
 
         DynamicEntity = create_model(
             "DynamicEntity",
@@ -406,7 +446,7 @@ class ExtractionEngine:
         )
 
         try:
-            fields_str = ", ".join(keys)
+            fields_str = self._build_fields_prompt(keys, meta_map)
             prompt = f"Extract the following fields: {fields_str}\n\nText:\n{text}"
 
             if draft_hint:
@@ -440,7 +480,7 @@ class ExtractionEngine:
             raw_entities = []
             for entity in entities:
                 if hasattr(entity, "model_dump"):
-                    raw_entities.append(entity.model_dump())
+                    raw_entities.append(entity.model_dump(by_alias=True))
                 elif isinstance(entity, dict):
                     raw_entities.append(entity)
 
@@ -451,7 +491,7 @@ class ExtractionEngine:
             if ("output validation" in error_msg or "retries" in error_msg.lower()
                     or "validation error" in error_msg.lower()):
                 if allow_fallback:
-                    return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking_override)
+                    return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking_override, meta_map=meta_map)
                 return []
             return []
 
@@ -472,9 +512,10 @@ class ExtractionEngine:
         keys: list[str],
         model_name: str,
         thinking_override: Optional[bool] = None,
+        meta_map: dict[str, dict] | None = None,
     ) -> list:
         try:
-            fields_str = ", ".join([f'"{k}"' for k in keys])
+            fields_str = self._build_fields_prompt(keys, meta_map)
             prompt = (
                 f"Extract the following fields from the text and return them as a JSON object.\n"
                 f"Return ONLY valid JSON, no markdown, no code blocks, no explanations.\n\n"

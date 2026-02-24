@@ -1,5 +1,5 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Loader2, Copy, Trash2, Star, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye, Shield, ArrowRight, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
@@ -19,12 +19,20 @@ import {
 } from '../../api/extractions'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
 import { searchDocuments } from '../../api/documents'
+import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { getModels } from '../../api/config'
-import { submitRating } from '../../api/feedback'
+import { submitForVerification } from '../../api/library'
 import { useLibraries } from '../../hooks/useLibrary'
 import { useTeams } from '../../hooks/useTeams'
 import { AddToLibraryDialog } from '../library/AddToLibraryDialog'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
+import { QualityBadge } from '../library/QualityBadge'
+import { QualitySparkline } from '../library/QualitySparkline'
+import { useQualitySparkline } from '../../hooks/useQualitySparkline'
+import { getQualityStatus } from '../../api/extractions'
+import type { QualityStatus } from '../../api/extractions'
+import { relativeTime } from '../../utils/time'
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced'
 
@@ -53,6 +61,10 @@ export function ExtractionEditorPanel() {
   const [showAddToLibrary, setShowAddToLibrary] = useState(false)
   const { libraries } = useLibraries(currentTeam?.uuid)
 
+  const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  const { scores: sparklineScores } = useQualitySparkline('search_set', openExtractionId ?? undefined)
+
   const { items, loading: itemsLoading, refresh: refreshItems, add, remove, update, reorder } =
     useSearchSetItems(openExtractionId)
 
@@ -72,6 +84,15 @@ export function ExtractionEditorPanel() {
     setResults({})
     setActiveTab('design')
   }, [refresh])
+
+  // Fetch quality status
+  useEffect(() => {
+    if (!openExtractionId) return
+    getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
+    // Check localStorage for nudge dismissal
+    const key = `quality-nudge-dismissed-${openExtractionId}`
+    setNudgeDismissed(!!localStorage.getItem(key))
+  }, [openExtractionId])
 
   // --- Title editing ---
   const startEditTitle = () => {
@@ -256,6 +277,17 @@ export function ExtractionEditorPanel() {
               >
                 <Pencil style={{ width: 14, height: 14 }} />
               </button>
+              {searchSet.quality_tier && (
+                <>
+                  <QualityBadge tier={searchSet.quality_tier} score={searchSet.quality_score ?? null} />
+                  {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
+                </>
+              )}
+              {searchSet.last_validated_at && (
+                <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                  Validated {relativeTime(searchSet.last_validated_at)}
+                </span>
+              )}
             </div>
           )}
           <div style={{ fontSize: 12, color: '#5f6368', marginTop: 2 }}>
@@ -291,6 +323,13 @@ export function ExtractionEditorPanel() {
       >
         {(['design', 'tools', 'validate', 'advanced'] as const).map((tab) => {
           const isActive = activeTab === tab
+          // Colored dot for validate tab
+          let tabDot: string | null = null
+          if (tab === 'validate' && qualityStatus) {
+            if (qualityStatus.status === 'unvalidated') tabDot = '#9ca3af'
+            else if (qualityStatus.stale) tabDot = '#eab308'
+            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#dc2626'
+          }
           return (
             <button
               key={tab}
@@ -307,60 +346,104 @@ export function ExtractionEditorPanel() {
                 cursor: 'pointer',
                 textTransform: 'capitalize',
                 transition: 'color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
               }}
             >
               {tab}
+              {tabDot && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  backgroundColor: tabDot, display: 'inline-block',
+                }} />
+              )}
             </button>
           )
         })}
       </div>
 
-      {/* Tab content */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
-          {activeTab === 'design' && (
-            <DesignTab
-              items={items}
-              itemsLoading={itemsLoading}
-              results={results}
-              hasResults={hasResults}
-              running={running}
-              config={config}
-              docCount={selectedDocUuids.length}
-              onExport={handleExport}
-              onRemoveItem={remove}
-              onUpdateItem={update}
-              onReorder={reorder}
-              pdfTitle={searchSet?.title ?? ''}
-              searchSetUuid={openExtractionId ?? undefined}
-              onHighlightValue={setHighlightTerms}
-            />
-          )}
-          {activeTab === 'tools' && (
-            <ToolsTab
-              onClone={handleClone}
-              onDelete={handleDelete}
-              onAddToLibrary={() => setShowAddToLibrary(true)}
-              onBuildFromDocument={handleBuildFromDocument}
-              buildingFromDoc={buildingFromDoc}
-              hasDocuments={selectedDocUuids.length > 0}
-            />
-          )}
-          {activeTab === 'validate' && openExtractionId && (
-            <ValidateTab
-              searchSetUuid={openExtractionId}
-              items={items}
-              extractionConfig={config}
-            />
-          )}
-          {activeTab === 'advanced' && (
-            <AdvancedTab
-              config={config}
-              useDefaults={useDefaults}
-              onSetUseDefaults={setUseDefaults}
-              onSaveConfig={saveConfig}
-            />
-          )}
+      {/* Tab content — all tabs stay mounted to preserve state */}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
+        <DesignTab
+          items={items}
+          itemsLoading={itemsLoading}
+          results={results}
+          hasResults={hasResults}
+          running={running}
+          config={config}
+          docCount={selectedDocUuids.length}
+          onExport={handleExport}
+          onRemoveItem={remove}
+          onUpdateItem={update}
+          onReorder={reorder}
+          pdfTitle={searchSet?.title ?? ''}
+          searchSetUuid={openExtractionId ?? undefined}
+          onHighlightValue={setHighlightTerms}
+        />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
+        <ToolsTab
+          onClone={handleClone}
+          onDelete={handleDelete}
+          onAddToLibrary={() => setShowAddToLibrary(true)}
+          onBuildFromDocument={handleBuildFromDocument}
+          buildingFromDoc={buildingFromDoc}
+          hasDocuments={selectedDocUuids.length > 0}
+        />
+      </div>
+      {openExtractionId && (
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
+          <ValidateTab
+            searchSetUuid={openExtractionId}
+            items={items}
+            extractionConfig={config}
+            onUpdateItem={update}
+          />
         </div>
+      )}
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'advanced' ? undefined : 'none' }}>
+        <AdvancedTab
+          config={config}
+          useDefaults={useDefaults}
+          onSetUseDefaults={setUseDefaults}
+          onSaveConfig={saveConfig}
+        />
+      </div>
+
+      {/* Nudge banner for unvalidated items */}
+      {activeTab === 'design' && !nudgeDismissed && searchSet.validation_run_count === 0 && Object.keys(results).length > 0 && (
+        <div style={{
+          padding: '8px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
+          display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        }}>
+          <Shield style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#1e40af', flex: 1 }}>
+            Check reliability with validation
+          </span>
+          <button
+            onClick={() => setActiveTab('validate')}
+            style={{
+              fontSize: 12, fontWeight: 600, color: '#2563eb', background: 'none',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px',
+            }}
+          >
+            Validate
+          </button>
+          <button
+            onClick={() => {
+              setNudgeDismissed(true)
+              if (openExtractionId) localStorage.setItem(`quality-nudge-dismissed-${openExtractionId}`, '1')
+            }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+              color: '#9ca3af', display: 'flex',
+            }}
+          >
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        </div>
+      )}
 
       {/* Bottom toolbar (Design tab only) */}
       {activeTab === 'design' && (
@@ -416,20 +499,17 @@ export function ExtractionEditorPanel() {
           <button
             onClick={handleRun}
             disabled={running || selectedDocUuids.length === 0}
+            className="bg-highlight text-highlight-text font-bold hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
               padding: '10px 20px',
               fontSize: 13,
-              fontWeight: 700,
               fontFamily: 'inherit',
-              borderRadius: 8,
+              borderRadius: 'var(--ui-radius, 8px)',
               border: 'none',
-              backgroundColor: '#191919',
-              color: '#fff',
               cursor: running || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: running || selectedDocUuids.length === 0 ? 0.5 : 1,
               whiteSpace: 'nowrap',
               flexShrink: 0,
             }}
@@ -513,7 +593,7 @@ function DesignTab({
   searchSetUuid,
   onHighlightValue,
 }: {
-  items: { id: string; searchphrase: string }[]
+  items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   itemsLoading: boolean
   results: Record<string, string>
   hasResults: boolean
@@ -522,7 +602,7 @@ function DesignTab({
   docCount: number
   onExport: () => void
   onRemoveItem: (id: string) => void
-  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string }) => void
+  onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
   onReorder: (itemIds: string[]) => void
   pdfTitle: string
   searchSetUuid?: string
@@ -532,6 +612,8 @@ function DesignTab({
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
+  const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null)
+  const [enumDraft, setEnumDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
 
   const handleDragStart = (idx: number) => {
@@ -733,11 +815,39 @@ function DesignTab({
                         setEditingId(item.id)
                         setEditDraft(item.searchphrase)
                       }}
-                      style={{ fontSize: 14, color: '#202124', flex: 1, cursor: 'text' }}
+                      style={{ fontSize: 14, color: '#202124', flex: 1, cursor: 'text', display: 'flex', alignItems: 'center', gap: 4 }}
                     >
                       {item.searchphrase}
+                      {item.is_optional && (
+                        <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
+                      )}
+                      {item.enum_values.length > 0 && (
+                        <span style={{ fontSize: 10, color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
+                      )}
                     </span>
                   )}
+                  <button
+                    onClick={() => {
+                      const opening = expandedSettingsId !== item.id
+                      setExpandedSettingsId(opening ? item.id : null)
+                      if (opening) setEnumDraft(item.enum_values.join(', '))
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: 4,
+                      color: '#9ca3af',
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                    title="Field settings"
+                  >
+                    {expandedSettingsId === item.id
+                      ? <ChevronDown style={{ width: 14, height: 14 }} />
+                      : <ChevronRight style={{ width: 14, height: 14 }} />
+                    }
+                  </button>
                   <button
                     onClick={() => onRemoveItem(item.id)}
                     style={{
@@ -784,155 +894,127 @@ function DesignTab({
                     {resultVal}
                   </div>
                 )}
+                {expandedSettingsId === item.id && (
+                  <div style={{
+                    marginTop: 6,
+                    marginLeft: 42,
+                    padding: '8px 10px',
+                    background: '#f9fafb',
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb',
+                    fontSize: 12,
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', marginBottom: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={item.is_optional}
+                        onChange={() => onUpdateItem(item.id, { is_optional: !item.is_optional })}
+                        style={{ accentColor: '#2563eb' }}
+                      />
+                      <span style={{ color: '#374151', fontWeight: 500 }}>Optional</span>
+                      <span style={{ color: '#9ca3af' }}>&mdash; skip accuracy penalty when not found</span>
+                    </label>
+                    <div>
+                      <div style={{ color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</div>
+                      <input
+                        value={enumDraft}
+                        onChange={(e) => setEnumDraft(e.target.value)}
+                        onBlur={() => {
+                          const vals = enumDraft.split(',').map(v => v.trim()).filter(Boolean)
+                          onUpdateItem(item.id, { enum_values: vals })
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+                        }}
+                        placeholder="e.g. USD, EUR, GBP"
+                        style={{
+                          width: '100%',
+                          fontSize: 12,
+                          fontFamily: 'inherit',
+                          color: '#202124',
+                          border: '1px solid #d1d5db',
+                          borderRadius: 4,
+                          padding: '4px 8px',
+                          outline: 'none',
+                          boxSizing: 'border-box',
+                        }}
+                      />
+                      <div style={{ color: '#9ca3af', fontSize: 11, marginTop: 3 }}>
+                        Comma-separated. LLM will pick from these values.
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}
         </div>
       )}
 
-      {/* Rating widget — shown after results */}
-      {hasResults && (
-        <RatingWidget
-          pdfTitle={pdfTitle}
-          resultJson={results}
-          searchSetUuid={searchSetUuid}
-        />
-      )}
+      {/* Quality Pulse card */}
+      <QualityPulse searchSetUuid={searchSetUuid} />
+
     </div>
   )
 }
 
-/* ── Rating Widget ── */
+/* ── Quality Pulse Card ── */
 
-function RatingWidget({
-  pdfTitle,
-  resultJson,
-  searchSetUuid,
-}: {
-  pdfTitle: string
-  resultJson: Record<string, string>
-  searchSetUuid?: string
-}) {
-  const [rating, setRating] = useState(0)
-  const [hoveredStar, setHoveredStar] = useState(0)
-  const [comment, setComment] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+function QualityPulse({ searchSetUuid }: { searchSetUuid?: string }) {
+  const [status, setStatus] = useState<QualityStatus | null>(null)
 
-  const handleSubmit = async () => {
-    if (rating === 0) return
-    setSubmitting(true)
-    try {
-      await submitRating({
-        pdf_title: pdfTitle,
-        rating,
-        comment: comment.trim() || undefined,
-        result_json: resultJson as Record<string, unknown>,
-        search_set_uuid: searchSetUuid,
-      })
-      setSubmitted(true)
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  useEffect(() => {
+    if (!searchSetUuid) return
+    getQualityStatus(searchSetUuid).then(setStatus).catch(() => {})
+  }, [searchSetUuid])
 
-  if (submitted) {
+  if (!status || !searchSetUuid) return null
+
+  if (status.status === 'unvalidated') {
     return (
-      <div
-        style={{
-          marginTop: 20,
-          padding: 16,
-          border: '1px solid #d1fae5',
-          borderRadius: 8,
-          backgroundColor: '#ecfdf5',
-          textAlign: 'center',
-          fontSize: 13,
-          color: '#065f46',
-        }}
-      >
-        Thank you for your feedback!
+      <div style={{
+        marginTop: 20, padding: 16, border: '1px solid #e5e7eb',
+        borderRadius: 8, backgroundColor: '#fafafa',
+        display: 'flex', alignItems: 'center', gap: 12,
+      }}>
+        <Shield style={{ width: 20, height: 20, color: '#9ca3af', flexShrink: 0 }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>No validation data yet</div>
+          <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+            Run validation to check extraction reliability
+          </div>
+        </div>
       </div>
     )
   }
 
   return (
-    <div
-      style={{
-        marginTop: 20,
-        padding: 16,
-        border: '1px solid #e5e7eb',
-        borderRadius: 8,
-        backgroundColor: '#fafafa',
-      }}
-    >
-      <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 10 }}>
-        Rate extraction quality
+    <div style={{
+      marginTop: 20, padding: 16,
+      border: status.config_changed ? '1px solid #fde68a' : '1px solid #e5e7eb',
+      borderRadius: 8,
+      backgroundColor: status.config_changed ? '#fffbeb' : '#fafafa',
+      display: 'flex', alignItems: 'center', gap: 12,
+    }}>
+      <Shield style={{
+        width: 20, height: 20, flexShrink: 0,
+        color: status.config_changed ? '#d97706' : status.tier === 'excellent' ? '#16a34a' : status.tier === 'good' ? '#2563eb' : '#d97706',
+      }} />
+      <div style={{ flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <QualityBadge tier={status.tier} score={status.score} />
+          {status.last_validated_at && (
+            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+              {relativeTime(status.last_validated_at)}
+            </span>
+          )}
+        </div>
+        {status.config_changed && (
+          <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
+            Config changed since last validation &mdash; re-validate for accurate results
+          </div>
+        )}
       </div>
-
-      {/* Stars */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 10 }}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <button
-            key={star}
-            onClick={() => setRating(star)}
-            onMouseEnter={() => setHoveredStar(star)}
-            onMouseLeave={() => setHoveredStar(0)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 2,
-              display: 'flex',
-              color: star <= (hoveredStar || rating) ? '#f59e0b' : '#d1d5db',
-              transition: 'color 0.1s',
-            }}
-          >
-            <Star
-              style={{ width: 22, height: 22 }}
-              fill={star <= (hoveredStar || rating) ? '#f59e0b' : 'none'}
-            />
-          </button>
-        ))}
-      </div>
-
-      {/* Comment */}
-      <textarea
-        value={comment}
-        onChange={(e) => setComment(e.target.value)}
-        placeholder="Optional comment..."
-        rows={2}
-        style={{
-          width: '100%',
-          fontSize: 13,
-          fontFamily: 'inherit',
-          border: '1px solid #d1d5db',
-          borderRadius: 6,
-          padding: '8px 10px',
-          resize: 'vertical',
-          outline: 'none',
-          boxSizing: 'border-box',
-          marginBottom: 10,
-        }}
-      />
-
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={rating === 0 || submitting}
-        style={{
-          padding: '8px 20px',
-          fontSize: 13,
-          fontWeight: 600,
-          fontFamily: 'inherit',
-          borderRadius: 6,
-          border: 'none',
-          backgroundColor: rating === 0 ? '#e5e7eb' : '#191919',
-          color: rating === 0 ? '#9ca3af' : '#fff',
-          cursor: rating === 0 || submitting ? 'not-allowed' : 'pointer',
-        }}
-      >
-        {submitting ? 'Submitting...' : 'Submit Rating'}
-      </button>
     </div>
   )
 }
@@ -1311,7 +1393,12 @@ function useValidationProgress(
 
   useEffect(() => {
     if (!validating) {
-      setState({ sourceIndex: 0, runIndex: 0, phase: '', pct: 0, elapsed: 0 })
+      // Brief 100% flash before reset so the bar doesn't jump from 99→0
+      if (state.pct > 0) {
+        setState(prev => ({ ...prev, pct: 100, phase: 'Complete' }))
+        const t = setTimeout(() => setState({ sourceIndex: 0, runIndex: 0, phase: '', pct: 0, elapsed: 0 }), 600)
+        return () => clearTimeout(t)
+      }
       return
     }
 
@@ -1323,44 +1410,36 @@ function useValidationProgress(
 
     // Each source×run = one "step". Each step has sub-phases.
     const totalSteps = numSources * numRuns
-    const secsPerStep = passCount * consensusMultiplier * 4 // rough estimate: 4s per LLM call
+    const secsPerStep = passCount * consensusMultiplier * 12 // ~12s per LLM call (conservative)
     const extractionEstSecs = totalSteps * secsPerStep
-    // Analysis is now pure normalization (no LLM judge calls), effectively instant
-    const analysisEstSecs = 2
-    const totalEstSecs = extractionEstSecs + analysisEstSecs
 
-    // Extraction phase gets 0-97%, analysis phase gets 97-99%
-    const extractionPctCap = 0.97
-
+    // Never-stalling progress: linear to 90% over the estimated time,
+    // then a perpetual slow crawl toward 99% that keeps visibly moving.
     const interval = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000
 
-      // Two-phase progress: extraction then analysis
-      const inAnalysisPhase = elapsed > extractionEstSecs * 0.8
       let rawPct: number
-      if (!inAnalysisPhase) {
-        // Extraction phase: asymptotic up to extractionPctCap
-        rawPct = extractionPctCap * (1 - Math.exp(-elapsed / (extractionEstSecs * 0.5)))
+      if (elapsed < extractionEstSecs) {
+        // Linear phase: steady progress up to 90%
+        rawPct = (elapsed / extractionEstSecs) * 0.90
       } else {
-        // Analysis phase: continue from where extraction left off, creep toward 99%
-        const analysisElapsed = elapsed - extractionEstSecs * 0.8
-        const baselinePct = extractionPctCap * (1 - Math.exp(-(extractionEstSecs * 0.8) / (extractionEstSecs * 0.5)))
-        const remainingPct = 0.99 - baselinePct
-        rawPct = baselinePct + remainingPct * (1 - Math.exp(-analysisElapsed / (analysisEstSecs * 0.6)))
+        // Overtime: logarithmic crawl from 90% toward 99%.
+        // Keeps moving ~1% every 30s of overtime so it never looks stuck.
+        const overtime = elapsed - extractionEstSecs
+        rawPct = 0.90 + 0.09 * (overtime / (overtime + 60))
       }
       rawPct = Math.min(0.99, rawPct)
 
-      // Map pct to source/run indices (based on extraction phase only)
-      const extractionPct = Math.min(rawPct / extractionPctCap, 1)
-      const stepProgress = extractionPct * totalSteps
+      // Map pct to source/run indices
+      const stepProgress = Math.min(rawPct / 0.90, 1) * totalSteps
       const currentStep = Math.min(Math.floor(stepProgress), totalSteps - 1)
       const si = Math.floor(currentStep / numRuns)
       const ri = currentStep % numRuns
 
       // Phase label
       let phase: string
-      if (inAnalysisPhase) {
-        phase = 'Analyzing accuracy & consistency...'
+      if (elapsed >= extractionEstSecs) {
+        phase = 'Waiting for LLM responses...'
       } else {
         const stepFrac = stepProgress - currentStep
         if (mode === 'two_pass') {
@@ -1416,11 +1495,6 @@ function ValidationProgressDisplay({
   const hasChunking = config.key_chunking?.enabled ?? false
   const modelName = (mode === 'two_pass' ? config.two_pass?.pass1?.model : config.one_pass?.model) || 'system default'
 
-  const currentSource = sources[progress.sourceIndex]
-  const sourceLabel = currentSource
-    ? (currentSource.document_title || (currentSource.source_type === 'text' ? `Text Chunk ${progress.sourceIndex + 1}` : `Source ${progress.sourceIndex + 1}`))
-    : ''
-
   return (
     <div style={{
       border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
@@ -1444,10 +1518,10 @@ function ValidationProgressDisplay({
         <Loader2 style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#1e40af' }}>
-            Source {progress.sourceIndex + 1}/{sources.length}: {sourceLabel}
+            Running {sources.length} {sources.length === 1 ? 'source' : 'sources'} &times; {numRuns} {numRuns === 1 ? 'replicate' : 'replicates'}
           </div>
           <div style={{ fontSize: 12, color: '#3b5998', marginTop: 2 }}>
-            Replicate {progress.runIndex + 1} of {numRuns} — {progress.phase}
+            {progress.phase}
           </div>
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 20, fontWeight: 700, color: '#3b82f6' }}>
@@ -1507,6 +1581,76 @@ function ValidationProgressDisplay({
 
 /* ── Validate Tab ── */
 
+function downloadValidationCSV(results: ValidationV2Result) {
+  const csvEscape = (v: string) => {
+    if (v.includes(',') || v.includes('"') || v.includes('\n')) {
+      return `"${v.replace(/"/g, '""')}"`
+    }
+    return v
+  }
+
+  // Build header: fixed columns + one column per run
+  const numRuns = results.num_runs
+  const runHeaders = Array.from({ length: numRuns }, (_, i) => `Run ${i + 1}`)
+  const headers = [
+    'Source', 'Field', 'Expected',
+    ...runHeaders,
+    'Most Common Value', 'Distinct Values',
+    'Accuracy %', 'Consistency %',
+    'Accuracy Issues', 'Reproducibility Issues',
+  ]
+
+  const rows: string[][] = []
+
+  for (const source of results.sources) {
+    for (const field of source.fields) {
+      // Accuracy annotation
+      const accIssues: string[] = []
+      const errorEntries = Object.entries(field.error_types).filter(([, v]) => v > 0)
+      if (errorEntries.length > 0) {
+        for (const [errType, count] of errorEntries) {
+          accIssues.push(`${errType.replace('_', ' ')} (${count}/${numRuns} runs)`)
+        }
+      }
+      if (field.accuracy !== null && field.accuracy < 1) {
+        accIssues.push(`${Math.round(field.accuracy * 100)}% accurate`)
+      }
+
+      // Reproducibility annotation
+      const reproIssues: string[] = []
+      if (field.distinct_value_count > 1) {
+        reproIssues.push(`${field.distinct_value_count} distinct values across ${numRuns} runs`)
+      }
+      if (field.consistency < 1) {
+        reproIssues.push(`${Math.round(field.consistency * 100)}% consistent`)
+      }
+
+      const row = [
+        source.source_label,
+        field.field_name,
+        field.expected ?? '',
+        ...field.extracted_values.map(v => v ?? ''),
+        field.most_common_value ?? '',
+        String(field.distinct_value_count),
+        field.accuracy !== null ? String(Math.round(field.accuracy * 100)) : 'N/A',
+        String(Math.round(field.consistency * 100)),
+        accIssues.join('; '),
+        reproIssues.join('; '),
+      ]
+      rows.push(row)
+    }
+  }
+
+  const csv = [headers, ...rows].map(row => row.map(csvEscape).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `validation-results-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 interface SourceLocal {
   id: string
   source_type: 'document' | 'text'
@@ -1521,10 +1665,12 @@ function ValidateTab({
   searchSetUuid,
   items,
   extractionConfig,
+  onUpdateItem,
 }: {
   searchSetUuid: string
-  items: { id: string; searchphrase: string }[]
+  items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   extractionConfig: ExtractionConfig
+  onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
 }) {
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const [sources, setSources] = useState<SourceLocal[]>([])
@@ -1541,6 +1687,8 @@ function ValidateTab({
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
+  const [submittingToLibrary, setSubmittingToLibrary] = useState(false)
+  const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
   // Debounce timers keyed by source id
@@ -1759,10 +1907,41 @@ function ValidateTab({
           </div>
         ) : sources.length === 0 ? (
           <div style={{
-            textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0',
+            textAlign: 'center', padding: '32px 16px',
             border: '1px dashed #d1d5db', borderRadius: 8,
           }}>
-            Add documents or text to validate against.
+            <Shield style={{ width: 32, height: 32, color: '#9ca3af', margin: '0 auto 12px' }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Validate your extraction
+            </div>
+            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, lineHeight: 1.5 }}>
+              Add documents with expected values to measure accuracy and consistency across multiple runs.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowDocPicker(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 16px', fontSize: 13, fontWeight: 600,
+                  fontFamily: 'inherit', borderRadius: 8, border: 'none',
+                  backgroundColor: '#191919', color: '#fff', cursor: 'pointer',
+                }}
+              >
+                <Plus style={{ width: 14, height: 14 }} /> Add Documents
+              </button>
+              <button
+                onClick={addTextSource}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '8px 16px', fontSize: 13, fontWeight: 500,
+                  fontFamily: 'inherit', borderRadius: 8,
+                  border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                Add Text
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
@@ -1856,25 +2035,48 @@ function ValidateTab({
                           {fillError}
                         </div>
                       )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                         {items.map(item => (
-                          <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <span style={{
-                              fontSize: 11, color: '#374151', width: 120, flexShrink: 0,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {item.searchphrase}
-                            </span>
-                            <input
-                              value={src.expected_values[item.searchphrase] ?? ''}
-                              onChange={e => updateExpectedValue(src.id, item.searchphrase, e.target.value)}
-                              placeholder="Expected value"
-                              style={{
-                                flex: 1, fontSize: 11, fontFamily: 'inherit',
-                                border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 6px',
-                                outline: 'none',
-                              }}
-                            />
+                          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{
+                                fontSize: 11, color: '#374151', width: 120, flexShrink: 0,
+                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                display: 'flex', alignItems: 'center', gap: 3,
+                              }}>
+                                {item.searchphrase}
+                                {item.is_optional && (
+                                  <span style={{ fontSize: 9, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '0px 3px', fontWeight: 500 }}>opt</span>
+                                )}
+                              </span>
+                              <input
+                                value={src.expected_values[item.searchphrase] ?? ''}
+                                onChange={e => updateExpectedValue(src.id, item.searchphrase, e.target.value)}
+                                placeholder={item.is_optional ? 'Expected value (optional field)' : 'Expected value'}
+                                style={{
+                                  flex: 1, fontSize: 11, fontFamily: 'inherit',
+                                  border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 6px',
+                                  outline: 'none',
+                                  backgroundColor: item.is_optional && !src.expected_values[item.searchphrase] ? '#fafafa' : '#fff',
+                                }}
+                              />
+                              <label
+                                title={item.is_optional ? 'Field is optional — no accuracy penalty when blank' : 'Mark as optional'}
+                                style={{ display: 'flex', alignItems: 'center', flexShrink: 0, cursor: 'pointer' }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={item.is_optional}
+                                  onChange={() => onUpdateItem(item.id, { is_optional: !item.is_optional })}
+                                  style={{ accentColor: '#2563eb', width: 12, height: 12 }}
+                                />
+                              </label>
+                            </div>
+                            {item.enum_values.length > 0 && (
+                              <div style={{ marginLeft: 126, fontSize: 10, color: '#7c3aed' }}>
+                                Allowed: {item.enum_values.join(', ')}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -1994,34 +2196,8 @@ function ValidateTab({
             <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
             <span style={{ fontSize: 11, color: '#9ca3af' }}>({qualityHistory.length} runs)</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 60 }}>
-            {[...qualityHistory].reverse().map((run, i) => {
-              const accPct = run.accuracy != null ? Math.round(run.accuracy * 100) : null
-              const consPct = run.consistency != null ? Math.round(run.consistency * 100) : null
-              const barHeight = Math.max(4, Math.round(run.score * 0.6))
-              const barColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
-              return (
-                <div
-                  key={run.uuid}
-                  title={`Run ${i + 1}: Score ${Math.round(run.score)}${accPct != null ? ` | Acc ${accPct}%` : ''}${consPct != null ? ` | Cons ${consPct}%` : ''} | ${new Date(run.created_at).toLocaleDateString()}`}
-                  style={{
-                    flex: 1, maxWidth: 24, height: barHeight,
-                    backgroundColor: barColor, borderRadius: 2,
-                    opacity: i === [...qualityHistory].length - 1 ? 1 : 0.6,
-                    transition: 'height 0.2s',
-                    cursor: 'default',
-                  }}
-                />
-              )
-            })}
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>
-              {new Date(qualityHistory[qualityHistory.length - 1].created_at).toLocaleDateString()}
-            </span>
-            <span style={{ fontSize: 10, color: '#9ca3af' }}>
-              {new Date(qualityHistory[0].created_at).toLocaleDateString()}
-            </span>
+          <div style={{ width: '100%', height: 80 }}>
+            <QualityHistoryChart runs={qualityHistory} />
           </div>
 
           {/* Run comparison table */}
@@ -2094,7 +2270,20 @@ function ValidateTab({
       {/* 4. Results — Executive Summary */}
       {results && (
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Results</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Results</div>
+            <button
+              onClick={() => downloadValidationCSV(results)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                color: '#374151', cursor: 'pointer',
+              }}
+            >
+              <Download style={{ width: 13, height: 13 }} /> Download CSV
+            </button>
+          </div>
 
           {/* Executive Summary Card */}
           <div style={{
@@ -2139,6 +2328,57 @@ function ValidateTab({
               </div>
             </div>
           </div>
+
+          {/* Submit to public library nudge */}
+          {(() => {
+            const acc = results.executive_summary.mean_accuracy ?? 0
+            const con = results.executive_summary.mean_consistency ?? 0
+            const unified = acc * 60 + con * 40
+            if (unified < 80) return null
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '12px 16px', borderRadius: 8,
+                backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
+              }}>
+                <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
+                <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
+                  <strong>Great results!</strong> This extraction scored {Math.round(unified)}%. Consider sharing it with the public library so others can benefit.
+                </div>
+                {submitLibraryResult === 'success' ? (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+                ) : (
+                  <button
+                    disabled={submittingToLibrary}
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      setSubmittingToLibrary(true)
+                      try {
+                        await submitForVerification({
+                          item_kind: 'search_set',
+                          item_id: searchSetUuid,
+                        })
+                        setSubmitLibraryResult('success')
+                      } catch {
+                        setSubmitLibraryResult('error')
+                      } finally {
+                        setSubmittingToLibrary(false)
+                      }
+                    }}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
+                      color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
+                      opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
+                  </button>
+                )}
+              </div>
+            )
+          })()}
 
           {/* 5. Per-Run Reproducibility */}
           {results.executive_summary.per_run_reproducibility.length > 0 && (
@@ -2362,6 +2602,31 @@ function ValidateTab({
   )
 }
 
+function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
+  const data = [...runs].reverse().map(r => ({
+    date: new Date(r.created_at).toLocaleDateString(),
+    score: Math.round(r.score),
+  }))
+
+  const latestScore = data.length > 0 ? data[data.length - 1].score : 0
+  const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#d97706' : '#dc2626'
+
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+        <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} interval="preserveStartEnd" />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
+        <Tooltip
+          contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
+          formatter={(value: number) => [`${value}%`, 'Score']}
+        />
+        <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 function _summarizeConfig(config?: Record<string, unknown> | null): string {
   if (!config || Object.keys(config).length === 0) return 'default'
   if (config.mode === 'two_pass') return 'two_pass'
@@ -2490,143 +2755,6 @@ function _scoreBg(score: number | null): string {
   if (score >= 0.9) return '#ecfdf5'
   if (score >= 0.7) return '#fffbeb'
   return '#fef2f2'
-}
-
-function DocumentPickerDialog({
-  onSelect,
-  onClose,
-  excludeUuids,
-}: {
-  onSelect: (docs: { uuid: string; title: string }[]) => void
-  onClose: () => void
-  excludeUuids: string[]
-}) {
-  const [query, setQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<{ uuid: string; title: string }[]>([])
-  const [searching, setSearching] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const excludeRef = useCallback((uuid: string) => excludeUuids.includes(uuid), [excludeUuids.join(',')])
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearching(true)
-      searchDocuments(query, 30)
-        .then(res => {
-          setSearchResults(
-            res.items
-              .filter(d => !excludeRef(d.uuid))
-              .map(d => ({ uuid: d.uuid, title: d.title }))
-          )
-        })
-        .catch(() => setSearchResults([]))
-        .finally(() => setSearching(false))
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [query, excludeRef])
-
-  const toggleDoc = (uuid: string) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      if (next.has(uuid)) next.delete(uuid)
-      else next.add(uuid)
-      return next
-    })
-  }
-
-  const handleAdd = () => {
-    const docs = searchResults.filter(d => selected.has(d.uuid))
-    onSelect(docs)
-    onClose()
-  }
-
-  return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 1000,
-    }}>
-      <div style={{
-        backgroundColor: '#fff', borderRadius: 12, width: 480, maxHeight: '70vh',
-        display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-      }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>Add Documents</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
-            <X style={{ width: 18, height: 18 }} />
-          </button>
-        </div>
-        <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
-          <div style={{ position: 'relative' }}>
-            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
-            <input
-              autoFocus
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="Search documents..."
-              style={{
-                width: '100%', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
-                outline: 'none', boxSizing: 'border-box',
-              }}
-            />
-          </div>
-        </div>
-        <div style={{ flex: 1, overflowY: 'auto', padding: '8px 20px', minHeight: 200, maxHeight: 400 }}>
-          {searching ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
-              <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite', display: 'inline-block' }} />
-            </div>
-          ) : searchResults.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0' }}>
-              {query ? 'No documents found.' : 'Type to search documents...'}
-            </div>
-          ) : (
-            searchResults.map(doc => (
-              <label key={doc.uuid} style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
-                borderBottom: '1px solid #f0f0f0', cursor: 'pointer',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(doc.uuid)}
-                  onChange={() => toggleDoc(doc.uuid)}
-                />
-                <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
-                <span style={{ fontSize: 13, color: '#202124', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {doc.title}
-                </span>
-              </label>
-            ))
-          )}
-        </div>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#374151', cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAdd}
-            disabled={selected.size === 0}
-            style={{
-              padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 6, border: 'none',
-              backgroundColor: selected.size > 0 ? '#191919' : '#e5e7eb',
-              color: selected.size > 0 ? '#fff' : '#9ca3af',
-              cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
-            }}
-          >
-            Add {selected.size > 0 ? `${selected.size} ` : ''}Selected
-          </button>
-        </div>
-      </div>
-    </div>
-  )
 }
 
 /* ── Shared ── */

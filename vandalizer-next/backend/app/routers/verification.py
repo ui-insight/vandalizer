@@ -41,6 +41,8 @@ class SubmitRequest(BaseModel):
 class UpdateStatusRequest(BaseModel):
     status: str  # "approved", "rejected", "in_review"
     reviewer_notes: Optional[str] = None
+    group_ids: Optional[list[str]] = None
+    collection_ids: Optional[list[str]] = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -441,6 +443,8 @@ async def update_status(
         new_status=req.status,
         reviewer_user_id=user.user_id,
         reviewer_notes=req.reviewer_notes,
+        group_ids=req.group_ids,
+        collection_ids=req.collection_ids,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Verification request not found")

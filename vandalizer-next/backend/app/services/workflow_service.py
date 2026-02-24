@@ -78,6 +78,8 @@ async def get_workflow(workflow_id: str) -> dict | None:
         "space": wf.space,
         "num_executions": wf.num_executions,
         "steps": steps,
+        "validation_plan": wf.validation_plan,
+        "validation_inputs": wf.validation_inputs,
     }
 
 
@@ -148,6 +150,15 @@ async def duplicate_workflow(workflow_id: str, user_id: str) -> dict | None:
         new_step_ids.append(new_step.id)
 
     new_wf.steps = new_step_ids
+
+    # Copy validation plan and inputs from original
+    original_wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if original_wf:
+        if original_wf.validation_plan:
+            new_wf.validation_plan = original_wf.validation_plan
+        if original_wf.validation_inputs:
+            new_wf.validation_inputs = original_wf.validation_inputs
+
     await new_wf.save()
 
     return await get_workflow(str(new_wf.id))
@@ -359,87 +370,361 @@ async def reorder_steps(workflow_id: str, step_ids: list[str]) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Validation
+# Validation Plan
 # ---------------------------------------------------------------------------
 
-async def validate_workflow(
-    workflow_id: str,
-    eval_plan: str | None = None,
-    text_input: str | None = None,
-) -> dict:
-    """Run validation checks on a workflow and return grade + check results."""
+async def get_validation_plan(workflow_id: str) -> list[dict]:
+    """Return the workflow's persisted validation plan."""
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+    return wf.validation_plan
+
+
+async def update_validation_plan(workflow_id: str, checks: list[dict]) -> list[dict]:
+    """Replace the workflow's validation plan with *checks*."""
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+    wf.validation_plan = checks
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return wf.validation_plan
+
+
+# ---------------------------------------------------------------------------
+# Validation Inputs
+# ---------------------------------------------------------------------------
+
+async def get_validation_inputs(workflow_id: str) -> list[dict]:
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+    return wf.validation_inputs
+
+
+async def update_validation_inputs(workflow_id: str, inputs: list[dict]) -> list[dict]:
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+    wf.validation_inputs = inputs
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return wf.validation_inputs
+
+
+async def create_temp_documents_from_text(texts: list[dict], user_id: str) -> list[str]:
+    """Create temporary SmartDocument records with raw_text pre-filled.
+
+    Each entry in *texts* should have ``text`` and optionally ``label``.
+    Returns the list of generated UUIDs.
+    """
+    from app.models.document import SmartDocument
+
+    uuids: list[str] = []
+    for entry in texts:
+        uid = uuid_mod.uuid4().hex.upper()
+        label = entry.get("label") or "Validation text input"
+        doc = SmartDocument(
+            title=label,
+            processing=False,
+            valid=True,
+            raw_text=entry.get("text", ""),
+            path="",
+            downloadpath="",
+            extension="txt",
+            uuid=uid,
+            user_id=user_id,
+            space="__validation_temp__",
+            folder="0",
+        )
+        await doc.insert()
+        uuids.append(uid)
+    return uuids
+
+
+async def generate_validation_plan(workflow_id: str) -> list[dict]:
+    """Use an LLM to auto-generate quality check definitions from the workflow structure."""
+    import json as _json
+    from app.services.llm_service import create_chat_agent
+    from app.models.system_config import SystemConfig
+
     wf_data = await get_workflow(workflow_id)
     if not wf_data:
         raise ValueError("Workflow not found")
 
-    checks = []
-    steps = wf_data.get("steps", [])
+    # Build a detailed summary of the workflow for the LLM
+    steps_summary = []
+    for step in wf_data.get("steps", []):
+        tasks_desc = []
+        for task in step.get("tasks", []):
+            task_info = f"  - Task: {task['name']}"
+            data = task.get("data", {})
+            if task["name"] == "Prompt" and data.get("prompt"):
+                task_info += f" (prompt: {data['prompt'][:200]})"
+            elif task["name"] == "Extraction" and data.get("extractions"):
+                field_names = [e.get("key", "") for e in data["extractions"][:10]]
+                task_info += f" (fields: {', '.join(field_names)})"
+            elif task["name"] == "DataExport":
+                fmt = data.get("format", "json")
+                task_info += f" (format: {fmt})"
+            elif task["name"] == "DocumentRenderer":
+                tpl = data.get("template_type", "")
+                task_info += f" (template: {tpl})"
+            tasks_desc.append(task_info)
+        step_desc = f"Step: {step['name']}" + (" [OUTPUT]" if step.get("is_output") else "")
+        steps_summary.append(step_desc + "\n" + "\n".join(tasks_desc))
 
-    # Check 1: Has at least one step
-    if len(steps) > 0:
-        checks.append({"name": "Has steps", "status": "PASS", "detail": f"{len(steps)} step(s) defined"})
-    else:
-        checks.append({"name": "Has steps", "status": "FAIL", "detail": "No steps defined"})
+    workflow_desc = (
+        f"Workflow: {wf_data.get('name', 'Unnamed')}\n"
+        f"Description: {wf_data.get('description', 'No description')}\n\n"
+        + "\n\n".join(steps_summary)
+    )
 
-    # Check 2: All steps have at least one task
-    empty_steps = [s["name"] for s in steps if len(s.get("tasks", [])) == 0]
-    if not empty_steps:
-        checks.append({"name": "Steps have tasks", "status": "PASS", "detail": "All steps have at least one task"})
-    elif steps:
-        checks.append({"name": "Steps have tasks", "status": "WARN", "detail": f"Empty steps: {', '.join(empty_steps)}"})
-    else:
-        checks.append({"name": "Steps have tasks", "status": "SKIP", "detail": "No steps to check"})
+    system_prompt = (
+        "You are a workflow quality analyst. Given a workflow definition, generate 4-8 quality "
+        "check DEFINITIONS that can later be evaluated against the workflow's actual output.\n\n"
+        "Focus on these categories:\n"
+        "- completeness: Are all expected fields/sections present?\n"
+        "- formatting: Is the output in the correct format (JSON, CSV, markdown, etc.)?\n"
+        "- content: Is the content meaningful, coherent, and relevant?\n"
+        "- accuracy: Are there signals of correctness (consistent data, reasonable values)?\n\n"
+        "Return ONLY a JSON array of check definition objects. Each object must have:\n"
+        '- "name": short check name (string, max 60 chars)\n'
+        '- "description": what the evaluator should look for in the output (string)\n'
+        '- "category": one of "completeness", "formatting", "content", "accuracy" (string)\n\n'
+        "Do NOT evaluate anything — just define what should be checked.\n"
+        "Return ONLY the JSON array, no other text."
+    )
 
-    # Check 3: Has an output step
-    output_steps = [s for s in steps if s.get("is_output")]
-    if output_steps:
-        checks.append({"name": "Output step defined", "status": "PASS", "detail": f"Output step: {output_steps[0]['name']}"})
-    else:
-        checks.append({"name": "Output step defined", "status": "WARN", "detail": "No output step designated"})
+    model = await get_user_model_name(wf_data.get("user_id", ""))
 
-    # Check 4: Has been executed at least once
-    if wf_data.get("num_executions", 0) > 0:
-        checks.append({"name": "Has been tested", "status": "PASS", "detail": f"Executed {wf_data['num_executions']} time(s)"})
-    else:
-        checks.append({"name": "Has been tested", "status": "WARN", "detail": "Never executed"})
+    sys_config = await SystemConfig.get_config()
+    sys_config_doc = sys_config.model_dump() if sys_config else {}
 
-    # Check 5: Last run succeeded (check most recent result)
+    agent = create_chat_agent(
+        model,
+        system_prompt=system_prompt,
+        system_config_doc=sys_config_doc,
+    )
+
+    try:
+        result = await agent.run(f"## Workflow\n{workflow_desc}")
+    except Exception:
+        raise ValueError("LLM call failed — could not generate validation plan")
+
+    parsed = _parse_json_array(result.output)
+    if parsed is None:
+        raise ValueError("Could not parse LLM response into a validation plan")
+
+    # Normalize into check definitions with UUIDs
+    checks: list[dict] = []
+    valid_categories = {"completeness", "formatting", "content", "accuracy"}
+    for item in parsed:
+        if not isinstance(item, dict) or "name" not in item:
+            continue
+        cat = str(item.get("category", "content")).lower()
+        if cat not in valid_categories:
+            cat = "content"
+        checks.append({
+            "id": str(uuid_mod.uuid4()),
+            "name": str(item["name"])[:60],
+            "description": str(item.get("description", "")),
+            "category": cat,
+        })
+
+    # Persist
     wf = await Workflow.get(PydanticObjectId(workflow_id))
-    last_result = await WorkflowResult.find(
-        WorkflowResult.workflow == wf.id
+    if wf:
+        wf.validation_plan = checks
+        wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        await wf.save()
+
+    return checks
+
+
+# ---------------------------------------------------------------------------
+# Validation Execution
+# ---------------------------------------------------------------------------
+
+async def validate_workflow(workflow_id: str) -> dict:
+    """Evaluate the last execution's output against the persisted validation plan."""
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+
+    plan = wf.validation_plan
+    if not plan:
+        raise ValueError("No validation plan — generate or add checks first")
+
+    wf_data = await get_workflow(workflow_id)
+
+    # Find the most recent completed WorkflowResult
+    last_results = await WorkflowResult.find(
+        WorkflowResult.workflow == wf.id,
+        WorkflowResult.status == "completed",
     ).sort("-_id").limit(1).to_list()
 
-    if last_result:
-        result = last_result[0]
-        if result.status == "completed":
-            checks.append({"name": "Last run succeeded", "status": "PASS", "detail": "Last execution completed successfully"})
-        elif result.status in ("error", "failed"):
-            checks.append({"name": "Last run succeeded", "status": "FAIL", "detail": f"Last execution status: {result.status}"})
-        else:
-            checks.append({"name": "Last run succeeded", "status": "SKIP", "detail": f"Last execution status: {result.status}"})
-    else:
-        checks.append({"name": "Last run succeeded", "status": "SKIP", "detail": "No execution history"})
+    if not last_results:
+        # All checks SKIP
+        checks = [
+            {
+                "check_id": c["id"],
+                "name": c["name"],
+                "status": "SKIP",
+                "detail": "No completed execution found. Run the workflow first.",
+            }
+            for c in plan
+        ]
+        return _build_result(checks, workflow_id, wf_data)
 
-    # Check 6: Extraction tasks have search set configured
-    for step in steps:
-        for task in step.get("tasks", []):
-            if task["name"] == "Extraction":
-                if task.get("data", {}).get("search_set_uuid") or task.get("data", {}).get("extractions"):
-                    checks.append({"name": f"Extraction configured ({step['name']})", "status": "PASS", "detail": "Extraction fields defined"})
-                else:
-                    checks.append({"name": f"Extraction configured ({step['name']})", "status": "WARN", "detail": "No extraction fields configured"})
-            elif task["name"] == "Prompt":
-                if task.get("data", {}).get("prompt"):
-                    checks.append({"name": f"Prompt configured ({step['name']})", "status": "PASS", "detail": "Prompt text defined"})
-                else:
-                    checks.append({"name": f"Prompt configured ({step['name']})", "status": "WARN", "detail": "No prompt text"})
+    wr = last_results[0]
+    output_text = _serialize_output(wr.final_output)
+    steps_output = wr.steps_output
 
-    # LLM-powered checks from eval_plan
-    if eval_plan and eval_plan.strip():
-        llm_checks = await _generate_llm_checks(wf_data, eval_plan, text_input)
-        checks.extend(llm_checks)
+    if output_text is None:
+        checks = [
+            {
+                "check_id": c["id"],
+                "name": c["name"],
+                "status": "SKIP",
+                "detail": "Binary output cannot be evaluated as text.",
+            }
+            for c in plan
+        ]
+        return _build_result(checks, workflow_id, wf_data)
 
-    # Calculate grade
+    checks = await _evaluate_checks_against_output(plan, output_text, steps_output, wf_data)
+    return await _build_result(checks, workflow_id, wf_data)
+
+
+def _serialize_output(final_output: dict | None) -> str | None:
+    """Convert final_output to a text string for LLM evaluation.
+
+    Returns ``None`` for binary formats that cannot be evaluated as text.
+    """
+    import json as _json
+    import base64 as _b64
+
+    if final_output is None:
+        return ""
+
+    output_data = final_output.get("output", final_output) if isinstance(final_output, dict) else final_output
+
+    # Handle file_download type
+    if isinstance(output_data, dict) and output_data.get("type") == "file_download":
+        file_type = output_data.get("file_type", "")
+        if file_type in ("zip", "pdf", "xlsx"):
+            return None  # binary — cannot evaluate
+        # Text-based file downloads (csv, json, md, txt)
+        try:
+            raw = _b64.b64decode(output_data.get("data_b64", ""))
+            return raw.decode("utf-8", errors="replace")[:50_000]
+        except Exception:
+            return None
+
+    if isinstance(output_data, (dict, list)):
+        return _json.dumps(output_data, indent=2, default=str)[:50_000]
+
+    return str(output_data)[:50_000]
+
+
+async def _evaluate_checks_against_output(
+    plan: list[dict],
+    output_text: str,
+    steps_output: dict,
+    wf_data: dict,
+) -> list[dict]:
+    """Single LLM call to evaluate all checks against the actual output."""
+    import json as _json
+    from app.services.llm_service import create_chat_agent
+    from app.models.system_config import SystemConfig
+
+    # Build the check definitions for the prompt
+    checks_desc = _json.dumps(
+        [{"check_id": c["id"], "name": c["name"], "description": c.get("description", "")} for c in plan],
+        indent=2,
+    )
+
+    # Include a summary of steps_output (truncated)
+    steps_text = ""
+    if steps_output:
+        steps_text = "\n\n## Intermediate Step Outputs\n" + _json.dumps(steps_output, indent=2, default=str)[:20_000]
+
+    system_prompt = (
+        "You are a strict quality evaluator. You are given the actual output of a workflow execution "
+        "and a list of quality checks to evaluate.\n\n"
+        "For EACH check, determine whether it PASSES, FAILS, or deserves a WARNING based on the output.\n"
+        "Cite specific evidence from the output to justify your assessment.\n\n"
+        "Return ONLY a JSON array of result objects. Each object must have:\n"
+        '- "check_id": the check ID from the input (string)\n'
+        '- "status": one of "PASS", "FAIL", "WARN" (string)\n'
+        '- "detail": specific evidence from the output justifying the status (string)\n\n'
+        "Be thorough but fair. Use PASS when the check is clearly satisfied, "
+        "FAIL when clearly not satisfied, WARN when partially satisfied or ambiguous.\n"
+        "Return ONLY the JSON array, no other text."
+    )
+
+    user_prompt = (
+        f"## Quality Checks to Evaluate\n{checks_desc}\n\n"
+        f"## Workflow Final Output\n{output_text}"
+        f"{steps_text}"
+    )
+
+    model = await get_user_model_name(wf_data.get("user_id", ""))
+
+    sys_config = await SystemConfig.get_config()
+    sys_config_doc = sys_config.model_dump() if sys_config else {}
+
+    agent = create_chat_agent(
+        model,
+        system_prompt=system_prompt,
+        system_config_doc=sys_config_doc,
+    )
+
+    try:
+        result = await agent.run(user_prompt)
+    except Exception:
+        return [
+            {"check_id": c["id"], "name": c["name"], "status": "SKIP", "detail": "LLM evaluation failed"}
+            for c in plan
+        ]
+
+    parsed = _parse_json_array(result.output)
+    if parsed is None:
+        return [
+            {"check_id": c["id"], "name": c["name"], "status": "SKIP", "detail": "Could not parse LLM evaluation response"}
+            for c in plan
+        ]
+
+    # Build a lookup from check_id → result
+    result_map: dict[str, dict] = {}
+    valid_statuses = {"PASS", "FAIL", "WARN", "SKIP"}
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        cid = str(item.get("check_id", ""))
+        status = str(item.get("status", "SKIP")).upper()
+        if status not in valid_statuses:
+            status = "SKIP"
+        result_map[cid] = {"status": status, "detail": str(item.get("detail", ""))}
+
+    # Merge with plan to guarantee every check has a result
+    checks = []
+    for c in plan:
+        r = result_map.get(c["id"], {"status": "SKIP", "detail": "No evaluation returned for this check"})
+        checks.append({
+            "check_id": c["id"],
+            "name": c["name"],
+            "status": r["status"],
+            "detail": r["detail"],
+        })
+
+    return checks
+
+
+async def _build_result(checks: list[dict], workflow_id: str, wf_data: dict | None) -> dict:
+    """Compute grade, persist, and return the validation result dict."""
     statuses = [c["status"] for c in checks]
     fail_count = statuses.count("FAIL")
     warn_count = statuses.count("WARN")
@@ -458,90 +743,30 @@ async def validate_workflow(
         grade = "F"
 
     summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"
-
     result_dict = {"grade": grade, "summary": summary, "checks": checks}
 
-    # Persist validation run for quality tracking
     from app.services.quality_service import persist_validation_run
     await persist_validation_run(
         item_kind="workflow",
         item_id=workflow_id,
-        item_name=wf_data.get("name", ""),
+        item_name=(wf_data or {}).get("name", ""),
         run_type="workflow",
         result=result_dict,
-        user_id=wf_data.get("user_id", ""),
+        user_id=(wf_data or {}).get("user_id", ""),
     )
 
     return result_dict
 
 
-async def _generate_llm_checks(
-    wf_data: dict,
-    eval_plan: str,
-    text_input: str | None = None,
-) -> list[dict]:
-    """Use an LLM to generate validation checks based on the eval plan."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _parse_json_array(text: str) -> list | None:
+    """Best-effort extraction of a JSON array from LLM text output."""
     import json as _json
-    from app.services.llm_service import create_chat_agent
-    from app.models.system_config import SystemConfig
 
-    # Build workflow summary for the LLM
-    steps_summary = []
-    for step in wf_data.get("steps", []):
-        tasks_desc = []
-        for task in step.get("tasks", []):
-            task_info = f"  - Task: {task['name']}"
-            data = task.get("data", {})
-            if task["name"] == "Prompt" and data.get("prompt"):
-                task_info += f" (prompt: {data['prompt'][:200]})"
-            elif task["name"] == "Extraction" and data.get("extractions"):
-                task_info += f" (fields: {', '.join(e.get('key', '') for e in data['extractions'][:10])})"
-            tasks_desc.append(task_info)
-        step_desc = f"Step: {step['name']}" + (" [OUTPUT]" if step.get("is_output") else "")
-        steps_summary.append(step_desc + "\n" + "\n".join(tasks_desc))
-
-    workflow_desc = (
-        f"Workflow: {wf_data.get('name', 'Unnamed')}\n"
-        f"Description: {wf_data.get('description', 'No description')}\n\n"
-        + "\n\n".join(steps_summary)
-    )
-
-    system_prompt = (
-        "You are a workflow validation assistant. Given a workflow definition and an evaluation plan, "
-        "generate validation checks that assess whether the workflow meets the criteria described in the evaluation plan.\n\n"
-        "Return ONLY a JSON array of check objects. Each object must have:\n"
-        '- "name": short check name (string)\n'
-        '- "status": one of "PASS", "FAIL", "WARN", or "SKIP" (string)\n'
-        '- "detail": explanation of the check result (string)\n\n'
-        "Assess the workflow structure against the evaluation criteria. "
-        "Use PASS when a criterion is clearly met, FAIL when clearly not met, "
-        "WARN when partially met or uncertain, and SKIP when not applicable.\n\n"
-        "Return ONLY the JSON array, no other text."
-    )
-
-    user_prompt = f"## Workflow\n{workflow_desc}\n\n## Evaluation Plan\n{eval_plan}"
-    if text_input and text_input.strip():
-        user_prompt += f"\n\n## Sample Input Text\nThe following is sample text that this workflow should be able to handle:\n{text_input[:50000]}"
-
-    # Resolve model — use a default model for validation
-    model = await get_user_model_name(wf_data.get("user_id", ""))
-
-    sys_config = await SystemConfig.get_config()
-    sys_config_doc = sys_config.model_dump() if sys_config else {}
-
-    agent = create_chat_agent(
-        model,
-        system_prompt=system_prompt,
-        system_config_doc=sys_config_doc,
-    )
-
-    try:
-        result = await agent.run(user_prompt)
-    except Exception:
-        return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "LLM call failed — could not generate eval checks"}]
-
-    # Parse JSON from response
-    text = result.output.strip()
+    text = text.strip()
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text[3:]
     if text.endswith("```"):
@@ -550,33 +775,19 @@ async def _generate_llm_checks(
 
     try:
         parsed = _json.loads(text)
+        if isinstance(parsed, list):
+            return parsed
     except _json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]") + 1
-        if start >= 0 and end > start:
-            try:
-                parsed = _json.loads(text[start:end])
-            except _json.JSONDecodeError:
-                return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Could not parse LLM response"}]
-        else:
-            return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Could not parse LLM response"}]
+        pass
 
-    if not isinstance(parsed, list):
-        return [{"name": "Eval plan analysis", "status": "SKIP", "detail": "Unexpected LLM response format"}]
+    start = text.find("[")
+    end = text.rfind("]") + 1
+    if start >= 0 and end > start:
+        try:
+            parsed = _json.loads(text[start:end])
+            if isinstance(parsed, list):
+                return parsed
+        except _json.JSONDecodeError:
+            pass
 
-    # Normalize and validate each check
-    valid_statuses = {"PASS", "FAIL", "WARN", "SKIP"}
-    llm_checks = []
-    for item in parsed:
-        if not isinstance(item, dict) or "name" not in item:
-            continue
-        status = str(item.get("status", "SKIP")).upper()
-        if status not in valid_statuses:
-            status = "SKIP"
-        llm_checks.append({
-            "name": str(item["name"]),
-            "status": status,
-            "detail": str(item.get("detail", "")),
-        })
-
-    return llm_checks
+    return None

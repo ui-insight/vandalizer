@@ -1,6 +1,8 @@
 """Quality service  - persist validation runs, compute tiers, history, regression."""
 
 import datetime
+import hashlib
+import json
 from typing import Optional
 
 from app.models.system_config import SystemConfig
@@ -10,6 +12,11 @@ from app.models.verification import VerifiedItemMetadata
 
 # Grade-to-score mapping for workflow validation
 _GRADE_SCORES = {"A": 95, "B": 85, "C": 75, "D": 55, "F": 30}
+
+
+def compute_config_hash(config: dict) -> str:
+    """Deterministic SHA256 hash of a config dict."""
+    return hashlib.sha256(json.dumps(config or {}, sort_keys=True).encode()).hexdigest()
 
 
 async def persist_validation_run(
@@ -45,6 +52,8 @@ async def persist_validation_run(
     test_cases = result.get("test_cases", [])
     num_test_cases = len(test_cases)
 
+    cfg_hash = compute_config_hash(extraction_config) if extraction_config else None
+
     vr = ValidationRun(
         item_kind=item_kind,
         item_id=item_id,
@@ -62,6 +71,7 @@ async def persist_validation_run(
         checks_failed=checks_failed,
         result_snapshot=result,
         extraction_config=extraction_config or {},
+        config_hash=cfg_hash,
         user_id=user_id,
         created_at=datetime.datetime.now(tz=datetime.timezone.utc),
     )
@@ -355,8 +365,11 @@ async def generate_improvement_suggestions(
         ),
         system_config_doc=sys_config_doc,
     )
-    res = await agent.run(prompt)
-    return res.output
+    try:
+        res = await agent.run(prompt)
+        return res.output
+    except Exception:
+        return "Unable to generate suggestions — the LLM returned an invalid response. Please try again."
 
 
 def _build_extraction_suggestion_prompt(result: dict) -> str:
@@ -410,6 +423,169 @@ def _fmt_pct(val) -> str:
     if val is None:
         return "N/A"
     return f"{round(val * 100)}%"
+
+
+# ---------------------------------------------------------------------------
+# Stale / monitoring helpers
+# ---------------------------------------------------------------------------
+
+
+async def detect_stale_items(max_age_days: int = 14) -> list[dict]:
+    """Find verified items whose last validation is older than max_age_days."""
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=max_age_days)
+    stale = await VerifiedItemMetadata.find(
+        VerifiedItemMetadata.last_validated_at < cutoff,
+    ).to_list()
+    return [
+        {
+            "item_kind": m.item_kind,
+            "item_id": m.item_id,
+            "display_name": m.display_name or m.item_id,
+            "quality_score": m.quality_score,
+            "quality_tier": m.quality_tier,
+            "last_validated_at": m.last_validated_at.isoformat() if m.last_validated_at else None,
+        }
+        for m in stale
+    ]
+
+
+async def get_quality_contract_status(item_kind: str, item_id: str) -> dict:
+    """Return quality contract status for a verified item."""
+    from app.models.quality_alert import QualityAlert
+
+    sys_cfg = await SystemConfig.get_config()
+    qc = sys_cfg.get_quality_config()
+    monitoring = qc.get("monitoring", {})
+    stale_days = monitoring.get("stale_threshold_days", 14)
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == item_kind,
+        VerifiedItemMetadata.item_id == item_id,
+    )
+    if not meta:
+        return {"status": "unmonitored", "tier": None, "score": None, "last_validated_at": None,
+                "is_stale": False, "has_alerts": False, "monitored": False}
+
+    is_stale = False
+    if meta.last_validated_at:
+        lv = meta.last_validated_at
+        if lv.tzinfo is None:
+            lv = lv.replace(tzinfo=datetime.timezone.utc)
+        is_stale = (datetime.datetime.now(datetime.timezone.utc) - lv).days > stale_days
+
+    has_alerts = await QualityAlert.find(
+        QualityAlert.item_kind == item_kind,
+        QualityAlert.item_id == item_id,
+        QualityAlert.acknowledged == False,
+    ).count() > 0
+
+    monitored = monitoring.get("auto_revalidate", False)
+
+    status = "stale" if is_stale else "monitored" if monitored else "unmonitored"
+
+    return {
+        "status": status,
+        "tier": meta.quality_tier,
+        "score": meta.quality_score,
+        "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
+        "is_stale": is_stale,
+        "has_alerts": has_alerts,
+        "monitored": monitored,
+    }
+
+
+async def get_quality_items(
+    sort: str = "score",
+    order: str = "asc",
+    limit: int = 100,
+) -> list[dict]:
+    """Return per-item quality data for the admin dashboard."""
+    all_meta = await VerifiedItemMetadata.find_all().to_list()
+    sys_cfg = await SystemConfig.get_config()
+    qc = sys_cfg.get_quality_config()
+    stale_days = qc.get("monitoring", {}).get("stale_threshold_days", 14)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    items = []
+    for m in all_meta:
+        # Determine trend from last 2 runs
+        runs = await (
+            ValidationRun.find(
+                ValidationRun.item_kind == m.item_kind,
+                ValidationRun.item_id == m.item_id,
+            )
+            .sort("-created_at")
+            .limit(2)
+            .to_list()
+        )
+        trend = "flat"
+        if len(runs) >= 2:
+            if runs[0].score > runs[1].score + 2:
+                trend = "up"
+            elif runs[0].score < runs[1].score - 2:
+                trend = "down"
+
+        is_stale = False
+        if m.last_validated_at:
+            lv = m.last_validated_at
+            if lv.tzinfo is None:
+                lv = lv.replace(tzinfo=datetime.timezone.utc)
+            is_stale = (now - lv).days > stale_days
+
+        items.append({
+            "item_kind": m.item_kind,
+            "item_id": m.item_id,
+            "display_name": m.display_name or m.item_id,
+            "quality_score": m.quality_score,
+            "quality_tier": m.quality_tier,
+            "last_validated_at": m.last_validated_at.isoformat() if m.last_validated_at else None,
+            "validation_run_count": m.validation_run_count or 0,
+            "trend": trend,
+            "stale": is_stale,
+        })
+
+    # Sort
+    reverse = order == "desc"
+    if sort == "score":
+        items.sort(key=lambda x: x.get("quality_score") or 0, reverse=reverse)
+    elif sort == "name":
+        items.sort(key=lambda x: (x.get("display_name") or "").lower(), reverse=reverse)
+    elif sort == "last_validated":
+        items.sort(key=lambda x: x.get("last_validated_at") or "", reverse=reverse)
+
+    return items[:limit]
+
+
+async def get_quality_item_detail(item_kind: str, item_id: str) -> dict:
+    """Return detailed quality info for a single item including history and model comparison."""
+    runs = await (
+        ValidationRun.find(
+            ValidationRun.item_kind == item_kind,
+            ValidationRun.item_id == item_id,
+        )
+        .sort("-created_at")
+        .to_list()
+    )
+
+    history = [_run_to_dict(r) for r in runs]
+
+    # Model comparison: group runs by model, compute average score per model
+    model_scores: dict[str, list[float]] = {}
+    for r in runs:
+        model_key = r.model or "default"
+        model_scores.setdefault(model_key, []).append(r.score)
+
+    model_comparison = [
+        {"model": model, "avg_score": round(sum(scores) / len(scores), 1), "run_count": len(scores)}
+        for model, scores in model_scores.items()
+    ]
+
+    return {
+        "item_kind": item_kind,
+        "item_id": item_id,
+        "history": history,
+        "model_comparison": model_comparison,
+    }
 
 
 # ---------------------------------------------------------------------------

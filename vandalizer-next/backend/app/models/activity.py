@@ -12,6 +12,7 @@ class ActivityType(str, Enum):
     CONVERSATION = "conversation"
     SEARCH_SET_RUN = "search_set_run"
     WORKFLOW_RUN = "workflow_run"
+    QUALITY_ALERT = "quality_alert"
 
 
 class ActivityStatus(str, Enum):

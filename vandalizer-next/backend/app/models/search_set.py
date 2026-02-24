@@ -17,6 +17,8 @@ class SearchSetItem(Document):
     user_id: Optional[str] = None
     space_id: Optional[str] = None
     title: Optional[str] = None
+    is_optional: bool = False
+    enum_values: list[str] = []
 
     class Settings:
         name = "search_set_item"

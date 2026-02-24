@@ -229,3 +229,70 @@ export function runRegressionSuite(model?: string) {
   const params = model ? `?model=${encodeURIComponent(model)}` : ''
   return apiFetch<RegressionResult>(`/api/admin/quality/regression-suite${params}`, { method: 'POST' })
 }
+
+// Quality Alerts
+
+export interface QualityAlert {
+  uuid: string
+  alert_type: 'regression' | 'stale' | 'config_changed'
+  item_kind: string
+  item_id: string
+  item_name: string
+  severity: 'info' | 'warning' | 'critical'
+  message: string
+  previous_score: number | null
+  current_score: number | null
+  previous_tier: string | null
+  current_tier: string | null
+  acknowledged: boolean
+  created_at: string | null
+}
+
+export function getQualityAlerts(limit = 50, acknowledged = false) {
+  return apiFetch<{ alerts: QualityAlert[] }>(`/api/admin/quality/alerts?limit=${limit}&acknowledged=${acknowledged}`)
+}
+
+export function acknowledgeAlert(uuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/admin/quality/alerts/${uuid}/acknowledge`, { method: 'POST' })
+}
+
+// Quality Items (per-item drill-down)
+
+export interface QualityItem {
+  item_kind: string
+  item_id: string
+  display_name: string
+  quality_score: number | null
+  quality_tier: string | null
+  last_validated_at: string | null
+  validation_run_count: number
+  trend: 'up' | 'down' | 'flat'
+  stale: boolean
+}
+
+export interface QualityItemDetail {
+  item_kind: string
+  item_id: string
+  history: {
+    uuid: string
+    score: number
+    accuracy: number | null
+    consistency: number | null
+    grade: string | null
+    model: string | null
+    created_at: string
+  }[]
+  model_comparison: {
+    model: string
+    avg_score: number
+    run_count: number
+  }[]
+}
+
+export function getQualityItems(sort = 'score', order = 'asc', limit = 100) {
+  return apiFetch<{ items: QualityItem[] }>(`/api/admin/quality/items?sort=${sort}&order=${order}&limit=${limit}`)
+}
+
+export function getQualityItemDetail(itemKind: string, itemId: string) {
+  return apiFetch<QualityItemDetail>(`/api/admin/quality/items/${itemKind}/${itemId}`)
+}

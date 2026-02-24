@@ -57,6 +57,8 @@ class Workflow(Document):
     stats: dict = {}
     version: int = 1
     parent_version_id: Optional[str] = None
+    validation_plan: list[dict] = []
+    validation_inputs: list[dict] = []
 
     class Settings:
         name = "workflow"
