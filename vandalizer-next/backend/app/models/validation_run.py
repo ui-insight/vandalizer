@@ -27,6 +27,7 @@ class ValidationRun(Document):
     checks_failed: int = 0
     result_snapshot: dict = {}  # Full validation result payload
     extraction_config: dict = {}  # Extraction config used for this run
+    config_hash: Optional[str] = None
     user_id: str
     created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
 

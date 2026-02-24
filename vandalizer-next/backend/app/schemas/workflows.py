@@ -87,14 +87,54 @@ class ReorderStepsRequest(BaseModel):
 
 
 class ValidateWorkflowRequest(BaseModel):
-    eval_plan: Optional[str] = None
-    text_input: Optional[str] = None
+    pass  # Plan is already persisted; output comes from last execution
+
+
+class ValidationCheckDefinition(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    category: Optional[str] = None
+
+
+class UpdateValidationPlanRequest(BaseModel):
+    checks: list[ValidationCheckDefinition]
+
+
+class ValidationPlanResponse(BaseModel):
+    checks: list[ValidationCheckDefinition]
+
+
+# ---------------------------------------------------------------------------
+# Validation Inputs
+# ---------------------------------------------------------------------------
+
+class ValidationInputDefinition(BaseModel):
+    id: str
+    type: str  # "document" | "text"
+    document_uuid: Optional[str] = None
+    document_title: Optional[str] = None
+    text: Optional[str] = None
+    label: Optional[str] = None
+
+
+class UpdateValidationInputsRequest(BaseModel):
+    inputs: list[ValidationInputDefinition]
+
+
+class ValidationInputsResponse(BaseModel):
+    inputs: list[ValidationInputDefinition]
+
+
+class CreateTempDocumentsRequest(BaseModel):
+    texts: list[dict]  # [{"text": "...", "label": "..."}]
 
 
 class ValidationCheckResult(BaseModel):
     name: str
     status: str  # PASS, FAIL, WARN, SKIP
     detail: Optional[str] = None
+    check_id: Optional[str] = None
 
 
 class ValidateWorkflowResponse(BaseModel):

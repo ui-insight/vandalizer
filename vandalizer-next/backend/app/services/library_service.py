@@ -5,6 +5,7 @@ import uuid as uuid_mod
 from typing import Optional
 
 from beanie import PydanticObjectId
+from bson import ObjectId as BsonObjectId
 
 from app.models.library import (
     Library,
@@ -14,6 +15,7 @@ from app.models.library import (
     LibraryScope,
 )
 from app.models.search_set import SearchSet, SearchSetItem
+from app.models.system_config import SystemConfig
 from app.models.team import Team
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 
@@ -88,6 +90,56 @@ async def get_or_create_team_library(user_id: str, team_id: str) -> Library:
     return lib
 
 
+async def get_or_create_verified_library() -> Library:
+    """Return the global verified library, creating and backfilling if needed."""
+    lib = await Library.find_one(Library.scope == LibraryScope.VERIFIED)
+    if not lib:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        lib = Library(
+            scope=LibraryScope.VERIFIED,
+            title="Verified Library",
+            owner_user_id="system",
+            created_at=now,
+            updated_at=now,
+        )
+        await lib.insert()
+
+    # Backfill: if the library is empty, populate from all verified LibraryItems
+    if not lib.items:
+        await _backfill_verified_library(lib)
+
+    return lib
+
+
+async def _backfill_verified_library(lib: Library) -> None:
+    """Populate the verified library from all existing verified LibraryItems."""
+    verified_items = await LibraryItem.find(LibraryItem.verified == True).to_list()  # noqa: E712
+    if not verified_items:
+        return
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    seen: set[tuple[str, str]] = set()
+    for item in verified_items:
+        key = (str(item.item_id), item.kind.value)
+        if key in seen:
+            continue
+        seen.add(key)
+        new_item = LibraryItem(
+            item_id=item.item_id,
+            kind=item.kind,
+            added_by_user_id="system",
+            verified=True,
+            tags=[],
+            created_at=now,
+        )
+        await new_item.insert()
+        lib.items.append(new_item.id)
+
+    if lib.items:
+        lib.updated_at = now
+        await lib.save()
+
+
 async def list_libraries(user_id: str, team_id: str | None = None) -> list[dict]:
     personal = await get_or_create_personal_library(user_id)
     results = [_library_to_dict(personal)]
@@ -95,6 +147,9 @@ async def list_libraries(user_id: str, team_id: str | None = None) -> list[dict]
     if team_id:
         team_lib = await get_or_create_team_library(user_id, team_id)
         results.append(_library_to_dict(team_lib))
+
+    verified = await get_or_create_verified_library()
+    results.append(_library_to_dict(verified))
 
     return results
 
@@ -200,15 +255,23 @@ async def update_item(
     item = await LibraryItem.get(PydanticObjectId(item_id))
     if not item:
         return None
+    # Use targeted $set to avoid overwriting fields on old documents
+    # that Pydantic filled with defaults (e.g. created_at → "now").
+    updates: dict = {}
     if note is not None:
+        updates[LibraryItem.note] = note
         item.note = note
     if tags is not None:
+        updates[LibraryItem.tags] = tags
         item.tags = tags
     if pinned is not None:
+        updates[LibraryItem.pinned] = pinned
         item.pinned = pinned
     if favorited is not None:
+        updates[LibraryItem.favorited] = favorited
         item.favorited = favorited
-    await item.save()
+    if updates:
+        await item.set(updates)
     return await _dereference_item(item)
 
 
@@ -217,8 +280,8 @@ async def touch_item(item_id: str) -> bool:
     item = await LibraryItem.get(PydanticObjectId(item_id))
     if not item:
         return False
-    item.last_used_at = datetime.datetime.now(datetime.timezone.utc)
-    await item.save()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    await item.set({LibraryItem.last_used_at: now})
     return True
 
 
@@ -241,8 +304,9 @@ async def get_library_items(
     if folder is not None:
         items = [i for i in items if i.folder == folder]
 
-    # For verified-scope libraries, import metadata for group filtering
+    # Import metadata for group filtering and quality data
     from app.models.verification import VerifiedItemMetadata
+    from app.services.quality_service import get_latest_validation, compute_quality_tier
 
     results = []
     for item in items:
@@ -253,17 +317,36 @@ async def get_library_items(
                 tags_str = " ".join(deref.get("tags", [])).lower()
                 if search.lower() not in name_lower and search.lower() not in tags_str:
                     continue
-            # Group filtering and quality metadata for verified items
+
+            # Look up quality metadata for all scopes
+            # Validation stores item_id as the UUID for search sets,
+            # so use item_uuid when available.
+            quality_lookup_id = deref.get("item_uuid") or str(item.item_id)
+            meta = await VerifiedItemMetadata.find_one(
+                VerifiedItemMetadata.item_kind == item.kind.value,
+                VerifiedItemMetadata.item_id == quality_lookup_id,
+            )
+
+            # Group filtering for verified-scope libraries
             if lib.scope == LibraryScope.VERIFIED and item.verified:
-                meta = await VerifiedItemMetadata.find_one(
-                    VerifiedItemMetadata.item_kind == item.kind.value,
-                    VerifiedItemMetadata.item_id == str(item.item_id),
-                )
                 if user_group_uuids is not None and meta and meta.group_ids and not (set(meta.group_ids) & set(user_group_uuids)):
                     continue
-                if meta:
-                    deref["quality_tier"] = meta.quality_tier
-                    deref["quality_score"] = meta.quality_score
+
+            # Attach quality metadata for all scopes
+            if meta:
+                deref["quality_tier"] = meta.quality_tier
+                deref["quality_score"] = meta.quality_score
+                deref["last_validated_at"] = meta.last_validated_at.isoformat() if meta.last_validated_at else None
+            else:
+                # Fall back to latest ValidationRun
+                latest = await get_latest_validation(item.kind.value, quality_lookup_id)
+                if latest:
+                    score = latest.get("score")
+                    deref["quality_score"] = score
+                    sys_cfg = await SystemConfig.get_config()
+                    deref["quality_tier"] = compute_quality_tier(score, sys_cfg.get_quality_config())
+                    deref["last_validated_at"] = latest.get("created_at")
+
             results.append(deref)
 
     return results
@@ -435,6 +518,23 @@ async def search_libraries(
 # ---------------------------------------------------------------------------
 
 
+def _item_created_at(item: LibraryItem) -> str | None:
+    """Return a reliable ISO creation timestamp for a library item.
+
+    Old documents (created by the Flask/MongoEngine backend) store their
+    creation time in ``added_at`` instead of ``created_at``.  When Beanie
+    loads these, the ``default_factory`` on ``created_at`` fires and produces
+    "now", which is wrong.  The MongoDB ObjectId always embeds the true
+    insertion timestamp, so we use that as the canonical source.
+    """
+    if item.id:
+        try:
+            return BsonObjectId(str(item.id)).generation_time.isoformat()
+        except Exception:
+            pass
+    return item.created_at.isoformat() if item.created_at else None
+
+
 async def _dereference_item(item: LibraryItem) -> dict | None:
     """Load the actual Workflow or SearchSet and return combined dict."""
     name = ""
@@ -473,7 +573,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "favorited": item.favorited,
         "verified": item.verified,
         "added_by_user_id": item.added_by_user_id,
-        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "created_at": _item_created_at(item),
         "last_used_at": item.last_used_at.isoformat() if item.last_used_at else None,
     }
 

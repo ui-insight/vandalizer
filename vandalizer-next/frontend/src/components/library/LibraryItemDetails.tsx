@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { X, ExternalLink, Trash2, Calendar, Tag, ShieldCheck } from 'lucide-react'
+import { X, ExternalLink, Trash2, Calendar, Tag, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { submitForVerification } from '../../api/library'
+import { QualityBadge } from './QualityBadge'
 import type { LibraryItem } from '../../types/library'
 
 interface Props {
@@ -141,18 +142,32 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           {item.kind === 'workflow' ? 'Open' : 'Use'}
         </button>
         {!item.verified && (
-          <button
-            onClick={handleSubmitForVerification}
-            disabled={submitting || submitResult === 'success'}
-            className="flex w-full items-center justify-center gap-1.5 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <ShieldCheck className="h-4 w-4" />
-            {submitting
-              ? 'Submitting...'
-              : submitResult === 'success'
-                ? 'Submitted!'
-                : 'Submit for Verification'}
-          </button>
+          <>
+            {/* Show quality metrics before verification submission */}
+            {item.quality_score != null && (
+              <div className="flex items-center gap-2 px-2 py-1.5 mb-1">
+                <QualityBadge tier={item.quality_tier ?? null} score={item.quality_score ?? null} />
+                {item.quality_score != null && item.quality_score < 70 && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3 w-3" />
+                    Below verification gate
+                  </span>
+                )}
+              </div>
+            )}
+            <button
+              onClick={handleSubmitForVerification}
+              disabled={submitting || submitResult === 'success'}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {submitting
+                ? 'Submitting...'
+                : submitResult === 'success'
+                  ? 'Submitted!'
+                  : 'Submit for Verification'}
+            </button>
+          </>
         )}
         {submitResult === 'error' && (
           <p className="text-xs text-red-500 text-center">{submitError}</p>

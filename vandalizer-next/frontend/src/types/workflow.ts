@@ -4,6 +4,8 @@ export interface SearchSetItem {
   searchset: string | null;
   searchtype: string;
   title: string | null;
+  is_optional: boolean;
+  enum_values: string[];
 }
 
 export interface SearchSet {
@@ -18,6 +20,10 @@ export interface SearchSet {
   verified: boolean;
   item_count: number;
   extraction_config: Record<string, unknown>;
+  quality_score?: number | null;
+  quality_tier?: string | null;
+  last_validated_at?: string | null;
+  validation_run_count?: number;
 }
 
 export interface WorkflowTask {

@@ -332,7 +332,7 @@ export default function Landing() {
 
           {/* Tagline */}
           <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto leading-relaxed mb-8">
-            Next generation document handling, built at the University of Idaho.
+            AI-powered knowledge extraction, built at the University of Idaho.
           </p>
 
           {/* Auth Block */}

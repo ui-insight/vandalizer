@@ -29,6 +29,7 @@ from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.group import Group, GroupMembership
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.validation_run import ValidationRun
+from app.models.quality_alert import QualityAlert
 
 ALL_MODELS = [
     User,
@@ -70,6 +71,7 @@ ALL_MODELS = [
     GroupMembership,
     ExtractionTestCase,
     ValidationRun,
+    QualityAlert,
 ]
 
 

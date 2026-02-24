@@ -158,12 +158,72 @@ export function reorderSteps(workflowId: string, stepIds: string[]) {
   })
 }
 
-// Validation
+// Validation Plan
+
+export interface ValidationCheckDefinition {
+  id: string
+  name: string
+  description: string
+  category?: string
+}
+
+export interface ValidationPlanResponse {
+  checks: ValidationCheckDefinition[]
+}
+
+export function getValidationPlan(workflowId: string) {
+  return apiFetch<ValidationPlanResponse>(`/api/workflows/${workflowId}/validation-plan`)
+}
+
+export function updateValidationPlan(workflowId: string, checks: ValidationCheckDefinition[]) {
+  return apiFetch<ValidationPlanResponse>(`/api/workflows/${workflowId}/validation-plan`, {
+    method: 'PUT',
+    body: JSON.stringify({ checks }),
+  })
+}
+
+export function generateValidationPlan(workflowId: string) {
+  return apiFetch<ValidationPlanResponse>(`/api/workflows/${workflowId}/validation-plan/generate`, {
+    method: 'POST',
+  })
+}
+
+// Validation Inputs
+
+export interface ValidationInputDefinition {
+  id: string
+  type: 'document' | 'text'
+  document_uuid?: string
+  document_title?: string
+  text?: string
+  label?: string
+}
+
+export function getValidationInputs(workflowId: string) {
+  return apiFetch<{ inputs: ValidationInputDefinition[] }>(`/api/workflows/${workflowId}/validation-inputs`)
+}
+
+export function updateValidationInputs(workflowId: string, inputs: ValidationInputDefinition[]) {
+  return apiFetch<{ inputs: ValidationInputDefinition[] }>(`/api/workflows/${workflowId}/validation-inputs`, {
+    method: 'PUT',
+    body: JSON.stringify({ inputs }),
+  })
+}
+
+export function createTempDocuments(workflowId: string, texts: { text: string; label: string }[]) {
+  return apiFetch<{ document_uuids: string[] }>(`/api/workflows/${workflowId}/create-temp-documents`, {
+    method: 'POST',
+    body: JSON.stringify({ texts }),
+  })
+}
+
+// Validation Execution
 
 export interface ValidationCheck {
   name: string
   status: 'PASS' | 'FAIL' | 'WARN' | 'SKIP'
   detail: string | null
+  check_id?: string
 }
 
 export interface ValidationResult {
@@ -172,10 +232,9 @@ export interface ValidationResult {
   checks: ValidationCheck[]
 }
 
-export function validateWorkflow(workflowId: string, evalPlan?: string, textInput?: string) {
+export function validateWorkflow(workflowId: string) {
   return apiFetch<ValidationResult>(`/api/workflows/${workflowId}/validate`, {
     method: 'POST',
-    body: JSON.stringify({ eval_plan: evalPlan, text_input: textInput }),
   })
 }
 

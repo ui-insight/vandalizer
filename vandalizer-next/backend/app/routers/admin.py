@@ -842,3 +842,100 @@ async def regression_suite(
     await _require_admin(user)
     from app.services.quality_service import run_regression_suite
     return await run_regression_suite(user.user_id, model)
+
+
+# ---------------------------------------------------------------------------
+# 16. Quality Alerts (Phase 3)
+# ---------------------------------------------------------------------------
+
+@router.get("/quality/alerts")
+async def get_quality_alerts(
+    limit: int = Query(default=50, ge=1, le=200),
+    acknowledged: bool = Query(default=False),
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.models.quality_alert import QualityAlert
+
+    query = QualityAlert.find(QualityAlert.acknowledged == acknowledged)
+    alerts = await query.sort("-created_at").limit(limit).to_list()
+    return {
+        "alerts": [
+            {
+                "uuid": a.uuid,
+                "alert_type": a.alert_type,
+                "item_kind": a.item_kind,
+                "item_id": a.item_id,
+                "item_name": a.item_name,
+                "severity": a.severity,
+                "message": a.message,
+                "previous_score": a.previous_score,
+                "current_score": a.current_score,
+                "previous_tier": a.previous_tier,
+                "current_tier": a.current_tier,
+                "acknowledged": a.acknowledged,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in alerts
+        ]
+    }
+
+
+@router.post("/quality/alerts/{uuid}/acknowledge")
+async def acknowledge_alert(
+    uuid: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.models.quality_alert import QualityAlert
+
+    alert = await QualityAlert.find_one(QualityAlert.uuid == uuid)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+    alert.acknowledged = True
+    alert.acknowledged_by = user.user_id
+    alert.acknowledged_at = datetime.datetime.now(datetime.timezone.utc)
+    await alert.save()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# 17. Per-Item Quality (Phase 4)
+# ---------------------------------------------------------------------------
+
+@router.get("/quality/items")
+async def quality_items(
+    sort: str = Query(default="score"),
+    order: str = Query(default="asc"),
+    limit: int = Query(default=100, ge=1, le=500),
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_items
+    return {"items": await get_quality_items(sort, order, limit)}
+
+
+@router.get("/quality/items/{item_kind}/{item_id}")
+async def quality_item_detail(
+    item_kind: str,
+    item_id: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_item_detail
+    return await get_quality_item_detail(item_kind, item_id)
+
+
+# ---------------------------------------------------------------------------
+# 18. Quality Contract (Phase 6)
+# ---------------------------------------------------------------------------
+
+@router.get("/quality/contract/{item_kind}/{item_id}")
+async def quality_contract(
+    item_kind: str,
+    item_id: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    from app.services.quality_service import get_quality_contract_status
+    return await get_quality_contract_status(item_kind, item_id)

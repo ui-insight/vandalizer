@@ -24,11 +24,15 @@ class SearchSetItemRequest(BaseModel):
     searchphrase: str
     searchtype: str = "extraction"
     title: Optional[str] = None
+    is_optional: bool = False
+    enum_values: list[str] = []
 
 
 class UpdateSearchSetItemRequest(BaseModel):
     searchphrase: Optional[str] = None
     title: Optional[str] = None
+    is_optional: Optional[bool] = None
+    enum_values: Optional[list[str]] = None
 
 
 class ReorderItemsRequest(BaseModel):
@@ -52,6 +56,10 @@ class SearchSetResponse(BaseModel):
     verified: bool = False
     item_count: int = 0
     extraction_config: dict = {}
+    quality_score: Optional[float] = None
+    quality_tier: Optional[str] = None
+    last_validated_at: Optional[str] = None
+    validation_run_count: int = 0
 
 
 class SearchSetItemResponse(BaseModel):
@@ -60,6 +68,8 @@ class SearchSetItemResponse(BaseModel):
     searchset: Optional[str] = None
     searchtype: str
     title: Optional[str] = None
+    is_optional: bool = False
+    enum_values: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +160,7 @@ class FieldValidationResult(BaseModel):
     consistency: float = 0.0
     accuracy: Optional[float] = None
     accuracy_method: Optional[str] = None
+    enum_compliance: Optional[float] = None
 
 
 class TestCaseValidationResult(BaseModel):

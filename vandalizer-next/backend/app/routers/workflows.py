@@ -15,15 +15,19 @@ from app.models.user import User
 from app.schemas.workflows import (
     AddStepRequest,
     AddTaskRequest,
+    CreateTempDocumentsRequest,
     CreateWorkflowRequest,
     ReorderStepsRequest,
     RunWorkflowRequest,
     TestStepRequest,
     UpdateStepRequest,
     UpdateTaskRequest,
+    UpdateValidationInputsRequest,
+    UpdateValidationPlanRequest,
     UpdateWorkflowRequest,
-    ValidateWorkflowRequest,
     ValidateWorkflowResponse,
+    ValidationInputsResponse,
+    ValidationPlanResponse,
     WorkflowResponse,
     WorkflowStatusResponse,
 )
@@ -300,6 +304,17 @@ async def get_workflow_quality_history(
     return {"runs": await get_quality_history("workflow", workflow_id, limit)}
 
 
+@router.get("/{workflow_id}/quality-sparkline")
+async def get_workflow_quality_sparkline(
+    workflow_id: str, limit: int = 10, user: User = Depends(get_current_user),
+):
+    """Return compact score history for sparkline visualization."""
+    from app.services.quality_service import get_quality_history
+    runs = await get_quality_history("workflow", workflow_id, limit)
+    scores = [{"score": r["score"], "created_at": r["created_at"]} for r in reversed(runs)]
+    return {"scores": scores}
+
+
 @router.post("/{workflow_id}/improvement-suggestions")
 async def get_workflow_suggestions(
     workflow_id: str, user: User = Depends(get_current_user),
@@ -315,13 +330,70 @@ async def get_workflow_suggestions(
     return {"suggestions": suggestions}
 
 
-@router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
-async def validate_workflow(workflow_id: str, req: ValidateWorkflowRequest, user: User = Depends(get_current_user)):
+@router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
+async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        result = await svc.validate_workflow(workflow_id, req.eval_plan, req.text_input)
-        return ValidateWorkflowResponse(**result)
+        checks = await svc.get_validation_plan(workflow_id)
+        return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
+async def update_validation_plan(
+    workflow_id: str, req: UpdateValidationPlanRequest, user: User = Depends(get_current_user),
+):
+    try:
+        checks = await svc.update_validation_plan(workflow_id, [c.model_dump() for c in req.checks])
+        return ValidationPlanResponse(checks=checks)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{workflow_id}/validation-plan/generate", response_model=ValidationPlanResponse)
+async def generate_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
+    try:
+        checks = await svc.generate_validation_plan(workflow_id)
+        return ValidationPlanResponse(checks=checks)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
+async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
+    try:
+        inputs = await svc.get_validation_inputs(workflow_id)
+        return ValidationInputsResponse(inputs=inputs)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.put("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
+async def update_validation_inputs(
+    workflow_id: str, req: UpdateValidationInputsRequest, user: User = Depends(get_current_user),
+):
+    try:
+        inputs = await svc.update_validation_inputs(workflow_id, [i.model_dump() for i in req.inputs])
+        return ValidationInputsResponse(inputs=inputs)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{workflow_id}/create-temp-documents")
+async def create_temp_documents(
+    workflow_id: str, req: CreateTempDocumentsRequest, user: User = Depends(get_current_user),
+):
+    uuids = await svc.create_temp_documents_from_text(req.texts, user.user_id)
+    return {"document_uuids": uuids}
+
+
+@router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
+async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+    try:
+        result = await svc.validate_workflow(workflow_id)
+        return ValidateWorkflowResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ---------------------------------------------------------------------------

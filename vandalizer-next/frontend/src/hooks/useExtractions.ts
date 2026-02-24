@@ -67,7 +67,7 @@ export function useSearchSetItems(searchSetUuid: string | null) {
     setItems(prev => prev.filter(i => i.id !== itemId))
   }
 
-  const update = async (itemId: string, data: { searchphrase?: string; title?: string }) => {
+  const update = async (itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => {
     const updated = await api.updateItem(itemId, data)
     setItems(prev => prev.map(i => i.id === itemId ? updated : i))
     return updated

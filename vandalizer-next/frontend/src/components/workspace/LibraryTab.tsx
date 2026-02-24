@@ -95,8 +95,13 @@ export function LibraryTab() {
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOption === 'az') return a.name.localeCompare(b.name)
+    // Pinned first, then favorited
     if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
     if (a.favorited !== b.favorited) return a.favorited ? -1 : 1
+    // Then by most recently used/created (descending)
+    const aTime = a.last_used_at || a.created_at || ''
+    const bTime = b.last_used_at || b.created_at || ''
+    if (aTime !== bTime) return bTime.localeCompare(aTime)
     return 0
   })
 
@@ -491,20 +496,20 @@ export function LibraryTab() {
         {/* Sidebar */}
         <div
           style={{
-            width: 180,
+            width: 120,
             flexShrink: 0,
             minHeight: 0,
             borderRight: '1px solid #f0f0f0',
             backgroundColor: '#fafafa',
-            padding: '20px 0',
+            padding: '14px 0',
             overflowY: 'auto',
           }}
         >
           <div
             style={{
-              padding: '0 24px',
-              marginBottom: 8,
-              fontSize: 11,
+              padding: '0 12px',
+              marginBottom: 6,
+              fontSize: 10,
               fontWeight: 700,
               textTransform: 'uppercase',
               color: '#888',
@@ -533,9 +538,9 @@ export function LibraryTab() {
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  padding: '10px 16px 10px 24px',
+                  padding: '7px 10px 7px 12px',
                   cursor: 'pointer',
-                  fontSize: 14,
+                  fontSize: 12,
                   fontWeight: isActive ? 600 : 500,
                   color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
                   backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
@@ -543,10 +548,10 @@ export function LibraryTab() {
                   transition: 'background 0.1s',
                 }}
               >
-                <Icon style={{ width: 14, height: 14, marginRight: 10, flexShrink: 0 }} />
+                <Icon style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{label}</span>
                 {count > 0 && (
-                  <span style={{ marginLeft: 'auto', fontSize: 12, color: '#aaa', fontWeight: 400 }}>{count}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa', fontWeight: 400 }}>{count}</span>
                 )}
               </div>
             )
@@ -593,7 +598,8 @@ export function LibraryTab() {
                   onShare={handleShare}
                   onRemove={handleRemove}
                   onEdit={openEditModal}
-                  {...(scope === 'explore' ? { qualityTier: item.quality_tier, qualityScore: item.quality_score } : {})}
+                  qualityTier={item.quality_tier}
+                  qualityScore={item.quality_score}
                   onOpen={(it) => {
                     touchItem(it.id).then(() => refreshItems()).catch(() => {})
                     if (it.kind === 'workflow') {

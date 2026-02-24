@@ -7,8 +7,11 @@ import {
   Share2,
   Trash2,
   Pencil,
+  ShieldCheck,
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
+import { submitForVerification } from '../../api/library'
+import { relativeTime } from '../../utils/time'
 import type { LibraryItem } from '../../types/library'
 
 interface Props {
@@ -84,7 +87,6 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           }}
         >
           {item.name}
-          {qualityTier !== undefined && <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />}
           {item.favorited && !hovered && (
             <Star size={12} fill="#fbbc04" style={{ color: '#fbbc04', flexShrink: 0 }} />
           )}
@@ -119,13 +121,15 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       </div>
 
       {/* Last used / actions column */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
         {!hovered && !menuOpen ? (
           <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
             {item.last_used_at ? relativeTime(item.last_used_at) : item.created_at ? relativeTime(item.created_at) : 'Never'}
           </div>
         ) : (
           <>
+            {/* Top row: action buttons */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             {/* Favorite */}
             <button
               onClick={(e) => {
@@ -266,6 +270,25 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       }}
                     />
                   )}
+                  {!item.verified && (
+                    <MenuItem
+                      icon={<ShieldCheck size={14} />}
+                      label="Submit for Verification"
+                      onClick={async () => {
+                        setMenuOpen(false)
+                        try {
+                          await submitForVerification({
+                            item_kind: item.kind,
+                            item_id: item.item_id,
+                            summary: item.name,
+                          })
+                          alert('Submitted for verification!')
+                        } catch {
+                          alert('Failed to submit. Please try again.')
+                        }
+                      }}
+                    />
+                  )}
                   <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                   <MenuItem
                     icon={<Trash2 size={14} />}
@@ -279,25 +302,16 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 </div>
               )}
             </div>
+            </div>
+            {/* Bottom row: quality badge (workflows and extraction tasks only) */}
+            {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
+              <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
+            )}
           </>
         )}
       </div>
     </div>
   )
-}
-
-function relativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'Just now'
-  if (mins < 60) return `${mins}m ago`
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  if (days < 30) return `${days}d ago`
-  const months = Math.floor(days / 30)
-  if (months < 12) return `${months}mo ago`
-  return `${Math.floor(months / 12)}y ago`
 }
 
 function MenuItem({

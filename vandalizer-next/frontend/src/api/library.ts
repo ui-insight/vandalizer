@@ -126,10 +126,21 @@ export function myVerificationRequests(limit = 50) {
   return apiFetch<{ requests: VerificationRequest[] }>(`/api/verification/mine?limit=${limit}`)
 }
 
-export function updateVerificationStatus(requestUuid: string, status: string, reviewerNotes?: string) {
+export function updateVerificationStatus(
+  requestUuid: string,
+  status: string,
+  reviewerNotes?: string,
+  groupIds?: string[],
+  collectionIds?: string[],
+) {
   return apiFetch<VerificationRequest>(`/api/verification/${requestUuid}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status, reviewer_notes: reviewerNotes }),
+    body: JSON.stringify({
+      status,
+      reviewer_notes: reviewerNotes,
+      group_ids: groupIds,
+      collection_ids: collectionIds,
+    }),
   })
 }
 

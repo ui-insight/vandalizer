@@ -62,7 +62,7 @@ function statusMetaClass(status: ActivityEvent['status']) {
 }
 
 export function ActivityRail() {
-  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, activitySignal } = useWorkspace()
+  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
   const { activities, refresh } = useActivities(activitySignal)
 
   const handleDelete = useCallback(
@@ -77,6 +77,9 @@ export function ActivityRail() {
   const handleClick = useCallback(
     (activity: ActivityEvent) => {
       if (activity.type === 'conversation' && activity.conversation_id) {
+        closeWorkflow()
+        closeExtraction()
+        closeAutomation()
         setActiveRightTab('assistant')
         setLoadConversationId(activity.conversation_id)
       } else if (activity.type === 'workflow_run' && activity.workflow_id) {
@@ -85,7 +88,7 @@ export function ActivityRail() {
         openExtraction(activity.search_set_uuid)
       }
     },
-    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction],
+    [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation],
   )
 
   const isRunning = (status: ActivityEvent['status']) =>

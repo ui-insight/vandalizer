@@ -6,7 +6,7 @@ import {
   MousePointerClick, PenTool, Send, ClipboardCheck, Flag,
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck,
-  ArrowRight, Pause, ChevronRight, TrendingUp,
+  ArrowRight, Pause, ChevronRight, TrendingUp, RefreshCw,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
@@ -14,8 +14,9 @@ import {
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow,
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions,
+  getValidationPlan, updateValidationPlan, generateValidationPlan,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationResult, QualityHistoryRun } from '../../api/workflows'
+import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, QualityHistoryRun } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { listContents } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
@@ -2996,59 +2997,90 @@ const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: str
   SKIP: { bg: '#f3f4f6', text: '#6b7280', label: 'SKIP' },
 }
 
-const STATUS_OPTIONS: Array<ValidationCheck['status']> = ['PASS', 'FAIL', 'WARN', 'SKIP']
-
-function computeGrade(checks: ValidationCheck[]): { grade: string; summary: string } {
-  const statuses = checks.map(c => c.status)
-  const failCount = statuses.filter(s => s === 'FAIL').length
-  const warnCount = statuses.filter(s => s === 'WARN').length
-  const passCount = statuses.filter(s => s === 'PASS').length
-  const total = checks.length
-
-  let grade: string
-  if (failCount === 0 && warnCount === 0) grade = 'A'
-  else if (failCount === 0 && warnCount <= 1) grade = 'B'
-  else if (failCount === 0) grade = 'C'
-  else if (failCount === 1) grade = 'D'
-  else grade = 'F'
-
-  const summary = `${passCount}/${total} checks passed, ${warnCount} warnings, ${failCount} failures`
-  return { grade, summary }
-}
 
 function ValidateTab({ workflowId }: { workflowId: string | null }) {
-  const [evalPlan, setEvalPlan] = useState('')
-  const [textInput, setTextInput] = useState('')
+  // Plan state
+  const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
+  const [planLoading, setPlanLoading] = useState(false)
+  const [generating, setGenerating] = useState(false)
+
+  // Plan editing state
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [addingCheck, setAddingCheck] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDesc, setNewDesc] = useState('')
+  const [newCategory, setNewCategory] = useState('content')
+
+  // Validation results state
   const [validating, setValidating] = useState(false)
   const [checks, setChecks] = useState<ValidationCheck[]>([])
   const [gradeInfo, setGradeInfo] = useState<{ grade: string; summary: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [editingIdx, setEditingIdx] = useState<number | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editDetail, setEditDetail] = useState('')
-  const [addingCheck, setAddingCheck] = useState(false)
-  const [newName, setNewName] = useState('')
-  const [newStatus, setNewStatus] = useState<ValidationCheck['status']>('PASS')
-  const [newDetail, setNewDetail] = useState('')
+
+  // Quality history & suggestions
   const [qualityHistory, setQualityHistory] = useState<QualityHistoryRun[]>([])
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
-  const updateGrade = (updatedChecks: ValidationCheck[]) => {
-    setChecks(updatedChecks)
-    if (updatedChecks.length > 0) {
-      setGradeInfo(computeGrade(updatedChecks))
-    } else {
-      setGradeInfo(null)
-    }
-  }
+  // Debounce timer for auto-saving plan edits
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  const savePlan = useCallback((updatedChecks: ValidationCheckDefinition[]) => {
+    setPlanChecks(updatedChecks)
+    if (!workflowId) return
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      updateValidationPlan(workflowId, updatedChecks).catch(() => {})
+    }, 800)
+  }, [workflowId])
+
+  // Load plan and quality history on mount
   useEffect(() => {
     if (!workflowId) return
+    setPlanLoading(true)
+    getValidationPlan(workflowId)
+      .then(r => setPlanChecks(r.checks))
+      .catch(() => {})
+      .finally(() => setPlanLoading(false))
     getWorkflowQualityHistory(workflowId)
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
   }, [workflowId])
+
+  const handleGenerate = async () => {
+    if (!workflowId) return
+    setGenerating(true)
+    setError(null)
+    try {
+      const res = await generateValidationPlan(workflowId)
+      setPlanChecks(res.checks)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to generate plan')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleValidate = async () => {
+    if (!workflowId || planChecks.length === 0) return
+    setValidating(true)
+    setError(null)
+    setSuggestions(null)
+    try {
+      const res = await validateWorkflow(workflowId)
+      setChecks(res.checks)
+      setGradeInfo({ grade: res.grade, summary: res.summary })
+      getWorkflowQualityHistory(workflowId)
+        .then(r => setQualityHistory(r.runs))
+        .catch(() => {})
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Validation failed')
+    } finally {
+      setValidating(false)
+    }
+  }
 
   const handleGetSuggestions = async () => {
     if (!workflowId) return
@@ -3063,62 +3095,43 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     }
   }
 
-  const handleValidate = async () => {
-    if (!workflowId) return
-    setValidating(true)
-    setError(null)
-    setEditingIdx(null)
-    setAddingCheck(false)
-    setSuggestions(null)
-    try {
-      const res = await validateWorkflow(workflowId, evalPlan || undefined, textInput || undefined)
-      setChecks(res.checks)
-      setGradeInfo({ grade: res.grade, summary: res.summary })
-      // Refresh quality history after new validation run
-      getWorkflowQualityHistory(workflowId)
-        .then(r => setQualityHistory(r.runs))
-        .catch(() => {})
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Validation failed')
-    } finally {
-      setValidating(false)
-    }
-  }
-
-  const handleDeleteCheck = (idx: number) => {
-    const updated = checks.filter((_, i) => i !== idx)
-    if (editingIdx === idx) setEditingIdx(null)
-    else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1)
-    updateGrade(updated)
-  }
-
+  // Plan editing handlers
   const handleStartEdit = (idx: number) => {
     setEditingIdx(idx)
-    setEditName(checks[idx].name)
-    setEditDetail(checks[idx].detail || '')
+    setEditName(planChecks[idx].name)
+    setEditDesc(planChecks[idx].description)
   }
 
   const handleSaveEdit = (idx: number) => {
-    const updated = [...checks]
-    updated[idx] = { ...updated[idx], name: editName, detail: editDetail }
+    const updated = [...planChecks]
+    updated[idx] = { ...updated[idx], name: editName, description: editDesc }
     setEditingIdx(null)
-    updateGrade(updated)
+    savePlan(updated)
   }
 
-  const handleStatusChange = (idx: number, status: ValidationCheck['status']) => {
-    const updated = [...checks]
-    updated[idx] = { ...updated[idx], status }
-    updateGrade(updated)
+  const handleDeletePlanCheck = (idx: number) => {
+    const updated = planChecks.filter((_, i) => i !== idx)
+    if (editingIdx === idx) setEditingIdx(null)
+    else if (editingIdx !== null && editingIdx > idx) setEditingIdx(editingIdx - 1)
+    savePlan(updated)
   }
 
-  const handleAddCheck = () => {
+  const handleAddPlanCheck = () => {
     if (!newName.trim()) return
-    const updated = [...checks, { name: newName.trim(), status: newStatus, detail: newDetail.trim() || null }]
+    const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2)
+    const updated = [...planChecks, { id, name: newName.trim(), description: newDesc.trim(), category: newCategory }]
     setNewName('')
-    setNewStatus('PASS')
-    setNewDetail('')
+    setNewDesc('')
+    setNewCategory('content')
     setAddingCheck(false)
-    updateGrade(updated)
+    savePlan(updated)
+  }
+
+  const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+    completeness: { bg: '#dbeafe', text: '#2563eb' },
+    formatting: { bg: '#fae8ff', text: '#a21caf' },
+    content: { bg: '#dcfce7', text: '#16a34a' },
+    accuracy: { bg: '#fef3c7', text: '#ca8a04' },
   }
 
   const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
@@ -3126,71 +3139,262 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
   return (
     <div style={{ padding: 24 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 16 }}>
-        Validation & Evaluation
+        Output Quality Validation
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Evaluation plan */}
+
+        {/* ---- Validation Plan Section ---- */}
         <div style={{
           border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
         }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Evaluation Plan
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Validation Plan</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                Quality checks evaluated against the workflow's actual output.
+              </div>
+            </div>
+            {planChecks.length > 0 && (
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#6b7280', cursor: generating ? 'not-allowed' : 'pointer',
+                  opacity: generating ? 0.6 : 1,
+                }}
+              >
+                <RefreshCw style={{ width: 11, height: 11 }} /> Regenerate
+              </button>
+            )}
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Define criteria for validating workflow output quality. When provided, the LLM will generate additional checks based on your criteria.
-          </div>
-          <textarea
-            value={evalPlan}
-            onChange={e => setEvalPlan(e.target.value)}
-            placeholder="Describe what a successful workflow output looks like..."
-            style={{
-              width: '100%', minHeight: 80, fontSize: 13, fontFamily: 'inherit',
-              border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px',
-              backgroundColor: '#fff', resize: 'vertical', boxSizing: 'border-box',
-              color: '#374151', outline: 'none',
-            }}
-          />
+
+          {planLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, justifyContent: 'center' }}>
+              <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
+              <span style={{ fontSize: 12, color: '#6b7280' }}>Loading plan...</span>
+            </div>
+          ) : planChecks.length === 0 && !generating ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              padding: '24px 16px', border: '2px dashed #d1d5db', borderRadius: 8, marginTop: 8,
+            }}>
+              <ShieldCheck style={{ width: 28, height: 28, color: '#9ca3af' }} />
+              <div style={{ fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
+                No validation plan yet. Generate one from your workflow structure.
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                style={{
+                  padding: '8px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                  border: 'none', borderRadius: 6, cursor: 'pointer',
+                  backgroundColor: 'var(--highlight-color, #eab308)',
+                  color: 'var(--highlight-text-color, #000)',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <Sparkles style={{ width: 14, height: 14 }} /> Generate Plan
+              </button>
+            </div>
+          ) : generating ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, justifyContent: 'center' }}>
+              <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
+              <span style={{ fontSize: 12, color: '#6b7280' }}>Generating quality checks...</span>
+            </div>
+          ) : (
+            /* Editable check list */
+            <div style={{
+              border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden', marginTop: 8,
+              backgroundColor: '#fff',
+            }}>
+              {planChecks.map((check, idx) => {
+                const catColor = CATEGORY_COLORS[check.category || 'content'] || CATEGORY_COLORS.content
+                const isEditing = editingIdx === idx
+                return (
+                  <div
+                    key={check.id}
+                    style={{
+                      display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                      borderBottom: idx < planChecks.length - 1 ? '1px solid #f3f4f6' : 'none',
+                    }}
+                  >
+                    {/* Category badge */}
+                    <span style={{
+                      padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
+                      letterSpacing: '0.05em', textTransform: 'uppercase',
+                      backgroundColor: catColor.bg, color: catColor.text,
+                      whiteSpace: 'nowrap', marginTop: 3,
+                    }}>
+                      {check.category || 'content'}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      {isEditing ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          <input
+                            value={editName}
+                            onChange={e => setEditName(e.target.value)}
+                            style={{
+                              fontSize: 13, fontWeight: 500, color: '#202124',
+                              border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px',
+                              fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box',
+                            }}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(idx) }}
+                          />
+                          <textarea
+                            value={editDesc}
+                            onChange={e => setEditDesc(e.target.value)}
+                            placeholder="What should the evaluator look for..."
+                            style={{
+                              fontSize: 11, color: '#6b7280',
+                              border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px',
+                              fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box',
+                              resize: 'vertical', minHeight: 40,
+                            }}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
+                          {check.description && (
+                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{check.description}</div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      {isEditing ? (
+                        <button
+                          onClick={() => handleSaveEdit(idx)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#16a34a', display: 'flex' }}
+                          title="Save"
+                        >
+                          <CheckCircle style={{ width: 14, height: 14 }} />
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleStartEdit(idx)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                          title="Edit check"
+                        >
+                          <Pencil style={{ width: 13, height: 13 }} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDeletePlanCheck(idx)}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                        title="Remove check"
+                      >
+                        <X style={{ width: 14, height: 14 }} />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Add check row */}
+              {addingCheck ? (
+                <div style={{ padding: '10px 12px', borderTop: '1px solid #f3f4f6' }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                    <select
+                      value={newCategory}
+                      onChange={e => setNewCategory(e.target.value)}
+                      style={{
+                        padding: '4px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600,
+                        border: '1px solid #d1d5db', cursor: 'pointer', fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value="completeness">completeness</option>
+                      <option value="formatting">formatting</option>
+                      <option value="content">content</option>
+                      <option value="accuracy">accuracy</option>
+                    </select>
+                    <input
+                      value={newName}
+                      onChange={e => setNewName(e.target.value)}
+                      placeholder="Check name..."
+                      autoFocus
+                      style={{
+                        flex: 1, fontSize: 13, border: '1px solid #d1d5db', borderRadius: 4,
+                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddPlanCheck() }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      value={newDesc}
+                      onChange={e => setNewDesc(e.target.value)}
+                      placeholder="Description: what should the evaluator look for..."
+                      style={{
+                        flex: 1, fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4,
+                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
+                      }}
+                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddPlanCheck() }}
+                    />
+                    <button
+                      onClick={handleAddPlanCheck}
+                      disabled={!newName.trim()}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        border: 'none', borderRadius: 4, cursor: newName.trim() ? 'pointer' : 'not-allowed',
+                        backgroundColor: '#16a34a', color: '#fff', opacity: newName.trim() ? 1 : 0.5,
+                      }}
+                    >
+                      Add
+                    </button>
+                    <button
+                      onClick={() => { setAddingCheck(false); setNewName(''); setNewDesc(''); setNewCategory('content') }}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer',
+                        backgroundColor: '#fff', color: '#374151',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingCheck(true)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px',
+                    width: '100%', background: 'none', border: 'none', borderTop: '1px solid #f3f4f6',
+                    cursor: 'pointer', fontSize: 12, color: '#6b7280', fontFamily: 'inherit',
+                  }}
+                >
+                  <Plus style={{ width: 13, height: 13 }} /> Add Check
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Test text input */}
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Test Text
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Paste sample text to validate the workflow against.
-          </div>
-          <textarea
-            value={textInput}
-            onChange={e => setTextInput(e.target.value)}
-            placeholder="Paste sample document text here..."
-            style={{
-              width: '100%', minHeight: 80, fontSize: 13, fontFamily: 'inherit',
-              border: '1px solid #d1d5db', borderRadius: 6, padding: '10px 12px',
-              backgroundColor: '#fff', resize: 'vertical', boxSizing: 'border-box',
-              color: '#374151', outline: 'none',
-            }}
-          />
-        </div>
-
-        {/* Run validation button */}
+        {/* ---- Run Validation ---- */}
         <button
           onClick={handleValidate}
-          disabled={validating || !workflowId}
+          disabled={validating || !workflowId || planChecks.length === 0}
           style={{
             padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            border: 'none', borderRadius: 6, cursor: validating ? 'not-allowed' : 'pointer',
+            border: 'none', borderRadius: 6,
+            cursor: validating || planChecks.length === 0 ? 'not-allowed' : 'pointer',
             backgroundColor: 'var(--highlight-color, #eab308)',
             color: 'var(--highlight-text-color, #000)',
-            opacity: validating ? 0.6 : 1,
+            opacity: validating || planChecks.length === 0 ? 0.5 : 1,
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
         >
           {validating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
-          {validating ? 'Validating...' : 'Run Validation'}
+          {validating ? 'Evaluating output...' : 'Run Validation'}
         </button>
+        {planChecks.length === 0 && !planLoading && !generating && (
+          <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: -8 }}>
+            Generate or add checks to your validation plan first.
+          </div>
+        )}
 
         {error && (
           <div style={{
@@ -3201,11 +3405,10 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
           </div>
         )}
 
-        {/* Quality History Chart — visible even before running validation */}
+        {/* ---- Quality History Chart ---- */}
         {qualityHistory.length > 1 && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
-            backgroundColor: '#fff',
+            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fff',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
               <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
@@ -3224,8 +3427,7 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
                       flex: 1, maxWidth: 24, height: barHeight,
                       backgroundColor: gc.text, borderRadius: 2,
                       opacity: i === [...qualityHistory].length - 1 ? 1 : 0.6,
-                      transition: 'height 0.2s',
-                      cursor: 'default',
+                      transition: 'height 0.2s', cursor: 'default',
                     }}
                   />
                 )
@@ -3242,7 +3444,7 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
           </div>
         )}
 
-        {/* Validation result */}
+        {/* ---- Validation Results ---- */}
         {gradeInfo && (
           <>
             {/* Grade badge */}
@@ -3253,28 +3455,22 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
               <div style={{
                 width: 56, height: 56, borderRadius: 12,
                 backgroundColor: gradeStyle?.bg,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
                 <span style={{ fontSize: 28, fontWeight: 800, color: gradeStyle?.text }}>
                   {gradeInfo.grade}
                 </span>
               </div>
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
-                  Validation Grade
-                </div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  {gradeInfo.summary}
-                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Validation Grade</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{gradeInfo.summary}</div>
               </div>
             </div>
 
-            {/* LLM Improvement Suggestions — show when grade is below A */}
+            {/* Improvement Suggestions */}
             {gradeInfo.grade !== 'A' && (
               <div style={{
-                border: '1px solid #fde68a', borderRadius: 8, padding: 16,
-                backgroundColor: '#fffbeb',
+                border: '1px solid #fde68a', borderRadius: 8, padding: 16, backgroundColor: '#fffbeb',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -3309,195 +3505,43 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
               </div>
             )}
 
-            {/* Check results table */}
-            <div style={{
-              border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden',
-            }}>
+            {/* Check results */}
+            <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
               <div style={{
                 padding: '10px 16px', backgroundColor: '#f9fafb',
                 borderBottom: '1px solid #e5e7eb',
                 fontSize: 12, fontWeight: 600, color: '#374151',
                 textTransform: 'uppercase', letterSpacing: '0.05em',
               }}>
-                Validation Checks
+                Check Results
               </div>
               {checks.map((check, idx) => {
                 const statusStyle = CHECK_STATUS_STYLES[check.status] || CHECK_STATUS_STYLES.SKIP
-                const isEditing = editingIdx === idx
                 return (
                   <div
-                    key={idx}
+                    key={check.check_id || idx}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+                      display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 16px',
                       borderBottom: idx < checks.length - 1 ? '1px solid #f3f4f6' : 'none',
                     }}
                   >
-                    {/* Status badge — clickable dropdown when editing */}
-                    <select
-                      value={check.status}
-                      onChange={e => handleStatusChange(idx, e.target.value as ValidationCheck['status'])}
-                      style={{
-                        padding: '2px 4px', borderRadius: 4,
-                        fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
-                        backgroundColor: statusStyle.bg, color: statusStyle.text,
-                        border: '1px solid transparent', cursor: 'pointer',
-                        appearance: 'auto', minWidth: 60,
-                      }}
-                    >
-                      {STATUS_OPTIONS.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    <span style={{
+                      padding: '2px 6px', borderRadius: 4,
+                      fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                      backgroundColor: statusStyle.bg, color: statusStyle.text,
+                      whiteSpace: 'nowrap', marginTop: 2,
+                    }}>
+                      {check.status}
+                    </span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      {isEditing ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          <input
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            style={{
-                              fontSize: 13, fontWeight: 500, color: '#202124',
-                              border: '1px solid #d1d5db', borderRadius: 4, padding: '4px 8px',
-                              fontFamily: 'inherit', outline: 'none', width: '100%',
-                              boxSizing: 'border-box',
-                            }}
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(idx) }}
-                          />
-                          <input
-                            value={editDetail}
-                            onChange={e => setEditDetail(e.target.value)}
-                            placeholder="Detail..."
-                            style={{
-                              fontSize: 11, color: '#6b7280',
-                              border: '1px solid #d1d5db', borderRadius: 4, padding: '3px 8px',
-                              fontFamily: 'inherit', outline: 'none', width: '100%',
-                              boxSizing: 'border-box',
-                            }}
-                            onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(idx) }}
-                          />
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
-                          {check.detail && (
-                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{check.detail}</div>
-                          )}
-                        </>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>{check.name}</div>
+                      {check.detail && (
+                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.5 }}>{check.detail}</div>
                       )}
-                    </div>
-                    {/* Action buttons */}
-                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                      {isEditing ? (
-                        <button
-                          onClick={() => handleSaveEdit(idx)}
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                            color: '#16a34a', display: 'flex',
-                          }}
-                          title="Save"
-                        >
-                          <CheckCircle style={{ width: 14, height: 14 }} />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleStartEdit(idx)}
-                          style={{
-                            background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                            color: '#9ca3af', display: 'flex',
-                          }}
-                          title="Edit check"
-                        >
-                          <Pencil style={{ width: 13, height: 13 }} />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteCheck(idx)}
-                        style={{
-                          background: 'none', border: 'none', cursor: 'pointer', padding: 4,
-                          color: '#9ca3af', display: 'flex',
-                        }}
-                        title="Remove check"
-                      >
-                        <X style={{ width: 14, height: 14 }} />
-                      </button>
                     </div>
                   </div>
                 )
               })}
-
-              {/* Add check row */}
-              {addingCheck ? (
-                <div style={{ padding: '10px 16px', borderTop: '1px solid #f3f4f6' }}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-                    <select
-                      value={newStatus}
-                      onChange={e => setNewStatus(e.target.value as ValidationCheck['status'])}
-                      style={{
-                        padding: '4px 6px', borderRadius: 4, fontSize: 11, fontWeight: 700,
-                        border: '1px solid #d1d5db', cursor: 'pointer', fontFamily: 'inherit',
-                      }}
-                    >
-                      {STATUS_OPTIONS.map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
-                    <input
-                      value={newName}
-                      onChange={e => setNewName(e.target.value)}
-                      placeholder="Check name..."
-                      autoFocus
-                      style={{
-                        flex: 1, fontSize: 13, border: '1px solid #d1d5db', borderRadius: 4,
-                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
-                      }}
-                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddCheck() }}
-                    />
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <input
-                      value={newDetail}
-                      onChange={e => setNewDetail(e.target.value)}
-                      placeholder="Detail (optional)..."
-                      style={{
-                        flex: 1, fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4,
-                        padding: '4px 8px', fontFamily: 'inherit', outline: 'none',
-                      }}
-                      onKeyDown={e => { if (e.key === 'Enter' && newName.trim()) handleAddCheck() }}
-                    />
-                    <button
-                      onClick={handleAddCheck}
-                      disabled={!newName.trim()}
-                      style={{
-                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                        border: 'none', borderRadius: 4, cursor: newName.trim() ? 'pointer' : 'not-allowed',
-                        backgroundColor: '#16a34a', color: '#fff', opacity: newName.trim() ? 1 : 0.5,
-                      }}
-                    >
-                      Add
-                    </button>
-                    <button
-                      onClick={() => { setAddingCheck(false); setNewName(''); setNewDetail(''); setNewStatus('PASS') }}
-                      style={{
-                        padding: '4px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                        border: '1px solid #d1d5db', borderRadius: 4, cursor: 'pointer',
-                        backgroundColor: '#fff', color: '#374151',
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setAddingCheck(true)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 6, padding: '10px 16px',
-                    width: '100%', background: 'none', border: 'none', borderTop: '1px solid #f3f4f6',
-                    cursor: 'pointer', fontSize: 12, color: '#6b7280', fontFamily: 'inherit',
-                  }}
-                >
-                  <Plus style={{ width: 13, height: 13 }} /> Add Check
-                </button>
-              )}
             </div>
           </>
         )}

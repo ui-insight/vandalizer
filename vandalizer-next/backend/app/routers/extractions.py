@@ -32,34 +32,65 @@ router = APIRouter()
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+async def _attach_quality(ss) -> dict:
+    """Query quality data for a SearchSet from VerifiedItemMetadata or latest ValidationRun."""
+    from app.models.verification import VerifiedItemMetadata
+    from app.services.quality_service import get_latest_validation
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == "search_set",
+        VerifiedItemMetadata.item_id == ss.uuid,
+    )
+    if meta:
+        return {
+            "quality_score": meta.quality_score,
+            "quality_tier": meta.quality_tier,
+            "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
+            "validation_run_count": meta.validation_run_count or 0,
+        }
+
+    latest = await get_latest_validation("search_set", ss.uuid)
+    if latest:
+        return {
+            "quality_score": latest.get("score"),
+            "quality_tier": None,
+            "last_validated_at": latest.get("created_at"),
+            "validation_run_count": 1,
+        }
+
+    return {"quality_score": None, "quality_tier": None, "last_validated_at": None, "validation_run_count": 0}
+
+
+async def _ss_response(ss) -> SearchSetResponse:
+    """Build a SearchSetResponse with quality data attached."""
+    count = await ss.item_count()
+    quality = await _attach_quality(ss)
+    return SearchSetResponse(
+        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
+        status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
+        is_global=ss.is_global, verified=ss.verified, item_count=count,
+        extraction_config=ss.extraction_config,
+        **quality,
+    )
+
+
+# ---------------------------------------------------------------------------
 # SearchSet CRUD
 # ---------------------------------------------------------------------------
 
 @router.post("/search-sets", response_model=SearchSetResponse)
 async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
     ss = await svc.create_search_set(req.title, req.space, req.set_type, user.user_id, extraction_config=req.extraction_config)
-    count = await ss.item_count()
-    return SearchSetResponse(
-        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
-        status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-        is_global=ss.is_global, verified=ss.verified, item_count=count,
-        extraction_config=ss.extraction_config,
-    )
+    return await _ss_response(ss)
 
 
 @router.get("/search-sets", response_model=list[SearchSetResponse])
 async def list_search_sets(space: str | None = None, user: User = Depends(get_current_user)):
     sets = await svc.list_search_sets(space=space)
-    results = []
-    for ss in sets:
-        count = await ss.item_count()
-        results.append(SearchSetResponse(
-            id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
-            status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-            is_global=ss.is_global, verified=ss.verified, item_count=count,
-            extraction_config=ss.extraction_config,
-        ))
-    return results
+    return [await _ss_response(ss) for ss in sets]
 
 
 @router.get("/search-sets/{uuid}", response_model=SearchSetResponse)
@@ -67,13 +98,7 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
     ss = await svc.get_search_set(uuid)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
-    count = await ss.item_count()
-    return SearchSetResponse(
-        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
-        status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-        is_global=ss.is_global, verified=ss.verified, item_count=count,
-        extraction_config=ss.extraction_config,
-    )
+    return await _ss_response(ss)
 
 
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
@@ -81,13 +106,7 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
     ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
-    count = await ss.item_count()
-    return SearchSetResponse(
-        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
-        status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-        is_global=ss.is_global, verified=ss.verified, item_count=count,
-        extraction_config=ss.extraction_config,
-    )
+    return await _ss_response(ss)
 
 
 @router.delete("/search-sets/{uuid}")
@@ -103,13 +122,7 @@ async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
     ss = await svc.clone_search_set(uuid, user.user_id)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
-    count = await ss.item_count()
-    return SearchSetResponse(
-        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
-        status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-        is_global=ss.is_global, verified=ss.verified, item_count=count,
-        extraction_config=ss.extraction_config,
-    )
+    return await _ss_response(ss)
 
 
 # ---------------------------------------------------------------------------
@@ -118,10 +131,14 @@ async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
 
 @router.post("/search-sets/{uuid}/items", response_model=SearchSetItemResponse)
 async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(get_current_user)):
-    item = await svc.add_item(uuid, req.searchphrase, req.searchtype, req.title, user.user_id)
+    item = await svc.add_item(
+        uuid, req.searchphrase, req.searchtype, req.title, user.user_id,
+        is_optional=req.is_optional, enum_values=req.enum_values or [],
+    )
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
+        is_optional=item.is_optional, enum_values=item.enum_values,
     )
 
 
@@ -132,6 +149,7 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
         SearchSetItemResponse(
             id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
             searchtype=item.searchtype, title=item.title,
+            is_optional=item.is_optional, enum_values=item.enum_values,
         )
         for item in items
     ]
@@ -139,12 +157,16 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
 
 @router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
 async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)):
-    item = await svc.update_item(item_id, searchphrase=req.searchphrase, title=req.title)
+    item = await svc.update_item(
+        item_id, searchphrase=req.searchphrase, title=req.title,
+        is_optional=req.is_optional, enum_values=req.enum_values,
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
+        is_optional=item.is_optional, enum_values=item.enum_values,
     )
 
 
@@ -398,6 +420,89 @@ async def get_extraction_quality_history(
 ):
     from app.services.quality_service import get_quality_history
     return {"runs": await get_quality_history("search_set", uuid, limit)}
+
+
+@router.get("/search-sets/{uuid}/quality-sparkline")
+async def get_extraction_quality_sparkline(
+    uuid: str, limit: int = 10, user: User = Depends(get_current_user),
+):
+    """Return compact score history for sparkline visualization."""
+    from app.services.quality_service import get_quality_history
+    runs = await get_quality_history("search_set", uuid, limit)
+    scores = [{"score": r["score"], "created_at": r["created_at"]} for r in reversed(runs)]
+    return {"scores": scores}
+
+
+@router.get("/search-sets/{uuid}/quality-status")
+async def get_extraction_quality_status(
+    uuid: str, user: User = Depends(get_current_user),
+):
+    """Return quality status for Quality Pulse card."""
+    import hashlib
+    import json
+    from app.models.verification import VerifiedItemMetadata
+    from app.services.quality_service import get_latest_validation
+
+    ss = await svc.get_search_set(uuid)
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == "search_set",
+        VerifiedItemMetadata.item_id == uuid,
+    )
+    latest = await get_latest_validation("search_set", uuid)
+
+    if not latest and not meta:
+        return {"status": "unvalidated", "score": None, "tier": None, "config_changed": False, "stale": False}
+
+    score = meta.quality_score if meta else latest.get("score") if latest else None
+    tier = meta.quality_tier if meta else None
+    last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else
+               latest.get("created_at") if latest else None)
+
+    # Check if config changed since last validation
+    config_changed = False
+    if latest:
+        last_config = latest.get("extraction_config", {})
+        current_config = ss.extraction_config or {}
+        current_hash = hashlib.sha256(json.dumps(current_config, sort_keys=True).encode()).hexdigest()
+        last_hash = hashlib.sha256(json.dumps(last_config, sort_keys=True).encode()).hexdigest()
+        config_changed = current_hash != last_hash
+
+    # Check staleness (>14 days)
+    import datetime
+    stale = False
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    if meta and meta.last_validated_at:
+        lv = meta.last_validated_at
+        if lv.tzinfo is None:
+            lv = lv.replace(tzinfo=datetime.timezone.utc)
+        stale = (now_utc - lv).days > 14
+    elif latest and latest.get("created_at"):
+        from dateutil.parser import isoparse
+        created = isoparse(latest["created_at"])
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=datetime.timezone.utc)
+        stale = (now_utc - created).days > 14
+
+    return {
+        "status": "validated",
+        "score": score,
+        "tier": tier,
+        "last_validated_at": last_at,
+        "config_changed": config_changed,
+        "stale": stale,
+    }
+
+
+@router.get("/search-sets/{uuid}/quality-contract")
+async def get_extraction_quality_contract(
+    uuid: str, user: User = Depends(get_current_user),
+):
+    """Return quality contract status for a search set."""
+    from app.services.quality_service import get_quality_contract_status
+    return await get_quality_contract_status("search_set", uuid)
 
 
 @router.post("/search-sets/{uuid}/improvement-suggestions")
