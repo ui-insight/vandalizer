@@ -1955,6 +1955,40 @@ class IntakeConfig(me.Document):
 # ---------------------------------------------------------------------------
 
 
+class KnowledgeBase(me.Document):
+    """A curated knowledge base built from documents and URLs."""
+
+    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
+    title = me.StringField(required=True, max_length=300)
+    description = me.StringField(required=False, max_length=5000)
+    user_id = me.StringField(required=True, max_length=200)
+    team_id = me.StringField(required=False, max_length=200)
+    space = me.StringField(required=False, max_length=200)
+    sources = me.ListField(
+        me.ReferenceField("KnowledgeBaseSource")
+    )
+    status = me.StringField(
+        default="empty",
+        choices=["empty", "building", "ready", "error"],
+    )
+    total_sources = me.IntField(default=0)
+    sources_ready = me.IntField(default=0)
+    sources_failed = me.IntField(default=0)
+    total_chunks = me.IntField(default=0)
+    collection_name = me.StringField(required=False, max_length=200)
+    created_at = me.DateTimeField(default=datetime.datetime.now)
+    updated_at = me.DateTimeField(default=datetime.datetime.now)
+
+    meta = {
+        "collection": "knowledge_bases",
+        "indexes": [
+            {"fields": ["user_id", "-created_at"]},
+            {"fields": ["team_id", "-created_at"]},
+            {"fields": ["uuid"], "unique": True},
+        ],
+    }
+
+
 class KnowledgeBaseSource(me.Document):
     """A single source (document or URL) within a knowledge base."""
 
@@ -1982,40 +2016,6 @@ class KnowledgeBaseSource(me.Document):
         "indexes": [
             "knowledge_base",
             "uuid",
-        ],
-    }
-
-
-class KnowledgeBase(me.Document):
-    """A curated knowledge base built from documents and URLs."""
-
-    uuid = me.StringField(default=lambda: uuid4().hex, required=True, unique=True)
-    title = me.StringField(required=True, max_length=300)
-    description = me.StringField(required=False, max_length=5000)
-    user_id = me.StringField(required=True, max_length=200)
-    team_id = me.StringField(required=False, max_length=200)
-    space = me.StringField(required=False, max_length=200)
-    sources = me.ListField(
-        me.ReferenceField("KnowledgeBaseSource", reverse_delete_rule=PULL)
-    )
-    status = me.StringField(
-        default="empty",
-        choices=["empty", "building", "ready", "error"],
-    )
-    total_sources = me.IntField(default=0)
-    sources_ready = me.IntField(default=0)
-    sources_failed = me.IntField(default=0)
-    total_chunks = me.IntField(default=0)
-    collection_name = me.StringField(required=False, max_length=200)
-    created_at = me.DateTimeField(default=datetime.datetime.now)
-    updated_at = me.DateTimeField(default=datetime.datetime.now)
-
-    meta = {
-        "collection": "knowledge_bases",
-        "indexes": [
-            {"fields": ["user_id", "-created_at"]},
-            {"fields": ["team_id", "-created_at"]},
-            {"fields": ["uuid"], "unique": True},
         ],
     }
 

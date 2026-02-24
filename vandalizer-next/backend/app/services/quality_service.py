@@ -20,6 +20,7 @@ async def persist_validation_run(
     result: dict,
     user_id: str,
     model: Optional[str] = None,
+    extraction_config: Optional[dict] = None,
 ) -> ValidationRun:
     """Create a ValidationRun from a validation result dict and update quality metadata."""
     # Compute unified score
@@ -60,6 +61,7 @@ async def persist_validation_run(
         checks_passed=checks_passed,
         checks_failed=checks_failed,
         result_snapshot=result,
+        extraction_config=extraction_config or {},
         user_id=user_id,
         created_at=datetime.datetime.now(tz=datetime.timezone.utc),
     )
@@ -446,6 +448,7 @@ def _run_to_dict(r: ValidationRun) -> dict:
         "checks_passed": r.checks_passed,
         "checks_failed": r.checks_failed,
         "result_snapshot": r.result_snapshot,
+        "extraction_config": r.extraction_config,
         "user_id": r.user_id,
         "created_at": r.created_at.isoformat() if r.created_at else None,
     }

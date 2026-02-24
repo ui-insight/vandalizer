@@ -52,6 +52,10 @@ interface WorkspaceContextValue {
   deactivateKB: () => void
   /** Reset workspace to default home state */
   resetToHome: () => void
+  /** Request the left panel to view a specific document */
+  viewDocumentRequest: { uuid: string; title: string } | null
+  viewDocument: (uuid: string, title: string) => void
+  clearViewDocumentRequest: () => void
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
@@ -111,6 +115,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
+  const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
 
   const bumpActivitySignal = useCallback(() => {
     setActivitySignal(prev => prev + 1)
@@ -177,6 +182,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const deactivateKB = useCallback(() => {
     setActiveKBUuid(null)
     setActiveKBTitle(null)
+  }, [])
+
+  const viewDocument = useCallback((uuid: string, title: string) => {
+    setViewDocumentRequest({ uuid, title })
+  }, [])
+
+  const clearViewDocumentRequest = useCallback(() => {
+    setViewDocumentRequest(null)
   }, [])
 
   const resetToHome = useCallback(() => {
@@ -250,6 +263,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         activateKB,
         deactivateKB,
         resetToHome,
+        viewDocumentRequest,
+        viewDocument,
+        clearViewDocumentRequest,
       }}
     >
       {children}
