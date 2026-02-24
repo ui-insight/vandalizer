@@ -66,7 +66,7 @@ export function PanelResizer({ containerRef, onDragStart, onDragEnd }: PanelResi
       style={{
         width: 1,
         position: 'relative',
-        zIndex: 600,
+        zIndex: 10,
       }}
     >
       {/* Visible line */}

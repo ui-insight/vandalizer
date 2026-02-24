@@ -83,10 +83,11 @@ export function runExtractionSync(data: {
   document_uuids: string[]
   model?: string
   extraction_config_override?: Record<string, unknown>
-}) {
+}, signal?: AbortSignal) {
   return apiFetch<{ results: unknown[] }>('/api/extractions/run-sync', {
     method: 'POST',
     body: JSON.stringify(data),
+    signal,
   })
 }
 
@@ -178,6 +179,80 @@ export function runValidation(data: {
   })
 }
 
+// V2 Validation (source-based)
+
+export interface ValidationSource {
+  source_type: 'document' | 'text'
+  document_uuid?: string
+  label?: string
+  source_text?: string
+  expected_values: Record<string, string>
+}
+
+export interface ExecutiveSummary {
+  mean_accuracy: number | null
+  mean_consistency: number
+  perfect_fields_count: number
+  total_fields_count: number
+  run_to_run_std_dev: number
+  best_run: { source_index: number; run_index: number; correct: number }
+  worst_run: { source_index: number; run_index: number; correct: number }
+  per_run_reproducibility: { source_label: string; runs: number[] }[]
+}
+
+export interface SourceFieldResult {
+  field_name: string
+  expected: string | null
+  extracted_values: (string | null)[]
+  most_common_value: string | null
+  distinct_value_count: number
+  consistency: number
+  accuracy: number | null
+  accuracy_method: string | null
+  error_types: Record<string, number>
+}
+
+export interface SourceValidationResult {
+  source_label: string
+  source_type: string
+  fields: SourceFieldResult[]
+  overall_accuracy: number | null
+  overall_consistency: number
+  per_run_correct: number[]
+}
+
+export interface ChallengingField {
+  field_name: string
+  source_label: string
+  accuracy: number | null
+  consistency: number
+  most_common_error: string
+}
+
+export interface ValidationV2Result {
+  search_set_uuid: string
+  num_runs: number
+  num_sources: number
+  executive_summary: ExecutiveSummary
+  sources: SourceValidationResult[]
+  aggregate_accuracy: number | null
+  aggregate_consistency: number
+  challenging_fields: ChallengingField[]
+  error_type_summary: Record<string, number>
+}
+
+export function runValidationV2(data: {
+  search_set_uuid: string
+  sources: ValidationSource[]
+  num_runs?: number
+  model?: string
+}) {
+  return apiFetch<ValidationV2Result>('/api/extractions/validate-v2', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // Quality history
 
 export interface QualityHistoryRun {
@@ -189,6 +264,8 @@ export interface QualityHistoryRun {
   model: string | null
   created_at: string
   num_test_cases: number
+  num_runs?: number
+  extraction_config?: Record<string, unknown> | null
 }
 
 export function getExtractionQualityHistory(uuid: string) {

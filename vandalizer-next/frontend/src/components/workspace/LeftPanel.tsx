@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, highlightTerms, setProcessingDoc } = useWorkspace()
+  const { setSelectedDocUuids, highlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -22,6 +22,15 @@ export function LeftPanel() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+
+  // Open a document when requested from another panel (e.g. validation tab)
+  useEffect(() => {
+    if (viewDocumentRequest) {
+      setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
+      setSelectedDocUuids([viewDocumentRequest.uuid])
+      clearViewDocumentRequest()
+    }
+  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids])
 
   // Sync processing state to workspace context so ChatPanel can show it
   useEffect(() => {

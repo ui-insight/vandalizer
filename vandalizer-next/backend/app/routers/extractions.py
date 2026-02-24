@@ -16,6 +16,7 @@ from app.schemas.extractions import (
     ReorderItemsRequest,
     RunExtractionSyncRequest,
     RunValidationRequest,
+    RunValidationV2Request,
     SearchSetItemRequest,
     SearchSetItemResponse,
     SearchSetResponse,
@@ -421,6 +422,21 @@ async def run_validation(req: RunValidationRequest, user: User = Depends(get_cur
             search_set_uuid=req.search_set_uuid,
             user_id=user.user_id,
             test_case_uuids=req.test_case_uuids or None,
+            num_runs=req.num_runs,
+            model=req.model,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/validate-v2")
+async def run_validation_v2(req: RunValidationV2Request, user: User = Depends(get_current_user)):
+    try:
+        result = await val_svc.run_validation_v2(
+            search_set_uuid=req.search_set_uuid,
+            user_id=user.user_id,
+            sources=[s.model_dump() for s in req.sources],
             num_runs=req.num_runs,
             model=req.model,
         )

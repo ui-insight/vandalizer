@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Sparkles, FileInput, Loader2, BookOpen, X, ArrowDown } from 'lucide-react'
+import { FileInput, Loader2, BookOpen, X, ArrowDown } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -299,7 +299,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   ) : activeKBUuid ? (
                     <BookOpen className="h-7 w-7 opacity-90" />
                   ) : (
-                    <Sparkles className="h-7 w-7 opacity-90" />
+                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
                   )}
                 </div>
                 <div>

@@ -127,6 +127,21 @@ class RunValidationRequest(BaseModel):
     model: Optional[str] = None
 
 
+class ValidationSource(BaseModel):
+    source_type: str  # "document" | "text"
+    document_uuid: Optional[str] = None
+    label: Optional[str] = None
+    source_text: Optional[str] = None
+    expected_values: dict[str, str] = {}
+
+
+class RunValidationV2Request(BaseModel):
+    search_set_uuid: str
+    sources: list[ValidationSource]
+    num_runs: int = 3
+    model: Optional[str] = None
+
+
 class FieldValidationResult(BaseModel):
     field_name: str
     expected: Optional[str] = None

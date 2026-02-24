@@ -21,7 +21,9 @@
       "Bash(npm install:*)",
       "Bash(npm uninstall:*)",
       "Bash(npm ls:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)"
     ]
   }
 }
