@@ -5,23 +5,25 @@ import {
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, Send, ClipboardCheck, Flag,
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
-  Circle, Hand, Keyboard, Sparkles, ShieldCheck,
+  Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, ChevronRight, TrendingUp, RefreshCw,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
-  reorderSteps, validateWorkflow,
+  reorderSteps, validateWorkflow, runWorkflow, streamWorkflowStatus, createTempDocuments,
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
+  getValidationInputs, updateValidationInputs,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, QualityHistoryRun } from '../../api/workflows'
+import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
-import { listContents } from '../../api/documents'
+import { listContents, searchDocuments } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet } from '../../types/workflow'
 import type { Document as VDoc } from '../../types/document'
+import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -405,7 +407,7 @@ export function WorkflowEditorPanel() {
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
         {activeTab === 'output' && <OutputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
-        {activeTab === 'validate' && <ValidateTab workflowId={openWorkflowId} />}
+        {activeTab === 'validate' && <ValidateTab workflowId={openWorkflowId} selectedDocUuids={selectedDocUuids} />}
       </div>
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
@@ -2998,7 +3000,7 @@ const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: str
 }
 
 
-function ValidateTab({ workflowId }: { workflowId: string | null }) {
+function ValidateTab({ workflowId, selectedDocUuids }: { workflowId: string | null; selectedDocUuids: string[] }) {
   // Plan state
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
   const [planLoading, setPlanLoading] = useState(false)
@@ -3013,6 +3015,16 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
   const [newDesc, setNewDesc] = useState('')
   const [newCategory, setNewCategory] = useState('content')
 
+  // Test inputs state
+  const [inputs, setInputs] = useState<ValidationInputDefinition[]>([])
+  const [inputsLoading, setInputsLoading] = useState(false)
+  const [showDocPicker, setShowDocPicker] = useState(false)
+
+  // Combined run & validate state
+  const [runPhase, setRunPhase] = useState<'idle' | 'running' | 'validating'>('idle')
+  const [runProgress, setRunProgress] = useState('')
+  const cleanupRef = useRef<(() => void) | null>(null)
+
   // Validation results state
   const [validating, setValidating] = useState(false)
   const [checks, setChecks] = useState<ValidationCheck[]>([])
@@ -3024,8 +3036,9 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
 
-  // Debounce timer for auto-saving plan edits
+  // Debounce timers
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const inputsSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const savePlan = useCallback((updatedChecks: ValidationCheckDefinition[]) => {
     setPlanChecks(updatedChecks)
@@ -3036,18 +3049,37 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     }, 800)
   }, [workflowId])
 
-  // Load plan and quality history on mount
+  const saveInputs = useCallback((updatedInputs: ValidationInputDefinition[]) => {
+    setInputs(updatedInputs)
+    if (!workflowId) return
+    if (inputsSaveTimerRef.current) clearTimeout(inputsSaveTimerRef.current)
+    inputsSaveTimerRef.current = setTimeout(() => {
+      updateValidationInputs(workflowId, updatedInputs).catch(() => {})
+    }, 800)
+  }, [workflowId])
+
+  // Load plan, inputs, and quality history on mount
   useEffect(() => {
     if (!workflowId) return
     setPlanLoading(true)
+    setInputsLoading(true)
     getValidationPlan(workflowId)
       .then(r => setPlanChecks(r.checks))
       .catch(() => {})
       .finally(() => setPlanLoading(false))
+    getValidationInputs(workflowId)
+      .then(r => setInputs(r.inputs))
+      .catch(() => {})
+      .finally(() => setInputsLoading(false))
     getWorkflowQualityHistory(workflowId)
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
   }, [workflowId])
+
+  // Cleanup SSE stream on unmount
+  useEffect(() => {
+    return () => { cleanupRef.current?.() }
+  }, [])
 
   const handleGenerate = async () => {
     if (!workflowId) return
@@ -3082,6 +3114,82 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     }
   }
 
+  // Combined Run & Validate flow
+  const handleRunAndValidate = async () => {
+    if (!workflowId || planChecks.length === 0 || inputs.length === 0) return
+    setError(null)
+    setSuggestions(null)
+    setRunPhase('running')
+    setRunProgress('Preparing inputs...')
+
+    try {
+      // Collect document UUIDs from document inputs
+      const docUuids: string[] = inputs
+        .filter(i => i.type === 'document' && i.document_uuid)
+        .map(i => i.document_uuid!)
+
+      // Create temp documents from text inputs
+      const textInputs = inputs.filter(i => i.type === 'text' && i.text)
+      if (textInputs.length > 0) {
+        setRunProgress('Creating temp documents...')
+        const tempResult = await createTempDocuments(
+          workflowId,
+          textInputs.map(i => ({ text: i.text!, label: i.label || 'Text input' })),
+        )
+        docUuids.push(...tempResult.document_uuids)
+      }
+
+      if (docUuids.length === 0) {
+        setError('No valid inputs to run the workflow with.')
+        setRunPhase('idle')
+        return
+      }
+
+      // Run the workflow
+      setRunProgress('Starting workflow...')
+      const { session_id } = await runWorkflow(workflowId, { document_uuids: docUuids })
+
+      // Stream status until complete
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = streamWorkflowStatus(
+          session_id,
+          (status) => {
+            const step = status.current_step_name || ''
+            const detail = status.current_step_detail || ''
+            setRunProgress(
+              step
+                ? `Running: ${step}${detail ? ` - ${detail}` : ''} (${status.num_steps_completed}/${status.num_steps_total})`
+                : `Running... (${status.num_steps_completed}/${status.num_steps_total} steps)`
+            )
+            if (status.status === 'completed') {
+              resolve()
+            } else if (status.status === 'error' || status.status === 'failed') {
+              reject(new Error('Workflow execution failed'))
+            }
+          },
+          (err) => reject(err),
+        )
+        cleanupRef.current = cleanup
+      })
+
+      // Now validate
+      setRunPhase('validating')
+      setRunProgress('Evaluating output...')
+      const res = await validateWorkflow(workflowId)
+      setChecks(res.checks)
+      setGradeInfo({ grade: res.grade, summary: res.summary })
+      getWorkflowQualityHistory(workflowId)
+        .then(r => setQualityHistory(r.runs))
+        .catch(() => {})
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Run & Validate failed')
+    } finally {
+      setRunPhase('idle')
+      setRunProgress('')
+      cleanupRef.current = null
+    }
+  }
+
   const handleGetSuggestions = async () => {
     if (!workflowId) return
     setLoadingSuggestions(true)
@@ -3093,6 +3201,60 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
     } finally {
       setLoadingSuggestions(false)
     }
+  }
+
+  // Test inputs handlers
+  const addDocuments = (docs: { uuid: string; title: string }[]) => {
+    const newInputs: ValidationInputDefinition[] = docs.map(d => ({
+      id: crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+      type: 'document' as const,
+      document_uuid: d.uuid,
+      document_title: d.title,
+    }))
+    saveInputs([...inputs, ...newInputs])
+  }
+
+  const addTextInput = () => {
+    const newInput: ValidationInputDefinition = {
+      id: crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+      type: 'text',
+      text: '',
+      label: '',
+    }
+    saveInputs([...inputs, newInput])
+  }
+
+  const addCurrentDocuments = async () => {
+    if (selectedDocUuids.length === 0) return
+    const existingUuids = new Set(inputs.filter(i => i.document_uuid).map(i => i.document_uuid!))
+    const newUuids = selectedDocUuids.filter(u => !existingUuids.has(u))
+    if (newUuids.length === 0) return
+
+    // Look up titles via search
+    let titleMap: Record<string, string> = {}
+    try {
+      const res = await searchDocuments('', 100)
+      for (const doc of res.items) {
+        titleMap[doc.uuid] = doc.title
+      }
+    } catch { /* use fallback titles */ }
+
+    const newInputs: ValidationInputDefinition[] = newUuids.map(uuid => ({
+      id: crypto.randomUUID?.() || Math.random().toString(36).slice(2),
+      type: 'document' as const,
+      document_uuid: uuid,
+      document_title: titleMap[uuid] || `Document ${uuid.slice(0, 8)}...`,
+    }))
+    saveInputs([...inputs, ...newInputs])
+  }
+
+  const updateTextInput = (id: string, field: 'text' | 'label', value: string) => {
+    const updated = inputs.map(i => i.id === id ? { ...i, [field]: value } : i)
+    saveInputs(updated)
+  }
+
+  const removeInput = (id: string) => {
+    saveInputs(inputs.filter(i => i.id !== id))
   }
 
   // Plan editing handlers
@@ -3135,6 +3297,9 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
   }
 
   const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
+  const hasInputs = inputs.length > 0
+  const hasChecks = planChecks.length > 0
+  const isBusy = runPhase !== 'idle' || validating
 
   return (
     <div style={{ padding: 24 }}>
@@ -3142,6 +3307,143 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
         Output Quality Validation
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* ---- Test Inputs Section ---- */}
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Test Inputs</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                Documents or text blocks to run the workflow against during validation.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {selectedDocUuids.length > 0 && (
+                <button
+                  onClick={addCurrentDocuments}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                    color: '#374151', cursor: 'pointer',
+                  }}
+                >
+                  <Plus style={{ width: 11, height: 11 }} /> Add Current Doc
+                </button>
+              )}
+              <button
+                onClick={() => setShowDocPicker(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <FileText style={{ width: 11, height: 11 }} /> Add Document
+              </button>
+              <button
+                onClick={addTextInput}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <Type style={{ width: 11, height: 11 }} /> Add Text
+              </button>
+            </div>
+          </div>
+
+          {inputsLoading ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, justifyContent: 'center' }}>
+              <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', color: '#6b7280' }} />
+              <span style={{ fontSize: 12, color: '#6b7280' }}>Loading inputs...</span>
+            </div>
+          ) : inputs.length === 0 ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              padding: '16px', border: '2px dashed #e5e7eb', borderRadius: 8, marginTop: 4,
+            }}>
+              <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
+                No test inputs yet. Add documents or text blocks, then use "Run & Validate" to test.
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af' }}>
+                Without inputs, validation evaluates the last execution's output.
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden', marginTop: 4,
+              backgroundColor: '#fff',
+            }}>
+              {inputs.map((input, idx) => (
+                <div
+                  key={input.id}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                    borderBottom: idx < inputs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  }}
+                >
+                  {/* Type badge */}
+                  <span style={{
+                    padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
+                    letterSpacing: '0.05em', textTransform: 'uppercase',
+                    backgroundColor: input.type === 'document' ? '#dbeafe' : '#f3e8ff',
+                    color: input.type === 'document' ? '#2563eb' : '#7c3aed',
+                    whiteSpace: 'nowrap', marginTop: 3,
+                  }}>
+                    {input.type === 'document' ? 'DOC' : 'TEXT'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {input.type === 'document' ? (
+                      <div style={{ fontSize: 13, fontWeight: 500, color: '#202124', display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {input.document_title || input.document_uuid}
+                        </span>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <input
+                          value={input.label || ''}
+                          onChange={e => updateTextInput(input.id, 'label', e.target.value)}
+                          placeholder="Label (optional)..."
+                          style={{
+                            fontSize: 12, fontWeight: 500, color: '#202124',
+                            border: '1px solid #e5e7eb', borderRadius: 4, padding: '3px 8px',
+                            fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box',
+                          }}
+                        />
+                        <textarea
+                          value={input.text || ''}
+                          onChange={e => updateTextInput(input.id, 'text', e.target.value)}
+                          placeholder="Paste or type test content..."
+                          style={{
+                            fontSize: 12, color: '#374151',
+                            border: '1px solid #e5e7eb', borderRadius: 4, padding: '6px 8px',
+                            fontFamily: 'inherit', outline: 'none', width: '100%', boxSizing: 'border-box',
+                            resize: 'vertical', minHeight: 60,
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => removeInput(input.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex', flexShrink: 0 }}
+                    title="Remove input"
+                  >
+                    <Trash2 style={{ width: 13, height: 13 }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ---- Validation Plan Section ---- */}
         <div style={{
@@ -3373,24 +3675,47 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
           )}
         </div>
 
-        {/* ---- Run Validation ---- */}
-        <button
-          onClick={handleValidate}
-          disabled={validating || !workflowId || planChecks.length === 0}
-          style={{
-            padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-            border: 'none', borderRadius: 6,
-            cursor: validating || planChecks.length === 0 ? 'not-allowed' : 'pointer',
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            opacity: validating || planChecks.length === 0 ? 0.5 : 1,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          {validating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
-          {validating ? 'Evaluating output...' : 'Run Validation'}
-        </button>
-        {planChecks.length === 0 && !planLoading && !generating && (
+        {/* ---- Run Buttons ---- */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          {hasInputs && hasChecks ? (
+            <button
+              onClick={handleRunAndValidate}
+              disabled={isBusy}
+              style={{
+                flex: 1, padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                border: 'none', borderRadius: 6,
+                cursor: isBusy ? 'not-allowed' : 'pointer',
+                backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)',
+                opacity: isBusy ? 0.7 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {runPhase !== 'idle' && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+              {runPhase === 'running' ? runProgress
+                : runPhase === 'validating' ? 'Evaluating output...'
+                : 'Run & Validate'}
+            </button>
+          ) : (
+            <button
+              onClick={handleValidate}
+              disabled={isBusy || !workflowId || !hasChecks}
+              style={{
+                flex: 1, padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                border: 'none', borderRadius: 6,
+                cursor: isBusy || !hasChecks ? 'not-allowed' : 'pointer',
+                backgroundColor: 'var(--highlight-color, #eab308)',
+                color: 'var(--highlight-text-color, #000)',
+                opacity: isBusy || !hasChecks ? 0.5 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {validating && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+              {validating ? 'Evaluating output...' : 'Run Validation'}
+            </button>
+          )}
+        </div>
+        {!hasChecks && !planLoading && !generating && (
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: -8 }}>
             Generate or add checks to your validation plan first.
           </div>
@@ -3546,6 +3871,15 @@ function ValidateTab({ workflowId }: { workflowId: string | null }) {
           </>
         )}
       </div>
+
+      {/* Document Picker Dialog */}
+      {showDocPicker && (
+        <DocumentPickerDialog
+          onSelect={addDocuments}
+          onClose={() => setShowDocPicker(false)}
+          excludeUuids={inputs.filter(i => i.document_uuid).map(i => i.document_uuid!)}
+        />
+      )}
     </div>
   )
 }

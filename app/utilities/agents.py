@@ -326,41 +326,44 @@ def get_agent_model(agent_model, thinking_override: Optional[bool] = None):
     thinking_enabled = model_config.get("thinking", False) if model_config else False
     if thinking_override is not None:
         thinking_enabled = thinking_override
-    
+
+    # Resolve per-model API key, falling back to env var or placeholder
+    api_key = (model_config.get("api_key", "") if model_config else "") or OPENAI_API_KEY or "no-api-key"
+
     # Handle OpenAI models (external OpenAI API)
     if "openai" in agent_model and model_config and model_config.get("external", False):
         model_name = agent_model.split("/")[-1]
         return OpenAIModel(
             model_name=model_name,
         )
-    
+
     # Get endpoint and protocol for this model
     endpoint = _get_model_endpoint(agent_model)
     api_protocol = _detect_api_protocol(agent_model, model_config)
-    
+
     debug(f"Using model {agent_model} with endpoint {endpoint} and protocol {api_protocol}")
-    
+
     # Create appropriate provider based on protocol
     if api_protocol == "ollama":
         provider = OllamaProvider(
-            api_key="no-api-key",
+            api_key=api_key,
             endpoint=endpoint,
             thinking_enabled=thinking_enabled
         )
     elif api_protocol == "vllm":
         provider = VLLMProvider(
-            api_key="no-api-key",
+            api_key=api_key,
             endpoint=endpoint,
             thinking_enabled=thinking_enabled
         )
     else:
         # Default to OpenAI-compatible (InsightAIProvider)
         provider = InsightAIProvider(
-            api_key="no-api-key",
+            api_key=api_key,
             thinking_enabled=thinking_enabled,
             endpoint=endpoint
         )
-    
+
     return OpenAIModel(
         model_name=agent_model,
         provider=provider,
