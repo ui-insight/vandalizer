@@ -666,17 +666,21 @@
 {% if recaptcha_site_key %}
 <script>
   (function () {
-    var form = document.getElementById('login-form');
-    if (!form) return;
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      grecaptcha.ready(function () {
-        grecaptcha.execute('{{ recaptcha_site_key }}', { action: 'login' }).then(function (token) {
-          document.getElementById('g-recaptcha-response').value = token;
-          form.submit();
+    function attachRecaptcha(formId, inputId, action) {
+      var form = document.getElementById(formId);
+      if (!form) return;
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        grecaptcha.ready(function () {
+          grecaptcha.execute('{{ recaptcha_site_key }}', { action: action }).then(function (token) {
+            document.getElementById(inputId).value = token;
+            form.submit();
+          });
         });
       });
-    });
+    }
+    attachRecaptcha('login-form', 'g-recaptcha-response', 'login');
+    attachRecaptcha('register-form', 'g-recaptcha-response-register', 'register');
   })();
 </script>
 {% endif %}

@@ -23,6 +23,36 @@ from app.utilities.config import get_auth_methods, get_oauth_provider_by_type, g
 auth = Blueprint("auth", __name__)
 
 
+def _verify_recaptcha(token: str) -> bool:
+    """Verify a reCAPTCHA v3 token. Returns True if valid or if no secret key is configured."""
+    import json as _json
+    import urllib.parse
+    import urllib.request
+
+    secret_key = get_recaptcha_secret_key()
+    if not secret_key:
+        return True
+    if not token:
+        return False
+    try:
+        data = urllib.parse.urlencode({
+            "secret": secret_key,
+            "response": token,
+            "remoteip": request.remote_addr,
+        }).encode()
+        req = urllib.request.Request(
+            "https://www.google.com/recaptcha/api/siteverify",
+            data=data,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            result = _json.loads(resp.read())
+        return bool(result.get("success"))
+    except Exception:
+        current_app.logger.warning("reCAPTCHA verification request failed; allowing through.")
+        return True
+
+
 @auth.route("/")
 def index() -> ResponseReturnValue:
     """Render the landing page if not authorized."""
@@ -109,33 +139,9 @@ def login() -> ResponseReturnValue:
 
     if password_enabled:
         # Verify reCAPTCHA token if configured
-        secret_key = get_recaptcha_secret_key()
-        if secret_key:
-            import urllib.parse
-            import urllib.request
-            import json as _json
-            token = request.form.get("g-recaptcha-response", "")
-            if not token:
-                flash("reCAPTCHA verification failed. Please try again.", "danger")
-                return redirect(url_for("auth.index"))
-            try:
-                data = urllib.parse.urlencode({
-                    "secret": secret_key,
-                    "response": token,
-                    "remoteip": request.remote_addr,
-                }).encode()
-                req = urllib.request.Request(
-                    "https://www.google.com/recaptcha/api/siteverify",
-                    data=data,
-                    method="POST",
-                )
-                with urllib.request.urlopen(req, timeout=5) as resp:
-                    result = _json.loads(resp.read())
-                if not result.get("success"):
-                    flash("reCAPTCHA verification failed. Please try again.", "danger")
-                    return redirect(url_for("auth.index"))
-            except Exception:
-                current_app.logger.warning("reCAPTCHA verification request failed; allowing login.")
+        if not _verify_recaptcha(request.form.get("g-recaptcha-response", "")):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return redirect(url_for("auth.index"))
 
         email = request.form.get("email")
         password = request.form.get("password")
@@ -170,6 +176,10 @@ def register():
         flash("Password registration is disabled. Please use the configured SSO provider.", "warning")
         return redirect(url_for("auth.index"))
     if request.method == "POST":
+        if not _verify_recaptcha(request.form.get("g-recaptcha-response", "")):
+            flash("reCAPTCHA verification failed. Please try again.", "danger")
+            return redirect(url_for("auth.register"))
+
         name = (request.form.get("name") or "").strip()
         email = (request.form.get("email") or "").strip()
         password = request.form.get("password")
@@ -225,7 +235,7 @@ def register():
         return redirect(url_for("home.index"))
 
     # For GET requests, show the registration form
-    return render_template("users/register.html")
+    return render_template("users/register.html", recaptcha_site_key=get_recaptcha_site_key())
 
 
 @auth.route("/logout")

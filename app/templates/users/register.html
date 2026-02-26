@@ -3,7 +3,7 @@
 {% block title %}Create Account{% endblock %}
 
 {% block hero_auth %}
-<form method="POST" action="{{ url_for('auth.register') }}" class="local-login-form">
+<form method="POST" action="{{ url_for('auth.register') }}" class="local-login-form" id="register-form">
   {% with messages = get_flashed_messages(with_categories=true) %}
   {% if messages %}
   {% for category, message in messages %}
@@ -14,6 +14,9 @@
   <input type="text" name="name" placeholder="Full Name" required />
   <input type="email" name="email" placeholder="Email Address" required />
   <input type="password" name="password" placeholder="Password" required />
+  {% if recaptcha_site_key %}
+  <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response-register">
+  {% endif %}
   <button type="submit">Create Account</button>
 </form>
 <hr>
