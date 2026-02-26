@@ -321,6 +321,30 @@ def get_ui_radius() -> str:
     return "12px"
 
 
+def get_recaptcha_site_key() -> str | None:
+    """Get reCAPTCHA v3 site key from database config or environment fallback."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.recaptcha_site_key:
+            return db_config.recaptcha_site_key
+    except Exception:
+        pass
+    return os.getenv("RECAPTCHA_SITE_KEY") or None
+
+
+def get_recaptcha_secret_key() -> str | None:
+    """Get reCAPTCHA v3 secret key from database config or environment fallback."""
+    try:
+        from app.models import SystemConfig
+        db_config = SystemConfig.get_config()
+        if db_config and db_config.recaptcha_secret_key:
+            return db_config.recaptcha_secret_key
+    except Exception:
+        pass
+    return os.getenv("RECAPTCHA_SECRET_KEY") or None
+
+
 def get_auth_methods() -> list[str]:
     """Get enabled authentication methods from database config."""
     env = os.getenv("FLASK_ENV", "development").lower()

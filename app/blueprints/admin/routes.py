@@ -711,8 +711,13 @@ def admin_config_auth_methods():
         methods.append("oauth")
         
     config.auth_methods = methods
+
+    # reCAPTCHA v3 keys
+    config.recaptcha_site_key = request.form.get("recaptcha_site_key", "").strip()
+    config.recaptcha_secret_key = request.form.get("recaptcha_secret_key", "").strip()
+
     config.save()
-    
+
     flash("Authentication methods updated.")
     return redirect(url_for("admin.admin_config"))
 

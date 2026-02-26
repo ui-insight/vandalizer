@@ -18,7 +18,7 @@ from mongoengine.errors import NotUniqueError
 from app import load_user
 from app.oauth import configure_azure_blueprint
 from app.models import TeamInvite, TeamMembership, User
-from app.utilities.config import get_auth_methods, get_oauth_provider_by_type
+from app.utilities.config import get_auth_methods, get_oauth_provider_by_type, get_recaptcha_site_key, get_recaptcha_secret_key
 
 auth = Blueprint("auth", __name__)
 
@@ -75,6 +75,7 @@ def index() -> ResponseReturnValue:
         azure_config_complete=azure_config_complete,
         azure_blueprint_registered=azure_blueprint_registered,
         azure_disabled_reason=azure_disabled_reason,
+        recaptcha_site_key=get_recaptcha_site_key(),
     )
 
 
@@ -107,6 +108,35 @@ def login() -> ResponseReturnValue:
         return redirect(url_for("auth.index"))
 
     if password_enabled:
+        # Verify reCAPTCHA token if configured
+        secret_key = get_recaptcha_secret_key()
+        if secret_key:
+            import urllib.parse
+            import urllib.request
+            import json as _json
+            token = request.form.get("g-recaptcha-response", "")
+            if not token:
+                flash("reCAPTCHA verification failed. Please try again.", "danger")
+                return redirect(url_for("auth.index"))
+            try:
+                data = urllib.parse.urlencode({
+                    "secret": secret_key,
+                    "response": token,
+                    "remoteip": request.remote_addr,
+                }).encode()
+                req = urllib.request.Request(
+                    "https://www.google.com/recaptcha/api/siteverify",
+                    data=data,
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    result = _json.loads(resp.read())
+                if not result.get("success"):
+                    flash("reCAPTCHA verification failed. Please try again.", "danger")
+                    return redirect(url_for("auth.index"))
+            except Exception:
+                current_app.logger.warning("reCAPTCHA verification request failed; allowing login.")
+
         email = request.form.get("email")
         password = request.form.get("password")
 

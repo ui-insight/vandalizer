@@ -130,6 +130,10 @@ class SystemConfig(me.Document):
     # - userinfo_endpoint: str (custom OAuth)
     oauth_providers = me.ListField(me.DictField(), default=[])
 
+    # reCAPTCHA v3 configuration
+    recaptcha_site_key = me.StringField(default="", max_length=200)
+    recaptcha_secret_key = me.StringField(default="", max_length=200)
+
     # Metadata
     updated_at = me.DateTimeField(default=datetime.datetime.now)
     updated_by = me.StringField(max_length=200)

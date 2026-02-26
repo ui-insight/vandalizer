@@ -436,7 +436,47 @@
                 </div>
             </div>
         </div>
-        <button type="submit" class="btn btn-secondary">Update Auth Methods</button>
+
+        <!-- reCAPTCHA v3 -->
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <label style="font-size: 14px; font-weight: 600; color: #374151; margin: 0;">
+                    Google reCAPTCHA v3
+                    {% if config.recaptcha_site_key and config.recaptcha_secret_key %}
+                    <span style="margin-left: 8px; font-size: 12px; font-weight: 500; color: #16a34a; background: #dcfce7; padding: 2px 8px; border-radius: 9999px;">Configured</span>
+                    {% else %}
+                    <span style="margin-left: 8px; font-size: 12px; font-weight: 500; color: #9ca3af; background: #f3f4f6; padding: 2px 8px; border-radius: 9999px;">Not configured</span>
+                    {% endif %}
+                </label>
+            </div>
+            <p style="font-size: 13px; color: #6b7280; margin: 4px 0 12px 0;">
+                Protect the login form with reCAPTCHA v3 (invisible challenge). Clear both fields to disable.
+                Get your keys at <a href="https://www.google.com/recaptcha/admin" target="_blank" style="color: #3b82f6;">g.co/recaptcha</a>.
+            </p>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label for="recaptcha_site_key">Site Key</label>
+                <div style="position: relative; display: flex; gap: 8px; align-items: center;">
+                    <input type="text" id="recaptcha_site_key" name="recaptcha_site_key"
+                        value="{{ config.recaptcha_site_key or '' }}"
+                        placeholder="6Lc..." style="flex: 1; font-family: monospace;">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label for="recaptcha_secret_key">Secret Key</label>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="password" id="recaptcha_secret_key" name="recaptcha_secret_key"
+                        value="{{ config.recaptcha_secret_key or '' }}"
+                        placeholder="6Lc..." autocomplete="new-password" style="flex: 1; font-family: monospace;">
+                    <button type="button" onclick="toggleRecaptchaSecret()"
+                        style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: #f9fafb; font-size: 13px; cursor: pointer; white-space: nowrap;">
+                        Show
+                    </button>
+                </div>
+                <small style="color: #6b7280; font-size: 12px; margin-top: 4px; display: block;">The secret key is sensitive. Use the Show button to reveal the current value.</small>
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-secondary" style="margin-top: 16px;">Update Auth Methods</button>
     </form>
 
     <!-- OAuth/SAML Providers -->
@@ -810,6 +850,18 @@
         const panel = document.getElementById(`provider-edit-${index}`);
         if (!panel) return;
         panel.classList.toggle('active');
+    }
+
+    function toggleRecaptchaSecret() {
+        const input = document.getElementById('recaptcha_secret_key');
+        const btn = input.nextElementSibling;
+        if (input.type === 'password') {
+            input.type = 'text';
+            btn.textContent = 'Hide';
+        } else {
+            input.type = 'password';
+            btn.textContent = 'Show';
+        }
     }
 </script>
 <script>

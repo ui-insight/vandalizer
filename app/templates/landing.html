@@ -1,6 +1,9 @@
 {% extends "base.html" %} {%block title%}Vandalizer{%endblock%} {% block head %}
 {{super()}}
 <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" />
+{% if recaptcha_site_key %}
+<script src="https://www.google.com/recaptcha/api.js?render={{ recaptcha_site_key }}"></script>
+{% endif %}
 
 {% endblock %} {% block styles %} {{super()}}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.8.0/dist/leaflet.css"
@@ -145,9 +148,12 @@
 
           {% if password_enabled %}
 
-          <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form">
+          <form method="POST" action="{{ url_for('auth.login') }}" class="local-login-form" id="login-form">
             <input type="email" name="email" placeholder="Email Address" required />
             <input type="password" name="password" placeholder="Password" required />
+            {% if recaptcha_site_key %}
+            <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response">
+            {% endif %}
             <button type="submit">SIGN IN</button>
           </form>
           <p style="margin-top: 12px; color: white;">
@@ -657,6 +663,23 @@
 <script>
   lucide.createIcons();
 </script>
+{% if recaptcha_site_key %}
+<script>
+  (function () {
+    var form = document.getElementById('login-form');
+    if (!form) return;
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      grecaptcha.ready(function () {
+        grecaptcha.execute('{{ recaptcha_site_key }}', { action: 'login' }).then(function (token) {
+          document.getElementById('g-recaptcha-response').value = token;
+          form.submit();
+        });
+      });
+    });
+  })();
+</script>
+{% endif %}
 <!-- 
 {% include "sitewide/footer.html" %}  -->
 
