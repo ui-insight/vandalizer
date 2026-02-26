@@ -5,12 +5,28 @@ services:
       - "6379:6379"
     networks:
       - vandalizer
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   mongo:
-    image: mongo:latest
+    image: mongo:7
     ports:
       - "27018:27017"
     networks:
       - vandalizer
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   chromadb:
     image: chromadb/chroma:latest
     ports:
@@ -22,59 +38,84 @@ services:
     environment:
       - IS_PERSISTENT=TRUE
       - ANONYMIZED_TELEMETRY=FALSE
-  celery:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    depends_on:
-      - redis
-      - mongo
-      - chromadb
-    env_file: .env
-    environment:
-      - REDIS_HOST=redis
-      - MONGO_HOST=mongodb://mongo:27017
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-      - USE_CHROMA_SERVER=true
-    networks:
-      - vandalizer
-    volumes:
-      - /tmp/vandalizer:/app/static/uploads
-    entrypoint: sh run_celery.sh
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-  web:
+  api:
     build:
-      context: .
+      context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "8001:8001"
     depends_on:
-      - redis
-      - mongo
-      - chromadb
-      - celery
-    env_file: .env
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    env_file: ./backend/.env
     environment:
       - REDIS_HOST=redis
-      - MONGO_HOST=mongodb://mongo:27017
-      - FLASK_ENV=development
-      - CHROMA_HOST=chromadb
-      - CHROMA_PORT=8000
-      - USE_CHROMA_SERVER=true
+      - MONGO_HOST=mongodb://mongo:27017/
+      - CHROMADB_PERSIST_DIR=/app/static/db
+      - UPLOAD_DIR=/app/static/uploads
     networks:
       - vandalizer
     volumes:
-      - /tmp/vandalizer:/app/static/uploads
+      - uploads:/app/static/uploads
+      - chroma-data:/app/static/db
+    restart: unless-stopped
+
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    env_file: ./backend/.env
+    environment:
+      - REDIS_HOST=redis
+      - MONGO_HOST=mongodb://mongo:27017/
+      - CHROMADB_PERSIST_DIR=/app/static/db
+      - UPLOAD_DIR=/app/static/uploads
+    networks:
+      - vandalizer
+    volumes:
+      - uploads:/app/static/uploads
+      - chroma-data:/app/static/db
+    entrypoint: ["sh", "run_celery.sh"]
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - vandalizer
+    restart: unless-stopped
 
 networks:
   vandalizer:
-    external: false
-    ipam:
-      driver: default
-      config:
-        - subnet: 10.20.0.0/24
+    driver: bridge
 
 volumes:
+  mongo-data:
+    driver: local
   chroma-data:
+    driver: local
+  uploads:
     driver: local

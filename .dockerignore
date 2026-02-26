@@ -1,3 +1,41 @@
-.venv
+# Version control
 .git
-app/static/uploads
+.gitignore
+
+# Virtual environments
+.venv
+**/node_modules
+
+# Build artifacts
+dist/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Logs and temp files
+*.log
+logs/
+pids/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Project-specific
+deprecated/
+demo-data/
+demo-containers/
+certs/
+chrome-extension/
+
+# CI / tooling
+.github/
+.claude/
+*.md
+!README.md
+LICENSE
