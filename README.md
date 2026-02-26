@@ -19,8 +19,29 @@ Vandalizer is an open-source platform built at the University of Idaho for AI-po
 
 ## Quickstart
 
+### Option A: Docker Compose (recommended)
+
 ```bash
-# Clone the repository
+git clone https://github.com/ui-insight/vandalizer.git
+cd vandalizer
+
+# Configure environment
+cp backend/.env.example backend/.env
+# Edit backend/.env — set OPENAI_API_KEY and JWT_SECRET_KEY
+
+# Build and start everything
+docker compose up --build -d
+
+# Verify
+curl http://localhost:8001/api/health
+# → {"status":"ok"}
+```
+
+The frontend is available at `http://localhost` and the API at `http://localhost:8001`.
+
+### Option B: Local development
+
+```bash
 git clone https://github.com/ui-insight/vandalizer.git
 cd vandalizer
 
@@ -28,20 +49,22 @@ cd vandalizer
 docker compose up -d redis mongo chromadb
 
 # Configure environment
-cp .env.example .env
-# Edit .env with your OPENAI_API_KEY and other settings
+cp backend/.env.example backend/.env
+# Edit backend/.env — set OPENAI_API_KEY
 
-# Install backend dependencies and run
+# Install and run the backend
+cd backend
 uv sync
-python run.py
+uvicorn app.main:app --reload --port 8001
 
-# In another terminal - start the frontend
-cd vandalizer-next/frontend
+# In another terminal — start the frontend
+cd frontend
 npm install
 npm run dev
 
-# In another terminal - start Celery workers
-./run_celery.sh start
+# In another terminal — start Celery workers
+cd backend
+./run_celery.sh
 ```
 
 ## Environment Variables
@@ -51,36 +74,35 @@ Copy `.env.example` to `.env`. Key variables:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `OPENAI_API_KEY` | Yes | API key for LLM provider |
-| `FLASK_ENV` | Yes | `development` / `testing` / `production` |
-| `SECRET_KEY` | Yes | Flask secret key for sessions |
-| `SECURITY_PASSWORD_SALT` | Yes | Salt for password hashing |
 | `MONGO_HOST` | Yes | MongoDB connection host |
-| `redis_host` | Yes | Redis connection host |
+| `MONGO_DB` | Yes | MongoDB database name (default: `osp`) |
+| `REDIS_HOST` | Yes | Redis connection host |
+| `JWT_SECRET_KEY` | Yes | Secret key for JWT authentication |
 
 See `.env.example` for the full list.
 
 ## Architecture
 
 ```
-React Frontend  -->  Flask Backend  -->  MongoDB
+React Frontend  -->  FastAPI Backend  -->  MongoDB
                          |
                     Celery Workers
                          |
               Redis / ChromaDB / LLM APIs
 ```
 
-- **Backend**: Flask with app factory pattern, MongoEngine models, pydantic-ai agents
-- **Frontend**: React 19, Tailwind CSS v4, TanStack Router
-- **Task Queues**: Celery with 4 named queues (uploads, documents, workflows, default)
+- **Backend**: FastAPI with Beanie ODM, pydantic-ai agents (`backend/`)
+- **Frontend**: React 19, Vite, Tailwind CSS v4, TanStack Router (`frontend/`)
+- **Task Queues**: Celery with named queues (uploads, documents, workflows, etc.)
 - **Vector Store**: ChromaDB for document embeddings and RAG
 - **Package Manager**: `uv` (Python), `npm` (frontend)
 
 ## Documentation
 
-- [Full Documentation](/docs) (when running locally)
+- [Deployment Guide](DEPLOY.md)
 - [Contributing Guide](CONTRIBUTING.md)
-- [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 

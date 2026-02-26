@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vandalizer is a Flask-based document intelligence platform for AI-powered document review, extraction, and chat. Built at the University of Idaho. Users upload documents, run LLM-powered extraction workflows, chat with documents via RAG, and collaborate in teams.
+Vandalizer is an AI-powered document intelligence platform for research administration, built at the University of Idaho. Users upload documents, run LLM-powered extraction workflows, chat with documents via RAG, and collaborate in teams.
+
+**Stack**: FastAPI + Beanie (backend), React 19 + Vite (frontend), Celery (task queues), MongoDB, Redis, ChromaDB.
 
 ## Development Commands
 
@@ -12,71 +14,69 @@ Vandalizer is a Flask-based document intelligence platform for AI-powered docume
 # Start infrastructure (Redis, MongoDB, ChromaDB)
 docker compose up redis mongo chromadb
 
-# Install dependencies
+# Backend
+cd backend
 uv sync
-
-# Run Flask dev server (port 5003)
-python run.py
+uvicorn app.main:app --reload --port 8001
 
 # Celery workers
-./run_celery.sh start       # Start all workers + Flower
-./run_celery.sh stop        # Stop all
-./run_celery.sh status      # Check status
-./run_celery.sh logs        # Tail all logs
-./run_celery.sh logs uploads  # Tail specific queue logs
+cd backend
+./run_celery.sh
 
-# Tests (E2E via Selenium against dev server)
-tox run                     # Headless Firefox + Chrome
-pytest                      # Run locally
+# Frontend
+cd frontend
+npm install
+npm run dev
 
 # Production
-gunicorn wsgi_app           # Configured in gunicorn.conf.py, port 8000
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
 ## Architecture
 
-### App Factory Pattern
-`app/__init__.py` — `create_app()` initializes Flask, Celery, config, blueprints, and auth. Config is selected by `FLASK_ENV` (development/testing/production).
+### Backend (`backend/`)
 
-### Three-Level Configuration
-1. **`app/configuration.py`** — Python config classes per environment (`DevelopmentConfig`, `TestingConfig`, `ProductionConfig`)
-2. **`app/utilities/config.py`** — `Settings` (Pydantic BaseSettings, reads `.env`) + DB-backed helpers
-3. **`SystemConfig` model** — MongoDB singleton for runtime-editable settings (models, auth, extraction, UI theme). Admins change these at runtime.
+**FastAPI application** with Beanie ODM (async MongoDB driver built on Motor).
 
-### Blueprints (in `app/`)
-`auth`, `home`, `workflows`, `files`, `spaces`, `library`, `tasks`, `office`, `admin`, `teams`, `feedback`, `activity` — each has its own `routes.py` with a URL prefix.
+- **`app/main.py`** — FastAPI app creation, middleware, router registration, Beanie initialization
+- **`app/config.py`** — Pydantic `Settings` (reads `.env`)
+- **`app/database.py`** — MongoDB/Beanie connection setup
+- **`app/dependencies.py`** — FastAPI dependency injection (current user, DB sessions)
 
-### Data Models
-`app/models.py` — All MongoEngine documents. Key models: `SystemConfig`, `User`, `Team`/`TeamMembership`, `SmartDocument`, `SmartFolder`, `Space`, `Workflow`/`WorkflowStep`/`WorkflowResult`, `ChatConversation`, `Library`/`LibraryItem`.
+### Routers (`backend/app/routers/`)
+`auth`, `documents`, `files`, `folders`, `workflows`, `extractions`, `chat`, `spaces`, `library`, `knowledge`, `teams`, `admin`, `config`, `feedback`, `activity`, `office`, `automations`, `verification`, `demo`, `browser_automation`, `graph_webhooks`
 
-### LLM / AI Layer (`app/utilities/`)
-- **`agents.py`** — pydantic-ai `Agent` creation, model resolution, OpenAI-compatible protocol detection, Redis-backed LLM caching. Agents are cached in module-level dicts.
-- **`extraction_manager_nontyped.py`** — Core extraction logic. Strategies: `one_pass` (single structured extraction) and `two_pass` (thinking draft → structured final). Configurable via `SystemConfig.extraction_config`.
-- **`chat_manager.py`** — Streaming chat with RAG, conversation persistence
-- **`workflow.py`** — Workflow execution engine using ThreadPoolExecutor parallelism and graphlib-based dependency resolution
+### Data Models (`backend/app/models/`)
+Beanie `Document` classes: `User`, `Team`/`TeamMembership`, `SmartDocument`, `SmartFolder`, `Space`, `Workflow`/`WorkflowStep`/`WorkflowResult`, `ChatConversation`, `Library`/`LibraryItem`, `SystemConfig`, `SearchSet`, `Group`, `QualityAlert`, `ValidationRun`, and more.
 
-### Document Processing (`app/utilities/`)
-- **`document_manager.py`** — Document processing pipeline, ChromaDB ingestion, PDF text extraction
-- **`document_readers.py`** — Multi-format text extraction (PDF, DOCX, XLSX, HTML) via PyMuPDF, pypandoc, markitdown
-- **`upload_manager.py`** — Celery chord-based parallel document validation
+### Services (`backend/app/services/`)
+Business logic layer. Key services:
+- **`llm_service.py`** — pydantic-ai agent creation, model resolution, LLM caching
+- **`extraction_engine.py`** — Core extraction logic (one-pass and two-pass strategies)
+- **`chat_service.py`** — Streaming chat with RAG
+- **`workflow_engine.py`** — Workflow execution with dependency resolution
+- **`document_manager.py`** — Document processing pipeline, ChromaDB ingestion
+- **`document_readers.py`** — Multi-format text extraction (PDF, DOCX, XLSX, HTML)
 
-### Celery Task Queues
-Defined in `app/celery_worker.py`. Four named queues: `uploads` (2 workers), `documents` (3 workers), `workflows` (2 workers), `default` (1 worker). Tasks are named as `tasks.<queue>.<name>`.
+### Celery Tasks (`backend/app/tasks/`)
+Task modules: `upload_tasks`, `document_tasks`, `workflow_tasks`, `extraction_tasks`, `evaluation_tasks`, `quality_tasks`, `knowledge_base_tasks`, `activity_tasks`, `passive_tasks`, `m365_tasks`, `demo_tasks`, `upload_validation_tasks`
+
+### Frontend (`frontend/`)
+React 19, Vite, TypeScript, Tailwind CSS v4, TanStack Router. Source in `frontend/src/`.
 
 ### Multi-Tenancy
 Documents, workflows, and folders are scoped by `space` and `team_id`. Users have a `current_team` and `TeamMembership` records with role-based access (owner/admin/member).
 
-### Frontend
-Jinja2 templates in `app/templates/`, Tailwind CSS, vanilla JS + jQuery. Core workspace UI is in `index.html` and `index_scripts.html`. Uses Lucide icons, Marked.js for markdown, Socket.IO for real-time features.
-
 ## Key Environment Variables
 
-Copy `.env.example` to `.env`. Required: `OPENAI_API_KEY`, `FLASK_ENV`, `SECRET_KEY`, `SECURITY_PASSWORD_SALT`, `MONGO_HOST`, `redis_host`. See `.env.example` for full list.
+Copy `.env.example` to `.env`. Required: `OPENAI_API_KEY`, `MONGO_HOST`, `MONGO_DB`, `REDIS_HOST`, `JWT_SECRET_KEY`. See `.env.example` for full list.
 
 ## Conventions
 
-- Uses `devtools.debug()` instead of `print()` for dev output
-- Python >=3.11,<3.12 required
-- `uv` is the package manager (used in Dockerfile and for local dev)
+- Python >=3.11,<3.13 required
+- `uv` is the Python package manager; `npm` for frontend
+- Beanie ODM for MongoDB (async, Pydantic v2 models)
 - Celery tasks use `bind=True` and `autoretry_for` patterns
-- MongoDB database name: `osp` (prod/dev), `osp-staging` (testing)
+- MongoDB database name: `osp` (prod/dev)
+- The old Flask app is preserved in `deprecated/flask-app/` for reference

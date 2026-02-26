@@ -1,15 +1,13 @@
-app/chroma_db
-app/chroma_db/*
-app/chroma_db/
-app/chroma_db/
+deprecated/flask-app/app/chroma_db
+deprecated/flask-app/app/chroma_db/*
+deprecated/flask-app/app/chroma_db/
+deprecated/flask-app/app/static/fillable_form.pdf
+deprecated/flask-app/app/static/temp/*
+deprecated/flask-app/app/app.db
+deprecated/flask-app/app/static/images/uploads/*
+deprecated/flask-app/app/static/uploads/*
 data/recommendations_vectordb
-uv.lock
-app/static/fillable_form.pdf
-app/static/temp/*
-venv/*
-app/app.db
-app/static/images/uploads/*
-app/static/uploads/*
+# uv.lock — intentionally tracked for reproducible builds
 .DS_Store
 .env
 .flaskenv
@@ -35,11 +33,13 @@ htmlcov/
 .coverage.*
 *,cover
 
-/app/static/db/
+deprecated/flask-app/app/static/db/
 /.python-version
 /data/
 *.log
 /logs/
 /pids/
 *.db
-vandalizer-next/backend/data/chromadb/
+backend/data/chromadb/
+frontend/.vite/
+node_modules/
