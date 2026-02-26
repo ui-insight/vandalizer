@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class DemoSignupRequest(BaseModel):
     name: str
+    title: str = ""
     email: str
     organization: str
     questionnaire_responses: dict = {}
@@ -51,3 +52,14 @@ class DemoAdminStatsResponse(BaseModel):
     expired_count: int
     completed_count: int
     by_organization: list[dict]
+
+
+class PostExperienceResponseDetail(BaseModel):
+    uuid: str
+    name: str
+    email: str
+    organization: str
+    title: str = ""
+    questionnaire_responses: dict = {}
+    responses: dict
+    created_at: str

@@ -32,6 +32,7 @@ async def apply(body: DemoSignupRequest, settings: Settings = Depends(get_settin
             email=body.email,
             organization=body.organization,
             questionnaire_responses=body.questionnaire_responses,
+            title=body.title,
             settings=settings,
         )
     except ValueError as e:
@@ -112,6 +113,13 @@ async def admin_stats(user: User = Depends(get_current_user)):
     _require_admin(user)
     stats = await demo_service.admin_get_stats()
     return DemoAdminStatsResponse(**stats)
+
+
+@router.get("/admin/responses")
+async def admin_responses(user: User = Depends(get_current_user)):
+    """List all post-experience responses with applicant info."""
+    _require_admin(user)
+    return await demo_service.admin_list_post_responses()
 
 
 @router.get("/admin/applications")

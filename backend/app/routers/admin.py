@@ -279,6 +279,8 @@ async def usage_timeseries(
         ts = ev.started_at
         if not ts:
             continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=datetime.timezone.utc)
         day_str = ts.strftime("%Y-%m-%d")
 
         if ts >= cutoff:

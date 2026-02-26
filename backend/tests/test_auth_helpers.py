@@ -4,7 +4,6 @@ from fastapi import Response
 
 from app.config import Settings
 from app.routers.auth import _get_azure_provider, _set_tokens
-from app.models.system_config import SystemConfig
 
 
 def _make_mock_user():
@@ -19,22 +18,15 @@ def _make_mock_user():
 class TestSetTokensCookieSecurity:
     """Verify that _set_tokens sets cookies with correct security attributes."""
 
+    def _get_cookie_headers(self, response: Response) -> list[str]:
+        return [v.decode() for k, v in response.raw_headers if k == b"set-cookie"]
+
     def test_cookies_are_httponly(self):
         settings = Settings(environment="development")
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 
-        cookies = {c.key: c for c in response.raw_headers if c[0] == b"set-cookie"}
-        raw_headers = dict(response.headers)
-
-        # Check that both cookies appear in the response headers
-        header_text = str(response.headers.getlist("set-cookie") if hasattr(response.headers, "getlist") else "")
-        # Use the response body to inspect cookies
-        cookie_headers = [
-            v.decode() for k, v in response.raw_headers if k == b"set-cookie"
-        ]
-        assert len(cookie_headers) == 2
-        for header in cookie_headers:
+        for header in self._get_cookie_headers(response):
             assert "httponly" in header.lower()
 
     def test_secure_flag_in_production(self):
@@ -42,10 +34,7 @@ class TestSetTokensCookieSecurity:
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 
-        cookie_headers = [
-            v.decode() for k, v in response.raw_headers if k == b"set-cookie"
-        ]
-        for header in cookie_headers:
+        for header in self._get_cookie_headers(response):
             assert "secure" in header.lower()
 
     def test_no_secure_flag_in_development(self):
@@ -53,11 +42,7 @@ class TestSetTokensCookieSecurity:
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 
-        cookie_headers = [
-            v.decode() for k, v in response.raw_headers if k == b"set-cookie"
-        ]
-        for header in cookie_headers:
-            # In dev mode, secure should NOT be set
+        for header in self._get_cookie_headers(response):
             assert "secure" not in header.lower()
 
     def test_samesite_lax(self):
@@ -65,10 +50,7 @@ class TestSetTokensCookieSecurity:
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 
-        cookie_headers = [
-            v.decode() for k, v in response.raw_headers if k == b"set-cookie"
-        ]
-        for header in cookie_headers:
+        for header in self._get_cookie_headers(response):
             assert "samesite=lax" in header.lower()
 
     def test_both_token_cookies_set(self):
@@ -76,22 +58,39 @@ class TestSetTokensCookieSecurity:
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 
-        cookie_headers = [
-            v.decode() for k, v in response.raw_headers if k == b"set-cookie"
-        ]
-        cookie_names = [h.split("=")[0] for h in cookie_headers]
+        headers = self._get_cookie_headers(response)
+        cookie_names = [h.split("=")[0] for h in headers]
         assert "access_token" in cookie_names
         assert "refresh_token" in cookie_names
 
+    def test_max_age_matches_settings(self):
+        settings = Settings(
+            environment="development",
+            jwt_access_expire_minutes=15,
+            jwt_refresh_expire_days=7,
+        )
+        response = Response()
+        _set_tokens(response, _make_mock_user(), settings)
+
+        headers = self._get_cookie_headers(response)
+        for header in headers:
+            if header.startswith("access_token="):
+                assert "max-age=900" in header.lower()  # 15 * 60
+            elif header.startswith("refresh_token="):
+                assert "max-age=604800" in header.lower()  # 7 * 86400
+
 
 class TestGetAzureProvider:
-    """Verify the OAuth gate only returns fully configured providers."""
+    """Verify the OAuth gate only returns fully configured providers.
 
-    def _make_config(self, providers: list[dict]) -> SystemConfig:
-        """Build a SystemConfig with the given oauth_providers (no DB needed)."""
-        cfg = SystemConfig()
-        cfg.oauth_providers = providers
-        return cfg
+    SystemConfig is a Beanie Document and requires DB init to construct,
+    so we create a simple mock with an oauth_providers attribute instead.
+    """
+
+    def _make_config(self, providers: list[dict]):
+        class FakeConfig:
+            oauth_providers = providers
+        return FakeConfig()
 
     def test_no_providers_returns_none(self):
         cfg = self._make_config([])
@@ -112,7 +111,7 @@ class TestGetAzureProvider:
             "provider": "azure",
             "enabled": True,
             "client_id": "id",
-            "client_secret": "",  # empty = not configured
+            "client_secret": "",
             "tenant_id": "tenant",
         }])
         assert _get_azure_provider(cfg) is None
@@ -124,6 +123,16 @@ class TestGetAzureProvider:
             "client_id": "id",
             "client_secret": "secret",
             "tenant_id": "",
+        }])
+        assert _get_azure_provider(cfg) is None
+
+    def test_missing_client_id_returns_none(self):
+        cfg = self._make_config([{
+            "provider": "azure",
+            "enabled": True,
+            "client_id": "",
+            "client_secret": "secret",
+            "tenant_id": "tenant",
         }])
         assert _get_azure_provider(cfg) is None
 

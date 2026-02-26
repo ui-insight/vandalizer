@@ -7,61 +7,68 @@ import {
   ArrowLeft,
   Github,
   AlertCircle,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
 import { getPostQuestionnaire, submitPostQuestionnaire } from '../api/demo'
-import type { FeedbackInfo } from '../types/demo'
+import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
+import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
+import type { SurveyField, FeedbackInfo } from '../types/demo'
 
 // ---------------------------------------------------------------------------
-// Configurable feedback fields
+// Group fields by section
 // ---------------------------------------------------------------------------
 
-interface FeedbackField {
-  key: string
-  label: string
-  type: 'text' | 'textarea' | 'select' | 'rating'
-  required: boolean
-  placeholder?: string
-  options?: string[]
+function groupBySection(fields: SurveyField[]) {
+  const sections: { name: string; fields: SurveyField[] }[] = []
+  let current: { name: string; fields: SurveyField[] } | null = null
+  for (const f of fields) {
+    const sec = f.section || ''
+    if (!current || current.name !== sec) {
+      current = { name: sec, fields: [] }
+      sections.push(current)
+    }
+    current.fields.push(f)
+  }
+  return sections
 }
 
-const FEEDBACK_FIELDS: FeedbackField[] = [
-  {
-    key: 'overall_rating',
-    label: 'How would you rate your overall experience?',
-    type: 'select',
-    required: true,
-    options: ['Excellent', 'Good', 'Fair', 'Poor'],
-  },
-  {
-    key: 'most_useful',
-    label: 'What feature did you find most useful?',
-    type: 'textarea',
-    required: true,
-    placeholder: 'e.g., Workflow builder, document extraction, chat...',
-  },
-  {
-    key: 'missing_features',
-    label: 'What features or capabilities were missing?',
-    type: 'textarea',
-    required: false,
-    placeholder: 'Anything you wished Vandalizer could do...',
-  },
-  {
-    key: 'would_recommend',
-    label: 'Would you recommend Vandalizer to a colleague?',
-    type: 'select',
-    required: true,
-    options: ['Definitely', 'Probably', 'Not sure', 'Probably not', 'Definitely not'],
-  },
-  {
-    key: 'additional_comments',
-    label: 'Any additional comments or suggestions?',
-    type: 'textarea',
-    required: false,
-    placeholder: 'We appreciate your feedback!',
-  },
-]
+// ---------------------------------------------------------------------------
+// Collapsible section component
+// ---------------------------------------------------------------------------
+
+function SurveySection({
+  name,
+  children,
+  defaultOpen = true,
+}: {
+  name: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  if (!name) return <>{children}</>
+
+  return (
+    <div className="border border-white/10 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-3 bg-white/5 hover:bg-white/10 transition-colors"
+      >
+        <span className="text-sm font-bold text-[#f1b300] uppercase tracking-wide">{name}</span>
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+      {open && <div className="p-5 space-y-5">{children}</div>}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Main feedback page
@@ -76,7 +83,7 @@ export default function DemoFeedback() {
   const [error, setError] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, unknown>>({})
 
   useEffect(() => {
     if (!token) {
@@ -95,7 +102,7 @@ export default function DemoFeedback() {
       .finally(() => setLoading(false))
   }, [token])
 
-  function updateAnswer(key: string, value: string) {
+  function updateAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -112,6 +119,8 @@ export default function DemoFeedback() {
       setSubmitting(false)
     }
   }
+
+  const sections = groupBySection(POST_SURVEY_FIELDS)
 
   return (
     <div className="bg-[#0a0a0a] text-gray-200 antialiased min-h-screen">
@@ -135,7 +144,7 @@ export default function DemoFeedback() {
       </nav>
 
       <div className="relative z-10 pt-28 pb-16">
-        <div className="max-w-lg mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
             <div className="flex justify-center py-20">
               <Loader2 className="w-8 h-8 animate-spin text-[#f1b300]" />
@@ -190,45 +199,22 @@ export default function DemoFeedback() {
               )}
 
               <form onSubmit={handleSubmit} className="space-y-5">
-                {FEEDBACK_FIELDS.map((field) => (
-                  <div key={field.key}>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      {field.label}{field.required ? ' *' : ''}
-                    </label>
-                    {field.type === 'text' && (
-                      <input
-                        type="text"
-                        required={field.required}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => updateAnswer(field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                      />
-                    )}
-                    {field.type === 'textarea' && (
-                      <textarea
-                        required={field.required}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => updateAnswer(field.key, e.target.value)}
-                        placeholder={field.placeholder}
-                        rows={3}
-                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50 resize-none"
-                      />
-                    )}
-                    {field.type === 'select' && (
-                      <select
-                        required={field.required}
-                        value={answers[field.key] || ''}
-                        onChange={(e) => updateAnswer(field.key, e.target.value)}
-                        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                      >
-                        <option value="">Select...</option>
-                        {field.options?.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
+                {sections.map((sec) => (
+                  <SurveySection key={sec.name} name={sec.name}>
+                    {sec.fields.map((field) => (
+                      <div key={field.key}>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          {field.label}
+                          {field.required ? ' *' : ''}
+                        </label>
+                        <SurveyFieldRenderer
+                          field={field}
+                          value={answers[field.key]}
+                          onChange={updateAnswer}
+                        />
+                      </div>
+                    ))}
+                  </SurveySection>
                 ))}
 
                 <button

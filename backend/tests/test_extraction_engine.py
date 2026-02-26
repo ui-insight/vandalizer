@@ -153,9 +153,15 @@ class TestBuildDraftHint:
         result = _engine()._build_draft_hint({"A": "1"})
         assert result == {"A": "1"}
 
-    def test_empty_values_skipped(self):
+    def test_single_dict_returned_as_is(self):
+        """Single-dict lists are returned directly without filtering empty values."""
         result = _engine()._build_draft_hint([{"A": "val", "B": None, "C": "", "D": []}])
-        assert result == {"A": "val"}
+        assert result == {"A": "val", "B": None, "C": "", "D": []}
+
+    def test_empty_values_skipped_during_merge(self):
+        """When merging multiple dicts, empty values are skipped."""
+        result = _engine()._build_draft_hint([{"A": None}, {"A": "real", "B": "val"}])
+        assert result == {"A": "real", "B": "val"}
 
     def test_multiple_dicts_merged(self):
         result = _engine()._build_draft_hint([{"A": "1"}, {"B": "2"}])
@@ -165,8 +171,14 @@ class TestBuildDraftHint:
         result = _engine()._build_draft_hint([{"A": "first"}, {"A": "second"}])
         assert result == {"A": "first"}
 
-    def test_all_empty_returns_none(self):
+    def test_all_empty_single_dict_returned(self):
+        """Single-dict list returns dict directly, even if all values empty."""
         result = _engine()._build_draft_hint([{"A": None, "B": ""}])
+        assert result == {"A": None, "B": ""}
+
+    def test_all_empty_multi_dict_returns_none(self):
+        """When merging multiple dicts and all values are empty, returns None."""
+        result = _engine()._build_draft_hint([{"A": None}, {"B": ""}])
         assert result is None
 
 

@@ -7,6 +7,7 @@ from beanie import Document, PydanticObjectId
 class DemoApplication(Document):
     uuid: str
     name: str
+    title: str = ""
     email: str
     organization: str
     questionnaire_responses: dict = {}

@@ -6,6 +6,7 @@ import type {
   FeedbackInfo,
   DemoAdminStats,
   DemoApplication,
+  PostExperienceResponseAdmin,
 } from '../types/demo'
 
 // ---------------------------------------------------------------------------
@@ -27,7 +28,7 @@ export function getPostQuestionnaire(token: string) {
   return apiFetch<FeedbackInfo>(`/api/demo/feedback/${token}`)
 }
 
-export function submitPostQuestionnaire(token: string, responses: Record<string, string>) {
+export function submitPostQuestionnaire(token: string, responses: Record<string, unknown>) {
   return apiFetch<{ message: string }>(`/api/demo/feedback/${token}`, {
     method: 'POST',
     body: JSON.stringify({ responses }),
@@ -53,4 +54,8 @@ export function releaseDemoUser(demoUuid: string) {
 
 export function activateDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/activate/${demoUuid}`, { method: 'POST' })
+}
+
+export function getPostExperienceResponses() {
+  return apiFetch<PostExperienceResponseAdmin[]>('/api/demo/admin/responses')
 }

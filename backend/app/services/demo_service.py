@@ -32,6 +32,7 @@ async def submit_application(
     email: str,
     organization: str,
     questionnaire_responses: dict,
+    title: str = "",
     settings: Settings | None = None,
 ) -> DemoApplication:
     """Create a new demo application and send confirmation email."""
@@ -55,6 +56,7 @@ async def submit_application(
     app = DemoApplication(
         uuid=secrets.token_urlsafe(16),
         name=name,
+        title=title,
         email=email,
         organization=organization.strip(),
         questionnaire_responses=questionnaire_responses,
@@ -388,3 +390,28 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
         }
         for a in apps
     ]
+
+
+async def admin_list_post_responses() -> list[dict]:
+    """List all post-experience responses with associated applicant info."""
+    responses = await PostExperienceResponse.find().sort("-created_at").to_list()
+
+    # Build lookup of demo applications by id
+    app_ids = [r.demo_application_id for r in responses]
+    apps = await DemoApplication.find({"_id": {"$in": app_ids}}).to_list()
+    app_map = {a.id: a for a in apps}
+
+    result = []
+    for r in responses:
+        app = app_map.get(r.demo_application_id)
+        result.append({
+            "uuid": r.uuid,
+            "name": app.name if app else "Unknown",
+            "email": app.email if app else "Unknown",
+            "organization": app.organization if app else "Unknown",
+            "title": app.title if app else "",
+            "questionnaire_responses": app.questionnaire_responses if app else {},
+            "responses": r.responses,
+            "created_at": r.created_at.isoformat(),
+        })
+    return result

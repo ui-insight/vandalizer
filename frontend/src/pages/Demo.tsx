@@ -10,61 +10,280 @@ import {
   FileText,
   Cpu,
   Github,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
 import { submitDemoApplication, getWaitlistStatus } from '../api/demo'
-import type { WaitlistStatusResponse } from '../types/demo'
+import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
+import type { SurveyField, WaitlistStatusResponse } from '../types/demo'
 
 // ---------------------------------------------------------------------------
-// Configurable questionnaire fields — edit this array to change the form
+// Pre-survey field definitions
 // ---------------------------------------------------------------------------
 
-interface QuestionField {
-  key: string
-  label: string
-  type: 'text' | 'textarea' | 'select'
-  required: boolean
-  placeholder?: string
-  options?: string[]
-}
-
-const QUESTIONNAIRE_FIELDS: QuestionField[] = [
+const PRE_SURVEY_FIELDS: SurveyField[] = [
+  // --- Demographics ---
   {
-    key: 'role',
-    label: 'Your Role',
+    key: 'ra_department',
+    label: 'Research Administration Department',
     type: 'select',
     required: true,
+    section: 'Demographics',
     options: [
-      'Research Administrator',
-      'Faculty / PI',
-      'Graduate Student',
-      'Staff',
-      'IT / Developer',
+      'Pre-Award',
+      'Post-Award',
+      'Contracts',
+      'Cost Accounting/Cost Compliance',
+      'Financial/Invoicing',
+      'Departmental Support',
+      'Compliance (IACUC, IRB, etc.)',
+      'IT Support',
+      'Other',
+      "I'm not in research administration",
+    ],
+  },
+  {
+    key: 'carnegie_classification',
+    label: 'Carnegie Classification',
+    type: 'select',
+    required: true,
+    section: 'Demographics',
+    options: [
+      'R1',
+      'R2',
+      'Primarily Undergraduate',
+      'Community College',
+      'MSI',
+      'Academic Medical Center',
+      'Independent Research Institute',
+      'Emerging Research',
+      'HBCU',
       'Other',
     ],
   },
   {
-    key: 'use_case',
-    label: 'What would you like to use Vandalizer for?',
-    type: 'textarea',
-    required: true,
-    placeholder: 'e.g., Grant proposal review, compliance checking, document extraction...',
-  },
-  {
-    key: 'documents_per_week',
-    label: 'How many documents do you process per week?',
-    type: 'select',
-    required: false,
-    options: ['1-10', '11-50', '51-100', '100+'],
-  },
-  {
-    key: 'how_heard',
-    label: 'How did you hear about Vandalizer?',
+    key: 'research_expenditures',
+    label: 'Approximate research expenditures FY2025',
     type: 'text',
     required: false,
-    placeholder: 'e.g., Colleague, conference, website...',
+    section: 'Demographics',
+    placeholder: 'e.g., $50M',
+  },
+  {
+    key: 'active_federal_grants',
+    label: 'Approximate number of active federal grants',
+    type: 'text',
+    required: false,
+    section: 'Demographics',
+    placeholder: 'e.g., 200',
+  },
+  {
+    key: 'ra_staff_size',
+    label: 'Approximate research administration staff size',
+    type: 'text',
+    required: false,
+    section: 'Demographics',
+    placeholder: 'e.g., 25',
+  },
+
+  // --- Where did you come from? ---
+  {
+    key: 'process_obstacles',
+    label: 'What process obstacles or bottlenecks do you currently face?',
+    type: 'textarea',
+    required: true,
+    section: 'Where did you come from?',
+    placeholder: 'Describe current pain points in your workflow...',
+  },
+  {
+    key: 'intended_use',
+    label: 'What do you intend to use Vandalizer for?',
+    type: 'textarea',
+    required: true,
+    section: 'Where did you come from?',
+    placeholder: 'e.g., Grant proposal review, compliance checking, document extraction...',
+  },
+
+  // --- Task Time Estimates ---
+  {
+    key: 'time_rfa_checklist',
+    label: 'Build an RFA checklist (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_foa_checklist',
+    label: 'Build an FOA checklist (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_compliance_framework',
+    label: 'Build a compliance framework from an award notice (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_effort_compliance',
+    label: 'Create effort/time-and-effort compliance reports (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_management_plan',
+    label: 'Build a management plan from an SF-425 (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_prior_approval',
+    label: 'Create a prior approval requirements list (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+  {
+    key: 'time_subaward_extraction',
+    label: 'Subaward extraction (minutes)',
+    type: 'number',
+    required: false,
+    section: 'Task Time Estimates',
+    placeholder: 'Minutes',
+  },
+
+  // --- AI Experience ---
+  {
+    key: 'ai_experience_level',
+    label: 'What is your experience level with AI tools?',
+    type: 'select',
+    required: true,
+    section: 'AI Experience',
+    options: [
+      'No experience',
+      'Less than 1 year',
+      '1-2 years',
+      '2-5 years',
+      '5+ years',
+    ],
+  },
+  {
+    key: 'ai_tools_used',
+    label: 'Which AI tools have you used? (select all that apply)',
+    type: 'multiselect',
+    required: false,
+    section: 'AI Experience',
+    options: [
+      'ChatGPT',
+      'Claude',
+      'Microsoft Co-Pilot',
+      'Google Gemini',
+      'Perplexity',
+      'Institution Specific Internal Tools',
+      'Other',
+    ],
+  },
+  {
+    key: 'ai_work_frequency',
+    label: 'How often do you use AI tools in your work?',
+    type: 'select',
+    required: true,
+    section: 'AI Experience',
+    options: ['Never', 'Rarely', 'Sometimes', 'Often'],
+  },
+
+  // --- Pre-Experience Assessment ---
+  {
+    key: 'pre_assessment',
+    label: 'Please rate your agreement with the following statements:',
+    type: 'likert_group',
+    required: false,
+    section: 'Pre-Experience Assessment',
+    statements: [
+      { key: 'trust_ai', label: 'I trust AI outputs' },
+      { key: 'want_ai', label: 'I want to use AI in my work life' },
+      { key: 'not_worried_job', label: "I'm not worried AI will take my job" },
+      { key: 'easy_to_use', label: 'I find AI easy to use' },
+      { key: 'safe_use', label: 'I can use AI safely in my work' },
+      { key: 'understand_models', label: 'I understand how AI models work' },
+      {
+        key: 'ethics_transparency',
+        label:
+          'I believe AI tools should be transparent about their limitations and potential biases',
+      },
+      {
+        key: 'environmental_ethics',
+        label:
+          'I believe the environmental impact of AI (energy use, carbon footprint) should be considered when adopting AI tools',
+      },
+    ],
   },
 ]
+
+// ---------------------------------------------------------------------------
+// Group fields by section
+// ---------------------------------------------------------------------------
+
+function groupBySection(fields: SurveyField[]) {
+  const sections: { name: string; fields: SurveyField[] }[] = []
+  let current: { name: string; fields: SurveyField[] } | null = null
+  for (const f of fields) {
+    const sec = f.section || ''
+    if (!current || current.name !== sec) {
+      current = { name: sec, fields: [] }
+      sections.push(current)
+    }
+    current.fields.push(f)
+  }
+  return sections
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible section component
+// ---------------------------------------------------------------------------
+
+function SurveySection({
+  name,
+  children,
+  defaultOpen = true,
+}: {
+  name: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+
+  if (!name) return <>{children}</>
+
+  return (
+    <div className="border border-white/10 rounded-xl overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-3 bg-white/5 hover:bg-white/10 transition-colors"
+      >
+        <span className="text-sm font-bold text-[#f1b300] uppercase tracking-wide">{name}</span>
+        {open ? (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+      {open && <div className="p-5 space-y-5">{children}</div>}
+    </div>
+  )
+}
 
 // ---------------------------------------------------------------------------
 // Waitlist status check component
@@ -153,11 +372,12 @@ export default function Demo() {
 
   // Form state
   const [name, setName] = useState('')
+  const [title, setTitle] = useState('')
   const [email, setEmail] = useState('')
   const [organization, setOrganization] = useState('')
-  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [answers, setAnswers] = useState<Record<string, unknown>>({})
 
-  function updateAnswer(key: string, value: string) {
+  function updateAnswer(key: string, value: unknown) {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
@@ -168,6 +388,7 @@ export default function Demo() {
     try {
       const result = await submitDemoApplication({
         name,
+        title,
         email,
         organization,
         questionnaire_responses: answers,
@@ -181,6 +402,8 @@ export default function Demo() {
       setSubmitting(false)
     }
   }
+
+  const sections = groupBySection(PRE_SURVEY_FIELDS)
 
   return (
     <div className="bg-[#0a0a0a] text-gray-200 antialiased min-h-screen">
@@ -264,7 +487,7 @@ export default function Demo() {
             </div>
           ) : (
             /* Signup form */
-            <div className="max-w-lg mx-auto">
+            <div className="max-w-2xl mx-auto">
               <div className="p-8 rounded-2xl border border-white/10 bg-white/5">
                 <h2 className="text-2xl font-bold text-white mb-6 text-center">
                   Request Demo Access
@@ -277,6 +500,7 @@ export default function Demo() {
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Core identity fields */}
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Full Name *</label>
                     <input
@@ -284,6 +508,17 @@ export default function Demo() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
+                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+                    <input
+                      type="text"
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
+                      placeholder="e.g., Grants Manager, Research Coordinator..."
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
                     />
                   </div>
@@ -311,46 +546,23 @@ export default function Demo() {
                     />
                   </div>
 
-                  {/* Dynamic questionnaire fields */}
-                  {QUESTIONNAIRE_FIELDS.map((field) => (
-                    <div key={field.key}>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        {field.label}{field.required ? ' *' : ''}
-                      </label>
-                      {field.type === 'text' && (
-                        <input
-                          type="text"
-                          required={field.required}
-                          value={answers[field.key] || ''}
-                          onChange={(e) => updateAnswer(field.key, e.target.value)}
-                          placeholder={field.placeholder}
-                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                        />
-                      )}
-                      {field.type === 'textarea' && (
-                        <textarea
-                          required={field.required}
-                          value={answers[field.key] || ''}
-                          onChange={(e) => updateAnswer(field.key, e.target.value)}
-                          placeholder={field.placeholder}
-                          rows={3}
-                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50 resize-none"
-                        />
-                      )}
-                      {field.type === 'select' && (
-                        <select
-                          required={field.required}
-                          value={answers[field.key] || ''}
-                          onChange={(e) => updateAnswer(field.key, e.target.value)}
-                          className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                        >
-                          <option value="">Select...</option>
-                          {field.options?.map((opt) => (
-                            <option key={opt} value={opt}>{opt}</option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
+                  {/* Survey sections */}
+                  {sections.map((sec) => (
+                    <SurveySection key={sec.name} name={sec.name}>
+                      {sec.fields.map((field) => (
+                        <div key={field.key}>
+                          <label className="block text-sm font-medium text-gray-300 mb-2">
+                            {field.label}
+                            {field.required ? ' *' : ''}
+                          </label>
+                          <SurveyFieldRenderer
+                            field={field}
+                            value={answers[field.key]}
+                            onChange={updateAnswer}
+                          />
+                        </div>
+                      ))}
+                    </SurveySection>
                   ))}
 
                   <button

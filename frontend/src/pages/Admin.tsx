@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Shield, ShieldCheck, BarChart3, Users, Building2, Workflow, Settings,
   Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
-  ChevronRight, RefreshCw, MessageSquare, Search, Zap,
+  ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
 } from 'lucide-react'
@@ -26,8 +26,11 @@ import {
 } from '../api/admin'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
+  getPostExperienceResponses,
 } from '../api/demo'
-import type { DemoAdminStats, DemoApplication as DemoApp } from '../types/demo'
+import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
+import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
+import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
   WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
@@ -42,7 +45,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'workflows' | 'quality' | 'demo' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'workflows' | 'quality' | 'demo' | 'debugging' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -51,6 +54,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
   { key: 'demo', label: 'Demo', icon: Zap },
+  { key: 'debugging', label: 'Debugging', icon: Bug },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -2427,6 +2431,239 @@ function DemoTab() {
   )
 }
 
+function DebuggingTab() {
+  const [responses, setResponses] = useState<PostExperienceResponseAdmin[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewAnswers, setPreviewAnswers] = useState<Record<string, unknown>>({})
+  const previewSections = useMemo(() => {
+    const sections: { name: string; fields: typeof POST_SURVEY_FIELDS }[] = []
+    let current: { name: string; fields: typeof POST_SURVEY_FIELDS } | null = null
+    for (const f of POST_SURVEY_FIELDS) {
+      const sec = f.section || ''
+      if (!current || current.name !== sec) {
+        current = { name: sec, fields: [] }
+        sections.push(current)
+      }
+      current.fields.push(f)
+    }
+    return sections
+  }, [])
+
+  const loadData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await getPostExperienceResponses()
+      setResponses(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  function renderValue(val: unknown): string {
+    if (val === null || val === undefined) return '-'
+    if (Array.isArray(val)) return val.join(', ')
+    if (typeof val === 'object') {
+      return Object.entries(val as Record<string, unknown>)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ')
+    }
+    return String(val)
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Survey Responses</h2>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => { setShowPreview(!showPreview); setPreviewAnswers({}) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: showPreview ? '#111827' : '#fff',
+              color: showPreview ? '#fff' : '#374151',
+              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}
+          >
+            <MessageSquare size={14} /> {showPreview ? 'Hide Preview' : 'Preview Post-Survey'}
+          </button>
+          <button
+            onClick={loadData}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {showPreview && (
+        <div style={{
+          marginBottom: 24, padding: 24, borderRadius: 12,
+          border: '1px solid #e5e7eb', background: '#0a0a0a',
+          color: '#e5e7eb',
+        }}>
+          <div style={{ textAlign: 'center', marginBottom: 20 }}>
+            <MessageSquare size={32} color="#f1b300" style={{ margin: '0 auto 8px' }} />
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#fff', margin: 0 }}>
+              Post-Survey Preview
+            </h3>
+            <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 4 }}>
+              This is what participants see after their demo expires.
+            </p>
+          </div>
+          {previewSections.map((sec) => (
+            <div key={sec.name} style={{
+              marginBottom: 16, border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 12, overflow: 'hidden',
+            }}>
+              <div style={{
+                padding: '10px 16px', background: 'rgba(255,255,255,0.05)',
+                fontSize: 12, fontWeight: 700, color: '#f1b300',
+                textTransform: 'uppercase', letterSpacing: '0.05em',
+              }}>
+                {sec.name}
+              </div>
+              <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {sec.fields.map((field) => (
+                  <div key={field.key}>
+                    <label style={{
+                      display: 'block', fontSize: 13, fontWeight: 500,
+                      color: '#d1d5db', marginBottom: 6,
+                    }}>
+                      {field.label}{field.required ? ' *' : ''}
+                    </label>
+                    <SurveyFieldRenderer
+                      field={field}
+                      value={previewAnswers[field.key]}
+                      onChange={(k, v) => setPreviewAnswers(prev => ({ ...prev, [k]: v }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>Loading...</div>
+      ) : responses.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 40, color: '#9ca3af' }}>
+          No survey responses yet.
+        </div>
+      ) : (
+        <div style={{ borderRadius: 12, border: '1px solid #e5e7eb', overflow: 'hidden', background: '#fff' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb' }}>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Name</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Email</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Organization</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Submitted</th>
+              </tr>
+            </thead>
+            <tbody>
+              {responses.map((resp) => (
+                <React.Fragment key={resp.uuid}>
+                  <tr
+                    onClick={() => setExpandedUuid(expandedUuid === resp.uuid ? null : resp.uuid)}
+                    style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                  >
+                    <td style={{ padding: '12px 16px', fontWeight: 500 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {expandedUuid === resp.uuid ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        {resp.name}
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 16px', color: '#6b7280' }}>{resp.email}</td>
+                    <td style={{ padding: '12px 16px', color: '#6b7280' }}>{resp.organization}</td>
+                    <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                      {formatDate(resp.created_at)}
+                    </td>
+                  </tr>
+                  {expandedUuid === resp.uuid && (
+                    <tr>
+                      <td colSpan={4} style={{ padding: '0 16px 16px 40px', background: '#fafbfc' }}>
+                        {/* Pre-Survey (Questionnaire) */}
+                        {Object.keys(resp.questionnaire_responses).length > 0 && (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{
+                              fontSize: 13, fontWeight: 700, color: '#111827',
+                              marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em',
+                            }}>
+                              Pre-Survey
+                            </div>
+                            <div style={{
+                              display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 16px',
+                              padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff',
+                            }}>
+                              {resp.title && (
+                                <React.Fragment>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>title</div>
+                                  <div style={{ fontSize: 13, color: '#6b7280' }}>{resp.title}</div>
+                                </React.Fragment>
+                              )}
+                              {Object.entries(resp.questionnaire_responses).map(([key, val]) => (
+                                <React.Fragment key={key}>
+                                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                                    {key.replace(/_/g, ' ')}
+                                  </div>
+                                  <div style={{ fontSize: 13, color: '#6b7280', wordBreak: 'break-word' }}>
+                                    {renderValue(val)}
+                                  </div>
+                                </React.Fragment>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Post-Survey (Feedback) */}
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{
+                            fontSize: 13, fontWeight: 700, color: '#111827',
+                            marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em',
+                          }}>
+                            Post-Survey
+                          </div>
+                          <div style={{
+                            display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '8px 16px',
+                            padding: 16, borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff',
+                          }}>
+                            {Object.entries(resp.responses).map(([key, val]) => (
+                              <React.Fragment key={key}>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                                  {key.replace(/_/g, ' ')}
+                                </div>
+                                <div style={{ fontSize: 13, color: '#6b7280', wordBreak: 'break-word' }}>
+                                  {renderValue(val)}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Admin() {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
@@ -2437,7 +2674,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isTeamAdmin
 
   // Only global admins see the Config, Quality, and Demo tabs
-  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config' && t.key !== 'quality' && t.key !== 'demo')
+  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config' && t.key !== 'quality' && t.key !== 'demo' && t.key !== 'debugging')
 
   if (!hasAccess) {
     return (
@@ -2506,6 +2743,7 @@ export default function Admin() {
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
           {activeTab === 'demo' && isGlobalAdmin && <DemoTab />}
+          {activeTab === 'debugging' && isGlobalAdmin && <DebuggingTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>
