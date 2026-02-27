@@ -7,8 +7,8 @@ interface AuthContextValue {
   loading: boolean
   demoExpired: boolean
   demoFeedbackToken: string | null
-  login: (userId: string, password: string) => Promise<void>
-  register: (userId: string, email: string, password: string, name?: string) => Promise<void>
+  login: (userId: string, password: string, recaptchaToken?: string) => Promise<void>
+  register: (userId: string, email: string, password: string, name?: string, recaptchaToken?: string) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setLoading(false))
   }, [])
 
-  const login = useCallback(async (userId: string, password: string) => {
-    const resp = await authApi.login(userId, password) as User & {
+  const login = useCallback(async (userId: string, password: string, recaptchaToken?: string) => {
+    const resp = await authApi.login(userId, password, recaptchaToken) as User & {
       demo_expired?: boolean
       demo_feedback_token?: string | null
     }
@@ -54,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(
-    async (userId: string, email: string, password: string, name?: string) => {
-      const u = await authApi.register(userId, email, password, name)
+    async (userId: string, email: string, password: string, name?: string, recaptchaToken?: string) => {
+      const u = await authApi.register(userId, email, password, name, recaptchaToken)
       setUser(u)
     },
     [],

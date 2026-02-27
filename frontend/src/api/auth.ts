@@ -14,12 +14,13 @@ export interface OAuthProvider {
 export interface AuthConfig {
   auth_methods: string[]
   oauth_providers: OAuthProvider[]
+  recaptcha_site_key: string | null
 }
 
 export async function getAuthConfig(): Promise<AuthConfig> {
   const res = await fetch('/api/auth/config')
   if (!res.ok) {
-    return { auth_methods: ['password'], oauth_providers: [] }
+    return { auth_methods: ['password'], oauth_providers: [], recaptcha_site_key: null }
   }
   return res.json()
 }
@@ -28,17 +29,17 @@ export async function getAuthConfig(): Promise<AuthConfig> {
 // Password auth
 // ---------------------------------------------------------------------------
 
-export function login(user_id: string, password: string) {
+export function login(user_id: string, password: string, recaptcha_token?: string) {
   return apiFetch<User>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ user_id, password }),
+    body: JSON.stringify({ user_id, password, recaptcha_token }),
   })
 }
 
-export function register(user_id: string, email: string, password: string, name?: string) {
+export function register(user_id: string, email: string, password: string, name?: string, recaptcha_token?: string) {
   return apiFetch<User>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ user_id, email, password, name }),
+    body: JSON.stringify({ user_id, email, password, name, recaptcha_token }),
   })
 }
 

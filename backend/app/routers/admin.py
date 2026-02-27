@@ -602,6 +602,8 @@ async def get_config(
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
+        "recaptcha_site_key": cfg.recaptcha_site_key,
+        "recaptcha_secret_key": cfg.recaptcha_secret_key,
     }
 
 
@@ -805,6 +807,37 @@ async def update_auth_methods(
     await cfg.save()
 
     return {"status": "ok", "auth_methods": cfg.auth_methods}
+
+
+# ---------------------------------------------------------------------------
+# 12b. PUT /config/auth/recaptcha  - Update reCAPTCHA v3 config
+# ---------------------------------------------------------------------------
+
+
+class RecaptchaConfigRequest(BaseModel):
+    site_key: str = ""
+    secret_key: str = ""
+
+
+@router.put("/config/auth/recaptcha")
+async def update_recaptcha_config(
+    body: RecaptchaConfigRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+
+    cfg = await SystemConfig.get_config()
+    cfg.recaptcha_site_key = body.site_key.strip()
+    cfg.recaptcha_secret_key = body.secret_key.strip()
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+
+    return {
+        "status": "ok",
+        "recaptcha_site_key": cfg.recaptcha_site_key,
+        "recaptcha_secret_key": cfg.recaptcha_secret_key,
+    }
 
 
 # ---------------------------------------------------------------------------

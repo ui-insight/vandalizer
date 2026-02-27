@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { useRecaptcha } from '../../hooks/useRecaptcha'
 
-export function LoginForm() {
+export function LoginForm({ recaptchaSiteKey }: { recaptchaSiteKey?: string | null }) {
   const { login } = useAuth()
+  const { execute: executeRecaptcha } = useRecaptcha(recaptchaSiteKey)
   const [userId, setUserId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -13,7 +15,8 @@ export function LoginForm() {
     setError('')
     setLoading(true)
     try {
-      await login(userId, password)
+      const token = await executeRecaptcha('login')
+      await login(userId, password, token)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {

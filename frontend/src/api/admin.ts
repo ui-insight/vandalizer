@@ -134,6 +134,8 @@ export interface SystemConfigData {
   llm_endpoint: string
   highlight_color: string
   ui_radius: string
+  recaptcha_site_key: string
+  recaptcha_secret_key: string
 }
 
 export function getSystemConfig() {
@@ -180,6 +182,13 @@ export function deleteOAuthProvider(index: number) {
 
 export function updateAuthMethods(methods: string[]) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/methods', { method: 'PUT', body: JSON.stringify({ methods }) })
+}
+
+export function updateRecaptchaConfig(data: { site_key: string; secret_key: string }) {
+  return apiFetch<{ status: string; recaptcha_site_key: string; recaptcha_secret_key: string }>(
+    '/api/admin/config/auth/recaptcha',
+    { method: 'PUT', body: JSON.stringify(data) },
+  )
 }
 
 // Quality

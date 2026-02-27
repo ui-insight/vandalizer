@@ -1,6 +1,7 @@
 import { useState, useEffect, type FormEvent } from 'react'
 import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
+import { useRecaptcha } from '../hooks/useRecaptcha'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
 import { Footer } from '../components/layout/Footer'
 import {
@@ -31,8 +32,9 @@ import {
 // Inline dark-themed auth forms
 // ---------------------------------------------------------------------------
 
-function LandingLoginForm() {
+function LandingLoginForm({ recaptchaSiteKey }: { recaptchaSiteKey?: string | null }) {
   const { login } = useAuth()
+  const { execute: executeRecaptcha } = useRecaptcha(recaptchaSiteKey)
   const [userId, setUserId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -43,7 +45,8 @@ function LandingLoginForm() {
     setError('')
     setSubmitting(true)
     try {
-      await login(userId, password)
+      const token = await executeRecaptcha('login')
+      await login(userId, password, token)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed')
     } finally {
@@ -85,8 +88,9 @@ function LandingLoginForm() {
   )
 }
 
-function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
+function LandingRegisterForm({ onSwitch, recaptchaSiteKey }: { onSwitch: () => void; recaptchaSiteKey?: string | null }) {
   const { register } = useAuth()
+  const { execute: executeRecaptcha } = useRecaptcha(recaptchaSiteKey)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -98,8 +102,9 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
     setError('')
     setSubmitting(true)
     try {
+      const token = await executeRecaptcha('register')
       // user_id = email, matching Flask behavior
-      await register(email, email, password, name || undefined)
+      await register(email, email, password, name || undefined, token)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -211,7 +216,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
         <>
           {mode === 'login' ? (
             <>
-              <LandingLoginForm />
+              <LandingLoginForm recaptchaSiteKey={config.recaptcha_site_key} />
               <p className="mt-4 text-center text-sm text-gray-400">
                 Don&apos;t have an account?{' '}
                 <button
@@ -223,7 +228,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
               </p>
             </>
           ) : (
-            <LandingRegisterForm onSwitch={() => setMode('login')} />
+            <LandingRegisterForm onSwitch={() => setMode('login')} recaptchaSiteKey={config.recaptcha_site_key} />
           )}
         </>
       )}

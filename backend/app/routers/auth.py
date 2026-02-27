@@ -1,4 +1,5 @@
 import datetime
+import logging
 import secrets
 import urllib.parse
 
@@ -20,6 +21,33 @@ from app.utils.security import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _verify_recaptcha(token: str | None, request: Request) -> bool:
+    """Verify a reCAPTCHA v3 token. Returns True if valid or if no secret key is configured."""
+    config = await SystemConfig.get_config()
+    secret_key = config.recaptcha_secret_key
+    if not secret_key:
+        return True
+    if not token:
+        return False
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                "https://www.google.com/recaptcha/api/siteverify",
+                data={
+                    "secret": secret_key,
+                    "response": token,
+                    "remoteip": request.client.host if request.client else "",
+                },
+                timeout=5,
+            )
+            result = resp.json()
+        return bool(result.get("success"))
+    except Exception:
+        logger.warning("reCAPTCHA verification request failed; allowing through.")
+        return True
 
 
 def _set_tokens(response: Response, user: User, settings: Settings) -> None:
@@ -73,6 +101,11 @@ async def login(
     response: Response,
     settings: Settings = Depends(get_settings),
 ):
+    if not await _verify_recaptcha(body.recaptcha_token, request):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reCAPTCHA verification failed. Please try again.",
+        )
     user = await auth_service.authenticate(body.user_id, body.password)
     if not user:
         raise HTTPException(
@@ -107,6 +140,11 @@ async def register(
     response: Response,
     settings: Settings = Depends(get_settings),
 ):
+    if not await _verify_recaptcha(body.recaptcha_token, request):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="reCAPTCHA verification failed. Please try again.",
+        )
     try:
         user = await auth_service.register(
             body.user_id or body.email, body.email, body.password, body.name
@@ -230,6 +268,7 @@ async def auth_config():
     return {
         "auth_methods": config.auth_methods,
         "oauth_providers": providers,
+        "recaptcha_site_key": config.recaptcha_site_key or None,
     }
 
 

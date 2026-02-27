@@ -5,6 +5,7 @@ from pydantic import BaseModel
 class LoginRequest(BaseModel):
     user_id: str
     password: str
+    recaptcha_token: Optional[str] = None
 
 
 class RegisterRequest(BaseModel):
@@ -12,6 +13,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    recaptcha_token: Optional[str] = None
 
 
 class UpdateProfileRequest(BaseModel):

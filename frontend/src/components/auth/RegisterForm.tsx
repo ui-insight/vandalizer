@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { useRecaptcha } from '../../hooks/useRecaptcha'
 
-export function RegisterForm() {
+export function RegisterForm({ recaptchaSiteKey }: { recaptchaSiteKey?: string | null }) {
   const { register } = useAuth()
+  const { execute: executeRecaptcha } = useRecaptcha(recaptchaSiteKey)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,8 +16,9 @@ export function RegisterForm() {
     setError('')
     setLoading(true)
     try {
+      const token = await executeRecaptcha('register')
       // user_id = email, matching Flask behavior
-      await register(email, email, password, name || undefined)
+      await register(email, email, password, name || undefined, token)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {

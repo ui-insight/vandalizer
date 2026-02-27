@@ -95,6 +95,10 @@ class SystemConfig(Document):
     auth_methods: list[str] = ["password"]
     oauth_providers: list[dict] = []
 
+    # reCAPTCHA v3 configuration
+    recaptcha_site_key: str = ""
+    recaptcha_secret_key: str = ""
+
     # Metadata
     updated_at: Optional[datetime.datetime] = None
     updated_by: Optional[str] = None
