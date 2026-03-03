@@ -97,12 +97,14 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.extraction.run",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
 def perform_extraction_task(
+    self,
     activity_id: str,
     searchset_uuid: str,
     document_uuids: list,
@@ -138,7 +140,6 @@ def perform_extraction_task(
             document_uuids,
             model=model_name,
             extraction_config_override=extraction_config_override,
-            activity_id=activity_id,
         )
         raw_results = deepcopy(results)
 
@@ -244,17 +245,23 @@ def perform_extraction_task(
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.extraction.ingest_recommendation",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
 def ingest_extraction_recommendation_task(
+    self,
     searchset_uuid: str,
     document_uuids: list,
     keys: list,
 ) -> None:
-    """Build and ingest extraction recommendations into semantic recommender."""
+    """Build and ingest extraction recommendations into semantic recommender.
+
+    NOTE: Recommendation storage is not yet implemented. This task currently
+    only logs the ingestion text for future integration.
+    """
     db = _get_db()
 
     search_set = db.search_set.find_one({"uuid": searchset_uuid})
@@ -274,6 +281,6 @@ def ingest_extraction_recommendation_task(
 
     ingestion_text = _build_extraction_ingestion_text(documents, keys)
     logger.info(
-        "Ingested extraction recommendation for %s (text length %d)",
+        "Extraction recommendation prepared for %s (text length %d) — storage not yet implemented",
         searchset_uuid, len(ingestion_text),
     )

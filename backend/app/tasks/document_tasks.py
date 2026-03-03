@@ -37,12 +37,13 @@ def _remove_images_from_markdown(markdown_text: str) -> str:
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.document.extraction",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
-def perform_extraction_and_update(document_uuid: str, extension: str) -> str:
+def perform_extraction_and_update(self, document_uuid: str, extension: str) -> str:
     """Extract text from a document file (PDF, DOCX, XLSX, etc.).
 
     Updates SmartDocument.raw_text and processing flags.
@@ -69,9 +70,14 @@ def perform_extraction_and_update(document_uuid: str, extension: str) -> str:
         # For PDFs that already have raw_text, just ensure processing is cleared
         if extension == "pdf" and doc.get("raw_text", "").strip():
             raw_text = doc["raw_text"]
+            token_count = len(raw_text) // 4
             db.smart_document.update_one(
                 {"uuid": document_uuid},
-                {"$set": {"processing": False}},
+                {"$set": {
+                    "processing": False,
+                    "task_status": "complete",
+                    "token_count": token_count,
+                }},
             )
             return raw_text
 
@@ -123,12 +129,13 @@ def perform_extraction_and_update(document_uuid: str, extension: str) -> str:
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.document.update",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
-def update_document_fields(document_uuid: str) -> None:
+def update_document_fields(self, document_uuid: str) -> None:
     """Mark document extraction as complete."""
     db = _get_db()
     result = db.smart_document.update_one(
@@ -140,29 +147,36 @@ def update_document_fields(document_uuid: str) -> None:
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.document.cleanup",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
-def cleanup_document(document_uuid: str) -> None:
-    """Error handler — mark document as errored."""
+def cleanup_document(self, document_uuid: str) -> None:
+    """Error handler — mark document as errored with details."""
     db = _get_db()
     result = db.smart_document.update_one(
         {"uuid": document_uuid},
-        {"$set": {"task_id": None, "task_status": "error", "processing": False}},
+        {"$set": {
+            "task_id": None,
+            "task_status": "error",
+            "processing": False,
+            "error_message": "Document extraction failed. Please try re-uploading.",
+        }},
     )
     if result.matched_count == 0:
         logger.warning("Document %s not found for cleanup", document_uuid)
 
 
 @celery_app.task(
+    bind=True,
     name="tasks.document.semantic_ingestion",
     autoretry_for=(Exception,),
     max_retries=3,
     default_retry_delay=5,
 )
-def perform_semantic_ingestion(raw_text: str, document_uuid: str, user_id: str) -> str:
+def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str) -> str:
     """Chunk text and embed into ChromaDB for RAG search."""
     import os
 

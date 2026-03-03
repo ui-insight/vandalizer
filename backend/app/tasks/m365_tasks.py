@@ -89,8 +89,15 @@ def _trigger_text_extraction(doc: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.ingest_email_message")
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.ingest_email_message",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
 def ingest_email_message(
+    self,
     user_id: str,
     message_resource: str,
     intake_config_id: str,
@@ -184,8 +191,15 @@ def ingest_email_message(
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.ingest_drive_item")
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.ingest_drive_item",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
 def ingest_drive_item(
+    self,
     user_id: str,
     item_resource: str,
     intake_config_id: str,
@@ -271,8 +285,14 @@ def ingest_drive_item(
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.triage_work_item")
-def triage_work_item(work_item_id: str) -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.triage_work_item",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def triage_work_item(self, work_item_id: str) -> dict:
     """Classify a work item and route it to the right workflow."""
     from bson import ObjectId
 
@@ -319,8 +339,9 @@ def triage_work_item(work_item_id: str) -> dict:
         logger.error("Triage failed for work item %s: %s", work_item.get("uuid"), e)
         db.work_items.update_one(
             {"_id": work_item["_id"]},
-            {"$set": {"triage_summary": f"Triage error: {e}", "status": "triaged"}},
+            {"$set": {"triage_summary": f"Triage error: {e}", "status": "triage_failed"}},
         )
+        return {"status": "triage_failed", "error": str(e)}
 
     # Route to workflow
     workflow = _match_workflow(db, work_item, intake)
@@ -375,8 +396,14 @@ def _match_workflow(db, work_item: dict, intake: dict):
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.renew_graph_subscriptions")
-def renew_graph_subscriptions() -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.renew_graph_subscriptions",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def renew_graph_subscriptions(self) -> dict:
     """Renew Graph subscriptions expiring within 24 hours."""
     from app.services.graph_client import GraphClient
 
@@ -406,8 +433,14 @@ def renew_graph_subscriptions() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.send_daily_digest")
-def send_daily_digest() -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.send_daily_digest",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def send_daily_digest(self) -> dict:
     """Send daily summary to Teams channels."""
     from app.services.graph_client import GraphClient
     from app.services.teams_cards import build_daily_digest_card

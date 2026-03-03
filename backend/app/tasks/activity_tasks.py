@@ -22,7 +22,13 @@ def _get_db():
     return client[mongo_db]
 
 
-@celery_app.task(name="tasks.activity.generate_description", bind=True)
+@celery_app.task(
+    bind=True,
+    name="tasks.activity.generate_description",
+    autoretry_for=(Exception,),
+    max_retries=2,
+    default_retry_delay=5,
+)
 def generate_activity_description_task(
     self,
     activity_id: str,
@@ -139,13 +145,10 @@ def generate_activity_description_task(
         result = chat_agent.run_sync(prompt)
         description = result.output.strip()
 
-        # Ensure 8 words
+        # Truncate to 8 words max; accept shorter descriptions as-is
         words = description.split()
         if len(words) > 8:
             description = " ".join(words[:8])
-        elif len(words) < 8:
-            description = " ".join(words) + " " + " ".join(["task"] * (8 - len(words)))
-            description = description.strip()
 
         # Update activity
         meta_summary = activity.get("meta_summary", {}) or {}

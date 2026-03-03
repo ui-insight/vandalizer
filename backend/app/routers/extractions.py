@@ -233,6 +233,11 @@ async def run_extraction_sync(req: RunExtractionSyncRequest, user: User = Depend
             activity.id,
             documents_touched=len(req.document_uuids),
         )
+
+        # Fire-and-forget auto-validation if test cases exist
+        from app.tasks.quality_tasks import auto_validate_extraction
+        auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
+
         return {"results": results}
     except Exception as e:
         await activity_service.activity_finish(
@@ -297,6 +302,7 @@ async def run_extraction_integrated(
 
         task_id = dispatch_upload_tasks(
             document_uuid=uid, extension=ext, document_path=str(file_path),
+            user_id=user.user_id,
         )
         doc.task_id = task_id
         await doc.save()

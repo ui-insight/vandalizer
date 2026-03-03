@@ -4,7 +4,11 @@ Uses pymongo (sync) for DB access  - same pattern as Flask Celery workers.
 Task names use 'tasks.workflow_next.*' to coexist with Flask's 'tasks.workflow.*'.
 """
 
+import logging
+
 from app.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 
 def _get_db():
@@ -37,7 +41,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     """
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
+    from app.services.workflow_engine import build_workflow_engine
 
     db = _get_db()
 
@@ -46,7 +50,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)})
 
     if not workflow_doc or not result_doc:
-        return {"status": "error", "error": "Workflow or result not found"}
+        raise ValueError(f"Workflow {workflow_id} or result {workflow_result_id} not found")
 
     # Load system config for sync engine
     sys_config = db.system_config.find_one() or {}
@@ -123,7 +127,15 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         system_config_doc=sys_config,
     )
 
-    final_output, data = engine.execute(workflow_result_updater=update_progress)
+    try:
+        final_output, data = engine.execute(workflow_result_updater=update_progress)
+    except Exception as e:
+        logger.error("Workflow execution failed for %s: %s", workflow_id, e)
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"status": "error", "error": str(e)}},
+        )
+        raise
 
     # Save final result
     db.workflow_result.update_one(
@@ -140,6 +152,10 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         {"$inc": {"num_executions": 1}},
     )
 
+    # Fire-and-forget auto-validation if validation plan exists
+    from app.tasks.quality_tasks import auto_validate_workflow
+    auto_validate_workflow.delay(workflow_id)
+
     return {
         "status": "completed",
         "result_id": workflow_result_id,
@@ -147,7 +163,13 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     }
 
 
-@celery_app.task(bind=True, name="tasks.workflow_next.execution_step_test")
+@celery_app.task(
+    bind=True,
+    name="tasks.workflow_next.execution_step_test",
+    autoretry_for=(Exception,),
+    max_retries=2,
+    default_retry_delay=5,
+)
 def execute_task_step_test(self, task_name, task_data, doc_uuids):
     """Test a single workflow step.
 
@@ -159,6 +181,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
     from app.services.workflow_engine import (
         APICallNode,
         AddDocumentNode,
+        BrowserAutomationNode,
         CodeExecutionNode,
         CrawlerNode,
         DataExportNode,
@@ -222,8 +245,10 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = DataExportNode(data=task_data)
     elif task_name == "PackageBuilder":
         process_node = PackageBuilderNode(data=task_data)
+    elif task_name == "BrowserAutomation":
+        process_node = BrowserAutomationNode(data=task_data)
     else:
-        return {"error": f"Unknown task type: {task_name}"}
+        raise ValueError(f"Unknown task type: {task_name}")
 
     process_node._sys_cfg = sys_config
 

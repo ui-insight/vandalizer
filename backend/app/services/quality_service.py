@@ -78,12 +78,12 @@ async def persist_validation_run(
     await vr.insert()
 
     # Update quality metadata on verified item
-    await update_quality_metadata(item_kind, item_id)
+    await update_quality_metadata(item_kind, item_id, item_name=item_name)
 
     return vr
 
 
-async def update_quality_metadata(item_kind: str, item_id: str) -> None:
+async def update_quality_metadata(item_kind: str, item_id: str, item_name: str | None = None) -> None:
     """Find latest ValidationRun for item and upsert quality fields on VerifiedItemMetadata."""
     latest = await _get_latest_run(item_kind, item_id)
     if not latest:
@@ -109,11 +109,14 @@ async def update_quality_metadata(item_kind: str, item_id: str) -> None:
         meta.quality_grade = latest.grade
         meta.last_validated_at = now
         meta.validation_run_count = run_count
+        if item_name and not meta.display_name:
+            meta.display_name = item_name
         await meta.save()
     else:
         meta = VerifiedItemMetadata(
             item_kind=item_kind,
             item_id=item_id,
+            display_name=item_name,
             quality_score=latest.score,
             quality_tier=tier,
             quality_grade=latest.grade,

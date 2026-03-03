@@ -9,6 +9,7 @@ import csv
 import graphlib
 import io
 import json
+import logging
 import multiprocessing
 import re
 import zipfile
@@ -21,6 +22,8 @@ from bs4 import BeautifulSoup
 
 from app.services.extraction_engine import ExtractionEngine
 from app.services.llm_service import create_chat_agent, get_agent_model
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -177,26 +180,32 @@ class MultiTaskNode(Node):
         return task.process(task.inputs)
 
     def process(self, inputs):
+        from copy import deepcopy
+
         for task in self.tasks:
-            task.inputs = inputs
+            task.inputs = deepcopy(inputs)
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
             results = [future.result() for future in as_completed(task_futures)]
 
-        output = {"input": inputs.get("input"), "output": [], "step_name": self.name}
+        collected = []
+        task_step_name = self.name
         for result in results:
             result_output = result.get("output")
             if result_output is None:
                 continue
-            elif isinstance(result_output, str):
-                output["output"].append(result_output)
-            elif isinstance(result_output, dict):
-                output["output"].append(result_output)
             elif isinstance(result_output, list):
-                output["output"].extend(result_output)
+                collected.extend(result_output)
             else:
-                output["output"].append(result_output)
-        return output
+                collected.append(result_output)
+            # Preserve the underlying task step_name for downstream routing
+            if result.get("step_name"):
+                task_step_name = result["step_name"]
+
+        # Unwrap single-element lists for cleaner downstream data flow
+        final_output = collected[0] if len(collected) == 1 else collected
+
+        return {"input": inputs.get("input"), "output": final_output, "step_name": task_step_name}
 
 
 # ---------------------------------------------------------------------------
@@ -241,18 +250,12 @@ class ExtractionNode(Node):
                 full_text = "\n".join(str(x) for x in step_input)
             else:
                 full_text = str(step_input) if step_input else ""
-        elif prev_step_name in {"Extraction", "Formatter"}:
-            step_input = inputs.get("output")
-            if isinstance(step_input, str):
-                full_text = step_input
-            elif step_input:
-                full_text = json.dumps(step_input) if not isinstance(step_input, str) else step_input
         else:
             step_input = inputs.get("output")
             if isinstance(step_input, str):
                 full_text = step_input
             elif step_input:
-                full_text = json.dumps(step_input) if not isinstance(step_input, str) else step_input
+                full_text = json.dumps(step_input)
 
         extraction_response = data_extraction_model(
             self.model, keys, doc_texts=doc_texts, full_text=full_text,
@@ -334,10 +337,15 @@ class WebsiteNode(Node):
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
         self.report_progress(f"Fetching {url}")
-        with httpx.Client(timeout=30, follow_redirects=True) as client:
-            resp = client.get(url)
-            resp.raise_for_status()
-        text = _extract_text_from_html(resp.text)
+        try:
+            with httpx.Client(timeout=30, follow_redirects=True) as client:
+                resp = client.get(url)
+                resp.raise_for_status()
+            text = _extract_text_from_html(resp.text)
+        except httpx.HTTPStatusError as e:
+            text = f"HTTP error fetching {url}: {e.response.status_code}"
+        except httpx.RequestError as e:
+            text = f"Request error fetching {url}: {e}"
         return {"output": text, "input": inputs.get("output"), "step_name": self.name}
 
 
@@ -415,6 +423,12 @@ class CodeExecutionNode(Node):
             except concurrent.futures.TimeoutError:
                 return {
                     "output": f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            except Exception as e:
+                return {
+                    "output": f"Code execution error: {e}",
                     "input": inputs.get("output"),
                     "step_name": self.name,
                 }
@@ -528,9 +542,14 @@ class APICallNode(Node):
             except json.JSONDecodeError:
                 body = body_raw
 
-        with httpx.Client(timeout=30, follow_redirects=True) as client:
-            resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
-            resp.raise_for_status()
+        try:
+            with httpx.Client(timeout=30, follow_redirects=True) as client:
+                resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
+                resp.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            return {"output": f"HTTP error: {e.response.status_code} {e.response.text[:500]}", "input": inputs.get("output"), "step_name": self.name}
+        except httpx.RequestError as e:
+            return {"output": f"Request error: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         try:
             output = resp.json()
@@ -901,6 +920,8 @@ def build_workflow_engine(
                 elif task_name == "BrowserAutomation":
                     n = BrowserAutomationNode(data=task_data)
                     tasks.append(n)
+                else:
+                    logger.warning("Unknown task type '%s' in step '%s' — skipping", task_name, step_name)
 
             node = MultiTaskNode(step_name)
             node.add_tasks(tasks)

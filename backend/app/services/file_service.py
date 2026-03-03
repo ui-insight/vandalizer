@@ -92,6 +92,7 @@ async def upload_document(
         document_uuid=uid,
         extension=extension,
         document_path=str(file_path),
+        user_id=user_id,
     )
     document.task_id = task_id
     await document.save()
