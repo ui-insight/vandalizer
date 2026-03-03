@@ -448,6 +448,7 @@ async def run_workflow_integrated(
 
         task_id = dispatch_upload_tasks(
             document_uuid=uid, extension=ext, document_path=str(file_path),
+            user_id=user.user_id,
         )
         doc.task_id = task_id
         await doc.save()

@@ -31,8 +31,14 @@ def _get_db():
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.process_pending_triggers")
-def process_pending_triggers() -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.process_pending_triggers",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def process_pending_triggers(self) -> dict:
     """Evaluate pending WorkflowTriggerEvents and dispatch execution.
 
     Runs every minute via Celery Beat.
@@ -149,8 +155,11 @@ def process_pending_triggers() -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.execute_workflow_passive")
-def execute_workflow_passive(trigger_event_id: str) -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.execute_workflow_passive",
+)
+def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     """Execute a workflow for a passive trigger event."""
     from app.services.workflow_engine import build_workflow_engine
 
@@ -358,8 +367,14 @@ def execute_workflow_passive(trigger_event_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.process_outputs")
-def process_outputs(workflow_result_id: str) -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.process_outputs",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def process_outputs(self, workflow_result_id: str) -> dict:
     """Process output configuration after workflow completes."""
     from app.services.output_handlers import (
         call_webhook,
@@ -497,8 +512,14 @@ def process_outputs(workflow_result_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="tasks.passive.cleanup_old_trigger_events")
-def cleanup_old_trigger_events() -> dict:
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.cleanup_old_trigger_events",
+    autoretry_for=(Exception,),
+    max_retries=3,
+    default_retry_delay=10,
+)
+def cleanup_old_trigger_events(self) -> dict:
     """Delete completed/failed/skipped trigger events older than 30 days."""
     db = _get_db()
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)

@@ -2,8 +2,11 @@
 
 import asyncio
 import datetime
+import logging
 
 from app.celery_app import celery
+
+logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
@@ -15,7 +18,13 @@ def _run_async(coro):
         loop.close()
 
 
-@celery.task(name="tasks.passive.quality_monitor", bind=True)
+@celery.task(
+    bind=True,
+    name="tasks.passive.quality_monitor",
+    autoretry_for=(Exception,),
+    max_retries=2,
+    default_retry_delay=10,
+)
 def quality_monitor(self):
     """Daily quality monitoring task.
 
@@ -153,13 +162,75 @@ async def _quality_monitor_async():
                                 submitted_at=now,
                             ).insert()
 
-            except Exception:
-                pass  # Skip items that fail to revalidate
+            except Exception as e:
+                logger.warning(
+                    "Auto-revalidation failed for %s %s: %s",
+                    meta.item_kind, meta.item_id, e,
+                )
 
 
-# Add beat schedule entry
-celery.conf.beat_schedule = getattr(celery.conf, "beat_schedule", {})
-celery.conf.beat_schedule["quality-monitor-daily"] = {
-    "task": "tasks.passive.quality_monitor",
-    "schedule": 86400.0,
-}
+# ---------------------------------------------------------------------------
+# Auto-validate after runs
+# ---------------------------------------------------------------------------
+
+
+@celery.task(
+    name="tasks.passive.auto_validate_extraction",
+    bind=True,
+    autoretry_for=(Exception,),
+    max_retries=1,
+    default_retry_delay=10,
+)
+def auto_validate_extraction(self, search_set_uuid, user_id, model=None):
+    """Auto-run validation after extraction if test cases exist."""
+    _run_async(_auto_validate_extraction_async(search_set_uuid, user_id, model))
+
+
+async def _auto_validate_extraction_async(search_set_uuid, user_id, model=None):
+    from app.config import Settings
+    from app.database import init_db
+
+    settings = Settings()
+    await init_db(settings)
+
+    from app.models.extraction_test_case import ExtractionTestCase
+    from app.services import extraction_validation_service
+
+    count = await ExtractionTestCase.find(
+        ExtractionTestCase.search_set_uuid == search_set_uuid,
+    ).count()
+    if count > 0:
+        await extraction_validation_service.run_validation(
+            search_set_uuid=search_set_uuid,
+            user_id=user_id,
+            model=model,
+        )
+
+
+@celery.task(
+    name="tasks.passive.auto_validate_workflow",
+    bind=True,
+    autoretry_for=(Exception,),
+    max_retries=1,
+    default_retry_delay=10,
+)
+def auto_validate_workflow(self, workflow_id):
+    """Auto-run workflow validation after execution if validation plan exists."""
+    _run_async(_auto_validate_workflow_async(workflow_id))
+
+
+async def _auto_validate_workflow_async(workflow_id):
+    from app.config import Settings
+    from app.database import init_db
+
+    settings = Settings()
+    await init_db(settings)
+
+    from app.models.workflow import Workflow
+    from app.services import workflow_service
+
+    wf = await Workflow.get(workflow_id)
+    if wf and wf.validation_plan:
+        await workflow_service.validate_workflow(str(wf.id))
+
+

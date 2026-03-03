@@ -58,6 +58,10 @@ celery.conf.beat_schedule = {
         "task": "tasks.passive.cleanup_old_trigger_events",
         "schedule": crontab(hour=3, minute=0),  # daily at 3am
     },
+    "quality-monitor-daily": {
+        "task": "tasks.passive.quality_monitor",
+        "schedule": 86400.0,
+    },
 }
 
 # Alias for import convenience
