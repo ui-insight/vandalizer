@@ -67,11 +67,12 @@ async def chat(
             space=body.current_space_id,
         )
 
-        # Set a simple title if no documents
-        if not document_uuids and not activity.title:
+        # Always set a placeholder title from the first message so the rail
+        # shows something immediately while the AI title generates in the background.
+        if not activity.title:
             first_line = (message or "").strip().splitlines()[0] if message else ""
             words = [w for w in first_line.split() if w]
-            short = " ".join(words[:8]).strip() or "Chat"
+            short = " ".join(words[:6]).strip() or "Chat"
             if len(short) > 80:
                 short = short[:77].rstrip() + "..."
             activity.title = short

@@ -271,12 +271,32 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 
 @router.post("/{workflow_id}/run")
 async def run_workflow(workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
+    from app.models.activity import ActivityType
+    from app.models.workflow import Workflow
+    from app.services import activity_service
+    from beanie import PydanticObjectId
+
+    # Look up workflow name for activity title
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    initial_title = wf.name if wf else "Workflow Run"
+
+    activity = await activity_service.activity_start(
+        type=ActivityType.WORKFLOW_RUN,
+        title=initial_title,
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+        workflow=PydanticObjectId(workflow_id),
+    )
+
     try:
         session_id = await svc.run_workflow(
-            workflow_id, req.document_uuids, user.user_id, req.model
+            workflow_id, req.document_uuids, user.user_id, req.model,
+            activity_id=str(activity.id),
         )
-        return {"session_id": session_id}
+        return {"session_id": session_id, "activity_id": str(activity.id)}
     except ValueError as e:
+        from app.models.activity import ActivityStatus
+        await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
 

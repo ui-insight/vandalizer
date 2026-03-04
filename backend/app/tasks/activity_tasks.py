@@ -66,8 +66,21 @@ def generate_activity_description_task(
                         break
 
         if not document_text.strip():
-            logger.info("No document text found for activity %s", activity_id)
-            return
+            # For conversations, fall back to the first exchange as context
+            if activity_type == "conversation" and activity.get("conversation_id"):
+                conv = db.chat_conversation.find_one({"uuid": activity["conversation_id"]})
+                if conv and conv.get("messages"):
+                    msg_ids = conv["messages"][:4]
+                    msgs = list(db.chat_message.find({"_id": {"$in": msg_ids}}))
+                    if msgs:
+                        combined = " ".join(
+                            (m.get("message") or "")[:400] for m in msgs[:2]
+                        ).strip()
+                        if combined:
+                            document_text = combined
+            if not document_text.strip():
+                logger.info("No text context found for activity %s", activity_id)
+                return
 
         # Build context based on activity type
         task_description = {
@@ -123,32 +136,33 @@ def generate_activity_description_task(
         # Build prompt
         if activity_type == "search_set_run":
             prompt = (
-                f"You are generating a title for an extraction activity. "
+                f"You are generating a short title for an extraction activity. "
                 f"Based on the extraction set name, the fields being extracted, "
-                f"and the document content, create an 8-word description.\n\n"
+                f"and the document content, create a 4-to-6-word title.\n\n"
                 f"Extraction Set: {extraction_set_title or 'Data Extraction'}\n"
                 f"{extraction_context}\n\n"
                 f"Document content (first page):\n{document_text}\n\n"
-                f"Generate exactly 8 words that describe what data is being extracted "
-                f"from what type of document. Return only the 8 words, nothing else."
+                f"Generate a memorable 4-to-6-word title describing what data is being extracted "
+                f"from what type of document. No punctuation. Return only the words, nothing else."
             )
         else:
             prompt = (
-                f"Based on the following document excerpt and the task being performed, "
-                f"generate a very short 8-word description.\n\n"
+                f"Based on the following content and the task being performed, "
+                f"generate a very short 4-to-6-word title.\n\n"
                 f"Task: {task_description}{extraction_context}\n\n"
-                f"Document excerpt:\n{document_text}\n\n"
-                f"Generate exactly 8 words. Return only the 8 words, nothing else."
+                f"Content:\n{document_text}\n\n"
+                f"Generate a memorable 4-to-6-word title. No punctuation. "
+                f"Return only the words, nothing else."
             )
 
         chat_agent = create_chat_agent(model_name, system_config_doc=sys_cfg)
         result = chat_agent.run_sync(prompt)
         description = result.output.strip()
 
-        # Truncate to 8 words max; accept shorter descriptions as-is
+        # Truncate to 6 words max; accept shorter descriptions as-is
         words = description.split()
-        if len(words) > 8:
-            description = " ".join(words[:8])
+        if len(words) > 6:
+            description = " ".join(words[:6])
 
         # Update activity
         meta_summary = activity.get("meta_summary", {}) or {}

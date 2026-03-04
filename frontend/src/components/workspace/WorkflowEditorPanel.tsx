@@ -119,7 +119,7 @@ const TEST_MESSAGES = [
 // ---------------------------------------------------------------------------
 
 export function WorkflowEditorPanel() {
-  const { openWorkflowId, closeWorkflow, selectedDocUuids } = useWorkspace()
+  const { openWorkflowId, closeWorkflow, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -3148,6 +3148,7 @@ function ValidateTab({ workflowId, selectedDocUuids }: { workflowId: string | nu
       // Run the workflow
       setRunProgress('Starting workflow...')
       const { session_id } = await runWorkflow(workflowId, { document_uuids: docUuids })
+      bumpActivitySignal()
 
       // Stream status until complete
       await new Promise<void>((resolve, reject) => {

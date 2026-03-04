@@ -349,3 +349,13 @@ async def _finalize(
             ev.finished_at = datetime.now(timezone.utc)
             ev.last_updated_at = datetime.now(timezone.utc)
             await ev.save()
+
+            # Generate an AI title after the first exchange
+            if ev.message_count <= 2:
+                try:
+                    from app.tasks.activity_tasks import generate_activity_description_task
+                    generate_activity_description_task.delay(
+                        str(ev.id), ev.type, [d.uuid for d in documents]
+                    )
+                except Exception as _e:
+                    logger.warning("Could not queue activity title generation: %s", _e)

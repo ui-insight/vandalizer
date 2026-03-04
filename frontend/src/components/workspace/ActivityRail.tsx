@@ -63,7 +63,7 @@ function statusMetaClass(status: ActivityEvent['status']) {
 
 export function ActivityRail() {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
-  const { activities, refresh } = useActivities(activitySignal)
+  const { activities, refresh, freshTitleIds, markTitleShimmered } = useActivities(activitySignal)
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
@@ -142,6 +142,7 @@ export function ActivityRail() {
           {activities.map((activity) => {
             const Icon = activityIcon(activity.type)
             const running = isRunning(activity.status)
+            const titleFresh = freshTitleIds.has(activity.id)
 
             return (
               <div
@@ -178,7 +179,9 @@ export function ActivityRail() {
                         className={cn(
                           'text-[11px] leading-[1.4] break-words',
                           running ? 'text-white' : 'text-[#111]',
+                          titleFresh && !running ? 'title-shimmer' : '',
                         )}
+                        onAnimationEnd={titleFresh ? () => markTitleShimmered(activity.id) : undefined}
                       >
                         {activity.title || activity.type}
                       </div>
