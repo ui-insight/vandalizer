@@ -260,7 +260,13 @@ async def delete_task(task_id: str) -> bool:
 # Execution
 # ---------------------------------------------------------------------------
 
-async def run_workflow(workflow_id: str, document_uuids: list[str], user_id: str, model: str | None = None) -> str:
+async def run_workflow(
+    workflow_id: str,
+    document_uuids: list[str],
+    user_id: str,
+    model: str | None = None,
+    activity_id: str | None = None,
+) -> str:
     """Start workflow execution. Returns session_id for polling."""
     wf = await Workflow.get(PydanticObjectId(workflow_id))
     if not wf:
@@ -288,6 +294,7 @@ async def run_workflow(workflow_id: str, document_uuids: list[str], user_id: str
             "workflow_id": str(wf.id),
             "trigger_step_data": trigger_step_data,
             "model": model,
+            "activity_id": activity_id,
         },
         queue="workflows",
     )

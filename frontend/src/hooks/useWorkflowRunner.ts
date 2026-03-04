@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getWorkflowStatus, runWorkflow } from '../api/workflows'
+import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { WorkflowStatus } from '../types/workflow'
 
 export function useWorkflowRunner() {
+  const { bumpActivitySignal } = useWorkspace()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [status, setStatus] = useState<WorkflowStatus | null>(null)
   const [running, setRunning] = useState(false)
@@ -29,10 +31,11 @@ export function useWorkflowRunner() {
     setStatus(null)
     const { session_id } = await runWorkflow(workflowId, { document_uuids: documentUuids, model })
     setSessionId(session_id)
+    bumpActivitySignal()
     // Start polling
     poll(session_id)
     intervalRef.current = setInterval(() => poll(session_id), 2000)
-  }, [poll])
+  }, [poll, bumpActivitySignal])
 
   const reset = useCallback(() => {
     setSessionId(null)

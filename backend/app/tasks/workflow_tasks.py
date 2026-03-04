@@ -30,7 +30,7 @@ def _get_db():
     max_retries=3,
     default_retry_delay=5,
 )
-def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_data, model):
+def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_data, model, activity_id=None):
     """Execute a full workflow.
 
     Args:
@@ -38,6 +38,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         workflow_id: Workflow document ID (str).
         trigger_step_data: Dict with 'doc_uuids' for the Document trigger step.
         model: LLM model name.
+        activity_id: Optional ActivityEvent ID to track this run in the rail.
     """
     from bson import ObjectId
 
@@ -127,6 +128,16 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         system_config_doc=sys_config,
     )
 
+    # Mark activity as running
+    if activity_id:
+        try:
+            db.activity_event.update_one(
+                {"_id": ObjectId(activity_id)},
+                {"$set": {"status": "running"}},
+            )
+        except Exception as e:
+            logger.warning("Could not update activity to running: %s", e)
+
     try:
         final_output, data = engine.execute(workflow_result_updater=update_progress)
     except Exception as e:
@@ -135,6 +146,15 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             {"_id": ObjectId(workflow_result_id)},
             {"$set": {"status": "error", "error": str(e)}},
         )
+        if activity_id:
+            try:
+                from datetime import datetime, timezone
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id)},
+                    {"$set": {"status": "failed", "error": str(e)[:2000], "finished_at": datetime.now(timezone.utc)}},
+                )
+            except Exception:
+                pass
         raise
 
     # Save final result
@@ -151,6 +171,25 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         {"_id": ObjectId(workflow_id)},
         {"$inc": {"num_executions": 1}},
     )
+
+    # Update activity and generate AI title
+    if activity_id:
+        try:
+            from datetime import datetime, timezone
+            doc_uuids = trigger_step_data.get("doc_uuids", [])
+            db.activity_event.update_one(
+                {"_id": ObjectId(activity_id)},
+                {"$set": {
+                    "status": "completed",
+                    "finished_at": datetime.now(timezone.utc),
+                    "last_updated_at": datetime.now(timezone.utc),
+                    "workflow_result": ObjectId(workflow_result_id),
+                }},
+            )
+            from app.tasks.activity_tasks import generate_activity_description_task
+            generate_activity_description_task.delay(activity_id, "workflow_run", doc_uuids)
+        except Exception as e:
+            logger.warning("Could not finalize activity for workflow %s: %s", workflow_id, e)
 
     # Fire-and-forget auto-validation if validation plan exists
     from app.tasks.quality_tasks import auto_validate_workflow
