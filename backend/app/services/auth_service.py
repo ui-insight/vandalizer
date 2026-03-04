@@ -60,7 +60,7 @@ async def resolve_oauth_user(
     team_uuid = uuid.uuid4().hex
     team = Team(
         uuid=team_uuid,
-        name=f"{uid}'s Team",
+        name=f"{display_name or uid}'s Team",
         owner_user_id=uid,
     )
     await team.insert()
@@ -102,7 +102,7 @@ async def register(user_id: str, email: str, password: str, name: str | None = N
     team_uuid = uuid.uuid4().hex
     team = Team(
         uuid=team_uuid,
-        name=f"{user_id}'s Team",
+        name=f"{name or user_id}'s Team",
         owner_user_id=user_id,
     )
     await team.insert()

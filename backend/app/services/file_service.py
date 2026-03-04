@@ -122,8 +122,8 @@ async def delete_document(doc_uuid: str, settings: Settings) -> bool:
 
 
 async def rename_document(doc_uuid: str, new_title: str) -> bool:
-    if not is_allowed_file(new_title):
-        raise ValueError(f"File name '{new_title}' is not allowed.")
+    if not new_title.strip():
+        raise ValueError("File name cannot be empty.")
     doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
     if not doc:
         return False

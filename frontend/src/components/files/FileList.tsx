@@ -47,7 +47,7 @@ export function FileList({
   const allSelected = onToggleSelect && selectedUuids && allUuids.length > 0 && allUuids.every(u => selectedUuids.has(u))
 
   return (
-    <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse' }}>
+    <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       {onToggleSelect && allUuids.length > 0 && (
         <thead>
           <tr style={{ borderBottom: '1px solid #dddddd' }}>

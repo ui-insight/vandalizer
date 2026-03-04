@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     folder_uuid: Optional[str] = None
     model: Optional[str] = None
     knowledge_base_uuid: Optional[str] = None
+    include_onboarding_context: bool = False
 
 
 class AddLinkRequest(BaseModel):

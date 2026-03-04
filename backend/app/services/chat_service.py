@@ -134,6 +134,7 @@ async def chat_stream(
     settings=None,
     model_override: Optional[str] = None,
     kb_uuid: Optional[str] = None,
+    include_onboarding_context: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -215,12 +216,12 @@ async def chat_stream(
 
     if parts:
         prompt = f"{message}\n\n---\n\n{''.join(parts)}"
-    else:
-        # No documents or KB context — inject Vandalizer context directly into
-        # the user prompt so the model answers as the Vandalizer assistant even
-        # when the system prompt is ignored by the underlying model/provider.
-        # Place context BEFORE the question so the model sees it first.
+    elif include_onboarding_context:
+        # Inject Vandalizer onboarding context only when explicitly requested
+        # (triggered by the placeholder pills in the chat UI).
         prompt = f"{VANDALIZER_CONTEXT}\n\nUser question: {message}"
+    else:
+        prompt = message
 
     # Stream the response
     full_response: list[str] = []

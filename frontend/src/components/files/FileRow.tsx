@@ -14,8 +14,13 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
   return (
     <tr
       className="hover:bg-[#a6b5c945]"
-      onClick={onClick}
-      onContextMenu={onContextMenu}
+      onClick={(e) => {
+        if (e.button === 0) onClick?.()
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu(e)
+      }}
       style={{ borderBottom: '1px solid #dddddd', cursor: 'pointer' }}
     >
       {onToggleSelect && (
@@ -102,7 +107,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               e.stopPropagation()
               onContextMenu(e)
             }}
-            className="ml-auto bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded shrink-0"
+            className="ml-2 bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded shrink-0"
           >
             <MoreVertical className="h-4 w-4" />
           </button>

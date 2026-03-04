@@ -60,7 +60,7 @@ function LandingLoginForm() {
       )}
       <input
         type="text"
-        placeholder="Username or Email"
+        placeholder="Email"
         required
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
