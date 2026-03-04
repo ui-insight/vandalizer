@@ -93,7 +93,7 @@ function getStoredNumber(key: string, fallback: number): number {
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaceMode, _setWorkspaceMode] = useState<WorkspaceMode>(() =>
-    getStoredString('workspace:mode', 'files', ['chat', 'files', 'automations', 'knowledge']),
+    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge']),
   )
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
     _setWorkspaceMode(mode)

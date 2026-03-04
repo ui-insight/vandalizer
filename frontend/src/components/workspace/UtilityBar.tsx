@@ -9,7 +9,7 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar() {
-  const { workspaceMode, setWorkspaceMode } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, resetToHome } = useWorkspace()
 
   return (
     <div
@@ -30,7 +30,13 @@ export function UtilityBar() {
         return (
           <button
             key={mode}
-            onClick={() => setWorkspaceMode(mode)}
+            onClick={() => {
+              if (mode === 'chat' && active) {
+                resetToHome()
+              } else {
+                setWorkspaceMode(mode)
+              }
+            }}
             title={label}
             style={{
               width: 40,

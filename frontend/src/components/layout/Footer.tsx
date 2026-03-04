@@ -13,7 +13,7 @@ export function Footer() {
               AI-powered document intelligence for research administration. Built at the University
               of Idaho.
             </p>
-            <p className="text-sm text-gray-500">&copy; 2024&ndash;2025 University of Idaho</p>
+            <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 University of Idaho</p>
           </div>
 
           {/* Col 2: Links */}

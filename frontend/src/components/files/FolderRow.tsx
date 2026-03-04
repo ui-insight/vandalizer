@@ -16,8 +16,13 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
   return (
     <tr
       className="cursor-pointer"
-      onClick={onClick}
-      onContextMenu={onContextMenu}
+      onClick={(e) => {
+        if (e.button === 0) onClick()
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu(e)
+      }}
       style={{ borderBottom: '1px solid #dddddd' }}
     >
       {onToggleSelect && (
@@ -32,7 +37,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         </td>
       )}
       <td style={{ padding: '12px 15px' }}>
-        <div className="flex items-center">
+        <div className="flex items-center min-w-0">
           {isTeam ? (
             <Users className="h-4 w-4 shrink-0" style={{ color: iconColor }} />
           ) : (
@@ -47,12 +52,14 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
+              flex: 1,
+              minWidth: 0,
             }}
           >
             {folder.title}
           </span>
           {isTeam && (
-            <span style={{
+            <span className="shrink-0" style={{
               fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
               color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
               marginLeft: 6, whiteSpace: 'nowrap',
@@ -66,8 +73,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
               e.stopPropagation()
               onContextMenu(e)
             }}
-            className="ml-auto bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
-            style={{ float: 'right' }}
+            className="ml-2 bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded shrink-0"
           >
             <MoreVertical className="h-4 w-4" />
           </button>

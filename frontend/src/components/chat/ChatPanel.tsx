@@ -177,8 +177,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0
 
-  const handleSend = (message: string) => {
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined)
+  const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext)
   }
 
   const handleAttachFile = async (files: File[]) => {
@@ -261,7 +261,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       {attachLoading && (
         <div className="flex items-center gap-2 border-b border-gray-200 bg-[color-mix(in_srgb,var(--highlight-color),white_90%)] px-4 py-2 text-xs text-highlight">
           <div className="chat-loader" style={{ width: 30 }} />
-          Attaching...
+          Processing document... This may take a moment for PDFs and scanned files.
         </div>
       )}
 
@@ -364,7 +364,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 ] : onboardingPills).map(suggestion => (
                   <button
                     key={suggestion}
-                    onClick={() => handleSend(suggestion)}
+                    onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext)}
                     style={{
                       padding: '8px 14px',
                       fontSize: 13,

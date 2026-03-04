@@ -2,6 +2,8 @@
 
 import io
 import logging
+import os
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -115,6 +117,7 @@ async def chat(
             settings=settings,
             model_override=body.model,
             kb_uuid=body.knowledge_base_uuid,
+            include_onboarding_context=body.include_onboarding_context,
         ):
             yield chunk
 
@@ -256,13 +259,27 @@ async def add_document(
             continue
         try:
             file_content = await file.read()
-            content_text = file_content.decode("utf-8", errors="replace")
+            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+
+            # Use document_readers for proper text extraction (PDF, DOCX, etc.)
+            # For PDFs, go straight to OCR to match the main files pipeline.
+            from app.services.document_readers import extract_text_from_file, ocr_extract_text_from_pdf
+
+            suffix = f".{ext}" if ext else ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(file_content)
+                tmp_path = tmp.name
+            try:
+                if ext == "pdf":
+                    content_text = ocr_extract_text_from_pdf(tmp_path)
+                else:
+                    content_text = extract_text_from_file(tmp_path, ext or "txt")
+            finally:
+                os.unlink(tmp_path)
 
             max_content_length = 50000
             if len(content_text) > max_content_length:
                 content_text = content_text[:max_content_length] + "\n\n[Content truncated...]"
-
-            ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
 
             file_attachment = FileAttachment(
                 filename=file.filename,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { UserPlus, Trash2 } from 'lucide-react'
+import { UserPlus, Trash2, Pencil, Check, X } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
@@ -11,6 +11,7 @@ import {
   changeMemberRole,
   removeMember,
   createTeam,
+  updateTeamName,
 } from '../api/teams'
 
 export function TeamSettings() {
@@ -22,6 +23,8 @@ export function TeamSettings() {
   const [inviteRole, setInviteRole] = useState('member')
   const [newTeamName, setNewTeamName] = useState('')
   const [error, setError] = useState('')
+  const [editingName, setEditingName] = useState(false)
+  const [renameValue, setRenameValue] = useState('')
 
   const canEdit = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
 
@@ -72,6 +75,17 @@ export function TeamSettings() {
     }
   }
 
+  async function handleRename() {
+    if (!currentTeam || !renameValue.trim()) return
+    try {
+      await updateTeamName(currentTeam.uuid, renameValue.trim())
+      setEditingName(false)
+      refreshTeams()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to rename team')
+    }
+  }
+
   async function handleCreateTeam(e: FormEvent) {
     e.preventDefault()
     if (!newTeamName.trim()) return
@@ -93,7 +107,51 @@ export function TeamSettings() {
         {currentTeam && (
           <div className="rounded-lg border border-gray-200 bg-white">
             <div className="border-b border-gray-200 px-4 py-3">
-              <h3 className="font-medium text-gray-900">{currentTeam.name}</h3>
+              <div className="flex items-center gap-2">
+                {editingName ? (
+                  <>
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRename()
+                        if (e.key === 'Escape') setEditingName(false)
+                      }}
+                      autoFocus
+                      className="rounded-md border border-gray-300 px-2 py-1 text-sm font-medium focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
+                    />
+                    <button
+                      onClick={handleRename}
+                      className="rounded p-1 text-green-600 hover:bg-green-50"
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setEditingName(false)}
+                      className="rounded p-1 text-gray-400 hover:bg-gray-100"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-medium text-gray-900">{currentTeam.name}</h3>
+                    {canEdit && (
+                      <button
+                        onClick={() => {
+                          setRenameValue(currentTeam.name)
+                          setEditingName(true)
+                        }}
+                        className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                        title="Rename team"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
               <p className="text-xs text-gray-500">Your role: {currentTeam.role}</p>
             </div>
             <table className="w-full">
