@@ -28,6 +28,7 @@ dependencies = [
     "msal>=1.28",
     "redis>=5.0",
     "slowapi>=0.1",
+    "reportlab>=4.0",
 ]
 
 [project.optional-dependencies]

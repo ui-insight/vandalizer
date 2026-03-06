@@ -14,6 +14,11 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
   return (
     <tr
       className="hover:bg-[#a6b5c945]"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move'
+        e.dataTransfer.setData('text/plain', doc.uuid)
+      }}
       onClick={(e) => {
         if (e.button === 0) onClick?.()
       }}

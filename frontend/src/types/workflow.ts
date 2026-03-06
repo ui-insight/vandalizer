@@ -6,6 +6,7 @@ export interface SearchSetItem {
   title: string | null;
   is_optional: boolean;
   enum_values: string[];
+  pdf_binding?: string | null;
 }
 
 export interface SearchSet {
@@ -20,6 +21,7 @@ export interface SearchSet {
   verified: boolean;
   item_count: number;
   extraction_config: Record<string, unknown>;
+  fillable_pdf_url?: string | null;
   quality_score?: number | null;
   quality_tier?: string | null;
   last_validated_at?: string | null;

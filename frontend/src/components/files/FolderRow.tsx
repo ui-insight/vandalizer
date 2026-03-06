@@ -1,3 +1,4 @@
+import { useState, useRef } from 'react'
 import { Folder as FolderIcon, Users, MoreVertical } from 'lucide-react'
 import type { Folder } from '../../types/document'
 
@@ -7,11 +8,14 @@ interface FolderRowProps {
   onContextMenu: (e: React.MouseEvent) => void
   selected?: boolean
   onToggleSelect?: (uuid: string) => void
+  onDropFile?: (fileUuid: string, folderUuid: string) => void
 }
 
-export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect }: FolderRowProps) {
+export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect, onDropFile }: FolderRowProps) {
   const isTeam = !!folder.team_id || folder.is_shared_team_root
   const iconColor = isTeam ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
+  const [isDragOver, setIsDragOver] = useState(false)
+  const dragCounter = useRef(0)
 
   return (
     <tr
@@ -23,7 +27,32 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         e.preventDefault()
         onContextMenu(e)
       }}
-      style={{ borderBottom: '1px solid #dddddd' }}
+      onDragEnter={(e) => {
+        e.preventDefault()
+        dragCounter.current++
+        setIsDragOver(true)
+      }}
+      onDragOver={(e) => {
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+      }}
+      onDragLeave={() => {
+        dragCounter.current--
+        if (dragCounter.current === 0) setIsDragOver(false)
+      }}
+      onDrop={(e) => {
+        e.preventDefault()
+        dragCounter.current = 0
+        setIsDragOver(false)
+        const fileUuid = e.dataTransfer.getData('text/plain')
+        if (fileUuid) onDropFile?.(fileUuid, folder.uuid)
+      }}
+      style={{
+        borderBottom: '1px solid #dddddd',
+        backgroundColor: isDragOver ? 'color-mix(in srgb, var(--highlight-color, #eab308) 15%, white)' : undefined,
+        outline: isDragOver ? '2px solid color-mix(in srgb, var(--highlight-color, #eab308) 60%, white)' : undefined,
+        outlineOffset: '-2px',
+      }}
     >
       {onToggleSelect && (
         <td style={{ padding: '12px 0 12px 15px', width: 32 }}>

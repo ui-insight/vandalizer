@@ -56,6 +56,7 @@ class SearchSetResponse(BaseModel):
     verified: bool = False
     item_count: int = 0
     extraction_config: dict = {}
+    fillable_pdf_url: Optional[str] = None
     quality_score: Optional[float] = None
     quality_tier: Optional[str] = None
     last_validated_at: Optional[str] = None
@@ -70,6 +71,12 @@ class SearchSetItemResponse(BaseModel):
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
+    pdf_binding: Optional[str] = None
+
+
+class ExportPDFRequest(BaseModel):
+    results: dict[str, str]
+    document_names: list[str] = []
 
 
 # ---------------------------------------------------------------------------

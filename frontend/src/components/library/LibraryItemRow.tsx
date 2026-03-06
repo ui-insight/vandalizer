@@ -8,11 +8,13 @@ import {
   Trash2,
   Pencil,
   ShieldCheck,
+  FolderInput,
+  Check,
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { submitForVerification } from '../../api/library'
 import { relativeTime } from '../../utils/time'
-import type { LibraryItem } from '../../types/library'
+import type { LibraryItem, LibraryFolder } from '../../types/library'
 
 interface Props {
   item: LibraryItem
@@ -24,13 +26,16 @@ interface Props {
   onRemove: (id: string) => void
   onOpen?: (item: LibraryItem) => void
   onEdit?: (item: LibraryItem) => void
+  onMoveToFolder?: (itemId: string, folderUuid: string | null) => void
+  folders?: LibraryFolder[]
   qualityTier?: string | null
   qualityScore?: number | null
 }
 
-export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, qualityTier, qualityScore }: Props) {
+export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const kindLabel =
@@ -288,6 +293,118 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                         }
                       }}
                     />
+                  )}
+                  {onMoveToFolder && folders && folders.length > 0 && (
+                    <>
+                      <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                      {/* Move to folder submenu trigger */}
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          onMouseEnter={() => setFolderSubmenuOpen(true)}
+                          onMouseLeave={() => setFolderSubmenuOpen(false)}
+                          style={{
+                            display: 'flex',
+                            width: '100%',
+                            alignItems: 'center',
+                            gap: 10,
+                            padding: '8px 16px',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            color: '#1f2937',
+                            textAlign: 'left',
+                          }}
+                          onFocus={() => setFolderSubmenuOpen(true)}
+                          onBlur={() => setFolderSubmenuOpen(false)}
+                        >
+                          <span style={{ width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                            <FolderInput size={14} />
+                          </span>
+                          Move to folder
+                        </button>
+
+                        {folderSubmenuOpen && (
+                          <div
+                            onMouseEnter={() => setFolderSubmenuOpen(true)}
+                            onMouseLeave={() => setFolderSubmenuOpen(false)}
+                            style={{
+                              position: 'absolute',
+                              right: 'calc(100% + 4px)',
+                              top: 0,
+                              zIndex: 1100,
+                              minWidth: 180,
+                              borderRadius: 'var(--ui-radius, 12px)',
+                              border: '1px solid rgba(0,0,0,0.15)',
+                              background: '#fff',
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                              padding: '6px 0',
+                            }}
+                          >
+                            {/* Remove from folder option */}
+                            {item.folder && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onMoveToFolder(item.id, null)
+                                  setMenuOpen(false)
+                                  setFolderSubmenuOpen(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  width: '100%',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  padding: '8px 16px',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  color: '#6b7280',
+                                  textAlign: 'left',
+                                  fontStyle: 'italic',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                              >
+                                Remove from folder
+                              </button>
+                            )}
+                            {folders.map((folder) => (
+                              <button
+                                key={folder.uuid}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onMoveToFolder(item.id, folder.uuid)
+                                  setMenuOpen(false)
+                                  setFolderSubmenuOpen(false)
+                                }}
+                                style={{
+                                  display: 'flex',
+                                  width: '100%',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  padding: '8px 16px',
+                                  background: 'none',
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  fontSize: 13,
+                                  color: '#1f2937',
+                                  textAlign: 'left',
+                                }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(0,0,0,0.04)' }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                              >
+                                <span style={{ width: 20, display: 'flex', justifyContent: 'center', flexShrink: 0 }}>
+                                  {item.folder === folder.uuid && <Check size={12} style={{ color: '#22c55e' }} />}
+                                </span>
+                                {folder.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </>
                   )}
                   <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
                   <MenuItem

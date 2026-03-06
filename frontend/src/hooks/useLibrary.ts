@@ -69,6 +69,19 @@ export function useLibraryItems(libraryId: string | null, filters?: { kind?: str
 
 export function useLibraryFolders(scope: string, teamId?: string) {
   const [folders, setFolders] = useState<LibraryFolder[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try {
+      const data = await api.listFolders(scope, teamId)
+      setFolders(data)
+    } catch { /* ignore */ } finally {
+      setLoading(false)
+    }
+  }, [scope, teamId])
+
+  useEffect(() => { refresh() }, [refresh])
 
   const create = async (name: string, parentId?: string) => {
     const folder = await api.createFolder({ name, parent_id: parentId, scope, team_id: teamId })
@@ -91,5 +104,5 @@ export function useLibraryFolders(scope: string, teamId?: string) {
     await api.moveItems(itemIds, folderUuid)
   }
 
-  return { folders, create, rename, remove, moveItems: moveItemsToFolder }
+  return { folders, loading, refresh, create, rename, remove, moveItems: moveItemsToFolder }
 }

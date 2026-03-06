@@ -2,6 +2,7 @@ import { FolderOpen } from 'lucide-react'
 import type { Document, Folder } from '../../types/document'
 import { FolderRow } from './FolderRow'
 import { FileRow } from './FileRow'
+import { FileBrowserTutorial } from '../workspace/FileBrowserTutorial'
 
 interface FileListProps {
   folders: Folder[]
@@ -14,6 +15,7 @@ interface FileListProps {
   onToggleSelect?: (uuid: string) => void
   onToggleAll?: () => void
   snippets?: Map<string, string>
+  onDropFile?: (fileUuid: string, folderUuid: string) => void
 }
 
 export function FileList({
@@ -27,20 +29,10 @@ export function FileList({
   onToggleSelect,
   onToggleAll,
   snippets,
+  onDropFile,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
-    return (
-      <div style={{ padding: '40px 20px', textAlign: 'center', color: '#5d5f63' }}>
-        <div className="flex flex-col items-center gap-3">
-          <FolderOpen className="h-7 w-7" style={{ color: '#b0b3b8' }} />
-          <div style={{ fontWeight: 600, color: '#2d2f33' }}>No files yet</div>
-          <div style={{ fontSize: 13, maxWidth: 320 }}>
-            Use the + Add button above or drag files in to get started. You can also
-            create folders to keep things organized.
-          </div>
-        </div>
-      </div>
-    )
+    return <FileBrowserTutorial />
   }
 
   const allUuids = [...folders.map(f => f.uuid), ...documents.map(d => d.uuid)]
@@ -77,6 +69,7 @@ export function FileList({
             }}
             selected={selectedUuids?.has(folder.uuid)}
             onToggleSelect={onToggleSelect}
+            onDropFile={onDropFile}
           />
         ))}
         {documents.map((doc) => (

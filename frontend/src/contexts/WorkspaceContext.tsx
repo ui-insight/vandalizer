@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 
 type RightTab = 'assistant' | 'library'
 export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge'
@@ -91,24 +92,31 @@ function getStoredNumber(key: string, fallback: number): number {
   }
 }
 
-export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [workspaceMode, _setWorkspaceMode] = useState<WorkspaceMode>(() =>
-    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge']),
-  )
-  const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
-    _setWorkspaceMode(mode)
-    localStorage.setItem('workspace:mode', mode)
-  }, [])
+type NavSearch = (prev: Record<string, unknown>) => Record<string, unknown>
 
+export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate()
+  const search = useSearch({ from: '/' })
+
+  // ── URL-derived state ─────────────────────────────────────────────────────
+  // These values live in the URL and are reactive via useSearch.
+  // Defaults: mode falls back to localStorage, tab/editors default to none.
+
+  const workspaceMode: WorkspaceMode =
+    search.mode ??
+    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge'])
+
+  const openWorkflowId: string | null = search.workflow ?? null
+  const openExtractionId: string | null = search.extraction ?? null
+  const openAutomationId: string | null = search.automation ?? null
+  const activeRightTab: RightTab = search.tab ?? 'assistant'
+
+  // ── Pure React state (ephemeral / not URL-worthy) ─────────────────────────
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
-  const [activeRightTab, setActiveRightTab] = useState<RightTab>('assistant')
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
-  const [openWorkflowId, setOpenWorkflowId] = useState<string | null>(null)
-  const [openExtractionId, setOpenExtractionId] = useState<string | null>(null)
-  const [openAutomationId, setOpenAutomationId] = useState<string | null>(null)
   const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
@@ -117,17 +125,49 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
 
+  // ── URL-updating setters ──────────────────────────────────────────────────
+
+  const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
+    localStorage.setItem('workspace:mode', mode)
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, mode: mode === 'chat' ? undefined : mode })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const setActiveRightTab = useCallback((tab: RightTab) => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const openWorkflow = useCallback((id: string) => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const closeWorkflow = useCallback(() => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const openExtraction = useCallback((uuid: string) => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const closeExtraction = useCallback(() => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, extraction: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const openAutomation = useCallback((id: string) => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
+  const closeAutomation = useCallback(() => {
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, automation: undefined })) as NavSearch, replace: true })
+  }, [navigate])
+
   const bumpActivitySignal = useCallback(() => {
     setActivitySignal(prev => prev + 1)
   }, [])
 
   const sendChatMessage = useCallback((message: string) => {
-    setOpenWorkflowId(null)
-    setOpenExtractionId(null)
-    setOpenAutomationId(null)
-    setActiveRightTab('assistant')
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
     setPendingChatMessage(message)
-  }, [])
+  }, [navigate])
 
   const clearPendingChatMessage = useCallback(() => {
     setPendingChatMessage(null)
@@ -135,49 +175,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const triggerNewChat = useCallback(() => {
     setNewChatSignal(prev => prev + 1)
-    setOpenWorkflowId(null)
-    setOpenExtractionId(null)
-    setOpenAutomationId(null)
-    setActiveRightTab('assistant')
-  }, [])
-
-  const openWorkflow = useCallback((id: string) => {
-    setOpenExtractionId(null)
-    setOpenAutomationId(null)
-    setOpenWorkflowId(id)
-  }, [])
-
-  const closeWorkflow = useCallback(() => {
-    setOpenWorkflowId(null)
-  }, [])
-
-  const openExtraction = useCallback((uuid: string) => {
-    setOpenWorkflowId(null)
-    setOpenAutomationId(null)
-    setOpenExtractionId(uuid)
-  }, [])
-
-  const openAutomation = useCallback((id: string) => {
-    setOpenWorkflowId(null)
-    setOpenExtractionId(null)
-    setOpenAutomationId(id)
-  }, [])
-
-  const closeAutomation = useCallback(() => {
-    setOpenAutomationId(null)
-  }, [])
-
-  const closeExtraction = useCallback(() => {
-    setOpenExtractionId(null)
-  }, [])
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
+  }, [navigate])
 
   const activateKB = useCallback((uuid: string, title: string) => {
     setActiveKBUuid(uuid)
     setActiveKBTitle(title)
-    _setWorkspaceMode('chat')
     localStorage.setItem('workspace:mode', 'chat')
-    setActiveRightTab('assistant')
-  }, [])
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
+  }, [navigate])
 
   const deactivateKB = useCallback(() => {
     setActiveKBUuid(null)
@@ -193,19 +199,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const resetToHome = useCallback(() => {
-    setOpenWorkflowId(null)
-    setOpenExtractionId(null)
-    setOpenAutomationId(null)
-    setActiveRightTab('assistant')
+    navigate({ search: {}, replace: true })
+    localStorage.setItem('workspace:mode', 'chat')
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
     setPendingChatMessage(null)
     setHighlightTerms([])
     setActiveKBUuid(null)
     setActiveKBTitle(null)
-    _setWorkspaceMode('chat')
-    localStorage.setItem('workspace:mode', 'chat')
-  }, [])
+  }, [navigate])
 
   const toggleRailDocked = useCallback(() => {
     setRailDocked(prev => {

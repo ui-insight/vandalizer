@@ -63,8 +63,18 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   validateSearch: (search: Record<string, unknown>) => ({
-    openWorkflow: (search.openWorkflow as string) || undefined,
-    openExtraction: (search.openExtraction as string) || undefined,
+    // Workspace mode (chat is the default, omitted from URL when active)
+    mode: (['chat', 'files', 'automations', 'knowledge'].includes(search.mode as string)
+      ? (search.mode as 'chat' | 'files' | 'automations' | 'knowledge')
+      : undefined),
+    // Active right panel tab (assistant is the default, omitted when active)
+    tab: (['assistant', 'library'].includes(search.tab as string)
+      ? (search.tab as 'assistant' | 'library')
+      : undefined),
+    // Open editor IDs — support legacy param names for backwards compat
+    workflow: ((search.workflow as string) || (search.openWorkflow as string) || undefined),
+    extraction: ((search.extraction as string) || (search.openExtraction as string) || undefined),
+    automation: (search.automation as string) || undefined,
   }),
   component: () => (
     <ProtectedRoute>

@@ -63,6 +63,12 @@ export function shareToTeam(itemId: string, teamId: string) {
 
 // Folders
 
+export function listFolders(scope: string, teamId?: string) {
+  const params = new URLSearchParams({ scope })
+  if (teamId) params.set('team_id', teamId)
+  return apiFetch<LibraryFolder[]>(`/api/library/folders?${params}`)
+}
+
 export function createFolder(data: { name: string; parent_id?: string; scope: string; team_id?: string }) {
   return apiFetch<LibraryFolder>('/api/library/folders', { method: 'POST', body: JSON.stringify(data) })
 }

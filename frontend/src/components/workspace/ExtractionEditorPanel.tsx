@@ -1,4 +1,5 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye, Shield, ArrowRight, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
@@ -16,15 +17,16 @@ import {
   createTestCase,
   updateTestCase,
   deleteTestCase,
+  uploadPdfTemplate,
+  exportExtractionPdf,
+  generateExampleTemplate,
 } from '../../api/extractions'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
 import { searchDocuments } from '../../api/documents'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { getModels } from '../../api/config'
 import { submitForVerification } from '../../api/library'
-import { useLibraries } from '../../hooks/useLibrary'
 import { useTeams } from '../../hooks/useTeams'
-import { AddToLibraryDialog } from '../library/AddToLibraryDialog'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -58,8 +60,10 @@ export function ExtractionEditorPanel() {
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<Record<string, string>>({})
-  const [showAddToLibrary, setShowAddToLibrary] = useState(false)
-  const { libraries } = useLibraries(currentTeam?.uuid)
+  const [attachingTemplate, setAttachingTemplate] = useState(false)
+  const [generatingTemplate, setGeneratingTemplate] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const templateInputRef = useRef<HTMLInputElement>(null)
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
@@ -168,6 +172,41 @@ export function ExtractionEditorPanel() {
       setActiveTab('design')
     } finally {
       setBuildingFromDoc(false)
+    }
+  }
+
+  const handleAttachTemplate = async (file: File) => {
+    if (!openExtractionId) return
+    setAttachingTemplate(true)
+    try {
+      const ss = await uploadPdfTemplate(openExtractionId, file)
+      setSearchSet(ss)
+      refreshItems()
+      setActiveTab('design')
+    } finally {
+      setAttachingTemplate(false)
+    }
+  }
+
+  const handleGenerateTemplate = async () => {
+    if (!openExtractionId) return
+    setGeneratingTemplate(true)
+    try {
+      await generateExampleTemplate(openExtractionId)
+      await refresh()
+      refreshItems()
+    } finally {
+      setGeneratingTemplate(false)
+    }
+  }
+
+  const handleExportPdf = async () => {
+    if (!openExtractionId) return
+    setExportingPdf(true)
+    try {
+      await exportExtractionPdf(openExtractionId, results, [])
+    } finally {
+      setExportingPdf(false)
     }
   }
 
@@ -383,14 +422,35 @@ export function ExtractionEditorPanel() {
         />
       </div>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
-        <ToolsTab
-          onClone={handleClone}
-          onDelete={handleDelete}
-          onAddToLibrary={() => setShowAddToLibrary(true)}
-          onBuildFromDocument={handleBuildFromDocument}
-          buildingFromDoc={buildingFromDoc}
-          hasDocuments={selectedDocUuids.length > 0}
-        />
+        <>
+          <input
+            ref={templateInputRef}
+            type="file"
+            accept=".pdf"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) handleAttachTemplate(f)
+              e.target.value = ''
+            }}
+          />
+          <ToolsTab
+            onClone={handleClone}
+            onDelete={handleDelete}
+            onAttachTemplate={() => templateInputRef.current?.click()}
+            onGenerateTemplate={handleGenerateTemplate}
+            onExportPdf={handleExportPdf}
+            onBuildFromDocument={handleBuildFromDocument}
+            buildingFromDoc={buildingFromDoc}
+            attachingTemplate={attachingTemplate}
+            generatingTemplate={generatingTemplate}
+            exportingPdf={exportingPdf}
+            hasDocuments={selectedDocUuids.length > 0}
+            hasResults={Object.keys(results).length > 0}
+            hasTemplate={!!searchSet?.fillable_pdf_url}
+            hasItems={items.length > 0}
+          />
+        </>
       </div>
       {openExtractionId && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
@@ -526,15 +586,6 @@ export function ExtractionEditorPanel() {
         </div>
       )}
 
-      {showAddToLibrary && openExtractionId && (
-        <AddToLibraryDialog
-          libraries={libraries}
-          itemId={openExtractionId}
-          kind="search_set"
-          onClose={() => setShowAddToLibrary(false)}
-          onAdded={() => setShowAddToLibrary(false)}
-        />
-      )}
     </div>
   )
 }
@@ -727,16 +778,7 @@ function DesignTab({
           Loading...
         </div>
       ) : items.length === 0 ? (
-        <div
-          style={{
-            textAlign: 'center',
-            color: '#888',
-            fontSize: 13,
-            padding: '32px 0',
-          }}
-        >
-          Add your first item to begin
-        </div>
+        <ExtractionTutorial />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
           {items.map((item, idx) => {
@@ -952,7 +994,7 @@ function DesignTab({
       )}
 
       {/* Quality Pulse card */}
-      <QualityPulse searchSetUuid={searchSetUuid} />
+      <QualityPulse searchSetUuid={searchSetUuid} itemCount={items.length} />
 
     </div>
   )
@@ -960,7 +1002,7 @@ function DesignTab({
 
 /* ── Quality Pulse Card ── */
 
-function QualityPulse({ searchSetUuid }: { searchSetUuid?: string }) {
+function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string; itemCount?: number }) {
   const [status, setStatus] = useState<QualityStatus | null>(null)
 
   useEffect(() => {
@@ -971,6 +1013,7 @@ function QualityPulse({ searchSetUuid }: { searchSetUuid?: string }) {
   if (!status || !searchSetUuid) return null
 
   if (status.status === 'unvalidated') {
+    if (itemCount === 0) return null
     return (
       <div style={{
         marginTop: 20, padding: 16, border: '1px solid #e5e7eb',
@@ -1024,17 +1067,33 @@ function QualityPulse({ searchSetUuid }: { searchSetUuid?: string }) {
 function ToolsTab({
   onClone,
   onDelete,
-  onAddToLibrary,
+  onAttachTemplate,
+  onGenerateTemplate,
+  onExportPdf,
   onBuildFromDocument,
   buildingFromDoc,
+  attachingTemplate,
+  generatingTemplate,
+  exportingPdf,
   hasDocuments,
+  hasResults,
+  hasTemplate,
+  hasItems,
 }: {
   onClone: () => void
   onDelete: () => void
-  onAddToLibrary: () => void
+  onAttachTemplate: () => void
+  onGenerateTemplate: () => void
+  onExportPdf: () => void
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
+  attachingTemplate: boolean
+  generatingTemplate: boolean
+  exportingPdf: boolean
   hasDocuments: boolean
+  hasResults: boolean
+  hasTemplate: boolean
+  hasItems: boolean
 }) {
   return (
     <div style={{ padding: 24 }}>
@@ -1062,11 +1121,32 @@ function ToolsTab({
           description="Create a copy of this extraction"
           onClick={onClone}
         />
-        {/* Add to Library */}
+        {/* Attach Template */}
         <ToolCard
-          title="Add to Library"
-          description="Save this extraction to a library for reuse"
-          onClick={onAddToLibrary}
+          title={attachingTemplate ? 'Attaching...' : hasTemplate ? 'Replace Template' : 'Attach Template'}
+          description={
+            hasTemplate
+              ? 'A fillable PDF template is attached — click to replace it'
+              : 'Upload a fillable PDF to auto-generate extraction fields and enable PDF export'
+          }
+          onClick={onAttachTemplate}
+          disabled={attachingTemplate || generatingTemplate}
+          secondaryAction={{
+            label: generatingTemplate ? 'Generating...' : 'Generate example from fields →',
+            onClick: onGenerateTemplate,
+            disabled: generatingTemplate || attachingTemplate || !hasItems,
+          }}
+        />
+        {/* Export PDF */}
+        <ToolCard
+          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
+          description={
+            hasTemplate
+              ? 'Download a filled copy of the PDF template with extracted values'
+              : 'Download extraction results as a PDF report'
+          }
+          onClick={onExportPdf}
+          disabled={exportingPdf || !hasResults}
         />
         {/* Delete */}
         <ToolCard
@@ -1074,6 +1154,7 @@ function ToolsTab({
           description="Permanently delete this extraction"
           danger
           onClick={onDelete}
+          style={{ gridColumn: '1 / -1' }}
         />
       </div>
     </div>
@@ -1086,12 +1167,16 @@ function ToolCard({
   disabled,
   danger,
   onClick,
+  style,
+  secondaryAction,
 }: {
   title: string
   description: string
   disabled?: boolean
   danger?: boolean
   onClick: () => void
+  style?: React.CSSProperties
+  secondaryAction?: { label: string; onClick: () => void; disabled?: boolean }
 }) {
   return (
     <button
@@ -1110,6 +1195,7 @@ function ToolCard({
         textAlign: 'left',
         fontFamily: 'inherit',
         transition: 'box-shadow 0.15s',
+        ...style,
       }}
     >
       <div
@@ -1126,6 +1212,27 @@ function ToolCard({
         {title}
       </div>
       <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
+      {secondaryAction && (
+        <>
+          <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 4 }} />
+          <span
+            role="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              if (!secondaryAction.disabled) secondaryAction.onClick()
+            }}
+            style={{
+              fontSize: 11,
+              color: secondaryAction.disabled ? '#9ca3af' : '#2563eb',
+              cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
+              fontWeight: 500,
+              paddingTop: 2,
+            }}
+          >
+            {secondaryAction.label}
+          </span>
+        </>
+      )}
     </button>
   )
 }

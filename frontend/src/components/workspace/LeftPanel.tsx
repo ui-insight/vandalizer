@@ -226,6 +226,7 @@ export function LeftPanel() {
               })
               setSelectedDocUuids([doc.uuid])
             }}
+            onSelectionChange={setSelectedDocUuids}
           />
         </div>
       )}

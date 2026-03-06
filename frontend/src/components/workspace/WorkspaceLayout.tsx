@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
-import { useSearch, useNavigate } from '@tanstack/react-router'
+import { useRef, useState } from 'react'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
@@ -11,22 +10,10 @@ import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, openWorkflow, openExtraction, workspaceMode } = useWorkspace()
-  const search = useSearch({ from: '/' })
-  const navigate = useNavigate()
+  const { railDocked, panelSplit, workspaceMode } = useWorkspace()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
 
-  // Handle deep-link query params (e.g. /?openWorkflow=123)
-  useEffect(() => {
-    if (search.openWorkflow) {
-      openWorkflow(search.openWorkflow)
-      navigate({ to: '/', search: {}, replace: true })
-    } else if (search.openExtraction) {
-      openExtraction(search.openExtraction)
-      navigate({ to: '/', search: {}, replace: true })
-    }
-  }, [search, navigate, openWorkflow, openExtraction])
   const railWidth = railDocked ? 64 : 220
 
   const isChat = workspaceMode === 'chat'

@@ -12,7 +12,7 @@ import { UploadProgress } from './UploadProgress'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
-import { deleteFile, renameFile, downloadFileUrl } from '../../api/files'
+import { deleteFile, renameFile, downloadFileUrl, moveFile } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
 import type { Document, Folder } from '../../types/document'
 
@@ -26,9 +26,10 @@ interface FileBrowserProps {
   onDocClick?: (doc: Document) => void
   searchQuery?: string
   contentMatches?: ContentMatch[]
+  onSelectionChange?: (docUuids: string[]) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange }: FileBrowserProps) {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
   const space = user?.user_id || ''
@@ -51,6 +52,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches }: Fi
   // Bulk selection
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+
+  // Sync selected document UUIDs (excluding folders) to parent
+  useEffect(() => {
+    if (!onSelectionChange) return
+    const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
+    onSelectionChange(docUuids)
+  }, [selectedUuids, documents, onSelectionChange])
 
   // Clear selection when navigating folders
   useEffect(() => {
@@ -123,6 +131,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches }: Fi
       setBulkDeleting(false)
     }
   }, [selectedUuids, folders, refresh])
+
+  const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
+    await moveFile(fileUuid, folderUuid)
+    refresh()
+  }, [refresh])
 
   const handleBulkDownload = useCallback(() => {
     const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
@@ -346,6 +359,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches }: Fi
           onToggleSelect={handleToggleSelect}
           onToggleAll={handleToggleAll}
           snippets={searchQuery.trim() ? snippetMap : undefined}
+          onDropFile={handleDropFile}
         />
       </div>
 

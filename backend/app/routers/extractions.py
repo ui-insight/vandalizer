@@ -2,7 +2,7 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.activity import ActivityStatus, ActivityType
@@ -12,6 +12,7 @@ from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
     CreateTestCaseRequest,
+    ExportPDFRequest,
     ExtractionStatusResponse,
     ReorderItemsRequest,
     RunExtractionSyncRequest,
@@ -73,6 +74,7 @@ async def _ss_response(ss) -> SearchSetResponse:
         status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
         is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
+        fillable_pdf_url=ss.fillable_pdf_url,
         **quality,
     )
 
@@ -125,6 +127,211 @@ async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
     return await _ss_response(ss)
 
 
+@router.post("/search-sets/{uuid}/upload-template", response_model=SearchSetResponse)
+async def upload_pdf_template(
+    uuid: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Attach a fillable PDF template; auto-generate extraction items from its form fields."""
+    import re
+    from pathlib import Path
+    from pydantic import BaseModel as PydanticBase
+    from PyPDF2 import PdfReader
+    from app.config import Settings
+    from app.models.search_set import SearchSetItem
+    from app.services.llm_service import create_chat_agent
+    from app.services.config_service import get_default_model_name
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+
+    ss = await svc.get_search_set(uuid)
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+
+    settings = Settings()
+    file_bytes = await file.read()
+
+    # Save template file
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    template_filename = f"{uuid}_template.pdf"
+    template_path = upload_dir / template_filename
+    template_path.write_bytes(file_bytes)
+
+    # Extract form field names
+    import io
+    reader = PdfReader(io.BytesIO(file_bytes))
+    raw_fields = reader.get_fields() or {}
+    if not raw_fields:
+        raise HTTPException(status_code=422, detail="No form fields found in PDF")
+
+    # Build field info dict: {field_name: value_or_options}
+    field_info: dict[str, object] = {}
+    for name, field_obj in raw_fields.items():
+        if hasattr(field_obj, "get"):
+            options = field_obj.get("/Opt")
+            field_info[name] = options if options else None
+        else:
+            field_info[name] = None
+
+    # Use LLM to map field names to human-readable extraction prompts
+    class FieldMapping(PydanticBase):
+        mappings: dict[str, str]  # {pdf_field_name: human_readable_prompt}
+
+    model_name = await get_default_model_name()
+    agent = create_chat_agent(
+        model_name,
+        system_prompt=(
+            "You are a document intelligence assistant. Given PDF form field names and their "
+            "possible values, produce a JSON object with a 'mappings' key whose value maps each "
+            "field name to a short, clear English extraction prompt (what to extract from a document "
+            "to fill that field). Return only valid JSON."
+        ),
+    )
+    prompt = (
+        f"PDF form fields and their options:\n{field_info}\n\n"
+        "Return a JSON object with key 'mappings' mapping each field name to a human-readable "
+        "extraction prompt."
+    )
+    result = await agent.run(prompt, output_type=FieldMapping)
+    mappings: dict[str, str] = result.output.mappings
+
+    # Replace all existing items with new ones from the mapping
+    existing = await SearchSetItem.find(SearchSetItem.searchset == uuid).to_list()
+    for item in existing:
+        await item.delete()
+
+    new_items = []
+    for field_name, human_prompt in mappings.items():
+        item = SearchSetItem(
+            searchphrase=human_prompt,
+            searchset=uuid,
+            searchtype="extraction",
+            pdf_binding=field_name,
+            user_id=user.user_id,
+        )
+        await item.insert()
+        new_items.append(item)
+
+    # Update search set
+    ss.fillable_pdf_url = template_filename
+    ss.item_order = [str(i.id) for i in new_items]
+    await ss.save()
+
+    return await _ss_response(ss)
+
+
+@router.post("/search-sets/{uuid}/generate-template")
+async def generate_pdf_template(
+    uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Generate an example fillable PDF from the current extraction items and attach it as the template."""
+    from pathlib import Path
+    from app.config import Settings
+    from app.models.search_set import SearchSetItem
+    from app.services.pdf_service import generate_fillable_template
+
+    ss = await svc.get_search_set(uuid)
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+
+    items = await SearchSetItem.find(SearchSetItem.searchset == uuid).to_list()
+    if ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items = sorted(items, key=lambda i: order_map.get(str(i.id), 9999))
+
+    if not items:
+        raise HTTPException(status_code=400, detail="No items to generate template from")
+
+    pdf_bytes, field_names = generate_fillable_template(ss.title or "Extraction Template", items)
+
+    settings = Settings()
+    upload_dir = Path(settings.upload_dir)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    template_filename = f"{uuid}_template.pdf"
+    (upload_dir / template_filename).write_bytes(pdf_bytes)
+
+    for i, item in enumerate(items):
+        item.pdf_binding = field_names[i]
+        await item.save()
+
+    ss.fillable_pdf_url = template_filename
+    await ss.save()
+
+    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in (ss.title or "template")).strip() or "template"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_template.pdf"'},
+    )
+
+
+@router.post("/search-sets/{uuid}/export-pdf")
+async def export_pdf(
+    uuid: str,
+    req: ExportPDFRequest,
+    user: User = Depends(get_current_user),
+):
+    """Download a filled PDF template or a clean report PDF with extraction results."""
+    from pathlib import Path
+    from app.config import Settings
+    from app.models.search_set import SearchSetItem
+    from app.services.pdf_service import generate_extraction_pdf
+
+    ss = await svc.get_search_set(uuid)
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+
+    items = await SearchSetItem.find(SearchSetItem.searchset == uuid).to_list()
+    # Respect item_order if present
+    if ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items = sorted(items, key=lambda i: order_map.get(str(i.id), 9999))
+
+    safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in ss.title).strip() or "extraction"
+
+    if ss.fillable_pdf_url:
+        # Fill the PDF template
+        from io import BytesIO
+        from PyPDF2 import PdfReader, PdfWriter
+
+        settings = Settings()
+        template_path = Path(settings.upload_dir) / ss.fillable_pdf_url
+        if not template_path.exists():
+            raise HTTPException(status_code=404, detail="Template file not found on server")
+
+        bindings: dict[str, str] = {}
+        for item in items:
+            if item.pdf_binding and item.searchphrase in req.results:
+                bindings[item.pdf_binding] = req.results[item.searchphrase]
+
+        reader = PdfReader(str(template_path))
+        writer = PdfWriter()
+        writer.append(reader)
+        if bindings:
+            writer.update_page_form_field_values(writer.pages[0], bindings, auto_regenerate=False)
+
+        buf = BytesIO()
+        writer.write(buf)
+        pdf_bytes = buf.getvalue()
+    else:
+        pdf_bytes = generate_extraction_pdf(
+            title=ss.title,
+            items=items,
+            results=req.results,
+            document_names=req.document_names,
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )
+
+
 # ---------------------------------------------------------------------------
 # SearchSetItem CRUD
 # ---------------------------------------------------------------------------
@@ -150,6 +357,7 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
             id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
             searchtype=item.searchtype, title=item.title,
             is_optional=item.is_optional, enum_values=item.enum_values,
+            pdf_binding=item.pdf_binding,
         )
         for item in items
     ]

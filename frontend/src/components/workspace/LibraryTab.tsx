@@ -16,10 +16,17 @@ import {
   Filter,
   Terminal,
   Code,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
+import { useLibraryFolders } from '../../hooks/useLibrary'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
-type ViewFilter = 'all' | 'favorites' | 'pinned'
+type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
 type KindFilter = 'all' | 'workflow' | 'search_set'
 type SortOption = 'recent' | 'az'
 
@@ -37,6 +44,16 @@ export function LibraryTab() {
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
+  // Folder system
+  const folderScope = scope === 'team' ? 'team' : 'personal'
+  const { folders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null) // folder uuid with open menu
+  const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [newFolderMode, setNewFolderMode] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
+  const folderMenuRef = useRef<HTMLDivElement>(null)
+
   // Close + New menu on outside click
   useEffect(() => {
     if (!newMenuOpen) return
@@ -49,6 +66,28 @@ export function LibraryTab() {
     return () => document.removeEventListener('mousedown', handler)
   }, [newMenuOpen])
 
+  // Close folder context menu on outside click
+  useEffect(() => {
+    if (!folderMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (folderMenuRef.current && !folderMenuRef.current.contains(e.target as Node)) {
+        setFolderMenuOpen(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [folderMenuOpen])
+
+  // Reset folder view when scope changes
+  useEffect(() => {
+    if (viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned') {
+      setViewFilter('all')
+    }
+    setFolderMenuOpen(null)
+    setRenamingFolder(null)
+    setNewFolderMode(false)
+  }, [scope])
+
   // Find the library matching current scope
   const activeLibrary =
     scope === 'mine'
@@ -57,12 +96,14 @@ export function LibraryTab() {
         ? libraries.find((l) => l.scope === 'team') ?? null
         : libraries.find((l) => l.scope === 'verified') ?? null
 
-  // Items
+  // Items — pass folder filter when a folder is selected
+  const selectedFolder = viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned' ? viewFilter : undefined
   const { items, loading: itemsLoading, refresh: refreshItems, update, remove } = useLibraryItems(
     activeLibrary?.id ?? null,
     {
       kind: kindFilter === 'all' ? undefined : kindFilter,
       search: search || undefined,
+      folder: selectedFolder,
     },
   )
 
@@ -85,8 +126,12 @@ export function LibraryTab() {
   const handleRemove = async (itemId: string) => {
     await remove(itemId)
   }
+  const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
+    await moveFolderItems([itemId], folderUuid)
+    refreshItems()
+  }
 
-  // Apply view filter + sort
+  // Apply view filter + sort (folder filtering is handled server-side via useLibraryItems)
   const filtered = items.filter((item) => {
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
@@ -410,6 +455,9 @@ export function LibraryTab() {
                 onClick={() => {
                   setScope(key)
                   setViewFilter('all')
+                  setFolderMenuOpen(null)
+                  setRenamingFolder(null)
+                  setNewFolderMode(false)
                 }}
                 style={{
                   padding: '0 14px',
@@ -496,7 +544,7 @@ export function LibraryTab() {
         {/* Sidebar */}
         <div
           style={{
-            width: 120,
+            width: 148,
             flexShrink: 0,
             minHeight: 0,
             borderRight: '1px solid #f0f0f0',
@@ -505,6 +553,7 @@ export function LibraryTab() {
             overflowY: 'auto',
           }}
         >
+          {/* Saved Views */}
           <div
             style={{
               padding: '0 12px',
@@ -556,6 +605,268 @@ export function LibraryTab() {
               </div>
             )
           })}
+
+          {/* Folders section — only for personal and team scopes */}
+          {scope !== 'explore' && (
+            <div style={{ marginTop: 16 }}>
+              {/* Folders header row */}
+              <div
+                style={{
+                  padding: '0 8px 0 12px',
+                  marginBottom: 4,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', color: '#888', letterSpacing: '0.5px' }}>
+                  Folders
+                </span>
+                <button
+                  title="New folder"
+                  onClick={() => { setNewFolderMode(true); setNewFolderName('') }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    padding: '2px 4px',
+                    cursor: 'pointer',
+                    color: '#aaa',
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderRadius: 4,
+                    lineHeight: 1,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#555' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#aaa' }}
+                >
+                  <FolderPlus style={{ width: 13, height: 13 }} />
+                </button>
+              </div>
+
+              {/* New folder input */}
+              {newFolderMode && (
+                <div style={{ padding: '4px 8px 4px 12px' }}>
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Folder name"
+                    onKeyDown={async (e) => {
+                      if (e.key === 'Enter' && newFolderName.trim()) {
+                        await createFolder(newFolderName.trim())
+                        setNewFolderMode(false)
+                        setNewFolderName('')
+                      } else if (e.key === 'Escape') {
+                        setNewFolderMode(false)
+                        setNewFolderName('')
+                      }
+                    }}
+                    onBlur={() => {
+                      setNewFolderMode(false)
+                      setNewFolderName('')
+                    }}
+                    style={{
+                      width: '100%',
+                      fontSize: 12,
+                      padding: '4px 6px',
+                      border: '1px solid #dadce0',
+                      borderRadius: 5,
+                      outline: 'none',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Folder list */}
+              {folders.length === 0 && !newFolderMode && (
+                <div style={{ padding: '4px 12px', fontSize: 11, color: '#bbb', fontStyle: 'italic' }}>
+                  No folders yet
+                </div>
+              )}
+              {folders.map((folder) => {
+                const isActive = viewFilter === folder.uuid
+                const isRenaming = renamingFolder === folder.uuid
+                const isMenuOpen = folderMenuOpen === folder.uuid
+                return (
+                  <div
+                    key={folder.uuid}
+                    style={{ position: 'relative' }}
+                  >
+                    {isRenaming ? (
+                      <div style={{ padding: '4px 8px 4px 12px' }}>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={renameValue}
+                          onChange={(e) => setRenameValue(e.target.value)}
+                          onKeyDown={async (e) => {
+                            if (e.key === 'Enter' && renameValue.trim()) {
+                              await renameFolder(folder.uuid, renameValue.trim())
+                              setRenamingFolder(null)
+                            } else if (e.key === 'Escape') {
+                              setRenamingFolder(null)
+                            }
+                          }}
+                          onBlur={async () => {
+                            if (renameValue.trim()) {
+                              await renameFolder(folder.uuid, renameValue.trim())
+                            }
+                            setRenamingFolder(null)
+                          }}
+                          style={{
+                            width: '100%',
+                            fontSize: 12,
+                            padding: '4px 6px',
+                            border: '1px solid #dadce0',
+                            borderRadius: 5,
+                            outline: 'none',
+                            fontFamily: 'inherit',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => setViewFilter(isActive ? 'all' : folder.uuid)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          padding: '7px 6px 7px 12px',
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontWeight: isActive ? 600 : 500,
+                          color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
+                          backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
+                          borderLeft: isActive ? '3px solid var(--library-highlight)' : '3px solid transparent',
+                          transition: 'background 0.1s',
+                          gap: 0,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = '#f0f0f0'
+                          const btn = e.currentTarget.querySelector('.folder-menu-btn') as HTMLElement
+                          if (btn) btn.style.opacity = '1'
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'
+                          if (!isMenuOpen) {
+                            const btn = e.currentTarget.querySelector('.folder-menu-btn') as HTMLElement
+                            if (btn) btn.style.opacity = '0'
+                          }
+                        }}
+                      >
+                        {isActive
+                          ? <FolderOpen style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
+                          : <Folder style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
+                        }
+                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {folder.name}
+                        </span>
+                        <button
+                          className="folder-menu-btn"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setFolderMenuOpen(isMenuOpen ? null : folder.uuid)
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: '2px 3px',
+                            cursor: 'pointer',
+                            color: '#888',
+                            display: 'flex',
+                            alignItems: 'center',
+                            borderRadius: 4,
+                            opacity: isMenuOpen ? 1 : 0,
+                            transition: 'opacity 0.1s',
+                            flexShrink: 0,
+                          }}
+                        >
+                          <MoreHorizontal style={{ width: 12, height: 12 }} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Folder context menu */}
+                    {isMenuOpen && (
+                      <div
+                        ref={folderMenuRef}
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: '100%',
+                          zIndex: 1000,
+                          minWidth: 140,
+                          borderRadius: 8,
+                          border: '1px solid rgba(0,0,0,0.14)',
+                          background: '#fff',
+                          boxShadow: '0 6px 18px rgba(0,0,0,0.14)',
+                          padding: 4,
+                        }}
+                      >
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setRenamingFolder(folder.uuid)
+                            setRenameValue(folder.name)
+                            setFolderMenuOpen(null)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            width: '100%',
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 10px',
+                            fontSize: 12,
+                            color: '#1f2937',
+                            cursor: 'pointer',
+                            borderRadius: 5,
+                            textAlign: 'left',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                        >
+                          <Pencil style={{ width: 12, height: 12, color: '#6b7280' }} />
+                          Rename
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            await removeFolder(folder.uuid)
+                            if (viewFilter === folder.uuid) setViewFilter('all')
+                            setFolderMenuOpen(null)
+                          }}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 8,
+                            width: '100%',
+                            background: 'none',
+                            border: 'none',
+                            padding: '8px 10px',
+                            fontSize: 12,
+                            color: '#dc2626',
+                            cursor: 'pointer',
+                            borderRadius: 5,
+                            textAlign: 'left',
+                          }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#fef2f2' }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent' }}
+                        >
+                          <Trash2 style={{ width: 12, height: 12 }} />
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         {/* Results pane */}
@@ -598,6 +909,8 @@ export function LibraryTab() {
                   onShare={handleShare}
                   onRemove={handleRemove}
                   onEdit={openEditModal}
+                  onMoveToFolder={scope !== 'explore' ? handleMoveToFolder : undefined}
+                  folders={scope !== 'explore' ? folders : undefined}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
                   onOpen={(it) => {

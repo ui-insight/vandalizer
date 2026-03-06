@@ -41,6 +41,128 @@ async def list_libraries(
     return [LibraryResponse(**lib) for lib in libs]
 
 
+# ---------------------------------------------------------------------------
+# Items (fixed paths — must come before /{library_id})
+# ---------------------------------------------------------------------------
+
+
+@router.patch("/items/{item_id}", response_model=LibraryItemResponse)
+async def update_item(
+    item_id: str,
+    req: UpdateItemRequest,
+    user: User = Depends(get_current_user),
+):
+    item = await svc.update_item(
+        item_id,
+        user.user_id,
+        note=req.note,
+        tags=req.tags,
+        pinned=req.pinned,
+        favorited=req.favorited,
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return LibraryItemResponse(**item)
+
+
+@router.post("/items/{item_id}/touch")
+async def touch_item(item_id: str, user: User = Depends(get_current_user)):
+    """Record that a library item was just used."""
+    await svc.touch_item(item_id)
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Clone / Share (fixed paths — must come before /{library_id})
+# ---------------------------------------------------------------------------
+
+
+@router.post("/clone", response_model=LibraryItemResponse)
+async def clone_to_personal(req: CloneRequest, user: User = Depends(get_current_user)):
+    item = await svc.clone_to_personal(req.item_id, user.user_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return LibraryItemResponse(**item)
+
+
+@router.post("/share", response_model=LibraryItemResponse)
+async def share_to_team(req: ShareToTeamRequest, user: User = Depends(get_current_user)):
+    item = await svc.share_to_team(req.item_id, user.user_id, req.team_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found or team not accessible")
+    return LibraryItemResponse(**item)
+
+
+# ---------------------------------------------------------------------------
+# Folders (fixed paths — must come before /{library_id})
+# ---------------------------------------------------------------------------
+
+
+@router.get("/folders")
+async def list_folders(
+    scope: str = Query("personal"),
+    team_id: Optional[str] = Query(None),
+    user: User = Depends(get_current_user),
+):
+    return await svc.list_folders(scope=scope, user_id=user.user_id, team_id=team_id)
+
+
+@router.post("/folders")
+async def create_folder(req: CreateFolderRequest, user: User = Depends(get_current_user)):
+    folder = await svc.create_folder(
+        scope=req.scope,
+        user_id=user.user_id,
+        name=req.name,
+        parent_id=req.parent_id,
+        team_id=req.team_id,
+    )
+    return folder
+
+
+@router.post("/folders/move-items")
+async def move_items(req: MoveItemsRequest, user: User = Depends(get_current_user)):
+    await svc.move_items(req.item_ids, req.folder_uuid, user.user_id)
+    return {"ok": True}
+
+
+@router.patch("/folders/{folder_uuid}")
+async def rename_folder(
+    folder_uuid: str,
+    req: RenameFolderRequest,
+    user: User = Depends(get_current_user),
+):
+    folder = await svc.rename_folder(folder_uuid, user.user_id, req.name)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return folder
+
+
+@router.delete("/folders/{folder_uuid}")
+async def delete_folder(folder_uuid: str, user: User = Depends(get_current_user)):
+    ok = await svc.delete_folder(folder_uuid, user.user_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Search (fixed path — must come before /{library_id})
+# ---------------------------------------------------------------------------
+
+
+@router.post("/search", response_model=list[LibraryItemResponse])
+async def search_libraries(req: SearchRequest, user: User = Depends(get_current_user)):
+    items = await svc.search_libraries(
+        user.user_id, req.query, team_id=req.team_id, kind=req.kind
+    )
+    return [LibraryItemResponse(**i) for i in items]
+
+
+# ---------------------------------------------------------------------------
+# Library CRUD by ID (parameterized — must come after all fixed paths)
+# ---------------------------------------------------------------------------
+
+
 @router.get("/{library_id}", response_model=LibraryResponse)
 async def get_library(library_id: str, user: User = Depends(get_current_user)):
     lib = await svc.get_library(library_id, user.user_id)
@@ -70,7 +192,7 @@ async def delete_library(library_id: str, user: User = Depends(get_current_user)
 
 
 # ---------------------------------------------------------------------------
-# Items
+# Items (parameterized library_id)
 # ---------------------------------------------------------------------------
 
 
@@ -118,32 +240,6 @@ async def list_items(
     return [LibraryItemResponse(**i) for i in items]
 
 
-@router.patch("/items/{item_id}", response_model=LibraryItemResponse)
-async def update_item(
-    item_id: str,
-    req: UpdateItemRequest,
-    user: User = Depends(get_current_user),
-):
-    item = await svc.update_item(
-        item_id,
-        user.user_id,
-        note=req.note,
-        tags=req.tags,
-        pinned=req.pinned,
-        favorited=req.favorited,
-    )
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return LibraryItemResponse(**item)
-
-
-@router.post("/items/{item_id}/touch")
-async def touch_item(item_id: str, user: User = Depends(get_current_user)):
-    """Record that a library item was just used."""
-    await svc.touch_item(item_id)
-    return {"ok": True}
-
-
 @router.delete("/{library_id}/items/{item_id}")
 async def remove_item(
     library_id: str,
@@ -154,80 +250,3 @@ async def remove_item(
     if not ok:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Clone / Share
-# ---------------------------------------------------------------------------
-
-
-@router.post("/clone", response_model=LibraryItemResponse)
-async def clone_to_personal(req: CloneRequest, user: User = Depends(get_current_user)):
-    item = await svc.clone_to_personal(req.item_id, user.user_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return LibraryItemResponse(**item)
-
-
-@router.post("/share", response_model=LibraryItemResponse)
-async def share_to_team(req: ShareToTeamRequest, user: User = Depends(get_current_user)):
-    item = await svc.share_to_team(req.item_id, user.user_id, req.team_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Item not found or team not accessible")
-    return LibraryItemResponse(**item)
-
-
-# ---------------------------------------------------------------------------
-# Folders
-# ---------------------------------------------------------------------------
-
-
-@router.post("/folders")
-async def create_folder(req: CreateFolderRequest, user: User = Depends(get_current_user)):
-    folder = await svc.create_folder(
-        scope=req.scope,
-        user_id=user.user_id,
-        name=req.name,
-        parent_id=req.parent_id,
-        team_id=req.team_id,
-    )
-    return folder
-
-
-@router.patch("/folders/{folder_uuid}")
-async def rename_folder(
-    folder_uuid: str,
-    req: RenameFolderRequest,
-    user: User = Depends(get_current_user),
-):
-    folder = await svc.rename_folder(folder_uuid, user.user_id, req.name)
-    if not folder:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    return folder
-
-
-@router.delete("/folders/{folder_uuid}")
-async def delete_folder(folder_uuid: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_folder(folder_uuid, user.user_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Folder not found")
-    return {"ok": True}
-
-
-@router.post("/folders/move-items")
-async def move_items(req: MoveItemsRequest, user: User = Depends(get_current_user)):
-    await svc.move_items(req.item_ids, req.folder_uuid, user.user_id)
-    return {"ok": True}
-
-
-# ---------------------------------------------------------------------------
-# Search
-# ---------------------------------------------------------------------------
-
-
-@router.post("/search", response_model=list[LibraryItemResponse])
-async def search_libraries(req: SearchRequest, user: User = Depends(get_current_user)):
-    items = await svc.search_libraries(
-        user.user_id, req.query, team_id=req.team_id, kind=req.kind
-    )
-    return [LibraryItemResponse(**i) for i in items]

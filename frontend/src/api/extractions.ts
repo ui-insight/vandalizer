@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, ApiError } from './client'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
@@ -314,4 +314,77 @@ export function getExtractionImprovementSuggestions(uuid: string) {
   return apiFetch<{ suggestions: string }>(`/api/extractions/search-sets/${uuid}/improvement-suggestions`, {
     method: 'POST',
   })
+}
+
+// Fillable PDF template upload
+
+export async function uploadPdfTemplate(uuid: string, file: File): Promise<SearchSet> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/upload-template`, {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Upload failed' }))
+    throw new ApiError(res.status, body.detail || 'Upload failed')
+  }
+  return res.json()
+}
+
+// Generate example fillable PDF template from current extraction items
+
+export async function generateExampleTemplate(uuid: string): Promise<void> {
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/generate-template`, {
+    method: 'POST',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Generation failed' }))
+    throw new ApiError(res.status, body.detail || 'Generation failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? match[1] : 'template.pdf'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+// Export extraction results as PDF (filled template or report)
+
+export async function exportExtractionPdf(
+  uuid: string,
+  results: Record<string, string>,
+  documentNames: string[],
+): Promise<void> {
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/export-pdf`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ results, document_names: documentNames }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Export failed' }))
+    throw new ApiError(res.status, body.detail || 'Export failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? match[1] : 'extraction.pdf'
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
