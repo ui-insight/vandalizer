@@ -1,8 +1,11 @@
 """Verification queue API routes."""
 
+import io
+import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
@@ -414,6 +417,79 @@ async def search_users_for_examiner(
         raise HTTPException(status_code=403, detail="Admin access required")
     users = await svc.search_users(q)
     return {"users": users}
+
+
+# ---------------------------------------------------------------------------
+# Catalog export / import
+# ---------------------------------------------------------------------------
+
+
+@router.get("/catalog/export")
+async def export_catalog(user: User = Depends(get_current_user)):
+    """Download full verified catalog as a shareable JSON file."""
+    from app.services import export_import_service as eis
+
+    data = await eis.export_catalog(user.email or user.user_id)
+    json_bytes = json.dumps(data, indent=2, default=str).encode()
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": 'attachment; filename="catalog.vandalizer.json"'},
+    )
+
+
+@router.post("/catalog/preview-import")
+async def preview_catalog_import(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Parse a catalog export and return item list for selection UI (no DB writes)."""
+    from app.services import export_import_service as eis
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        preview = eis.preview_catalog_import(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"items": preview}
+
+
+@router.post("/catalog/import")
+async def import_catalog(
+    file: UploadFile = File(...),
+    selected_indices: str = Form(...),
+    space: str = Form("default"),
+    user: User = Depends(get_current_user),
+):
+    """Import selected catalog items from an export file."""
+    from app.services import export_import_service as eis
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        indices = json.loads(selected_indices)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid selected_indices")
+
+    if not isinstance(indices, list):
+        raise HTTPException(status_code=400, detail="selected_indices must be an array")
+
+    try:
+        results = await eis.import_catalog_items(data, indices, user.user_id, space)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"imported": results}
 
 
 # ---------------------------------------------------------------------------

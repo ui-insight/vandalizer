@@ -97,6 +97,58 @@ export function searchLibraries(query: string, kind?: LibraryItemKind, teamId?: 
   })
 }
 
+// Catalog Export / Import
+
+export function exportCatalogUrl() {
+  return '/api/verification/catalog/export'
+}
+
+export interface CatalogPreviewItem {
+  index: number
+  item_kind: string
+  name: string
+  description: string
+  quality_tier: string | null
+  quality_grade: string | null
+}
+
+export async function previewCatalogImport(file: File): Promise<CatalogPreviewItem[]> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch('/api/verification/catalog/preview-import', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Preview failed' }))
+    throw new Error(body.detail || 'Preview failed')
+  }
+  const data = await res.json()
+  return data.items
+}
+
+export async function importCatalogItems(
+  file: File,
+  selectedIndices: number[],
+  space: string,
+): Promise<{ imported: { kind: string; id?: string; uuid?: string; name: string }[] }> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('selected_indices', JSON.stringify(selectedIndices))
+  form.append('space', space)
+  const res = await fetch('/api/verification/catalog/import', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Import failed' }))
+    throw new Error(body.detail || 'Import failed')
+  }
+  return res.json()
+}
+
 // Verification - Queue
 
 export function submitForVerification(data: {

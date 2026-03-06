@@ -10,6 +10,19 @@ const DOC_STACK = [
   { x: 24, y: 12, opacity: 1 },
 ]
 
+// Dark palette
+const BG = '#1e2330'
+const CARD = '#272d3d'
+const BORDER = '#363e52'
+const BORDER_LT = '#424b62'
+const TEXT = '#c0c7d6'
+const TEXT_DIM = '#7a8499'
+const TEXT_BRIGHT = '#dbe1eb'
+const ACCENT = '#5e6a82'
+const LINE_STUB = '#3d4559'
+const DOC_FOLD = '#363e52'
+const BUBBLE_BG = '#323a4e'
+
 export function KnowledgeTutorial() {
   const svgRef = useRef<SVGSVGElement>(null)
 
@@ -42,7 +55,7 @@ export function KnowledgeTutorial() {
       .attr('markerWidth', 6).attr('markerHeight', 6)
       .attr('orient', 'auto')
       .append('path').attr('d', 'M0,0 L10,5 L0,10 Z')
-      .attr('fill', 'var(--highlight-color, #eab308)')
+      .attr('fill', ACCENT)
 
     // ── Stacked document cards ───────────────────────────────
     const fold = 11
@@ -52,18 +65,18 @@ export function KnowledgeTutorial() {
       g.append('rect')
         .attr('x', d.x).attr('y', d.y)
         .attr('width', DOC_W).attr('height', DOC_H)
-        .attr('rx', 5).attr('fill', '#f8fafc')
-        .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+        .attr('rx', 5).attr('fill', CARD)
+        .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
       g.append('path')
         .attr('d', `M ${d.x + DOC_W - fold} ${d.y} L ${d.x + DOC_W} ${d.y + fold} L ${d.x + DOC_W - fold} ${d.y + fold} Z`)
-        .attr('fill', '#e2e8f0')
+        .attr('fill', DOC_FOLD)
 
       ;[0, 1, 2, 3, 4].forEach((li) => {
         g.append('rect')
           .attr('x', d.x + 9).attr('y', d.y + 20 + li * 14)
           .attr('width', li === 2 ? 36 : 55).attr('height', 5)
-          .attr('rx', 2.5).attr('fill', '#cbd5e1')
+          .attr('rx', 2.5).attr('fill', LINE_STUB)
       })
 
       return g
@@ -74,19 +87,19 @@ export function KnowledgeTutorial() {
 
     kbG.append('circle')
       .attr('cx', KB_CX).attr('cy', KB_CY).attr('r', KB_R)
-      .attr('fill', 'white')
-      .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+      .attr('fill', CARD)
+      .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
     const kbInner = kbG.append('circle')
       .attr('cx', KB_CX).attr('cy', KB_CY).attr('r', KB_R - 7)
-      .attr('fill', 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)')
-      .attr('stroke', 'var(--highlight-color, #eab308)').attr('stroke-width', 1.5)
+      .attr('fill', BUBBLE_BG)
+      .attr('stroke', BORDER_LT).attr('stroke-width', 1.5)
 
     kbG.append('text')
       .attr('x', KB_CX).attr('y', KB_CY + 4)
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
       .attr('font-size', 11).attr('font-weight', 700)
-      .attr('fill', 'var(--highlight-color, #eab308)').text('KB')
+      .attr('fill', TEXT_DIM).text('KB')
 
     // ── Arrows ───────────────────────────────────────────────
     const mid1x = (ARROW1_X1 + ARROW1_X2) / 2
@@ -94,7 +107,7 @@ export function KnowledgeTutorial() {
     const arrowPath1 = svg.append('path')
       .attr('d', `M ${ARROW1_X1},${ARROW1_Y} C ${mid1x},${ARROW1_Y} ${mid1x},${ARROW2_Y} ${ARROW1_X2},${ARROW2_Y}`)
       .attr('fill', 'none')
-      .attr('stroke', 'var(--highlight-color, #eab308)')
+      .attr('stroke', ACCENT)
       .attr('stroke-width', 2)
       .attr('marker-end', 'url(#kb-arrow-tip)')
 
@@ -104,7 +117,7 @@ export function KnowledgeTutorial() {
     const arrowPath2 = svg.append('path')
       .attr('d', `M ${ARROW2_X1},${ARROW2_Y} L ${ARROW2_X2},${ARROW2_Y}`)
       .attr('fill', 'none')
-      .attr('stroke', 'var(--highlight-color, #eab308)')
+      .attr('stroke', ACCENT)
       .attr('stroke-width', 2)
       .attr('marker-end', 'url(#kb-arrow-tip)')
 
@@ -117,51 +130,51 @@ export function KnowledgeTutorial() {
     chatG.append('rect')
       .attr('x', CHAT_X).attr('y', CHAT_Y)
       .attr('width', CHAT_W).attr('height', CHAT_H)
-      .attr('rx', 7).attr('fill', 'white')
-      .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+      .attr('rx', 7).attr('fill', CARD)
+      .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
     chatG.append('text')
       .attr('x', CHAT_X + 12).attr('y', CHAT_Y + 16)
       .attr('font-size', 7.5).attr('font-weight', 700)
-      .attr('fill', '#94a3b8').attr('letter-spacing', 1)
+      .attr('fill', TEXT_DIM).attr('letter-spacing', 1)
       .text('CHAT')
 
     chatG.append('line')
       .attr('x1', CHAT_X + 1).attr('y1', CHAT_Y + 22)
       .attr('x2', CHAT_X + CHAT_W - 1).attr('y2', CHAT_Y + 22)
-      .attr('stroke', '#e2e8f0').attr('stroke-width', 1)
+      .attr('stroke', BORDER).attr('stroke-width', 1)
 
     // Question bubble
     chatG.append('rect')
       .attr('x', CHAT_X + 8).attr('y', CHAT_Y + 28)
       .attr('width', CHAT_W - 22).attr('height', 30)
-      .attr('rx', 6).attr('fill', '#f3f4f6')
+      .attr('rx', 6).attr('fill', BUBBLE_BG)
 
     chatG.append('text')
       .attr('x', CHAT_X + 16).attr('y', CHAT_Y + 47)
-      .attr('font-size', 9.5).attr('fill', '#374151')
+      .attr('font-size', 9.5).attr('fill', TEXT)
       .text('What is the total budget?')
 
     chatG.append('line')
       .attr('x1', CHAT_X + 12).attr('y1', CHAT_Y + 70)
       .attr('x2', CHAT_X + CHAT_W - 12).attr('y2', CHAT_Y + 70)
-      .attr('stroke', '#e2e8f0').attr('stroke-width', 1)
+      .attr('stroke', BORDER).attr('stroke-width', 1)
 
     // Answer
     chatG.append('text')
       .attr('x', CHAT_X + 12).attr('y', CHAT_Y + 88)
       .attr('font-size', 8).attr('font-weight', 600)
-      .attr('fill', '#9ca3af').attr('letter-spacing', 0.5)
+      .attr('fill', TEXT_DIM).attr('letter-spacing', 0.5)
       .text('ANSWER')
 
     chatG.append('text')
       .attr('x', CHAT_X + 12).attr('y', CHAT_Y + 110)
       .attr('font-size', 15).attr('font-weight', 700)
-      .attr('fill', '#111827').text('$2.4M in grants')
+      .attr('fill', TEXT_BRIGHT).text('$2.4M in grants')
 
     chatG.append('text')
       .attr('x', CHAT_X + 12).attr('y', CHAT_Y + 128)
-      .attr('font-size', 9).attr('fill', '#9ca3af')
+      .attr('font-size', 9).attr('fill', TEXT_DIM)
       .text('across 3 active projects')
 
     // ── Animation loop ───────────────────────────────────────
@@ -228,14 +241,18 @@ export function KnowledgeTutorial() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 8px' }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '20px 16px 8px',
+      backgroundColor: BG, borderRadius: 12, margin: '8px 12px',
+    }}>
       <svg
         ref={svgRef}
         width={385}
         height={190}
         style={{ overflow: 'visible', maxWidth: '100%' }}
       />
-      <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
+      <p style={{ fontSize: 13, color: TEXT_DIM, marginTop: 8, textAlign: 'center', maxWidth: 300, marginBottom: 8 }}>
         Build a knowledge base from your documents to enable AI-powered chat and search
       </p>
     </div>

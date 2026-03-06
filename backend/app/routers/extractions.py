@@ -1,8 +1,10 @@
 """Extraction API routes  - SearchSet CRUD and extraction execution."""
 
+import json
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.activity import ActivityStatus, ActivityType
@@ -124,6 +126,49 @@ async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
     ss = await svc.clone_search_set(uuid, user.user_id)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
+    return await _ss_response(ss)
+
+
+@router.get("/search-sets/{uuid}/export")
+async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
+    """Download extraction definition as a shareable JSON file."""
+    import io
+    from app.services import export_import_service as eis
+
+    try:
+        data = await eis.export_search_set(uuid, user.email or user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    json_bytes = json.dumps(data, indent=2, default=str).encode()
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in (data["items"][0]["title"] or "extraction")).strip() or "extraction"
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+    )
+
+
+@router.post("/search-sets/import", response_model=SearchSetResponse)
+async def import_search_set(
+    file: UploadFile = File(...),
+    space: str = Form("default"),
+    user: User = Depends(get_current_user),
+):
+    """Import an extraction from an exported JSON file."""
+    from app.services import export_import_service as eis
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        ss = await eis.import_search_set(data, user.user_id, space)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
     return await _ss_response(ss)
 
 

@@ -149,6 +149,28 @@ export function downloadResults(sessionId: string, format: string = 'json') {
   return `/api/workflows/download?session_id=${encodeURIComponent(sessionId)}&format=${format}`
 }
 
+// Export / Import
+
+export function exportWorkflowUrl(id: string) {
+  return `/api/workflows/${id}/export`
+}
+
+export async function importWorkflow(file: File, space: string): Promise<Workflow> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('space', space)
+  const res = await fetch('/api/workflows/import', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Import failed' }))
+    throw new Error(body.detail || 'Import failed')
+  }
+  return res.json()
+}
+
 // Step reordering
 
 export function reorderSteps(workflowId: string, stepIds: string[]) {

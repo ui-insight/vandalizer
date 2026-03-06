@@ -174,6 +174,48 @@ async def download_results(
     )
 
 
+@router.get("/{workflow_id}/export")
+async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+    """Download workflow definition as a shareable JSON file."""
+    from app.services import export_import_service as eis
+
+    try:
+        data = await eis.export_workflow(workflow_id, user.email or user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    json_bytes = json.dumps(data, indent=2, default=str).encode()
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in (data["items"][0]["name"] or "workflow")).strip() or "workflow"
+    return StreamingResponse(
+        io.BytesIO(json_bytes),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+    )
+
+
+@router.post("/import")
+async def import_workflow(
+    file: UploadFile = File(...),
+    space: str = Form("default"),
+    user: User = Depends(get_current_user),
+):
+    """Import a workflow from an exported JSON file."""
+    from app.services import export_import_service as eis
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        wf = await eis.import_workflow(data, user.user_id, space)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return WorkflowResponse(**wf)
+
+
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
 async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     wf = await svc.get_workflow(workflow_id)

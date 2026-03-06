@@ -53,13 +53,13 @@ export function UploadZone({ onFilesSelected }: UploadZoneProps) {
         {dragOver ? 'Drop files here' : 'Drag & Drop to Upload Files'}
       </div>
       <div style={{ fontSize: 12, fontWeight: 300, color: '#5d5d5d78' }}>
-        <i>pdf, xls, xlsx, docx</i>
+        <i>pdf, xls, xlsx, csv, docx</i>
       </div>
       <input
         ref={inputRef}
         type="file"
         multiple
-        accept=".pdf,.docx,.xlsx,.xls"
+        accept=".pdf,.docx,.xlsx,.xls,.csv"
         className="hidden"
         onChange={(e) => {
           if (e.target.files?.length) onFilesSelected(e.target.files)

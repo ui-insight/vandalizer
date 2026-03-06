@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
+import { SpreadsheetViewer } from './SpreadsheetViewer'
 import * as pdfjsLib from 'pdfjs-dist'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -40,6 +41,7 @@ const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
 export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskStatus }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
+  const [isSpreadsheet, setIsSpreadsheet] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const pdfDataRef = useRef<ArrayBuffer | null>(null)
@@ -54,14 +56,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
   useEffect(() => {
     let cancelled = false
     setIsPdf(null)
+    setIsSpreadsheet(false)
     pdfDataRef.current = null
 
-    fetch(url, { credentials: 'include' })
+    fetch(url, { credentials: 'include', method: 'HEAD' })
       .then(async (resp) => {
         if (cancelled) return
         const ct = resp.headers.get('content-type') || ''
-        if (ct.includes('pdf')) {
-          const data = await resp.arrayBuffer()
+        if (ct.includes('csv') || ct.includes('spreadsheet') || ct.includes('excel') || ct.includes('ms-excel')) {
+          setIsSpreadsheet(true)
+          setIsPdf(false)
+        } else if (ct.includes('pdf')) {
+          const fullResp = await fetch(url, { credentials: 'include' })
+          const data = await fullResp.arrayBuffer()
           if (cancelled) return
           pdfDataRef.current = data
           setIsPdf(true)
@@ -365,6 +372,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
       </div>
     </div>
   ) : null
+
+  // Spreadsheet viewer for CSV / Excel
+  if (isSpreadsheet) {
+    return <SpreadsheetViewer docUuid={docUuid} processing={processing} taskStatus={taskStatus} />
+  }
 
   // Loading state
   if (isPdf === null) {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Plus, Loader2, Zap } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
+import { AutomationsTutorial } from './AutomationsTutorial'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -103,11 +104,7 @@ export function AutomationsPanel() {
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : automations.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>
-            <Zap style={{ width: 32, height: 32, margin: '0 auto 12px', opacity: 0.4 }} />
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No automations yet</div>
-            <div style={{ fontSize: 12 }}>Click "+ New" to create your first automation</div>
-          </div>
+          <AutomationsTutorial />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {automations.map(auto => {

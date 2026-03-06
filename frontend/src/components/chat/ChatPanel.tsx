@@ -76,10 +76,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // When we skip a programmatic scroll, no scroll event fires, so this stays frozen at "scrolled up".
   const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
 
-  // Load saved model preference on mount
+  // Load saved model preference on mount — auto-select first model if none is set
   useEffect(() => {
     getUserConfig().then(cfg => {
-      if (cfg.model) setSelectedModel(cfg.model)
+      if (cfg.model) {
+        setSelectedModel(cfg.model)
+      } else if (cfg.available_models?.length) {
+        const first = cfg.available_models[0].tag || cfg.available_models[0].name
+        setSelectedModel(first)
+        updateUserConfig({ model: first }).catch(() => {})
+      }
     }).catch(() => {})
   }, [])
 

@@ -2,12 +2,22 @@ import { useEffect, useRef } from 'react'
 import * as d3 from 'd3'
 
 const ACTIONS = [
-  { label: 'Run Extraction', color: '#3b82f6' },
-  { label: 'Notify Team', color: '#8b5cf6' },
-  { label: 'Archive File', color: '#10b981' },
+  { label: 'Run Extraction', num: '1' },
+  { label: 'Notify Team', num: '2' },
+  { label: 'Archive File', num: '3' },
 ]
 
 const LOOP_MS = 4500
+
+// Dark palette
+const BG = '#1e2330'
+const CARD = '#272d3d'
+const BORDER = '#363e52'
+const BORDER_LT = '#424b62'
+const TEXT = '#c0c7d6'
+const TEXT_DIM = '#7a8499'
+const ACCENT = '#5e6a82'
+const DOT_BG = '#323a4e'
 
 export function AutomationsTutorial() {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -37,15 +47,15 @@ export function AutomationsTutorial() {
       .attr('markerWidth', 6).attr('markerHeight', 6)
       .attr('orient', 'auto')
       .append('path').attr('d', 'M0,0 L10,5 L0,10 Z')
-      .attr('fill', 'var(--highlight-color, #eab308)')
+      .attr('fill', ACCENT)
 
     // ── Trigger card ─────────────────────────────────────────
     const trigCard = svg.append('rect')
       .attr('x', TRIG_X).attr('y', TRIG_Y)
       .attr('width', TRIG_W).attr('height', TRIG_H)
       .attr('rx', 8)
-      .attr('fill', '#fafafa')
-      .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+      .attr('fill', CARD)
+      .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
     // Pulse ring behind the trigger card
     const ripple = svg.append('rect')
@@ -53,46 +63,46 @@ export function AutomationsTutorial() {
       .attr('width', TRIG_W + 8).attr('height', TRIG_H + 8)
       .attr('rx', 12)
       .attr('fill', 'none')
-      .attr('stroke', 'var(--highlight-color, #eab308)')
+      .attr('stroke', BORDER_LT)
       .attr('stroke-width', 2).attr('opacity', 0)
 
     // Zap icon circle
     svg.append('circle')
       .attr('cx', TRIG_CX).attr('cy', TRIG_Y + 38)
       .attr('r', 20)
-      .attr('fill', 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)')
-      .attr('stroke', 'var(--highlight-color, #eab308)').attr('stroke-width', 1.5)
+      .attr('fill', DOT_BG)
+      .attr('stroke', BORDER_LT).attr('stroke-width', 1.5)
 
     // Lightning bolt path centered in the circle
     const bx = TRIG_CX, by = TRIG_Y + 38
     svg.append('path')
       .attr('d', `M ${bx + 3},${by - 12} L ${bx - 3},${by} L ${bx + 1},${by} L ${bx - 3},${by + 12} L ${bx + 3},${by + 1} L ${bx - 1},${by + 1} Z`)
-      .attr('fill', 'var(--highlight-color, #eab308)')
+      .attr('fill', TEXT_DIM)
 
     svg.append('text')
       .attr('x', TRIG_CX).attr('y', TRIG_Y + 72)
       .attr('text-anchor', 'middle')
       .attr('font-size', 7.5).attr('font-weight', 700)
-      .attr('fill', '#94a3b8').attr('letter-spacing', 1)
+      .attr('fill', TEXT_DIM).attr('letter-spacing', 1)
       .text('TRIGGER')
 
     svg.append('text')
       .attr('x', TRIG_CX).attr('y', TRIG_Y + 90)
       .attr('text-anchor', 'middle')
       .attr('font-size', 11.5).attr('font-weight', 600)
-      .attr('fill', '#374151').text('File Uploaded')
+      .attr('fill', TEXT).text('File Uploaded')
 
     svg.append('text')
       .attr('x', TRIG_CX).attr('y', TRIG_Y + 107)
       .attr('text-anchor', 'middle')
-      .attr('font-size', 9.5).attr('fill', '#9ca3af')
+      .attr('font-size', 9.5).attr('fill', TEXT_DIM)
       .text('to watched folder')
 
     // ── Arrow ────────────────────────────────────────────────
     const arrowPath = svg.append('path')
       .attr('d', `M ${ARROW_X1},${ARROW_Y} C ${MID_X - 8},${ARROW_Y} ${MID_X + 8},${ARROW_Y} ${ARROW_X2},${ARROW_Y}`)
       .attr('fill', 'none')
-      .attr('stroke', 'var(--highlight-color, #eab308)')
+      .attr('stroke', ACCENT)
       .attr('stroke-width', 2)
       .attr('marker-end', 'url(#auto-arrow-tip)')
 
@@ -108,23 +118,23 @@ export function AutomationsTutorial() {
 
       g.append('rect')
         .attr('width', ACT_W).attr('height', ACT_H)
-        .attr('rx', 6).attr('fill', 'white')
-        .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+        .attr('rx', 6).attr('fill', CARD)
+        .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
       // Numbered dot
       g.append('circle')
         .attr('cx', 18).attr('cy', ACT_H / 2).attr('r', 10)
-        .attr('fill', a.color).attr('opacity', 0.12)
+        .attr('fill', DOT_BG)
       g.append('text')
         .attr('x', 18).attr('y', ACT_H / 2 + 4)
         .attr('text-anchor', 'middle')
         .attr('font-size', 9).attr('font-weight', 700)
-        .attr('fill', a.color).text(i + 1)
+        .attr('fill', TEXT_DIM).text(a.num)
 
       g.append('text')
         .attr('x', 34).attr('y', ACT_H / 2 + 4)
         .attr('font-size', 11.5).attr('font-weight', 600)
-        .attr('fill', '#374151').text(a.label)
+        .attr('fill', TEXT).text(a.label)
 
       return g
     })
@@ -134,7 +144,7 @@ export function AutomationsTutorial() {
 
     function loop() {
       ripple.interrupt().attr('opacity', 0)
-      trigCard.interrupt().attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+      trigCard.interrupt().attr('stroke', BORDER).attr('stroke-width', 1.5)
       arrowPath.interrupt().attr('stroke-dashoffset', pathLen)
       actionGroups.forEach(g => g.interrupt().attr('opacity', 0))
 
@@ -144,9 +154,9 @@ export function AutomationsTutorial() {
         .transition().duration(350).attr('opacity', 0)
       trigCard
         .transition().delay(100).duration(350)
-        .attr('stroke', 'var(--highlight-color, #eab308)').attr('stroke-width', 2)
+        .attr('stroke', BORDER_LT).attr('stroke-width', 2)
         .transition().duration(350)
-        .attr('stroke', '#e2e8f0').attr('stroke-width', 1.5)
+        .attr('stroke', BORDER).attr('stroke-width', 1.5)
 
       // 2. Arrow draws (800–1300ms)
       arrowPath
@@ -177,14 +187,18 @@ export function AutomationsTutorial() {
   }, [])
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 8px' }}>
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      padding: '20px 16px 8px',
+      backgroundColor: BG, borderRadius: 12, margin: '8px 12px',
+    }}>
       <svg
         ref={svgRef}
         width={385}
         height={185}
         style={{ overflow: 'visible', maxWidth: '100%' }}
       />
-      <p style={{ fontSize: 13, color: '#6b7280', marginTop: 8, textAlign: 'center', maxWidth: 300 }}>
+      <p style={{ fontSize: 13, color: TEXT_DIM, marginTop: 8, textAlign: 'center', maxWidth: 300, marginBottom: 8 }}>
         Create automations to trigger workflows automatically when files arrive or events occur
       </p>
     </div>

@@ -316,6 +316,28 @@ export function getExtractionImprovementSuggestions(uuid: string) {
   })
 }
 
+// Export / Import
+
+export function exportSearchSetUrl(uuid: string) {
+  return `/api/extractions/search-sets/${uuid}/export`
+}
+
+export async function importSearchSet(file: File, space: string): Promise<SearchSet> {
+  const form = new FormData()
+  form.append('file', file)
+  form.append('space', space)
+  const res = await fetch('/api/extractions/search-sets/import', {
+    method: 'POST',
+    credentials: 'include',
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Import failed' }))
+    throw new ApiError(res.status, body.detail || 'Import failed')
+  }
+  return res.json()
+}
+
 // Fillable PDF template upload
 
 export async function uploadPdfTemplate(uuid: string, file: File): Promise<SearchSet> {

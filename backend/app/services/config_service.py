@@ -24,12 +24,13 @@ async def get_llm_models() -> list[dict]:
 
 
 async def get_default_model_name() -> str:
-    """Return the first configured model name."""
+    """Return the first configured model name (never empty when models exist)."""
     models = await get_llm_models()
-    if models:
-        first = models[0]
-        if isinstance(first, dict):
-            return first.get("name", "")
+    for m in models:
+        if isinstance(m, dict):
+            name = m.get("name", "")
+            if name:
+                return name
     return ""
 
 
@@ -111,14 +112,22 @@ async def get_user_model_name(user_id: str | None) -> str:
 
     # Sync available_models list if stale
     models = await get_llm_models()
+    needs_save = False
     if user_config.available_models != models:
         user_config.available_models = models
-        await user_config.save()
+        needs_save = True
 
     # If stored value doesn't match any model, reset to default
     if not await get_llm_model_by_name(user_config.name):
         user_config.name = resolved
+        needs_save = True
+
+    if needs_save:
         await user_config.save()
+
+    # Final guard: if resolved is still empty, try default one more time
+    if not resolved:
+        resolved = await get_default_model_name()
 
     return resolved
 

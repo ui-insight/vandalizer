@@ -84,16 +84,26 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
     if db is None:
         db = _get_db()
 
+    sys_cfg = db.system_config.find_one() or {}
+    models = sys_cfg.get("available_models", [])
+
+    def _default_model() -> str:
+        for m in models:
+            if isinstance(m, dict) and m.get("name"):
+                return m["name"]
+        return ""
+
     if user_id:
         user_config = db.user_model_config.find_one({"user_id": user_id})
         if user_config and user_config.get("name"):
-            return user_config["name"]
+            stored = user_config["name"]
+            # Verify stored name/tag still matches a configured model
+            for m in models:
+                if isinstance(m, dict) and (m.get("name") == stored or m.get("tag") == stored):
+                    return m.get("name", stored)
+            # Stored value is stale — fall through to default
 
-    sys_cfg = db.system_config.find_one() or {}
-    models = sys_cfg.get("available_models", [])
-    if models and isinstance(models[0], dict):
-        return models[0].get("name", "")
-    return ""
+    return _default_model()
 
 
 @celery_app.task(

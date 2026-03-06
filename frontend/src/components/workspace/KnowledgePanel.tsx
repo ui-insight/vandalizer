@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Loader2, BookOpen, ArrowLeft, Trash2, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Pencil, Check } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, Trash2, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Pencil, Check } from 'lucide-react'
 import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -9,6 +9,7 @@ import type { KnowledgeBaseDetail, KnowledgeBaseSource } from '../../types/knowl
 import type { Group } from '../../types/library'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
+import { KnowledgeTutorial } from './KnowledgeTutorial'
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
   empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
@@ -763,11 +764,7 @@ export function KnowledgePanel() {
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : knowledgeBases.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: '#888' }}>
-            <BookOpen style={{ width: 32, height: 32, margin: '0 auto 12px', opacity: 0.4 }} />
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 4 }}>No knowledge bases yet</div>
-            <div style={{ fontSize: 12 }}>Click "+ New" to create your first knowledge base</div>
-          </div>
+          <KnowledgeTutorial />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {knowledgeBases.map(kb => {

@@ -1,6 +1,6 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye, Shield, ArrowRight, ShieldCheck, Download } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye, Shield, ArrowRight, ShieldCheck, Download, Upload } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
@@ -20,6 +20,8 @@ import {
   uploadPdfTemplate,
   exportExtractionPdf,
   generateExampleTemplate,
+  exportSearchSetUrl,
+  importSearchSet,
 } from '../../api/extractions'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
 import { searchDocuments } from '../../api/documents'
@@ -50,7 +52,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
-  const { openExtractionId, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal } = useWorkspace()
   const { currentTeam } = useTeams()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
@@ -64,6 +66,7 @@ export function ExtractionEditorPanel() {
   const [generatingTemplate, setGeneratingTemplate] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
   const templateInputRef = useRef<HTMLInputElement>(null)
+  const importDefInputRef = useRef<HTMLInputElement>(null)
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
@@ -434,12 +437,31 @@ export function ExtractionEditorPanel() {
               e.target.value = ''
             }}
           />
+          <input
+            ref={importDefInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              e.target.value = ''
+              try {
+                const result = await importSearchSet(f, searchSet?.space || 'default')
+                openExtraction(result.uuid)
+              } catch (err: any) {
+                alert(err.message || 'Import failed')
+              }
+            }}
+          />
           <ToolsTab
             onClone={handleClone}
             onDelete={handleDelete}
             onAttachTemplate={() => templateInputRef.current?.click()}
             onGenerateTemplate={handleGenerateTemplate}
             onExportPdf={handleExportPdf}
+            onExportDefinition={() => window.open(exportSearchSetUrl(openExtractionId!), '_blank')}
+            onImportDefinition={() => importDefInputRef.current?.click()}
             onBuildFromDocument={handleBuildFromDocument}
             buildingFromDoc={buildingFromDoc}
             attachingTemplate={attachingTemplate}
@@ -1070,6 +1092,8 @@ function ToolsTab({
   onAttachTemplate,
   onGenerateTemplate,
   onExportPdf,
+  onExportDefinition,
+  onImportDefinition,
   onBuildFromDocument,
   buildingFromDoc,
   attachingTemplate,
@@ -1085,6 +1109,8 @@ function ToolsTab({
   onAttachTemplate: () => void
   onGenerateTemplate: () => void
   onExportPdf: () => void
+  onExportDefinition: () => void
+  onImportDefinition: () => void
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
   attachingTemplate: boolean
@@ -1147,6 +1173,18 @@ function ToolsTab({
           }
           onClick={onExportPdf}
           disabled={exportingPdf || !hasResults}
+        />
+        {/* Export Definition */}
+        <ToolCard
+          title="Export Definition"
+          description="Download as a shareable JSON file"
+          onClick={onExportDefinition}
+        />
+        {/* Import Definition */}
+        <ToolCard
+          title="Import Definition"
+          description="Create a new extraction from an exported JSON file"
+          onClick={onImportDefinition}
         />
         {/* Delete */}
         <ToolCard

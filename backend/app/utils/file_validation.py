@@ -1,7 +1,7 @@
 import io
 import zipfile
 
-ALLOWED_EXTS = {"pdf", "docx", "xlsx", "xls"}
+ALLOWED_EXTS = {"pdf", "docx", "xlsx", "xls", "csv"}
 
 
 def is_allowed_file(filename: str) -> bool:
@@ -29,5 +29,12 @@ def is_valid_file_content(data: bytes, extension: str) -> bool:
         except Exception:
             return False
         return True
+
+    if ext == "csv":
+        try:
+            data[:8192].decode("utf-8")
+            return True
+        except UnicodeDecodeError:
+            return False
 
     return False

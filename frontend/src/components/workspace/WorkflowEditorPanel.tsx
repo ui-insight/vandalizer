@@ -7,6 +7,7 @@ import {
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, ChevronRight, TrendingUp, RefreshCw,
+  Upload,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
@@ -16,6 +17,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
+  exportWorkflowUrl, importWorkflow,
 } from '../../api/workflows'
 import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
@@ -119,7 +121,7 @@ const TEST_MESSAGES = [
 // ---------------------------------------------------------------------------
 
 export function WorkflowEditorPanel() {
-  const { openWorkflowId, closeWorkflow, selectedDocUuids, bumpActivitySignal } = useWorkspace()
+  const { openWorkflowId, openWorkflow, closeWorkflow, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -137,6 +139,7 @@ export function WorkflowEditorPanel() {
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const editingStep = editingStepId
     ? workflow?.steps.find(s => s.id === editingStepId) ?? null
@@ -333,6 +336,37 @@ export function WorkflowEditorPanel() {
               <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
             </div>
           )}
+          <button
+            onClick={() => window.open(exportWorkflowUrl(workflow.id), '_blank')}
+            title="Export workflow"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
+          >
+            <Download style={{ width: 16, height: 16 }} />
+          </button>
+          <button
+            onClick={() => importInputRef.current?.click()}
+            title="Import workflow"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
+          >
+            <Upload style={{ width: 16, height: 16 }} />
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json"
+            style={{ display: 'none' }}
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              e.target.value = ''
+              try {
+                const result = await importWorkflow(f, workflow.space || 'default')
+                openWorkflow(result.id)
+              } catch (err: any) {
+                alert(err.message || 'Import failed')
+              }
+            }}
+          />
           <button
             onClick={closeWorkflow}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}

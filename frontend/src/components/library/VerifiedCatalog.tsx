@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus } from 'lucide-react'
+import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { QualityContractBadge } from './QualityContractBadge'
-import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups, listCollections, addToCollection } from '../../api/library'
+import { CatalogImportDialog } from './CatalogImportDialog'
+import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
+import type { CatalogPreviewItem } from '../../api/library'
 import type { VerifiedCatalogItem, VerifiedCollection, Group } from '../../types/library'
 
 type KindFilter = '' | 'workflow' | 'search_set'
@@ -243,6 +245,9 @@ export function VerifiedCatalog() {
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
   const [groupMap, setGroupMap] = useState<Record<string, string>>({})
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
+  const [importPreview, setImportPreview] = useState<CatalogPreviewItem[] | null>(null)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   // Load groups and collections
   useEffect(() => {
@@ -324,6 +329,40 @@ export function VerifiedCatalog() {
           <option value="good">Good or better</option>
           <option value="fair">Fair or better</option>
         </select>
+        <div className="flex items-center gap-1 ml-auto">
+          <button
+            onClick={() => window.open(exportCatalogUrl(), '_blank')}
+            title="Export catalog"
+            className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+          >
+            <Download className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => importInputRef.current?.click()}
+            title="Import catalog"
+            className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
+          >
+            <Upload className="h-4 w-4" />
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".json"
+            className="hidden"
+            onChange={async (e) => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              e.target.value = ''
+              try {
+                const preview = await previewCatalogImport(f)
+                setImportFile(f)
+                setImportPreview(preview)
+              } catch (err: any) {
+                alert(err.message || 'Failed to read file')
+              }
+            }}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -418,6 +457,15 @@ export function VerifiedCatalog() {
           item={editingItem}
           onClose={() => setEditingItem(null)}
           onSaved={refresh}
+        />
+      )}
+
+      {importPreview && importFile && (
+        <CatalogImportDialog
+          items={importPreview}
+          file={importFile}
+          onClose={() => { setImportPreview(null); setImportFile(null) }}
+          onImported={() => { setImportPreview(null); setImportFile(null); refresh() }}
         />
       )}
     </div>
