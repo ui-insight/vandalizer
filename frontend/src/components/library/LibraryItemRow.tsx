@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import {
   Ellipsis,
   Pin,
@@ -37,6 +37,16 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [flipUp, setFlipUp] = useState(false)
+
+  useLayoutEffect(() => {
+    if (!menuOpen) { setFlipUp(false); return }
+    const el = dropdownRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    if (rect.bottom + 8 > window.innerHeight) setFlipUp(true)
+  }, [menuOpen])
 
   const kindLabel =
     item.kind === 'workflow'
@@ -206,10 +216,11 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
               {menuOpen && (
                 <div
+                  ref={dropdownRef}
                   style={{
                     position: 'absolute',
                     right: 0,
-                    top: '100%',
+                    ...(flipUp ? { bottom: '100%' } : { top: '100%' }),
                     zIndex: 1000,
                     minWidth: 200,
                     borderRadius: 'var(--ui-radius, 12px)',

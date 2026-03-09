@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { Download, Edit2, Trash2, Copy } from 'lucide-react'
 
 interface ContextMenuProps {
@@ -21,6 +21,18 @@ export function ContextMenu({
   onCopyUuid,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: y, left: x })
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const pad = 8
+    setPos({
+      top: y + rect.height + pad > window.innerHeight ? Math.max(pad, y - rect.height) : y,
+      left: x + rect.width + pad > window.innerWidth ? Math.max(pad, x - rect.width) : x,
+    })
+  }, [x, y])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -46,8 +58,8 @@ export function ContextMenu({
     <div
       ref={ref}
       style={{
-        top: y,
-        left: x,
+        top: pos.top,
+        left: pos.left,
         borderColor: 'rgba(0,0,0,.15)',
         boxShadow: '0 8px 24px rgba(0,0,0,.12)',
       }}

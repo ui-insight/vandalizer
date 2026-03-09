@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, useRef, useEffect } from 'react'
+import { useCallback, useMemo, useState, useRef, useEffect, type DragEvent } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
@@ -176,6 +176,36 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [createTeamFolder, setCreateTeamFolder] = useState(false)
 
+  // Panel-wide drag & drop
+  const dragCounter = useRef(0)
+  const [panelDragOver, setPanelDragOver] = useState(false)
+
+  const handlePanelDragEnter = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    dragCounter.current++
+    if (e.dataTransfer.types.includes('Files')) setPanelDragOver(true)
+  }, [])
+
+  const handlePanelDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault()
+  }, [])
+
+  const handlePanelDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    dragCounter.current--
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0
+      setPanelDragOver(false)
+    }
+  }, [])
+
+  const handlePanelDrop = useCallback((e: DragEvent) => {
+    e.preventDefault()
+    dragCounter.current = 0
+    setPanelDragOver(false)
+    if (e.dataTransfer.files.length > 0) upload(e.dataTransfer.files)
+  }, [upload])
+
   const handleFolderContextMenu = useCallback((folder: Folder, e: React.MouseEvent) => {
     setContextMenu({ x: e.clientX, y: e.clientY, type: 'folder', item: folder })
   }, [])
@@ -234,8 +264,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }
 
   return (
-    <div style={{ padding: '0px 45px 45px 45px' }}>
-      <UploadZone onFilesSelected={(files) => upload(files)} />
+    <div
+      style={{ padding: '0px 45px 45px 45px' }}
+      onDragEnter={handlePanelDragEnter}
+      onDragOver={handlePanelDragOver}
+      onDragLeave={handlePanelDragLeave}
+      onDrop={handlePanelDrop}
+    >
+      <UploadZone onFilesSelected={(files) => upload(files)} highlighted={panelDragOver} />
       <UploadProgress uploads={uploads} />
 
       {/* + Add button with dropdown menu - matches Flask _add_button.html */}
@@ -360,6 +396,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onToggleAll={handleToggleAll}
           snippets={searchQuery.trim() ? snippetMap : undefined}
           onDropFile={handleDropFile}
+          highlighted={panelDragOver}
         />
       </div>
 

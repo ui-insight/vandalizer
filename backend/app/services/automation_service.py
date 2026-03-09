@@ -18,6 +18,7 @@ async def create_automation(
     action_id: str | None = None,
     team_id: str | None = None,
     shared_with_team: bool = False,
+    output_config: dict | None = None,
 ) -> Automation:
     auto = Automation(
         name=name,
@@ -29,6 +30,7 @@ async def create_automation(
         action_id=action_id,
         team_id=team_id,
         shared_with_team=shared_with_team,
+        output_config=output_config or {},
     )
     await auto.insert()
     return auto
@@ -67,6 +69,7 @@ async def update_automation(
     action_type: str | None = None,
     action_id: str | None = None,
     shared_with_team: bool | None = None,
+    output_config: dict | None = None,
 ) -> Automation | None:
     auto = await Automation.get(PydanticObjectId(automation_id))
     if not auto:
@@ -87,6 +90,8 @@ async def update_automation(
         auto.action_id = action_id
     if shared_with_team is not None:
         auto.shared_with_team = shared_with_team
+    if output_config is not None:
+        auto.output_config = output_config
     auto.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await auto.save()
     return auto

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Pencil, Trash2, FolderOpen, Globe, Clock, Zap } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
+import { listContents } from '../../api/documents'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
+import type { Folder } from '../../types/document'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
@@ -310,6 +312,11 @@ export function AutomationEditorPanel() {
             </select>
           </div>
         )}
+
+        {/* Section C — Post-Action Output */}
+        <SectionLabel>Post-Action Output</SectionLabel>
+        <OutputStorageCard automation={automation} onSave={debouncedSave} />
+        <OutputNotificationCard automation={automation} onSave={debouncedSave} />
       </div>
     </div>
   )
@@ -447,6 +454,192 @@ function ApiConfig({ automation }: { automation: Automation }) {
       <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
         Send a POST request to this endpoint to trigger the automation.
       </div>
+    </div>
+  )
+}
+
+function OutputStorageCard({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
+  const oc = (automation.output_config || {}) as Record<string, unknown>
+  const storage = (oc.storage || {}) as Record<string, unknown>
+  const enabled = (storage.enabled as boolean) || false
+  const destinationFolder = (storage.destination_folder as string) || ''
+  const format = (storage.format as string) || 'json'
+  const fileNaming = (storage.file_naming as string) || '{workflow_name}_{date}'
+
+  const [folders, setFolders] = useState<Folder[]>([])
+
+  useEffect(() => {
+    listContents('personal').then(r => setFolders(r.folders)).catch(() => {})
+  }, [])
+
+  const updateStorage = (patch: Record<string, unknown>) => {
+    const next = { ...storage, ...patch }
+    onSave({ output_config: { ...oc, storage: next } })
+  }
+
+  return (
+    <div style={{ padding: 16, marginBottom: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => updateStorage({ enabled: e.target.checked })}
+          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Save results to a folder</span>
+      </label>
+
+      {enabled && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Destination Folder
+            </label>
+            <select
+              value={destinationFolder}
+              onChange={e => updateStorage({ destination_folder: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="">-- Select folder --</option>
+              {folders.map(f => (
+                <option key={f.uuid} value={f.uuid}>{f.title}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Format
+            </label>
+            <select
+              value={format}
+              onChange={e => updateStorage({ format: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="json">JSON</option>
+              <option value="csv">CSV</option>
+              <option value="text">Plain Text</option>
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              File Naming Pattern
+            </label>
+            <input
+              type="text"
+              defaultValue={fileNaming}
+              onBlur={e => updateStorage({ file_naming: e.target.value })}
+              placeholder="{workflow_name}_{date}"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Variables: {'{workflow_name}'}, {'{date}'}, {'{timestamp}'}, {'{document_name}'}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OutputNotificationCard({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
+  const oc = (automation.output_config || {}) as Record<string, unknown>
+  const notifications = (oc.notifications || []) as Record<string, unknown>[]
+  const notif = notifications[0] || {}
+  const enabled = notifications.length > 0 && notif.channel === 'email'
+  const recipients = ((notif.recipients || []) as string[]).join(', ')
+  const notifyOwner = (notif.notify_owner as boolean) ?? true
+  const conditions = (notif.conditions as string) || 'always'
+
+  const updateNotification = (patch: Record<string, unknown>) => {
+    const base = { channel: 'email', recipients: [], notify_owner: true, conditions: 'always', ...notif, ...patch }
+    if (patch.recipients_str !== undefined) {
+      base.recipients = (patch.recipients_str as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+      delete base.recipients_str
+    }
+    onSave({ output_config: { ...oc, notifications: [base] } })
+  }
+
+  const handleToggle = (checked: boolean) => {
+    if (checked) {
+      updateNotification({})
+    } else {
+      onSave({ output_config: { ...oc, notifications: [] } })
+    }
+  }
+
+  return (
+    <div style={{ padding: 16, marginBottom: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => handleToggle(e.target.checked)}
+          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Send email notification</span>
+      </label>
+
+      {enabled && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Recipients
+            </label>
+            <input
+              type="text"
+              defaultValue={recipients}
+              onBlur={e => updateNotification({ recipients_str: e.target.value })}
+              placeholder="email@example.com, another@example.com"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={notifyOwner}
+              onChange={e => updateNotification({ notify_owner: e.target.checked })}
+              style={{ width: 14, height: 14, accentColor: '#3b82f6' }}
+            />
+            <span style={{ fontSize: 13, color: '#374151' }}>Notify automation owner</span>
+          </label>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Send when
+            </label>
+            <select
+              value={conditions}
+              onChange={e => updateNotification({ conditions: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="always">Always</option>
+              <option value="success">On success only</option>
+              <option value="failure">On failure only</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

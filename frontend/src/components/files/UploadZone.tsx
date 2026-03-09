@@ -4,11 +4,13 @@ import { cn } from '../../lib/cn'
 
 interface UploadZoneProps {
   onFilesSelected: (files: FileList) => void
+  highlighted?: boolean
 }
 
-export function UploadZone({ onFilesSelected }: UploadZoneProps) {
+export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
   const [dragOver, setDragOver] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const active = dragOver || highlighted
 
   const handleDrop = useCallback(
     (e: DragEvent) => {
@@ -32,7 +34,7 @@ export function UploadZone({ onFilesSelected }: UploadZoneProps) {
       onClick={() => inputRef.current?.click()}
       className={cn(
         'group relative flex cursor-pointer flex-col items-center gap-1 rounded-[var(--ui-radius)] border-2 border-dashed',
-        dragOver
+        active
           ? 'border-[var(--highlight-color,#eab308)] bg-[var(--highlight-color,#eab308)]/[0.06] scale-[1.01]'
           : 'border-[#17181a30] hover:border-[#17181a60] hover:bg-[#17181a06]',
       )}
@@ -43,14 +45,14 @@ export function UploadZone({ onFilesSelected }: UploadZoneProps) {
     >
       <CloudUpload
         className="h-6 w-6 transition-transform duration-200 group-hover:scale-110"
-        style={{ color: dragOver ? 'var(--highlight-color, #eab308)' : '#17181abb' }}
+        style={{ color: active ? 'var(--highlight-color, #eab308)' : '#17181abb' }}
       />
       <div style={{
         fontSize: 14, fontWeight: 500, padding: '0 15px', textAlign: 'center',
-        color: dragOver ? 'var(--highlight-color, #eab308)' : '#17181abb',
+        color: active ? 'var(--highlight-color, #eab308)' : '#17181abb',
         transition: 'color 0.2s',
       }}>
-        {dragOver ? 'Drop files here' : 'Drag & Drop to Upload Files'}
+        {active ? 'Drop files here' : 'Drag & Drop to Upload Files'}
       </div>
       <div style={{ fontSize: 12, fontWeight: 300, color: '#5d5d5d78' }}>
         <i>pdf, xls, xlsx, csv, docx</i>

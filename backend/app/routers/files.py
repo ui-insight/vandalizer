@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from app.config import Settings
@@ -43,6 +43,24 @@ MEDIA_TYPES = {
     ".xls": "application/vnd.ms-excel",
     ".csv": "text/csv",
 }
+
+
+@router.head("/download")
+async def download_head(
+    docid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    path = await file_service.download_document(docid, settings)
+    if not path or not path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    return Response(
+        headers={
+            "Content-Type": media_type,
+            "Content-Length": str(path.stat().st_size),
+        },
+    )
 
 
 @router.get("/download")

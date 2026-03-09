@@ -3,7 +3,7 @@ import {
   X, Play, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
-  MousePointerClick, PenTool, Send, ClipboardCheck, Flag,
+  MousePointerClick, PenTool, ClipboardCheck, Flag,
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, ChevronRight, TrendingUp, RefreshCw,
@@ -26,12 +26,14 @@ import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet } from '../../types/workflow'
 import type { Document as VDoc } from '../../types/document'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 
 // ---------------------------------------------------------------------------
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type Tab = 'design' | 'input' | 'output' | 'validate'
+type Tab = 'design' | 'input' | 'validate'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
 type TaskSubTab = 'design' | 'input' | 'output'
 type TaskInputSource = 'step_input' | 'select_document' | 'workflow_documents'
@@ -74,7 +76,6 @@ const CATEGORIES: { key: TaskCategory; label: string }[] = [
 const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
   { key: 'design', label: 'Design', icon: PenTool },
   { key: 'input', label: 'Input', icon: Zap },
-  { key: 'output', label: 'Output', icon: Send },
   { key: 'validate', label: 'Validate', icon: ClipboardCheck },
 ]
 
@@ -289,7 +290,6 @@ export function WorkflowEditorPanel() {
 
   // --- tab badge counts ---
   const inputBadge = workflow.steps.some(s => s.data?.trigger_type === 'folder_watch') ? 1 : 0
-  const outputBadge = workflow.steps.some(s => s.is_output) ? 1 : 0
 
   // --- render ---
 
@@ -383,7 +383,7 @@ export function WorkflowEditorPanel() {
       <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
           const TabIcon = tab.icon
-          const badge = tab.key === 'input' ? inputBadge : tab.key === 'output' ? outputBadge : 0
+          const badge = tab.key === 'input' ? inputBadge : 0
           return (
             <button
               key={tab.key}
@@ -440,7 +440,6 @@ export function WorkflowEditorPanel() {
         )}
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
-        {activeTab === 'output' && <OutputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
         {activeTab === 'validate' && <ValidateTab workflowId={openWorkflowId} selectedDocUuids={selectedDocUuids} />}
       </div>
 
@@ -2256,8 +2255,13 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
 
   const renderOutput = (data: unknown): string => {
     if (data === null || data === undefined) return ''
-    if (typeof data === 'string') return data
-    try { return JSON.stringify(data, null, 2) } catch { return String(data) }
+    let md: string
+    if (typeof data === 'string') {
+      md = data
+    } else {
+      try { md = '```json\n' + JSON.stringify(data, null, 2) + '\n```' } catch { md = String(data) }
+    }
+    return DOMPurify.sanitize(marked.parse(md) as string)
   }
 
   return (
@@ -2313,13 +2317,14 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
             <CheckCircle style={{ width: 16, height: 16 }} />
             Completed
           </div>
-          <div style={{
-            backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
-            padding: 12, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
-            maxHeight: 300, overflowY: 'auto', color: '#374151',
-          }}>
-            {renderOutput(output)}
-          </div>
+          <div
+            style={{
+              backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+              padding: 12, fontSize: 13, lineHeight: 1.6,
+              maxHeight: 300, overflowY: 'auto', color: '#374151',
+            }}
+            dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
+          />
           <div style={{ marginTop: 12, position: 'relative', display: 'inline-block' }}>
             <button
               onClick={() => setShowDownloadPopup(!showDownloadPopup)}
@@ -2848,171 +2853,6 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Output Tab — storage, delivery, & notification configuration
-// ---------------------------------------------------------------------------
-
-function OutputTab({ workflow, openWorkflowId, onRefresh }: {
-  workflow: Workflow
-  openWorkflowId: string | null
-  onRefresh: () => void
-}) {
-  const [format, setFormat] = useState('json')
-  const [fileNaming, setFileNaming] = useState('{workflow_name}_{date}')
-  const [savePlatform, setSavePlatform] = useState(true)
-  const [exportCloud, setExportCloud] = useState(false)
-  const [cloudDestination, setCloudDestination] = useState('')
-  const [sendWebhook, setSendWebhook] = useState(false)
-  const [webhookUrl, setWebhookUrl] = useState('')
-  const [emailNotify, setEmailNotify] = useState(false)
-  const [emailRecipients, setEmailRecipients] = useState('')
-  const [notifyOnFail, setNotifyOnFail] = useState(true)
-  const [notifyOnComplete, setNotifyOnComplete] = useState(true)
-
-  return (
-    <div style={{ padding: 24 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 16 }}>
-        Output Configuration
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Output format */}
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Default Output Format</div>
-          <select
-            value={format}
-            onChange={e => setFormat(e.target.value)}
-            style={{
-              width: '100%', fontSize: 13, fontFamily: 'inherit',
-              border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 12px',
-              backgroundColor: '#fff', color: '#374151',
-            }}
-          >
-            <option value="json">JSON</option>
-            <option value="csv">CSV</option>
-            <option value="pdf">PDF Report</option>
-            <option value="text">Plain Text</option>
-          </select>
-        </div>
-
-        {/* File naming */}
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>File Naming Pattern</div>
-          <input
-            type="text"
-            value={fileNaming}
-            onChange={e => setFileNaming(e.target.value)}
-            placeholder="{workflow_name}_{date}"
-            style={{
-              width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-              border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-            }}
-          />
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-            Variables: {'{workflow_name}'}, {'{date}'}, {'{timestamp}'}, {'{document_name}'}
-          </div>
-        </div>
-
-        {/* Storage destinations */}
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Storage Destinations
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Configure where workflow results are saved automatically.
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-              <input type="checkbox" checked={savePlatform} onChange={e => setSavePlatform(e.target.checked)} />
-              <span style={{ fontSize: 13, color: '#374151' }}>Save to platform (default)</span>
-            </label>
-
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={exportCloud} onChange={e => setExportCloud(e.target.checked)} />
-                <span style={{ fontSize: 13, color: '#374151' }}>Export to cloud storage</span>
-              </label>
-              {exportCloud && (
-                <input
-                  type="text"
-                  value={cloudDestination}
-                  onChange={e => setCloudDestination(e.target.value)}
-                  placeholder="e.g., s3://bucket/path or OneDrive folder"
-                  style={{
-                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
-                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-              )}
-            </div>
-
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={sendWebhook} onChange={e => setSendWebhook(e.target.checked)} />
-                <span style={{ fontSize: 13, color: '#374151' }}>Send via webhook</span>
-              </label>
-              {sendWebhook && (
-                <input
-                  type="text"
-                  value={webhookUrl}
-                  onChange={e => setWebhookUrl(e.target.value)}
-                  placeholder="https://your-webhook-url.com/endpoint"
-                  style={{
-                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
-                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Notifications */}
-        <div style={{
-          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-            Notifications
-          </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Get notified when a workflow run completes or fails.
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                <input type="checkbox" checked={emailNotify} onChange={e => setEmailNotify(e.target.checked)} />
-                <span style={{ fontSize: 13, color: '#374151' }}>Email notification</span>
-              </label>
-              {emailNotify && (
-                <input
-                  type="text"
-                  value={emailRecipients}
-                  onChange={e => setEmailRecipients(e.target.value)}
-                  placeholder="email@example.com, another@example.com"
-                  style={{
-                    width: '100%', marginTop: 6, padding: '6px 10px', fontSize: 12, fontFamily: 'inherit',
-                    border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-                  }}
-                />
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: 16 }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={notifyOnComplete} onChange={e => setNotifyOnComplete(e.target.checked)} />
-                <span style={{ fontSize: 12, color: '#374151' }}>On completion</span>
-              </label>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <input type="checkbox" checked={notifyOnFail} onChange={e => setNotifyOnFail(e.target.checked)} />
-                <span style={{ fontSize: 12, color: '#374151' }}>On failure</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Validate Tab — run validation with grade + check results

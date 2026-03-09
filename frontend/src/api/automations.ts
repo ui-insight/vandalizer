@@ -23,10 +23,15 @@ export function updateAutomation(id: string, data: {
   action_type?: string
   action_id?: string
   shared_with_team?: boolean
+  output_config?: Record<string, unknown>
 }) {
   return apiFetch<Automation>(`/api/automations/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 
 export function deleteAutomation(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/automations/${id}`, { method: 'DELETE' })
+}
+
+export function getActiveAutomations() {
+  return apiFetch<{ active_automation_ids: string[] }>('/api/automations/active')
 }

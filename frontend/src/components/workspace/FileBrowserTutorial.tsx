@@ -9,7 +9,7 @@ const FILES = [
 
 const LOOP_MS = 4500
 
-export function FileBrowserTutorial() {
+export function FileBrowserTutorial({ highlighted }: { highlighted?: boolean }) {
   const svgRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
@@ -42,6 +42,7 @@ export function FileBrowserTutorial() {
 
     // ── Upload zone ─────────────────────────────────────────
     svg.append('rect')
+      .attr('class', 'upl-border')
       .attr('x', UPL_X).attr('y', UPL_Y)
       .attr('width', UPL_W).attr('height', UPL_H)
       .attr('rx', 8)
@@ -70,6 +71,7 @@ export function FileBrowserTutorial() {
       .attr('stroke-linejoin', 'round')
 
     svg.append('text')
+      .attr('class', 'upl-label')
       .attr('x', UPL_CX).attr('y', UPL_Y + UPL_H - 18)
       .attr('text-anchor', 'middle')
       .attr('font-size', 8).attr('font-weight', 700)
@@ -184,6 +186,21 @@ export function FileBrowserTutorial() {
       svg.selectAll('*').interrupt()
     }
   }, [])
+
+  // Toggle highlight on the upload zone when files are dragged over the panel
+  useEffect(() => {
+    const el = svgRef.current
+    if (!el) return
+    const svg = d3.select(el)
+    const hl = 'var(--highlight-color, #eab308)'
+    svg.select('.upl-border')
+      .attr('stroke', highlighted ? hl : '#94a3b8')
+      .attr('stroke-width', highlighted ? 2.5 : 1.5)
+      .attr('fill', highlighted ? 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)' : 'none')
+    svg.select('.upl-label')
+      .attr('fill', highlighted ? hl : '#94a3b8')
+      .text(highlighted ? 'DROP FILES HERE' : 'DRAG FILES HERE')
+  }, [highlighted])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '20px 16px 8px' }}>

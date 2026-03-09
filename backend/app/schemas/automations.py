@@ -12,6 +12,7 @@ class CreateAutomationRequest(BaseModel):
     action_type: Optional[str] = None
     action_id: Optional[str] = None
     shared_with_team: bool = False
+    output_config: Optional[dict] = None
 
 
 class UpdateAutomationRequest(BaseModel):
@@ -23,6 +24,7 @@ class UpdateAutomationRequest(BaseModel):
     action_type: Optional[str] = None
     action_id: Optional[str] = None
     shared_with_team: Optional[bool] = None
+    output_config: Optional[dict] = None
 
 
 class AutomationResponse(BaseModel):
@@ -38,5 +40,6 @@ class AutomationResponse(BaseModel):
     team_id: Optional[str] = None
     shared_with_team: bool = False
     space: Optional[str] = None
+    output_config: dict = {}
     created_at: str
     updated_at: str

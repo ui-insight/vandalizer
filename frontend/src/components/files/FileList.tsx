@@ -16,6 +16,7 @@ interface FileListProps {
   onToggleAll?: () => void
   snippets?: Map<string, string>
   onDropFile?: (fileUuid: string, folderUuid: string) => void
+  highlighted?: boolean
 }
 
 export function FileList({
@@ -30,9 +31,10 @@ export function FileList({
   onToggleAll,
   snippets,
   onDropFile,
+  highlighted,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
-    return <FileBrowserTutorial />
+    return <FileBrowserTutorial highlighted={highlighted} />
   }
 
   const allUuids = [...folders.map(f => f.uuid), ...documents.map(d => d.uuid)]

@@ -395,6 +395,15 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 
     output_config = workflow.get("output_config") or {}
 
+    # Override with automation output_config if an enabled automation targets this workflow
+    automation = db.automation.find_one({
+        "action_type": "workflow",
+        "action_id": str(workflow["_id"]),
+        "enabled": True,
+    })
+    if automation and automation.get("output_config"):
+        output_config = automation["output_config"]
+
     # Find associated work item (if any)
     work_item = None
     trigger_event = None

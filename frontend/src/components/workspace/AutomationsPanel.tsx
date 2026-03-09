@@ -4,6 +4,7 @@ import { AutomationsTutorial } from './AutomationsTutorial'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useAutomationActivity } from '../../hooks/useAutomationActivity'
 import type { Automation, TriggerType } from '../../types/automation'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: string }> = {
@@ -17,6 +18,7 @@ export function AutomationsPanel() {
   const { openAutomation } = useWorkspace()
   const { automations, loading, create } = useAutomations()
   const { workflows } = useWorkflows()
+  const { activeIds } = useAutomationActivity()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -109,6 +111,7 @@ export function AutomationsPanel() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {automations.map(auto => {
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
+              const isRunning = activeIds.has(auto.id)
               return (
                 <button
                   key={auto.id}
@@ -119,11 +122,12 @@ export function AutomationsPanel() {
                     textAlign: 'left',
                     padding: '14px 16px',
                     backgroundColor: '#2a2a2a',
-                    border: '1px solid #3a3a3a',
+                    border: isRunning ? '1px solid rgba(234, 179, 8, 0.4)' : '1px solid #3a3a3a',
                     borderRadius: 8,
                     cursor: 'pointer',
                     fontFamily: 'inherit',
-                    transition: 'background-color 0.15s',
+                    transition: 'background-color 0.15s, border-color 0.15s',
+                    animation: isRunning ? 'automationRowShimmer 2s ease-in-out infinite' : undefined,
                   }}
                   onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#333')}
                   onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#2a2a2a')}
@@ -134,8 +138,9 @@ export function AutomationsPanel() {
                         width: 8,
                         height: 8,
                         borderRadius: '50%',
-                        backgroundColor: auto.enabled ? '#22c55e' : '#6b7280',
+                        backgroundColor: isRunning ? '#eab308' : auto.enabled ? '#22c55e' : '#6b7280',
                         flexShrink: 0,
+                        animation: isRunning ? 'automationPulseDot 1.5s ease-in-out infinite' : undefined,
                       }}
                     />
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -164,8 +169,8 @@ export function AutomationsPanel() {
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {getActionName(auto)}
+                  <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
                 </button>
               )
@@ -173,6 +178,17 @@ export function AutomationsPanel() {
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes automationPulseDot {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.4; transform: scale(1.4); }
+        }
+        @keyframes automationRowShimmer {
+          0%, 100% { border-color: rgba(234, 179, 8, 0.2); }
+          50% { border-color: rgba(234, 179, 8, 0.5); }
+        }
+      `}</style>
     </div>
   )
 }

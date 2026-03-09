@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.system_config import SystemConfig
+from app.services.llm_service import clear_agent_caches
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.workflow import Workflow, WorkflowResult
@@ -630,6 +631,7 @@ async def update_config(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    clear_agent_caches()
 
     return {"status": "ok"}
 
@@ -660,6 +662,7 @@ async def add_model(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    clear_agent_caches()
 
     return {"status": "ok", "models": cfg.available_models}
 
@@ -692,6 +695,7 @@ async def update_model(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    clear_agent_caches()
 
     return {"status": "ok", "models": cfg.available_models}
 
@@ -715,6 +719,7 @@ async def delete_model(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    clear_agent_caches()
 
     return {"status": "ok", "removed": removed, "models": cfg.available_models}
 

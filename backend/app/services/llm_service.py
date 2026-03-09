@@ -26,6 +26,14 @@ _rag_agent_cache: dict[str, Agent] = {}
 _prompt_agent_cache: dict[str, Agent] = {}
 
 
+def clear_agent_caches():
+    """Clear all cached agents so config changes (API keys, endpoints) take effect."""
+    _chat_agent_cache.clear()
+    _extraction_agent_cache.clear()
+    _rag_agent_cache.clear()
+    _prompt_agent_cache.clear()
+
+
 # ---------------------------------------------------------------------------
 # RAG deps dataclass
 # ---------------------------------------------------------------------------
