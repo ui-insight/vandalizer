@@ -3,10 +3,11 @@
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
+from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
 from app.services import activity_service
@@ -459,7 +460,8 @@ async def build_from_document(uuid: str, req: BuildFromDocumentRequest, user: Us
 
 
 @router.post("/run-sync")
-async def run_extraction_sync(req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):
     # Look up the search set for the activity title
     ss = await svc.get_search_set(req.search_set_uuid)
     title = ss.title if ss else req.search_set_uuid

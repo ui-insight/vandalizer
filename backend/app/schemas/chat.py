@@ -10,7 +10,7 @@ class ChatRequest(BaseModel):
     activity_id: Optional[str] = None
     document_uuids: list[str] = []
     current_space_id: Optional[str] = None
-    folder_uuid: Optional[str] = None
+    folder_uuids: list[str] = []
     model: Optional[str] = None
     knowledge_base_uuid: Optional[str] = None
     include_onboarding_context: bool = False

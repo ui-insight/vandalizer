@@ -318,6 +318,106 @@ async def get_workflow_status(session_id: str) -> dict | None:
     }
 
 
+async def run_workflow_batch(
+    workflow_id: str,
+    document_uuids: list[str],
+    user_id: str,
+    model: str | None = None,
+    activity_id: str | None = None,
+) -> str:
+    """Start a batched workflow execution — one run per document.
+
+    Returns a ``batch_id`` that can be polled via ``get_batch_status``.
+    """
+    from app.models.document import SmartDocument
+
+    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    if not wf:
+        raise ValueError("Workflow not found")
+
+    if not model:
+        model = await get_user_model_name(user_id)
+
+    batch_id = str(uuid_mod.uuid4())[:8]
+
+    for doc_uuid in document_uuids:
+        # Look up title for display
+        doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        doc_title = doc.title if doc else doc_uuid
+
+        session_id = str(uuid_mod.uuid4())[:8]
+
+        result = WorkflowResult(
+            workflow=wf.id,
+            session_id=session_id,
+            status="queued",
+            num_steps_total=len(wf.steps),
+            batch_id=batch_id,
+            document_title=doc_title,
+        )
+        await result.insert()
+
+        trigger_step_data = {"doc_uuids": [doc_uuid]}
+
+        celery_app.send_task(
+            "tasks.workflow_next.execution",
+            kwargs={
+                "workflow_result_id": str(result.id),
+                "workflow_id": str(wf.id),
+                "trigger_step_data": trigger_step_data,
+                "model": model,
+                "activity_id": activity_id,
+            },
+            queue="workflows",
+        )
+
+    return batch_id
+
+
+async def get_batch_status(batch_id: str) -> dict | None:
+    """Return aggregated status for a batch run."""
+    results = await WorkflowResult.find(
+        WorkflowResult.batch_id == batch_id,
+    ).to_list()
+
+    if not results:
+        return None
+
+    total = len(results)
+    completed = sum(1 for r in results if r.status == "completed")
+    failed = sum(1 for r in results if r.status in ("error", "failed"))
+    running = sum(1 for r in results if r.status in ("running", "queued"))
+
+    if running > 0:
+        overall_status = "running"
+    elif failed == total:
+        overall_status = "failed"
+    elif completed + failed == total:
+        overall_status = "completed"
+    else:
+        overall_status = "running"
+
+    items = []
+    for r in results:
+        items.append({
+            "session_id": r.session_id,
+            "document_title": r.document_title,
+            "status": r.status,
+            "num_steps_completed": r.num_steps_completed,
+            "num_steps_total": r.num_steps_total,
+            "current_step_name": r.current_step_name,
+            "final_output": r.final_output,
+        })
+
+    return {
+        "status": overall_status,
+        "total": total,
+        "completed": completed,
+        "failed": failed,
+        "items": items,
+    }
+
+
 async def test_step(task_name: str, task_data: dict, document_uuids: list[str], user_id: str, model: str | None = None) -> str:
     """Test a single step. Returns Celery task_id for polling."""
     if not model:

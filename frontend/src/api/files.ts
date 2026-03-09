@@ -34,3 +34,31 @@ export function moveFile(fileUUID: string, folderID: string) {
 export function downloadFileUrl(docid: string) {
   return `/api/files/download?docid=${docid}`
 }
+
+export function downloadFile(docid: string) {
+  const a = document.createElement('a')
+  a.href = downloadFileUrl(docid)
+  a.download = ''
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+}
+
+export async function downloadFilesAsZip(docIds: string[]) {
+  const res = await fetch('/api/files/download-bulk', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ doc_ids: docIds }),
+  })
+  if (!res.ok) throw new Error('Download failed')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'documents.zip'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

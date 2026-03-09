@@ -1,5 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
-from fastapi.responses import FileResponse
+import io
+import zipfile
+
+from fastapi import APIRouter, Body, Depends, HTTPException, Response
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
@@ -77,7 +80,32 @@ async def download(
         path,
         filename=path.name,
         media_type=media_type,
-        content_disposition_type="inline",
+        content_disposition_type="attachment",
+    )
+
+
+@router.post("/download-bulk")
+async def download_bulk(
+    doc_ids: list[str] = Body(..., embed=True),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Download multiple files as a single zip archive."""
+    if not doc_ids:
+        raise HTTPException(status_code=400, detail="No document IDs provided")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for docid in doc_ids:
+            path = await file_service.download_document(docid, settings)
+            if path and path.exists():
+                zf.write(path, path.name)
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=documents.zip"},
     )
 
 

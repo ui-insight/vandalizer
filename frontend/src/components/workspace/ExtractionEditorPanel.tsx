@@ -449,8 +449,8 @@ export function ExtractionEditorPanel() {
               try {
                 const result = await importSearchSet(f, searchSet?.space || 'default')
                 openExtraction(result.uuid)
-              } catch (err: any) {
-                alert(err.message || 'Import failed')
+              } catch (err: unknown) {
+                alert(err instanceof Error ? err.message : 'Import failed')
               }
             }}
           />

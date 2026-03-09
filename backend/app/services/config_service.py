@@ -78,7 +78,7 @@ async def get_llm_endpoint() -> str:
     config = await SystemConfig.get_config()
     if config and config.llm_endpoint:
         return config.llm_endpoint
-    return "https://mindrouter-api.nkn.uidaho.edu/v1"
+    return ""
 
 
 # ---------------------------------------------------------------------------

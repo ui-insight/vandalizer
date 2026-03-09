@@ -42,7 +42,7 @@ export function Header() {
       {/* Right: Support + Teams dropdown */}
       <div className="flex items-center gap-4">
         <a
-          href="https://reporting.insight.uidaho.edu"
+          href={import.meta.env.VITE_SUPPORT_URL || 'https://github.com/ui-insight/vandalizer/issues'}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 rounded-[30px] border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#555] hover:bg-gray-100 transition-all"

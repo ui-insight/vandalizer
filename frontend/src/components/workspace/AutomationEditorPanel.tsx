@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Clock, Zap } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Clock, Zap, Copy, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { listContents } from '../../api/documents'
 import { useWorkflows } from '../../hooks/useWorkflows'
+import { useSearchSets } from '../../hooks/useExtractions'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 import type { Folder } from '../../types/document'
 
@@ -15,13 +16,14 @@ const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderO
 
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string; enabled: boolean }[] = [
   { value: 'workflow', label: 'Run Workflow', description: 'Execute a workflow on triggered documents', enabled: true },
-  { value: 'extraction', label: 'Run Extraction', description: 'Run an extraction template', enabled: false },
-  { value: 'task', label: 'Run Task', description: 'Execute a standalone task', enabled: false },
+  { value: 'extraction', label: 'Run Extraction', description: 'Run an extraction template', enabled: true },
+  { value: 'task', label: 'Run Task', description: 'Execute a standalone task', enabled: true },
 ]
 
 export function AutomationEditorPanel() {
   const { openAutomationId, closeAutomation } = useWorkspace()
   const { workflows } = useWorkflows()
+  const { searchSets } = useSearchSets()
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -97,8 +99,8 @@ export function AutomationEditorPanel() {
     await save({ action_type: type, action_id: null })
   }
 
-  const handleWorkflowSelect = async (workflowId: string) => {
-    await save({ action_id: workflowId || null })
+  const handleActionSelect = async (id: string) => {
+    await save({ action_id: id || null })
   }
 
   if (loading) {
@@ -290,7 +292,7 @@ export function AutomationEditorPanel() {
           })}
         </div>
 
-        {/* Workflow selector */}
+        {/* Action selector */}
         {automation.action_type === 'workflow' && (
           <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
             <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
@@ -298,7 +300,49 @@ export function AutomationEditorPanel() {
             </label>
             <select
               value={automation.action_id || ''}
-              onChange={e => handleWorkflowSelect(e.target.value)}
+              onChange={e => handleActionSelect(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="">-- Select a workflow --</option>
+              {workflows.map(wf => (
+                <option key={wf.id} value={wf.id}>{wf.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {automation.action_type === 'extraction' && (
+          <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+              Select Extraction
+            </label>
+            <select
+              value={automation.action_id || ''}
+              onChange={e => handleActionSelect(e.target.value)}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="">-- Select an extraction --</option>
+              {searchSets.map(ss => (
+                <option key={ss.uuid} value={ss.uuid}>{ss.title}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        {automation.action_type === 'task' && (
+          <div style={{ marginTop: 16, padding: '16px', backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+              Select Workflow Task
+            </label>
+            <select
+              value={automation.action_id || ''}
+              onChange={e => handleActionSelect(e.target.value)}
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13,
                 border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
@@ -438,22 +482,206 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
 }
 
 function ApiConfig({ automation }: { automation: Automation }) {
-  const endpoint = `POST /api/automations/${automation.id}/trigger`
+  const [lang, setLang] = useState<'python' | 'curl'>('python')
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const baseUrl = window.location.origin
+  const endpoint = `${baseUrl}/api/automations/${automation.id}/trigger`
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const pythonFileSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    files=[
+        ("files", ("document.pdf", open("document.pdf", "rb"), "application/pdf")),
+        # Add more files as needed
+    ],
+)
+print(response.json())`
+
+  const pythonTextSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={"text": "Your document text content here..."},
+)
+print(response.json())`
+
+  const pythonDocUuidSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={"document_uuids": "UUID1,UUID2"},
+)
+print(response.json())`
+
+  const curlFileSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "files=@document.pdf"`
+
+  const curlTextSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "text=Your document text content here..."`
+
+  const curlDocUuidSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "document_uuids=UUID1,UUID2"`
+
+  const statusSnippet = lang === 'python'
+    ? `# Check workflow/task status
+response = requests.get(
+    "${baseUrl}/api/workflows/status",
+    params={"session_id": "SESSION_ID_FROM_RESPONSE"},
+    headers={"x-api-key": "YOUR_API_KEY"},
+)
+print(response.json())`
+    : `# Check workflow/task status
+curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
+  -H "x-api-key: YOUR_API_KEY"`
+
+  const responseExample = automation.action_type === 'extraction'
+    ? `{
+  "status": "completed",
+  "activity_id": "...",
+  "action_type": "extraction",
+  "documents": ["UUID1"],
+  "results": [{"field": "value", ...}]
+}`
+    : `{
+  "status": "queued",
+  "activity_id": "...",
+  "session_id": "...",
+  "action_type": "${automation.action_type || 'workflow'}",
+  "documents": ["UUID1"]
+}`
+
+  const codeBlockStyle: React.CSSProperties = {
+    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
+  }
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 4, cursor: 'pointer', border: 'none',
+    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
+    color: active ? '#fff' : '#6b7280',
+  })
 
   return (
     <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
-        Trigger Endpoint
-      </label>
-      <div style={{
-        padding: '10px 14px', backgroundColor: '#1e1e1e', borderRadius: 6, fontFamily: 'monospace',
-        fontSize: 13, color: '#e5e5e5', userSelect: 'all',
-      }}>
-        {endpoint}
+      {/* Header with language toggle */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          API Integration
+        </label>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+          <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
-        Send a POST request to this endpoint to trigger the automation.
+
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+        Requires an API key. Generate one from <strong>My Account</strong> in the top-right menu.
       </div>
+
+      {/* Endpoint */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          Endpoint
+        </div>
+        <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
+        </div>
+      </div>
+
+      {/* Upload files snippet */}
+      <CodeBlock
+        title="Send files"
+        code={lang === 'python' ? pythonFileSnippet : curlFileSnippet}
+        id="files"
+        copied={copied}
+        onCopy={copyToClipboard}
+        style={codeBlockStyle}
+      />
+
+      {/* Text input snippet */}
+      <CodeBlock
+        title="Send text"
+        code={lang === 'python' ? pythonTextSnippet : curlTextSnippet}
+        id="text"
+        copied={copied}
+        onCopy={copyToClipboard}
+        style={codeBlockStyle}
+      />
+
+      {/* Existing documents snippet */}
+      <CodeBlock
+        title="Use existing documents"
+        code={lang === 'python' ? pythonDocUuidSnippet : curlDocUuidSnippet}
+        id="docs"
+        copied={copied}
+        onCopy={copyToClipboard}
+        style={codeBlockStyle}
+      />
+
+      {/* Response example */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          Response
+        </div>
+        <div style={codeBlockStyle}>
+          {responseExample}
+        </div>
+      </div>
+
+      {/* Status check (for workflow/task only) */}
+      {automation.action_type !== 'extraction' && (
+        <CodeBlock
+          title="Check status"
+          code={statusSnippet}
+          id="status"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+      )}
+    </div>
+  )
+}
+
+function CodeBlock({ title, code, id, copied, onCopy, style }: {
+  title: string; code: string; id: string; copied: string | null;
+  onCopy: (text: string, id: string) => void; style: React.CSSProperties;
+}) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {title}
+        </div>
+        <button
+          onClick={() => onCopy(code, id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
+            border: '1px solid #e5e7eb', backgroundColor: '#fff',
+            color: copied === id ? '#16a34a' : '#6b7280',
+          }}
+        >
+          {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+          {copied === id ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={style}>{code}</div>
     </div>
   )
 }

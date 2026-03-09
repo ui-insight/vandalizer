@@ -57,7 +57,10 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
 
     Falls back gracefully if the OCR service is unavailable.
     """
-    ocr_endpoint = os.environ.get("OCR_ENDPOINT", "https://ocr.insight.uidaho.edu/")
+    ocr_endpoint = os.environ.get("OCR_ENDPOINT", "")
+    if not ocr_endpoint:
+        logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
+        return ""
     logger.info("Extracting text with OCR for %s", pdf_path)
 
     for _attempt in range(retries):

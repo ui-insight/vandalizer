@@ -20,7 +20,7 @@ export function useChat() {
   const thinkingDurationRef = useRef<number | null>(null)
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[]) => {
       setError(null)
       setIsStreaming(true)
       setStreamingContent('')
@@ -60,6 +60,7 @@ export function useChat() {
           model,
           knowledgeBaseUuid,
           includeOnboardingContext,
+          folderUuids,
         )
 
         setConversationUuid(result.conversationUuid)

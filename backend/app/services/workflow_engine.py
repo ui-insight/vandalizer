@@ -163,6 +163,22 @@ class Node:
         if self.progress_reporter:
             self.progress_reporter(detail, preview)
 
+    def _apply_post_process(self, result: dict) -> dict:
+        """Apply post_process_prompt if configured in task data."""
+        post_prompt = getattr(self, "data", {}).get("post_process_prompt") if hasattr(self, "data") else None
+        if not post_prompt or not result.get("output"):
+            return result
+        self.report_progress("Post-processing output")
+        processed = llm_chat_model(
+            model=getattr(self, "data", {}).get("model"),
+            prompt=post_prompt,
+            data=result["output"],
+            include_next_step=False,
+            system_config_doc=self._sys_cfg,
+        )
+        result["output"] = processed
+        return result
+
 
 class MultiTaskNode(Node):
     def __init__(self, name: str) -> None:
@@ -177,7 +193,8 @@ class MultiTaskNode(Node):
         self.tasks.extend(tasks)
 
     def process_task(self, task):
-        return task.process(task.inputs)
+        result = task.process(task.inputs)
+        return task._apply_post_process(result)
 
     def process(self, inputs):
         from copy import deepcopy
@@ -238,9 +255,11 @@ class ExtractionNode(Node):
 
         self.report_progress("Extraction running")
 
-        if prev_step_name == "Document":
-            doc_uuids = inputs.get("output", [])
-            # doc_texts must be pre-loaded  - for now we pass UUIDs in data
+        input_source = self.data.get("input_source", "step_input")
+
+        if input_source == "select_document" and self.data.get("selected_doc_text"):
+            full_text = self.data["selected_doc_text"]
+        elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts")
         elif prev_step_name == "Prompt":
             step_input = inputs.get("output")
@@ -284,8 +303,14 @@ class PromptNode(Node):
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Prompt: {prompt}")
 
-        if prev_step_name == "Document":
-            # Get doc texts from data (pre-loaded by engine)
+        input_source = self.data.get("input_source", "step_input")
+
+        if input_source == "select_document" and self.data.get("selected_doc_text"):
+            chat_response = llm_chat_model(
+                model=self.model, prompt=prompt, data=self.data["selected_doc_text"],
+                include_next_step=False, system_config_doc=self._sys_cfg,
+            )
+        elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts", [])
             full_text = "\n".join(doc_texts) if doc_texts else ""
             chat_response = llm_chat_model(
@@ -314,12 +339,15 @@ class FormatNode(Node):
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Formatter: {formatting_prompt}")
 
-        if prev_step_name == "Prompt":
-            text = data.get("formatted_answer", "") if isinstance(data, dict) else data
-        elif prev_step_name == "Document":
-            # Use pre-loaded doc texts
+        input_source = self.data.get("input_source", "step_input")
+
+        if input_source == "select_document" and self.data.get("selected_doc_text"):
+            text = self.data["selected_doc_text"]
+        elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts", [])
             text = "\n".join(doc_texts)
+        elif prev_step_name == "Prompt":
+            text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         else:
             text = data
 

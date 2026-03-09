@@ -131,8 +131,8 @@ async def browser_automation_ws(websocket: WebSocket):
                 if message["type"] == "message":
                     data = json.loads(message["data"])
                     await websocket.send_json(data)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("WebSocket pubsub listener ended: %s", e)
         finally:
             await pubsub.unsubscribe(channel)
             await r.aclose()

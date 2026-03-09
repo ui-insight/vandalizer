@@ -834,18 +834,20 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
-              href="https://ai4ra.uidaho.edu/contact/"
+              href="https://github.com/ui-insight/vandalizer/issues"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex h-14 items-center justify-center rounded-full bg-white text-black px-8 font-bold text-lg transition-all hover:bg-gray-200 hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)]"
             >
-              <Mail className="w-5 h-5 mr-2" /> Contact the Team
+              <Mail className="w-5 h-5 mr-2" /> Get in Touch
             </a>
             <a
-              href="https://ai4ra.uidaho.edu"
+              href="https://github.com/ui-insight/vandalizer"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex h-14 items-center justify-center rounded-full border border-white/20 bg-white/5 px-8 font-bold text-white transition-all hover:bg-white/10"
             >
-              Visit AI4RA Website
+              View on GitHub
             </a>
           </div>
         </div>

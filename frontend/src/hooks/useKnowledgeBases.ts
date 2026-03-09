@@ -11,8 +11,8 @@ export function useKnowledgeBases() {
     try {
       const data = await api.listKnowledgeBases()
       setKnowledgeBases(data)
-    } catch (err) {
-      console.error('Failed to fetch knowledge bases:', err)
+    } catch {
+      // errors handled by caller
     } finally {
       setLoading(false)
     }

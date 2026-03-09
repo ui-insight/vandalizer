@@ -62,6 +62,7 @@ class UpdateTaskRequest(BaseModel):
 class RunWorkflowRequest(BaseModel):
     document_uuids: list[str]
     model: Optional[str] = None
+    batch_mode: bool = False
 
 
 class WorkflowStatusResponse(BaseModel):
@@ -73,6 +74,24 @@ class WorkflowStatusResponse(BaseModel):
     current_step_preview: Optional[str] = None
     final_output: Optional[Any] = None
     steps_output: Optional[dict] = None
+
+
+class BatchStatusItem(BaseModel):
+    session_id: str
+    document_title: Optional[str] = None
+    status: str
+    num_steps_completed: int = 0
+    num_steps_total: int = 0
+    current_step_name: Optional[str] = None
+    final_output: Optional[Any] = None
+
+
+class BatchStatusResponse(BaseModel):
+    status: str
+    total: int = 0
+    completed: int = 0
+    failed: int = 0
+    items: list[BatchStatusItem] = []
 
 
 class TestStepRequest(BaseModel):

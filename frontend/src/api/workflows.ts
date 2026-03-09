@@ -61,8 +61,8 @@ export function deleteTask(taskId: string) {
 
 // Execution
 
-export function runWorkflow(workflowId: string, data: { document_uuids: string[]; model?: string }) {
-  return apiFetch<{ session_id: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
+export function runWorkflow(workflowId: string, data: { document_uuids: string[]; model?: string; batch_mode?: boolean }) {
+  return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
     method: 'POST',
     body: JSON.stringify(data),
   })
@@ -70,6 +70,28 @@ export function runWorkflow(workflowId: string, data: { document_uuids: string[]
 
 export function getWorkflowStatus(sessionId: string) {
   return apiFetch<WorkflowStatus>(`/api/workflows/status?session_id=${encodeURIComponent(sessionId)}`)
+}
+
+export interface BatchStatusItem {
+  session_id: string
+  document_title: string | null
+  status: string
+  num_steps_completed: number
+  num_steps_total: number
+  current_step_name: string | null
+  final_output: unknown
+}
+
+export interface BatchStatus {
+  status: string
+  total: number
+  completed: number
+  failed: number
+  items: BatchStatusItem[]
+}
+
+export function getBatchStatus(batchId: string) {
+  return apiFetch<BatchStatus>(`/api/workflows/batch-status?batch_id=${encodeURIComponent(batchId)}`)
 }
 
 export function streamWorkflowStatus(

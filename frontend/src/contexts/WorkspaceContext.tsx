@@ -9,6 +9,8 @@ interface WorkspaceContextValue {
   setWorkspaceMode: (mode: WorkspaceMode) => void
   selectedDocUuids: string[]
   setSelectedDocUuids: (uuids: string[]) => void
+  selectedFolderUuids: string[]
+  setSelectedFolderUuids: (uuids: string[]) => void
   activeRightTab: RightTab
   setActiveRightTab: (tab: RightTab) => void
   railDocked: boolean
@@ -113,6 +115,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // ── Pure React state (ephemeral / not URL-worthy) ─────────────────────────
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
+  const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
@@ -232,6 +235,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setWorkspaceMode,
         selectedDocUuids,
         setSelectedDocUuids,
+        selectedFolderUuids,
+        setSelectedFolderUuids,
         activeRightTab,
         setActiveRightTab,
         railDocked,

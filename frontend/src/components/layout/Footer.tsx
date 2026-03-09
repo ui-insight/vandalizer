@@ -10,10 +10,9 @@ export function Footer() {
           <div>
             <h3 className="text-xl font-bold text-white mb-3">Vandalizer</h3>
             <p className="text-sm leading-relaxed mb-4">
-              AI-powered document intelligence for research administration. Built at the University
-              of Idaho.
+              AI-powered document intelligence for research administration.
             </p>
-            <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 University of Idaho</p>
+            <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 Vandalizer Contributors</p>
           </div>
 
           {/* Col 2: Links */}
@@ -37,22 +36,12 @@ export function Footer() {
               </li>
               <li>
                 <a
-                  href="https://ai4ra.uidaho.edu"
+                  href="https://github.com/ui-insight/vandalizer/issues"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 hover:text-[#f1b300] transition-colors"
                 >
-                  AI4RA <ExternalLink className="w-3 h-3" />
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://ai4ra.uidaho.edu/contact/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 hover:text-[#f1b300] transition-colors"
-                >
-                  Contact <ExternalLink className="w-3 h-3" />
+                  Issues <ExternalLink className="w-3 h-3" />
                 </a>
               </li>
             </ul>
