@@ -11,8 +11,8 @@ export function useAutomations(space?: string) {
     try {
       const data = await api.listAutomations(space)
       setAutomations(data)
-    } catch (err) {
-      console.error('Failed to fetch automations:', err)
+    } catch {
+      // errors handled by caller
     } finally {
       setLoading(false)
     }

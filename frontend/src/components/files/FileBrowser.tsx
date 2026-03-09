@@ -12,7 +12,7 @@ import { UploadProgress } from './UploadProgress'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
-import { deleteFile, renameFile, downloadFileUrl, moveFile } from '../../api/files'
+import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
 import type { Document, Folder } from '../../types/document'
 
@@ -27,9 +27,10 @@ interface FileBrowserProps {
   searchQuery?: string
   contentMatches?: ContentMatch[]
   onSelectionChange?: (docUuids: string[]) => void
+  onFolderSelectionChange?: (folderUuids: string[]) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onFolderSelectionChange }: FileBrowserProps) {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
   const space = user?.user_id || ''
@@ -59,6 +60,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
     onSelectionChange(docUuids)
   }, [selectedUuids, documents, onSelectionChange])
+
+  // Sync selected folder UUIDs to parent
+  useEffect(() => {
+    if (!onFolderSelectionChange) return
+    const folderUuids = [...selectedUuids].filter(u => folders.some(f => f.uuid === u))
+    onFolderSelectionChange(folderUuids)
+  }, [selectedUuids, folders, onFolderSelectionChange])
 
   // Clear selection when navigating folders
   useEffect(() => {
@@ -139,8 +147,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handleBulkDownload = useCallback(() => {
     const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
-    for (const uuid of docUuids) {
-      window.open(downloadFileUrl(uuid), '_blank')
+    if (docUuids.length === 0) return
+    if (docUuids.length === 1) {
+      downloadFile(docUuids[0])
+    } else {
+      downloadFilesAsZip(docUuids)
     }
   }, [selectedUuids, documents])
 
@@ -417,7 +428,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onDownload={
             contextMenu.type === 'doc'
               ? () => {
-                  window.open(downloadFileUrl(contextMenu.item.uuid), '_blank')
+                  downloadFile(contextMenu.item.uuid)
                 }
               : undefined
           }

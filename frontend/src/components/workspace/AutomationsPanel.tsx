@@ -3,6 +3,7 @@ import { Plus, Loader2 } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
+import { useSearchSets } from '../../hooks/useExtractions'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAutomationActivity } from '../../hooks/useAutomationActivity'
 import type { Automation, TriggerType } from '../../types/automation'
@@ -18,6 +19,7 @@ export function AutomationsPanel() {
   const { openAutomation } = useWorkspace()
   const { automations, loading, create } = useAutomations()
   const { workflows } = useWorkflows()
+  const { searchSets } = useSearchSets()
   const { activeIds } = useAutomationActivity()
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +43,16 @@ export function AutomationsPanel() {
       const wf = workflows.find(w => w.id === auto.action_id)
       return wf ? `Runs: ${wf.name}` : 'Runs: (unknown workflow)'
     }
-    if (auto.action_type === 'extraction') return 'Extraction (coming soon)'
-    if (auto.action_type === 'task') return 'Task (coming soon)'
+    if (auto.action_type === 'extraction' && auto.action_id) {
+      const ss = searchSets.find(s => s.uuid === auto.action_id)
+      return ss ? `Extracts: ${ss.title}` : 'Extracts: (unknown extraction)'
+    }
+    if (auto.action_type === 'task' && auto.action_id) {
+      const wf = workflows.find(w => w.id === auto.action_id)
+      return wf ? `Task: ${wf.name}` : 'Task: (unknown workflow)'
+    }
+    if (auto.action_type === 'extraction') return 'No extraction selected'
+    if (auto.action_type === 'task') return 'No task selected'
     return 'No action selected'
   }
 

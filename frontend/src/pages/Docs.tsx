@@ -538,16 +538,16 @@ function About() {
       <h2 className="text-3xl font-bold text-white">About & Funding</h2>
 
       <p className="text-gray-300 text-lg leading-relaxed">
-        Vandalizer is an open-source initiative developed by the{' '}
+        Vandalizer is an open-source AI-powered document intelligence platform for research
+        administration, originally developed at the University of Idaho as part of the{' '}
         <a
-          href="https://ai4ra.uidaho.edu"
+          href="https://www.nsf.gov/awardsearch/showAward?AWD_ID=2427549"
           target="_blank"
           rel="noopener noreferrer"
           className="text-[#f1b300] hover:underline"
         >
-          Artificial Intelligence for Research Administration (AI4RA)
-        </a>{' '}
-        team at the University of Idaho.
+          NSF GRANTED program
+        </a>.
       </p>
 
       <div className="bg-[#262626] rounded-lg p-6 border border-white/5">
@@ -560,29 +560,13 @@ function About() {
         </p>
       </div>
 
-      <h3 className="text-xl font-bold text-white mt-8">AI4RA</h3>
+      <h3 className="text-xl font-bold text-white mt-8">Contributing</h3>
       <p className="text-gray-300 leading-relaxed">
-        The AI4RA project, part of the NSF GRANTED program, is dedicated to reducing barriers to
-        research administration and building capacity at emerging research institutions. Vandalizer
-        is one of the core tools being developed under this initiative.
-      </p>
-
-      <h3 className="text-xl font-bold text-white mt-8">University of Idaho</h3>
-      <p className="text-gray-300 leading-relaxed">
-        Vandalizer is developed and maintained by researchers and engineers at the University of
-        Idaho in Moscow, Idaho. We are committed to building open-source tools that advance research
-        administration for the academic community.
+        Vandalizer is open source and welcomes contributions. Whether you're a researcher,
+        developer, or research administrator, check out the GitHub repository to get started.
       </p>
 
       <div className="flex flex-wrap gap-4 mt-8">
-        <a
-          href="https://ai4ra.uidaho.edu"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 hover:text-[#f1b300] hover:border-[#f1b300]/30 transition-colors"
-        >
-          AI4RA Website <ExternalLink className="w-3 h-3" />
-        </a>
         <a
           href="https://github.com/ui-insight/vandalizer"
           target="_blank"

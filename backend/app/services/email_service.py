@@ -71,7 +71,7 @@ def waitlist_confirmation_email(name: str, position: int, frontend_url: str, sta
       <p>Your demo application has been received. You are currently at position <span class="highlight">#{position}</span> on the waitlist.</p>
       <p>We activate new accounts regularly. When a spot opens up, you'll receive an email with your login credentials and full access to the platform for 2 weeks.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/demo/status/{status_uuid}">Check Your Status</a></p>
-      <div class="footer">University of Idaho &middot; AI4RA</div>
+      <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html
 
@@ -88,7 +88,7 @@ def activation_email(name: str, user_id: str, password: str, expires_at: str, fr
          <strong style="color:#fff">Password:</strong> {password}</p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/landing">Sign In Now</a></p>
-      <div class="footer">University of Idaho &middot; AI4RA</div>
+      <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html
 
@@ -103,7 +103,7 @@ def expiry_warning_email(name: str, days_left: int, expires_at: str, frontend_ur
       <p>Hi {name}, your Vandalizer demo trial expires on <span class="highlight">{expires_at}</span> ({days_left} day{'s' if days_left != 1 else ''} remaining).</p>
       <p>Make sure to explore any features you haven't tried yet! After expiry, your account will be locked and you'll be asked to complete a short feedback questionnaire.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/landing">Go to Vandalizer</a></p>
-      <div class="footer">University of Idaho &middot; AI4RA</div>
+      <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html
 
@@ -119,6 +119,6 @@ def trial_expired_email(name: str, feedback_url: str) -> tuple[str, str]:
       <p>We'd love to hear about your experience. Please take a few minutes to fill out our feedback questionnaire:</p>
       <p style="margin-top:24px"><a class="btn" href="{feedback_url}">Share Your Feedback</a></p>
       <p>Your feedback helps us improve Vandalizer for future users and researchers.</p>
-      <div class="footer">University of Idaho &middot; AI4RA</div>
+      <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

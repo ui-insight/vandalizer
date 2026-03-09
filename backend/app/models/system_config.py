@@ -73,8 +73,8 @@ def _apply_legacy_strategy(config: dict, strategy: str):
 class SystemConfig(Document):
     """System-wide configuration singleton."""
 
-    ocr_endpoint: str = "https://processpdf.insight.uidaho.edu"
-    llm_endpoint: str = "https://mindrouter-api.nkn.uidaho.edu/v1"
+    ocr_endpoint: str = ""
+    llm_endpoint: str = ""
     available_models: list[dict] = []
 
     # Legacy fields kept for backwards compatibility

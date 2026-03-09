@@ -61,7 +61,7 @@ class InsightAIProvider(OpenRouterProvider):
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             return self._endpoint
-        return "https://mindrouter-api.nkn.uidaho.edu/v1"
+        return ""
 
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
@@ -169,7 +169,7 @@ def _get_model_endpoint_sync(model_name: str, system_config_doc: dict | None = N
             return endpoint
     if system_config_doc and system_config_doc.get("llm_endpoint"):
         return system_config_doc["llm_endpoint"]
-    return "https://mindrouter-api.nkn.uidaho.edu/v1"
+    return ""
 
 
 def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
@@ -254,8 +254,8 @@ def create_chat_agent(
 # ---------------------------------------------------------------------------
 
 DEFAULT_CHAT_SYSTEM_PROMPT = (
-    "You are the built-in assistant for **Vandalizer**, a document intelligence platform "
-    "built at the University of Idaho.\n\n"
+    "You are the built-in assistant for **Vandalizer**, an open-source AI-powered "
+    "document intelligence platform.\n\n"
     "## UI layout\n"
     "- **Left sidebar** (Utility Bar): four mode tabs — **Chat**, **Files**, "
     "**Automations**, **Knowledge**.\n"
@@ -350,8 +350,8 @@ DEFAULT_CHAT_SYSTEM_PROMPT = (
 )
 
 VANDALIZER_CONTEXT = (
-    "[IMPORTANT INSTRUCTION] You are the assistant for Vandalizer, a document intelligence "
-    "platform at the University of Idaho. The user is asking about Vandalizer. "
+    "[IMPORTANT INSTRUCTION] You are the assistant for Vandalizer, an open-source "
+    "document intelligence platform. The user is asking about Vandalizer. "
     "Answer ONLY using the Vandalizer-specific instructions below. "
     "Do NOT mention Slack, Trello, GitHub, Xbox, or any other platform.\n\n"
     "UPLOADING: Files tab (left sidebar) → Upload button. Supports PDF, DOCX, XLSX, HTML, images.\n"

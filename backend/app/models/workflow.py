@@ -81,6 +81,9 @@ class WorkflowResult(Document):
     trigger_type: Optional[str] = None
     is_passive: bool = False
     input_context: Optional[dict] = None
+    # Batch run fields
+    batch_id: Optional[str] = None
+    document_title: Optional[str] = None
 
     class Settings:
         name = "workflow_result"

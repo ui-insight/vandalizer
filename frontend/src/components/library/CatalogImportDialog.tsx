@@ -69,8 +69,8 @@ export function CatalogImportDialog({
     try {
       await importCatalogItems(file, Array.from(selected), 'default')
       onImported()
-    } catch (err: any) {
-      alert(err.message || 'Import failed')
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Import failed')
     } finally {
       setImporting(false)
     }

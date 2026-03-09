@@ -44,10 +44,11 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const switchTeam = useCallback(
     async (teamUuid: string) => {
       await teamsApi.switchTeam(teamUuid)
-      // Reload page to refresh all state
-      window.location.reload()
+      // Re-fetch teams to pick up the new current_team; consumers
+      // should react to the changed currentTeam via context.
+      await refreshTeams()
     },
-    [],
+    [refreshTeams],
   )
 
   const createTeam = useCallback(

@@ -1,15 +1,17 @@
-deprecated/flask-app/app/chroma_db
-deprecated/flask-app/app/chroma_db/*
-deprecated/flask-app/app/chroma_db/
-deprecated/flask-app/app/static/fillable_form.pdf
-deprecated/flask-app/app/static/temp/*
-deprecated/flask-app/app/app.db
-deprecated/flask-app/app/static/images/uploads/*
-deprecated/flask-app/app/static/uploads/*
-data/recommendations_vectordb
+# Deprecated Flask app (contains legacy code, excluded from open-source release)
+deprecated/
+
+# Uploads directory
+app/static/uploads/
+
+# Development certificates
+certs/
+
 # uv.lock — intentionally tracked for reproducible builds
 .DS_Store
 .env
+.env.*
+!.env.example
 .flaskenv
 *.pyc
 *.pyo
@@ -33,7 +35,6 @@ htmlcov/
 .coverage.*
 *,cover
 
-deprecated/flask-app/app/static/db/
 /.python-version
 /data/
 *.log

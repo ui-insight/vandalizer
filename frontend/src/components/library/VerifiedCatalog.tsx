@@ -357,8 +357,8 @@ export function VerifiedCatalog() {
                 const preview = await previewCatalogImport(f)
                 setImportFile(f)
                 setImportPreview(preview)
-              } catch (err: any) {
-                alert(err.message || 'Failed to read file')
+              } catch (err: unknown) {
+                alert(err instanceof Error ? err.message : 'Failed to read file')
               }
             }}
           />

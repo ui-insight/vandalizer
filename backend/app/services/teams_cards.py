@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timezone
 
-BASE_URL = os.environ.get("VANDALIZER_BASE_URL", "https://vandalizer.uidaho.edu")
+BASE_URL = os.environ.get("VANDALIZER_BASE_URL", "http://localhost:5173")
 
 
 def build_work_item_card(work_item_doc: dict, result_doc: dict | None = None) -> dict:

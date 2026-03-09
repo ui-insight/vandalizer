@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
+from app.rate_limit import limiter
 from app.models.activity import ActivityEvent, ActivityStatus, ActivityType
 from app.models.chat import (
     ChatConversation,
@@ -34,7 +35,9 @@ router = APIRouter()
 
 
 @router.post("")
+@limiter.limit("30/minute")
 async def chat(
+    request: Request,
     body: ChatRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
@@ -43,7 +46,21 @@ async def chat(
     user_id = user.user_id
     message = body.message
     activity_id = body.activity_id
-    document_uuids = body.document_uuids
+    document_uuids = list(body.document_uuids)
+
+    # Resolve folder selections: find all documents inside selected folders
+    if body.folder_uuids:
+        from app.models.document import SmartDocument
+
+        existing = set(document_uuids)
+        for folder_uuid in body.folder_uuids:
+            folder_docs = await SmartDocument.find(
+                SmartDocument.folder == folder_uuid,
+            ).to_list()
+            for doc in folder_docs:
+                if doc.uuid not in existing:
+                    document_uuids.append(doc.uuid)
+                    existing.add(doc.uuid)
 
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None

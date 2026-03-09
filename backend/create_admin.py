@@ -6,16 +6,17 @@ it ensures the is_admin and is_examiner flags are set.
 
 Usage:
     cd backend
-    python create_admin.py
+    ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=yourpassword python create_admin.py
 
 Environment variables (or .env file):
-    ADMIN_EMAIL     (default: admin@admin.com)
-    ADMIN_PASSWORD  (default: admin)
+    ADMIN_EMAIL     (required)
+    ADMIN_PASSWORD  (required)
     ADMIN_NAME      (default: Admin)
 """
 
 import asyncio
 import os
+import sys
 
 from dotenv import load_dotenv
 
@@ -30,9 +31,14 @@ async def main():
     settings = Settings()
     await init_db(settings)
 
-    email = os.environ.get("ADMIN_EMAIL", "admin@admin.com")
-    password = os.environ.get("ADMIN_PASSWORD", "admin")
+    email = os.environ.get("ADMIN_EMAIL", "")
+    password = os.environ.get("ADMIN_PASSWORD", "")
     name = os.environ.get("ADMIN_NAME", "Admin")
+
+    if not email or not password:
+        print("Error: ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required.")
+        print("Usage: ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=secret python create_admin.py")
+        sys.exit(1)
 
     # Check if user already exists
     existing = await User.find_one(User.email == email.strip().lower())
@@ -66,7 +72,6 @@ async def main():
 
     print(f"Created admin user:")
     print(f"  Email:    {email}")
-    print(f"  Password: {password}")
     print(f"  Name:     {name}")
     print(f"  Admin:    Yes")
     print(f"  Examiner: Yes")

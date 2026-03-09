@@ -89,6 +89,12 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                             doc_texts.append(doc["raw_text"])
                     task_data["doc_texts"] = doc_texts
 
+                # Pre-load specific document text when input_source is "select_document"
+                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                    sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+                    if sel_doc and sel_doc.get("raw_text"):
+                        task_data["selected_doc_text"] = sel_doc["raw_text"]
+
                 tasks.append({"name": task_doc.get("name", ""), "data": task_data})
 
         steps_data.append({
@@ -248,6 +254,12 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         if doc and doc.get("raw_text"):
             doc_texts.append(doc["raw_text"])
     task_data["doc_texts"] = doc_texts
+
+    # Pre-load specific document text when input_source is "select_document"
+    if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+        sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+        if sel_doc and sel_doc.get("raw_text"):
+            task_data["selected_doc_text"] = sel_doc["raw_text"]
 
     engine = WorkflowEngine()
     nodes = []

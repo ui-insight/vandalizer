@@ -7,7 +7,7 @@ import io
 import json
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
@@ -15,6 +15,7 @@ from app.models.user import User
 from app.schemas.workflows import (
     AddStepRequest,
     AddTaskRequest,
+    BatchStatusResponse,
     CreateTempDocumentsRequest,
     CreateWorkflowRequest,
     ReorderStepsRequest,
@@ -31,6 +32,7 @@ from app.schemas.workflows import (
     WorkflowResponse,
     WorkflowStatusResponse,
 )
+from app.rate_limit import limiter
 from app.services import workflow_service as svc
 
 router = APIRouter()
@@ -67,6 +69,14 @@ async def get_workflow_status(session_id: str, user: User = Depends(get_current_
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
     return WorkflowStatusResponse(**status)
+
+
+@router.get("/batch-status", response_model=BatchStatusResponse)
+async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)):
+    status = await svc.get_batch_status(batch_id)
+    if not status:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return status
 
 
 @router.get("/status/stream")
@@ -312,7 +322,8 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @router.post("/{workflow_id}/run")
-async def run_workflow(workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
+@limiter.limit("20/minute")
+async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
     from app.models.activity import ActivityType
     from app.models.workflow import Workflow
     from app.services import activity_service
@@ -331,11 +342,18 @@ async def run_workflow(workflow_id: str, req: RunWorkflowRequest, user: User = D
     )
 
     try:
-        session_id = await svc.run_workflow(
-            workflow_id, req.document_uuids, user.user_id, req.model,
-            activity_id=str(activity.id),
-        )
-        return {"session_id": session_id, "activity_id": str(activity.id)}
+        if req.batch_mode and len(req.document_uuids) > 1:
+            batch_id = await svc.run_workflow_batch(
+                workflow_id, req.document_uuids, user.user_id, req.model,
+                activity_id=str(activity.id),
+            )
+            return {"batch_id": batch_id, "activity_id": str(activity.id)}
+        else:
+            session_id = await svc.run_workflow(
+                workflow_id, req.document_uuids, user.user_id, req.model,
+                activity_id=str(activity.id),
+            )
+            return {"session_id": session_id, "activity_id": str(activity.id)}
     except ValueError as e:
         from app.models.activity import ActivityStatus
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))

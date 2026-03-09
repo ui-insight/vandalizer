@@ -19,7 +19,7 @@ import {
   getValidationInputs, updateValidationInputs,
   exportWorkflowUrl, importWorkflow,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun } from '../../api/workflows'
+import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { listContents, searchDocuments } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
@@ -136,6 +136,7 @@ export function WorkflowEditorPanel() {
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
   const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
   const runner = useWorkflowRunner()
+  const [batchMode, setBatchMode] = useState(false)
   const [runElapsed, setRunElapsed] = useState(0)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -265,7 +266,7 @@ export function WorkflowEditorPanel() {
     const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
     if (uuids.length === 0) return
     setActiveTab('design')
-    await runner.start(openWorkflowId, uuids)
+    await runner.start(openWorkflowId, uuids, undefined, batchMode)
   }
 
   // --- loading / error ---
@@ -362,8 +363,8 @@ export function WorkflowEditorPanel() {
               try {
                 const result = await importWorkflow(f, workflow.space || 'default')
                 openWorkflow(result.id)
-              } catch (err: any) {
-                alert(err.message || 'Import failed')
+              } catch (err: unknown) {
+                alert(err instanceof Error ? err.message : 'Import failed')
               }
             }}
           />
@@ -430,6 +431,7 @@ export function WorkflowEditorPanel() {
             runnerStatus={runner.status}
             runnerRunning={runner.running}
             runnerSessionId={runner.sessionId}
+            batchStatus={runner.batchStatus}
             runElapsed={runElapsed}
             showDownloadPopup={showDownloadPopup}
             setShowDownloadPopup={setShowDownloadPopup}
@@ -445,6 +447,20 @@ export function WorkflowEditorPanel() {
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
       <div style={{ flexShrink: 0, padding: 15, backgroundColor: '#fff', boxShadow: '0 0px 23px -8px rgb(211,211,211)' }}>
+        {selectedDocUuids.length > 1 && (
+          <label style={{
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+            fontSize: 13, color: '#374151', cursor: 'pointer', userSelect: 'none',
+          }}>
+            <input
+              type="checkbox"
+              checked={batchMode}
+              onChange={e => setBatchMode(e.target.checked)}
+              style={{ accentColor: 'var(--highlight-color, #eab308)' }}
+            />
+            Run per document ({selectedDocUuids.length} runs)
+          </label>
+        )}
         <button
           onClick={handleRun}
           disabled={runner.running || selectedDocUuids.length === 0}
@@ -604,6 +620,7 @@ function DesignCanvas({
   runnerStatus,
   runnerRunning,
   runnerSessionId,
+  batchStatus,
   runElapsed,
   showDownloadPopup,
   setShowDownloadPopup,
@@ -616,6 +633,7 @@ function DesignCanvas({
   runnerStatus: WorkflowStatus | null
   runnerRunning: boolean
   runnerSessionId: string | null
+  batchStatus: BatchStatus | null
   runElapsed: number
   showDownloadPopup: boolean
   setShowDownloadPopup: (v: boolean) => void
@@ -696,7 +714,7 @@ function DesignCanvas({
       )}
 
       {/* Workflow output (during/after run) */}
-      {(runnerRunning || runnerStatus) && (
+      {(runnerRunning || runnerStatus) && !batchStatus && (
         <>
           <ConnectionLine />
           <WorkflowOutputCard
@@ -706,6 +724,18 @@ function DesignCanvas({
             runElapsed={runElapsed}
             showDownloadPopup={showDownloadPopup}
             setShowDownloadPopup={setShowDownloadPopup}
+          />
+        </>
+      )}
+
+      {/* Batch output (during/after batch run) */}
+      {batchStatus && (
+        <>
+          <ConnectionLine />
+          <BatchOutputCard
+            batchStatus={batchStatus}
+            running={runnerRunning}
+            runElapsed={runElapsed}
           />
         </>
       )}
@@ -2381,6 +2411,122 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
           Failed
         </div>
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Batch output card
+// ---------------------------------------------------------------------------
+
+function BatchOutputCard({ batchStatus, running, runElapsed }: {
+  batchStatus: BatchStatus
+  running: boolean
+  runElapsed: number
+}) {
+  const isCompleted = batchStatus.status === 'completed'
+  const isError = batchStatus.status === 'failed'
+  const isDone = isCompleted || isError
+  const [expandedIdx, setExpandedIdx] = useState<number | null>(null)
+
+  const renderOutput = (data: unknown): string => {
+    if (data === null || data === undefined) return ''
+    let md: string
+    if (typeof data === 'string') {
+      md = data
+    } else {
+      try { md = '```json\n' + JSON.stringify(data, null, 2) + '\n```' } catch { md = String(data) }
+    }
+    return DOMPurify.sanitize(marked.parse(md) as string)
+  }
+
+  return (
+    <div style={{
+      backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
+      boxShadow: '0 6px 18px rgba(0,0,0,0.05)', padding: 20,
+      border: isDone
+        ? (isError ? '2px solid #fca5a5' : '2px solid #86efac')
+        : '2px solid #e5e7eb',
+    }}>
+      <div style={{ fontWeight: 600, fontSize: 14, color: '#202124', marginBottom: 8 }}>
+        {running ? 'Batch Running' : isCompleted ? 'Batch Complete' : isError ? 'Batch Failed' : 'Batch Output'}
+      </div>
+
+      {/* Progress summary */}
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
+        {batchStatus.completed} of {batchStatus.total} completed
+        {batchStatus.failed > 0 && <span style={{ color: '#dc2626' }}> ({batchStatus.failed} failed)</span>}
+        {running && <span> &mdash; {runElapsed}s elapsed</span>}
+      </div>
+
+      {/* Progress bar */}
+      <div style={{
+        height: 4, borderRadius: 2, backgroundColor: '#e5e7eb',
+        overflow: 'hidden', marginBottom: 12,
+      }}>
+        <div style={{
+          height: '100%', borderRadius: 2,
+          backgroundColor: batchStatus.failed > 0 && !running ? '#fca5a5' : 'var(--highlight-color, #eab308)',
+          width: batchStatus.total > 0
+            ? `${((batchStatus.completed + batchStatus.failed) / batchStatus.total) * 100}%`
+            : '0%',
+          transition: 'width 0.3s',
+        }} />
+      </div>
+
+      {/* Per-document items */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {batchStatus.items.map((item, idx) => {
+          const itemDone = item.status === 'completed'
+          const itemFailed = item.status === 'error' || item.status === 'failed'
+          const itemRunning = item.status === 'running'
+          const isExpanded = expandedIdx === idx
+
+          return (
+            <div key={item.session_id} style={{
+              border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden',
+            }}>
+              <div
+                onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
+                  cursor: itemDone ? 'pointer' : 'default',
+                  backgroundColor: itemDone ? '#f0fdf4' : itemFailed ? '#fef2f2' : '#fff',
+                }}
+              >
+                {itemDone && <CheckCircle style={{ width: 14, height: 14, color: '#16a34a', flexShrink: 0 }} />}
+                {itemFailed && <XCircle style={{ width: 14, height: 14, color: '#dc2626', flexShrink: 0 }} />}
+                {itemRunning && <Loader2 style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, animation: 'spin 1s linear infinite' }} />}
+                {!itemDone && !itemFailed && !itemRunning && <Circle style={{ width: 14, height: 14, color: '#d1d5db', flexShrink: 0 }} />}
+                <span style={{ fontSize: 13, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {item.document_title || item.session_id}
+                </span>
+                {itemRunning && item.current_step_name && (
+                  <span style={{ fontSize: 11, color: '#9ca3af', flexShrink: 0 }}>{item.current_step_name}</span>
+                )}
+                {itemDone && (
+                  <ChevronDown style={{
+                    width: 14, height: 14, color: '#9ca3af', flexShrink: 0,
+                    transition: 'transform 0.15s',
+                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }} />
+                )}
+              </div>
+              {isExpanded && itemDone && item.final_output && (
+                <div style={{
+                  borderTop: '1px solid #e5e7eb', padding: 12,
+                  backgroundColor: '#f9fafb', fontSize: 13, lineHeight: 1.6,
+                  maxHeight: 200, overflowY: 'auto', color: '#374151',
+                }}>
+                  <div dangerouslySetInnerHTML={{
+                    __html: renderOutput((item.final_output as Record<string, unknown>)?.output ?? item.final_output),
+                  }} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

@@ -62,7 +62,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     loadHistory,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const onboardingPills = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
@@ -176,15 +176,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   useEffect(() => {
     if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
       pendingHandled.current = pendingMessage
-      send(pendingMessage, selectedDocUuids)
+      send(pendingMessage, selectedDocUuids, undefined, undefined, undefined, selectedFolderUuids)
       onPendingMessageConsumed?.()
     }
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
 
-  const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0
+  const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext)
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids)
   }
 
   const handleAttachFile = async (files: File[]) => {
@@ -524,7 +524,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onModelChange={handleModelChange}
         onExport={handleExport}
         hasMessages={messages.length > 0}
-        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0}
+        hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
       />
     </div>
   )
