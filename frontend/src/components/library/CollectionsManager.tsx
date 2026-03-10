@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Plus, Trash2, Pencil, X, FolderOpen, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Plus, Trash2, Pencil, X, FolderOpen, Search, ExternalLink } from 'lucide-react'
 import {
   listCollections, createCollection, updateCollection, deleteCollection,
   addToCollection, removeFromCollection, listVerifiedItems,
 } from '../../api/library'
 import type { VerifiedCollection, VerifiedCatalogItem } from '../../types/library'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 export function CollectionsManager() {
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
@@ -26,11 +27,21 @@ export function CollectionsManager() {
   const [addSearch, setAddSearch] = useState('')
   const [loadingItems, setLoadingItems] = useState(false)
 
+  const { openWorkflow, openExtraction } = useWorkspace()
+
+  // Lookup map: item_id → VerifiedCatalogItem
+  const itemMap = useMemo(() => {
+    const m = new Map<string, VerifiedCatalogItem>()
+    for (const v of verifiedItems) m.set(v.item_id, v)
+    return m
+  }, [verifiedItems])
+
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listCollections()
-      setCollections(data.collections)
+      const [colData, itemData] = await Promise.all([listCollections(), listVerifiedItems()])
+      setCollections(colData.collections)
+      setVerifiedItems(itemData.items)
     } catch {
       // silently fail
     } finally {
@@ -84,12 +95,14 @@ export function CollectionsManager() {
 
   const handleOpenAddItem = async () => {
     setShowAddItem(true)
-    setLoadingItems(true)
-    try {
-      const data = await listVerifiedItems()
-      setVerifiedItems(data.items)
-    } finally {
-      setLoadingItems(false)
+    if (verifiedItems.length === 0) {
+      setLoadingItems(true)
+      try {
+        const data = await listVerifiedItems()
+        setVerifiedItems(data.items)
+      } finally {
+        setLoadingItems(false)
+      }
     }
   }
 
@@ -272,18 +285,53 @@ export function CollectionsManager() {
                       <div className="text-xs text-gray-500 py-4 text-center">No items in this collection.</div>
                     ) : (
                       <div className="space-y-1">
-                        {col.item_ids.map((itemId) => (
-                          <div key={itemId} className="flex items-center justify-between px-3 py-2 bg-white rounded border border-gray-200">
-                            <span className="text-xs font-mono text-gray-700 truncate">{itemId}</span>
-                            <button
-                              onClick={() => handleRemoveItem(itemId)}
-                              className="p-1 rounded hover:bg-red-50 text-red-500 shrink-0"
-                              title="Remove"
-                            >
-                              <X className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
+                        {col.item_ids.map((itemId) => {
+                          const item = itemMap.get(itemId)
+                          return (
+                            <div key={itemId} className="flex items-center justify-between px-3 py-2 bg-white rounded border border-gray-200 gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${
+                                  item?.kind === 'workflow' ? 'bg-purple-50 text-purple-700' : item?.kind === 'search_set' ? 'bg-teal-50 text-teal-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {item?.kind === 'workflow' ? 'WF' : item?.kind === 'search_set' ? 'EX' : '?'}
+                                </span>
+                                <span className="text-sm text-gray-900 truncate">
+                                  {item?.display_name || item?.name || itemId}
+                                </span>
+                                {item?.quality_tier && (
+                                  <span className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${
+                                    item.quality_tier === 'gold' ? 'bg-yellow-50 text-yellow-700'
+                                      : item.quality_tier === 'silver' ? 'bg-gray-100 text-gray-600'
+                                      : 'bg-orange-50 text-orange-700'
+                                  }`}>
+                                    {item.quality_tier}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                {item && (
+                                  <button
+                                    onClick={() => {
+                                      if (item.kind === 'workflow') openWorkflow(item.item_id)
+                                      else openExtraction(item.item_id)
+                                    }}
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                                    title="Open"
+                                  >
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleRemoveItem(itemId)}
+                                  className="p-1 rounded hover:bg-red-50 text-red-500 shrink-0"
+                                  title="Remove"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
 
