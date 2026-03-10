@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
-import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem } from '../../api/library'
+import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { createWorkflow } from '../../api/workflows'
 import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem } from '../../api/extractions'
 import {
@@ -23,7 +23,9 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  X,
 } from 'lucide-react'
+import type { VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
@@ -55,6 +57,20 @@ export function LibraryTab() {
   const [newFolderMode, setNewFolderMode] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
   const folderMenuRef = useRef<HTMLDivElement>(null)
+
+  // Collections (Explore tab)
+  const [collections, setCollections] = useState<VerifiedCollection[]>([])
+  const [collectionsLoading, setCollectionsLoading] = useState(false)
+
+  // Fetch collections when Explore tab is active
+  useEffect(() => {
+    if (scope !== 'explore') { setCollections([]); return }
+    setCollectionsLoading(true)
+    listCollections()
+      .then(data => setCollections(data.collections))
+      .catch(() => {})
+      .finally(() => setCollectionsLoading(false))
+  }, [scope])
 
   // Close + New menu on outside click
   useEffect(() => {
@@ -99,7 +115,8 @@ export function LibraryTab() {
         : libraries.find((l) => l.scope === 'verified') ?? null
 
   // Items — pass folder filter when a folder is selected
-  const selectedFolder = viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned' ? viewFilter : undefined
+  const isCollectionFilter = viewFilter.startsWith('collection:')
+  const selectedFolder = viewFilter !== 'all' && viewFilter !== 'favorites' && viewFilter !== 'pinned' && !isCollectionFilter ? viewFilter : undefined
   const { items, loading: itemsLoading, refresh: refreshItems, update, remove } = useLibraryItems(
     activeLibrary?.id ?? null,
     {
@@ -135,9 +152,15 @@ export function LibraryTab() {
   }
 
   // Apply view filter + sort (folder filtering is handled server-side via useLibraryItems)
+  const selectedCollection = isCollectionFilter
+    ? collections.find(c => viewFilter === `collection:${c.id}`)
+    : null
+  const collectionItemIds = selectedCollection ? new Set(selectedCollection.item_ids) : null
+
   const filtered = items.filter((item) => {
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
+    if (collectionItemIds) return collectionItemIds.has(item.item_id)
     return true
   })
 
@@ -609,6 +632,56 @@ export function LibraryTab() {
             )
           })}
 
+          {/* Collections section — only for Explore scope */}
+          {scope === 'explore' && collections.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div
+                style={{
+                  padding: '0 12px',
+                  marginBottom: 4,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  textTransform: 'uppercase',
+                  color: '#888',
+                  letterSpacing: '0.5px',
+                }}
+              >
+                Collections
+              </div>
+              {collections.map((col) => {
+                const isActive = viewFilter === `collection:${col.id}`
+                return (
+                  <div
+                    key={col.id}
+                    onClick={() => setViewFilter(isActive ? 'all' : `collection:${col.id}`)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '7px 10px 7px 12px',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
+                      backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
+                      borderLeft: isActive ? '3px solid var(--library-highlight)' : '3px solid transparent',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = '#f0f0f0' }}
+                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent' }}
+                  >
+                    <Layers style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
+                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {col.title}
+                    </span>
+                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa', fontWeight: 400 }}>
+                      {col.item_ids.length}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
           {/* Folders section — only for personal and team scopes */}
           {scope !== 'explore' && (
             <div style={{ marginTop: 16 }}>
@@ -882,6 +955,35 @@ export function LibraryTab() {
 
         {/* Results pane */}
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
+          {/* Collection filter banner */}
+          {selectedCollection && (
+            <div style={{ padding: '12px 24px', background: '#f8f9fa', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{selectedCollection.title}</div>
+                {selectedCollection.description && (
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{selectedCollection.description}</div>
+                )}
+              </div>
+              <button
+                onClick={() => setViewFilter('all')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  padding: 4,
+                  cursor: 'pointer',
+                  color: '#888',
+                  display: 'flex',
+                  alignItems: 'center',
+                  borderRadius: 4,
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#333' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#888' }}
+              >
+                <X style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+          )}
+
           {/* List header */}
           <div
             style={{
