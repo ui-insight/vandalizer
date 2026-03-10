@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { Header } from '../layout/Header'
 import { ActivityRail } from './ActivityRail'
 import { PanelResizer } from './PanelResizer'
@@ -8,11 +8,42 @@ import { UtilityBar } from './UtilityBar'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
+import { useAutomationActivity } from '../../hooks/useAutomationActivity'
+import type { AutomationStarted } from '../../hooks/useAutomationActivity'
+import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, workspaceMode } = useWorkspace()
+  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode } = useWorkspace()
+  const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+
+  const handleAutomationStarted = useCallback((info: AutomationStarted) => {
+    toast(`${info.name} started`, 'info')
+  }, [toast])
+
+  const handleAutomationCompleted = useCallback((info: CompletedAutomation) => {
+    const failed = info.status === 'failed'
+    if (failed) {
+      toast(`${info.name} failed`, 'error')
+      return
+    }
+    const doc = info.documents[0]
+    toast(
+      `${info.name} completed`,
+      'success',
+      doc ? {
+        label: 'Open file',
+        onClick: () => {
+          setWorkspaceMode('files')
+          viewDocument(doc.uuid, doc.title)
+        },
+      } : undefined,
+    )
+  }, [toast, viewDocument, setWorkspaceMode])
+
+  const automationActivity = useAutomationActivity(handleAutomationStarted, handleAutomationCompleted)
 
   const railWidth = railDocked ? 64 : 220
 
@@ -25,7 +56,7 @@ export function WorkspaceLayout() {
     <div className="flex h-screen flex-col">
       <Header />
       <div className="flex flex-1 overflow-hidden">
-        <UtilityBar />
+        <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <div
           ref={containerRef}
           className="flex flex-1 overflow-hidden"
@@ -43,7 +74,7 @@ export function WorkspaceLayout() {
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
-            {isAutomations ? <AutomationsPanel /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
+            {isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
           {/* Resizer — hidden in chat mode */}

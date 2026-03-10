@@ -1,4 +1,4 @@
-export type TriggerType = 'folder_watch' | 'm365_intake' | 'api' | 'schedule'
+export type TriggerType = 'folder_watch' | 'm365_intake' | 'api'
 export type ActionType = 'workflow' | 'extraction' | 'task'
 
 export interface Automation {

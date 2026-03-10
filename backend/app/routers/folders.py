@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
+from app.models.folder import SmartFolder
 from app.models.user import User
 from app.schemas.documents import CreateFolderRequest, RenameFolderRequest
 from app.services import folder_service
@@ -62,6 +63,52 @@ async def delete(
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
     return {"ok": True}
+
+
+@router.get("/all")
+async def list_all_folders(
+    user: User = Depends(get_current_user),
+):
+    """Return all folders for the current user, including subfolders."""
+    # space field stores user_id (email) — same as the file browser
+    folders = await SmartFolder.find(SmartFolder.space == user.user_id).to_list()
+
+    # Also include team folders if user has a team
+    if user.current_team:
+        from app.models.team import Team
+        team = await Team.get(user.current_team)
+        if team:
+            team_folders = await SmartFolder.find(
+                SmartFolder.team_id == team.uuid,
+                SmartFolder.space == user.user_id,
+            ).to_list()
+            existing = {f.uuid for f in folders}
+            for tf in team_folders:
+                if tf.uuid not in existing:
+                    folders.append(tf)
+
+    # Build path labels by resolving parent chains
+    by_uuid = {f.uuid: f for f in folders}
+
+    def get_path(f: SmartFolder) -> str:
+        parts = [f.title]
+        current = f
+        while current.parent_id != "0" and current.parent_id in by_uuid:
+            current = by_uuid[current.parent_id]
+            parts.append(current.title)
+        return " / ".join(reversed(parts))
+
+    return [
+        {
+            "uuid": f.uuid,
+            "title": f.title,
+            "path": get_path(f),
+            "parent_id": f.parent_id,
+            "is_shared_team_root": f.is_shared_team_root,
+            "team_id": f.team_id,
+        }
+        for f in folders
+    ]
 
 
 @router.get("/breadcrumbs/{folder_uuid}")

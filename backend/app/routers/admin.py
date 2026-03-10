@@ -15,6 +15,7 @@ from app.models.system_config import SystemConfig
 from app.services.llm_service import clear_agent_caches
 from app.models.team import Team, TeamMembership
 from app.models.user import User
+from app.models.document import SmartDocument
 from app.models.workflow import Workflow, WorkflowResult
 
 router = APIRouter()
@@ -37,7 +38,7 @@ async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
     Returns (user, team_id) where team_id is None for global admins or the
     stringified team ObjectId for team admins.
     """
-    if user.is_admin:
+    if user.is_admin or getattr(user, "is_examiner", False):
         return user, None
 
     if not user.current_team:
@@ -144,6 +145,10 @@ class ModelAddRequest(BaseModel):
     endpoint: Optional[str] = ""
     api_protocol: Optional[str] = ""
     api_key: Optional[str] = ""
+    speed: Optional[str] = ""
+    tier: Optional[str] = ""
+    privacy: Optional[str] = ""
+    supports_structured: bool = True
 
 
 class OAuthProviderRequest(BaseModel):
@@ -179,6 +184,53 @@ class TimeseriesDayItem(BaseModel):
 class TimeseriesResponse(BaseModel):
     days: list[TimeseriesDayItem]
     previous_period: UsageStatsResponse
+
+
+class TeamDetailMember(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    role: str = "member"
+    tokens_total: int = 0
+    workflows_run: int = 0
+    conversations: int = 0
+    last_active: Optional[datetime.datetime] = None
+
+
+class TeamDetailResponse(BaseModel):
+    team_id: str
+    name: str
+    uuid: str
+    tokens_in: int = 0
+    tokens_out: int = 0
+    workflows_started: int = 0
+    workflows_completed: int = 0
+    workflows_failed: int = 0
+    conversations: int = 0
+    active_users: int = 0
+    document_count: int = 0
+    timeseries: list[TimeseriesDayItem] = []
+    previous_period: UsageStatsResponse = Field(default_factory=UsageStatsResponse)
+    members: list[TeamDetailMember] = []
+    recent_workflows: list[WorkflowEventItem] = []
+
+
+class UserDetailResponse(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    is_admin: bool = False
+    is_examiner: bool = False
+    tokens_in: int = 0
+    tokens_out: int = 0
+    workflows_started: int = 0
+    workflows_completed: int = 0
+    workflows_failed: int = 0
+    conversations: int = 0
+    document_count: int = 0
+    timeseries: list[TimeseriesDayItem] = []
+    previous_period: UsageStatsResponse = Field(default_factory=UsageStatsResponse)
+    recent_workflows: list[WorkflowEventItem] = []
 
 
 # ---------------------------------------------------------------------------
@@ -478,6 +530,340 @@ async def team_leaderboard(
 
 
 # ---------------------------------------------------------------------------
+# 3b. GET /teams/{team_id}/detail  - Team drill-down
+# ---------------------------------------------------------------------------
+
+@router.get("/teams/{team_id}/detail", response_model=TeamDetailResponse)
+async def team_detail(
+    team_id: str,
+    days: int = Query(default=30, ge=1),
+    user: User = Depends(get_current_user),
+):
+    _, team_scope = await _require_admin_or_team_admin(user)
+
+    # Team admins can only see their own team
+    if team_scope and team_scope != team_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # Fetch team record
+    try:
+        team = await Team.find_one({"_id": BsonObjectId(team_id)}) if len(team_id) == 24 else None
+    except Exception:
+        team = None
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(days=days)
+    prev_cutoff = cutoff - datetime.timedelta(days=days)
+
+    events = await ActivityEvent.find(
+        {"team_id": team_id, "started_at": {"$gte": prev_cutoff}}
+    ).to_list()
+
+    # Split current vs previous period
+    cur_events = [e for e in events if e.started_at and e.started_at >= cutoff]
+    prev_events = [e for e in events if e.started_at and e.started_at < cutoff]
+
+    # KPIs
+    conversations = sum(1 for e in cur_events if e.type == "conversation")
+    workflows_started = sum(1 for e in cur_events if e.type == "workflow_run")
+    workflows_completed = sum(1 for e in cur_events if e.type == "workflow_run" and e.status == "completed")
+    workflows_failed = sum(1 for e in cur_events if e.type == "workflow_run" and e.status == "failed")
+    tokens_in = sum(e.tokens_input or 0 for e in cur_events)
+    tokens_out = sum(e.tokens_output or 0 for e in cur_events)
+    user_ids = {e.user_id for e in cur_events}
+
+    # Previous period KPIs
+    prev_convos = sum(1 for e in prev_events if e.type == "conversation")
+    prev_wf_started = sum(1 for e in prev_events if e.type == "workflow_run")
+    prev_wf_completed = sum(1 for e in prev_events if e.type == "workflow_run" and e.status == "completed")
+    prev_wf_failed = sum(1 for e in prev_events if e.type == "workflow_run" and e.status == "failed")
+    prev_tokens_in = sum(e.tokens_input or 0 for e in prev_events)
+    prev_tokens_out = sum(e.tokens_output or 0 for e in prev_events)
+    prev_users = {e.user_id for e in prev_events}
+
+    previous_period = UsageStatsResponse(
+        conversations=prev_convos,
+        workflows_started=prev_wf_started,
+        workflows_completed=prev_wf_completed,
+        workflows_failed=prev_wf_failed,
+        tokens_in=prev_tokens_in,
+        tokens_out=prev_tokens_out,
+        active_users=len(prev_users),
+    )
+
+    # Timeseries
+    daily: dict[str, dict] = {}
+    for i in range(days):
+        d = (cutoff + datetime.timedelta(days=i + 1)).strftime("%Y-%m-%d")
+        daily[d] = {
+            "conversations": 0, "search_runs": 0,
+            "workflows_started": 0, "workflows_completed": 0, "workflows_failed": 0,
+            "tokens_in": 0, "tokens_out": 0, "user_ids": set(),
+        }
+    for ev in cur_events:
+        ts = ev.started_at
+        if not ts:
+            continue
+        day_str = ts.strftime("%Y-%m-%d")
+        bucket = daily.get(day_str)
+        if bucket:
+            if ev.type == "conversation":
+                bucket["conversations"] += 1
+            elif ev.type == "search_set_run":
+                bucket["search_runs"] += 1
+            elif ev.type == "workflow_run":
+                bucket["workflows_started"] += 1
+                if ev.status == "completed":
+                    bucket["workflows_completed"] += 1
+                elif ev.status == "failed":
+                    bucket["workflows_failed"] += 1
+            bucket["tokens_in"] += ev.tokens_input or 0
+            bucket["tokens_out"] += ev.tokens_output or 0
+            bucket["user_ids"].add(ev.user_id)
+
+    timeseries = [
+        TimeseriesDayItem(
+            date=d, conversations=b["conversations"], search_runs=b["search_runs"],
+            workflows_started=b["workflows_started"], workflows_completed=b["workflows_completed"],
+            workflows_failed=b["workflows_failed"], tokens_in=b["tokens_in"],
+            tokens_out=b["tokens_out"], active_users=len(b["user_ids"]),
+        )
+        for d, b in sorted(daily.items())
+    ]
+
+    # Members
+    memberships = await TeamMembership.find(
+        TeamMembership.team == BsonObjectId(team_id)
+    ).to_list()
+    member_user_ids = [m.user_id for m in memberships]
+    member_role_map = {m.user_id: m.role for m in memberships}
+
+    all_users = await User.find({"user_id": {"$in": member_user_ids}}).to_list() if member_user_ids else []
+    user_map = {u.user_id: u for u in all_users}
+
+    # Per-member stats from current events
+    member_agg: dict[str, dict] = {uid: {"tokens_total": 0, "workflows_run": 0, "conversations": 0, "last_active": None} for uid in member_user_ids}
+    for ev in cur_events:
+        agg = member_agg.get(ev.user_id)
+        if not agg:
+            continue
+        agg["tokens_total"] += (ev.tokens_input or 0) + (ev.tokens_output or 0)
+        if ev.type == "workflow_run":
+            agg["workflows_run"] += 1
+        elif ev.type == "conversation":
+            agg["conversations"] += 1
+        ts = ev.started_at
+        if ts and (agg["last_active"] is None or ts > agg["last_active"]):
+            agg["last_active"] = ts
+
+    members = []
+    for uid in member_user_ids:
+        u = user_map.get(uid)
+        agg = member_agg[uid]
+        members.append(TeamDetailMember(
+            user_id=uid,
+            name=u.name if u else None,
+            email=u.email if u else None,
+            role=member_role_map.get(uid, "member"),
+            tokens_total=agg["tokens_total"],
+            workflows_run=agg["workflows_run"],
+            conversations=agg["conversations"],
+            last_active=agg["last_active"],
+        ))
+    members.sort(key=lambda m: m.tokens_total, reverse=True)
+
+    # Document count
+    doc_count = await SmartDocument.find(
+        {"user_id": {"$in": member_user_ids}}
+    ).count()
+
+    # Recent workflows
+    recent_wf_events = await ActivityEvent.find(
+        {"team_id": team_id, "type": "workflow_run"}
+    ).sort(-ActivityEvent.started_at).limit(20).to_list()
+
+    recent_workflows = []
+    for ev in recent_wf_events:
+        duration = None
+        if ev.started_at and ev.finished_at:
+            duration = int((ev.finished_at - ev.started_at).total_seconds() * 1000)
+        u = user_map.get(ev.user_id)
+        recent_workflows.append(WorkflowEventItem(
+            id=str(ev.id), status=ev.status, title=ev.title,
+            user_id=ev.user_id, user_name=u.name if u else None,
+            user_email=u.email if u else None,
+            team_id=ev.team_id, team_name=team.name,
+            started_at=ev.started_at, finished_at=ev.finished_at,
+            duration_ms=duration, tokens_in=ev.tokens_input or 0,
+            tokens_out=ev.tokens_output or 0,
+            steps_completed=ev.steps_completed or 0,
+            steps_total=ev.steps_total or 0, error=ev.error,
+        ))
+
+    return TeamDetailResponse(
+        team_id=team_id, name=team.name, uuid=team.uuid,
+        tokens_in=tokens_in, tokens_out=tokens_out,
+        workflows_started=workflows_started,
+        workflows_completed=workflows_completed,
+        workflows_failed=workflows_failed,
+        conversations=conversations,
+        active_users=len(user_ids),
+        document_count=doc_count,
+        timeseries=timeseries,
+        previous_period=previous_period,
+        members=members,
+        recent_workflows=recent_workflows,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 3c. GET /users/{user_id}/detail  - User drill-down
+# ---------------------------------------------------------------------------
+
+@router.get("/users/{user_id}/detail", response_model=UserDetailResponse)
+async def user_detail(
+    user_id: str,
+    days: int = Query(default=30, ge=1),
+    user: User = Depends(get_current_user),
+):
+    _, team_scope = await _require_admin_or_team_admin(user)
+
+    # Team admins: verify the target user is a member of their team
+    if team_scope:
+        membership = await TeamMembership.find_one(
+            TeamMembership.team == BsonObjectId(team_scope),
+            TeamMembership.user_id == user_id,
+        )
+        if not membership:
+            raise HTTPException(status_code=403, detail="User not in your team")
+
+    # Fetch user record
+    target_user = await User.find_one(User.user_id == user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(days=days)
+    prev_cutoff = cutoff - datetime.timedelta(days=days)
+
+    query_filter: dict = {"user_id": user_id, "started_at": {"$gte": prev_cutoff}}
+    if team_scope:
+        query_filter["team_id"] = team_scope
+    events = await ActivityEvent.find(query_filter).to_list()
+
+    cur_events = [e for e in events if e.started_at and e.started_at >= cutoff]
+    prev_events = [e for e in events if e.started_at and e.started_at < cutoff]
+
+    # KPIs
+    conversations = sum(1 for e in cur_events if e.type == "conversation")
+    workflows_started = sum(1 for e in cur_events if e.type == "workflow_run")
+    workflows_completed = sum(1 for e in cur_events if e.type == "workflow_run" and e.status == "completed")
+    workflows_failed = sum(1 for e in cur_events if e.type == "workflow_run" and e.status == "failed")
+    tokens_in = sum(e.tokens_input or 0 for e in cur_events)
+    tokens_out = sum(e.tokens_output or 0 for e in cur_events)
+
+    # Previous period
+    prev_convos = sum(1 for e in prev_events if e.type == "conversation")
+    prev_wf_started = sum(1 for e in prev_events if e.type == "workflow_run")
+    prev_wf_completed = sum(1 for e in prev_events if e.type == "workflow_run" and e.status == "completed")
+    prev_wf_failed = sum(1 for e in prev_events if e.type == "workflow_run" and e.status == "failed")
+    prev_tokens_in = sum(e.tokens_input or 0 for e in prev_events)
+    prev_tokens_out = sum(e.tokens_output or 0 for e in prev_events)
+
+    previous_period = UsageStatsResponse(
+        conversations=prev_convos,
+        workflows_started=prev_wf_started,
+        workflows_completed=prev_wf_completed,
+        workflows_failed=prev_wf_failed,
+        tokens_in=prev_tokens_in,
+        tokens_out=prev_tokens_out,
+    )
+
+    # Timeseries
+    daily: dict[str, dict] = {}
+    for i in range(days):
+        d = (cutoff + datetime.timedelta(days=i + 1)).strftime("%Y-%m-%d")
+        daily[d] = {
+            "conversations": 0, "search_runs": 0,
+            "workflows_started": 0, "workflows_completed": 0, "workflows_failed": 0,
+            "tokens_in": 0, "tokens_out": 0, "user_ids": set(),
+        }
+    for ev in cur_events:
+        ts = ev.started_at
+        if not ts:
+            continue
+        day_str = ts.strftime("%Y-%m-%d")
+        bucket = daily.get(day_str)
+        if bucket:
+            if ev.type == "conversation":
+                bucket["conversations"] += 1
+            elif ev.type == "search_set_run":
+                bucket["search_runs"] += 1
+            elif ev.type == "workflow_run":
+                bucket["workflows_started"] += 1
+                if ev.status == "completed":
+                    bucket["workflows_completed"] += 1
+                elif ev.status == "failed":
+                    bucket["workflows_failed"] += 1
+            bucket["tokens_in"] += ev.tokens_input or 0
+            bucket["tokens_out"] += ev.tokens_output or 0
+
+    timeseries = [
+        TimeseriesDayItem(
+            date=d, conversations=b["conversations"], search_runs=b["search_runs"],
+            workflows_started=b["workflows_started"], workflows_completed=b["workflows_completed"],
+            workflows_failed=b["workflows_failed"], tokens_in=b["tokens_in"],
+            tokens_out=b["tokens_out"], active_users=0,
+        )
+        for d, b in sorted(daily.items())
+    ]
+
+    # Document count
+    doc_count = await SmartDocument.find({"user_id": user_id}).count()
+
+    # Recent workflows
+    wf_filter: dict = {"user_id": user_id, "type": "workflow_run"}
+    if team_scope:
+        wf_filter["team_id"] = team_scope
+    recent_wf_events = await ActivityEvent.find(wf_filter).sort(
+        -ActivityEvent.started_at
+    ).limit(20).to_list()
+
+    recent_workflows = []
+    for ev in recent_wf_events:
+        duration = None
+        if ev.started_at and ev.finished_at:
+            duration = int((ev.finished_at - ev.started_at).total_seconds() * 1000)
+        recent_workflows.append(WorkflowEventItem(
+            id=str(ev.id), status=ev.status, title=ev.title,
+            user_id=ev.user_id, user_name=target_user.name,
+            user_email=target_user.email,
+            team_id=ev.team_id, started_at=ev.started_at,
+            finished_at=ev.finished_at, duration_ms=duration,
+            tokens_in=ev.tokens_input or 0, tokens_out=ev.tokens_output or 0,
+            steps_completed=ev.steps_completed or 0,
+            steps_total=ev.steps_total or 0, error=ev.error,
+        ))
+
+    return UserDetailResponse(
+        user_id=user_id, name=target_user.name, email=target_user.email,
+        is_admin=target_user.is_admin,
+        is_examiner=getattr(target_user, "is_examiner", False),
+        tokens_in=tokens_in, tokens_out=tokens_out,
+        workflows_started=workflows_started,
+        workflows_completed=workflows_completed,
+        workflows_failed=workflows_failed,
+        conversations=conversations,
+        document_count=doc_count,
+        timeseries=timeseries,
+        previous_period=previous_period,
+        recent_workflows=recent_workflows,
+    )
+
+
+# ---------------------------------------------------------------------------
 # 4. GET /workflows  - Paginated workflow events
 # ---------------------------------------------------------------------------
 
@@ -657,6 +1043,10 @@ async def add_model(
             "endpoint": body.endpoint or "",
             "api_protocol": body.api_protocol or "",
             "api_key": body.api_key or "",
+            "speed": body.speed or "",
+            "tier": body.tier or "",
+            "privacy": body.privacy or "",
+            "supports_structured": body.supports_structured,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -691,6 +1081,10 @@ async def update_model(
         "endpoint": body.endpoint or "",
         "api_protocol": body.api_protocol or "",
         "api_key": body.api_key or "",
+        "speed": body.speed or "",
+        "tier": body.tier or "",
+        "privacy": body.privacy or "",
+        "supports_structured": body.supports_structured,
     }
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id

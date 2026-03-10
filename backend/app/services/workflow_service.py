@@ -78,12 +78,18 @@ async def get_workflow(workflow_id: str) -> dict | None:
         "space": wf.space,
         "num_executions": wf.num_executions,
         "steps": steps,
+        "input_config": wf.input_config,
         "validation_plan": wf.validation_plan,
         "validation_inputs": wf.validation_inputs,
     }
 
 
-async def update_workflow(workflow_id: str, name: str | None = None, description: str | None = None) -> Workflow | None:
+async def update_workflow(
+    workflow_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    input_config: dict | None = None,
+) -> Workflow | None:
     wf = await Workflow.get(PydanticObjectId(workflow_id))
     if not wf:
         return None
@@ -91,6 +97,8 @@ async def update_workflow(workflow_id: str, name: str | None = None, description
         wf.name = name
     if description is not None:
         wf.description = description
+    if input_config is not None:
+        wf.input_config = input_config
     wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()
     return wf

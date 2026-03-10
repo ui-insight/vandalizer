@@ -12,6 +12,7 @@ import json
 import logging
 import multiprocessing
 import re
+import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NoReturn, Optional
@@ -24,6 +25,35 @@ from app.services.extraction_engine import ExtractionEngine
 from app.services.llm_service import create_chat_agent, get_agent_model
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Token usage accumulator
+# ---------------------------------------------------------------------------
+
+class UsageAccumulator:
+    """Thread-safe token usage accumulator for workflow/extraction LLM calls."""
+    __slots__ = ("tokens_in", "tokens_out", "_lock")
+
+    def __init__(self):
+        self.tokens_in = 0
+        self.tokens_out = 0
+        self._lock = threading.Lock()
+
+    def record(self, result) -> None:
+        """Record usage from a pydantic-ai RunResult."""
+        try:
+            usage = result.usage()
+            with self._lock:
+                self.tokens_in += usage.request_tokens or 0
+                self.tokens_out += usage.response_tokens or 0
+        except Exception:
+            pass
+
+    def add(self, tokens_in: int, tokens_out: int) -> None:
+        with self._lock:
+            self.tokens_in += tokens_in
+            self.tokens_out += tokens_out
 
 
 # ---------------------------------------------------------------------------
@@ -88,7 +118,8 @@ def _stringify_value(value):
 # ---------------------------------------------------------------------------
 
 def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
-                   include_next_step: bool = True, system_config_doc: dict | None = None):
+                   include_next_step: bool = True, system_config_doc: dict | None = None,
+                   usage_acc: UsageAccumulator | None = None):
     """Run a chat prompt via LLM. Sync context."""
     full_text = json.dumps(data) if data is not None else ""
     output_prompt = (
@@ -98,6 +129,8 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
     )
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
     result = chat_agent.run_sync(output_prompt)
+    if usage_acc:
+        usage_acc.record(result)
     output = result.output
     if progress_callback:
         progress_callback(output)
@@ -105,7 +138,8 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
 
 
 def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | None = None,
-                          full_text: str | None = None, system_config_doc: dict | None = None):
+                          full_text: str | None = None, system_config_doc: dict | None = None,
+                          usage_acc: UsageAccumulator | None = None):
     """Run extraction and return {raw, formatted}. Sync context."""
     engine = ExtractionEngine(system_config_doc=system_config_doc)
     output = engine.extract(
@@ -114,11 +148,14 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
         full_text=full_text,
         doc_texts=doc_texts,
     )
+    if usage_acc:
+        usage_acc.add(engine.tokens_in, engine.tokens_out)
     formatted_output = format_extraction_results(output)
     return {"raw": output, "formatted": formatted_output}
 
 
-def format_model(model: str, formatting_prompt: str, text, system_config_doc: dict | None = None):
+def format_model(model: str, formatting_prompt: str, text, system_config_doc: dict | None = None,
+                 usage_acc: UsageAccumulator | None = None):
     """Format text via LLM. Returns (prompt, formatted_text)."""
     system_prompt = (
         "Follow the instruction and output your answer as a nicely formatted markdown "
@@ -129,6 +166,8 @@ def format_model(model: str, formatting_prompt: str, text, system_config_doc: di
     prompt = f"{system_prompt}\n\n Instruction: {formatting_prompt}\n\n {text}"
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
     response = chat_agent.run_sync(prompt)
+    if usage_acc:
+        usage_acc.record(response)
     output = response.output
     if output is None:
         return None, None
@@ -152,6 +191,7 @@ class Node:
         self.tasks = []
         self.progress_reporter = None
         self._sys_cfg: dict | None = None
+        self._usage_acc: UsageAccumulator | None = None
 
     def process(self, inputs) -> NoReturn:
         raise NotImplementedError
@@ -175,6 +215,7 @@ class Node:
             data=result["output"],
             include_next_step=False,
             system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
         )
         result["output"] = processed
         return result
@@ -278,7 +319,7 @@ class ExtractionNode(Node):
 
         extraction_response = data_extraction_model(
             self.model, keys, doc_texts=doc_texts, full_text=full_text,
-            system_config_doc=self._sys_cfg,
+            system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
         )
 
         raw_output = extraction_response.get("raw") if isinstance(extraction_response, dict) else extraction_response
@@ -309,6 +350,7 @@ class PromptNode(Node):
             chat_response = llm_chat_model(
                 model=self.model, prompt=prompt, data=self.data["selected_doc_text"],
                 include_next_step=False, system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
             )
         elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts", [])
@@ -316,12 +358,14 @@ class PromptNode(Node):
             chat_response = llm_chat_model(
                 model=self.model, prompt=prompt, data=full_text,
                 include_next_step=False, system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
             )
         else:
             data = inputs.get("output")
             chat_response = llm_chat_model(
                 model=self.model, prompt=prompt, data=data,
                 include_next_step=False, system_config_doc=self._sys_cfg,
+                usage_acc=self._usage_acc,
             )
 
         return {"output": chat_response, "input": prompt, "step_name": self.name}
@@ -351,7 +395,8 @@ class FormatNode(Node):
         else:
             text = data
 
-        _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg)
+        _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg,
+                                 usage_acc=self._usage_acc)
         return {"output": output, "input": formatting_prompt, "step_name": self.name}
 
 
@@ -403,6 +448,7 @@ class DescribeImageNode(Node):
         response = llm_chat_model(
             model=self.model, prompt=full_prompt, data=inputs.get("output"),
             include_next_step=False, system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
         )
         return {"output": response, "input": inputs.get("output"), "step_name": self.name}
 
@@ -526,6 +572,7 @@ class ResearchNode(Node):
         findings = llm_chat_model(
             model=self.model, prompt=analysis_prompt, data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
         )
 
         self.report_progress("Pass 2: Synthesizing report")
@@ -538,6 +585,7 @@ class ResearchNode(Node):
         report = llm_chat_model(
             model=self.model, prompt=synthesis_prompt, data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
         )
         return {"output": report, "input": inputs.get("output"), "step_name": self.name}
 
@@ -629,6 +677,7 @@ class FormFillerNode(Node):
         filled = llm_chat_model(
             model=self.model, prompt=prompt, data=input_data,
             include_next_step=False, system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
         )
         return {"output": filled, "input": inputs.get("output"), "step_name": self.name}
 
@@ -765,6 +814,7 @@ class WorkflowEngine:
         self.nodes: list[Node] = []
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
+        self.usage = UsageAccumulator()
 
     def add_node(self, node: Node) -> None:
         self.graph.add(node)
@@ -895,7 +945,7 @@ def build_workflow_engine(
                 task_name = task.get("name", "")
                 task_data = task.get("data", {})
                 task_data["user_id"] = user_id
-                task_data["model"] = model
+                task_data["model"] = task_data.get("model") or model
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)
@@ -950,6 +1000,10 @@ def build_workflow_engine(
                     tasks.append(n)
                 else:
                     logger.warning("Unknown task type '%s' in step '%s' — skipping", task_name, step_name)
+
+            # Propagate usage accumulator to all task nodes
+            for t in tasks:
+                t._usage_acc = engine.usage
 
             node = MultiTaskNode(step_name)
             node.add_tasks(tasks)

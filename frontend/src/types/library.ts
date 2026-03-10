@@ -40,6 +40,7 @@ export interface LibraryFolder {
   name: string
   parent_id: string | null
   scope: LibraryScope
+  item_count: number
 }
 
 export type VerificationStatus = 'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'returned'

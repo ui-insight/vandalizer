@@ -16,10 +16,26 @@ import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } fr
 import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
 import type { Document, Folder } from '../../types/document'
 
+export type SortColumn = 'name' | 'modified'
+export type SortDirection = 'asc' | 'desc'
+export interface SortState {
+  column: SortColumn
+  direction: SortDirection
+}
+
 export interface ContentMatch {
   uuid: string
   title: string
   snippet: string
+  extension: string
+  num_pages: number
+  created_at: string
+  updated_at: string
+  processing: boolean
+  valid: boolean
+  task_status: string | null
+  folder: string | null
+  token_count: number
 }
 
 interface FileBrowserProps {
@@ -28,14 +44,18 @@ interface FileBrowserProps {
   contentMatches?: ContentMatch[]
   onSelectionChange?: (docUuids: string[]) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
+  currentFolder?: string | null
+  onFolderNavigate?: (folderId: string | null) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onFolderSelectionChange }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onFolderSelectionChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
   const space = user?.user_id || ''
 
-  const [currentFolder, setCurrentFolder] = useState<string | null>(null)
+  const [internalFolder, setInternalFolder] = useState<string | null>(null)
+  const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
+  const setCurrentFolder = onFolderNavigate ?? setInternalFolder
   const { documents, folders, loading, refresh } = useDocuments(space, currentFolder, currentTeam?.uuid)
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
   const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(space, currentFolder, refresh)
@@ -49,6 +69,16 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       clearLastUploaded()
     }
   }, [lastUploadedUuid, documents, onDocClick, clearLastUploaded])
+
+  // Sort state
+  const [sort, setSort] = useState<SortState>({ column: 'name', direction: 'asc' })
+  const handleSort = useCallback((column: SortColumn) => {
+    setSort(prev =>
+      prev.column === column
+        ? { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+        : { column, direction: 'asc' }
+    )
+  }, [])
 
   // Bulk selection
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set())
@@ -99,11 +129,59 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   const filteredDocuments = useMemo(() => {
     if (!searchQuery.trim()) return documents
     const q = searchQuery.toLowerCase()
-    // Include docs matching by title OR by content
-    return documents.filter(d =>
+    // Include docs matching by title OR by content from current folder
+    const matched = documents.filter(d =>
       d.title.toLowerCase().includes(q) || contentMatchUuids.has(d.uuid)
     )
-  }, [documents, searchQuery, contentMatchUuids])
+    // Merge in content matches from other folders (not already loaded)
+    if (contentMatches) {
+      const loadedUuids = new Set(documents.map(d => d.uuid))
+      for (const m of contentMatches) {
+        if (!loadedUuids.has(m.uuid)) {
+          matched.push({
+            id: m.uuid,
+            uuid: m.uuid,
+            title: m.title,
+            extension: m.extension,
+            processing: m.processing,
+            valid: m.valid,
+            task_status: m.task_status,
+            folder: m.folder,
+            created_at: m.created_at,
+            updated_at: m.updated_at,
+            token_count: m.token_count,
+            num_pages: m.num_pages,
+          })
+        }
+      }
+    }
+    return matched
+  }, [documents, searchQuery, contentMatchUuids, contentMatches])
+
+  // Sort folders (by name only) and documents independently — folders always above documents
+  const sortedFolders = useMemo(() => {
+    const sorted = [...filteredFolders].sort((a, b) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+    )
+    return sort.direction === 'desc' && sort.column === 'name' ? sorted.reverse() : sorted
+  }, [filteredFolders, sort])
+
+  const sortedDocuments = useMemo(() => {
+    const sorted = [...filteredDocuments].sort((a, b) => {
+      switch (sort.column) {
+        case 'name':
+          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' })
+        case 'modified': {
+          const aTime = a.updated_at ? new Date(a.updated_at).getTime() : 0
+          const bTime = b.updated_at ? new Date(b.updated_at).getTime() : 0
+          return aTime - bTime
+        }
+        default:
+          return 0
+      }
+    })
+    return sort.direction === 'desc' ? sorted.reverse() : sorted
+  }, [filteredDocuments, sort])
 
   const handleToggleSelect = useCallback((uuid: string) => {
     setSelectedUuids(prev => {
@@ -396,8 +474,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
         style={{ boxShadow: '0 0 20px rgba(0, 0, 0, 0.15)' }}
       >
         <FileList
-          folders={filteredFolders}
-          documents={filteredDocuments}
+          folders={sortedFolders}
+          documents={sortedDocuments}
           onFolderClick={setCurrentFolder}
           onFolderContextMenu={handleFolderContextMenu}
           onDocContextMenu={handleDocContextMenu}
@@ -408,6 +486,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           snippets={searchQuery.trim() ? snippetMap : undefined}
           onDropFile={handleDropFile}
           highlighted={panelDragOver}
+          sort={sort}
+          onSort={handleSort}
         />
       </div>
 

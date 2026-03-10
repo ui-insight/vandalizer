@@ -1,6 +1,5 @@
 import { MessageSquare, FolderOpen, Workflow, BookOpen } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
-import { useAutomationActivity } from '../../hooks/useAutomationActivity'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
   { mode: 'chat', icon: MessageSquare, label: 'Chat' },
@@ -9,9 +8,8 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
   { mode: 'knowledge', icon: BookOpen, label: 'Knowledge' },
 ]
 
-export function UtilityBar() {
+export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
   const { workspaceMode, setWorkspaceMode, resetToHome } = useWorkspace()
-  const { hasActive } = useAutomationActivity()
 
   return (
     <div
@@ -30,8 +28,8 @@ export function UtilityBar() {
       {MODES.map(({ mode, icon: Icon, label }) => {
         const active = workspaceMode === mode
         const isAutomations = mode === 'automations'
-        const showPulse = isAutomations && hasActive && active
-        const showDot = isAutomations && hasActive && !active
+        const showPulse = isAutomations && hasActiveAutomation && active
+        const showDot = isAutomations && hasActiveAutomation && !active
         return (
           <button
             key={mode}
@@ -61,7 +59,7 @@ export function UtilityBar() {
           >
             <Icon
               size={20}
-              style={{ color: (isAutomations && hasActive) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#888' }}
+              style={{ color: (isAutomations && hasActiveAutomation) ? 'var(--highlight-color, #eab308)' : active ? '#fff' : '#888' }}
             />
             {showDot && (
               <span

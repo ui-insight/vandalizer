@@ -67,15 +67,31 @@ async def list_automations(space: str | None = None, user: User = Depends(get_cu
 
 @router.get("/active")
 async def get_active_automations(user: User = Depends(get_current_user)):
-    """Return IDs of automations whose linked workflows/extractions/tasks are currently running."""
+    """Return IDs of automations whose linked workflows/extractions/tasks are currently running,
+    plus recently completed automations (within the last 30 seconds) for toast notifications."""
+    import datetime
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    recent_cutoff = now - datetime.timedelta(seconds=30)
+
     active_events = await WorkflowTriggerEvent.find(
         {"status": {"$in": ["pending", "queued", "running"]}}
     ).to_list()
 
-    if not active_events:
-        return {"active_automation_ids": []}
+    # Also find recently completed/failed events for toast notifications
+    recent_events = await WorkflowTriggerEvent.find(
+        {"status": {"$in": ["completed", "failed"]}, "completed_at": {"$gte": recent_cutoff}}
+    ).to_list()
 
     active_workflow_ids = {e.workflow for e in active_events if e.workflow}
+    recent_workflow_map: dict[str, dict] = {}
+    for e in recent_events:
+        if e.workflow:
+            wf_id_str = str(e.workflow)
+            recent_workflow_map[wf_id_str] = {
+                "status": e.status,
+                "documents": [str(d) for d in e.documents],
+            }
 
     team_id = str(user.current_team) if user.current_team else None
     user_query: dict = {"user_id": user.user_id, "enabled": True}
@@ -86,18 +102,59 @@ async def get_active_automations(user: User = Depends(get_current_user)):
         automations = await Automation.find(user_query).to_list()
 
     active_ids = []
+    recently_completed: list[dict] = []
+
     for a in automations:
         if not a.action_id:
             continue
+        a_id_str = str(a.id)
+
         if a.action_type in ("workflow", "task"):
             try:
-                if PydanticObjectId(a.action_id) in active_workflow_ids:
-                    active_ids.append(str(a.id))
+                oid = PydanticObjectId(a.action_id)
+                if oid in active_workflow_ids:
+                    active_ids.append(a_id_str)
+                elif a.action_id in recent_workflow_map:
+                    info = recent_workflow_map[a.action_id]
+                    recently_completed.append({
+                        "id": a_id_str,
+                        "name": a.name,
+                        "status": info["status"],
+                        "document_oids": info["documents"],
+                    })
             except Exception:
                 pass
-        # Extraction active status can be extended later via activity tracking
+        elif a.action_type == "extraction":
+            raw = await Automation.get_motor_collection().find_one(
+                {"_id": a.id}, {"_running": 1}
+            )
+            if raw and raw.get("_running"):
+                active_ids.append(a_id_str)
 
-    return {"active_automation_ids": active_ids}
+    # Resolve document ObjectIds to uuid+title for recently completed
+    all_doc_oids: list[PydanticObjectId] = []
+    for rc in recently_completed:
+        for d_oid_str in rc.get("document_oids", []):
+            try:
+                all_doc_oids.append(PydanticObjectId(d_oid_str))
+            except Exception:
+                pass
+
+    doc_info_map: dict[str, dict] = {}  # oid_str -> {uuid, title}
+    if all_doc_oids:
+        from app.models.document import SmartDocument
+        docs = await SmartDocument.find({"_id": {"$in": all_doc_oids}}).to_list()
+        for d in docs:
+            doc_info_map[str(d.id)] = {"uuid": d.uuid, "title": d.title}
+
+    for rc in recently_completed:
+        resolved = []
+        for d_oid_str in rc.pop("document_oids", []):
+            if d_oid_str in doc_info_map:
+                resolved.append(doc_info_map[d_oid_str])
+        rc["documents"] = resolved
+
+    return {"active_automation_ids": active_ids, "recently_completed": recently_completed}
 
 
 @router.get("/{automation_id}", response_model=AutomationResponse)
@@ -278,6 +335,12 @@ async def trigger_automation(
                 user_id=user.user_id,
             )
             await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+
+            # Process output_config (storage, notifications, webhooks)
+            output_config = auto.output_config or {}
+            if output_config:
+                _process_extraction_trigger_outputs(auto, results, output_config)
+
             return {
                 "status": "completed",
                 "activity_id": str(activity.id),
@@ -291,3 +354,51 @@ async def trigger_automation(
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported action type: {auto.action_type}")
+
+
+def _process_extraction_trigger_outputs(
+    auto: Automation, results: dict, output_config: dict
+) -> None:
+    """Process output_config for an extraction triggered via API (sync helpers)."""
+    from app.services.output_handlers import (
+        call_webhook,
+        save_extraction_results_to_folder,
+        send_workflow_notification,
+        should_send_notification,
+    )
+
+    automation_dict = {
+        "name": auto.name,
+        "user_id": auto.user_id,
+        "trigger_type": auto.trigger_type,
+        "_id": auto.id,
+    }
+
+    result_doc = {
+        "status": "completed",
+        "trigger_type": "api",
+        "final_output": {"output": results},
+    }
+
+    # Storage
+    storage_cfg = output_config.get("storage", {})
+    if storage_cfg.get("enabled"):
+        try:
+            save_extraction_results_to_folder(results, automation_dict, storage_cfg)
+        except Exception as e:
+            logger.error("API trigger: failed to save extraction results: %s", e)
+
+    # Notifications
+    for notification in output_config.get("notifications", []):
+        try:
+            if should_send_notification(result_doc, notification):
+                send_workflow_notification(result_doc, notification)
+        except Exception as e:
+            logger.error("API trigger: failed to send extraction notification: %s", e)
+
+    # Webhooks
+    for webhook_cfg in output_config.get("webhooks", []):
+        try:
+            call_webhook(result_doc, webhook_cfg)
+        except Exception as e:
+            logger.error("API trigger: failed to call extraction webhook: %s", e)

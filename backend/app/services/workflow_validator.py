@@ -30,9 +30,9 @@ VALID_SEVERITIES = {"must", "should", "nice"}
 def _get_db():
     from pymongo import MongoClient
 
-    mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-    mongo_db = os.environ.get("MONGO_DB", "osp")
-    return MongoClient(mongo_host)[mongo_db]
+    from app.config import Settings
+    settings = Settings()
+    return MongoClient(settings.mongo_host)[settings.mongo_db]
 
 
 def _resolve_model_name(user_id: str | None = None) -> str:

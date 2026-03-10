@@ -187,11 +187,24 @@ async def chat_stream(
                 f"\n\n## Document: {att.filename}\n\n{att.content[:10000]}\n"
             )
 
-    # Load message history
+    # Load message history, excluding the user message we just saved (chat.py
+    # saves the bare message before calling chat_stream).  We re-send it as
+    # the enriched prompt below so the model only sees the version that
+    # includes document / KB / attachment context.
     previous_messages: list[ModelMessage] = await conversation.to_model_messages()
+    if previous_messages:
+        previous_messages = previous_messages[:-1]
 
     # Build prompt — keep it clean; system prompt handles behavior
     full_text = _get_full_text(documents)
+    if document_uuids:
+        logger.info(
+            "Chat doc context: requested=%d found=%d with_text=%d text_len=%d",
+            len(document_uuids),
+            len(documents),
+            sum(1 for d in documents if d.raw_text),
+            len(full_text),
+        )
     agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
 
     parts: list[str] = []

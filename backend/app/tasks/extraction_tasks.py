@@ -21,10 +21,10 @@ def _get_db():
     """Get sync pymongo database handle."""
     from pymongo import MongoClient
 
-    mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-    mongo_db = os.environ.get("MONGO_DB", "osp")
-    client = MongoClient(mongo_host)
-    return client[mongo_db]
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    return client[settings.mongo_db]
 
 
 def normalize_results(results, expected_keys: list[str] | None = None) -> dict[str, Any]:
@@ -202,6 +202,9 @@ def perform_extraction_task(
                         "status": "completed",
                         "finished_at": now,
                         "last_updated_at": now,
+                        "tokens_input": engine.tokens_in,
+                        "tokens_output": engine.tokens_out,
+                        "total_tokens": engine.tokens_in + engine.tokens_out,
                         "result_snapshot": {
                             "raw": raw_results,
                             "normalized": normalized_results,

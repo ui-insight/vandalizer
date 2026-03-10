@@ -119,11 +119,10 @@ def triage_work_item_sync(
             models = system_config_doc.get("available_models", [])
             model_name = models[0]["name"] if models else ""
         if not model_name:
-            import os
             from pymongo import MongoClient
-            mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-            mongo_db = os.environ.get("MONGO_DB", "osp")
-            db = MongoClient(mongo_host)[mongo_db]
+            from app.config import Settings
+            _settings = Settings()
+            db = MongoClient(_settings.mongo_host)[_settings.mongo_db]
             sys_cfg = db.system_config.find_one() or {}
             models = sys_cfg.get("available_models", [])
             model_name = models[0]["name"] if models else "gpt-4o-mini"

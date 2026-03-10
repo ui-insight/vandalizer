@@ -76,6 +76,65 @@ export function getTeamLeaderboard() {
   return apiFetch<TeamLeaderboardItem[]>('/api/admin/teams')
 }
 
+// Team Detail
+
+export interface TeamDetailMember {
+  user_id: string
+  name: string | null
+  email: string | null
+  role: string
+  tokens_total: number
+  workflows_run: number
+  conversations: number
+  last_active: string | null
+}
+
+export interface TeamDetailResponse {
+  team_id: string
+  name: string
+  uuid: string
+  tokens_in: number
+  tokens_out: number
+  workflows_started: number
+  workflows_completed: number
+  workflows_failed: number
+  conversations: number
+  active_users: number
+  document_count: number
+  timeseries: TimeseriesDayItem[]
+  previous_period: UsageStats
+  members: TeamDetailMember[]
+  recent_workflows: WorkflowEventItem[]
+}
+
+export function getTeamDetail(teamId: string, days: number = 30) {
+  return apiFetch<TeamDetailResponse>(`/api/admin/teams/${teamId}/detail?days=${days}`)
+}
+
+// User Detail
+
+export interface UserDetailResponse {
+  user_id: string
+  name: string | null
+  email: string | null
+  is_admin: boolean
+  is_examiner: boolean
+  tokens_in: number
+  tokens_out: number
+  workflows_started: number
+  workflows_completed: number
+  workflows_failed: number
+  conversations: number
+  document_count: number
+  timeseries: TimeseriesDayItem[]
+  previous_period: UsageStats
+  recent_workflows: WorkflowEventItem[]
+}
+
+export function getUserDetail(userId: string, days: number = 30) {
+  return apiFetch<UserDetailResponse>(`/api/admin/users/${encodeURIComponent(userId)}/detail?days=${days}`)
+}
+
 // Workflows
 
 export interface WorkflowEventItem {
@@ -129,7 +188,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string }[]
+  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean }[]
   ocr_endpoint: string
   llm_endpoint: string
   highlight_color: string
@@ -146,14 +205,14 @@ export function updateSystemConfig(data: { extraction_config?: Record<string, un
 
 // Models
 
-export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string }) {
+export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean }) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateModel(index: number, data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string }) {
+export function updateModel(index: number, data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean }) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${index}`, {
     method: 'PUT',
     body: JSON.stringify(data),

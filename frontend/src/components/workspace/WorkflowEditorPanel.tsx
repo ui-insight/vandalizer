@@ -21,9 +21,10 @@ import {
 } from '../../api/workflows'
 import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
+import { getModels } from '../../api/config'
 import { listContents, searchDocuments } from '../../api/documents'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet, ModelInfo } from '../../types/workflow'
 import type { Document as VDoc } from '../../types/document'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -138,6 +139,7 @@ export function WorkflowEditorPanel() {
   const runner = useWorkflowRunner()
   const [batchMode, setBatchMode] = useState(false)
   const [runElapsed, setRunElapsed] = useState(0)
+  const [textInput, setTextInput] = useState('')
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
@@ -261,12 +263,26 @@ export function WorkflowEditorPanel() {
     refresh()
   }
 
+  const isTextInput = workflow?.input_config?.trigger_type === 'text_input'
+
   const handleRun = async () => {
     if (!openWorkflowId) return
-    const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
-    if (uuids.length === 0) return
-    setActiveTab('design')
-    await runner.start(openWorkflowId, uuids, undefined, batchMode)
+
+    if (isTextInput) {
+      if (!textInput.trim()) return
+      // Convert text to temp document, then combine with any selected docs
+      const { document_uuids: textUuids } = await createTempDocuments(openWorkflowId, [
+        { text: textInput.trim(), label: 'Text input' },
+      ])
+      const allUuids = [...textUuids, ...selectedDocUuids]
+      setActiveTab('design')
+      await runner.start(openWorkflowId, allUuids, undefined, false)
+    } else {
+      const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
+      if (uuids.length === 0) return
+      setActiveTab('design')
+      await runner.start(openWorkflowId, uuids, undefined, batchMode)
+    }
   }
 
   // --- loading / error ---
@@ -290,7 +306,7 @@ export function WorkflowEditorPanel() {
   }
 
   // --- tab badge counts ---
-  const inputBadge = workflow.steps.some(s => s.data?.trigger_type === 'folder_watch') ? 1 : 0
+  const inputBadge = 0
 
   // --- render ---
 
@@ -447,30 +463,56 @@ export function WorkflowEditorPanel() {
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
       <div style={{ flexShrink: 0, padding: 15, backgroundColor: '#fff', boxShadow: '0 0px 23px -8px rgb(211,211,211)' }}>
-        {selectedDocUuids.length > 1 && (
-          <label style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
-            fontSize: 13, color: '#374151', cursor: 'pointer', userSelect: 'none',
-          }}>
-            <input
-              type="checkbox"
-              checked={batchMode}
-              onChange={e => setBatchMode(e.target.checked)}
-              style={{ accentColor: 'var(--highlight-color, #eab308)' }}
+        {isTextInput ? (
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Type style={{ width: 14, height: 14 }} />
+              Text Input
+            </div>
+            <textarea
+              value={textInput}
+              onChange={e => setTextInput(e.target.value)}
+              placeholder="Paste or type the text to process..."
+              rows={4}
+              style={{
+                width: '100%', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
+                resize: 'vertical', boxSizing: 'border-box',
+              }}
             />
-            Run per document ({selectedDocUuids.length} runs)
-          </label>
+            {selectedDocUuids.length > 0 && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <FileText style={{ width: 12, height: 12 }} />
+                + {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
+              </div>
+            )}
+          </div>
+        ) : (
+          selectedDocUuids.length > 1 && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+              fontSize: 13, color: '#374151', cursor: 'pointer', userSelect: 'none',
+            }}>
+              <input
+                type="checkbox"
+                checked={batchMode}
+                onChange={e => setBatchMode(e.target.checked)}
+                style={{ accentColor: 'var(--highlight-color, #eab308)' }}
+              />
+              Run per document ({selectedDocUuids.length} runs)
+            </label>
+          )
         )}
         <button
           onClick={handleRun}
-          disabled={runner.running || selectedDocUuids.length === 0}
+          disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
           style={{
             width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
             fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
             backgroundColor: 'var(--highlight-color, #eab308)',
             color: 'var(--highlight-text-color, #000)',
-            cursor: runner.running || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
-            opacity: selectedDocUuids.length === 0 && !runner.running ? 0.5 : 1,
+            cursor: runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
+            opacity: (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) && !runner.running ? 0.5 : 1,
             textTransform: 'uppercase', letterSpacing: '0.05em',
             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
           }}
@@ -660,19 +702,34 @@ function DesignCanvas({
 
       <ConnectionLine />
 
-      {/* Documents Selected card */}
+      {/* Input card — adapts to trigger type */}
       <div style={{
         backgroundColor: '#fff', border: '2px solid var(--highlight-color, #eab308)',
         borderRadius: 'var(--ui-radius, 8px)', padding: 15, textAlign: 'center',
         boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-          <FileText style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
-          <span style={{ fontWeight: 600, fontSize: 14 }}>Documents Selected</span>
-        </div>
-        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
-          {selectedDocCount} document{selectedDocCount !== 1 ? 's' : ''} selected
-        </div>
+        {workflow.input_config?.trigger_type === 'text_input' ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Type style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
+              <span style={{ fontWeight: 600, fontSize: 14 }}>Text Input</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              Text provided at run time
+              {selectedDocCount > 0 && ` + ${selectedDocCount} document${selectedDocCount !== 1 ? 's' : ''}`}
+            </div>
+          </>
+        ) : (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <FileText style={{ width: 16, height: 16, color: 'var(--highlight-color, #eab308)' }} />
+              <span style={{ fontWeight: 600, fontSize: 14 }}>Documents Selected</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+              {selectedDocCount} document{selectedDocCount !== 1 ? 's' : ''} selected
+            </div>
+          </>
+        )}
       </div>
 
       {/* Step cards */}
@@ -1264,6 +1321,10 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
   const [savedSets, setSavedSets] = useState<SearchSet[]>([])
   const [loadingSets, setLoadingSets] = useState(false)
 
+  // Model override for LLM tasks
+  const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
+  const [models, setModels] = useState<ModelInfo[]>([])
+
   // Test step
   const [testing, setTesting] = useState(false)
   const [testProgress, setTestProgress] = useState(0)
@@ -1281,6 +1342,13 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
     if (task.name === 'Extraction') {
       setLoadingSets(true)
       listSearchSets().then(sets => setSavedSets(sets)).catch(() => {}).finally(() => setLoadingSets(false))
+    }
+  }, [task.name])
+
+  // Load models for LLM task types
+  useEffect(() => {
+    if (LLM_TASKS.includes(task.name)) {
+      getModels().then(setModels).catch(() => {})
     }
   }, [task.name])
 
@@ -1979,6 +2047,30 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                 <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
                   Creates a .zip containing output.json and output.txt from the input data.
                 </div>
+              </div>
+            )}
+
+            {/* Model override for LLM tasks */}
+            {LLM_TASKS.includes(task.name) && models.length > 0 && (
+              <div style={{ marginTop: 16 }}>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                  Model Override <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+                </label>
+                <select
+                  value={(taskData.model as string) || ''}
+                  onChange={e => setTaskData(prev => ({ ...prev, model: e.target.value }))}
+                  style={{
+                    width: '100%', padding: '8px 12px', fontSize: 13, borderRadius: 6,
+                    border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+                  }}
+                >
+                  <option value="">Use workflow default</option>
+                  {models.map(m => {
+                    const hints = [m.speed, m.tier ? `${m.tier} tier` : ''].filter(Boolean).join(', ')
+                    const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` — ${hints}` : '')
+                    return <option key={m.name} value={m.name}>{label}</option>
+                  })}
+                </select>
               </div>
             )}
 
@@ -2782,38 +2874,40 @@ function BrowserAutomationDesign({ taskData, setTextValue, getTextValue, setTask
 // Input Tab — trigger configuration with folder watch
 // ---------------------------------------------------------------------------
 
-const FILE_TYPE_OPTIONS = [
-  { value: 'pdf', label: 'PDF' },
-  { value: 'docx', label: 'DOCX' },
-  { value: 'xlsx', label: 'XLSX' },
-  { value: 'html', label: 'HTML' },
-  { value: 'txt', label: 'TXT' },
-]
 
 function InputTab({ workflow, openWorkflowId, onRefresh }: {
   workflow: Workflow
   openWorkflowId: string | null
   onRefresh: () => void
 }) {
-  const [triggerType, setTriggerType] = useState('manual')
-  const [folderWatchEnabled, setFolderWatchEnabled] = useState(false)
-  const [watchFolder, setWatchFolder] = useState('')
-  const [fileTypes, setFileTypes] = useState<string[]>(['pdf', 'docx', 'xlsx'])
-  const [excludePatterns, setExcludePatterns] = useState('')
-  const [batchMode, setBatchMode] = useState('individual')
+  const [triggerType, setTriggerType] = useState(workflow.input_config?.trigger_type || 'manual')
+  const [saving, setSaving] = useState(false)
+
+  const handleTriggerChange = async (value: string) => {
+    setTriggerType(value)
+    if (!openWorkflowId) return
+    setSaving(true)
+    try {
+      await updateWorkflow(openWorkflowId, { input_config: { trigger_type: value } })
+      onRefresh()
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 16 }}>
-        Trigger Configuration
+        Input Configuration
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Trigger type selector */}
+        {/* Input type selector */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Trigger Type</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>Input Type</div>
           <select
             value={triggerType}
-            onChange={e => setTriggerType(e.target.value)}
+            onChange={e => handleTriggerChange(e.target.value)}
+            disabled={saving}
             style={{
               width: '100%', fontSize: 13, fontFamily: 'inherit',
               border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 12px',
@@ -2821,9 +2915,7 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
             }}
           >
             <option value="manual">Manual (Select Documents)</option>
-            <option value="folder_watch">Folder Watch</option>
-            <option value="api">API Trigger</option>
-            <option value="schedule">Schedule</option>
+            <option value="text_input">Text Input</option>
           </select>
         </div>
 
@@ -2847,153 +2939,39 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
           </div>
         )}
 
-        {/* Folder Watch */}
-        {triggerType === 'folder_watch' && (
-          <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Folder Watch</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                  Automatically run when new documents are added.
-                </div>
+        {/* Text Input */}
+        {triggerType === 'text_input' && (
+          <>
+            <div style={{
+              border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+            }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                Text Input
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
-                <span style={{ fontSize: 12, color: folderWatchEnabled ? '#16a34a' : '#9ca3af', fontWeight: 600 }}>
-                  {folderWatchEnabled ? 'Enabled' : 'Disabled'}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={folderWatchEnabled}
-                  onChange={e => setFolderWatchEnabled(e.target.checked)}
-                  style={{ accentColor: '#16a34a' }}
-                />
-              </label>
-            </div>
-
-            {folderWatchEnabled && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    Watch Folder Path
-                  </label>
-                  <input
-                    type="text"
-                    value={watchFolder}
-                    onChange={e => setWatchFolder(e.target.value)}
-                    placeholder="Select or enter folder path..."
-                    style={{
-                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                      border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    File Types
-                  </label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {FILE_TYPE_OPTIONS.map(ft => (
-                      <label key={ft.value} style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={fileTypes.includes(ft.value)}
-                          onChange={e => {
-                            if (e.target.checked) setFileTypes(prev => [...prev, ft.value])
-                            else setFileTypes(prev => prev.filter(v => v !== ft.value))
-                          }}
-                        />
-                        <span style={{ fontSize: 12, color: '#374151' }}>{ft.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    Exclude Patterns
-                  </label>
-                  <input
-                    type="text"
-                    value={excludePatterns}
-                    onChange={e => setExcludePatterns(e.target.value)}
-                    placeholder="e.g., draft_*, temp_*"
-                    style={{
-                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                      border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                    Batch Mode
-                  </label>
-                  <select
-                    value={batchMode}
-                    onChange={e => setBatchMode(e.target.value)}
-                    style={{
-                      width: '100%', fontSize: 13, fontFamily: 'inherit',
-                      border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 12px',
-                      backgroundColor: '#fff', color: '#374151',
-                    }}
-                  >
-                    <option value="individual">Process individually (one document per run)</option>
-                    <option value="batch">Batch (all new documents per run)</option>
-                  </select>
-                </div>
+              <div style={{ fontSize: 12, color: '#6b7280' }}>
+                Provide text directly when running this workflow. A text area will appear in the run panel below.
+                You can also select documents to include alongside the text.
               </div>
-            )}
-          </div>
-        )}
-
-        {/* API */}
-        {triggerType === 'api' && (
-          <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-              API Endpoint
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Trigger this workflow programmatically via the API.
             </div>
             <div style={{
-              backgroundColor: '#f3f4f6', borderRadius: 6, padding: '8px 12px',
-              fontSize: 12, fontFamily: 'monospace', color: '#374151', marginBottom: 8,
+              border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
             }}>
-              POST /api/workflows/{openWorkflowId}/run
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                Fixed Documents (optional)
+              </div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+                Pre-assign documents to always include alongside the text input.
+              </div>
+              <div style={{
+                border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
+                textAlign: 'center', color: '#9ca3af', fontSize: 13,
+              }}>
+                Drag documents here or click to browse
+              </div>
             </div>
-            <div style={{
-              backgroundColor: '#f3f4f6', borderRadius: 6, padding: '8px 12px',
-              fontSize: 11, fontFamily: 'monospace', color: '#6b7280', whiteSpace: 'pre',
-            }}>
-{`{
-  "document_uuids": ["uuid1", "uuid2"],
-  "model": "optional-model-name"
-}`}
-            </div>
-          </div>
+          </>
         )}
 
-        {/* Schedule */}
-        {triggerType === 'schedule' && (
-          <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
-          }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-              Schedule
-            </div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Run this workflow on a recurring schedule.
-            </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>
-              Schedule configuration coming soon.
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )

@@ -5,6 +5,7 @@ import {
   ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
+  ArrowLeft, FileText,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -18,6 +19,7 @@ import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
+  getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig,
   addModel, updateModel, deleteModel, addOAuthProvider, updateOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
@@ -33,6 +35,7 @@ import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
+  TeamDetailResponse, UserDetailResponse,
   WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
@@ -423,11 +426,137 @@ function UsageTab() {
 
 type UserSortKey = 'tokens_total' | 'workflows_run' | 'conversations' | 'last_active' | 'name'
 
+function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void }) {
+  const [data, setData] = useState<UserDetailResponse | null>(null)
+  const [days, setDays] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    getUserDetail(userId, days).then(setData).catch(e => setError(e?.message || 'Failed to load')).finally(() => setLoading(false))
+  }, [userId, days])
+
+  useEffect(() => { load() }, [load])
+
+  const prev = data?.previous_period
+
+  if (loading && !data) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading user details...</div>
+  if (error) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
+        <ArrowLeft size={16} /> Back to Users
+      </button>
+      <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Error: {error}</div>
+    </div>
+  )
+  if (!data) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Back + header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
+          <ArrowLeft size={16} /> Back to Users
+        </button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <UserAvatar name={data.name || data.email} />
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20, fontWeight: 700 }}>{data.name || 'Unknown'}</span>
+            {data.is_admin && <RoleBadge role="admin" />}
+            {data.is_examiner && <RoleBadge role="examiner" />}
+          </div>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>{data.email || data.user_id}</div>
+        </div>
+      </div>
+
+      {/* Time range */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
+        {[7, 14, 30, 90].map(d => (
+          <button key={d} onClick={() => setDays(d)} style={{
+            padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
+            color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
+          }}>{d}d</button>
+        ))}
+        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+          <RefreshCw size={16} />
+        </button>
+      </div>
+
+      {/* KPI Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <KpiCard label="Conversations" value={formatNumber(data.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: data.conversations, previous: prev.conversations } : undefined} />
+        <KpiCard label="Workflows Completed" value={formatNumber(data.workflows_completed)} icon={CheckCircle2} color="#22c55e" trend={prev ? { current: data.workflows_completed, previous: prev.workflows_completed } : undefined} />
+        <KpiCard label="Total Tokens" value={formatNumber(data.tokens_in + data.tokens_out)} icon={Cpu} color="#8b5cf6" trend={prev ? { current: data.tokens_in + data.tokens_out, previous: prev.tokens_in + prev.tokens_out } : undefined} />
+        <KpiCard label="Documents" value={formatNumber(data.document_count)} icon={FileText} color="#f59e0b" />
+        <KpiCard label="Failed" value={formatNumber(data.workflows_failed)} icon={XCircle} color="#ef4444" trend={prev ? { current: data.workflows_failed, previous: prev.workflows_failed, invert: true } : undefined} />
+        <KpiCard label="Workflows Started" value={formatNumber(data.workflows_started)} icon={Zap} color="#06b6d4" trend={prev ? { current: data.workflows_started, previous: prev.workflows_started } : undefined} />
+      </div>
+
+      {/* Daily Activity Chart */}
+      {data.timeseries.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Daily Activity</div>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={data.timeseries}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
+              <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
+              <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
+              <Area type="monotone" dataKey="search_runs" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.15} name="Searches" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Recent Workflows */}
+      {data.recent_workflows.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+            Recent Workflows
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflow</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Duration</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Tokens</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.recent_workflows.map(ev => (
+                <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
+                  <td style={{ padding: '10px 16px', fontSize: 14 }}>{ev.title || '-'}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(ev.duration_ms)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(ev.tokens_in + ev.tokens_out)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDateTime(ev.started_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function UsersTab() {
   const [users, setUsers] = useState<UserLeaderboardItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
 
   useEffect(() => {
     getUserLeaderboard().then(setUsers).finally(() => setLoading(false))
@@ -477,6 +606,10 @@ function UsersTab() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading users...</div>
 
+  if (selectedUserId) {
+    return <UserDrillDown userId={selectedUserId} onBack={() => setSelectedUserId(null)} />
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -505,7 +638,7 @@ function UsersTab() {
             </thead>
             <tbody>
               {filtered.map((u, i) => (
-                <tr key={u.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <tr key={u.user_id} onClick={() => setSelectedUserId(u.user_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -544,16 +677,193 @@ function UsersTab() {
 }
 
 // ──────────────────────────────────────────
-// Teams Tab
+// Teams Tab + Drill-Down
 // ──────────────────────────────────────────
 
 type TeamSortKey = 'name' | 'tokens_total' | 'workflows_completed' | 'active_users' | 'member_count' | 'avg_latency_ms'
+
+function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void }) {
+  const [data, setData] = useState<TeamDetailResponse | null>(null)
+  const [days, setDays] = useState(30)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    getTeamDetail(teamId, days).then(setData).catch(e => setError(e?.message || 'Failed to load')).finally(() => setLoading(false))
+  }, [teamId, days])
+
+  useEffect(() => { load() }, [load])
+
+  const prev = data?.previous_period
+  const maxMemberTokens = data?.members.length ? Math.max(...data.members.map(m => m.tokens_total), 1) : 1
+
+  if (loading && !data) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading team details...</div>
+  if (error) return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
+        <ArrowLeft size={16} /> Back to Teams
+      </button>
+      <div style={{ padding: 40, textAlign: 'center', color: '#dc2626' }}>Error: {error}</div>
+    </div>
+  )
+  if (!data) return null
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      {/* Back + header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button onClick={onBack} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#6b7280', padding: '4px 0' }}>
+          <ArrowLeft size={16} /> Back to Teams
+        </button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div style={{
+          width: 44, height: 44, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        }}>
+          <Building2 size={22} color="#7c3aed" />
+        </div>
+        <span style={{ fontSize: 20, fontWeight: 700 }}>{data.name}</span>
+      </div>
+
+      {/* Time range */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
+        {[7, 14, 30, 90].map(d => (
+          <button key={d} onClick={() => setDays(d)} style={{
+            padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+            fontSize: 13, fontWeight: 500, cursor: 'pointer',
+            backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
+            color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
+          }}>{d}d</button>
+        ))}
+        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+          <RefreshCw size={16} />
+        </button>
+      </div>
+
+      {/* KPI Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <KpiCard label="Conversations" value={formatNumber(data.conversations)} icon={MessageSquare} color="#3b82f6" trend={prev ? { current: data.conversations, previous: prev.conversations } : undefined} />
+        <KpiCard label="Workflows Completed" value={formatNumber(data.workflows_completed)} icon={CheckCircle2} color="#22c55e" trend={prev ? { current: data.workflows_completed, previous: prev.workflows_completed } : undefined} />
+        <KpiCard label="Active Users" value={formatNumber(data.active_users)} icon={Users} color="#06b6d4" trend={prev ? { current: data.active_users, previous: prev.active_users } : undefined} />
+        <KpiCard label="Total Tokens" value={formatNumber(data.tokens_in + data.tokens_out)} icon={Cpu} color="#8b5cf6" trend={prev ? { current: data.tokens_in + data.tokens_out, previous: prev.tokens_in + prev.tokens_out } : undefined} />
+        <KpiCard label="Documents" value={formatNumber(data.document_count)} icon={FileText} color="#f59e0b" />
+        <KpiCard label="Failed" value={formatNumber(data.workflows_failed)} icon={XCircle} color="#ef4444" trend={prev ? { current: data.workflows_failed, previous: prev.workflows_failed, invert: true } : undefined} />
+      </div>
+
+      {/* Daily Activity Chart */}
+      {data.timeseries.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Daily Activity</div>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={data.timeseries}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={50} />
+              <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
+              <Area type="monotone" dataKey="conversations" stackId="1" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.15} name="Conversations" />
+              <Area type="monotone" dataKey="workflows_started" stackId="1" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.15} name="Workflows" />
+              <Area type="monotone" dataKey="search_runs" stackId="1" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.15} name="Searches" />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Members Table */}
+      {data.members.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+            Members ({data.members.length})
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Member</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Role</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Token Usage</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflows</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Chats</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Last Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.members.map(m => (
+                <tr key={m.user_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <UserAvatar name={m.name || m.email} />
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{m.name || 'Unknown'}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>{m.email || m.user_id}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px' }}><RoleBadge role={m.role} /></td>
+                  <td style={{ padding: '10px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+                        <div style={{ width: `${(m.tokens_total / maxMemberTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
+                      </div>
+                      <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
+                        {formatNumber(m.tokens_total)}
+                      </span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{m.workflows_run}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{m.conversations}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDate(m.last_active)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Recent Workflows */}
+      {data.recent_workflows.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+            Recent Workflows
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Workflow</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>User</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Duration</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Tokens</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.recent_workflows.map(ev => (
+                <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px' }}><StatusBadge status={ev.status} /></td>
+                  <td style={{ padding: '10px 16px', fontSize: 14 }}>{ev.title || '-'}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: '#374151' }}>{ev.user_name || ev.user_id}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(ev.duration_ms)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{formatNumber(ev.tokens_in + ev.tokens_out)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDateTime(ev.started_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function TeamsTab() {
   const [teams, setTeams] = useState<TeamLeaderboardItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
 
   useEffect(() => {
     getTeamLeaderboard().then(setTeams).finally(() => setLoading(false))
@@ -598,6 +908,10 @@ function TeamsTab() {
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading teams...</div>
 
+  if (selectedTeamId) {
+    return <TeamDrillDown teamId={selectedTeamId} onBack={() => setSelectedTeamId(null)} />
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -626,7 +940,7 @@ function TeamsTab() {
             </thead>
             <tbody>
               {filtered.map((t) => (
-                <tr key={t.team_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                <tr key={t.team_id} onClick={() => setSelectedTeamId(t.team_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div style={{
@@ -1450,7 +1764,7 @@ function ConfigTab() {
   const [showModelForm, setShowModelForm] = useState(false)
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
   const [savingModel, setSavingModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
 
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
@@ -1596,6 +1910,10 @@ function ConfigTab() {
       endpoint: m.endpoint || '',
       api_protocol: m.api_protocol || '',
       api_key: m.api_key || '',
+      speed: m.speed || '',
+      tier: m.tier || '',
+      privacy: m.privacy || '',
+      supports_structured: m.supports_structured !== false,
     })
     setEditingModelIndex(index)
     setShowModelForm(true)
@@ -2074,6 +2392,15 @@ function ConfigTab() {
                     {m.api_key && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#d1fae5', color: '#065f46', fontWeight: 600 }}>API Key</span>
                     )}
+                    {m.speed && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.speed === 'fast' ? '#d1fae5' : m.speed === 'slow' ? '#ffedd5' : '#f3f4f6', color: m.speed === 'fast' ? '#065f46' : m.speed === 'slow' ? '#9a3412' : '#6b7280', fontWeight: 600 }}>{m.speed}</span>
+                    )}
+                    {m.tier && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.tier === 'high' ? '#dbeafe' : m.tier === 'basic' ? '#fef9c3' : '#f3f4f6', color: m.tier === 'high' ? '#1e40af' : m.tier === 'basic' ? '#854d0e' : '#6b7280', fontWeight: 600 }}>{m.tier} tier</span>
+                    )}
+                    {m.privacy && (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.privacy === 'internal' ? '#d1fae5' : '#fef3c7', color: m.privacy === 'internal' ? '#065f46' : '#92400e', fontWeight: 600 }}>{m.privacy}</span>
+                    )}
                     {m.endpoint && (
                       <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
                     )}
@@ -2131,6 +2458,34 @@ function ConfigTab() {
                   <input type="password" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
+                <div>
+                  <label style={labelStyle}>Speed</label>
+                  <select value={newModel.speed} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, speed: v })) }} style={inputStyle}>
+                    <option value="">Not set</option>
+                    <option value="fast">Fast</option>
+                    <option value="standard">Standard</option>
+                    <option value="slow">Slow</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Tier</label>
+                  <select value={newModel.tier} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tier: v })) }} style={inputStyle}>
+                    <option value="">Not set</option>
+                    <option value="high">High</option>
+                    <option value="standard">Standard</option>
+                    <option value="basic">Basic</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Privacy</label>
+                  <select value={newModel.privacy} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, privacy: v })) }} style={inputStyle}>
+                    <option value="">Not set</option>
+                    <option value="internal">Internal</option>
+                    <option value="external">External</option>
+                  </select>
+                </div>
+              </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
                   <input type="checkbox" checked={newModel.external} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, external: v })) }} style={checkStyle} />
@@ -2139,6 +2494,10 @@ function ConfigTab() {
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
                   <input type="checkbox" checked={newModel.thinking} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, thinking: v })) }} style={checkStyle} />
                   Thinking
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newModel.supports_structured} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, supports_structured: v })) }} style={checkStyle} />
+                  Supports Structured Output
                 </label>
               </div>
               {error && (
@@ -2670,11 +3029,14 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>('usage')
 
   const isGlobalAdmin = !!user?.is_admin
+  const isExaminer = !!user?.is_examiner
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const hasAccess = isGlobalAdmin || isTeamAdmin
+  const hasAccess = isGlobalAdmin || isExaminer || isTeamAdmin
 
-  // Only global admins see the Config, Quality, and Demo tabs
-  const visibleTabs = isGlobalAdmin ? TABS : TABS.filter(t => t.key !== 'config' && t.key !== 'quality' && t.key !== 'demo' && t.key !== 'debugging')
+  // Examiners see analytics tabs but NOT config/quality/demo/debugging
+  const visibleTabs = isGlobalAdmin
+    ? TABS
+    : TABS.filter(t => !['config', 'quality', 'demo', 'debugging'].includes(t.key))
 
   if (!hasAccess) {
     return (
@@ -2704,7 +3066,7 @@ export default function Admin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <Shield size={20} color="#6b7280" />
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin ? 'Admin' : 'Team Admin'}
+              {isGlobalAdmin ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
             </h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>

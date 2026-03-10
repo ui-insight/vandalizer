@@ -19,6 +19,12 @@ export interface SearchResult {
   snippet: string
   num_pages: number
   created_at: string | null
+  updated_at: string | null
+  processing: boolean
+  valid: boolean
+  task_status: string | null
+  folder: string | null
+  token_count: number
 }
 
 export function searchDocuments(query: string = '', limit: number = 20) {

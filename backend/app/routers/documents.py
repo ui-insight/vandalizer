@@ -71,6 +71,12 @@ async def search_documents(
             "snippet": snippet,
             "num_pages": doc.num_pages,
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
+            "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
+            "processing": doc.processing,
+            "valid": doc.valid,
+            "task_status": doc.task_status,
+            "folder": doc.folder,
+            "token_count": doc.token_count,
         })
 
     return {"items": items, "total": len(items)}

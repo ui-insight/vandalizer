@@ -54,8 +54,9 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         outlineOffset: '-2px',
       }}
     >
-      {onToggleSelect && (
-        <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+      {/* Checkbox */}
+      <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+        {onToggleSelect && (
           <input
             type="checkbox"
             checked={!!selected}
@@ -63,8 +64,10 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
             onClick={(e) => e.stopPropagation()}
             className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
           />
-        </td>
-      )}
+        )}
+      </td>
+
+      {/* Name + icon */}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center min-w-0">
           {isTeam ? (
@@ -96,17 +99,23 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
               Team
             </span>
           )}
-
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onContextMenu(e)
-            }}
-            className="ml-2 bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded shrink-0"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
         </div>
+      </td>
+
+      {/* Modified (empty for folders) */}
+      <td style={{ padding: '12px 15px' }} />
+
+      {/* Menu */}
+      <td style={{ padding: '12px 4px', width: 40 }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onContextMenu(e)
+          }}
+          className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
       </td>
     </tr>
   )

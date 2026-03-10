@@ -32,6 +32,16 @@ export function deleteAutomation(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/automations/${id}`, { method: 'DELETE' })
 }
 
+export interface CompletedAutomation {
+  id: string
+  name: string
+  status: 'completed' | 'failed'
+  documents: { uuid: string; title: string }[]
+}
+
 export function getActiveAutomations() {
-  return apiFetch<{ active_automation_ids: string[] }>('/api/automations/active')
+  return apiFetch<{
+    active_automation_ids: string[]
+    recently_completed: CompletedAutomation[]
+  }>('/api/automations/active')
 }

@@ -84,7 +84,7 @@ export function TeamsDropdown() {
           </Link>
 
           {/* Admin: System Configuration */}
-          {user?.is_admin && (
+          {(user?.is_admin || user?.is_examiner) && (
             <>
               <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
               <Link
@@ -93,7 +93,7 @@ export function TeamsDropdown() {
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <Shield className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-                <span>Admin</span>
+                <span>{user?.is_admin ? 'Admin' : 'Analytics'}</span>
               </Link>
             </>
           )}

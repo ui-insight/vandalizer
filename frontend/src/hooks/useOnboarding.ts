@@ -28,7 +28,6 @@ const LEARN_PILLS: PillDef[] = [
   { id: 'learn-folder-watch', label: 'What are folder watch triggers?', gateFlag: null },
   { id: 'learn-m365', label: 'What are M365 intake triggers?', gateFlag: null },
   { id: 'learn-api', label: 'Can I trigger a workflow via API?', gateFlag: null },
-  { id: 'learn-schedule', label: 'Can I schedule a workflow to run automatically?', gateFlag: null },
 ]
 
 /** Deterministic shuffle seeded by day+hour so pills rotate but stay stable within the hour. */

@@ -1,5 +1,6 @@
-import { FileText, Loader2, MoreVertical, AlertTriangle } from 'lucide-react'
+import { Loader2, MoreVertical, AlertTriangle } from 'lucide-react'
 import type { Document } from '../../types/document'
+import { formatFileDate } from '../../utils/time'
 
 interface FileRowProps {
   doc: Document
@@ -28,8 +29,9 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       }}
       style={{ borderBottom: '1px solid #dddddd', cursor: 'pointer' }}
     >
-      {onToggleSelect && (
-        <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+      {/* Checkbox */}
+      <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+        {onToggleSelect && (
           <input
             type="checkbox"
             checked={!!selected}
@@ -37,28 +39,18 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             onClick={(e) => e.stopPropagation()}
             className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
           />
-        </td>
-      )}
+        )}
+      </td>
+
+      {/* Name + icon */}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center min-w-0">
-          {/* Icon */}
           {doc.processing ? (
-            <Loader2 className="h-4 w-4 animate-spin shrink-0" style={{ color: 'var(--highlight-color)' }} />
+            <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-color)' }} />
           ) : !doc.valid ? (
-            <AlertTriangle className="h-4 w-4 shrink-0 text-red-500" />
-          ) : (
-            <FileText className="h-4 w-4 shrink-0" style={{ color: 'rgb(206, 206, 206)' }} />
-          )}
-
-          {/* File name + snippet */}
-          <div
-            style={{
-              paddingLeft: 10,
-              paddingRight: 10,
-              minWidth: 0,
-              flex: 1,
-            }}
-          >
+            <AlertTriangle className="h-4 w-4 shrink-0 mr-2.5 text-red-500" />
+          ) : null}
+          <div style={{ minWidth: 0, flex: 1 }}>
             <span
               style={{
                 display: 'block',
@@ -87,36 +79,38 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               </span>
             )}
           </div>
-
-          {/* Date / status */}
-          <span
-            className="ml-2.5 shrink-0"
-            style={{
-              paddingLeft: 30,
-              paddingRight: 30,
-              color: '#17181a6e',
-              fontSize: '0.8em',
-              fontWeight: 300,
-            }}
-          >
-            {doc.processing ? (
-              <span style={{ color: 'var(--highlight-color)' }}>{doc.task_status || 'Processing...'}</span>
-            ) : (
-              doc.num_pages > 0 && `${doc.num_pages} pages`
-            )}
-          </span>
-
-          {/* Ellipsis menu */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onContextMenu(e)
-            }}
-            className="ml-2 bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded shrink-0"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
         </div>
+      </td>
+
+      {/* Modified */}
+      <td
+        style={{
+          padding: '12px 15px',
+          color: '#17181a6e',
+          fontSize: '0.8em',
+          fontWeight: 300,
+          whiteSpace: 'nowrap',
+        }}
+        title={doc.updated_at || doc.created_at || undefined}
+      >
+        {doc.processing ? (
+          <span style={{ color: 'var(--highlight-color)' }}>{doc.task_status || 'Processing...'}</span>
+        ) : (
+          (doc.updated_at || doc.created_at) && formatFileDate(doc.updated_at || doc.created_at)
+        )}
+      </td>
+
+      {/* Menu */}
+      <td style={{ padding: '12px 4px', width: 40 }}>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onContextMenu(e)
+          }}
+          className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
       </td>
     </tr>
   )

@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
+import { pollStatus } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import * as pdfjsLib from 'pdfjs-dist'
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -42,6 +45,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
+  const [isDocx, setIsDocx] = useState(false)
+  const [docxText, setDocxText] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const pdfDataRef = useRef<ArrayBuffer | null>(null)
@@ -57,6 +62,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
     let cancelled = false
     setIsPdf(null)
     setIsSpreadsheet(false)
+    setIsDocx(false)
+    setDocxText(null)
     pdfDataRef.current = null
 
     fetch(url, { credentials: 'include', method: 'HEAD' })
@@ -72,6 +79,14 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
           if (cancelled) return
           pdfDataRef.current = data
           setIsPdf(true)
+        } else if (ct.includes('wordprocessingml') || ct.includes('msword')) {
+          setIsDocx(true)
+          setIsPdf(false)
+          pollStatus(docUuid).then(res => {
+            if (!cancelled) setDocxText(res.raw_text || '')
+          }).catch(() => {
+            if (!cancelled) setDocxText('')
+          })
         } else {
           setIsPdf(false)
         }
@@ -82,6 +97,16 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
 
     return () => { cancelled = true }
   }, [url])
+
+  // Re-fetch docx text when processing completes
+  useEffect(() => {
+    if (!isDocx || processing) return
+    let cancelled = false
+    pollStatus(docUuid).then(res => {
+      if (!cancelled) setDocxText(res.raw_text || '')
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [isDocx, processing, docUuid])
 
   // Load PDF document from fetched data
   useEffect(() => {
@@ -373,9 +398,66 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
     </div>
   ) : null
 
+  // DOCX rendered HTML (must be before conditional returns for hooks rules)
+  const docxHtml = useMemo(() => {
+    if (!docxText) return ''
+    return DOMPurify.sanitize(marked.parse(docxText) as string)
+  }, [docxText])
+
   // Spreadsheet viewer for CSV / Excel
   if (isSpreadsheet) {
     return <SpreadsheetViewer docUuid={docUuid} processing={processing} taskStatus={taskStatus} />
+  }
+
+  // DOCX rendered markdown viewer
+  if (isDocx) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {processingOverlay}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
+          flexShrink: 0,
+        }}>
+          <button onClick={zoomOut} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+            <ZoomOut size={16} />
+          </button>
+          <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+            {Math.round(zoomLevel * 100)}%
+          </button>
+          <button onClick={zoomIn} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+            <ZoomIn size={16} />
+          </button>
+          <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Download original">
+            <Maximize2 size={16} />
+          </button>
+        </div>
+        <div style={{
+          flex: 1, overflow: 'auto', backgroundColor: '#fff',
+        }}>
+          {docxText === null ? (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
+              <Loader2 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : (
+            <div style={{
+              padding: '32px 48px',
+              maxWidth: 800,
+              margin: '0 auto',
+              fontSize: `${14 * zoomLevel}px`,
+              lineHeight: 1.7,
+              color: '#333',
+            }}>
+              <div
+                className="chat-markdown"
+                dangerouslySetInnerHTML={{ __html: docxHtml }}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   // Loading state

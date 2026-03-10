@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Ellipsis,
   Pin,
@@ -37,16 +38,22 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
   const [flipUp, setFlipUp] = useState(false)
 
-  useLayoutEffect(() => {
-    if (!menuOpen) { setFlipUp(false); return }
-    const el = dropdownRef.current
-    if (!el) return
-    const rect = el.getBoundingClientRect()
-    if (rect.bottom + 8 > window.innerHeight) setFlipUp(true)
-  }, [menuOpen])
+  const updateMenuPos = useCallback(() => {
+    const btn = triggerRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const shouldFlip = spaceBelow < 320
+    setFlipUp(shouldFlip)
+    setMenuPos({
+      top: shouldFlip ? rect.top : rect.bottom + 4,
+      left: rect.right - 200, // align right edge with button
+    })
+  }, [])
 
   const kindLabel =
     item.kind === 'workflow'
@@ -60,7 +67,11 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   useEffect(() => {
     if (!menuOpen) return
     const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      if (
+        menuRef.current && !menuRef.current.contains(target) &&
+        triggerRef.current && !triggerRef.current.contains(target)
+      ) {
         setMenuOpen(false)
       }
     }
@@ -192,10 +203,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             </button>
 
             {/* Ellipsis menu */}
-            <div ref={menuRef} style={{ position: 'relative', display: 'inline-block' }}>
+            <div style={{ position: 'relative', display: 'inline-block' }}>
               <button
+                ref={triggerRef}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (!menuOpen) updateMenuPos()
                   setMenuOpen(!menuOpen)
                 }}
                 style={{
@@ -214,14 +227,14 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 <Ellipsis size={14} />
               </button>
 
-              {menuOpen && (
+              {menuOpen && createPortal(
                 <div
-                  ref={dropdownRef}
+                  ref={menuRef}
                   style={{
-                    position: 'absolute',
-                    right: 0,
-                    ...(flipUp ? { bottom: '100%' } : { top: '100%' }),
-                    zIndex: 1000,
+                    position: 'fixed',
+                    left: Math.max(0, menuPos.left),
+                    ...(flipUp ? { bottom: window.innerHeight - menuPos.top + 4 } : { top: menuPos.top }),
+                    zIndex: 9999,
                     minWidth: 200,
                     borderRadius: 'var(--ui-radius, 12px)',
                     border: '1px solid rgba(0,0,0,0.15)',
@@ -427,7 +440,8 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                       setMenuOpen(false)
                     }}
                   />
-                </div>
+                </div>,
+                document.body,
               )}
             </div>
             </div>

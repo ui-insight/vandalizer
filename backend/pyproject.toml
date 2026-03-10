@@ -28,7 +28,7 @@ dependencies = [
     "msal>=1.28,<2",
     "redis>=5.0,<6",
     "slowapi>=0.1,<1",
-    "reportlab>=4.0,<5",
+    "fpdf2>=2.8.7",
 ]
 
 [project.optional-dependencies]

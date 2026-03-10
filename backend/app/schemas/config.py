@@ -10,6 +10,10 @@ class ModelInfo(BaseModel):
     tag: str = ""
     external: bool = False
     thinking: bool = False
+    speed: str = ""
+    tier: str = ""
+    privacy: str = ""
+    supports_structured: bool = True
 
 
 class UserConfigResponse(BaseModel):
