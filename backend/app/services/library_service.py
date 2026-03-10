@@ -428,7 +428,8 @@ async def rename_folder(folder_uuid: str, user_id: str, new_name: str) -> dict |
         return None
     folder.name = new_name
     await folder.save()
-    return _folder_to_dict(folder)
+    item_count = await LibraryItem.find(LibraryItem.folder == folder_uuid).count()
+    return _folder_to_dict(folder, item_count=item_count)
 
 
 async def delete_folder(folder_uuid: str, user_id: str) -> bool:
@@ -467,7 +468,20 @@ async def list_folders(
     if team_id:
         query["team"] = await _resolve_team_oid(team_id)
     folders = await LibraryFolder.find(query).to_list()
-    return [_folder_to_dict(f) for f in folders]
+
+    # Count items per folder
+    folder_uuids = [f.uuid for f in folders]
+    counts: dict[str, int] = {}
+    if folder_uuids:
+        pipeline = [
+            {"$match": {"folder": {"$in": folder_uuids}}},
+            {"$group": {"_id": "$folder", "count": {"$sum": 1}}},
+        ]
+        collection = LibraryItem.get_motor_collection()
+        results = await collection.aggregate(pipeline).to_list(length=None)
+        counts = {r["_id"]: r["count"] for r in results}
+
+    return [_folder_to_dict(f, item_count=counts.get(f.uuid, 0)) for f in folders]
 
 
 # ---------------------------------------------------------------------------
@@ -671,10 +685,11 @@ def _library_to_dict(lib: Library) -> dict:
     }
 
 
-def _folder_to_dict(folder: LibraryFolder) -> dict:
+def _folder_to_dict(folder: LibraryFolder, item_count: int = 0) -> dict:
     return {
         "uuid": folder.uuid,
         "name": folder.name,
         "parent_id": folder.parent_id,
         "scope": folder.scope.value,
+        "item_count": item_count,
     }

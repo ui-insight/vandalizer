@@ -1,26 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Plus, Loader2 } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { useAutomationActivity } from '../../hooks/useAutomationActivity'
 import type { Automation, TriggerType } from '../../types/automation'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: string }> = {
   folder_watch: { label: 'Folder Watch', color: '#1d4ed8', bg: '#dbeafe' },
   api: { label: 'API', color: '#7c3aed', bg: '#ede9fe' },
-  schedule: { label: 'Schedule', color: '#c2410c', bg: '#ffedd5' },
   m365_intake: { label: 'M365', color: '#15803d', bg: '#dcfce7' },
 }
 
-export function AutomationsPanel() {
-  const { openAutomation } = useWorkspace()
-  const { automations, loading, create } = useAutomations()
+export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
+  const { openAutomation, openAutomationId } = useWorkspace()
+  const { automations, loading, create, refresh } = useAutomations()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
-  const { activeIds } = useAutomationActivity()
+
+  // Refresh list when editor saves or closes
+  useEffect(() => {
+    if (openAutomationId === null) refresh()
+    const handler = () => refresh()
+    window.addEventListener('automations-updated', handler)
+    return () => window.removeEventListener('automations-updated', handler)
+  }, [openAutomationId])
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 

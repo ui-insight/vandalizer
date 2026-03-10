@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
-import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
+import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu, Zap, Star, Shield, Brain, ExternalLink } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 
@@ -205,22 +205,43 @@ export function ChatInput({
                   {models.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-gray-400">Loading models...</div>
                   ) : (
-                    uniqueModels.map(m => (
-                      <button
-                        key={m.tag}
-                        onClick={() => { onModelChange(m.tag); setShowModelMenu(false) }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
-                      >
-                        <Cpu className="h-3.5 w-3.5 shrink-0 text-gray-400" />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium truncate">{m.tag || m.name}</div>
-                          {m.external && <span className="text-[10px] text-gray-400">External</span>}
-                        </div>
-                        {selectedModel === m.tag && (
-                          <div className="h-2 w-2 rounded-full bg-highlight shrink-0" />
-                        )}
-                      </button>
-                    ))
+                    uniqueModels.map(m => {
+                      const pills: { icon: typeof Zap; label: string }[] = []
+                      if (m.speed) pills.push({ icon: Zap, label: m.speed })
+                      if (m.tier) pills.push({ icon: Star, label: m.tier })
+                      if (m.privacy) pills.push({ icon: Shield, label: m.privacy })
+                      if (m.thinking) pills.push({ icon: Brain, label: 'Thinking' })
+                      if (m.external) pills.push({ icon: ExternalLink, label: 'External' })
+                      return (
+                        <button
+                          key={m.tag}
+                          onClick={() => { onModelChange(m.tag); setShowModelMenu(false) }}
+                          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                        >
+                          <Cpu className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                          <div className="min-w-0 flex-1">
+                            <div className="text-sm font-medium truncate">{m.tag || m.name}</div>
+                            {pills.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {pills.map(({ icon: Icon, label }) => (
+                                  <span
+                                    key={label}
+                                    className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-medium leading-tight"
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.06)', color: '#666' }}
+                                  >
+                                    <Icon className="h-2.5 w-2.5" />
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          {selectedModel === m.tag && (
+                            <div className="h-2 w-2 rounded-full bg-highlight shrink-0" />
+                          )}
+                        </button>
+                      )
+                    })
                   )}
                 </div>
               )}

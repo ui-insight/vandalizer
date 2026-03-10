@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Clock, Zap, Copy, Check } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Zap, Copy, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { listContents } from '../../api/documents'
+import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
@@ -11,7 +12,6 @@ import type { Folder } from '../../types/document'
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
   { value: 'api', label: 'API Endpoint', icon: Globe, description: 'Trigger via HTTP POST request' },
-  { value: 'schedule', label: 'Schedule', icon: Clock, description: 'Trigger on a recurring schedule' },
 ]
 
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string; enabled: boolean }[] = [
@@ -55,6 +55,7 @@ export function AutomationEditorPanel() {
     if (!openAutomationId) return
     const updated = await updateAutomation(openAutomationId, updates)
     setAutomation(updated)
+    window.dispatchEvent(new Event('automations-updated'))
   }, [openAutomationId])
 
   const debouncedSave = useCallback((updates: Parameters<typeof updateAutomation>[1]) => {
@@ -207,6 +208,25 @@ export function AutomationEditorPanel() {
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px', minHeight: 0 }}>
+        {/* Description */}
+        <input
+          type="text"
+          defaultValue={automation.description || ''}
+          onBlur={e => {
+            const v = e.target.value.trim()
+            if (v !== (automation.description || '')) debouncedSave({ description: v || null })
+          }}
+          placeholder="Add a description..."
+          style={{
+            width: '100%', padding: '6px 0', fontSize: 13, color: '#6b7280',
+            border: 'none', borderBottom: '1px solid transparent', outline: 'none',
+            fontFamily: 'inherit', backgroundColor: 'transparent', marginBottom: 20,
+            boxSizing: 'border-box',
+          }}
+          onFocus={e => (e.currentTarget.style.borderBottomColor = '#d1d5db')}
+          onMouseLeave={e => { if (document.activeElement !== e.currentTarget) e.currentTarget.style.borderBottomColor = 'transparent' }}
+        />
+
         {/* Section A — Trigger */}
         <SectionLabel>Trigger</SectionLabel>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 32 }}>
@@ -401,24 +421,23 @@ function TriggerConfigCard({ automation, onSave }: { automation: Automation; onS
   if (automation.trigger_type === 'api') {
     return <ApiConfig automation={automation} />
   }
-  if (automation.trigger_type === 'schedule') {
-    return (
-      <div style={{
-        padding: '20px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8,
-        border: '1px solid #e5e7eb', textAlign: 'center', color: '#9ca3af', fontSize: 13,
-      }}>
-        Schedule configuration coming soon
-      </div>
-    )
-  }
   return null
 }
 
 function FolderWatchConfig({ automation, onSave }: { automation: Automation; onSave: (updates: Record<string, unknown>) => void }) {
   const config = (automation.trigger_config || {}) as Record<string, unknown>
+  const watchedFolder = (config.folder_id as string | undefined) || ''
   const fileTypes = (config.file_types as string[] | undefined) || ['pdf', 'docx', 'xlsx', 'html']
   const excludePatterns = (config.exclude_patterns as string | undefined) || ''
   const batchMode = (config.batch_mode as boolean | undefined) || false
+
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
+
+  useEffect(() => {
+    apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
+      .then(setFolders)
+      .catch(() => {})
+  }, [])
 
   const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
 
@@ -431,6 +450,24 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
 
   return (
     <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+        Watch Folder
+      </label>
+      <select
+        value={watchedFolder}
+        onChange={e => onSave({ trigger_config: { ...config, folder_id: e.target.value || undefined } })}
+        style={{
+          width: '100%', padding: '8px 12px', fontSize: 13,
+          border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+          backgroundColor: '#fff', color: '#202124', outline: 'none', marginBottom: 16,
+        }}
+      >
+        <option value="">-- Select a folder to watch --</option>
+        {folders.map(f => (
+          <option key={f.uuid} value={f.uuid}>{f.path}</option>
+        ))}
+      </select>
+
       <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         File Types
       </label>
@@ -691,13 +728,16 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
   const storage = (oc.storage || {}) as Record<string, unknown>
   const enabled = (storage.enabled as boolean) || false
   const destinationFolder = (storage.destination_folder as string) || ''
-  const format = (storage.format as string) || 'json'
+  const defaultFormat = automation.action_type === 'extraction' ? 'csv' : 'text'
+  const format = (storage.format as string) || defaultFormat
   const fileNaming = (storage.file_naming as string) || '{workflow_name}_{date}'
 
-  const [folders, setFolders] = useState<Folder[]>([])
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
 
   useEffect(() => {
-    listContents('personal').then(r => setFolders(r.folders)).catch(() => {})
+    apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
+      .then(setFolders)
+      .catch(() => {})
   }, [])
 
   const updateStorage = (patch: Record<string, unknown>) => {
@@ -734,7 +774,7 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
             >
               <option value="">-- Select folder --</option>
               {folders.map(f => (
-                <option key={f.uuid} value={f.uuid}>{f.title}</option>
+                <option key={f.uuid} value={f.uuid}>{f.path}</option>
               ))}
             </select>
           </div>
@@ -752,9 +792,22 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
                 backgroundColor: '#fff', color: '#202124', outline: 'none',
               }}
             >
-              <option value="json">JSON</option>
-              <option value="csv">CSV</option>
-              <option value="text">Plain Text</option>
+              {automation.action_type === 'extraction' ? (
+                <>
+                  <option value="csv">CSV</option>
+                  <option value="json">JSON</option>
+                  <option value="text">Plain Text</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="pdf">PDF</option>
+                </>
+              ) : (
+                <>
+                  <option value="text">Plain Text</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="pdf">PDF</option>
+                  <option value="json">JSON</option>
+                </>
+              )}
             </select>
           </div>
 

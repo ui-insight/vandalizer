@@ -2,15 +2,21 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 
 export type ToastType = 'success' | 'error' | 'info'
 
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface Toast {
   id: number
   type: ToastType
   message: string
+  action?: ToastAction
 }
 
 interface ToastContextValue {
   toasts: Toast[]
-  toast: (message: string, type?: ToastType) => void
+  toast: (message: string, type?: ToastType, action?: ToastAction) => void
   dismiss: (id: number) => void
 }
 
@@ -25,10 +31,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
 
-  const toast = useCallback((message: string, type: ToastType = 'info') => {
+  const toast = useCallback((message: string, type: ToastType = 'info', action?: ToastAction) => {
     const id = nextId++
-    setToasts(prev => [...prev, { id, type, message }])
-    setTimeout(() => dismiss(id), 4000)
+    setToasts(prev => [...prev, { id, type, message, action }])
+    setTimeout(() => dismiss(id), action ? 8000 : 4000)
   }, [dismiss])
 
   return (
@@ -58,7 +64,22 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               <span style={{ fontSize: 16 }}>
                 {t.type === 'success' ? '\u2713' : t.type === 'error' ? '\u2717' : '\u2139'}
               </span>
-              {t.message}
+              <span style={{ flex: 1 }}>
+                {t.message}
+                {t.action && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); t.action!.onClick(); dismiss(t.id) }}
+                    style={{
+                      display: 'inline', marginLeft: 8,
+                      background: 'none', border: 'none', padding: 0,
+                      font: 'inherit', fontSize: 'inherit', fontWeight: 600,
+                      color: 'inherit', textDecoration: 'underline', cursor: 'pointer',
+                    }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
+              </span>
             </div>
           ))}
         </div>

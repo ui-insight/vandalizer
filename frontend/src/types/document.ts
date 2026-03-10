@@ -8,6 +8,7 @@ export interface Document {
   task_status: string | null
   folder: string | null
   created_at: string
+  updated_at: string
   token_count: number
   num_pages: number
 }

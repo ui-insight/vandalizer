@@ -5,7 +5,9 @@ The caller must pre-fetch any async data (SystemConfig, document texts) and pass
 """
 
 import json
+import logging
 import os
+import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -13,7 +15,7 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
 from pydantic_ai import Agent
-from pydantic_ai._json_schema import InlineDefsJsonSchemaTransformer
+from app.services._json_schema_utils import inline_defs
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
 from app.services.llm_service import (
@@ -23,6 +25,8 @@ from app.services.llm_service import (
 )
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
+logger = logging.getLogger(__name__)
 
 
 class ExtractionEngine:
@@ -34,6 +38,19 @@ class ExtractionEngine:
             system_config_doc: Pre-fetched SystemConfig as a plain dict for sync access.
         """
         self._sys_cfg = system_config_doc or {}
+        self.tokens_in = 0
+        self.tokens_out = 0
+        self._usage_lock = threading.Lock()
+
+    def _record_usage(self, result) -> None:
+        """Accumulate token usage from a pydantic-ai RunResult."""
+        try:
+            usage = result.usage()
+            with self._usage_lock:
+                self.tokens_in += usage.request_tokens or 0
+                self.tokens_out += usage.response_tokens or 0
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # Public API
@@ -116,6 +133,7 @@ class ExtractionEngine:
 
         chat_agent = create_chat_agent(model, system_prompt=system_prompt, system_config_doc=self._sys_cfg)
         result = chat_agent.run_sync(prompt)
+        self._record_usage(result)
         output = result.output.replace("\\n", "").replace("```json", "").replace("```", "")
 
         if "{" in output and "}" in output:
@@ -431,7 +449,7 @@ class ExtractionEngine:
         def _build_structured_output_schema() -> dict:
             schema = ExtractionModel.model_json_schema(by_alias=True)
             if "$defs" in schema:
-                schema = InlineDefsJsonSchemaTransformer(schema).walk()
+                schema = inline_defs(schema)
             return schema
 
         api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
@@ -472,6 +490,7 @@ class ExtractionEngine:
             )
 
             result = agent.run_sync(prompt, model_settings=model_settings)
+            self._record_usage(result)
 
             if not hasattr(result, "output") or result.output is None:
                 return []
@@ -537,6 +556,7 @@ class ExtractionEngine:
                 system_config_doc=self._sys_cfg,
             )
             result = chat_agent.run_sync(prompt)
+            self._record_usage(result)
 
             output = result.output
             if "```json" in output:

@@ -73,6 +73,7 @@ async def list_contents(
                 "task_status": d.task_status,
                 "folder": d.folder,
                 "created_at": d.created_at.isoformat() if d.created_at else "",
+                "updated_at": d.updated_at.isoformat() if d.updated_at else "",
                 "token_count": d.token_count,
                 "num_pages": d.num_pages,
             }

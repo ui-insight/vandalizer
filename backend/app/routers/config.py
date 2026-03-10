@@ -43,6 +43,10 @@ async def get_models(user: User = Depends(get_current_user)):
             tag=m.get("tag", ""),
             external=m.get("external", False),
             thinking=m.get("thinking", False),
+            speed=m.get("speed", ""),
+            tier=m.get("tier", ""),
+            privacy=m.get("privacy", ""),
+            supports_structured=m.get("supports_structured", True),
         )
         for m in models
         if isinstance(m, dict)
@@ -60,6 +64,10 @@ async def get_user_config(user: User = Depends(get_current_user)):
             tag=m.get("tag", ""),
             external=m.get("external", False),
             thinking=m.get("thinking", False),
+            speed=m.get("speed", ""),
+            tier=m.get("tier", ""),
+            privacy=m.get("privacy", ""),
+            supports_structured=m.get("supports_structured", True),
         )
         for m in models
         if isinstance(m, dict)
@@ -104,6 +112,10 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
             tag=m.get("tag", ""),
             external=m.get("external", False),
             thinking=m.get("thinking", False),
+            speed=m.get("speed", ""),
+            tier=m.get("tier", ""),
+            privacy=m.get("privacy", ""),
+            supports_structured=m.get("supports_structured", True),
         )
         for m in models
         if isinstance(m, dict)

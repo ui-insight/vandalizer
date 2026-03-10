@@ -17,6 +17,7 @@ class CreateWorkflowRequest(BaseModel):
 class UpdateWorkflowRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    input_config: Optional[dict] = None
 
 
 class WorkflowResponse(BaseModel):
@@ -27,6 +28,7 @@ class WorkflowResponse(BaseModel):
     space: Optional[str] = None
     num_executions: int = 0
     steps: list[dict] = []  # Dereferenced step objects
+    input_config: dict = {}
 
 
 # ---------------------------------------------------------------------------

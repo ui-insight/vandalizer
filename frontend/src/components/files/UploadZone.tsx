@@ -15,6 +15,7 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
   const handleDrop = useCallback(
     (e: DragEvent) => {
       e.preventDefault()
+      e.stopPropagation()
       setDragOver(false)
       if (e.dataTransfer.files.length > 0) {
         onFilesSelected(e.dataTransfer.files)

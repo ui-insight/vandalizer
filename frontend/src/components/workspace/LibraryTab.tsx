@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
@@ -46,8 +47,9 @@ export function LibraryTab() {
 
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
-  const { folders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
-  const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null) // folder uuid with open menu
+  const { folders, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
+  const [folderMenuOpen, setFolderMenuOpen] = useState<string | null>(null)
+  const [folderMenuPos, setFolderMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 }) // folder uuid with open menu
   const [renamingFolder, setRenamingFolder] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [newFolderMode, setNewFolderMode] = useState(false)
@@ -129,6 +131,7 @@ export function LibraryTab() {
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
     await moveFolderItems([itemId], folderUuid)
     refreshItems()
+    refreshFolders()
   }
 
   // Apply view filter + sort (folder filtering is handled server-side via useLibraryItems)
@@ -764,10 +767,17 @@ export function LibraryTab() {
                         <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {folder.name}
                         </span>
+                        <span style={{ fontSize: 11, color: '#999', marginRight: 4, flexShrink: 0 }}>
+                          {folder.item_count}
+                        </span>
                         <button
                           className="folder-menu-btn"
                           onClick={(e) => {
                             e.stopPropagation()
+                            if (!isMenuOpen) {
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setFolderMenuPos({ top: rect.bottom + 4, left: rect.left })
+                            }
                             setFolderMenuOpen(isMenuOpen ? null : folder.uuid)
                           }}
                           style={{
@@ -789,15 +799,15 @@ export function LibraryTab() {
                       </div>
                     )}
 
-                    {/* Folder context menu */}
-                    {isMenuOpen && (
+                    {/* Folder context menu — rendered via portal to escape overflow:hidden */}
+                    {isMenuOpen && createPortal(
                       <div
                         ref={folderMenuRef}
                         style={{
-                          position: 'absolute',
-                          left: 0,
-                          top: '100%',
-                          zIndex: 1000,
+                          position: 'fixed',
+                          left: folderMenuPos.left,
+                          top: folderMenuPos.top,
+                          zIndex: 9999,
                           minWidth: 140,
                           borderRadius: 8,
                           border: '1px solid rgba(0,0,0,0.14)',
@@ -860,7 +870,8 @@ export function LibraryTab() {
                           <Trash2 style={{ width: 12, height: 12 }} />
                           Delete
                         </button>
-                      </div>
+                      </div>,
+                      document.body,
                     )}
                   </div>
                 )

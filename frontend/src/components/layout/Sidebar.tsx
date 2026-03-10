@@ -10,7 +10,7 @@ export function Sidebar() {
   const { currentTeam } = useTeams()
 
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const showAdmin = !!user?.is_admin || isTeamAdmin
+  const showAdmin = !!user?.is_admin || !!user?.is_examiner || isTeamAdmin
 
   const links = [
     { href: '/', label: 'Documents', icon: FileText },

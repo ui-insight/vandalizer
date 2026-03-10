@@ -19,6 +19,7 @@ export function LeftPanel() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [contentMatches, setContentMatches] = useState<ContentMatch[]>([])
+  const [currentFolder, setCurrentFolder] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -98,6 +99,15 @@ export function LeftPanel() {
             uuid: item.uuid,
             title: item.title,
             snippet: item.snippet,
+            extension: item.extension,
+            num_pages: item.num_pages,
+            created_at: item.created_at || '',
+            updated_at: item.updated_at || '',
+            processing: item.processing,
+            valid: item.valid,
+            task_status: item.task_status,
+            folder: item.folder,
+            token_count: item.token_count,
           }))
         )
       } catch {
@@ -217,6 +227,8 @@ export function LeftPanel() {
           <FileBrowser
             searchQuery={searchQuery}
             contentMatches={contentMatches}
+            currentFolder={currentFolder}
+            onFolderNavigate={setCurrentFolder}
             onDocClick={(doc) => {
               setViewingDoc({
                 uuid: doc.uuid,

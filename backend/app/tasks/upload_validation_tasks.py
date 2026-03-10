@@ -19,10 +19,10 @@ def _get_db():
     """Get sync pymongo database handle."""
     from pymongo import MongoClient
 
-    mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-    mongo_db = os.environ.get("MONGO_DB", "osp")
-    client = MongoClient(mongo_host)
-    return client[mongo_db]
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    return client[settings.mongo_db]
 
 
 def _get_compliance_rules() -> str:

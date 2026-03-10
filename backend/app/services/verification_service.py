@@ -224,6 +224,16 @@ async def list_verified_items(
 
     items = await LibraryItem.find(query).sort("-created_at").to_list()
 
+    # Deduplicate by (item_id, kind) — keep the first (newest) entry
+    seen: set[tuple[str, str]] = set()
+    deduped_items = []
+    for item in items:
+        key = (str(item.item_id), item.kind.value)
+        if key not in seen:
+            seen.add(key)
+            deduped_items.append(item)
+    items = deduped_items
+
     results = []
     for item in items:
         name = await _get_item_name(item.kind.value, item.item_id)
@@ -518,24 +528,31 @@ async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
 
 
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
-    """Set verified=True on all LibraryItem records and add to verified library."""
+    """Mark the underlying item as verified and add to the verified library."""
     from app.services.library_service import get_or_create_verified_library
 
-    items = await LibraryItem.find(
-        LibraryItem.item_id == item_id,
-        LibraryItem.kind == LibraryItemKind(item_kind),
-    ).to_list()
-    for item in items:
-        item.verified = True
-        await item.save()
+    # Mark verified on the underlying object (workflow / search_set)
+    if item_kind == "workflow":
+        wf = await Workflow.get(item_id)
+        if wf:
+            wf.verified = True
+            await wf.save()
+    elif item_kind == "search_set":
+        ss = await SearchSet.get(item_id)
+        if ss:
+            ss.verified = True
+            await ss.save()
 
     # Add a verified LibraryItem to the global verified library (if not already present)
     verified_lib = await get_or_create_verified_library()
+    verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
+
+    # Check if this item is already in the verified library
     existing_in_verified = await LibraryItem.find(
-        {"_id": {"$in": verified_lib.items}},
-        LibraryItem.item_id == item_id,
-        LibraryItem.kind == LibraryItemKind(item_kind),
-    ).to_list()
+        {"_id": {"$in": list(verified_item_ids)}},
+        {"item_id": item_id, "kind": item_kind},
+    ).to_list() if verified_item_ids else []
+
     if not existing_in_verified:
         now = datetime.datetime.now(datetime.timezone.utc)
         new_item = LibraryItem(

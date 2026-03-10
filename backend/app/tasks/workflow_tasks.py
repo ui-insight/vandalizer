@@ -13,13 +13,12 @@ logger = logging.getLogger(__name__)
 
 def _get_db():
     """Get sync pymongo database handle."""
-    import os
     from pymongo import MongoClient
 
-    mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-    mongo_db = os.environ.get("MONGO_DB", "osp")
-    client = MongoClient(mongo_host)
-    return client[mongo_db]
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    return client[settings.mongo_db]
 
 
 @celery_app.task(
@@ -183,14 +182,18 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         try:
             from datetime import datetime, timezone
             doc_uuids = trigger_step_data.get("doc_uuids", [])
+            usage_update = {
+                "status": "completed",
+                "finished_at": datetime.now(timezone.utc),
+                "last_updated_at": datetime.now(timezone.utc),
+                "workflow_result": ObjectId(workflow_result_id),
+                "tokens_input": engine.usage.tokens_in,
+                "tokens_output": engine.usage.tokens_out,
+                "total_tokens": engine.usage.tokens_in + engine.usage.tokens_out,
+            }
             db.activity_event.update_one(
                 {"_id": ObjectId(activity_id)},
-                {"$set": {
-                    "status": "completed",
-                    "finished_at": datetime.now(timezone.utc),
-                    "last_updated_at": datetime.now(timezone.utc),
-                    "workflow_result": ObjectId(workflow_result_id),
-                }},
+                {"$set": usage_update},
             )
             from app.tasks.activity_tasks import generate_activity_description_task
             generate_activity_description_task.delay(activity_id, "workflow_run", doc_uuids)

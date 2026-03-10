@@ -50,6 +50,7 @@ export interface Workflow {
   space: string | null;
   num_executions: number;
   steps: WorkflowStep[];
+  input_config?: { trigger_type?: string };
 }
 
 export interface WorkflowStatus {
@@ -68,6 +69,10 @@ export interface ModelInfo {
   tag: string;
   external: boolean;
   thinking: boolean;
+  speed: string;
+  tier: string;
+  privacy: string;
+  supports_structured: boolean;
 }
 
 export interface UserConfig {

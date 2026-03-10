@@ -1,5 +1,6 @@
-import { FolderOpen } from 'lucide-react'
+import { ChevronUp, ChevronDown } from 'lucide-react'
 import type { Document, Folder } from '../../types/document'
+import type { SortColumn, SortState } from './FileBrowser'
 import { FolderRow } from './FolderRow'
 import { FileRow } from './FileRow'
 import { FileBrowserTutorial } from '../workspace/FileBrowserTutorial'
@@ -17,6 +18,15 @@ interface FileListProps {
   snippets?: Map<string, string>
   onDropFile?: (fileUuid: string, folderUuid: string) => void
   highlighted?: boolean
+  sort?: SortState
+  onSort?: (column: SortColumn) => void
+}
+
+function SortIndicator({ column, sort }: { column: SortColumn; sort?: SortState }) {
+  if (!sort || sort.column !== column) return null
+  return sort.direction === 'asc'
+    ? <ChevronUp className="inline h-3.5 w-3.5 ml-0.5" />
+    : <ChevronDown className="inline h-3.5 w-3.5 ml-0.5" />
 }
 
 export function FileList({
@@ -32,6 +42,8 @@ export function FileList({
   snippets,
   onDropFile,
   highlighted,
+  sort,
+  onSort,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
     return <FileBrowserTutorial highlighted={highlighted} />
@@ -40,25 +52,54 @@ export function FileList({
   const allUuids = [...folders.map(f => f.uuid), ...documents.map(d => d.uuid)]
   const allSelected = onToggleSelect && selectedUuids && allUuids.length > 0 && allUuids.every(u => selectedUuids.has(u))
 
+  const headerStyle: React.CSSProperties = {
+    padding: '8px 15px',
+    textAlign: 'left',
+    fontSize: '0.8em',
+    fontWeight: 500,
+    color: '#6b7280',
+    cursor: onSort ? 'pointer' : undefined,
+    userSelect: 'none',
+    whiteSpace: 'nowrap',
+  }
+
   return (
     <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
-      {onToggleSelect && allUuids.length > 0 && (
-        <thead>
-          <tr style={{ borderBottom: '1px solid #dddddd' }}>
-            <th style={{ padding: '8px 0 8px 15px', width: 32 }}>
+      <colgroup>
+        <col style={{ width: 32 }} />
+        <col />
+        <col style={{ width: 140 }} />
+        <col style={{ width: 40 }} />
+      </colgroup>
+      <thead>
+        <tr style={{ borderBottom: '1px solid #dddddd' }}>
+          <th style={{ padding: '8px 0 8px 15px', width: 32 }}>
+            {onToggleSelect && allUuids.length > 0 && (
               <input
                 type="checkbox"
                 checked={!!allSelected}
                 onChange={onToggleAll}
                 className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
               />
-            </th>
-            <th style={{ padding: '8px 15px', textAlign: 'left', fontSize: '0.8em', fontWeight: 500, color: '#6b7280' }}>
-              {selectedUuids && selectedUuids.size > 0 ? `${selectedUuids.size} selected` : 'Select all'}
-            </th>
-          </tr>
-        </thead>
-      )}
+            )}
+          </th>
+          <th
+            style={headerStyle}
+            onClick={() => onSort?.('name')}
+          >
+            Name
+            <SortIndicator column="name" sort={sort} />
+          </th>
+          <th
+            style={headerStyle}
+            onClick={() => onSort?.('modified')}
+          >
+            Modified
+            <SortIndicator column="modified" sort={sort} />
+          </th>
+          <th style={{ width: 40 }} />
+        </tr>
+      </thead>
       <tbody>
         {folders.map((folder) => (
           <FolderRow

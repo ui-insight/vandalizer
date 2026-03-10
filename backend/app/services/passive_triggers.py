@@ -16,9 +16,9 @@ logger = logging.getLogger(__name__)
 def _get_db():
     from pymongo import MongoClient
 
-    mongo_host = os.environ.get("MONGO_HOST", "mongodb://localhost:27017/")
-    mongo_db = os.environ.get("MONGO_DB", "osp")
-    return MongoClient(mongo_host)[mongo_db]
+    from app.config import Settings
+    settings = Settings()
+    return MongoClient(settings.mongo_host)[settings.mongo_db]
 
 
 def create_folder_watch_trigger(workflow_doc: dict, document_doc: dict) -> dict:

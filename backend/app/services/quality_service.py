@@ -3,7 +3,10 @@
 import datetime
 import hashlib
 import json
+import logging
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from app.models.system_config import SystemConfig
 from app.models.validation_run import ValidationRun
@@ -371,8 +374,9 @@ async def generate_improvement_suggestions(
     try:
         res = await agent.run(prompt)
         return res.output
-    except Exception:
-        return "Unable to generate suggestions — the LLM returned an invalid response. Please try again."
+    except Exception as exc:
+        logger.exception("Failed to generate improvement suggestions for %s %s", item_kind, item_id)
+        return f"Unable to generate suggestions — {exc}"
 
 
 def _build_extraction_suggestion_prompt(result: dict) -> str:
