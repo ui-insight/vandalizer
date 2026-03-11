@@ -10,9 +10,9 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
     section: 'Overall Experience',
     options: [
       'Extremely Dissatisfied',
-      'Dissatisfied',
-      'Neutral',
-      'Satisfied',
+      'Somewhat Dissatisfied',
+      'Neither Satisfied nor Dissatisfied',
+      'Somewhat Satisfied',
       'Extremely Satisfied',
     ],
   },
@@ -23,11 +23,11 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
     required: true,
     section: 'Overall Experience',
     options: [
-      'Very Difficult',
-      'Difficult',
-      'Neutral',
-      'Easy',
-      'Very Easy',
+      'Very hard to use',
+      'Somewhat hard to use',
+      'Neither easy nor hard to use',
+      'Somewhat easy to use',
+      'Very easy to use',
     ],
   },
   {
@@ -40,7 +40,7 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_saved_description',
-    label: 'If yes, please describe how it saved you time',
+    label: 'How much time did it save you? Describe task and time savings.',
     type: 'textarea',
     required: false,
     section: 'Overall Experience',
@@ -103,7 +103,13 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
     type: 'select',
     required: true,
     section: 'Feedback',
-    options: ['Never', 'Rarely', 'Sometimes', 'Often'],
+    options: [
+      'Never',
+      'Rarely (less than once weekly)',
+      'Occasionally (a few times weekly)',
+      'Moderately (once daily)',
+      'Often (multiple times daily)',
+    ],
   },
 
   // --- Post-Experience Assessment ---
@@ -123,12 +129,12 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
       {
         key: 'ethics_transparency',
         label:
-          'I believe AI tools should be transparent about their limitations and potential biases',
+          'It is unethical to utilize AI without being transparent about its use and explicitly disclosing it to the recipients',
       },
       {
         key: 'environmental_ethics',
         label:
-          'I believe the environmental impact of AI (energy use, carbon footprint) should be considered when adopting AI tools',
+          'I am worried that I am ethically complicit in environmental harms when using energy-intensive AI systems',
       },
     ],
   },

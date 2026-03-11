@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
 import {
   MessageSquare,
@@ -7,68 +7,14 @@ import {
   ArrowLeft,
   Github,
   AlertCircle,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
 import { getPostQuestionnaire, submitPostQuestionnaire } from '../api/demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
+import { SurveyWizard } from '../components/survey/SurveyWizard'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
-import type { SurveyField, FeedbackInfo } from '../types/demo'
-
-// ---------------------------------------------------------------------------
-// Group fields by section
-// ---------------------------------------------------------------------------
-
-function groupBySection(fields: SurveyField[]) {
-  const sections: { name: string; fields: SurveyField[] }[] = []
-  let current: { name: string; fields: SurveyField[] } | null = null
-  for (const f of fields) {
-    const sec = f.section || ''
-    if (!current || current.name !== sec) {
-      current = { name: sec, fields: [] }
-      sections.push(current)
-    }
-    current.fields.push(f)
-  }
-  return sections
-}
-
-// ---------------------------------------------------------------------------
-// Collapsible section component
-// ---------------------------------------------------------------------------
-
-function SurveySection({
-  name,
-  children,
-  defaultOpen = true,
-}: {
-  name: string
-  children: React.ReactNode
-  defaultOpen?: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  if (!name) return <>{children}</>
-
-  return (
-    <div className="border border-white/10 rounded-xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-3 bg-white/5 hover:bg-white/10 transition-colors"
-      >
-        <span className="text-sm font-bold text-[#f1b300] uppercase tracking-wide">{name}</span>
-        {open ? (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        )}
-      </button>
-      {open && <div className="p-5 space-y-5">{children}</div>}
-    </div>
-  )
-}
+import { groupBySection } from '../lib/survey'
+import type { FeedbackInfo } from '../types/demo'
 
 // ---------------------------------------------------------------------------
 // Main feedback page
@@ -106,8 +52,7 @@ export default function DemoFeedback() {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function handleSubmit() {
     setError('')
     setSubmitting(true)
     try {
@@ -121,6 +66,27 @@ export default function DemoFeedback() {
   }
 
   const sections = groupBySection(POST_SURVEY_FIELDS)
+
+  const steps = sections.map((sec) => ({
+    title: sec.name,
+    content: (
+      <>
+        {sec.fields.map((field) => (
+          <div key={field.key}>
+            <label className="block text-sm font-medium text-gray-300 mb-2">
+              {field.label}
+              {field.required ? ' *' : ''}
+            </label>
+            <SurveyFieldRenderer
+              field={field}
+              value={answers[field.key]}
+              onChange={updateAnswer}
+            />
+          </div>
+        ))}
+      </>
+    ),
+  }))
 
   return (
     <div className="bg-[#0a0a0a] text-gray-200 antialiased min-h-screen">
@@ -192,47 +158,14 @@ export default function DemoFeedback() {
                 )}
               </div>
 
-              {error && (
-                <div className="mb-6 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
-                  {error}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {sections.map((sec) => (
-                  <SurveySection key={sec.name} name={sec.name}>
-                    {sec.fields.map((field) => (
-                      <div key={field.key}>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">
-                          {field.label}
-                          {field.required ? ' *' : ''}
-                        </label>
-                        <SurveyFieldRenderer
-                          field={field}
-                          value={answers[field.key]}
-                          onChange={updateAnswer}
-                        />
-                      </div>
-                    ))}
-                  </SurveySection>
-                ))}
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" /> Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="w-5 h-5" /> Submit Feedback
-                    </>
-                  )}
-                </button>
-              </form>
+              <SurveyWizard
+                steps={steps}
+                onSubmit={handleSubmit}
+                submitting={submitting}
+                submitLabel="Submit Feedback"
+                submitIcon={CheckCircle}
+                error={error}
+              />
             </div>
           )}
         </div>
