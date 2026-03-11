@@ -344,7 +344,7 @@ export default function Landing() {
               to="/demo"
               className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-[#f1b300]/30"
             >
-              Try the Free Demo
+              Try the Free Trial
               <span className="text-[#f1b300]">&rarr;</span>
             </Link>
           </div>

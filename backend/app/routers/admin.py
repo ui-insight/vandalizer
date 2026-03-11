@@ -244,7 +244,7 @@ async def usage_stats(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
     query_filter: dict = {"started_at": {"$gte": cutoff}}
     if team_scope:
         query_filter["team_id"] = team_scope
@@ -302,7 +302,7 @@ async def usage_timeseries(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.utcnow()
     cutoff = now - datetime.timedelta(days=days)
     prev_cutoff = cutoff - datetime.timedelta(days=days)
 
@@ -332,8 +332,6 @@ async def usage_timeseries(
         ts = ev.started_at
         if not ts:
             continue
-        if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=datetime.timezone.utc)
         day_str = ts.strftime("%Y-%m-%d")
 
         if ts >= cutoff:
@@ -553,7 +551,7 @@ async def team_detail(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.utcnow()
     cutoff = now - datetime.timedelta(days=days)
     prev_cutoff = cutoff - datetime.timedelta(days=days)
 
@@ -744,7 +742,7 @@ async def user_detail(
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.utcnow()
     cutoff = now - datetime.timedelta(days=days)
     prev_cutoff = cutoff - datetime.timedelta(days=days)
 

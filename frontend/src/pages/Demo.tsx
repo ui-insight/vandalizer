@@ -10,12 +10,12 @@ import {
   FileText,
   Cpu,
   Github,
-  ChevronDown,
-  ChevronRight,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
 import { submitDemoApplication, getWaitlistStatus } from '../api/demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
+import { SurveyWizard, type WizardStep } from '../components/survey/SurveyWizard'
+import { groupBySection } from '../lib/survey'
 import type { SurveyField, WaitlistStatusResponse } from '../types/demo'
 
 // ---------------------------------------------------------------------------
@@ -171,10 +171,10 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
     required: true,
     section: 'AI Experience',
     options: [
-      'No experience',
-      'Less than 1 year',
-      '1-2 years',
-      '2-5 years',
+      'I have no experience with AI',
+      'Less than a year',
+      '1 - 2 years',
+      '3 - 4 years',
       '5+ years',
     ],
   },
@@ -200,7 +200,13 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
     type: 'select',
     required: true,
     section: 'AI Experience',
-    options: ['Never', 'Rarely', 'Sometimes', 'Often'],
+    options: [
+      'Never',
+      'Rarely (less than once weekly)',
+      'Occasionally (a few times weekly)',
+      'Moderately (once daily)',
+      'Often (multiple times daily)',
+    ],
   },
 
   // --- Pre-Experience Assessment ---
@@ -220,70 +226,16 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
       {
         key: 'ethics_transparency',
         label:
-          'I believe AI tools should be transparent about their limitations and potential biases',
+          'It is unethical to utilize AI without being transparent about its use and explicitly disclosing it to the recipients',
       },
       {
         key: 'environmental_ethics',
         label:
-          'I believe the environmental impact of AI (energy use, carbon footprint) should be considered when adopting AI tools',
+          'I am worried that I am ethically complicit in environmental harms when using energy-intensive AI systems',
       },
     ],
   },
 ]
-
-// ---------------------------------------------------------------------------
-// Group fields by section
-// ---------------------------------------------------------------------------
-
-function groupBySection(fields: SurveyField[]) {
-  const sections: { name: string; fields: SurveyField[] }[] = []
-  let current: { name: string; fields: SurveyField[] } | null = null
-  for (const f of fields) {
-    const sec = f.section || ''
-    if (!current || current.name !== sec) {
-      current = { name: sec, fields: [] }
-      sections.push(current)
-    }
-    current.fields.push(f)
-  }
-  return sections
-}
-
-// ---------------------------------------------------------------------------
-// Collapsible section component
-// ---------------------------------------------------------------------------
-
-function SurveySection({
-  name,
-  children,
-  defaultOpen = true,
-}: {
-  name: string
-  children: React.ReactNode
-  defaultOpen?: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-
-  if (!name) return <>{children}</>
-
-  return (
-    <div className="border border-white/10 rounded-xl overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-3 bg-white/5 hover:bg-white/10 transition-colors"
-      >
-        <span className="text-sm font-bold text-[#f1b300] uppercase tracking-wide">{name}</span>
-        {open ? (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        )}
-      </button>
-      {open && <div className="p-5 space-y-5">{children}</div>}
-    </div>
-  )
-}
 
 // ---------------------------------------------------------------------------
 // Waitlist status check component
@@ -381,8 +333,7 @@ export default function Demo() {
     setAnswers((prev) => ({ ...prev, [key]: value }))
   }
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
+  async function handleSubmit() {
     setError('')
     setSubmitting(true)
     try {
@@ -403,7 +354,81 @@ export default function Demo() {
     }
   }
 
+  const INPUT_CLASS =
+    'w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50'
+
   const sections = groupBySection(PRE_SURVEY_FIELDS)
+
+  const steps: WizardStep[] = [
+    {
+      title: 'Your Info',
+      content: (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Full Name *</label>
+            <input
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g., Grants Manager, Research Coordinator..."
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={INPUT_CLASS}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-2">University / Organization *</label>
+            <input
+              type="text"
+              required
+              value={organization}
+              onChange={(e) => setOrganization(e.target.value)}
+              placeholder="e.g., University of Idaho"
+              className={INPUT_CLASS}
+            />
+          </div>
+        </>
+      ),
+    },
+    ...sections.map((sec) => ({
+      title: sec.name,
+      content: (
+        <>
+          {sec.fields.map((field) => (
+            <div key={field.key}>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {field.label}
+                {field.required ? ' *' : ''}
+              </label>
+              <SurveyFieldRenderer
+                field={field}
+                value={answers[field.key]}
+                onChange={updateAnswer}
+              />
+            </div>
+          ))}
+        </>
+      ),
+    })),
+  ]
 
   return (
     <div className="bg-[#0a0a0a] text-gray-200 antialiased min-h-screen">
@@ -438,14 +463,14 @@ export default function Demo() {
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#f1b300]/10 border border-[#f1b300]/20 mb-8">
               <span className="flex h-2 w-2 rounded-full bg-[#f1b300] animate-pulse" />
               <span className="text-sm font-bold text-[#f1b300] tracking-wide uppercase">
-                Free 2-Week Demo
+                Free Two Week Trial
               </span>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-6">
               Try Vandalizer for Free
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed">
-              Get full platform access for 2 weeks. Upload documents, build workflows,
+              Get full platform access for a two week trial. Upload documents, build workflows,
               and experience AI-powered knowledge extraction firsthand.
             </p>
           </div>
@@ -490,97 +515,17 @@ export default function Demo() {
             <div className="max-w-2xl mx-auto">
               <div className="p-8 rounded-2xl border border-white/10 bg-white/5">
                 <h2 className="text-2xl font-bold text-white mb-6 text-center">
-                  Request Demo Access
+                  Request Trial Access
                 </h2>
 
-                {error && (
-                  <div className="mb-6 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
-                    {error}
-                  </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-5">
-                  {/* Core identity fields */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Full Name *</label>
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
-                    <input
-                      type="text"
-                      value={title}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g., Grants Manager, Research Coordinator..."
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
-                    <input
-                      type="email"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">University / Organization *</label>
-                    <input
-                      type="text"
-                      required
-                      value={organization}
-                      onChange={(e) => setOrganization(e.target.value)}
-                      placeholder="e.g., University of Idaho"
-                      className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
-                    />
-                  </div>
-
-                  {/* Survey sections */}
-                  {sections.map((sec) => (
-                    <SurveySection key={sec.name} name={sec.name}>
-                      {sec.fields.map((field) => (
-                        <div key={field.key}>
-                          <label className="block text-sm font-medium text-gray-300 mb-2">
-                            {field.label}
-                            {field.required ? ' *' : ''}
-                          </label>
-                          <SurveyFieldRenderer
-                            field={field}
-                            value={answers[field.key]}
-                            onChange={updateAnswer}
-                          />
-                        </div>
-                      ))}
-                    </SurveySection>
-                  ))}
-
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" /> Submitting...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-5 h-5" /> Request Demo Access
-                      </>
-                    )}
-                  </button>
-                </form>
+                <SurveyWizard
+                  steps={steps}
+                  onSubmit={handleSubmit}
+                  submitting={submitting}
+                  submitLabel="Request Trial Access"
+                  submitIcon={Send}
+                  error={error}
+                />
               </div>
 
               <StatusCheck />

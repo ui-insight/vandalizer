@@ -52,18 +52,18 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true },
   { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true },
   { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true },
-  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: true },
+  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false },
   { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true },
   { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true },
-  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: true },
-  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: true },
+  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: false },
+  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false },
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true },
   { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true },
   { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true },
   { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
   { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true },
-  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: true },
+  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -1229,30 +1229,29 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
 
         {/* Task cards grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
+          {/* Enabled tasks */}
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
             gap: 12,
           }}>
-            {filteredTypes.map(taskType => {
+            {filteredTypes.filter(t => t.enabled).map(taskType => {
               const Icon = taskType.icon
               return (
                 <button
                   key={taskType.name}
-                  onClick={() => taskType.enabled && onSelect(taskType)}
-                  disabled={!taskType.enabled}
+                  onClick={() => onSelect(taskType)}
                   style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
                     padding: 16, border: '1px solid #e5e7eb',
                     borderRadius: 'var(--ui-radius, 8px)',
                     backgroundColor: '#fff',
-                    cursor: taskType.enabled ? 'pointer' : 'default',
-                    opacity: taskType.enabled ? 1 : 0.4,
+                    cursor: 'pointer',
                     fontFamily: 'inherit',
                     transition: 'box-shadow 0.15s',
                   }}
                   onMouseEnter={e => {
-                    if (taskType.enabled) (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.boxShadow = 'none'
@@ -1260,24 +1259,71 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
                 >
                   <div style={{
                     width: 40, height: 40, borderRadius: 8,
-                    backgroundColor: taskType.enabled ? taskType.color + '15' : '#f3f4f6',
+                    backgroundColor: taskType.color + '15',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Icon style={{ width: 20, height: 20, color: taskType.enabled ? taskType.color : '#9ca3af' }} />
+                    <Icon style={{ width: 20, height: 20, color: taskType.color }} />
                   </div>
                   <span style={{
                     fontSize: 12, fontWeight: 600, textAlign: 'center',
-                    color: taskType.enabled ? '#202124' : '#9ca3af',
+                    color: '#202124',
                   }}>
                     {taskType.label}
                   </span>
-                  {!taskType.enabled && (
-                    <span style={{ fontSize: 10, color: '#9ca3af' }}>Coming soon</span>
-                  )}
                 </button>
               )
             })}
           </div>
+
+          {/* Coming Soon section */}
+          {filteredTypes.some(t => !t.enabled) && (
+            <>
+              <div style={{
+                margin: '24px 0 12px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+                color: '#9ca3af', letterSpacing: '0.5px',
+              }}>
+                Coming Soon
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+                gap: 12,
+              }}>
+                {filteredTypes.filter(t => !t.enabled).map(taskType => {
+                  const Icon = taskType.icon
+                  return (
+                    <button
+                      key={taskType.name}
+                      disabled
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+                        padding: 16, border: '1px solid #e5e7eb',
+                        borderRadius: 'var(--ui-radius, 8px)',
+                        backgroundColor: '#fff',
+                        cursor: 'default',
+                        opacity: 0.4,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <div style={{
+                        width: 40, height: 40, borderRadius: 8,
+                        backgroundColor: '#f3f4f6',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <Icon style={{ width: 20, height: 20, color: '#9ca3af' }} />
+                      </div>
+                      <span style={{
+                        fontSize: 12, fontWeight: 600, textAlign: 'center',
+                        color: '#9ca3af',
+                      }}>
+                        {taskType.label}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
