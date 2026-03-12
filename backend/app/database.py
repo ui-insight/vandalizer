@@ -32,6 +32,7 @@ from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, GraphSubscription, M365AuditEntry
+from app.models.certification import CertificationProgress
 
 ALL_MODELS = [
     User,
@@ -79,6 +80,7 @@ ALL_MODELS = [
     WorkflowTriggerEvent,
     GraphSubscription,
     M365AuditEntry,
+    CertificationProgress,
 ]
 
 

@@ -25,6 +25,7 @@ const Verification = lazy(() => import('./pages/Verification'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
+const Certification = lazy(() => import('./pages/Certification'))
 
 // ---------------------------------------------------------------------------
 // Route tree
@@ -224,6 +225,16 @@ const demoFeedbackRoute = createRoute({
   component: DemoFeedback,
 })
 
+const certificationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/certification',
+  component: () => (
+    <ProtectedRoute>
+      <Certification />
+    </ProtectedRoute>
+  ),
+})
+
 const demoStatusRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/demo/status/$uuid',
@@ -248,6 +259,7 @@ const routeTree = rootRoute.addChildren([
   spacesRoute,
   verificationRoute,
   docsRoute,
+  certificationRoute,
   demoRoute,
   demoFeedbackRoute,
   demoStatusRoute,
