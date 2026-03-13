@@ -3,6 +3,8 @@ import { RouterProvider } from '@tanstack/react-router'
 import { AuthProvider } from './contexts/AuthContext'
 import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
+import { CertificationPanelProvider } from './contexts/CertificationPanelContext'
+import { CertificationPanel } from './components/certification/CertificationPanel'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
 import { getContrastTextColor, getComplementaryColor } from './utils/color'
@@ -30,7 +32,10 @@ export default function App() {
     <AuthProvider>
       <TeamProvider>
         <ToastProvider>
-          <RouterProvider router={router} />
+          <CertificationPanelProvider>
+            <RouterProvider router={router} />
+            <CertificationPanel />
+          </CertificationPanelProvider>
         </ToastProvider>
       </TeamProvider>
     </AuthProvider>
