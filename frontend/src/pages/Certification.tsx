@@ -26,7 +26,7 @@ import { LEVEL_CONFIG, LEVEL_THRESHOLDS, TOTAL_XP, TIERS } from '../components/c
 // Module definitions
 // ---------------------------------------------------------------------------
 
-const MODULES: ModuleDefinition[] = [
+export const MODULES: ModuleDefinition[] = [
   {
     id: 'ai_literacy',
     number: 0,

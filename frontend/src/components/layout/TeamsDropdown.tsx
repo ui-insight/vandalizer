@@ -3,10 +3,12 @@ import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, C
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
+import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
   const { user, logout } = useAuth()
+  const certPanel = useCertificationPanel()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -84,14 +86,16 @@ export function TeamsDropdown() {
           </Link>
 
           {/* Certification */}
-          <Link
-            to="/certification"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+          <button
+            onClick={() => {
+              certPanel.openPanel()
+              setOpen(false)
+            }}
+            className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
           >
             <Award className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>Certification</span>
-          </Link>
+          </button>
 
           {/* Admin: System Configuration */}
           {(user?.is_admin || user?.is_examiner) && (

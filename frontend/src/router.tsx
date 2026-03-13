@@ -1,12 +1,14 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import {
   createRootRoute,
   createRoute,
   createRouter,
   Navigate,
   Outlet,
+  useNavigate,
 } from '@tanstack/react-router'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { useCertificationPanel } from './contexts/CertificationPanelContext'
 import { Workspace } from './pages/Workspace'
 import { TeamSettings } from './pages/TeamSettings'
 
@@ -25,7 +27,13 @@ const Verification = lazy(() => import('./pages/Verification'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
-const Certification = lazy(() => import('./pages/Certification'))
+// Certification is now a dockable panel — this redirect opens it from old bookmarks
+function CertificationRedirect() {
+  const { openPanel } = useCertificationPanel()
+  const navigate = useNavigate()
+  useEffect(() => { openPanel(); navigate({ to: '/' }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  return null
+}
 
 // ---------------------------------------------------------------------------
 // Route tree
@@ -230,7 +238,7 @@ const certificationRoute = createRoute({
   path: '/certification',
   component: () => (
     <ProtectedRoute>
-      <Certification />
+      <CertificationRedirect />
     </ProtectedRoute>
   ),
 })
