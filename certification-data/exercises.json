@@ -1,0 +1,238 @@
+{
+  "ai_literacy": {
+    "documents": [],
+    "instructions": [
+      "Read through all 6 lessons in the **Learn** tab to build your understanding of AI for research administration.",
+      "When ready, switch to the **Challenge** tab.",
+      "Complete the **Self-Assessment** by answering all 3 reflection questions.",
+      "Click **Submit Self-Assessment** to save your answers.",
+      "Click **Check Progress** to verify completion, then **Complete Module** to earn your 50 XP."
+    ],
+    "expected_fields": [],
+    "expected_values": {},
+    "star_criteria": {
+      "3": "Complete all 3 self-assessment reflection questions (everyone earns 3 stars)"
+    }
+  },
+  "process_mapping": {
+    "documents": [],
+    "instructions": [
+      "Read through all 6 lessons in the **Learn** tab to build your process thinking skills.",
+      "Think about a specific repetitive task your team does that involves processing documents.",
+      "Switch to the **Challenge** tab and complete the **Process Reflection** by answering all 4 questions.",
+      "Click **Submit** to save your answers.",
+      "Click **Check Progress** to verify completion, then **Complete Module** to earn your 100 XP."
+    ],
+    "expected_fields": [],
+    "expected_values": {},
+    "star_criteria": {
+      "3": "Complete all 4 process reflection questions (everyone earns 3 stars)"
+    }
+  },
+  "workflow_design": {
+    "documents": [],
+    "instructions": [
+      "Read through all 6 lessons in the **Learn** tab to understand workflow design principles.",
+      "Think about how you would translate one of your team's processes into a workflow architecture.",
+      "Switch to the **Challenge** tab and complete the **Design Reflection** by answering all 4 questions.",
+      "Click **Submit** to save your answers.",
+      "Click **Check Progress** to verify completion, then **Complete Module** to earn your 100 XP."
+    ],
+    "expected_fields": [],
+    "expected_values": {},
+    "star_criteria": {
+      "3": "Complete all 4 design reflection questions (everyone earns 3 stars)"
+    }
+  },
+  "foundations": {
+    "documents": ["nsf-proposal-alpine-ecology.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add the sample NSF proposal to your Certification Lab space.",
+      "Go to the **Certification Lab** space and open the **Workflows** page.",
+      "Create a workflow named **NSF Proposal Extractor**.",
+      "Add a step with an **Extraction** task.",
+      "Create a SearchSet with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
+      "Run the workflow against **nsf-proposal-alpine-ecology.pdf**.",
+      "Verify: PI Name = Sarah Chen, Total Budget = $485,000."
+    ],
+    "expected_fields": ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"],
+    "expected_values": {
+      "PI Name": ["Sarah Chen", "Dr. Sarah Chen"],
+      "Institution": ["University of Idaho"],
+      "Total Budget": ["$485,000", "485000", "485,000"],
+      "Sponsoring Agency": ["NSF", "National Science Foundation"]
+    },
+    "star_criteria": {
+      "1": "Extract 3+ required fields and run the workflow",
+      "2": "Extract all 5 required fields",
+      "3": "Extract 8+ fields including Co-PI, Abstract, Program Officer"
+    }
+  },
+  "extraction_engine": {
+    "documents": ["nih-r01-neuroscience.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add the sample NIH R01 proposal to your Certification Lab space.",
+      "Create a new SearchSet with 15+ fields covering all sections of the NIH proposal.",
+      "Include fields for: PI, institution, grant number, budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.",
+      "Create a workflow with an Extraction task using your comprehensive SearchSet.",
+      "Run the workflow against **nih-r01-neuroscience.pdf**.",
+      "Review the results — verify PI Name = James Park, Total Budget = $1,250,000."
+    ],
+    "expected_fields": [
+      "PI Name", "Institution", "Grant Number", "Project Title", "Project Period",
+      "Total Budget", "Personnel Costs", "Equipment Costs", "Travel Costs",
+      "Supplies Costs", "Indirect Costs", "Indirect Cost Rate",
+      "Specific Aims", "Human Subjects", "Vertebrate Animals",
+      "Key Personnel", "Department", "Sponsoring Agency", "FOA Number", "Study Section"
+    ],
+    "expected_values": {
+      "PI Name": ["James Park", "Dr. James Park"],
+      "Institution": ["University of Idaho"],
+      "Grant Number": ["1R01NS123456-01"],
+      "Total Budget": ["$1,250,000", "1250000", "1,250,000"],
+      "Personnel Costs": ["$625,000", "625000", "625,000"],
+      "Sponsoring Agency": ["NIH", "National Institutes of Health"]
+    },
+    "star_criteria": {
+      "1": "Extract 15+ fields from the NIH proposal",
+      "2": "Extract 20+ fields including all budget categories",
+      "3": "Extract 25+ fields with enum values and optional field configuration"
+    }
+  },
+  "multi_step": {
+    "documents": ["subaward-agreement.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add the sample subaward agreement to your Certification Lab space.",
+      "Create a 3-step workflow:",
+      "  **Step 1** — Extraction: Create a SearchSet with fields for parties, amounts, period, PI, deliverables, and compliance terms.",
+      "  **Step 2** — Prompt: Write a prompt that analyzes the extracted subaward data and identifies key obligations and deadlines.",
+      "  **Step 3** — Formatter: Format the analysis into a structured compliance summary report.",
+      "Run the workflow against **subaward-agreement.pdf**.",
+      "Verify the pipeline chains correctly: extraction → analysis → formatted report."
+    ],
+    "expected_fields": [
+      "Prime Recipient", "Subrecipient", "Subaward Amount", "Performance Period",
+      "PI Name", "Deliverables", "Reporting Schedule", "Compliance Requirements"
+    ],
+    "expected_values": {
+      "Prime Recipient": ["University of Idaho"],
+      "Subrecipient": ["Boise State University"],
+      "Subaward Amount": ["$185,000", "185000", "185,000"],
+      "PI Name": ["Sarah Chen", "Dr. Sarah Chen"]
+    },
+    "star_criteria": {
+      "1": "Build a 3-step workflow with Extraction + Prompt + Formatter",
+      "2": "Build a 4+ step workflow with clear data flow between steps",
+      "3": "Build a 5+ step workflow using 4+ different task types"
+    }
+  },
+  "advanced_nodes": {
+    "documents": ["budget-justification.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add the sample budget justification to your Certification Lab space.",
+      "Create a workflow that processes the budget document using advanced nodes:",
+      "  **Step 1** — Extraction: Extract salary table, supply costs, travel, subawards, and indirect costs.",
+      "  **Step 2** — Code Execution: Write Python to sum line items and verify totals match the stated budget.",
+      "  **Step 3** — Add a second task in Step 2 (parallel): Use a Prompt task to generate a budget narrative summary.",
+      "Run the workflow against **budget-justification.pdf**.",
+      "Verify the Code Execution node produces computed totals and the parallel tasks both complete."
+    ],
+    "expected_fields": [
+      "Personnel", "Fringe Benefits", "Supplies", "Travel", "Subaward Costs",
+      "Indirect Costs", "Indirect Cost Rate", "Total Direct Costs", "Total Budget"
+    ],
+    "expected_values": {
+      "Total Budget": ["$542,800", "542800", "542,800"],
+      "Indirect Cost Rate": ["52%", "52", "0.52"]
+    },
+    "star_criteria": {
+      "1": "Use an advanced node type (Code, API, Research, Crawler, or Browser) + parallel tasks",
+      "2": "Use 2+ different advanced node types",
+      "3": "Run 3+ parallel tasks within a single step"
+    }
+  },
+  "output_delivery": {
+    "documents": ["progress-report-year2.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add the sample progress report to your Certification Lab space.",
+      "Create a workflow that produces a downloadable deliverable from the progress report:",
+      "  **Step 1** — Extraction: Extract accomplishments, publications, students trained, budget expenditures, and milestones.",
+      "  **Step 2** — Prompt: Summarize the progress and highlight key achievements.",
+      "  **Step 3** — Document Renderer or Data Export: Produce a downloadable report or CSV export.",
+      "Run the workflow against **progress-report-year2.pdf**.",
+      "Download the output file and verify it contains the extracted data."
+    ],
+    "expected_fields": [
+      "Project Title", "PI Name", "Reporting Period", "Accomplishments",
+      "Publications", "Students Trained", "Budget Spent", "Remaining Budget", "Upcoming Milestones"
+    ],
+    "expected_values": {
+      "PI Name": ["Sarah Chen", "Dr. Sarah Chen"],
+      "Project Title": ["Alpine Ecosystem Response to Climate Change"],
+      "Budget Spent": ["$287,500", "287500", "287,500"]
+    },
+    "star_criteria": {
+      "1": "Use a Document Renderer, Data Export, Package Builder, or Form Filler and run the workflow",
+      "2": "Use 2+ different output node types",
+      "3": "Use a Package Builder to create a ZIP archive with multiple output files"
+    }
+  },
+  "validation_qa": {
+    "documents": ["nsf-proposal-alpine-ecology.pdf"],
+    "instructions": [
+      "This module reuses the NSF proposal from Module 1 (already in your Certification Lab if you completed that module).",
+      "Open the workflow you created in Module 1 (or create a new one for this document).",
+      "Go to the **Validate** tab in the workflow editor.",
+      "Create a validation plan with at least 2 quality checks (e.g., 'PI Name is not null', 'Total Budget is a valid number').",
+      "Run validation against the NSF proposal document.",
+      "Review the validation results — check which quality checks passed and which failed.",
+      "Iterate on your extraction if needed to improve validation scores."
+    ],
+    "expected_fields": [],
+    "expected_values": {},
+    "star_criteria": {
+      "1": "Create a validation plan with 2+ checks and run a validated workflow",
+      "2": "Create a validation plan with 5+ quality checks",
+      "3": "Create a validation plan with 8+ checks covering completeness, accuracy, and format"
+    }
+  },
+  "batch_processing": {
+    "documents": ["proposal-batch-1.pdf", "proposal-batch-2.pdf", "proposal-batch-3.pdf"],
+    "instructions": [
+      "Click **Set Up Lab** to add three sample NSF proposals to your Certification Lab space.",
+      "Use an existing extraction workflow (from Module 1 or 2) or create a new one.",
+      "Select all three batch documents: **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, **proposal-batch-3.pdf**.",
+      "Run the workflow in **Batch** mode.",
+      "Monitor the batch progress as each document is processed.",
+      "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
+    ],
+    "expected_fields": ["PI Name", "Institution", "Total Budget", "Research Area", "Sponsoring Agency"],
+    "expected_values": {
+      "PI Name": ["Maria Lopez", "Robert Kim", "Amara Okafor"]
+    },
+    "star_criteria": {
+      "1": "Run a batch of 3+ documents with all completing successfully",
+      "2": "Run a batch of 5+ documents",
+      "3": "Run a batch of 10+ documents"
+    }
+  },
+  "governance": {
+    "documents": [],
+    "instructions": [
+      "This module uses workflows you've already built — no new documents needed.",
+      "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
+      "Build or duplicate a workflow in your second space.",
+      "Ensure your workflow has a clear description explaining what it does.",
+      "Mark the workflow as **verified** in the workflow settings.",
+      "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
+      "You now have a verified, portable, well-documented workflow."
+    ],
+    "expected_fields": [],
+    "expected_values": {},
+    "star_criteria": {
+      "1": "Mark a workflow as verified and use workflows across 2+ spaces",
+      "2": "Have 2+ verified workflows",
+      "3": "Have 3+ verified workflows across 3+ spaces"
+    }
+  }
+}

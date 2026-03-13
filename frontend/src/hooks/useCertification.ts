@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import * as api from '../api/certification'
-import type { CertificationProgress, ValidationResult, CompletionResult } from '../types/certification'
+import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise } from '../types/certification'
 
 export function useCertification() {
   const [progress, setProgress] = useState<CertificationProgress | null>(null)
@@ -28,5 +28,21 @@ export function useCertification() {
     return result
   }
 
-  return { progress, loading, refresh, validate, complete }
+  const provision = async (moduleId: string) => {
+    const result = await api.provisionModule(moduleId)
+    await refresh()
+    return result
+  }
+
+  const getExercise = useCallback(async (moduleId: string): Promise<CertExercise> => {
+    return api.getExercise(moduleId)
+  }, [])
+
+  const submitAssessment = async (moduleId: string, answers: Record<string, string>) => {
+    const result = await api.submitAssessment(moduleId, answers)
+    await refresh()
+    return result
+  }
+
+  return { progress, loading, refresh, validate, complete, provision, getExercise, submitAssessment }
 }
