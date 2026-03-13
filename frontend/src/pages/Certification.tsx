@@ -1,31 +1,36 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Award,
   BookOpen,
   Check,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Cog,
+  Compass,
   FileOutput,
   Flame,
   FlaskConical,
   FolderGit2,
   Layers,
   Lightbulb,
+  Loader2,
   Lock,
   Play,
   Puzzle,
+  Search,
   ShieldCheck,
   Sparkles,
   Star,
   Target,
+  Upload,
   X,
   Zap,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useCertification } from '../hooks/useCertification'
 import { cn } from '../lib/cn'
-import type { ModuleDefinition, LessonSection, ValidationResult, CompletionResult, ValidationCheck } from '../types/certification'
+import type { ModuleDefinition, LessonSection, ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../types/certification'
 
 // ---------------------------------------------------------------------------
 // Module definitions
@@ -33,20 +38,71 @@ import type { ModuleDefinition, LessonSection, ValidationResult, CompletionResul
 
 const MODULES: ModuleDefinition[] = [
   {
+    id: 'ai_literacy',
+    number: 0,
+    title: 'AI Literacy',
+    subtitle: 'Understanding AI for Research Administration',
+    description: 'Welcome to the Vandal Workflow Architect certification. By the end of this program, you\'ll earn an official VWA credential recognizing your ability to design and deploy AI-powered workflows for research administration. This first module builds your foundation — what AI actually is, what it\'s good and bad at, and how it applies to your work. No technical skills required yet.',
+    objectives: [
+      'Understand what an LLM is and how it generates text',
+      'Learn the key terms you\'ll encounter throughout this certification',
+      'Reflect on your own experience and comfort level with AI tools',
+    ],
+    tips: [
+      'There are no wrong answers on the self-assessment — it\'s for your own reflection',
+      'The key terms in this module will come up repeatedly in later modules',
+      'If you\'re skeptical about AI, that\'s healthy — this module is designed to give you an honest picture',
+    ],
+    lessons: [
+      {
+        title: 'What is an LLM, really?',
+        content: 'A Large Language Model (LLM) is not thinking. It is not sentient. It does not understand your documents the way you do.\n\nAn LLM is a sophisticated pattern-completion engine trained on vast amounts of text. When you give it a prompt, it predicts the most likely next words based on patterns it learned during training. This is both why it\'s capable and why it makes mistakes.\n\nIt\'s capable because human language follows patterns. A grant proposal has a predictable structure: PI name, institution, budget, aims. The LLM has seen thousands of similar documents and can reliably identify these patterns.\n\nIt makes mistakes because pattern-matching is not understanding. The LLM doesn\'t know what a budget is — it knows that numbers near the word "budget" are likely dollar amounts. When the pattern breaks (unusual formatting, ambiguous language), the LLM may confidently produce wrong answers.',
+        variant: 'concept',
+      },
+      {
+        title: 'Key terms you will encounter',
+        content: 'LLM (Large Language Model) — The AI engine that processes text. Examples: GPT-4, Claude, Gemini. Think of it as a very sophisticated autocomplete that can follow complex instructions.\n\nPrompt — The instructions you give to an LLM. A good prompt is specific and provides context. "Extract the PI name" is a prompt. The quality of your prompt directly affects the quality of the output.\n\nHallucination — When an LLM generates information that sounds plausible but is factually wrong. This is the #1 risk in research administration. An LLM might confidently report a budget of $500,000 when the document says $50,000.\n\nStructured Output — Forcing the LLM to return data in a specific format (like JSON with defined fields) instead of free-form text. This is how Vandalizer ensures consistent, machine-readable results.\n\nToken — The unit of text an LLM processes. Roughly 1 token = 3/4 of a word. Relevant because models have token limits that affect how much document text they can process at once.\n\nRAG (Retrieval-Augmented Generation) — A technique where the LLM is given relevant excerpts from your actual documents before generating a response. This grounds the output in real data rather than the LLM\'s training data.',
+        variant: 'key-terms',
+      },
+      {
+        title: 'What AI is genuinely good at',
+        content: 'AI excels at tasks that involve pattern recognition across large volumes of text:\n\n\u2022 Extracting specific information from long documents — Finding the PI name, budget, and project period in a 50-page proposal.\n\u2022 Summarizing — Condensing a progress report into key findings and milestones.\n\u2022 Comparing across documents — Identifying differences between two versions of a budget justification.\n\u2022 Drafting routine text — Generating first drafts of compliance summaries or progress report templates.\n\u2022 Processing many documents consistently — Applying the same extraction to 200 proposals and getting results in the same format every time.\n\nThe common thread: these are tasks where a human would be doing repetitive reading and data entry. AI handles the volume; you handle the judgment.',
+        variant: 'concept',
+      },
+      {
+        title: 'What AI is genuinely bad at',
+        content: 'Honesty about AI\'s limitations is essential for responsible use in research administration:\n\n\u2022 Judgment calls requiring institutional knowledge — AI doesn\'t know your university\'s internal policies, political dynamics, or historical context.\n\u2022 Catching its own mistakes — An LLM cannot reliably self-check. If it extracts the wrong budget figure, it won\'t flag the error. That\'s your job.\n\u2022 Math — LLMs frequently make arithmetic errors. Never trust an LLM to add up budget line items. Use code execution nodes for calculations.\n\u2022 Novel or unusual document formats — If a document doesn\'t follow standard patterns (hand-written notes, unusual layouts, scanned images with poor OCR), extraction quality drops significantly.\n\u2022 Replacing professional judgment on compliance — AI can flag potential issues, but determining whether a proposal actually meets regulatory requirements requires your expertise.\n\nThe pattern: AI is a powerful first-pass tool. It does the reading; you do the thinking.',
+        variant: 'insight',
+      },
+      {
+        title: 'AI for research administration',
+        content: 'Here\'s what AI-assisted research administration looks like in practice:\n\n\u2022 Proposal intake — Upload 30 new proposals. A workflow extracts PI name, agency, budget, and key dates from each one in minutes instead of hours.\n\u2022 Progress report processing — Extract accomplishments, publications, and expenditures from annual reports. Flag any that are missing required sections.\n\u2022 Compliance pre-screening — Check proposals against a list of required elements (human subjects approval, data management plan, budget justification) and flag gaps.\n\u2022 Subaward review — Extract parties, amounts, and terms from subaward agreements. Compare against institutional templates.\n\nThe pattern in every case: AI does the first pass of extraction, you do the second pass of verification and judgment. The AI handles volume and consistency. You bring expertise and accountability.',
+        variant: 'concept',
+      },
+      {
+        title: 'From chatbot to structured pipeline',
+        content: 'You may have used ChatGPT or Copilot to ask questions about a document. That works for one-off questions, but it fails for professional research administration work:\n\n\u2022 Inconsistent format — Ask the same question twice and you\'ll get differently structured answers.\n\u2022 No audit trail — There\'s no record of what was extracted, when, or from which document.\n\u2022 Can\'t scale — You can\'t paste 200 proposals into a chatbot one at a time.\n\u2022 No verification — There\'s no systematic way to check if the answers are correct.\n\nWorkflows solve all of these problems. A workflow defines exactly what to extract, produces consistent structured output, maintains a complete audit trail, runs across hundreds of documents, and can be validated for accuracy.\n\nThis is the bridge from "AI as a toy" to "AI as a professional tool." Over the next 10 modules, you\'ll learn to decompose your real processes, build workflows that handle them, validate those workflows for accuracy, and deploy them at scale. When you complete all 11 modules, you\'ll earn your Vandal Workflow Architect certification — a credential that says you can turn any document-heavy process into a reliable, AI-powered pipeline.',
+        variant: 'insight',
+      },
+    ],
+    xp: 50,
+    icon: 'Lightbulb',
+  },
+  {
     id: 'foundations',
     number: 1,
     title: 'Foundations',
     subtitle: 'Documents In, Intelligence Out',
-    description: 'Learn the basics of workflows: create your first extraction workflow, configure a SearchSet, and run it against a real document.',
+    description: 'Learn the basics of workflows using a sample NSF proposal from Dr. Sarah Chen. Click Set Up Lab to load it, then build your first extraction workflow.',
     objectives: [
-      'Create a workflow with an Extraction step',
-      'Configure a SearchSet with 3+ fields',
-      'Run the workflow at least once',
+      'Set up your Certification Lab with the sample NSF proposal',
+      'Create a workflow with an Extraction step and 5 fields',
+      'Run the workflow and verify extracted values',
     ],
     tips: [
-      'Start with a simple document like a grant proposal or invoice',
-      'Use clear, descriptive field names in your SearchSet',
-      'Test your extraction on a single document before scaling up',
+      'The sample NSF proposal contains clearly labeled fields like PI Name, Institution, and Total Budget',
+      'Use clear, descriptive field names in your SearchSet that match the document labels',
+      'After running, check that PI Name = Sarah Chen and Total Budget = $485,000',
     ],
     lessons: [
       {
@@ -79,18 +135,122 @@ const MODULES: ModuleDefinition[] = [
     icon: 'BookOpen',
   },
   {
-    id: 'extraction_engine',
+    id: 'process_mapping',
     number: 2,
-    title: 'Extraction Engine',
-    subtitle: 'Master the Extraction Pipeline',
-    description: 'Explore one-pass vs. two-pass extraction strategies, configure large field sets, and understand how the extraction engine maximizes accuracy.',
+    title: 'Thinking in Workflows',
+    subtitle: 'See Your Work as Automatable Processes',
+    description: 'Before you can build a workflow, you need to see your work differently. This module teaches you to recognize the repeatable processes hiding in your daily tasks, identify which parts are suitable for AI, and which parts need your expertise.',
     objectives: [
-      'Create a SearchSet with 15+ fields',
+      'Recognize repeatable processes in your research administration work',
+      'Identify which parts of a process are AI-suitable vs. human-judgment',
+      'Apply the process decomposition framework to a real task from your work',
     ],
     tips: [
-      'Two-pass extraction uses a draft-then-refine approach for higher accuracy',
-      'Use enum_values to constrain fields to known categories',
-      'Mark fields as optional when they may not appear in every document',
+      'Think about the tasks you do every week that follow the same pattern',
+      'The best workflow candidates are tasks where you spend most of your time reading and re-typing',
+      'Don\'t try to automate everything \u2014 the goal is to automate the tedious parts so you can focus on the important parts',
+    ],
+    lessons: [
+      {
+        title: 'Your work is already a workflow',
+        content: 'You already run workflows every day \u2014 you just run them in your head.\n\nWhen you process an incoming proposal, you probably follow steps like these:\n1. Open the document and skim for key details.\n2. Find the PI name, institution, budget, and project dates.\n3. Check whether required sections are present.\n4. Enter the data into a spreadsheet or system.\n5. Flag anything unusual for follow-up.\n\nThat\'s a workflow. You do the same steps in roughly the same order every time. The difference between that mental process and a Vandalizer workflow is that one runs in your head (inconsistently, one document at a time) and the other runs on a computer (consistently, across hundreds of documents).\n\nThe first step toward automation is recognizing these patterns in your own work.',
+        variant: 'concept',
+      },
+      {
+        title: 'The process decomposition framework',
+        content: 'Input \u2014 What triggers this process? Usually a document arriving: a proposal, a report, a subaward agreement, a budget justification.\n\nSteps \u2014 The discrete actions you take, in order. Each step has a clear purpose: "find the PI name," "check the budget," "write a summary."\n\nDecision Points \u2014 Where you apply judgment: "Is this budget reasonable?" "Does this meet compliance requirements?" These are where human expertise is essential.\n\nHandoffs \u2014 Where work passes between people: "Send to compliance officer for review," "Return to PI for corrections."\n\nOutput \u2014 What\'s produced at the end: a completed form, a summary report, a recommendation, data entered into a system.\n\nEvery process in your office can be described using these five elements. Once you can identify them, you can start deciding which steps to automate.',
+        variant: 'key-terms',
+      },
+      {
+        title: 'Finding the repetition',
+        content: 'The best candidates for workflows are tasks that share three properties:\n\n1. You do them repeatedly \u2014 not once, but dozens or hundreds of times. Processing proposals, reviewing progress reports, checking compliance documents.\n\n2. You follow the same steps each time \u2014 you look for the same information, in the same kinds of documents, and produce the same kind of output.\n\n3. Most of the time is spent reading, not thinking \u2014 you spend 80% of your time finding information in documents and 20% making decisions about it.\n\nHere\'s a quick test: could you write step-by-step instructions for a new hire to do this task? If yes, it\'s a workflow. If the instructions would be "use your judgment," that specific step stays human.\n\nCommon research admin processes that pass this test:\n\u2022 Processing incoming proposals (extracting key fields)\n\u2022 Reviewing progress reports (checking completeness)\n\u2022 Pre-screening for compliance (finding required elements)\n\u2022 Summarizing subaward terms (extracting parties and obligations)\n\u2022 Preparing data for reports (gathering numbers from multiple documents)',
+        variant: 'concept',
+      },
+      {
+        title: 'The AI suitability test',
+        content: 'Not every step in your process should be automated. Here\'s a practical framework:\n\nAI-suitable (automate these):\n\u2022 Reading a document and finding specific information \u2192 Extraction\n\u2022 Summarizing or paraphrasing document content \u2192 Prompt\n\u2022 Comparing information across documents \u2192 Prompt\n\u2022 Reformatting data from one structure to another \u2192 Formatter\n\u2022 Drafting routine text based on extracted data \u2192 Prompt\n\nUse code, not AI:\n\u2022 Adding up numbers or computing percentages \u2192 Code Execution\n\u2022 Date calculations or comparisons \u2192 Code Execution\n\u2022 Applying deterministic rules ("if budget > $500K, flag for review") \u2192 Code Execution\n\nKeep human:\n\u2022 Deciding whether something meets a policy requirement\n\u2022 Interpreting ambiguous or unusual situations\n\u2022 Making recommendations that require institutional context\n\u2022 Anything where a mistake has serious consequences and can\'t be easily caught\n\nThe pattern: AI reads and extracts. Code computes. Humans judge.',
+        variant: 'insight',
+      },
+      {
+        title: 'Walkthrough: Mapping a real process',
+        content: 'Let\'s decompose "processing incoming proposals" step by step:\n\n1. Receive the proposal document (PDF) \u2192 Input: this is your workflow trigger.\n\n2. Find PI name, institution, budget, project dates, agency \u2192 AI-suitable: this is reading and extracting. Map to an Extraction step.\n\n3. Check whether required sections are present (data management plan, budget justification, biosketches) \u2192 AI-suitable: checking for presence of sections. Map to a Prompt step ("Based on the document, which of these sections are present?").\n\n4. Verify the budget adds up \u2192 Use code: map to a Code Execution step that sums extracted line items.\n\n5. Decide whether to flag for compliance review \u2192 Keep human: this requires institutional judgment. This is where your workflow ends and your review begins.\n\n6. Enter data into your tracking system \u2192 The workflow\'s structured output makes this copy-paste or even automated via API.\n\nResult: a 3-step workflow (Extract \u2192 Check sections \u2192 Verify budget) that does 70% of the work, leaving you to do the 30% that requires your expertise.',
+        variant: 'walkthrough',
+      },
+      {
+        title: 'Common processes that become workflows',
+        content: 'Here are the most common research administration processes and how they map to workflows:\n\n\u2022 Proposal intake \u2014 Extract key fields, check completeness, flag gaps. 3-4 steps.\n\u2022 Progress report review \u2014 Extract accomplishments, publications, expenditures. Summarize and compare to milestones. 3 steps.\n\u2022 Compliance pre-screening \u2014 Extract required elements, check against a compliance checklist, produce a gap report. 3-4 steps.\n\u2022 Budget review \u2014 Extract line items, compute totals, compare to limits, produce a summary. 4 steps.\n\u2022 Subaward processing \u2014 Extract parties, amounts, terms, deliverables. Flag deviations from templates. 3 steps.\n\u2022 Award closeout \u2014 Gather final expenditures, publications, and deliverables from multiple documents. 4-5 steps.\n\nNotice the pattern: every workflow starts with extraction (getting data out of documents) and ends with either a human review point or a produced deliverable. The middle steps are where analysis, comparison, and computation happen.',
+        variant: 'concept',
+      },
+    ],
+    xp: 100,
+    icon: 'Search',
+  },
+  {
+    id: 'workflow_design',
+    number: 3,
+    title: 'Workflow Design',
+    subtitle: 'From Process Map to Pipeline Architecture',
+    description: 'Now that you can decompose a process, learn how to translate it into a specific workflow architecture. Which task types fit which steps? How should data flow? Where do humans stay in the loop?',
+    objectives: [
+      'Map process steps to specific Vandalizer task types',
+      'Understand the extract-reason-deliver pattern',
+      'Design workflows that support human review, not replace it',
+    ],
+    tips: [
+      'Start simple \u2014 a 2-3 step workflow that works is better than a 10-step workflow that doesn\'t',
+      'Design your output for the person who will review it, not for the computer',
+      'When in doubt about step granularity, split \u2014 it\'s easier to combine steps later than to debug one giant step',
+    ],
+    lessons: [
+      {
+        title: 'From process map to workflow architecture',
+        content: 'In the previous module, you decomposed a process into steps and identified which are AI-suitable. Now you need to translate each step into a specific task type in Vandalizer.\n\nThe mapping is straightforward:\n\u2022 "Find information in a document" \u2192 Extraction task with a SearchSet\n\u2022 "Analyze or summarize the extracted data" \u2192 Prompt task\n\u2022 "Compute, total, or apply rules" \u2192 Code Execution task\n\u2022 "Check a document for specific sections or elements" \u2192 Prompt task\n\u2022 "Produce a formatted report or export" \u2192 Document Renderer or Data Export\n\u2022 "Compare this document to another" \u2192 Add Document + Prompt task\n\nThe key insight: you\'re not starting from scratch asking "what can this tool do?" You\'re starting from your process and asking "which tool handles this step?"',
+        variant: 'concept',
+      },
+      {
+        title: 'Key design decisions',
+        content: 'Step granularity \u2014 How many steps should your workflow have? Each step should do one clear thing. If you can\'t describe a step\'s purpose in one sentence, split it.\n\nTask type selection \u2014 Choose the simplest task type that gets the job done. If you need structured data from a document, use Extraction \u2014 don\'t write a Prompt asking the LLM to produce JSON.\n\nData flow \u2014 Each step receives the previous step\'s output. Design your steps so the output of one naturally feeds the next. Extraction produces JSON; a Prompt can analyze that JSON; a Renderer can format the analysis.\n\nHuman checkpoints \u2014 Decide where a human should review before the workflow continues. In most research admin workflows, the answer is: review after the final output, not after every step.\n\nError tolerance \u2014 What happens if the LLM extracts a field incorrectly? Design your workflow so errors are visible in the output, not hidden. Show source data alongside conclusions.',
+        variant: 'key-terms',
+      },
+      {
+        title: 'The extract-reason-deliver pattern',
+        content: 'The most common and most effective workflow pattern in research administration has three phases:\n\n1. Extract \u2014 Pull structured data from the document. This is your Extraction step with a well-designed SearchSet. The output is clean, consistent JSON.\n\n2. Reason \u2014 Analyze the extracted data. This might be a Prompt step that summarizes findings, a Code Execution step that computes totals, or both. The output is analysis or computed results.\n\n3. Deliver \u2014 Produce something useful. A formatted report, a CSV export, a compliance checklist, or structured data ready for your tracking system.\n\nThis pattern works because it separates concerns. If your final report is wrong, you can check: did the extraction get the right data? (Check step 1\'s output.) Did the analysis interpret it correctly? (Check step 2.) You can fix the broken step without rebuilding the whole workflow.\n\nMost research admin workflows are variations of this pattern. A compliance review is Extract fields \u2192 Check against rules \u2192 Produce gap report. A proposal intake is Extract key data \u2192 Summarize \u2192 Export to spreadsheet.',
+        variant: 'concept',
+      },
+      {
+        title: 'Designing for your reviewer',
+        content: 'Here\'s a truth about AI in research administration: someone will always review the output. Maybe it\'s you, maybe it\'s a compliance officer, maybe it\'s a PI. Your workflow should make that review easy and efficient.\n\nDesign principles for reviewable output:\n\n\u2022 Show your sources \u2014 When the workflow extracts a budget figure, the output should make it easy to verify against the source document. Don\'t just say "$485,000" \u2014 say "Total Budget: $485,000 (from Section 4, Budget Justification)."\n\n\u2022 Flag uncertainty \u2014 If a field couldn\'t be found or the value seems unusual, the output should say so. A missing field is useful information, not a failure.\n\n\u2022 Structure for scanning \u2014 The reviewer should be able to scan the output in 30 seconds and know if everything looks right. Use clear headings, consistent formatting, and logical grouping.\n\n\u2022 Separate data from analysis \u2014 Show the raw extracted data first, then the analysis or recommendations. This lets the reviewer verify facts before reading conclusions.\n\nThe workflow\'s job is not to eliminate review. It\'s to make review fast and focused.',
+        variant: 'insight',
+      },
+      {
+        title: 'Walkthrough: Designing a compliance review pipeline',
+        content: 'Process: "Check whether a grant proposal includes all required compliance elements."\n\nStep 1 \u2014 Decompose the process:\n\u2022 Read the proposal and identify which compliance sections are present\n\u2022 Extract specific compliance data (human subjects, data management, conflict of interest)\n\u2022 Compare against the required elements checklist\n\u2022 Produce a gap report showing what\'s present and what\'s missing\n\nStep 2 \u2014 Map to task types:\n\u2022 "Read and extract compliance data" \u2192 Extraction task (SearchSet with fields: Human Subjects Approval, Data Management Plan, COI Disclosure, Biosketch, Budget Justification, Facilities Description)\n\u2022 "Compare against checklist" \u2192 Prompt task ("Given the extracted compliance data, identify which required elements are present, which are missing, and flag any that appear incomplete.")\n\u2022 "Produce gap report" \u2192 Document Renderer task (formats the analysis into a downloadable checklist)\n\nStep 3 \u2014 Design data flow:\n\u2022 Step 1 output: JSON with compliance field values (or "not found")\n\u2022 Step 2 input: that JSON. Output: analysis text with present/missing/incomplete categories\n\u2022 Step 3 input: analysis text. Output: formatted compliance checklist document\n\nResult: A 3-step workflow. Upload a proposal, click Run, download a compliance checklist.',
+        variant: 'walkthrough',
+      },
+      {
+        title: 'When to split, when to combine',
+        content: 'A common question: should this be one step or two?\n\nSplit into separate steps when:\n\u2022 You\'d want to check the intermediate output \u2014 "Did the extraction get the right data before I analyze it?"\n\u2022 The operations are different types \u2014 extraction and analysis are different skills; give the LLM one job at a time.\n\u2022 You might reuse one part \u2014 the same extraction could feed different analyses for different purposes.\n\u2022 Debugging would be easier \u2014 if the final output is wrong, separate steps tell you which part failed.\n\nCombine into one step when:\n\u2022 The operations are tightly coupled \u2014 they always happen together and never separately.\n\u2022 The intermediate output isn\'t useful on its own \u2014 nobody would ever check it.\n\u2022 The combined prompt is simple and focused \u2014 it\'s still doing one conceptual thing.\n\nRule of thumb: start with more steps. You can always combine later once you know the workflow works. But splitting a monolithic step that\'s producing bad output is much harder than combining two steps that work well individually.\n\nA 3-step workflow that\'s easy to debug beats a 1-step workflow that\'s impossible to fix.',
+        variant: 'insight',
+      },
+    ],
+    xp: 100,
+    icon: 'Compass',
+  },
+  {
+    id: 'extraction_engine',
+    number: 4,
+    title: 'Extraction Engine',
+    subtitle: 'Master the Extraction Pipeline',
+    description: 'Build a comprehensive 20+ field extraction using a sample NIH R01 proposal from Dr. James Park. The document has budget breakdowns, key personnel, and specific aims to extract.',
+    objectives: [
+      'Set up your Certification Lab with the NIH R01 proposal',
+      'Create a SearchSet with 15+ fields covering all document sections',
+      'Extract budget categories, personnel, aims, and compliance fields',
+    ],
+    tips: [
+      'The NIH R01 has clearly structured sections: budget, key personnel, specific aims, vertebrate animals',
+      'Use enum_values to constrain fields like Human Subjects (Yes/No) and Clinical Trial (Yes/No)',
+      'Mark fields like Co-Investigator as optional since there may be multiple',
     ],
     lessons: [
       {
@@ -124,18 +284,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'multi_step',
-    number: 3,
+    number: 5,
     title: 'Multi-Step Workflows',
     subtitle: 'Chain Steps Together',
-    description: 'Build workflows with multiple steps that chain together. Learn how extraction, prompt, and format steps work in sequence to produce rich outputs.',
+    description: 'Build a multi-step pipeline using a sample subaward agreement between University of Idaho and Boise State. Extract parties and terms, analyze obligations, then format a compliance summary.',
     objectives: [
-      'Build a workflow with 3+ steps',
-      'Include Extraction, Prompt, and Format task types in one workflow',
+      'Set up your Certification Lab with the subaward agreement',
+      'Build a 3-step workflow: Extraction + Prompt + Formatter',
+      'Verify the pipeline chains correctly from extraction to formatted report',
     ],
     tips: [
-      'Each step receives the previous step\'s output as input',
-      'Use Prompt steps to reason over extracted data',
-      'Format steps transform structured data into readable reports',
+      'The subaward has two parties (UI and BSU), financial terms, deliverables, and compliance requirements',
+      'Use the Prompt step to analyze obligations and flag key deadlines',
+      'The Formatter step should produce a clean compliance summary from the analysis',
     ],
     lessons: [
       {
@@ -169,18 +330,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'advanced_nodes',
-    number: 4,
+    number: 6,
     title: 'Advanced Nodes',
     subtitle: 'Parallel Tasks & Power Nodes',
-    description: 'Use advanced node types like Code Execution and API Call. Run multiple tasks in parallel within a single step for concurrent processing.',
+    description: 'Process a sample budget justification document using Code Execution to validate totals and parallel tasks for concurrent processing.',
     objectives: [
-      'Use an advanced node (Code, API, Research, Crawler, or Browser)',
+      'Set up your Certification Lab with the budget justification',
+      'Use a Code Execution node to compute and verify budget totals',
       'Run 2+ tasks in parallel within a single step',
     ],
     tips: [
-      'Code Execution nodes run sandboxed Python with a 10-second timeout',
-      'API Call nodes can fetch data from external services to enrich workflows',
-      'Parallel tasks within a step run concurrently for faster execution',
+      'The budget has personnel costs, supplies, travel, and subaward line items that should sum to $542,800',
+      'Use Code Execution to parse extracted numbers and compute sums for validation',
+      'Add a parallel Prompt task alongside Code Execution to generate a budget narrative',
     ],
     lessons: [
       {
@@ -214,18 +376,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'output_delivery',
-    number: 5,
+    number: 7,
     title: 'Output & Delivery',
     subtitle: 'Produce Real Deliverables',
-    description: 'Generate downloadable reports, CSV exports, ZIP archives, and pre-filled forms. Make your workflows produce ready-to-submit deliverables.',
+    description: 'Process a sample Year-2 progress report and produce downloadable deliverables. Extract accomplishments, publications, and budget data, then export as a report or CSV.',
     objectives: [
-      'Use a Document Renderer, Data Export, Package Builder, or Form Filler',
-      'Run the workflow to produce downloadable output',
+      'Set up your Certification Lab with the progress report',
+      'Create a workflow with an output node (Document Renderer, Data Export, etc.)',
+      'Run the workflow and download the generated output file',
     ],
     tips: [
-      'Document Renderer creates downloadable markdown/text files',
-      'Data Export supports JSON and CSV formats',
-      'Package Builder creates ZIP archives with multiple output files',
+      'The progress report has publications, students trained, and budget expenditures to extract',
+      'Document Renderer is great for producing a formatted summary report',
+      'Data Export with CSV format works well for the budget expenditure data',
     ],
     lessons: [
       {
@@ -254,18 +417,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'validation_qa',
-    number: 6,
+    number: 8,
     title: 'Validation & QA',
     subtitle: 'Ensure Quality at Scale',
-    description: 'Define validation plans, create quality checks, and track workflow reliability over time. Build confidence that your workflows produce correct results.',
+    description: 'Add validation to your NSF proposal workflow from Module 1. Define quality checks that verify your extraction produces correct results, then run validation to measure accuracy.',
     objectives: [
+      'Open your workflow from Module 1 (or create a new one for the NSF proposal)',
       'Create a validation plan with 2+ quality checks',
-      'Run a validated workflow',
+      'Run validation and review the results',
     ],
     tips: [
-      'Validation plans can be auto-generated from your workflow structure',
-      'Track quality history to spot regressions over time',
-      'Use improvement suggestions to iteratively refine your extraction',
+      'This module reuses the NSF proposal from Module 1 - no new documents needed',
+      'Start with checks like "PI Name is not null" and "Total Budget is a valid number"',
+      'Use auto-generated validation checks as a starting point, then customize',
     ],
     lessons: [
       {
@@ -299,18 +463,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'batch_processing',
-    number: 7,
+    number: 9,
     title: 'Batch Processing',
     subtitle: 'Process at Scale',
-    description: 'Run workflows against multiple documents simultaneously. Monitor batch execution, handle failures, and optimize for throughput.',
+    description: 'Process three sample NSF proposals in batch mode. Each proposal is from a different PI (Lopez, Kim, Okafor) with different research areas and budgets.',
     objectives: [
-      'Run a workflow in batch mode against 3+ documents',
-      'All documents in the batch must complete successfully',
+      'Set up your Certification Lab with 3 sample batch proposals',
+      'Run a workflow in batch mode against all 3 documents',
+      'Verify all 3 complete successfully with correct PI names',
     ],
     tips: [
-      'Batch mode runs your workflow once per document sequentially',
-      'Monitor progress via the real-time status feed',
-      'Test with a single document first, then scale to batch',
+      'Use your extraction workflow from Module 1 or 2, or create a new one',
+      'The three proposals have PIs: Dr. Maria Lopez, Dr. Robert Kim, Dr. Amara Okafor',
+      'Check that all 3 documents complete successfully before marking done',
     ],
     lessons: [
       {
@@ -344,18 +509,19 @@ const MODULES: ModuleDefinition[] = [
   },
   {
     id: 'governance',
-    number: 8,
+    number: 10,
     title: 'Collaboration & Governance',
     subtitle: 'Share and Standardize',
-    description: 'Organize workflows across spaces, share validated workflows with your team, and establish governance practices for production-grade workflows.',
+    description: 'The final module before your Vandal Workflow Architect certification. Demonstrate that you can organize, verify, and share production-ready workflows across your team. Complete this and you earn your VWA credential.',
     objectives: [
-      'Mark a workflow as verified',
-      'Use workflows across 2+ spaces',
+      'Mark a workflow as verified in the workflow settings',
+      'Use workflows across 2+ different spaces',
+      'No new documents needed - uses workflows you have already built',
     ],
     tips: [
+      'Create a second space from the Spaces page if you only have one',
       'Export workflows as .vandalizer.json files to share with teammates',
       'Verified workflows signal to your team that a workflow is production-ready',
-      'Use spaces to organize workflows by project, team, or document type',
     ],
     lessons: [
       {
@@ -385,7 +551,7 @@ const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Building a culture of reuse',
-        content: 'The highest-performing teams don\'t build workflows from scratch every time. They maintain a library of verified workflows that cover common document types, then adapt and extend them as needed. When a new grant format comes in, they duplicate an existing verified workflow and adjust the SearchSet \u2014 rather than starting over. Certification is your first step toward building this culture on your team.',
+        content: 'The highest-performing teams don\'t build workflows from scratch every time. They maintain a library of verified workflows that cover common document types, then adapt and extend them as needed. When a new grant format comes in, they duplicate an existing verified workflow and adjust the SearchSet \u2014 rather than starting over.\n\nBy completing this module, you\'ve demonstrated every skill in the Vandal Workflow Architect program: understanding AI, decomposing processes, designing pipelines, building extractions, chaining multi-step workflows, using advanced nodes, producing deliverables, validating quality, processing at scale, and governing shared workflows. You\'re now a certified VWA \u2014 the person on your team who knows how to turn any document-heavy process into a reliable, AI-powered pipeline. That\'s a rare and valuable skill.',
         variant: 'insight',
       },
     ],
@@ -419,7 +585,10 @@ const LEVEL_THRESHOLDS = [
 ]
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string; size?: number }>> = {
+  Lightbulb,
   BookOpen,
+  Search,
+  Compass,
   FlaskConical,
   Layers,
   Puzzle,
@@ -429,7 +598,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string; size?: 
   FolderGit2,
 }
 
-const TOTAL_XP = 1600
+const TOTAL_XP = 1850
 
 // ---------------------------------------------------------------------------
 // Progress ring component
@@ -652,21 +821,270 @@ function LessonRenderer({ section }: { section: LessonSection }) {
 }
 
 // ---------------------------------------------------------------------------
+// Self-assessment questions (per module)
+// ---------------------------------------------------------------------------
+
+type AssessmentQuestion = { key: string; question: string; options: readonly string[] }
+
+const MODULE_ASSESSMENTS: Record<string, { title: string; subtitle: string; questions: readonly AssessmentQuestion[] }> = {
+  ai_literacy: {
+    title: 'Self-Assessment',
+    subtitle: 'There are no wrong answers. This is about understanding your starting point.',
+    questions: [
+      {
+        key: 'experience',
+        question: 'Which best describes your experience with AI tools?',
+        options: [
+          'I have not used any AI tools',
+          "I've tried a chatbot (ChatGPT, Copilot, etc.) a few times",
+          'I use AI tools occasionally for work or personal tasks',
+          'I use AI tools regularly and feel confident with them',
+        ],
+      },
+      {
+        key: 'comfort',
+        question: 'When you think about using AI in research administration, how do you feel?',
+        options: [
+          "Skeptical \u2014 I worry about accuracy and whether it's appropriate for my work",
+          "Cautious but curious \u2014 I want to understand it before forming an opinion",
+          'Open to it if someone shows me how it helps with tasks I already do',
+          "Enthusiastic \u2014 I'm looking for ways to integrate AI into my workflows",
+        ],
+      },
+      {
+        key: 'concern',
+        question: 'What is your biggest concern about AI for research administration?',
+        options: [
+          "That it will make mistakes I won't catch, especially with compliance or financial data",
+          "That it's a black box \u2014 I won't understand how it reaches its answers",
+          "That it will change my role in ways I'm not comfortable with",
+          "I don't have major concerns, but I want to learn the right way to use it",
+        ],
+      },
+    ],
+  },
+  process_mapping: {
+    title: 'Process Reflection',
+    subtitle: 'Think about your actual daily work. There are no wrong answers.',
+    questions: [
+      {
+        key: 'process',
+        question: 'Which of these best describes a repetitive process in your work?',
+        options: [
+          'Processing incoming grant proposals (reading, extracting key details, filing)',
+          'Reviewing progress reports (checking completeness, summarizing findings)',
+          'Preparing compliance documentation (gathering data from multiple documents)',
+          'Routing and tracking subaward agreements or award modifications',
+        ],
+      },
+      {
+        key: 'time_sink',
+        question: 'When you do this process manually, what takes the most time?',
+        options: [
+          'Reading through documents to find specific information',
+          'Re-typing data from documents into spreadsheets or forms',
+          'Comparing information across multiple documents',
+          'Writing summaries or reports based on document contents',
+        ],
+      },
+      {
+        key: 'judgment',
+        question: 'Which part of this process most requires your expertise and judgment?',
+        options: [
+          'Deciding whether extracted information meets compliance requirements',
+          'Interpreting ambiguous or unusual document content',
+          'Making recommendations based on institutional knowledge and context',
+          'All of the above \u2014 I need to review everything the AI produces',
+        ],
+      },
+      {
+        key: 'outcome',
+        question: 'If you could build a workflow for this process, what would the ideal output be?',
+        options: [
+          'A structured spreadsheet with extracted data from all documents',
+          'A summary report highlighting key findings and potential issues',
+          'A compliance checklist showing what\'s present and what\'s missing',
+          'A complete package ready for review (data + summary + checklist)',
+        ],
+      },
+    ],
+  },
+  workflow_design: {
+    title: 'Design Reflection',
+    subtitle: 'Think about how you would structure workflows for your work.',
+    questions: [
+      {
+        key: 'step_splitting',
+        question: 'When you think about a process in your work, how would you decide where to split it into separate workflow steps?',
+        options: [
+          'Wherever I naturally take a break or hand off work to someone else',
+          'When the type of work changes (reading \u2192 analyzing \u2192 writing)',
+          'When I would want to verify output before proceeding to the next part',
+          "I'm not sure yet \u2014 I need to see more examples before I can decide",
+        ],
+      },
+      {
+        key: 'pattern',
+        question: 'For the documents your team processes, which workflow pattern seems most useful?',
+        options: [
+          'Extract then verify: pull structured data, then I review it',
+          'Extract, analyze, report: pull data, reason over it, produce a deliverable',
+          'Extract and compare: pull the same fields from multiple documents and compare them',
+          'Compliance pipeline: extract, check against rules, flag issues automatically',
+        ],
+      },
+      {
+        key: 'concern',
+        question: "What's your biggest concern about designing workflows for your team's processes?",
+        options: [
+          "I'm not sure how to break our processes into clear, discrete steps",
+          "I worry about choosing the wrong task types for each step",
+          "I'm concerned about maintaining and updating workflows as our processes change",
+          'I need help getting buy-in from my team to adopt workflow-based approaches',
+        ],
+      },
+      {
+        key: 'human_role',
+        question: 'When would you keep a step manual rather than adding it to the workflow?',
+        options: [
+          'When the step requires interpreting nuance or institutional context',
+          'When the stakes are too high for any AI error (regulatory compliance decisions)',
+          'When the input is too varied or unpredictable for consistent AI processing',
+          'All of the above \u2014 human judgment is irreplaceable for certain decisions',
+        ],
+      },
+    ],
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Self-assessment component
+// ---------------------------------------------------------------------------
+
+function SelfAssessment({ questions, existingAnswers, onSubmit, submitting }: {
+  questions: { title: string; subtitle: string; questions: readonly AssessmentQuestion[] }
+  existingAnswers?: Record<string, string>
+  onSubmit: (answers: Record<string, string>) => void
+  submitting: boolean
+}) {
+  const isCompleted = existingAnswers && questions.questions.every(q => existingAnswers[q.key])
+  const [answers, setAnswers] = useState<Record<string, string>>(existingAnswers || {})
+
+  const allAnswered = questions.questions.every(q => answers[q.key])
+
+  if (isCompleted) {
+    return (
+      <div
+        className="mb-5 p-5 border-2 border-green-200 bg-green-50/50"
+        style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <CheckCircle2 size={20} className="text-green-600" />
+          <h4 className="text-sm font-semibold text-green-800">Self-Assessment Complete</h4>
+          <Stars count={3} size={14} />
+        </div>
+        <div className="space-y-3">
+          {questions.questions.map(q => (
+            <div key={q.key}>
+              <p className="text-xs font-medium text-green-700 mb-0.5">{q.question}</p>
+              <p className="text-sm text-green-900">{existingAnswers[q.key]}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="mb-5 p-5 border-2 border-blue-200 bg-blue-50/30"
+      style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <Lightbulb size={18} className="text-blue-600" />
+        <h4 className="text-sm font-semibold text-blue-800">{questions.title}</h4>
+      </div>
+      <p className="text-xs text-gray-500 mb-4">
+        {questions.subtitle}
+      </p>
+
+      <div className="space-y-5">
+        {questions.questions.map(q => (
+          <div key={q.key}>
+            <p className="text-sm font-medium text-gray-900 mb-2">{q.question}</p>
+            <div className="space-y-1.5">
+              {q.options.map(option => (
+                <label
+                  key={option}
+                  className={cn(
+                    'flex items-start gap-2.5 p-2.5 border cursor-pointer transition-all text-sm',
+                    answers[q.key] === option
+                      ? 'border-blue-400 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-200',
+                  )}
+                  style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+                >
+                  <input
+                    type="radio"
+                    name={q.key}
+                    value={option}
+                    checked={answers[q.key] === option}
+                    onChange={() => setAnswers(prev => ({ ...prev, [q.key]: option }))}
+                    className="mt-0.5 accent-blue-600"
+                  />
+                  <span className="text-gray-700">{option}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        onClick={() => onSubmit(answers)}
+        disabled={!allAnswered || submitting}
+        className="mt-4 flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+      >
+        {submitting ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            Saving...
+          </>
+        ) : (
+          <>
+            <Check size={14} />
+            Submit Self-Assessment
+          </>
+        )}
+      </button>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Module detail panel (tabbed: Learn / Challenge)
 // ---------------------------------------------------------------------------
 
-function ModuleDetail({ module, moduleProgress, onValidate, onComplete, validating, completing }: {
+function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onSubmitAssessment, exercise, validating, completing, provisioning, submittingAssessment }: {
   module: ModuleDefinition
-  moduleProgress: { completed: boolean; stars: number; attempts: number } | null
+  moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; lab_space_id?: string; self_assessment?: Record<string, string> } | null
   onValidate: () => void
   onComplete: () => void
+  onProvision: () => void
+  onSubmitAssessment: (answers: Record<string, string>) => void
+  exercise: CertExercise | null
   validating: boolean
   completing: boolean
+  provisioning: boolean
+  submittingAssessment: boolean
 }) {
   const [tab, setTab] = useState<'learn' | 'challenge'>('learn')
   const [showTips, setShowTips] = useState(false)
   const Icon = ICON_MAP[module.icon] || BookOpen
   const completed = moduleProgress?.completed || false
+  const isProvisioned = (moduleProgress?.provisioned_docs?.length ?? 0) > 0
+  const hasDocuments = (exercise?.documents?.length ?? 0) > 0
 
   return (
     <div
@@ -756,29 +1174,149 @@ function ModuleDetail({ module, moduleProgress, onValidate, onComplete, validati
           </div>
         ) : (
           <div>
-            {/* Objectives */}
-            <div className="mb-5">
-              <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-                <Target size={14} />
-                Objectives
-              </h4>
-              <ul className="space-y-2">
-                {module.objectives.map((obj, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm">
-                    <div
-                      className={cn(
-                        'w-5 h-5 flex items-center justify-center shrink-0 mt-0.5',
-                        completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400',
-                      )}
+            {/* Self-assessment (modules with reflection questions) */}
+            {MODULE_ASSESSMENTS[module.id] && (
+              <SelfAssessment
+                questions={MODULE_ASSESSMENTS[module.id]}
+                existingAnswers={moduleProgress?.self_assessment}
+                onSubmit={onSubmitAssessment}
+                submitting={submittingAssessment}
+              />
+            )}
+
+            {/* Set Up Lab button */}
+            {hasDocuments && (
+              <div
+                className={cn(
+                  'mb-5 p-4 border-2',
+                  isProvisioned ? 'border-green-200 bg-green-50/50' : 'border-blue-200 bg-blue-50/50',
+                )}
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isProvisioned ? (
+                      <CheckCircle2 size={18} className="text-green-600" />
+                    ) : (
+                      <Upload size={18} className="text-blue-600" />
+                    )}
+                    <div>
+                      <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
+                        {isProvisioned ? 'Documents ready in Certification Lab' : 'Set up your lab environment'}
+                      </span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {exercise?.documents.map(d => d.replace('.pdf', '')).join(', ')}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onProvision}
+                    disabled={provisioning || isProvisioned}
+                    className={cn(
+                      'flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50',
+                      isProvisioned
+                        ? 'bg-green-100 text-green-700 cursor-default'
+                        : 'bg-blue-600 text-white hover:bg-blue-700',
+                    )}
+                    style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+                  >
+                    {provisioning ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Setting up...
+                      </>
+                    ) : isProvisioned ? (
+                      <>
+                        <Check size={14} />
+                        Ready
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={14} />
+                        Set Up Lab
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step-by-step instructions */}
+            {exercise?.instructions && exercise.instructions.length > 0 && (
+              <div className="mb-5">
+                <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
+                  <Target size={14} />
+                  Exercise Steps
+                </h4>
+                <ol className="space-y-2">
+                  {exercise.instructions.map((instruction, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <div
+                        className={cn(
+                          'w-5 h-5 flex items-center justify-center shrink-0 mt-0.5',
+                          completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-500',
+                        )}
+                        style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+                      >
+                        {completed ? <Check size={12} /> : <span className="text-xs font-medium">{i + 1}</span>}
+                      </div>
+                      <span
+                        className={cn('text-gray-700', completed && 'text-green-800')}
+                        dangerouslySetInnerHTML={{
+                          __html: instruction
+                            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+                            .replace(/`(.+?)`/g, '<code class="px-1 py-0.5 bg-gray-100 rounded text-xs font-mono">$1</code>'),
+                        }}
+                      />
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+
+            {/* Expected fields callout */}
+            {exercise?.expected_fields && exercise.expected_fields.length > 0 && (
+              <div
+                className="mb-5 p-3 bg-purple-50 border border-purple-200"
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 mb-2">
+                  Your SearchSet should include:
+                </h4>
+                <div className="flex flex-wrap gap-1.5">
+                  {exercise.expected_fields.map((field) => (
+                    <span
+                      key={field}
+                      className="inline-flex items-center px-2 py-1 bg-white border border-purple-200 text-xs font-medium text-purple-800"
                       style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                     >
-                      {completed ? <Check size={12} /> : <span className="text-xs">{i + 1}</span>}
+                      {field}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Star criteria */}
+            {exercise?.star_criteria && (
+              <div
+                className="mb-5 p-3 bg-amber-50 border border-amber-200"
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                <h4 className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2 flex items-center gap-1">
+                  <Star size={12} className="fill-amber-400 text-amber-400" />
+                  Star Criteria
+                </h4>
+                <div className="space-y-1.5">
+                  {Object.entries(exercise.star_criteria).map(([level, criteria]) => (
+                    <div key={level} className="flex items-start gap-2 text-sm">
+                      <Stars count={Number(level)} max={3} size={12} />
+                      <span className="text-gray-700">{criteria}</span>
                     </div>
-                    <span className={cn(completed && 'text-green-800')}>{obj}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Tips */}
             <div className="mb-5">
@@ -797,16 +1335,6 @@ function ModuleDetail({ module, moduleProgress, onValidate, onComplete, validati
                   ))}
                 </ul>
               )}
-            </div>
-
-            {/* Star criteria hint */}
-            <div
-              className="mb-5 p-3 bg-gray-50 border border-gray-200 text-sm text-gray-600"
-              style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-            >
-              <span className="font-semibold text-gray-700">Earning stars: </span>
-              Meet the minimum objectives for 1 star. Exceed them for 2-3 stars
-              (e.g., more fields, more steps, more advanced node types).
             </div>
 
             {/* Action buttons */}
@@ -927,16 +1455,25 @@ function CelebrationOverlay({ result, onDismiss }: { result: CompletionResult; o
       >
         {result.certified ? (
           <>
-            <div className="cert-badge-glow mx-auto mb-4 w-20 h-20 flex items-center justify-center rounded-full"
+            <div className="cert-badge-glow mx-auto mb-4 w-24 h-24 flex items-center justify-center rounded-full"
               style={{ background: `linear-gradient(135deg, ${levelConfig.color}, var(--highlight-complement))` }}
             >
-              <Award size={40} className="text-white" />
+              <Award size={48} className="text-white" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2 title-shimmer">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">
+              University of Idaho
+            </p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-1 title-shimmer">
               Vandal Workflow Architect
             </h2>
-            <p className="text-gray-600 mb-4">
-              You've mastered all 8 modules and earned your VWA certification.
+            <p className="text-sm font-semibold mb-3" style={{ color: 'var(--highlight-color)' }}>
+              Certified Professional
+            </p>
+            <p className="text-gray-600 text-sm mb-2">
+              You have completed all 11 modules and demonstrated mastery of AI-powered document workflow design, construction, validation, and governance for research administration.
+            </p>
+            <p className="text-gray-500 text-xs">
+              This credential recognizes your ability to turn real research administration processes into reliable, automated pipelines.
             </p>
           </>
         ) : (
@@ -999,7 +1536,7 @@ function CelebrationOverlay({ result, onDismiss }: { result: CompletionResult; o
 function CertifiedBanner() {
   return (
     <div
-      className="relative overflow-hidden p-6 text-center"
+      className="relative overflow-hidden p-8 text-center"
       style={{
         borderRadius: 'var(--ui-radius, 12px)',
         background: 'linear-gradient(135deg, #191919, #2d2d2d)',
@@ -1009,15 +1546,23 @@ function CertifiedBanner() {
       <div className="absolute inset-0 cert-banner-shimmer" />
 
       <div className="relative">
-        <div className="flex items-center justify-center gap-3 mb-2">
-          <Award size={28} className="text-yellow-400" />
-          <h2 className="text-xl font-bold text-white title-shimmer">
-            Vandal Workflow Architect
-          </h2>
-          <Award size={28} className="text-yellow-400" />
+        <div className="flex items-center justify-center gap-3 mb-1">
+          <Award size={32} className="text-yellow-400" />
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-0.5">
+              University of Idaho \u00b7 Certified
+            </p>
+            <h2 className="text-2xl font-bold text-white title-shimmer">
+              Vandal Workflow Architect
+            </h2>
+          </div>
+          <Award size={32} className="text-yellow-400" />
         </div>
-        <p className="text-gray-400 text-sm">
-          Certified \u00b7 All 8 modules completed \u00b7 1600 XP
+        <p className="text-gray-400 text-sm mt-2">
+          All 11 modules completed \u00b7 1850 XP \u00b7 Architect level
+        </p>
+        <p className="text-gray-500 text-xs mt-1">
+          Recognized for mastery in AI-powered document workflow design for research administration
         </p>
       </div>
     </div>
@@ -1029,12 +1574,15 @@ function CertifiedBanner() {
 // ---------------------------------------------------------------------------
 
 export default function Certification() {
-  const { progress, loading, validate, complete } = useCertification()
+  const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
   const [validating, setValidating] = useState(false)
   const [completing, setCompleting] = useState(false)
+  const [provisioning, setProvisioning] = useState(false)
+  const [submittingAssessment, setSubmittingAssessment] = useState(false)
+  const [exercise, setExercise] = useState<CertExercise | null>(null)
   const detailRef = useRef<HTMLDivElement>(null)
 
   const level = progress?.level || 'novice'
@@ -1052,12 +1600,18 @@ export default function Certification() {
 
   const overallPct = (totalXp / TOTAL_XP) * 100
 
-  const isModuleLocked = (moduleId: string): boolean => {
-    const idx = MODULES.findIndex(m => m.id === moduleId)
-    if (idx === 0) return false
-    const prevModule = MODULES[idx - 1]
-    return !progress?.modules[prevModule.id]?.completed
+  const isModuleLocked = (_moduleId: string): boolean => {
+    return false // TEMP: unlock all modules for review
   }
+
+  // Load exercise when active module changes
+  useEffect(() => {
+    if (!activeModule) {
+      setExercise(null)
+      return
+    }
+    getExercise(activeModule).then(setExercise).catch(() => setExercise(null))
+  }, [activeModule, getExercise])
 
   const handleValidate = async (moduleId: string) => {
     setValidating(true)
@@ -1076,10 +1630,28 @@ export default function Certification() {
       const result = await complete(moduleId)
       setCompletionResult(result)
     } catch {
-      // Validation failed — trigger validate to show what's missing
+      // Validation failed - trigger validate to show what's missing
       await handleValidate(moduleId)
     } finally {
       setCompleting(false)
+    }
+  }
+
+  const handleProvision = async (moduleId: string) => {
+    setProvisioning(true)
+    try {
+      await provision(moduleId)
+    } finally {
+      setProvisioning(false)
+    }
+  }
+
+  const handleSubmitAssessment = async (moduleId: string, answers: Record<string, string>) => {
+    setSubmittingAssessment(true)
+    try {
+      await submitAssessment(moduleId, answers)
+    } finally {
+      setSubmittingAssessment(false)
     }
   }
 
@@ -1134,9 +1706,18 @@ export default function Certification() {
               <h1 className="text-2xl font-bold text-gray-900 mb-1">
                 Vandal Workflow Architect
               </h1>
-              <p className="text-sm text-gray-500 mb-5">
-                Master all 8 modules to earn your VWA certification
+              <p className="text-sm text-gray-500 mb-2">
+                Complete all 11 modules to earn your official certification
               </p>
+              <div
+                className="flex items-center gap-2 px-3 py-2 mb-4 border border-yellow-200 bg-yellow-50/60"
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                <Award size={16} className="text-yellow-600 shrink-0" />
+                <p className="text-xs text-yellow-800">
+                  <span className="font-bold">Vandal Workflow Architect (VWA)</span> — a University of Idaho credential recognizing your ability to design, build, and deploy AI-powered document workflows for research administration.
+                </p>
+              </div>
 
               {/* XP bar */}
               <XPBar
@@ -1154,7 +1735,7 @@ export default function Certification() {
                 >
                   <Award size={14} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
                   <span className="font-semibold text-gray-900">{completedCount}</span>
-                  <span className="text-gray-500">/ 8 modules</span>
+                  <span className="text-gray-500">/ 11 modules</span>
                 </div>
                 <div
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
@@ -1209,11 +1790,19 @@ export default function Certification() {
                 completed: progress.modules[activeModuleDef.id].completed,
                 stars: progress.modules[activeModuleDef.id].stars,
                 attempts: progress.modules[activeModuleDef.id].attempts,
+                provisioned_docs: progress.modules[activeModuleDef.id].provisioned_docs,
+                lab_space_id: progress.modules[activeModuleDef.id].lab_space_id,
+                self_assessment: progress.modules[activeModuleDef.id].self_assessment,
               } : null}
               onValidate={() => handleValidate(activeModuleDef.id)}
               onComplete={() => handleComplete(activeModuleDef.id)}
+              onProvision={() => handleProvision(activeModuleDef.id)}
+              onSubmitAssessment={(answers) => handleSubmitAssessment(activeModuleDef.id, answers)}
+              exercise={exercise}
               validating={validating}
               completing={completing}
+              provisioning={provisioning}
+              submittingAssessment={submittingAssessment}
             />
 
             {validationResult && (

@@ -4,6 +4,17 @@ export interface ModuleProgress {
   completed_at: string | null
   attempts: number
   xp_earned: number
+  provisioned_docs?: string[]
+  lab_space_id?: string
+  self_assessment?: Record<string, string>
+}
+
+export interface CertExercise {
+  documents: string[]
+  instructions: string[]
+  expected_fields: string[]
+  expected_values: Record<string, string[]>
+  star_criteria: Record<string, string>
 }
 
 export interface CertificationProgress {

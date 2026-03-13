@@ -1,6 +1,10 @@
 """Service layer for the Vandal Workflow Architect certification system."""
 
+import base64
 import datetime
+import json
+import logging
+from pathlib import Path
 from typing import Optional
 
 from beanie import PydanticObjectId
@@ -8,13 +12,44 @@ from beanie import PydanticObjectId
 from app.models.certification import CertificationProgress
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, WorkflowResult
 from app.models.search_set import SearchSet, SearchSetItem
+from app.models.space import Space
+from app.models.folder import SmartFolder
+from app.models.document import SmartDocument
+
+log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Exercises data (loaded once from certification-data/exercises.json)
+# ---------------------------------------------------------------------------
+
+_CERT_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "certification-data"
+_EXERCISES: dict = {}
+
+
+def _load_exercises() -> dict:
+    global _EXERCISES
+    if _EXERCISES:
+        return _EXERCISES
+    exercises_path = _CERT_DATA_DIR / "exercises.json"
+    if exercises_path.exists():
+        _EXERCISES = json.loads(exercises_path.read_text())
+    return _EXERCISES
+
+
+def get_exercise(module_id: str) -> dict | None:
+    exercises = _load_exercises()
+    return exercises.get(module_id)
+
 
 # ---------------------------------------------------------------------------
 # XP & Level constants
 # ---------------------------------------------------------------------------
 
 MODULE_XP = {
+    "ai_literacy": 50,
     "foundations": 100,
+    "process_mapping": 100,
+    "workflow_design": 100,
     "extraction_engine": 150,
     "multi_step": 150,
     "advanced_nodes": 200,
@@ -37,7 +72,10 @@ LEVELS = [
 ]
 
 MODULE_ORDER = [
+    "ai_literacy",
     "foundations",
+    "process_mapping",
+    "workflow_design",
     "extraction_engine",
     "multi_step",
     "advanced_nodes",
@@ -104,6 +142,124 @@ def _update_streak(prog: CertificationProgress) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Document provisioning
+# ---------------------------------------------------------------------------
+
+CERT_SPACE_TITLE = "Certification Lab"
+CERT_FOLDER_TITLE = "Certification Lab"
+
+
+async def provision_module_documents(user_id: str, module_id: str, settings) -> dict:
+    """Provision sample documents for a certification module.
+
+    Creates a Certification Lab space/folder if needed, uploads the module's
+    sample PDFs, and records provisioned doc UUIDs in CertificationProgress.
+    """
+    from app.services import file_service, space_service, folder_service
+
+    exercise = get_exercise(module_id)
+    if not exercise:
+        return {"error": f"No exercise defined for module {module_id}"}
+
+    doc_filenames = exercise.get("documents", [])
+    if not doc_filenames:
+        return {"provisioned_docs": [], "space_id": None}
+
+    # Find or create Certification Lab space
+    space = await Space.find_one(Space.title == CERT_SPACE_TITLE, Space.user == user_id)
+    if not space:
+        space = await space_service.create_space(CERT_SPACE_TITLE, user_id=user_id)
+
+    # Find or create Certification Lab folder
+    folder = await SmartFolder.find_one(
+        SmartFolder.title == CERT_FOLDER_TITLE,
+        SmartFolder.space == space.uuid,
+        SmartFolder.user_id == user_id,
+    )
+    if not folder:
+        folder = await folder_service.create_folder(
+            name=CERT_FOLDER_TITLE,
+            parent_id="0",
+            space=space.uuid,
+            user_id=user_id,
+        )
+
+    # Upload each document (skip if already exists in the space)
+    provisioned = []
+    docs_dir = _CERT_DATA_DIR / "documents"
+
+    for filename in doc_filenames:
+        filepath = docs_dir / filename
+        if not filepath.exists():
+            log.warning("Certification PDF not found: %s", filepath)
+            continue
+
+        # Check if already uploaded
+        existing = await SmartDocument.find_one(
+            SmartDocument.title == filename,
+            SmartDocument.space == space.uuid,
+            SmartDocument.user_id == user_id,
+        )
+        if existing:
+            provisioned.append(existing.uuid)
+            continue
+
+        # Read and base64-encode
+        pdf_bytes = filepath.read_bytes()
+        blob = base64.b64encode(pdf_bytes).decode("utf-8")
+
+        result = await file_service.upload_document(
+            blob=blob,
+            filename=filename,
+            raw_extension="pdf",
+            space=space.uuid,
+            user_id=user_id,
+            settings=settings,
+            folder=str(folder.id),
+        )
+        provisioned.append(result["uuid"])
+
+    # Store provisioning info in progress
+    prog = await get_progress(user_id)
+    module_data = prog.modules.get(module_id, {})
+    module_data["provisioned_docs"] = provisioned
+    module_data["lab_space_id"] = space.uuid
+    prog.modules[module_id] = module_data
+    prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await prog.save()
+
+    return {"provisioned_docs": provisioned, "space_id": space.uuid}
+
+
+# ---------------------------------------------------------------------------
+# Fuzzy field matching
+# ---------------------------------------------------------------------------
+
+def _normalize(s: str) -> str:
+    return s.lower().strip().replace("_", " ").replace("-", " ")
+
+
+def _fuzzy_field_match(expected: str, field_names: list[str]) -> bool:
+    """Check if an expected field name matches any of the actual field names."""
+    norm_expected = _normalize(expected)
+    expected_words = set(norm_expected.split())
+    for field in field_names:
+        norm_field = _normalize(field)
+        # Exact match
+        if norm_expected == norm_field:
+            return True
+        # Substring match
+        if norm_expected in norm_field or norm_field in norm_expected:
+            return True
+        # Word overlap (at least 2 words or all words match)
+        field_words = set(norm_field.split())
+        overlap = expected_words & field_words
+        if len(overlap) >= min(2, len(expected_words)):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Module validation
 # ---------------------------------------------------------------------------
 
@@ -117,17 +273,17 @@ async def validate_module(user_id: str, module_id: str) -> dict:
 
     prog = await get_progress(user_id)
 
-    # Check prerequisites (must complete prior modules)
-    idx = MODULE_ORDER.index(module_id)
-    if idx > 0:
-        prev = MODULE_ORDER[idx - 1]
-        prev_data = prog.modules.get(prev, {})
-        if not prev_data.get("completed"):
-            return {
-                "passed": False,
-                "stars": 0,
-                "checks": [{"name": "prerequisite", "passed": False, "detail": f"Complete the previous module first"}],
-            }
+    # TEMP: prerequisite check bypassed for review
+    # idx = MODULE_ORDER.index(module_id)
+    # if idx > 0:
+    #     prev = MODULE_ORDER[idx - 1]
+    #     prev_data = prog.modules.get(prev, {})
+    #     if not prev_data.get("completed"):
+    #         return {
+    #             "passed": False,
+    #             "stars": 0,
+    #             "checks": [{"name": "prerequisite", "passed": False, "detail": f"Complete the previous module first"}],
+    #         }
 
     validator = _VALIDATORS.get(module_id)
     if not validator:
@@ -159,6 +315,7 @@ async def complete_module(user_id: str, module_id: str) -> dict:
         xp_earned += (stars - old_stars) * 25
 
     prog.modules[module_id] = {
+        **module_data,  # Preserve provisioned_docs, lab_space_id
         "completed": True,
         "stars": max(stars, old_stars),
         "completed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
@@ -195,16 +352,106 @@ async def complete_module(user_id: str, module_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Helper: collect extraction field names from a user's workflows
+# ---------------------------------------------------------------------------
+
+async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
+    """Returns (max_field_count, all_field_names) across all extraction tasks."""
+    max_fields = 0
+    all_field_names: list[str] = []
+    for wf in workflows:
+        for step_id in wf.steps:
+            step = await WorkflowStep.get(step_id)
+            if not step:
+                continue
+            for task_id in step.tasks:
+                task = await WorkflowStepTask.get(task_id)
+                if task and task.name == "Extraction":
+                    ss_id = (task.data or {}).get("search_set_id")
+                    if ss_id:
+                        items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
+                        field_names = [item.searchphrase for item in items if item.searchphrase]
+                        if len(items) > max_fields:
+                            max_fields = len(items)
+                            all_field_names = field_names
+    return max_fields, all_field_names
+
+
+# ---------------------------------------------------------------------------
+# Self-assessment storage
+# ---------------------------------------------------------------------------
+
+async def store_assessment(user_id: str, module_id: str, answers: dict) -> dict:
+    prog = await get_progress(user_id)
+    module_data = prog.modules.get(module_id, {})
+    module_data["self_assessment"] = {
+        **answers,
+        "completed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+    }
+    prog.modules[module_id] = module_data
+    _update_streak(prog)
+    prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await prog.save()
+    return {"stored": True}
+
+
+# ---------------------------------------------------------------------------
 # Per-module validators
 # ---------------------------------------------------------------------------
 
+async def _validate_ai_literacy(user_id: str) -> dict:
+    prog = await get_progress(user_id)
+    assessment = prog.modules.get("ai_literacy", {}).get("self_assessment", {})
+    all_answered = all(assessment.get(k) for k in ("experience", "comfort", "concern"))
+    checks = [
+        {
+            "name": "Self-assessment completed",
+            "passed": all_answered,
+            "detail": "Answer all 3 reflection questions",
+        }
+    ]
+    return {"passed": all_answered, "stars": 3 if all_answered else 0, "checks": checks}
+
+
+async def _validate_process_mapping(user_id: str) -> dict:
+    prog = await get_progress(user_id)
+    assessment = prog.modules.get("process_mapping", {}).get("self_assessment", {})
+    keys = ("process", "time_sink", "judgment", "outcome")
+    all_answered = all(assessment.get(k) for k in keys)
+    checks = [
+        {
+            "name": "Process reflection completed",
+            "passed": all_answered,
+            "detail": "Answer all 4 reflection questions about your work processes",
+        }
+    ]
+    return {"passed": all_answered, "stars": 3 if all_answered else 0, "checks": checks}
+
+
+async def _validate_workflow_design(user_id: str) -> dict:
+    prog = await get_progress(user_id)
+    assessment = prog.modules.get("workflow_design", {}).get("self_assessment", {})
+    keys = ("step_splitting", "pattern", "concern", "human_role")
+    all_answered = all(assessment.get(k) for k in keys)
+    checks = [
+        {
+            "name": "Design reflection completed",
+            "passed": all_answered,
+            "detail": "Answer all 4 reflection questions about workflow design",
+        }
+    ]
+    return {"passed": all_answered, "stars": 3 if all_answered else 0, "checks": checks}
+
+
 async def _validate_foundations(user_id: str) -> dict:
     checks = []
+    exercise = get_exercise("foundations")
+    expected_fields = exercise.get("expected_fields", []) if exercise else []
 
-    # Check: has a workflow with an Extraction task
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
     has_extraction_workflow = False
     extraction_field_count = 0
+    matched_fields: list[str] = []
     has_execution = False
 
     for wf in workflows:
@@ -216,22 +463,34 @@ async def _validate_foundations(user_id: str) -> dict:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
                     has_extraction_workflow = True
-                    # Count fields in the referenced search set
                     ss_id = (task.data or {}).get("search_set_id")
                     if ss_id:
                         items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
-                        extraction_field_count = max(extraction_field_count, len(items))
+                        field_names = [item.searchphrase for item in items if item.searchphrase]
+                        if len(items) > extraction_field_count:
+                            extraction_field_count = len(items)
+                            matched_fields = [
+                                ef for ef in expected_fields
+                                if _fuzzy_field_match(ef, field_names)
+                            ]
 
         if wf.num_executions and wf.num_executions >= 1:
             has_execution = True
 
+    missing_fields = [f for f in expected_fields if f not in matched_fields]
+
     checks.append({"name": "Has extraction workflow", "passed": has_extraction_workflow, "detail": "Create a workflow with an Extraction step"})
-    checks.append({"name": "3+ extraction fields", "passed": extraction_field_count >= 3, "detail": f"Found {extraction_field_count} fields (need 3+)"})
+    checks.append({
+        "name": "Expected fields configured",
+        "passed": len(matched_fields) >= 3,
+        "detail": f"Found {len(matched_fields)}/{len(expected_fields)} expected fields"
+              + (f" (missing: {', '.join(missing_fields[:3])})" if missing_fields else ""),
+    })
     checks.append({"name": "Workflow executed", "passed": has_execution, "detail": "Run your workflow at least once"})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
-    if passed and extraction_field_count >= 5:
+    if passed and len(matched_fields) >= 5:
         stars = 2
     if passed and extraction_field_count >= 8:
         stars = 3
@@ -241,29 +500,36 @@ async def _validate_foundations(user_id: str) -> dict:
 
 async def _validate_extraction_engine(user_id: str) -> dict:
     checks = []
+    exercise = get_exercise("extraction_engine")
+    expected_fields = exercise.get("expected_fields", []) if exercise else []
+
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    max_fields = 0
+    max_fields, all_field_names = await _get_extraction_fields(workflows)
 
-    for wf in workflows:
-        for step_id in wf.steps:
-            step = await WorkflowStep.get(step_id)
-            if not step:
-                continue
-            for task_id in step.tasks:
-                task = await WorkflowStepTask.get(task_id)
-                if task and task.name == "Extraction":
-                    ss_id = (task.data or {}).get("search_set_id")
-                    if ss_id:
-                        items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
-                        max_fields = max(max_fields, len(items))
+    matched_fields = [
+        ef for ef in expected_fields
+        if _fuzzy_field_match(ef, all_field_names)
+    ]
+    missing_fields = [f for f in expected_fields if f not in matched_fields]
 
-    checks.append({"name": "15+ extraction fields", "passed": max_fields >= 15, "detail": f"Largest extraction has {max_fields} fields (need 15+)"})
+    checks.append({
+        "name": "15+ extraction fields",
+        "passed": max_fields >= 15,
+        "detail": f"Largest extraction has {max_fields} fields (need 15+)"
+              + (f" - matched {len(matched_fields)}/{len(expected_fields)} expected" if expected_fields else ""),
+    })
+    if missing_fields:
+        checks.append({
+            "name": "Missing expected fields",
+            "passed": len(missing_fields) == 0,
+            "detail": f"Consider adding: {', '.join(missing_fields[:5])}",
+        })
 
-    passed = all(c["passed"] for c in checks)
+    passed = max_fields >= 15
     stars = 1 if passed else 0
     if passed and max_fields >= 20:
         stars = 2
-    if passed and max_fields >= 30:
+    if passed and max_fields >= 25:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
@@ -451,6 +717,9 @@ async def _validate_governance(user_id: str) -> dict:
 
 
 _VALIDATORS = {
+    "ai_literacy": _validate_ai_literacy,
+    "process_mapping": _validate_process_mapping,
+    "workflow_design": _validate_workflow_design,
     "foundations": _validate_foundations,
     "extraction_engine": _validate_extraction_engine,
     "multi_step": _validate_multi_step,
