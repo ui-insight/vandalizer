@@ -52,10 +52,23 @@ export interface CompletionResult {
   validation: ValidationResult
 }
 
+export interface KnowledgeCheckOption {
+  text: string
+  correct: boolean
+  explanation: string
+}
+
+export interface KnowledgeCheckData {
+  question: string
+  options: KnowledgeCheckOption[]
+}
+
 export interface LessonSection {
   title: string
   content: string
   variant: 'concept' | 'walkthrough' | 'key-terms' | 'insight'
+  knowledgeCheck?: KnowledgeCheckData
+  diagram?: string
 }
 
 export interface ModuleDefinition {
@@ -69,4 +82,13 @@ export interface ModuleDefinition {
   lessons: LessonSection[]
   xp: number
   icon: string
+  estimatedMinutes?: number
+}
+
+export interface TierDefinition {
+  name: string
+  theme: string
+  narrative: string
+  moduleIds: string[]
+  celebration: string
 }

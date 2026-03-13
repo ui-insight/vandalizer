@@ -12,7 +12,6 @@ from beanie import PydanticObjectId
 from app.models.certification import CertificationProgress
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, WorkflowResult
 from app.models.search_set import SearchSet, SearchSetItem
-from app.models.space import Space
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
 
@@ -145,17 +144,17 @@ def _update_streak(prog: CertificationProgress) -> None:
 # Document provisioning
 # ---------------------------------------------------------------------------
 
-CERT_SPACE_TITLE = "Certification Lab"
 CERT_FOLDER_TITLE = "Certification Lab"
 
 
 async def provision_module_documents(user_id: str, module_id: str, settings) -> dict:
     """Provision sample documents for a certification module.
 
-    Creates a Certification Lab space/folder if needed, uploads the module's
-    sample PDFs, and records provisioned doc UUIDs in CertificationProgress.
+    Creates a Certification Lab folder in the user's workspace if needed,
+    uploads the module's sample PDFs, and records provisioned doc UUIDs
+    in CertificationProgress.
     """
-    from app.services import file_service, space_service, folder_service
+    from app.services import file_service, folder_service
 
     exercise = get_exercise(module_id)
     if not exercise:
@@ -165,26 +164,24 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
     if not doc_filenames:
         return {"provisioned_docs": [], "space_id": None}
 
-    # Find or create Certification Lab space
-    space = await Space.find_one(Space.title == CERT_SPACE_TITLE, Space.user == user_id)
-    if not space:
-        space = await space_service.create_space(CERT_SPACE_TITLE, user_id=user_id)
+    # Use user_id as space (matches the workspace file browser convention)
+    space = user_id
 
-    # Find or create Certification Lab folder
+    # Find or create Certification Lab folder in user's workspace
     folder = await SmartFolder.find_one(
         SmartFolder.title == CERT_FOLDER_TITLE,
-        SmartFolder.space == space.uuid,
+        SmartFolder.space == space,
         SmartFolder.user_id == user_id,
     )
     if not folder:
         folder = await folder_service.create_folder(
             name=CERT_FOLDER_TITLE,
             parent_id="0",
-            space=space.uuid,
+            space=space,
             user_id=user_id,
         )
 
-    # Upload each document (skip if already exists in the space)
+    # Upload each document (skip if already exists)
     provisioned = []
     docs_dir = _CERT_DATA_DIR / "documents"
 
@@ -197,7 +194,7 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
         # Check if already uploaded
         existing = await SmartDocument.find_one(
             SmartDocument.title == filename,
-            SmartDocument.space == space.uuid,
+            SmartDocument.space == space,
             SmartDocument.user_id == user_id,
         )
         if existing:
@@ -212,10 +209,10 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
             blob=blob,
             filename=filename,
             raw_extension="pdf",
-            space=space.uuid,
+            space=space,
             user_id=user_id,
             settings=settings,
-            folder=str(folder.id),
+            folder=folder.uuid,
         )
         provisioned.append(result["uuid"])
 
@@ -223,12 +220,12 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
     prog = await get_progress(user_id)
     module_data = prog.modules.get(module_id, {})
     module_data["provisioned_docs"] = provisioned
-    module_data["lab_space_id"] = space.uuid
+    module_data["lab_space_id"] = space
     prog.modules[module_id] = module_data
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await prog.save()
 
-    return {"provisioned_docs": provisioned, "space_id": space.uuid}
+    return {"provisioned_docs": provisioned, "space_id": space}
 
 
 # ---------------------------------------------------------------------------

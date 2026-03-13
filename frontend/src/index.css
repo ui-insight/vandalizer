@@ -300,6 +300,49 @@ html {
   100% { opacity: 0; transform: translateY(100vh) translateX(var(--drift)) rotate(720deg); }
 }
 
+/* Stepper dot pulse for current lesson */
+.cert-dot-pulse {
+  animation: cert-dot-pulse 1.5s ease-in-out infinite;
+}
+@keyframes cert-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+
+/* Lesson markdown content styles */
+.cert-lesson-markdown p {
+  margin-bottom: 0.5rem;
+}
+.cert-lesson-markdown p:last-child {
+  margin-bottom: 0;
+}
+.cert-lesson-markdown strong {
+  font-weight: 600;
+  color: #111827;
+}
+.cert-lesson-markdown ul,
+.cert-lesson-markdown ol {
+  padding-left: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.cert-lesson-markdown li {
+  margin-bottom: 0.25rem;
+}
+.cert-lesson-markdown code {
+  padding: 0.1rem 0.3rem;
+  background: #f3f4f6;
+  border-radius: 0.25rem;
+  font-size: 0.8em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.cert-lesson-markdown blockquote {
+  border-left: 3px solid #d1d5db;
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: #6b7280;
+  font-style: italic;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .cert-slide-in,
   .cert-pop-in,
@@ -311,7 +354,8 @@ html {
   }
   .cert-level-glow,
   .cert-badge-glow,
-  .cert-banner-shimmer {
+  .cert-banner-shimmer,
+  .cert-dot-pulse {
     animation: none !important;
   }
 }

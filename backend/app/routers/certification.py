@@ -51,7 +51,7 @@ async def provision_module(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    """Provision sample documents for a certification module into the user's Certification Lab space."""
+    """Provision sample documents for a certification module into the user's workspace."""
     result = await svc.provision_module_documents(user.user_id, module_id, settings)
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])

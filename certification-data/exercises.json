@@ -47,8 +47,8 @@
   "foundations": {
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add the sample NSF proposal to your Certification Lab space.",
-      "Go to the **Certification Lab** space and open the **Workflows** page.",
+      "Click **Set Up Lab** to add the sample NSF proposal to your workspace.",
+      "Go to your **Workspace** and open the **Workflows** page.",
       "Create a workflow named **NSF Proposal Extractor**.",
       "Add a step with an **Extraction** task.",
       "Create a SearchSet with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
@@ -71,7 +71,7 @@
   "extraction_engine": {
     "documents": ["nih-r01-neuroscience.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add the sample NIH R01 proposal to your Certification Lab space.",
+      "Click **Set Up Lab** to add the sample NIH R01 proposal to your workspace.",
       "Create a new SearchSet with 15+ fields covering all sections of the NIH proposal.",
       "Include fields for: PI, institution, grant number, budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.",
       "Create a workflow with an Extraction task using your comprehensive SearchSet.",
@@ -102,7 +102,7 @@
   "multi_step": {
     "documents": ["subaward-agreement.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add the sample subaward agreement to your Certification Lab space.",
+      "Click **Set Up Lab** to add the sample subaward agreement to your workspace.",
       "Create a 3-step workflow:",
       "  **Step 1** — Extraction: Create a SearchSet with fields for parties, amounts, period, PI, deliverables, and compliance terms.",
       "  **Step 2** — Prompt: Write a prompt that analyzes the extracted subaward data and identifies key obligations and deadlines.",
@@ -129,7 +129,7 @@
   "advanced_nodes": {
     "documents": ["budget-justification.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add the sample budget justification to your Certification Lab space.",
+      "Click **Set Up Lab** to add the sample budget justification to your workspace.",
       "Create a workflow that processes the budget document using advanced nodes:",
       "  **Step 1** — Extraction: Extract salary table, supply costs, travel, subawards, and indirect costs.",
       "  **Step 2** — Code Execution: Write Python to sum line items and verify totals match the stated budget.",
@@ -154,7 +154,7 @@
   "output_delivery": {
     "documents": ["progress-report-year2.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add the sample progress report to your Certification Lab space.",
+      "Click **Set Up Lab** to add the sample progress report to your workspace.",
       "Create a workflow that produces a downloadable deliverable from the progress report:",
       "  **Step 1** — Extraction: Extract accomplishments, publications, students trained, budget expenditures, and milestones.",
       "  **Step 2** — Prompt: Summarize the progress and highlight key achievements.",
@@ -180,7 +180,7 @@
   "validation_qa": {
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
-      "This module reuses the NSF proposal from Module 1 (already in your Certification Lab if you completed that module).",
+      "This module reuses the NSF proposal from Module 1 (already in your workspace if you completed that module).",
       "Open the workflow you created in Module 1 (or create a new one for this document).",
       "Go to the **Validate** tab in the workflow editor.",
       "Create a validation plan with at least 2 quality checks (e.g., 'PI Name is not null', 'Total Budget is a valid number').",
@@ -199,7 +199,7 @@
   "batch_processing": {
     "documents": ["proposal-batch-1.pdf", "proposal-batch-2.pdf", "proposal-batch-3.pdf"],
     "instructions": [
-      "Click **Set Up Lab** to add three sample NSF proposals to your Certification Lab space.",
+      "Click **Set Up Lab** to add three sample NSF proposals to your workspace.",
       "Use an existing extraction workflow (from Module 1 or 2) or create a new one.",
       "Select all three batch documents: **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, **proposal-batch-3.pdf**.",
       "Run the workflow in **Batch** mode.",
