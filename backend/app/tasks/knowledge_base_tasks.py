@@ -168,7 +168,9 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         # Fetch URL content
         import httpx
         from bs4 import BeautifulSoup
+        from app.utils.url_validation import validate_outbound_url
 
+        validate_outbound_url(url)  # raises ValueError for internal/private URLs
         resp = httpx.get(url, timeout=30.0, follow_redirects=True)
         resp.raise_for_status()
 

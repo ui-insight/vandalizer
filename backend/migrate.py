@@ -15,9 +15,12 @@ This script reads each library_item document and:
 Run with:
     python migrate.py              # Apply changes
     python migrate.py --dry-run    # Preview without writing
+    python migrate.py --rollback   # Reverse migration (remove item_id/kind fields)
+    python migrate.py --verify     # Check migration integrity
 """
 
 import argparse
+import datetime
 import sys
 
 from pymongo import MongoClient
@@ -27,6 +30,17 @@ CLS_TO_KIND = {
     "Workflow": "workflow",
     "SearchSet": "search_set",
 }
+
+
+def backup_collection(db, collection_name: str) -> str:
+    """Copy collection to a timestamped backup. Returns backup collection name."""
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_name = f"{collection_name}_backup_{timestamp}"
+    docs = list(db[collection_name].find())
+    if docs:
+        db[backup_name].insert_many(docs)
+    print(f"Backed up {len(docs)} documents to {backup_name}")
+    return backup_name
 
 
 def migrate_library_items(db, dry_run: bool = False) -> dict:
@@ -90,9 +104,69 @@ def migrate_library_items(db, dry_run: bool = False) -> dict:
     return stats
 
 
+def rollback_library_items(db, dry_run: bool = False) -> dict:
+    """Reverse the migration: remove item_id/kind fields from documents
+    that still have the original obj field."""
+    collection = db["library_item"]
+
+    query = {"item_id": {"$exists": True}, "obj": {"$exists": True}}
+    docs = list(collection.find(query))
+
+    stats = {"total": len(docs), "rolled_back": 0}
+    print(f"Found {len(docs)} library_item documents to roll back")
+
+    for doc in docs:
+        doc_id = doc["_id"]
+        if dry_run:
+            print(f"  DRY-RUN rollback {doc_id}")
+        else:
+            collection.update_one(
+                {"_id": doc_id},
+                {"$unset": {"item_id": "", "kind": ""}},
+            )
+            print(f"  ROLLED BACK {doc_id}")
+        stats["rolled_back"] += 1
+
+    return stats
+
+
+def verify_migration(db) -> dict:
+    """Check migration integrity: every library_item should have item_id and kind."""
+    collection = db["library_item"]
+
+    total = collection.count_documents({})
+    with_item_id = collection.count_documents({"item_id": {"$exists": True}})
+    with_kind = collection.count_documents({"kind": {"$exists": True}})
+    with_obj_no_item_id = collection.count_documents(
+        {"obj": {"$exists": True}, "item_id": {"$exists": False}}
+    )
+
+    stats = {
+        "total": total,
+        "with_item_id": with_item_id,
+        "with_kind": with_kind,
+        "unmigrated": with_obj_no_item_id,
+    }
+
+    print(f"Total library_item documents: {total}")
+    print(f"  With item_id: {with_item_id}")
+    print(f"  With kind: {with_kind}")
+    print(f"  Unmigrated (have obj but no item_id): {with_obj_no_item_id}")
+
+    if with_obj_no_item_id > 0:
+        print("\nWARNING: Some documents still need migration!")
+    else:
+        print("\nMigration verified: all documents have been migrated.")
+
+    return stats
+
+
 def main():
     parser = argparse.ArgumentParser(description="Migrate LibraryItem GenericReferenceField to flat fields")
     parser.add_argument("--dry-run", action="store_true", help="Preview changes without writing")
+    parser.add_argument("--rollback", action="store_true", help="Reverse the migration")
+    parser.add_argument("--verify", action="store_true", help="Check migration integrity")
+    parser.add_argument("--no-backup", action="store_true", help="Skip automatic backup before migration")
     parser.add_argument("--mongo-host", default="mongodb://localhost:27017/", help="MongoDB connection string")
     parser.add_argument("--db-name", default="osp", help="Database name")
     args = parser.parse_args()
@@ -101,8 +175,29 @@ def main():
     db = client[args.db_name]
 
     print(f"Database: {args.db_name}")
+    print()
+
+    if args.verify:
+        verify_migration(db)
+        return
+
+    if args.rollback:
+        print(f"Dry run: {args.dry_run}")
+        print()
+        if not args.dry_run and not args.no_backup:
+            backup_collection(db, "library_item")
+            print()
+        stats = rollback_library_items(db, dry_run=args.dry_run)
+        print()
+        print(f"Results: {stats['rolled_back']} rolled back out of {stats['total']}")
+        return
+
     print(f"Dry run: {args.dry_run}")
     print()
+
+    if not args.dry_run and not args.no_backup:
+        backup_collection(db, "library_item")
+        print()
 
     stats = migrate_library_items(db, dry_run=args.dry_run)
 

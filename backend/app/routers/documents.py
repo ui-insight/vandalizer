@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
 from app.models.document import SmartDocument
+from app.models.team import Team, TeamMembership
 from app.models.user import User
-from app.models.team import Team
 from app.services import document_service
 
 router = APIRouter()
@@ -23,6 +23,17 @@ async def list_documents(
         team = await Team.get(user.current_team)
         if team:
             team_uuid = team.uuid
+
+    # Validate that the user is a member of the requested team
+    if team_uuid:
+        team = await Team.find_one(Team.uuid == team_uuid)
+        if team:
+            membership = await TeamMembership.find_one(
+                TeamMembership.team == team.id,
+                TeamMembership.user_id == user.user_id,
+            )
+            if not membership:
+                raise HTTPException(status_code=403, detail="Not a member of this team")
 
     return await document_service.list_contents(
         space, folder, user_id=user.user_id, team_uuid=team_uuid

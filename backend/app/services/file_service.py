@@ -100,22 +100,41 @@ async def upload_document(
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
 
-async def download_document(doc_uuid: str, settings: Settings) -> Path | None:
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+def _safe_resolve(settings: Settings, relative_path: str) -> Path | None:
+    """Resolve *relative_path* under the upload dir, rejecting traversal."""
+    upload_root = Path(settings.upload_dir).resolve()
+    resolved = (upload_root / relative_path).resolve()
+    if not resolved.is_relative_to(upload_root):
+        return None
+    return resolved
+
+
+async def download_document(
+    doc_uuid: str, settings: Settings, *, user_id: str | None = None
+) -> Path | None:
+    filters = [SmartDocument.uuid == doc_uuid]
+    if user_id is not None:
+        filters.append(SmartDocument.user_id == user_id)
+    doc = await SmartDocument.find_one(*filters)
     if not doc:
         return None
     download_path = doc.downloadpath or doc.path
-    return Path(settings.upload_dir) / download_path
+    return _safe_resolve(settings, download_path)
 
 
-async def delete_document(doc_uuid: str, settings: Settings) -> bool:
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+async def delete_document(
+    doc_uuid: str, settings: Settings, *, user_id: str | None = None
+) -> bool:
+    filters = [SmartDocument.uuid == doc_uuid]
+    if user_id is not None:
+        filters.append(SmartDocument.user_id == user_id)
+    doc = await SmartDocument.find_one(*filters)
     if not doc:
         return False
     # Delete file
     download_path = doc.downloadpath or doc.path
-    file_path = Path(settings.upload_dir) / download_path
-    if file_path.exists():
+    file_path = _safe_resolve(settings, download_path)
+    if file_path and file_path.exists():
         file_path.unlink()
     await doc.delete()
     return True

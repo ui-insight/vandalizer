@@ -6,12 +6,29 @@ export class ApiError extends Error {
   }
 }
 
+function getCsrfToken(): string | null {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
+  return match ? decodeURIComponent(match[1]) : null
+}
+
 async function refreshToken(): Promise<boolean> {
   const res = await fetch('/api/auth/refresh', {
     method: 'POST',
     credentials: 'include',
   })
   return res.ok
+}
+
+function buildHeaders(options: RequestInit): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  }
+  const csrf = getCsrfToken()
+  if (csrf) {
+    headers['X-CSRF-Token'] = csrf
+  }
+  return headers
 }
 
 export async function apiFetch<T>(
@@ -21,10 +38,7 @@ export async function apiFetch<T>(
   const res = await fetch(url, {
     ...options,
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers: buildHeaders(options),
   })
 
   if (res.status === 401) {
@@ -33,10 +47,7 @@ export async function apiFetch<T>(
       const retry = await fetch(url, {
         ...options,
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
+        headers: buildHeaders(options),
       })
       if (retry.ok) return retry.json()
     }

@@ -9,6 +9,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import Settings
 from app.database import init_db
+from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
 from app.routers import activity, admin, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, office, spaces, teams, verification, workflows
 
@@ -49,12 +50,21 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
         if get_settings().is_production:
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         return response
 
 
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(CSRFMiddleware)
 
 
 # ---------------------------------------------------------------------------

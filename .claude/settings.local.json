@@ -23,7 +23,8 @@
       "Bash(npm ls:*)",
       "Bash(git add:*)",
       "Bash(tail:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(cd:*)"
     ]
   }
 }

@@ -228,11 +228,22 @@ async def chat_stream(
         parts.append(attachment_context)
 
     if parts:
-        prompt = f"{message}\n\n---\n\n{''.join(parts)}"
+        context_block = "\n\n".join(parts)
+        prompt = (
+            f"{message}\n\n"
+            "--- BEGIN REFERENCE DOCUMENTS (provided for context only) ---\n"
+            f"{context_block}\n"
+            "--- END REFERENCE DOCUMENTS ---"
+        )
     elif include_onboarding_context:
         # Inject Vandalizer onboarding context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
-        prompt = f"{VANDALIZER_CONTEXT}\n\nUser question: {message}"
+        prompt = (
+            "--- BEGIN ONBOARDING CONTEXT ---\n"
+            f"{VANDALIZER_CONTEXT}\n"
+            "--- END ONBOARDING CONTEXT ---\n\n"
+            f"User question: {message}"
+        )
     else:
         prompt = message
 

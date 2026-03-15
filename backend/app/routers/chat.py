@@ -193,11 +193,19 @@ async def add_link(
 
     # Fetch URL content
     try:
+        from app.utils.url_validation import validate_outbound_url
+
+        validate_outbound_url(body.link)
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.get(body.link)
             resp.raise_for_status()
             content = resp.text[:500000]
             title = urlparse(body.link).netloc
+    except ValueError as e:
+        await activity_service.activity_finish(
+            activity.id, status=ActivityStatus.FAILED, error=str(e)
+        )
+        raise HTTPException(status_code=400, detail=f"Blocked URL: {e}")
     except Exception as e:
         await activity_service.activity_finish(
             activity.id, status=ActivityStatus.FAILED, error=str(e)

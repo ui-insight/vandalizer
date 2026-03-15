@@ -477,12 +477,23 @@ class CodeExecutionNode(Node):
         import datetime
         import math
 
+        from app.utils.code_sandbox import validate_sandbox_code
+
+        try:
+            validate_sandbox_code(code)
+        except (ValueError, SyntaxError) as e:
+            return {
+                "output": f"Code rejected: {e}",
+                "input": inputs.get("output"),
+                "step_name": self.name,
+            }
+
         safe_builtins = {
             "json": json, "re": re, "math": math, "datetime": datetime,
             "str": str, "int": int, "float": float, "list": list, "dict": dict,
             "len": len, "range": range, "enumerate": enumerate, "sorted": sorted,
             "min": min, "max": max, "sum": sum, "round": round, "abs": abs,
-            "isinstance": isinstance, "type": type, "print": print,
+            "isinstance": isinstance, "print": print,
             "True": True, "False": False, "None": None,
         }
         local_vars = {"data": inputs.get("output"), "result": None}
@@ -522,6 +533,13 @@ class CrawlerNode(Node):
         if not start_url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
+        from app.utils.url_validation import validate_outbound_url
+
+        try:
+            validate_outbound_url(start_url)
+        except ValueError as e:
+            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+
         self.report_progress(f"Crawling from {start_url}")
         parsed_start = urlparse(start_url)
         allowed = {d.strip() for d in allowed_domains.split(",") if d.strip()} if allowed_domains else {parsed_start.netloc}
@@ -549,7 +567,11 @@ class CrawlerNode(Node):
                     abs_url = urljoin(url, link["href"])
                     parsed = urlparse(abs_url)
                     if parsed.netloc in allowed and abs_url not in visited:
-                        to_visit.append(abs_url)
+                        try:
+                            validate_outbound_url(abs_url)
+                            to_visit.append(abs_url)
+                        except ValueError:
+                            continue
 
         return {"output": "\n\n".join(all_text), "input": inputs.get("output"), "step_name": self.name}
 
@@ -602,6 +624,13 @@ class APICallNode(Node):
         body_raw = self.data.get("body", "")
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        from app.utils.url_validation import validate_outbound_url
+
+        try:
+            validate_outbound_url(url)
+        except ValueError as e:
+            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         self.report_progress(f"{method} {url}")
         headers = {}

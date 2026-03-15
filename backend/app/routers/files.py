@@ -54,7 +54,7 @@ async def download_head(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings)
+    path = await file_service.download_document(docid, settings, user_id=user.user_id)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
@@ -72,7 +72,7 @@ async def download(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings)
+    path = await file_service.download_document(docid, settings, user_id=user.user_id)
     if not path or not path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
@@ -97,7 +97,9 @@ async def download_bulk(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for docid in doc_ids:
-            path = await file_service.download_document(docid, settings)
+            path = await file_service.download_document(
+                docid, settings, user_id=user.user_id
+            )
             if path and path.exists():
                 zf.write(path, path.name)
 
@@ -115,7 +117,7 @@ async def delete(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    ok = await file_service.delete_document(doc_uuid, settings)
+    ok = await file_service.delete_document(doc_uuid, settings, user_id=user.user_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}

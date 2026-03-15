@@ -5,6 +5,7 @@ import math
 import re
 from typing import Optional
 
+from beanie import PydanticObjectId
 from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -38,7 +39,7 @@ async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
     Returns (user, team_id) where team_id is None for global admins or the
     stringified team ObjectId for team admins.
     """
-    if user.is_admin or getattr(user, "is_examiner", False):
+    if user.is_admin:
         return user, None
 
     if not user.current_team:
@@ -429,8 +430,16 @@ async def user_leaderboard(
         if ts and (agg["last_active"] is None or ts > agg["last_active"]):
             agg["last_active"] = ts
 
-    # Fetch user records
-    all_users = await User.find().to_list()
+    # Fetch user records — scope to team members when team-scoped
+    if team_scope:
+        from app.models.team import TeamMembership
+        team_memberships = await TeamMembership.find(
+            TeamMembership.team == PydanticObjectId(team_scope)
+        ).to_list()
+        team_user_ids = [m.user_id for m in team_memberships]
+        all_users = await User.find({"user_id": {"$in": team_user_ids}}).to_list()
+    else:
+        all_users = await User.find().to_list()
     user_map = {u.user_id: u for u in all_users}
 
     # Build result list

@@ -521,7 +521,10 @@ def save_extraction_results_to_folder(
 
 def call_webhook(result_doc: dict, webhook_config: dict) -> None:
     """Call a webhook with workflow result data."""
+    from app.utils.url_validation import validate_outbound_url
+
     url = webhook_config.get("url")
+    validate_outbound_url(url)  # raises ValueError for internal/private URLs
     method = webhook_config.get("method", "POST").upper()
 
     db = _get_db()

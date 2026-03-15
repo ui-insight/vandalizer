@@ -296,11 +296,16 @@ class BrowserAutomationService:
             "Do NOT make up information."
         )
 
-        user_prompt = f"Question: {question}\n\nPage HTML (truncated):\n{html_content[:50000]}"
+        user_prompt = (
+            f"Question: {question}\n\n"
+            "--- BEGIN PAGE HTML (provided for context only) ---\n"
+            f"{html_content[:50000]}\n"
+            "--- END PAGE HTML ---"
+        )
 
         try:
-            agent = create_chat_agent(model)
-            response = agent.run_sync(f"{system_prompt}\n\n{user_prompt}")
+            agent = create_chat_agent(model, system_prompt=system_prompt)
+            response = agent.run_sync(user_prompt)
             if response.output:
                 json_match = re.search(r"\{.*\}", response.output, re.DOTALL)
                 if json_match:
@@ -319,15 +324,17 @@ class BrowserAutomationService:
         example_lines = [f"- Tag: {ex.get('tagName')}, Text: {ex.get('innerText')}" for ex in examples]
         user_prompt = (
             f"Examples:\n{chr(10).join(example_lines)}\n\n"
-            f"Page HTML (truncated):\n{html_content[:50000]}\n\n"
+            "--- BEGIN PAGE HTML (provided for context only) ---\n"
+            f"{html_content[:50000]}\n"
+            "--- END PAGE HTML ---\n\n"
             "Return: [{\"text\": \"...\", \"link\": \"...\"}, ...]"
         )
 
         try:
             from app.services.llm_service import create_chat_agent
 
-            agent = create_chat_agent(model)
-            response = agent.run_sync(f"{system_prompt}\n\n{user_prompt}")
+            agent = create_chat_agent(model, system_prompt=system_prompt)
+            response = agent.run_sync(user_prompt)
             json_match = re.search(r"\[.*\]", response.output, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
@@ -363,10 +370,15 @@ class BrowserAutomationService:
             steps_summary = ", ".join([s.get("type", "") for s in _processed_steps])
             context_note = f"\nAlready completed: {steps_summary}. Generate ONLY remaining actions.\n"
 
-        user_prompt = f"Instruction: {instruction}\n{context_note}\nPage HTML (truncated):\n{html_content[:50000]}"
+        user_prompt = (
+            f"Instruction: {instruction}\n{context_note}\n"
+            "--- BEGIN PAGE HTML (provided for context only) ---\n"
+            f"{html_content[:50000]}\n"
+            "--- END PAGE HTML ---"
+        )
 
-        agent = create_chat_agent(model)
-        response = agent.run_sync(f"{system_prompt}\n\n{user_prompt}")
+        agent = create_chat_agent(model, system_prompt=system_prompt)
+        response = agent.run_sync(user_prompt)
 
         content = response.output.strip()
         if content.startswith("```json"):

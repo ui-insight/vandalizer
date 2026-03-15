@@ -29,6 +29,14 @@ jobs:
       - name: Run tests
         run: uv run pytest -x -q
 
+      - name: Security scan (bandit)
+        run: uv run pip install bandit && uv run bandit -r app/ -s B101 -q
+        continue-on-error: true
+
+      - name: Dependency audit
+        run: uv run pip install pip-audit && uv run pip-audit
+        continue-on-error: true
+
   frontend:
     runs-on: ubuntu-latest
     defaults:
@@ -50,5 +58,19 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Run tests
+        run: npx vitest run
+
       - name: Build
         run: npm run build
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend container
+        run: docker build -t vandalizer-backend ./backend
+
+      - name: Build frontend container
+        run: docker build -t vandalizer-frontend ./frontend
