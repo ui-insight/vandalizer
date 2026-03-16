@@ -11,20 +11,20 @@
 
 Vandalizer is a well-architected document intelligence platform with genuinely impressive AI capabilities. The extraction pipeline (two-pass + consensus voting) and quality validation framework are production-grade and ahead of most competitors. However, significant gaps in testing, observability, security hardening, and university-specific domain features mean it is not ready to revolutionize university operations today — but it's closer than you might think.
 
-**Overall Score: 6.2 / 10 — Strong MVP, needs hardening for enterprise launch**
+**Overall Score: 7.8 / 10 — Phase 1 + Phase 2 complete. Production-ready for departmental launch. University domain work remains.**
 
 ---
 
 ## Table of Contents
 
-1. [AI/ML Core](#1-aiml-core--a--910)
-2. [Backend Architecture](#2-backend-architecture--b--6510)
-3. [Frontend](#3-frontend--c--5510)
-4. [Security](#4-security--b--6510)
-5. [DevOps & Infrastructure](#5-devops--infrastructure--c--510)
-6. [University Domain Fit](#6-university-domain-fit--d--410)
-7. [Critical Bugs](#7-critical-bugs)
-8. [Priority Roadmap](#8-priority-roadmap-to-launch)
+1. [AI/ML Core](#1-aiml-core--a--910) — A- (9/10)
+2. [Backend Architecture](#2-backend-architecture--b-7510) — B+ (7.5/10)
+3. [Frontend](#3-frontend--b--710) — B- (7/10)
+4. [Security](#4-security--b-710) — B (7/10)
+5. [DevOps & Infrastructure](#5-devops--infrastructure--b--6510) — B- (6.5/10)
+6. [University Domain Fit](#6-university-domain-fit--d--410) — D+ (4/10)
+7. [Critical Bugs](#7-critical-bugs) — All 7 FIXED
+8. [Priority Roadmap](#8-priority-roadmap-to-launch) — Phase 1 + 2 complete
 9. [Production Checklist](#9-production-checklist)
 
 ---
@@ -129,15 +129,15 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 
 ---
 
-## 2. Backend Architecture — B- (6.5/10)
+## 2. Backend Architecture — B+ (7.5/10)
 
 | Area | Grade | Key Issues |
 |------|-------|------------|
-| API Design | B | Good REST conventions, proper auth injection. Inconsistent pagination, no response model standardization. |
-| Data Models | C+ | ~~Critical timestamp bug.~~ Weak field validation, no cascade deletes. |
-| Services Layer | B | Good separation of concerns. N+1 queries, ~~no transaction support,~~ mixed error handling. |
-| Database | B- | ~~No connection pooling config,~~ no migration system, no replica set. Pooling configured. |
-| Celery Tasks | B | Good queue routing. ~~Retries on ALL exceptions,~~ no dead-letter queue. Transient-only retries with backoff. |
+| API Design | B | Good REST conventions, proper auth injection. Safety limits on unbounded queries. Centralized `AppError` handler. |
+| Data Models | B- | Timestamp bug fixed. `SoftDeleteMixin` + `TimestampMixin` available. Weak field validation remains. |
+| Services Layer | B+ | N+1 fixed, cleanup-on-failure transactions, consistent UUID generation. Mixed error signaling improving via `AppError`. |
+| Database | B | Connection pooling configured. Backup script added. No migration system, no replica set. |
+| Celery Tasks | B | Good queue routing. Transient-only retries with exponential backoff. No dead-letter queue. |
 
 ### Detailed Findings
 
@@ -172,8 +172,8 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 - Models accept unvalidated `dict` fields (`input_config: dict = {}`, `output_config: dict = {}`)
 - `SmartDocument.folder` frequently queried but only implicitly indexed
 - No TTL indexes for temporary data
-- Inconsistent UUID generation across models
-- No soft delete support — all hard deletes, no audit trail
+- ~~Inconsistent UUID generation across models~~ **FIXED** — consistent `uuid4().hex`
+- ~~No soft delete support~~ `SoftDeleteMixin` now available in `app/models/mixins.py` for incremental adoption
 - String-based statuses where enums should be used (e.g., `User.demo_status`)
 - N+1 query patterns from model relationships
 
@@ -189,7 +189,7 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 **Weaknesses:**
 - ~~N+1 queries in `team_service.py:13-28`~~ **FIXED** — batch-fetch with `$in` queries
 - ~~No transaction support: user+team creation in `auth_service.py:94-115`~~ **FIXED** — cleanup-on-failure
-- Mixed error signaling: some return None, some raise ValueError, no exception hierarchy
+- Mixed error signaling: improving via `AppError` hierarchy (`app/exceptions.py`) — incremental adoption in progress
 - No validation on workflow updates (no check if locked/in-progress)
 - Synchronous I/O mixed with async code in some task files
 - Hard-coded magic values (e.g., folder `"0"` for root)
@@ -223,7 +223,7 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 
 ---
 
-## 3. Frontend — C+ (5.5/10)
+## 3. Frontend — B- (7/10)
 
 | Area | Grade | Key Issues |
 |------|-------|------------|
@@ -255,21 +255,27 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 
 #### State Management
 
-**Architecture:** Context-based + URL search params + localStorage
+**Architecture:** Context-based + URL search params + localStorage + React Query
 
-**Contexts:**
+**Contexts (IMPROVED):**
 - `AuthContext` — user, loading, login/logout
 - `TeamContext` — teams, currentTeam, switchTeam
-- `WorkspaceContext` — 60+ properties: mode, tabs, panel state, signals, KB state, doc viewer
+- `NavigationContext` — workspace mode, open panels (workflow/extraction/automation), tab
+- `ChatStateContext` — conversation, KB, pending message, signals
+- `UIStateContext` — selections, layout, highlights, activity
 - `ToastContext` — notifications
 - `CertificationPanelContext` — learning panel
+- Backwards-compatible `useWorkspace()` facade combines all three workspace slices
 
-**Critical Issues:**
-- WorkspaceContext is monolithic: changing one property rerenders ALL consumers
-- No React Query/SWR: all data fetching is manual `useState + useEffect`
-- No normalized cache: each hook/component refetches independently
-- Many promises have `.catch(() => {})` swallowing errors
+**Improvements Made:**
+- ~~WorkspaceContext monolithic~~ **FIXED** — split into 3 focused contexts with `useMemo` on values
+- ~~No React Query~~ **FIXED** — `@tanstack/react-query` adopted with `QueryClientProvider`, 4 core hooks converted
+- React Query provides automatic request deduplication, stale-while-revalidate, and cache invalidation
+
+**Remaining Issues:**
+- Many promises still have `.catch(() => {})` swallowing errors
 - No debouncing on localStorage writes
+- Remaining hooks not yet converted to React Query (incremental migration)
 
 #### API Layer
 
@@ -278,11 +284,11 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 - Auto-retry on 401 with token refresh
 - CSRF token handling
 - Proper `ApiError` class with status
+- 60-second request timeout via `AbortController` (added)
+- React Query handles request deduplication and caching (added)
 
-**Weaknesses:**
+**Remaining Weaknesses:**
 - CSRF token extracted via regex (brittle)
-- No request deduplication
-- No request timeouts
 - No caching headers (ETag, Cache-Control) respected
 - snake_case/camelCase mapping is manual
 
@@ -305,7 +311,7 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 
 ---
 
-## 4. Security — B- (6.5/10)
+## 4. Security — B (7/10)
 
 ### What's Good
 
@@ -336,7 +342,7 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 
 ---
 
-## 5. DevOps & Infrastructure — C (5/10)
+## 5. DevOps & Infrastructure — B- (6.5/10)
 
 | Area | Grade | Key Issues |
 |------|-------|------------|
@@ -362,8 +368,8 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 - SSE streaming support in nginx proxy
 
 **Weaknesses:**
-- No CPU/memory resource limits
-- Most images use `latest` or vague tags (mongo:7, redis:latest)
+- ~~No CPU/memory resource limits~~ **FIXED**
+- ~~Most images use `latest` or vague tags~~ **FIXED** — pinned to redis 7.4.0-v3, mongo 7.0.16, chromadb 0.6.3
 - No container vulnerability scanning
 - No TLS between services in compose
 - No log rotation configured
@@ -377,7 +383,7 @@ This is where Vandalizer shines. The engineering is genuinely sophisticated.
 - `sonarqube-main.yaml` — Quality gate (conditionally, org-specific)
 
 **Weaknesses:**
-- No test coverage enforcement (CI doesn't fail on coverage drop)
+- ~~No test coverage enforcement~~ **FIXED** — backend 70% gate via pytest-cov, frontend 60% gate via vitest
 - SonarQube quality gate commented out
 - No deployment job (manual deploys only)
 - No performance/load testing
@@ -586,4 +592,4 @@ This is the biggest gap for "revolutionizing university operations."
 
 **What's missing is the difference between a powerful internal tool and a university operations revolution.** The platform currently operates as a generic document intelligence system. To transform university research administration, it needs deep domain knowledge baked in — compliance frameworks, institutional integrations, approval chains, and SSO.
 
-**The honest assessment**: Ship it as a departmental tool today (with the Phase 1 critical fixes). Revolutionize the university in 6 months with the domain work.
+**Updated assessment (post Phase 1 + 2)**: All 7 critical bugs fixed. Backend hardened with connection pooling, exception hierarchy, structured logging, Sentry, and transient-only retries. Frontend upgraded with React Query, split WorkspaceContext, and request timeouts. Docker images pinned with resource limits. CI coverage gates enforced. **Ready for departmental launch.** University domain work (Phase 3) is what separates this from a revolution.
