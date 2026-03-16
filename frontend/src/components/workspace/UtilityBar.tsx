@@ -41,6 +41,8 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
               }
             }}
             title={label}
+            aria-label={label}
+            aria-current={active ? 'page' : undefined}
             style={{
               position: 'relative',
               width: 40,

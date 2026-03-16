@@ -126,6 +126,8 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
             <div style={{ marginBottom: 10 }}>
               <button
                 onClick={() => setThinkingExpanded(!thinkingExpanded)}
+                aria-expanded={thinkingExpanded}
+                aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -203,6 +205,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Good response"
+              aria-label="Good response"
             >
               <ThumbsUp size={14} />
             </button>
@@ -216,6 +219,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Poor response"
+              aria-label="Poor response"
             >
               <ThumbsDown size={14} />
             </button>
@@ -229,6 +233,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Copy message"
+              aria-label="Copy message"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>

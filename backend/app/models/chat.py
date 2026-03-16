@@ -104,6 +104,11 @@ class ChatConversation(Document):
 
     class Settings:
         name = "chat_conversation"
+        indexes = [
+            "uuid",
+            "user_id",
+            [("user_id", 1), ("updated_at", -1)],
+        ]
 
     async def add_message(
         self,

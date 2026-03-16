@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import uuid4
 
 from beanie import Document
+from pydantic import Field
 
 
 class QualityAlert(Document):
@@ -24,7 +25,7 @@ class QualityAlert(Document):
     acknowledged: bool = False
     acknowledged_by: Optional[str] = None
     acknowledged_at: Optional[datetime.datetime] = None
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "quality_alerts"

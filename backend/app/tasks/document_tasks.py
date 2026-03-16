@@ -10,6 +10,7 @@ import re
 from pathlib import Path
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,8 @@ def _remove_images_from_markdown(markdown_text: str) -> str:
 @celery_app.task(
     bind=True,
     name="tasks.document.extraction",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )
@@ -131,7 +133,8 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
 @celery_app.task(
     bind=True,
     name="tasks.document.update",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )
@@ -384,7 +387,8 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
 @celery_app.task(
     bind=True,
     name="tasks.document.cleanup",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )
@@ -407,7 +411,8 @@ def cleanup_document(self, document_uuid: str) -> None:
 @celery_app.task(
     bind=True,
     name="tasks.document.semantic_ingestion",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )

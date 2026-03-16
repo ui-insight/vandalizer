@@ -16,11 +16,21 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose()
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-folder-dialog-title"
+      >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-medium text-gray-900">{title || 'New Folder'}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h3 id="create-folder-dialog-title" className="text-lg font-medium text-gray-900">{title || 'New Folder'}</h3>
+          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
             <X className="h-5 w-5" />
           </button>
         </div>

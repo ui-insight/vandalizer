@@ -52,8 +52,13 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
 
 
 @router.get("", response_model=list[WorkflowResponse])
-async def list_workflows(space: str | None = None, user: User = Depends(get_current_user)):
-    workflows = await svc.list_workflows(space=space)
+async def list_workflows(
+    space: str | None = None,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    user: User = Depends(get_current_user),
+):
+    workflows = await svc.list_workflows(space=space, skip=skip, limit=limit)
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,

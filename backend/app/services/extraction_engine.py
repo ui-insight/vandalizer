@@ -49,8 +49,8 @@ class ExtractionEngine:
             with self._usage_lock:
                 self.tokens_in += usage.request_tokens or 0
                 self.tokens_out += usage.response_tokens or 0
-        except Exception:
-            pass
+        except (AttributeError, TypeError):
+            pass  # usage() not available on all result types
 
     # ------------------------------------------------------------------
     # Public API

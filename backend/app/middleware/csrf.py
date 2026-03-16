@@ -77,7 +77,7 @@ def _ensure_csrf_cookie(response: Response, request: Request) -> None:
             secrets.token_urlsafe(32),
             httponly=False,  # JS must be able to read this
             secure=settings.is_production,
-            samesite="lax",
+            samesite="strict",
             path="/",
             max_age=86400 * 30,
         )

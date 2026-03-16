@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     chromadb_persist_dir: str = "../app/static/db"
     max_context_length: int = 100000
 
+    # Observability
+    sentry_dsn: str = ""
+    log_format: str = "json"  # "json" for structured logging, "text" for human-readable
+
     # SMTP email settings
     smtp_host: str = ""
     smtp_port: int = 587

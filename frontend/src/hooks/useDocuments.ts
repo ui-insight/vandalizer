@@ -1,49 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Document, Folder } from '../types/document'
-import { listContents, pollStatus } from '../api/documents'
+import { listContents } from '../api/documents'
+
+interface ContentsResult {
+  documents: Document[]
+  folders: Folder[]
+}
 
 export function useDocuments(space: string, folderId: string | null, teamUuid?: string) {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [folders, setFolders] = useState<Folder[]>([])
-  const [loading, setLoading] = useState(true)
-  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const qc = useQueryClient()
+  const queryKey = ['documents', space, folderId, teamUuid] as const
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await listContents(space, folderId ?? undefined, teamUuid)
-      setFolders(data.folders)
-      setDocuments(data.documents)
-    } finally {
-      setLoading(false)
-    }
-  }, [space, folderId, teamUuid])
+  const { data, isLoading: loading } = useQuery<ContentsResult>({
+    queryKey,
+    queryFn: () => listContents(space, folderId ?? undefined, teamUuid),
+    // Auto-poll every 3s when any document is still processing
+    refetchInterval: (query) => {
+      const docs = query.state.data?.documents
+      if (docs?.some((d) => d.processing)) return 3000
+      return false
+    },
+  })
 
-  useEffect(() => {
-    refresh()
-  }, [refresh])
+  const documents = data?.documents ?? []
+  const folders = data?.folders ?? []
 
-  // Poll processing documents
-  useEffect(() => {
-    const processing = documents.filter((d) => d.processing)
-    if (processing.length === 0) {
-      if (pollRef.current) clearInterval(pollRef.current)
-      return
-    }
-    pollRef.current = setInterval(async () => {
-      let changed = false
-      for (const doc of processing) {
-        const status = await pollStatus(doc.uuid)
-        if (status.complete) {
-          changed = true
-        }
-      }
-      if (changed) refresh()
-    }, 3000)
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, [documents, refresh])
+  const refresh = () => qc.invalidateQueries({ queryKey })
 
   return { documents, folders, loading, refresh }
 }

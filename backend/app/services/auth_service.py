@@ -57,23 +57,28 @@ async def resolve_oauth_user(
     )
     await user.insert()
 
-    team_uuid = uuid.uuid4().hex
-    team = Team(
-        uuid=team_uuid,
-        name=f"{display_name or uid}'s Team",
-        owner_user_id=uid,
-    )
-    await team.insert()
+    # Create team + membership with cleanup on failure to avoid orphaned users
+    try:
+        team_uuid = uuid.uuid4().hex
+        team = Team(
+            uuid=team_uuid,
+            name=f"{display_name or uid}'s Team",
+            owner_user_id=uid,
+        )
+        await team.insert()
 
-    membership = TeamMembership(
-        team=team.id,
-        user_id=uid,
-        role="owner",
-    )
-    await membership.insert()
+        membership = TeamMembership(
+            team=team.id,
+            user_id=uid,
+            role="owner",
+        )
+        await membership.insert()
 
-    user.current_team = team.id
-    await user.save()
+        user.current_team = team.id
+        await user.save()
+    except Exception:
+        await user.delete()
+        raise
 
     return user
 
@@ -99,22 +104,28 @@ async def register(user_id: str, email: str, password: str, name: str | None = N
     )
     await user.insert()
 
-    team_uuid = uuid.uuid4().hex
-    team = Team(
-        uuid=team_uuid,
-        name=f"{name or user_id}'s Team",
-        owner_user_id=user_id,
-    )
-    await team.insert()
+    # Create team + membership with cleanup on failure to avoid orphaned users
+    try:
+        team_uuid = uuid.uuid4().hex
+        team = Team(
+            uuid=team_uuid,
+            name=f"{name or user_id}'s Team",
+            owner_user_id=user_id,
+        )
+        await team.insert()
 
-    membership = TeamMembership(
-        team=team.id,
-        user_id=user_id,
-        role="owner",
-    )
-    await membership.insert()
+        membership = TeamMembership(
+            team=team.id,
+            user_id=user_id,
+            role="owner",
+        )
+        await membership.insert()
 
-    user.current_team = team.id
-    await user.save()
+        user.current_team = team.id
+        await user.save()
+    except Exception:
+        # Clean up the user so registration can be retried
+        await user.delete()
+        raise
 
     return user

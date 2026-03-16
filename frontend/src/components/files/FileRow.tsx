@@ -15,6 +15,13 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
   return (
     <tr
       className="hover:bg-[#a6b5c945]"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick?.()
+        }
+      }}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move'
@@ -108,6 +115,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             onContextMenu(e)
           }}
           className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
+          aria-label="More options"
         >
           <MoreVertical className="h-4 w-4" />
         </button>

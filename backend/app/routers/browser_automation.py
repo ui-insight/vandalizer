@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Cookie, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
@@ -96,21 +96,47 @@ async def end_session(session_id: str, user: User = Depends(get_current_user)):
 
 
 @router.websocket("/ws")
-async def browser_automation_ws(websocket: WebSocket):
+async def browser_automation_ws(
+    websocket: WebSocket,
+    access_token: str | None = Cookie(default=None),
+):
     """WebSocket endpoint for Chrome extension communication.
 
+    Authentication is validated during the handshake via the access_token
+    cookie — unauthenticated clients are rejected before the connection
+    is accepted.
+
     Protocol:
-    1. Extension connects and sends an `auth` message with user_id.
-    2. Server registers the connection.
+    1. Server validates JWT from cookie during handshake.
+    2. Extension connects and server registers the connection.
     3. Server forwards commands from Redis pub/sub to the extension.
     4. Extension sends responses/events which are routed back via Redis.
     """
+    # Authenticate via cookie before accepting the connection
+    from app.config import Settings
+    from app.dependencies import get_settings
+    from app.models.user import User
+    from app.utils.security import decode_token
+
+    settings = get_settings()
+    if not access_token:
+        await websocket.close(code=4001, reason="Not authenticated")
+        return
+    payload = decode_token(access_token, settings)
+    if not payload or payload.get("type") != "access":
+        await websocket.close(code=4001, reason="Invalid token")
+        return
+    ws_user = await User.find_one(User.user_id == payload["sub"])
+    if not ws_user:
+        await websocket.close(code=4001, reason="User not found")
+        return
+
     await websocket.accept()
 
     from app.services.browser_automation import BrowserAutomationService
 
     service = BrowserAutomationService.get_instance()
-    user_id: str | None = None
+    user_id: str | None = ws_user.user_id
 
     # Background task for forwarding Redis -> WebSocket
     forward_task: asyncio.Task | None = None
@@ -144,11 +170,9 @@ async def browser_automation_ws(websocket: WebSocket):
             msg_type = msg.get("type")
 
             if msg_type == "auth":
-                user_id = msg.get("user_id")
-                if not user_id:
-                    await websocket.send_json({"type": "error", "message": "user_id required"})
-                    continue
-
+                # user_id already validated from JWT during handshake;
+                # accept the auth message for protocol compatibility but
+                # always use the JWT-authenticated identity.
                 service.register_websocket(user_id, websocket)
                 await websocket.send_json({"type": "auth_ok"})
 

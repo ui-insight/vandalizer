@@ -60,6 +60,12 @@ class ActivityEvent(Document):
 
     class Settings:
         name = "activity_event"
+        indexes = [
+            "user_id",
+            "team_id",
+            [("user_id", 1), ("started_at", -1)],
+            "status",
+        ]
 
     @property
     def is_running(self) -> bool:

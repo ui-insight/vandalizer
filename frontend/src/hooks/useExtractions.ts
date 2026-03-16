@@ -1,83 +1,93 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/extractions'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 export function useSearchSets(space?: string) {
-  const [searchSets, setSearchSets] = useState<SearchSet[]>([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
+  const queryKey = ['searchSets', space] as const
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await api.listSearchSets(space)
-      setSearchSets(data)
-    } finally {
-      setLoading(false)
-    }
-  }, [space])
+  const { data: searchSets = [], isLoading: loading } = useQuery<SearchSet[]>({
+    queryKey,
+    queryFn: () => api.listSearchSets(space),
+  })
 
-  useEffect(() => { refresh() }, [refresh])
+  const refresh = () => qc.invalidateQueries({ queryKey })
 
-  const create = async (title: string, currentSpace: string) => {
-    const ss = await api.createSearchSet({ title, space: currentSpace })
-    setSearchSets(prev => [...prev, ss])
-    return ss
-  }
+  const createMutation = useMutation({
+    mutationFn: (args: { title: string; space: string }) =>
+      api.createSearchSet({ title: args.title, space: args.space }),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (uuid: string) => api.deleteSearchSet(uuid),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const cloneMutation = useMutation({
+    mutationFn: (uuid: string) => api.cloneSearchSet(uuid),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const create = async (title: string, currentSpace: string) =>
+    createMutation.mutateAsync({ title, space: currentSpace })
 
   const remove = async (uuid: string) => {
-    await api.deleteSearchSet(uuid)
-    setSearchSets(prev => prev.filter(s => s.uuid !== uuid))
+    await removeMutation.mutateAsync(uuid)
   }
 
-  const clone = async (uuid: string) => {
-    const ss = await api.cloneSearchSet(uuid)
-    setSearchSets(prev => [...prev, ss])
-    return ss
-  }
+  const clone = async (uuid: string) =>
+    cloneMutation.mutateAsync(uuid)
 
   return { searchSets, loading, refresh, create, remove, clone }
 }
 
 export function useSearchSetItems(searchSetUuid: string | null) {
-  const [items, setItems] = useState<SearchSetItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const qc = useQueryClient()
+  const queryKey = ['searchSetItems', searchSetUuid] as const
 
-  const refresh = useCallback(async () => {
-    if (!searchSetUuid) { setItems([]); return }
-    setLoading(true)
-    try {
-      const data = await api.listItems(searchSetUuid)
-      setItems(data)
-    } finally {
-      setLoading(false)
-    }
-  }, [searchSetUuid])
+  const { data: items = [], isLoading: loading } = useQuery<SearchSetItem[]>({
+    queryKey,
+    queryFn: () => api.listItems(searchSetUuid!),
+    enabled: !!searchSetUuid,
+  })
 
-  useEffect(() => { refresh() }, [refresh])
+  const refresh = () => qc.invalidateQueries({ queryKey })
+
+  const addMutation = useMutation({
+    mutationFn: (searchphrase: string) => api.addItem(searchSetUuid!, { searchphrase }),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (itemId: string) => api.deleteItem(itemId),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (args: { itemId: string; data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] } }) =>
+      api.updateItem(args.itemId, args.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
 
   const add = async (searchphrase: string) => {
     if (!searchSetUuid) return
-    const item = await api.addItem(searchSetUuid, { searchphrase })
-    setItems(prev => [...prev, item])
-    return item
+    return addMutation.mutateAsync(searchphrase)
   }
 
   const remove = async (itemId: string) => {
-    await api.deleteItem(itemId)
-    setItems(prev => prev.filter(i => i.id !== itemId))
+    await removeMutation.mutateAsync(itemId)
   }
 
-  const update = async (itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => {
-    const updated = await api.updateItem(itemId, data)
-    setItems(prev => prev.map(i => i.id === itemId ? updated : i))
-    return updated
-  }
+  const update = async (itemId: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) =>
+    updateMutation.mutateAsync({ itemId, data })
 
   const reorder = async (itemIds: string[]) => {
     if (!searchSetUuid) return
-    // Optimistically reorder locally
-    setItems(prev => {
-      const map = new Map(prev.map(i => [i.id, i]))
+    // Optimistically reorder in cache
+    qc.setQueryData<SearchSetItem[]>(queryKey, (old) => {
+      if (!old) return old
+      const map = new Map(old.map(i => [i.id, i]))
       return itemIds.map(id => map.get(id)).filter(Boolean) as SearchSetItem[]
     })
     await api.reorderItems(searchSetUuid, itemIds)

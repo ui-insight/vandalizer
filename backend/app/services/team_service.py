@@ -15,9 +15,15 @@ async def get_user_teams(user_id: str) -> list[dict]:
     memberships = await TeamMembership.find(
         TeamMembership.user_id == user_id
     ).to_list()
+    if not memberships:
+        return []
+    # Batch-fetch all teams in one query instead of N+1
+    team_ids = [m.team for m in memberships]
+    teams = await Team.find({"_id": {"$in": team_ids}}).to_list()
+    team_map = {team.id: team for team in teams}
     result = []
     for m in memberships:
-        team = await Team.get(m.team)
+        team = team_map.get(m.team)
         if team:
             result.append({
                 "id": str(team.id),
@@ -34,9 +40,15 @@ async def get_team_members(team_id: PydanticObjectId) -> list[dict]:
     memberships = await TeamMembership.find(
         TeamMembership.team == team_id
     ).to_list()
+    if not memberships:
+        return []
+    # Batch-fetch all users in one query instead of N+1
+    user_ids = [m.user_id for m in memberships]
+    users = await User.find({"user_id": {"$in": user_ids}}).to_list()
+    user_map = {u.user_id: u for u in users}
     result = []
     for m in memberships:
-        user = await User.find_one(User.user_id == m.user_id)
+        user = user_map.get(m.user_id)
         result.append({
             "user_id": m.user_id,
             "role": m.role,
@@ -67,7 +79,7 @@ async def get_team_invites(team_id: PydanticObjectId) -> list[dict]:
 async def create_team(name: str, user_id: str) -> Team:
     """Create a new team with the user as owner."""
     team = Team(
-        uuid=secrets.token_urlsafe(12),
+        uuid=uuid.uuid4().hex,
         name=name,
         owner_user_id=user_id,
     )

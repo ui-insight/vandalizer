@@ -49,7 +49,7 @@ async def upload_document(
         SmartDocument.folder == target_folder,
     )
     if existing:
-        return {"complete": True, "exists": True}
+        return {"complete": True, "exists": True, "uuid": existing.uuid}
 
     uid = uuid.uuid4().hex.upper()
 

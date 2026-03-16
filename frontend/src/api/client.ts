@@ -33,13 +33,28 @@ function buildHeaders(options: RequestInit): HeadersInit {
 
 export async function apiFetch<T>(
   url: string,
-  options: RequestInit = {},
+  options: RequestInit & { timeoutMs?: number } = {},
 ): Promise<T> {
-  const res = await fetch(url, {
-    ...options,
-    credentials: 'include',
-    headers: buildHeaders(options),
-  })
+  const { timeoutMs = 60_000, ...fetchOptions } = options
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+
+  let res: Response
+  try {
+    res = await fetch(url, {
+      ...fetchOptions,
+      credentials: 'include',
+      headers: buildHeaders(fetchOptions),
+      signal: controller.signal,
+    })
+  } catch (err) {
+    clearTimeout(timer)
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new ApiError(0, 'Request timed out')
+    }
+    throw err
+  }
+  clearTimeout(timer)
 
   if (res.status === 401) {
     const refreshed = await refreshToken()

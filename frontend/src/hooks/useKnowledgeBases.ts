@@ -1,34 +1,34 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/knowledge'
 import type { KnowledgeBase } from '../types/knowledge'
 
 export function useKnowledgeBases() {
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
+  const queryKey = ['knowledgeBases'] as const
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await api.listKnowledgeBases()
-      setKnowledgeBases(data)
-    } catch {
-      // errors handled by caller
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const { data: knowledgeBases = [], isLoading: loading } = useQuery<KnowledgeBase[]>({
+    queryKey,
+    queryFn: () => api.listKnowledgeBases(),
+  })
 
-  useEffect(() => { refresh() }, [refresh])
+  const refresh = () => qc.invalidateQueries({ queryKey })
 
-  const create = async (title: string, description?: string) => {
-    const kb = await api.createKnowledgeBase(title, description)
-    setKnowledgeBases(prev => [kb, ...prev])
-    return kb
-  }
+  const createMutation = useMutation({
+    mutationFn: (args: { title: string; description?: string }) =>
+      api.createKnowledgeBase(args.title, args.description),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (uuid: string) => api.deleteKnowledgeBase(uuid),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const create = async (title: string, description?: string) =>
+    createMutation.mutateAsync({ title, description })
 
   const remove = async (uuid: string) => {
-    await api.deleteKnowledgeBase(uuid)
-    setKnowledgeBases(prev => prev.filter(k => k.uuid !== uuid))
+    await removeMutation.mutateAsync(uuid)
   }
 
   return { knowledgeBases, loading, refresh, create, remove }

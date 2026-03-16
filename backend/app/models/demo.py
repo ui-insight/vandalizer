@@ -2,6 +2,7 @@ import datetime
 from typing import Optional
 
 from beanie import Document, PydanticObjectId
+from pydantic import Field
 
 
 class DemoApplication(Document):
@@ -21,7 +22,7 @@ class DemoApplication(Document):
     post_questionnaire_completed: bool = False
     post_questionnaire_token: Optional[str] = None
     admin_released: bool = False
-    created_at: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     last_notified_position: Optional[int] = None
 
     class Settings:
@@ -32,7 +33,7 @@ class PostExperienceResponse(Document):
     uuid: str
     demo_application_id: PydanticObjectId
     responses: dict = {}
-    created_at: datetime.datetime = datetime.datetime.now(datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     class Settings:
         name = "post_experience_response"

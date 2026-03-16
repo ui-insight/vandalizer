@@ -25,3 +25,8 @@ class User(Document):
 
     class Settings:
         name = "user"
+        indexes = [
+            "user_id",
+            "email",
+            "api_token",
+        ]

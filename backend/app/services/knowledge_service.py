@@ -436,6 +436,9 @@ async def _ingest_url_source(
     source.status = "processing"
     await source.save()
     try:
+        from app.utils.url_validation import validate_outbound_url
+
+        validate_outbound_url(source.url)
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             resp = await client.get(source.url)
             resp.raise_for_status()

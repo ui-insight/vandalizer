@@ -1,38 +1,44 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/workflows'
 import type { Workflow } from '../types/workflow'
 
 export function useWorkflows(space?: string) {
-  const [workflows, setWorkflows] = useState<Workflow[]>([])
-  const [loading, setLoading] = useState(true)
+  const qc = useQueryClient()
+  const queryKey = ['workflows', space] as const
 
-  const refresh = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await api.listWorkflows(space)
-      setWorkflows(data)
-    } finally {
-      setLoading(false)
-    }
-  }, [space])
+  const { data: workflows = [], isLoading: loading } = useQuery<Workflow[]>({
+    queryKey,
+    queryFn: () => api.listWorkflows(space),
+  })
 
-  useEffect(() => { refresh() }, [refresh])
+  const refresh = () => qc.invalidateQueries({ queryKey })
+
+  const createMutation = useMutation({
+    mutationFn: (args: { name: string; space?: string }) =>
+      api.createWorkflow({ name: args.name, space: args.space }),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: (id: string) => api.deleteWorkflow(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => api.duplicateWorkflow(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
 
   const create = async (name: string, currentSpace?: string) => {
-    const wf = await api.createWorkflow({ name, space: currentSpace })
-    setWorkflows(prev => [...prev, wf])
-    return wf
+    return createMutation.mutateAsync({ name, space: currentSpace })
   }
 
   const remove = async (id: string) => {
-    await api.deleteWorkflow(id)
-    setWorkflows(prev => prev.filter(w => w.id !== id))
+    await removeMutation.mutateAsync(id)
   }
 
   const duplicate = async (id: string) => {
-    const wf = await api.duplicateWorkflow(id)
-    setWorkflows(prev => [...prev, wf])
-    return wf
+    return duplicateMutation.mutateAsync(id)
   }
 
   return { workflows, loading, refresh, create, remove, duplicate }

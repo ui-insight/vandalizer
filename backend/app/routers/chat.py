@@ -56,7 +56,7 @@ async def chat(
         for folder_uuid in body.folder_uuids:
             folder_docs = await SmartDocument.find(
                 SmartDocument.folder == folder_uuid,
-            ).to_list()
+            ).limit(500).to_list()
             for doc in folder_docs:
                 if doc.uuid not in existing:
                     document_uuids.append(doc.uuid)

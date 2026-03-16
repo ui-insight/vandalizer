@@ -9,6 +9,7 @@ import logging
 import os
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,8 @@ def _recalculate_kb(db, kb_uuid: str) -> None:
 @celery_app.task(
     name="tasks.documents.kb_ingest_document",
     bind=True,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -134,7 +136,8 @@ def kb_ingest_document(self, source_uuid: str) -> None:
 @celery_app.task(
     name="tasks.documents.kb_ingest_url",
     bind=True,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )

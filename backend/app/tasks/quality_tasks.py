@@ -5,6 +5,7 @@ import datetime
 import logging
 
 from app.celery_app import celery
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,8 @@ def _run_async(coro):
 @celery.task(
     bind=True,
     name="tasks.passive.quality_monitor",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=10,
 )
@@ -177,7 +179,8 @@ async def _quality_monitor_async():
 @celery.task(
     name="tasks.passive.auto_validate_extraction",
     bind=True,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=1,
     default_retry_delay=10,
 )
@@ -210,7 +213,8 @@ async def _auto_validate_extraction_async(search_set_uuid, user_id, model=None):
 @celery.task(
     name="tasks.passive.auto_validate_workflow",
     bind=True,
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=1,
     default_retry_delay=10,
 )

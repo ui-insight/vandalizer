@@ -26,11 +26,12 @@ class KnowledgeBaseSource(Document):
     max_crawl_pages: int = 5
     parent_source_uuid: Optional[str] = None  # links crawled children to parent
     crawled_urls: Optional[list[str]] = None  # list of discovered URLs (on parent)
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     processed_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "knowledge_base_sources"
+        indexes = ["uuid", "knowledge_base_uuid"]
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -56,11 +57,12 @@ class KnowledgeBase(Document):
     sources_failed: int = 0
     total_chunks: int = 0
     collection_name: Optional[str] = None
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-    updated_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "knowledge_bases"
+        indexes = ["uuid", "user_id", "team_id"]
 
     def __init__(self, **data):
         super().__init__(**data)

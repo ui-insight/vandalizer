@@ -20,6 +20,13 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
   return (
     <tr
       className="cursor-pointer"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       onClick={(e) => {
         if (e.button === 0) onClick()
       }}
@@ -113,6 +120,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
             onContextMenu(e)
           }}
           className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
+          aria-label="More options"
         >
           <MoreVertical className="h-4 w-4" />
         </button>

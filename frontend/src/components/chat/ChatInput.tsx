@@ -132,6 +132,7 @@ export function ChatInput({
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={hasDocuments ? "Ask anything about this document..." : "Ask Vandalizer anything..."}
+            aria-label="Message input"
             rows={1}
             className="w-full resize-none border-0 bg-transparent text-base font-medium placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none"
             style={{ fontSize: 16 }}
@@ -190,6 +191,8 @@ export function ChatInput({
             <div ref={modelMenuRef} className="relative">
               <button
                 onClick={() => setShowModelMenu(!showModelMenu)}
+                aria-expanded={showModelMenu}
+                aria-haspopup="true"
                 className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
               >
                 <Cpu className="h-3 w-3" />
@@ -199,8 +202,12 @@ export function ChatInput({
 
               {showModelMenu && (
                 <div
+                  role="menu"
                   className="absolute left-0 z-[1000] min-w-[240px] rounded-[var(--ui-radius)] border bg-white p-1.5"
                   style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)', maxHeight: 280, overflowY: 'auto' }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') setShowModelMenu(false)
+                  }}
                 >
                   {models.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-gray-400">Loading models...</div>
@@ -215,6 +222,7 @@ export function ChatInput({
                       return (
                         <button
                           key={m.tag}
+                          role="menuitem"
                           onClick={() => { onModelChange(m.tag); setShowModelMenu(false) }}
                           className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                         >
@@ -286,6 +294,7 @@ export function ChatInput({
           <button
             onClick={handleSend}
             disabled={!message.trim() || disabled}
+            aria-label="Send message"
             className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Send className="h-4 w-4" />

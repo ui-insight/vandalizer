@@ -35,11 +35,16 @@ async def create_workflow(name: str, user_id: str, space: str | None = None, des
     return wf
 
 
-async def list_workflows(space: str | None = None, user_id: str | None = None) -> list[Workflow]:
+async def list_workflows(
+    space: str | None = None,
+    user_id: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[Workflow]:
     query = {}
     if space:
         query["space"] = space
-    return await Workflow.find(query).to_list()
+    return await Workflow.find(query).skip(skip).limit(limit).to_list()
 
 
 async def get_workflow(workflow_id: str) -> dict | None:

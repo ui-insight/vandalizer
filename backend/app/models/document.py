@@ -29,3 +29,11 @@ class SmartDocument(Document):
 
     class Settings:
         name = "smart_document"
+        indexes = [
+            "uuid",
+            "user_id",
+            "space",
+            [("user_id", 1), ("space", 1)],
+            [("user_id", 1), ("folder", 1)],
+            "created_at",
+        ]

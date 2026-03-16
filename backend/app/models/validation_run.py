@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import uuid4
 
 from beanie import Document
+from pydantic import Field
 
 
 class ValidationRun(Document):
@@ -29,7 +30,7 @@ class ValidationRun(Document):
     extraction_config: dict = {}  # Extraction config used for this run
     config_hash: Optional[str] = None
     user_id: str
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "validation_runs"

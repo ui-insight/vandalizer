@@ -53,8 +53,14 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         backgroundColor: 'rgba(0,0,0,0.4)',
       }}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose()
+      }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="raw-text-modal-title"
         style={{
           backgroundColor: '#fff',
           borderRadius: 12,
@@ -77,9 +83,10 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             borderBottom: '1px solid #eee',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: 16 }}>Raw Text</span>
+          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Raw Text</span>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'transparent',
               border: 'none',

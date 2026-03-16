@@ -1,67 +1,81 @@
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 
 type RightTab = 'assistant' | 'library'
 export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge'
 
-interface WorkspaceContextValue {
+// ---------------------------------------------------------------------------
+// 1. Navigation Context — URL-synced panels, mode, tab
+// ---------------------------------------------------------------------------
+
+interface NavigationContextValue {
   workspaceMode: WorkspaceMode
   setWorkspaceMode: (mode: WorkspaceMode) => void
-  selectedDocUuids: string[]
-  setSelectedDocUuids: (uuids: string[]) => void
-  selectedFolderUuids: string[]
-  setSelectedFolderUuids: (uuids: string[]) => void
   activeRightTab: RightTab
   setActiveRightTab: (tab: RightTab) => void
-  railDocked: boolean
-  toggleRailDocked: () => void
-  panelSplit: number
-  setPanelSplit: (pct: number, skipPersist?: boolean) => void
-  /** Load a conversation by its activity ID in the assistant tab */
-  loadConversationId: string | null
-  setLoadConversationId: (id: string | null) => void
-  /** Incremented to signal a new-chat reset */
-  newChatSignal: number
-  triggerNewChat: () => void
-  /** Workflow open in the right pane (replaces tabs when set) */
   openWorkflowId: string | null
   openWorkflow: (id: string) => void
   closeWorkflow: () => void
-  /** Extraction (SearchSet) open in the right pane by UUID */
   openExtractionId: string | null
   openExtraction: (uuid: string) => void
   closeExtraction: () => void
-  /** Automation open in the right pane */
   openAutomationId: string | null
   openAutomation: (id: string) => void
   closeAutomation: () => void
-  /** Pending message to send in the assistant chat */
+  resetToHome: () => void
+}
+
+const NavigationContext = createContext<NavigationContextValue | null>(null)
+
+// ---------------------------------------------------------------------------
+// 2. Chat State Context — conversation, KB, messages, signals
+// ---------------------------------------------------------------------------
+
+interface ChatStateContextValue {
+  loadConversationId: string | null
+  setLoadConversationId: (id: string | null) => void
+  newChatSignal: number
+  triggerNewChat: () => void
   pendingChatMessage: string | null
   sendChatMessage: (message: string) => void
   clearPendingChatMessage: () => void
-  /** Terms to highlight in the PDF viewer */
-  highlightTerms: string[]
-  setHighlightTerms: (terms: string[]) => void
-  /** Bumped to signal the activity rail to re-fetch */
-  activitySignal: number
-  bumpActivitySignal: () => void
-  /** Track document currently being processed (shown in chat panel) */
-  processingDoc: { title: string; status: string | null } | null
-  setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
-  /** Active knowledge base for chat */
   activeKBUuid: string | null
   activeKBTitle: string | null
   activateKB: (uuid: string, title: string) => void
   deactivateKB: () => void
-  /** Reset workspace to default home state */
-  resetToHome: () => void
-  /** Request the left panel to view a specific document */
+  processingDoc: { title: string; status: string | null } | null
+  setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
+}
+
+const ChatStateContext = createContext<ChatStateContextValue | null>(null)
+
+// ---------------------------------------------------------------------------
+// 3. UI State Context — selections, layout, highlights
+// ---------------------------------------------------------------------------
+
+interface UIStateContextValue {
+  selectedDocUuids: string[]
+  setSelectedDocUuids: (uuids: string[]) => void
+  selectedFolderUuids: string[]
+  setSelectedFolderUuids: (uuids: string[]) => void
+  railDocked: boolean
+  toggleRailDocked: () => void
+  panelSplit: number
+  setPanelSplit: (pct: number, skipPersist?: boolean) => void
+  highlightTerms: string[]
+  setHighlightTerms: (terms: string[]) => void
+  activitySignal: number
+  bumpActivitySignal: () => void
   viewDocumentRequest: { uuid: string; title: string } | null
   viewDocument: (uuid: string, title: string) => void
   clearViewDocumentRequest: () => void
 }
 
-const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
+const UIStateContext = createContext<UIStateContextValue | null>(null)
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 function getStoredBool(key: string, fallback: boolean): boolean {
   try {
@@ -96,14 +110,15 @@ function getStoredNumber(key: string, fallback: number): number {
 
 type NavSearch = (prev: Record<string, unknown>) => Record<string, unknown>
 
+// ---------------------------------------------------------------------------
+// Provider — wraps all three contexts
+// ---------------------------------------------------------------------------
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate()
   const search = useSearch({ from: '/' })
 
-  // ── URL-derived state ─────────────────────────────────────────────────────
-  // These values live in the URL and are reactive via useSearch.
-  // Defaults: mode falls back to localStorage, tab/editors default to none.
-
+  // ── URL-derived state ───────────────────────────────────────────────────
   const workspaceMode: WorkspaceMode =
     search.mode ??
     getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge'])
@@ -113,7 +128,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const openAutomationId: string | null = search.automation ?? null
   const activeRightTab: RightTab = search.tab ?? 'assistant'
 
-  // ── Pure React state (ephemeral / not URL-worthy) ─────────────────────────
+  // ── Ephemeral React state ───────────────────────────────────────────────
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
@@ -128,7 +143,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
 
-  // ── URL-updating setters ──────────────────────────────────────────────────
+  // ── Navigation callbacks ────────────────────────────────────────────────
 
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
     localStorage.setItem('workspace:mode', mode)
@@ -163,9 +178,23 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, automation: undefined })) as NavSearch, replace: true })
   }, [navigate])
 
-  const bumpActivitySignal = useCallback(() => {
-    setActivitySignal(prev => prev + 1)
-  }, [])
+  const resetToHome = useCallback(() => {
+    navigate({ search: {}, replace: true })
+    localStorage.setItem('workspace:mode', 'chat')
+    setNewChatSignal(prev => prev + 1)
+    setLoadConversationId(null)
+    setPendingChatMessage(null)
+    setHighlightTerms([])
+    setActiveKBUuid(null)
+    setActiveKBTitle(null)
+  }, [navigate])
+
+  // ── Chat callbacks ──────────────────────────────────────────────────────
+
+  const triggerNewChat = useCallback(() => {
+    setNewChatSignal(prev => prev + 1)
+    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
+  }, [navigate])
 
   const sendChatMessage = useCallback((message: string) => {
     navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
@@ -175,11 +204,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const clearPendingChatMessage = useCallback(() => {
     setPendingChatMessage(null)
   }, [])
-
-  const triggerNewChat = useCallback(() => {
-    setNewChatSignal(prev => prev + 1)
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
-  }, [navigate])
 
   const activateKB = useCallback((uuid: string, title: string) => {
     setActiveKBUuid(uuid)
@@ -193,24 +217,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBTitle(null)
   }, [])
 
-  const viewDocument = useCallback((uuid: string, title: string) => {
-    setViewDocumentRequest({ uuid, title })
-  }, [])
+  // ── UI callbacks ────────────────────────────────────────────────────────
 
-  const clearViewDocumentRequest = useCallback(() => {
-    setViewDocumentRequest(null)
+  const bumpActivitySignal = useCallback(() => {
+    setActivitySignal(prev => prev + 1)
   }, [])
-
-  const resetToHome = useCallback(() => {
-    navigate({ search: {}, replace: true })
-    localStorage.setItem('workspace:mode', 'chat')
-    setNewChatSignal(prev => prev + 1)
-    setLoadConversationId(null)
-    setPendingChatMessage(null)
-    setHighlightTerms([])
-    setActiveKBUuid(null)
-    setActiveKBTitle(null)
-  }, [navigate])
 
   const toggleRailDocked = useCallback(() => {
     setRailDocked(prev => {
@@ -228,64 +239,111 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const viewDocument = useCallback((uuid: string, title: string) => {
+    setViewDocumentRequest({ uuid, title })
+  }, [])
+
+  const clearViewDocumentRequest = useCallback(() => {
+    setViewDocumentRequest(null)
+  }, [])
+
+  // ── Memoized context values ─────────────────────────────────────────────
+
+  const navValue = useMemo<NavigationContextValue>(() => ({
+    workspaceMode, setWorkspaceMode,
+    activeRightTab, setActiveRightTab,
+    openWorkflowId, openWorkflow, closeWorkflow,
+    openExtractionId, openExtraction, closeExtraction,
+    openAutomationId, openAutomation, closeAutomation,
+    resetToHome,
+  }), [
+    workspaceMode, setWorkspaceMode,
+    activeRightTab, setActiveRightTab,
+    openWorkflowId, openWorkflow, closeWorkflow,
+    openExtractionId, openExtraction, closeExtraction,
+    openAutomationId, openAutomation, closeAutomation,
+    resetToHome,
+  ])
+
+  const chatValue = useMemo<ChatStateContextValue>(() => ({
+    loadConversationId, setLoadConversationId,
+    newChatSignal, triggerNewChat,
+    pendingChatMessage, sendChatMessage, clearPendingChatMessage,
+    activeKBUuid, activeKBTitle, activateKB, deactivateKB,
+    processingDoc, setProcessingDoc,
+  }), [
+    loadConversationId, newChatSignal, triggerNewChat,
+    pendingChatMessage, sendChatMessage, clearPendingChatMessage,
+    activeKBUuid, activeKBTitle, activateKB, deactivateKB,
+    processingDoc,
+  ])
+
+  const uiValue = useMemo<UIStateContextValue>(() => ({
+    selectedDocUuids, setSelectedDocUuids,
+    selectedFolderUuids, setSelectedFolderUuids,
+    railDocked, toggleRailDocked,
+    panelSplit, setPanelSplit,
+    highlightTerms, setHighlightTerms,
+    activitySignal, bumpActivitySignal,
+    viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+  }), [
+    selectedDocUuids, selectedFolderUuids,
+    railDocked, toggleRailDocked,
+    panelSplit, setPanelSplit,
+    highlightTerms, activitySignal, bumpActivitySignal,
+    viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+  ])
+
   return (
-    <WorkspaceContext.Provider
-      value={{
-        workspaceMode,
-        setWorkspaceMode,
-        selectedDocUuids,
-        setSelectedDocUuids,
-        selectedFolderUuids,
-        setSelectedFolderUuids,
-        activeRightTab,
-        setActiveRightTab,
-        railDocked,
-        toggleRailDocked,
-        panelSplit,
-        setPanelSplit,
-        loadConversationId,
-        setLoadConversationId,
-        newChatSignal,
-        triggerNewChat,
-        openWorkflowId,
-        openWorkflow,
-        closeWorkflow,
-        openExtractionId,
-        openExtraction,
-        closeExtraction,
-        openAutomationId,
-        openAutomation,
-        closeAutomation,
-        pendingChatMessage,
-        sendChatMessage,
-        clearPendingChatMessage,
-        highlightTerms,
-        setHighlightTerms,
-        activitySignal,
-        bumpActivitySignal,
-        processingDoc,
-        setProcessingDoc,
-        activeKBUuid,
-        activeKBTitle,
-        activateKB,
-        deactivateKB,
-        resetToHome,
-        viewDocumentRequest,
-        viewDocument,
-        clearViewDocumentRequest,
-      }}
-    >
-      {children}
-    </WorkspaceContext.Provider>
+    <NavigationContext.Provider value={navValue}>
+      <ChatStateContext.Provider value={chatValue}>
+        <UIStateContext.Provider value={uiValue}>
+          {children}
+        </UIStateContext.Provider>
+      </ChatStateContext.Provider>
+    </NavigationContext.Provider>
   )
 }
 
-export function useWorkspace() {
-  const ctx = useContext(WorkspaceContext)
-  if (!ctx) throw new Error('useWorkspace must be used within WorkspaceProvider')
+// ---------------------------------------------------------------------------
+// Focused hooks — use these for minimal rerenders
+// ---------------------------------------------------------------------------
+
+export function useWorkspaceNavigation() {
+  const ctx = useContext(NavigationContext)
+  if (!ctx) throw new Error('useWorkspaceNavigation must be used within WorkspaceProvider')
   return ctx
 }
 
+export function useWorkspaceChatState() {
+  const ctx = useContext(ChatStateContext)
+  if (!ctx) throw new Error('useWorkspaceChatState must be used within WorkspaceProvider')
+  return ctx
+}
+
+export function useWorkspaceUI() {
+  const ctx = useContext(UIStateContext)
+  if (!ctx) throw new Error('useWorkspaceUI must be used within WorkspaceProvider')
+  return ctx
+}
+
+// ---------------------------------------------------------------------------
+// Backwards-compatible facade — combines all three contexts
+// Components can incrementally migrate to focused hooks above.
+// ---------------------------------------------------------------------------
+
+export function useWorkspace() {
+  const nav = useContext(NavigationContext)
+  const chat = useContext(ChatStateContext)
+  const ui = useContext(UIStateContext)
+  if (!nav || !chat || !ui) throw new Error('useWorkspace must be used within WorkspaceProvider')
+  return { ...nav, ...chat, ...ui }
+}
+
 export function useOptionalWorkspace() {
-  return useContext(WorkspaceContext)
+  const nav = useContext(NavigationContext)
+  const chat = useContext(ChatStateContext)
+  const ui = useContext(UIStateContext)
+  if (!nav || !chat || !ui) return null
+  return { ...nav, ...chat, ...ui }
 }
