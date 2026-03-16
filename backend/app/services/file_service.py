@@ -161,10 +161,13 @@ async def delete_document(
     return True
 
 
-async def rename_document(doc_uuid: str, new_title: str) -> bool:
+async def rename_document(doc_uuid: str, new_title: str, *, user_id: str | None = None) -> bool:
     if not new_title.strip():
         raise ValueError("File name cannot be empty.")
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    filters = [SmartDocument.uuid == doc_uuid]
+    if user_id is not None:
+        filters.append(SmartDocument.user_id == user_id)
+    doc = await SmartDocument.find_one(*filters)
     if not doc:
         return False
     doc.title = new_title
@@ -174,8 +177,11 @@ async def rename_document(doc_uuid: str, new_title: str) -> bool:
     return True
 
 
-async def move_document(file_uuid: str, folder_id: str) -> bool:
-    doc = await SmartDocument.find_one(SmartDocument.uuid == file_uuid)
+async def move_document(file_uuid: str, folder_id: str, *, user_id: str | None = None) -> bool:
+    filters = [SmartDocument.uuid == file_uuid]
+    if user_id is not None:
+        filters.append(SmartDocument.user_id == user_id)
+    doc = await SmartDocument.find_one(*filters)
     if not doc:
         return False
     doc.folder = folder_id

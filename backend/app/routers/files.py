@@ -143,7 +143,7 @@ async def rename(
     user: User = Depends(get_current_user),
 ):
     try:
-        ok = await file_service.rename_document(body.uuid, body.newName)
+        ok = await file_service.rename_document(body.uuid, body.newName, user_id=user.user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not ok:
@@ -156,7 +156,7 @@ async def move(
     body: MoveFileRequest,
     user: User = Depends(get_current_user),
 ):
-    ok = await file_service.move_document(body.fileUUID, body.folderID)
+    ok = await file_service.move_document(body.fileUUID, body.folderID, user_id=user.user_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}
