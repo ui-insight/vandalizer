@@ -401,3 +401,65 @@ If something goes wrong, rolling back is straightforward:
 │:27017│ │:6379 │ │:8000   │ │workers │
 └─────┘ └──────┘ └────────┘ └────────┘
 ```
+
+---
+
+## Backup and Recovery
+
+### MongoDB
+
+Daily backups using `mongodump` with 30-day retention:
+
+```bash
+#!/bin/bash
+# /etc/cron.daily/vandalizer-mongo-backup
+BACKUP_DIR="/backups/mongodb"
+RETENTION_DAYS=30
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+mongodump --uri="$MONGO_HOST" --db=osp --gzip --out="$BACKUP_DIR/$TIMESTAMP"
+
+# Prune old backups
+find "$BACKUP_DIR" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} +
+```
+
+Restore:
+
+```bash
+mongorestore --uri="$MONGO_HOST" --db=osp --gzip "$BACKUP_DIR/$TIMESTAMP/osp"
+```
+
+### ChromaDB
+
+Weekly rsync of the persistent directory:
+
+```bash
+#!/bin/bash
+# /etc/cron.weekly/vandalizer-chromadb-backup
+rsync -a --delete /app/static/db/ /backups/chromadb/
+```
+
+ChromaDB can be rebuilt from source documents if the backup is lost, but this is time-consuming.
+
+### Uploaded Files
+
+Daily rsync of the uploads directory:
+
+```bash
+#!/bin/bash
+# /etc/cron.daily/vandalizer-uploads-backup
+BACKUP_DIR="/backups/uploads"
+rsync -a --delete /app/static/uploads/ "$BACKUP_DIR/"
+```
+
+### Redis
+
+No backup needed. Redis is used as a transient Celery broker and result backend. All task state is ephemeral and will be regenerated on restart. Pending tasks in the queue will be lost on Redis failure but can be re-submitted.
+
+### Recovery Order
+
+1. Restore MongoDB first (contains all application state)
+2. Restore uploaded files
+3. Restore ChromaDB (or re-ingest documents to rebuild vector store)
+4. Start Redis (no restore needed)
+5. Start application services

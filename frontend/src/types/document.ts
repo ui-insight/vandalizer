@@ -11,6 +11,12 @@ export interface Document {
   updated_at: string
   token_count: number
   num_pages: number
+  classification?: string | null
+  classification_confidence?: number | null
+  classified_at?: string | null
+  classified_by?: string | null
+  retention_hold?: boolean
+  soft_deleted?: boolean
 }
 
 export interface Folder {

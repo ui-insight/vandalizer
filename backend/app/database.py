@@ -33,6 +33,9 @@ from app.models.quality_alert import QualityAlert
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
+from app.models.organization import Organization
+from app.models.audit_log import AuditLog
+from app.models.approval import ApprovalRequest
 
 ALL_MODELS = [
     User,
@@ -81,6 +84,9 @@ ALL_MODELS = [
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,
+    Organization,
+    AuditLog,
+    ApprovalRequest,
 ]
 
 

@@ -39,13 +39,15 @@ async def list_contents(
             is_team_folder = True
 
     # Build document query  - team folders show all docs, personal folders filter by user
+    # Exclude soft-deleted documents from all queries
     if is_team_folder:
         documents = await SmartDocument.find(
             SmartDocument.space == space,
             SmartDocument.folder == folder_id,
+            SmartDocument.soft_deleted != True,  # noqa: E712
         ).to_list()
     else:
-        doc_filters = {"space": space, "folder": folder_id}
+        doc_filters = {"space": space, "folder": folder_id, "soft_deleted": {"$ne": True}}
         if user_id:
             doc_filters["user_id"] = user_id
         documents = await SmartDocument.find(doc_filters).to_list()
@@ -76,6 +78,12 @@ async def list_contents(
                 "updated_at": d.updated_at.isoformat() if d.updated_at else "",
                 "token_count": d.token_count,
                 "num_pages": d.num_pages,
+                "classification": d.classification,
+                "classification_confidence": d.classification_confidence,
+                "classified_at": d.classified_at.isoformat() if d.classified_at else None,
+                "classified_by": d.classified_by,
+                "retention_hold": d.retention_hold,
+                "soft_deleted": d.soft_deleted,
             }
             for d in documents
         ],

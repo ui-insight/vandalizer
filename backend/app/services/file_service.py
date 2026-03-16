@@ -25,6 +25,15 @@ async def upload_document(
     if not is_allowed_file(safe_name):
         raise ValueError(f"File type '{extension}' is not allowed.")
 
+    # Pre-decode size estimate (base64 expands ~4/3x) — cheap check before DB queries
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    estimated_size = len(blob) * 3 // 4
+    if estimated_size > max_bytes:
+        raise ValueError(
+            f"File too large: estimated {estimated_size / (1024 * 1024):.1f}MB "
+            f"exceeds {settings.max_upload_size_mb}MB limit."
+        )
+
     # Create folder if requested
     target_folder = folder
     if root_folder_name:
@@ -57,6 +66,13 @@ async def upload_document(
         file_data = base64.b64decode(blob, validate=True)
     except (ValueError, TypeError):
         raise ValueError("Invalid base64 string.")
+
+    # Post-decode exact size check
+    if len(file_data) > max_bytes:
+        raise ValueError(
+            f"File too large: {len(file_data) / (1024 * 1024):.1f}MB "
+            f"exceeds {settings.max_upload_size_mb}MB limit."
+        )
 
     if not is_valid_file_content(file_data, extension):
         raise ValueError("File content does not match its extension.")

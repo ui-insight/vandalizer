@@ -22,6 +22,7 @@ class User(Document):
     is_demo_user: bool = False
     demo_expires_at: Optional[datetime.datetime] = None
     demo_status: Optional[str] = None  # active | expired | locked
+    organization_id: Optional[str] = None  # org uuid for university hierarchy
 
     class Settings:
         name = "user"

@@ -43,6 +43,8 @@ class SearchSet(Document):
     created_by_user_id: Optional[str] = None
     extraction_config: dict = {}
     item_order: list[str] = []
+    domain: Optional[str] = None  # nsf | nih | dod | doe — for domain-specific prompts
+    cross_field_rules: list[dict] = []  # cross-field validation rules
 
     class Settings:
         name = "search_set"

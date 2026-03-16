@@ -29,6 +29,33 @@ DEFAULT_QUALITY_CONFIG = {
 }
 
 
+DEFAULT_CLASSIFICATION_CONFIG = {
+    "enabled": True,
+    "auto_classify_on_upload": True,
+    "default_classification": "unrestricted",
+    "levels": [
+        {"name": "unrestricted", "label": "Unrestricted", "color": "#22c55e", "severity": 0},
+        {"name": "internal", "label": "Internal", "color": "#3b82f6", "severity": 1},
+        {"name": "ferpa", "label": "FERPA", "color": "#f59e0b", "severity": 2},
+        {"name": "cui", "label": "CUI", "color": "#f97316", "severity": 3},
+        {"name": "itar", "label": "ITAR", "color": "#ef4444", "severity": 4},
+    ],
+}
+
+DEFAULT_RETENTION_CONFIG = {
+    "enabled": False,
+    "policies": {
+        "unrestricted": {"retention_days": 365, "soft_delete_grace_days": 30, "warning_days_before": 14},
+        "internal": {"retention_days": 730, "soft_delete_grace_days": 30},
+        "ferpa": {"retention_days": 2555, "soft_delete_grace_days": 60},
+        "cui": {"retention_days": 1825, "soft_delete_grace_days": 60},
+        "itar": {"retention_days": 1825, "soft_delete_grace_days": 90},
+    },
+    "activity_retention_days": 180,
+    "chat_retention_days": 365,
+    "workflow_result_retention_days": 365,
+}
+
 DEFAULT_EXTRACTION_CONFIG = {
     "mode": "two_pass",
     "model": "",
@@ -87,6 +114,12 @@ class SystemConfig(Document):
     # Quality configuration
     quality_config: dict = {}
 
+    # Classification configuration
+    classification_config: dict = {}
+
+    # Retention configuration
+    retention_config: dict = {}
+
     # UI Configuration
     highlight_color: str = "#eab308"
     ui_radius: str = "12px"
@@ -131,4 +164,18 @@ class SystemConfig(Document):
         config = deepcopy(DEFAULT_QUALITY_CONFIG)
         if self.quality_config:
             _deep_merge(config, self.quality_config)
+        return config
+
+    def get_classification_config(self) -> dict:
+        """Return classification config with defaults merged in."""
+        config = deepcopy(DEFAULT_CLASSIFICATION_CONFIG)
+        if self.classification_config:
+            _deep_merge(config, self.classification_config)
+        return config
+
+    def get_retention_config(self) -> dict:
+        """Return retention config with defaults merged in."""
+        config = deepcopy(DEFAULT_RETENTION_CONFIG)
+        if self.retention_config:
+            _deep_merge(config, self.retention_config)
         return config

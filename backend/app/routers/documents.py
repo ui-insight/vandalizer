@@ -1,12 +1,14 @@
 import re
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
+from typing import Optional
 
 from app.dependencies import get_current_user
 from app.models.document import SmartDocument
 from app.models.team import Team, TeamMembership
 from app.models.user import User
-from app.services import document_service
+from app.services import audit_service, document_service
 
 router = APIRouter()
 
@@ -102,3 +104,116 @@ async def poll_status(
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Classification
+# ---------------------------------------------------------------------------
+
+class ReclassifyRequest(BaseModel):
+    classification: str
+    reason: Optional[str] = None
+
+
+@router.patch("/{doc_uuid}/classify")
+async def reclassify_document(
+    doc_uuid: str,
+    body: ReclassifyRequest,
+    user: User = Depends(get_current_user),
+):
+    """Manually reclassify a document."""
+    valid_levels = {"unrestricted", "internal", "ferpa", "cui", "itar"}
+    if body.classification not in valid_levels:
+        raise HTTPException(status_code=400, detail=f"Classification must be one of {valid_levels}")
+
+    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    old_classification = doc.classification
+
+    from app.services.classification_service import apply_classification
+    await apply_classification(doc, body.classification, confidence=1.0, classified_by=user.user_id)
+
+    await audit_service.log_event(
+        action="document.classify",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc_uuid,
+        resource_name=doc.title,
+        detail={"old": old_classification, "new": body.classification, "reason": body.reason},
+    )
+
+    return {
+        "uuid": doc_uuid,
+        "classification": doc.classification,
+        "classification_confidence": doc.classification_confidence,
+        "classified_at": doc.classified_at.isoformat() if doc.classified_at else None,
+        "classified_by": doc.classified_by,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Retention
+# ---------------------------------------------------------------------------
+
+@router.post("/{doc_uuid}/retention-hold")
+async def set_retention_hold(
+    doc_uuid: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Place a legal hold on a document. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    body = await request.json()
+    reason = body.get("reason", "Legal hold")
+
+    doc.retention_hold = True
+    doc.retention_hold_reason = reason
+    doc.scheduled_deletion_at = None  # cancel any pending deletion
+    await doc.save()
+
+    await audit_service.log_event(
+        action="document.retention_hold",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc_uuid,
+        resource_name=doc.title,
+        detail={"reason": reason},
+    )
+
+    return {"detail": "Retention hold applied", "retention_hold": True}
+
+
+@router.delete("/{doc_uuid}/retention-hold")
+async def remove_retention_hold(
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Remove a legal hold from a document. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    doc.retention_hold = False
+    doc.retention_hold_reason = None
+    await doc.save()
+
+    await audit_service.log_event(
+        action="document.retention_hold_removed",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc_uuid,
+        resource_name=doc.title,
+    )
+
+    return {"detail": "Retention hold removed", "retention_hold": False}

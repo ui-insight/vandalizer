@@ -9,4 +9,4 @@ data/
 .env
 .env.*
 !.env.example
-uv.lock
+

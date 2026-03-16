@@ -176,6 +176,9 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
   const azureProvider = config.oauth_providers.find(
     (p) => p.provider === 'azure' && p.configured,
   )
+  const samlProvider = config.oauth_providers.find(
+    (p) => p.provider === 'saml',
+  )
 
   return (
     <div className="mt-8 w-full max-w-sm mx-auto">
@@ -192,6 +195,17 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-bold text-black transition-all hover:bg-gray-200"
           >
             {azureProvider.display_name}
+          </a>
+        </div>
+      )}
+
+      {samlProvider && (
+        <div className="mb-6">
+          <a
+            href="/api/auth/saml/login"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d4a017]"
+          >
+            {(samlProvider as Record<string, string>).display_name || 'Sign in with University SSO'}
           </a>
         </div>
       )}

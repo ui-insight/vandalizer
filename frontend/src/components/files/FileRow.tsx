@@ -1,6 +1,14 @@
-import { Loader2, MoreVertical, AlertTriangle } from 'lucide-react'
+import { Loader2, MoreVertical, AlertTriangle, Shield } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
+
+const CLASSIFICATION_STYLES: Record<string, { bg: string; text: string }> = {
+  unrestricted: { bg: '#dcfce7', text: '#166534' },
+  internal: { bg: '#dbeafe', text: '#1e40af' },
+  ferpa: { bg: '#fef3c7', text: '#92400e' },
+  cui: { bg: '#ffedd5', text: '#9a3412' },
+  itar: { bg: '#fee2e2', text: '#991b1b' },
+}
 
 interface FileRowProps {
   doc: Document
@@ -58,16 +66,30 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             <AlertTriangle className="h-4 w-4 shrink-0 mr-2.5 text-red-500" />
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
-            <span
-              style={{
-                display: 'block',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                color: '#17181abb',
-              }}
-            >
-              {doc.title}
+            <span className="flex items-center gap-1.5">
+              <span
+                style={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: '#17181abb',
+                }}
+              >
+                {doc.title}
+              </span>
+              {doc.classification && doc.classification !== 'unrestricted' && (
+                <span
+                  className="inline-flex items-center gap-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase"
+                  style={{
+                    backgroundColor: CLASSIFICATION_STYLES[doc.classification]?.bg || '#f3f4f6',
+                    color: CLASSIFICATION_STYLES[doc.classification]?.text || '#374151',
+                  }}
+                  title={`Classification: ${doc.classification}`}
+                >
+                  <Shield className="h-2.5 w-2.5" />
+                  {doc.classification}
+                </span>
+              )}
             </span>
             {snippet && (
               <span

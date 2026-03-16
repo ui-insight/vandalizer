@@ -164,6 +164,49 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 pass
         raise
 
+    # Check if workflow paused for approval
+    if isinstance(final_output, dict) and final_output.get("_approval_pause"):
+        import uuid as uuid_mod
+
+        # Find the step index (count of executed steps)
+        nodes = engine.get_topological_order()
+        step_index = 0
+        for idx, node in enumerate(nodes):
+            if node.name == "Approval":
+                step_index = idx
+                break
+
+        approval_uuid = str(uuid_mod.uuid4())
+        from datetime import datetime, timezone
+        db.approval_request.insert_one({
+            "uuid": approval_uuid,
+            "workflow_result_id": ObjectId(workflow_result_id),
+            "workflow_id": ObjectId(workflow_id),
+            "step_index": step_index,
+            "step_name": "Approval",
+            "data_for_review": final_output.get("_data_for_review", {}),
+            "review_instructions": final_output.get("_review_instructions", ""),
+            "status": "pending",
+            "assigned_to_user_ids": final_output.get("_assigned_to_user_ids", []),
+            "created_at": datetime.now(timezone.utc),
+        })
+
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {
+                "status": "pending_approval",
+                "paused_at_step_index": step_index,
+                "approval_request_id": approval_uuid,
+                "current_step_name": "Approval",
+                "current_step_detail": "Waiting for human review",
+            }},
+        )
+        return {
+            "status": "pending_approval",
+            "approval_uuid": approval_uuid,
+            "result_id": workflow_result_id,
+        }
+
     # Save final result
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},
@@ -319,3 +362,139 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
 
     final_output, _ = engine.execute()
     return final_output
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.workflow.resume_after_approval",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=3,
+    default_retry_delay=5,
+)
+def resume_workflow_after_approval(self, approval_uuid):
+    """Resume a workflow after an approval request has been approved."""
+    from bson import ObjectId
+
+    from app.services.workflow_engine import build_workflow_engine
+
+    db = _get_db()
+
+    approval_doc = db.approval_request.find_one({"uuid": approval_uuid})
+    if not approval_doc:
+        raise ValueError(f"Approval {approval_uuid} not found")
+    if approval_doc.get("status") != "approved":
+        raise ValueError(f"Approval {approval_uuid} is not approved")
+
+    workflow_result_id = str(approval_doc["workflow_result_id"])
+    workflow_id = str(approval_doc["workflow_id"])
+    step_index = approval_doc.get("step_index", 0)
+
+    workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
+    result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)})
+    if not workflow_doc or not result_doc:
+        raise ValueError(f"Workflow or result not found for approval {approval_uuid}")
+
+    sys_config = db.system_config.find_one() or {}
+
+    # Rebuild steps_data (same as execute_workflow_task)
+    trigger_data = result_doc.get("input_context", {}) or {}
+    doc_uuids = trigger_data.get("doc_uuids", [])
+    steps_data = [{"name": "Document", "data": trigger_data, "tasks": []}]
+
+    for step_oid in workflow_doc.get("steps", []):
+        step_doc = db.workflow_step.find_one({"_id": step_oid})
+        if not step_doc:
+            continue
+        tasks = []
+        for task_oid in step_doc.get("tasks", []):
+            task_doc = db.workflow_step_task.find_one({"_id": task_oid})
+            if task_doc:
+                task_data = dict(task_doc.get("data", {}))
+                if task_doc.get("name") == "Extraction" and task_data.get("search_set_uuid"):
+                    ss = db.search_set.find_one({"uuid": task_data["search_set_uuid"]})
+                    if ss:
+                        items = list(db.search_set_item.find({
+                            "searchset": task_data["search_set_uuid"],
+                            "searchtype": "extraction",
+                        }))
+                        task_data["keys"] = [item["searchphrase"] for item in items]
+                if doc_uuids:
+                    doc_texts = []
+                    for uuid in doc_uuids:
+                        doc = db.smart_document.find_one({"uuid": uuid})
+                        if doc and doc.get("raw_text"):
+                            doc_texts.append(doc["raw_text"])
+                    task_data["doc_texts"] = doc_texts
+                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                    sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
+                    if sel_doc and sel_doc.get("raw_text"):
+                        task_data["selected_doc_text"] = sel_doc["raw_text"]
+                tasks.append({"name": task_doc.get("name", ""), "data": task_data})
+        steps_data.append({
+            "name": step_doc.get("name", ""),
+            "data": step_doc.get("data", {}),
+            "tasks": tasks,
+        })
+
+    user_id = workflow_doc.get("user_id")
+
+    # Get saved output from before the pause
+    saved_output = approval_doc.get("data_for_review")
+    initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
+
+    # Update result to running
+    db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id)},
+        {"$set": {"status": "running", "current_step_detail": "Resuming after approval"}},
+    )
+
+    def update_progress(updates: dict):
+        set_ops = {}
+        for k, v in updates.items():
+            set_ops[k] = v
+        if set_ops:
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": set_ops},
+            )
+
+    engine = build_workflow_engine(
+        steps_data=steps_data,
+        model=workflow_doc.get("resource_config", {}).get("model", "gpt-4o-mini"),
+        user_id=user_id,
+        system_config_doc=sys_config,
+    )
+
+    try:
+        final_output, data = engine.execute(
+            workflow_result_updater=update_progress,
+            start_index=step_index + 1,
+            initial_output=initial_output,
+        )
+    except Exception as e:
+        logger.error("Workflow resume failed for %s: %s", workflow_id, e)
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"status": "error", "error": str(e)}},
+        )
+        raise
+
+    db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id)},
+        {"$set": {
+            "status": "completed",
+            "final_output": {"output": final_output, "data": data},
+        }},
+    )
+
+    db.workflow.update_one(
+        {"_id": ObjectId(workflow_id)},
+        {"$inc": {"num_executions": 1}},
+    )
+
+    return {
+        "status": "completed",
+        "result_id": workflow_result_id,
+        "workflow_id": workflow_id,
+    }

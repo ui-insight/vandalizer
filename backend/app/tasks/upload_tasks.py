@@ -50,6 +50,14 @@ def dispatch_upload_tasks(
             countdown=10,  # slight delay to let extraction finish
         )
 
+    # Run classification independently in the background
+    celery.send_task(
+        "tasks.document.classify",
+        kwargs={"document_uuid": document_uuid},
+        queue="documents",
+        countdown=15,  # delay to let text extraction finish
+    )
+
     # Run validation independently in the background
     celery.send_task(
         "tasks.upload.validation",

@@ -32,12 +32,14 @@ logger = logging.getLogger(__name__)
 class ExtractionEngine:
     """Synchronous extraction engine. Thread-safe for use in Celery workers."""
 
-    def __init__(self, system_config_doc: dict | None = None):
+    def __init__(self, system_config_doc: dict | None = None, domain: str | None = None):
         """
         Args:
             system_config_doc: Pre-fetched SystemConfig as a plain dict for sync access.
+            domain: Domain identifier for domain-specific prompts (nsf, nih, dod, doe).
         """
         self._sys_cfg = system_config_doc or {}
+        self._domain = domain
         self.tokens_in = 0
         self.tokens_out = 0
         self._usage_lock = threading.Lock()
@@ -363,8 +365,22 @@ class ExtractionEngine:
     # Prompt helpers
     # ------------------------------------------------------------------
 
+    def _get_domain_supplement(self) -> str:
+        """Get domain-specific prompt supplement if a domain is set."""
+        if not self._domain:
+            return ""
+        from app.services.domain_prompts import get_domain_template
+        admin_overrides = self._sys_cfg.get("extraction_config", {}).get("domain_templates")
+        template = get_domain_template(self._domain, admin_overrides)
+        if not template:
+            return ""
+        return "\n\n" + template.get("system_supplement", "")
+
     def _build_fields_prompt(self, keys: list[str], meta_map: dict[str, dict] | None = None) -> str:
-        """Build a fields description string with enum/optional annotations."""
+        """Build a fields description string with enum/optional annotations and domain hints."""
+        from app.services.domain_prompts import get_field_hint
+        admin_overrides = self._sys_cfg.get("extraction_config", {}).get("domain_templates") if self._domain else None
+
         parts = []
         for key in keys:
             fm = (meta_map or {}).get(key, {})
@@ -375,6 +391,11 @@ class ExtractionEngine:
                 annotations.append(f"allowed values: {', '.join(enum_vals)}")
             if fm.get("is_optional"):
                 annotations.append("optional")
+            # Add domain-specific hint
+            if self._domain:
+                hint = get_field_hint(self._domain, key, admin_overrides)
+                if hint:
+                    annotations.append(f"hint: {hint}")
             if annotations:
                 desc = f"{key} ({'; '.join(annotations)})"
             parts.append(desc)
@@ -462,6 +483,7 @@ class ExtractionEngine:
             "If a field is not found, leave it as null. "
             "Return a JSON object with an 'entities' key containing a list of extracted objects."
         )
+        system_prompt += self._get_domain_supplement()
 
         try:
             fields_str = self._build_fields_prompt(keys, meta_map)
@@ -548,6 +570,7 @@ class ExtractionEngine:
                 "Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations. "
                 "If a field is not found, use null."
             )
+            system_prompt += self._get_domain_supplement()
 
             chat_agent = create_chat_agent(
                 model_name,

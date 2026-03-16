@@ -27,6 +27,19 @@ class SmartDocument(Document):
     token_count: int = 0
     num_pages: int = 0
 
+    # Data classification (FERPA, CUI, etc.)
+    classification: Optional[str] = None  # unrestricted | internal | ferpa | cui | itar
+    classification_confidence: Optional[float] = None
+    classified_at: Optional[datetime.datetime] = None
+    classified_by: Optional[str] = None  # "auto" or user_id
+
+    # Data retention
+    retention_hold: bool = False
+    retention_hold_reason: Optional[str] = None
+    scheduled_deletion_at: Optional[datetime.datetime] = None
+    soft_deleted: bool = False
+    soft_deleted_at: Optional[datetime.datetime] = None
+
     class Settings:
         name = "smart_document"
         indexes = [
