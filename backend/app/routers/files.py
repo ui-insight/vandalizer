@@ -28,6 +28,15 @@ async def upload(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
+    # Resolve team_id from user's current team
+    team_id: str | None = None
+    if user.current_team:
+        from app.models.team import Team
+
+        team = await Team.get(user.current_team)
+        if team:
+            team_id = team.uuid
+
     try:
         result = await file_service.upload_document(
             blob=body.contentAsBase64String,
@@ -38,6 +47,7 @@ async def upload(
             settings=settings,
             folder=body.folder,
             root_folder_name=body.rootFolderName,
+            team_id=team_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

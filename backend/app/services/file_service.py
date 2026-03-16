@@ -18,6 +18,7 @@ async def upload_document(
     settings: Settings,
     folder: str | None = None,
     root_folder_name: str | None = None,
+    team_id: str | None = None,
 ) -> dict:
     safe_name = secure_filename(filename)
     extension = raw_extension.lower().lstrip(".")
@@ -78,6 +79,7 @@ async def upload_document(
         extension=extension,
         uuid=uid,
         user_id=user_id,
+        team_id=team_id,
         space=space,
         folder=target_folder,
         task_id=None,

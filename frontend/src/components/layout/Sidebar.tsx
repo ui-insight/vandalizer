@@ -28,7 +28,7 @@ export function Sidebar() {
 
   return (
     <aside className="flex w-56 flex-col border-r border-gray-200 bg-gray-50">
-      <nav className="flex-1 p-3 space-y-1">
+      <nav aria-label="Main navigation" className="flex-1 p-3 space-y-1">
         {links.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}

@@ -111,8 +111,11 @@ async def register(
         user = await auth_service.register(
             body.user_id or body.email, body.email, body.password, body.name
         )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration failed. Please check your details and try again.",
+        )
     _set_tokens(response, user, settings)
     return await _user_response(user)
 

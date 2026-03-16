@@ -61,7 +61,7 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           width: 32, height: 32, borderRadius: 6, border: 'none',
           background: 'none', cursor: 'pointer', color: '#fff',
         }}
-        title="Search documents"
+        aria-label="Search documents"
       >
         <Search size={16} />
       </button>

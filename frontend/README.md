@@ -1,73 +1,72 @@
-# React + TypeScript + Vite
+# Vandalizer Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 single-page application for the Vandalizer document intelligence platform.
 
-Currently, two official plugins are available:
+## Stack
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **React 19** with TypeScript (strict mode)
+- **Vite** for dev server and builds
+- **TanStack Router** for file-based routing
+- **TanStack React Query** for server state and caching
+- **Tailwind CSS v4** for styling
+- **DOMPurify + Marked** for safe markdown rendering
 
-## React Compiler
+## Getting Started
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+# Install dependencies
+npm install
 
-## Expanding the ESLint configuration
+# Copy environment config
+cp .env.example .env
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Start dev server (requires backend running on port 8001)
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The app runs at `http://localhost:5173` by default.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Project Structure
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+  api/          # API client and endpoint modules
+  components/   # Reusable React components
+    chat/       #   Chat panel, input, message rendering
+    files/      #   File browser, upload, folder management
+    knowledge/  #   Knowledge base UI
+    layout/     #   Header, Sidebar, AppLayout, Footer
+    library/    #   Library management
+  contexts/     # React context providers (workspace, auth)
+  hooks/        # Custom React hooks
+  lib/          # Utility functions
+  pages/        # Route page components
+  types/        # Shared TypeScript type definitions
+  utils/        # Helper utilities (color, formatting)
+```
+
+## Key Architecture Decisions
+
+- **Context + React Query**: Top-level app state uses React Context (split into Navigation, ChatState, UIState). Server data uses React Query for caching and background refresh.
+- **No additional state library**: Context + React Query is sufficient for the app's complexity.
+- **URL-driven state**: Navigation state persisted in URL search params for shareable links.
+- **Streaming chat**: Chat responses stream via newline-delimited JSON over fetch, with support for LLM thinking traces.
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm run preview` | Preview production build locally |
+| `npm run lint` | Run ESLint |
+| `npx tsc --noEmit` | Type check without emitting |
+| `npx vitest run` | Run tests |
+
+## Environment Variables
+
+See `.env.example`. The only required variable is:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VITE_SUPPORT_URL` | URL for the support/help link | GitHub issues |

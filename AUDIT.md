@@ -1,595 +1,617 @@
-# Vandalizer Platform — Full System Audit & Launch Readiness Assessment
+# Vandalizer Platform — Open-Source Readiness Audit
 
 **Date**: 2026-03-16
 **Auditor**: Claude Code (Opus 4.6)
 **Branch**: experiment/react
-**Commit**: 059a16a
+**Commit**: 5b44f68
+**Scope**: Readiness for national deployment as an open-source project across U.S. universities
 
 ---
 
 ## Executive Summary
 
-Vandalizer is a well-architected document intelligence platform with genuinely impressive AI capabilities. The extraction pipeline (two-pass + consensus voting) and quality validation framework are production-grade and ahead of most competitors. However, significant gaps in testing, observability, security hardening, and university-specific domain features mean it is not ready to revolutionize university operations today — but it's closer than you might think.
+Vandalizer is a well-architected AI-powered document intelligence platform with genuinely impressive extraction and workflow capabilities. It has strong fundamentals: clean backend separation of concerns, production-grade Docker setup, solid security posture, and excellent deployment documentation.
 
-**Overall Score: 7.8 / 10 — Phase 1 + Phase 2 complete. Production-ready for departmental launch. University domain work remains.**
+However, deploying this as an open-source project adopted by universities nationwide requires clearing several additional bars: institutional branding must be decoupled, accessibility must meet federal standards, multi-tenancy needs hardening, and the test suite needs significant expansion.
+
+**Overall Open-Source Readiness: 6.8 / 10**
+
+| Category | Score | Verdict |
+|----------|-------|---------|
+| AI/ML Core | 9/10 | Best-in-class extraction pipeline. Ready. |
+| Security | 7.5/10 | Solid auth & headers. Minor hardening needed. |
+| Documentation & Onboarding | 8.5/10 | Excellent DEPLOY.md, CONTRIBUTING.md, Docker setup. |
+| Code Quality & Architecture | 8/10 | Clean separation, consistent patterns. Large frontend files. |
+| Testing & CI/CD | 5/10 | Backend tests exist. Frontend nearly untested. No E2E. |
+| Multi-Institution Readiness | 4/10 | Hardcoded branding, no i18n, filesystem-only storage. |
+| Accessibility & Compliance | 3/10 | Minimal ARIA, no i18n, no VPAT. Blocker for public universities. |
+| DevOps & Scalability | 6.5/10 | Good Docker setup. No k8s, no cloud storage, basic monitoring. |
 
 ---
 
 ## Table of Contents
 
-1. [AI/ML Core](#1-aiml-core--a--910) — A- (9/10)
-2. [Backend Architecture](#2-backend-architecture--b-7510) — B+ (7.5/10)
-3. [Frontend](#3-frontend--b--710) — B- (7/10)
-4. [Security](#4-security--b-710) — B (7/10)
-5. [DevOps & Infrastructure](#5-devops--infrastructure--b--6510) — B- (6.5/10)
-6. [University Domain Fit](#6-university-domain-fit--d--410) — D+ (4/10)
-7. [Critical Bugs](#7-critical-bugs) — All 7 FIXED
-8. [Priority Roadmap](#8-priority-roadmap-to-launch) — Phase 1 + 2 complete
-9. [Production Checklist](#9-production-checklist)
+1. [AI/ML Core](#1-aiml-core--910)
+2. [Security](#2-security--7510)
+3. [Documentation & Onboarding](#3-documentation--onboarding--8510)
+4. [Code Quality & Architecture](#4-code-quality--architecture--810)
+5. [Testing & CI/CD](#5-testing--cicd--510)
+6. [Multi-Institution Readiness](#6-multi-institution-readiness--410)
+7. [Accessibility & Compliance](#7-accessibility--compliance--310)
+8. [DevOps & Scalability](#8-devops--scalability--6510)
+9. [Open-Source Governance](#9-open-source-governance)
+10. [Priority Roadmap](#10-priority-roadmap)
+11. [Production Checklist](#11-production-checklist)
 
 ---
 
-## 1. AI/ML Core — A- (9/10)
+## 1. AI/ML Core — 9/10
 
-This is where Vandalizer shines. The engineering is genuinely sophisticated.
+This is where Vandalizer shines. The engineering is genuinely sophisticated and ahead of most competitors in this space.
 
 | Feature | Grade | Notes |
 |---------|-------|-------|
 | Extraction Engine | A | Two-pass strategy + 3-run majority voting + fallback cascade. Production-grade. |
 | Workflow Engine | A- | Topological DAG resolution, 15+ node types, parallel execution. Lacks conditionals/rollback. |
 | Quality/Validation | A | Test case framework with regression detection, per-field metrics, quality tiers. Rare in this space. |
-| LLM Integration | B+ | Multi-provider (OpenAI/Ollama/VLLM), per-model config, agent caching. No cost controls. |
-| RAG/Chat | B- | Streaming works, thinking traces supported. Fixed k=8 retrieval, no reranking, no hallucination detection. |
-| Document Processing | B | Multi-format + OCR fallback. Fixed chunking, sparse metadata, no deduplication. |
-| Knowledge Base | B | Web crawling + source lifecycle. No incremental updates, no robots.txt respect. |
+| LLM Integration | A- | Multi-provider (OpenAI/Ollama/vLLM/OpenRouter), per-model config, agent caching. No cost controls. |
+| RAG/Chat | B- | Streaming works, thinking traces supported. Fixed k=8 retrieval, no reranking. |
+| Document Processing | B | Multi-format + OCR fallback. Fixed chunking, sparse metadata. |
+| Knowledge Base | B | Web crawling + source lifecycle. No incremental updates. |
 
-### Detailed Findings
+**Key strengths for open-source adoption:**
+- Multi-provider LLM support means institutions can use OpenAI, self-hosted Ollama/vLLM, or OpenRouter — no vendor lock-in
+- Per-model configuration via `SystemConfig.available_models` allows admin-controlled model selection
+- Agent caching with invalidation allows hot-reloading model configs without restart
 
-#### Extraction Engine (`backend/app/services/extraction_engine.py`)
-
-**Strengths:**
-- Two-pass extraction: Pass 1 does free-form JSON, Pass 2 uses structured validation with draft hints
-- One-pass fallback when structured output not needed
-- Chunking support splits large key lists to avoid token explosion
-- 3-run majority voting for high-stakes extractions (thread-pooled)
-- Dynamic Pydantic model generation at runtime with Literal types for enums
-- Metadata awareness: respects `is_optional` and `enum_values` per field
-- Fallback cascade: Structured -> JSON -> graceful empty on all failures
-
-**Weaknesses:**
-- No confidence scoring per field or per run
-- No cross-field dependency validation (e.g., "if A=X, then B must be Y")
-- Inconsistent null handling across paths (None vs "" vs {})
-- No extraction history — can't learn from previous extractions
-- Enum matching is exact case-insensitive only; no fuzzy matching
-
-#### Workflow Engine (`backend/app/services/workflow_engine.py`)
-
-**Strengths:**
-- Topological dependency resolution via Python's graphlib
-- Rich node types: Extraction, Prompt, Formatter, WebsiteNode, CrawlerNode, CodeNode, BrowserAutomation, etc.
-- Real-time progress reporting via callbacks
-- Post-processing hooks on each node
-- MultiTaskNode for parallel execution
-- Code execution node with restricted Python sandbox
-
-**Weaknesses:**
-- Errors produce string messages; no structured error reporting or rollback
-- No step validation before execution (missing required fields, invalid chaining)
-- No if/then/else conditional steps or loop constructs
-- No step rollback on failure
-- Code sandbox acknowledged as incomplete; not suitable for untrusted code
-- ThreadPoolExecutor bottlenecks on CPU-bound steps
-
-#### RAG/Chat (`backend/app/services/chat_service.py`)
-
-**Strengths:**
-- Async streaming with newline-delimited JSON chunks
-- Detects and streams native API thinking + embedded `<think>` tags
-- Multi-source context: documents + KB queries + URL attachments + file attachments
-- Separate prompt agent optimizes vector DB queries before retrieval
-
-**Weaknesses:**
-- No sliding window or summarization for long conversations
-- Fixed k=8 chunk retrieval regardless of question complexity
-- No semantic reranking of ChromaDB results
-- No specific passage/page attribution in responses
-- No hallucination detection
-- Prompt injection risk: user messages injected directly into prompts
-
-#### Quality/Validation (`backend/app/services/quality_service.py`, `extraction_validation_service.py`)
-
-**Strengths:**
-- Dual validation: extraction accuracy/consistency AND workflow grade/checks
-- Test case infrastructure with expected values and source types
-- Multi-run consistency measurement via value consensus
-- Per-field accuracy, consistency, and enum compliance metrics
-- Quality tiers mapped from scores via configurable thresholds
-- Validation history for trend analysis and regression detection
-- LLM-powered improvement suggestions
-- Model comparison / A/B testing support
-- Regression detection from last 2 runs
-
-**Weaknesses:**
-- Accuracy is simple string matching; no semantic similarity
-- Numeric validation treats "100" and "100.0" as different
-- N=3 runs triples extraction cost
-- No cross-field validation in test cases
-- Improvement suggestions are generic, not actionable
-
-### What Would Make It A+
-
-- Confidence scoring per extracted field
-- Semantic reranking in RAG retrieval
-- Adaptive chunking based on content type
-- Domain-specialized prompts for research administration
-- Cross-field dependency validation
-- Cost estimation before execution
-- Prompt versioning and A/B testing
+**Remaining gaps:**
+- No LLM cost tracking or per-team usage quotas
+- No confidence scoring per extracted field
+- Code sandbox for workflow CodeNode is incomplete — documented as unsafe for untrusted input
+- RAG retrieval uses fixed k=8 with no semantic reranking
 
 ---
 
-## 2. Backend Architecture — B+ (7.5/10)
+## 2. Security — 7.5/10
 
-| Area | Grade | Key Issues |
-|------|-------|------------|
-| API Design | B | Good REST conventions, proper auth injection. Safety limits on unbounded queries. Centralized `AppError` handler. |
-| Data Models | B- | Timestamp bug fixed. `SoftDeleteMixin` + `TimestampMixin` available. Weak field validation remains. |
-| Services Layer | B+ | N+1 fixed, cleanup-on-failure transactions, consistent UUID generation. Mixed error signaling improving via `AppError`. |
-| Database | B | Connection pooling configured. Backup script added. No migration system, no replica set. |
-| Celery Tasks | B | Good queue routing. Transient-only retries with exponential backoff. No dead-letter queue. |
+### Strengths
 
-### Detailed Findings
+| Area | Status | Details |
+|------|--------|---------|
+| Secret management | Strong | JWT validator enforces secret change in non-dev (`config.py:38-46`). `.env.example` has safe defaults. |
+| Authentication | Good | JWT access + refresh tokens in HttpOnly cookies. `secure=True` in production. `SameSite=lax`. |
+| Password hashing | Good | `werkzeug.security` (bcrypt-based) |
+| CSRF protection | Good | Custom middleware with strict cookie. Token rotated per response. |
+| CORS | Good | Restricted to `frontend_url`. No wildcard with credentials. Dev allows localhost:5173 only. |
+| Security headers | Good | X-Content-Type-Options, X-Frame-Options: DENY, CSP, HSTS in production, Permissions-Policy. |
+| NoSQL injection | Excellent | All queries use Beanie ODM. Regex searches use `re.escape()`. No raw query construction. |
+| File uploads | Strong | Extension whitelist (pdf/docx/xlsx/xls/csv), magic byte validation, `secure_filename()`, UUID-based storage paths. |
+| URL validation | Good | Outbound requests block private IPs (127.x, 10.x, 192.168.x, 172.16-31.x, ::1). |
+| Rate limiting | Good | Auth endpoints rate-limited via slowapi (login 5/min, register 3/min, refresh 10/min). |
+| Admin protection | Good | All admin routes guarded by `_require_admin()` or `_require_admin_or_team_admin()`. |
+| Dependency scanning | Good | `pip-audit` and `bandit` in CI pipeline. |
+| DOMPurify | Good | Frontend sanitizes markdown before `dangerouslySetInnerHTML` across all render points. |
 
-#### API Design
+### Issues to Fix
 
-**Strengths:**
-- REST conventions followed: POST for creation, GET for reads, PATCH for updates, DELETE for removal
-- Appropriate HTTP status codes (401, 403, 404)
-- Well-organized router structure with 16+ separate modules
-- Proper dependency injection for auth (`Depends(get_current_user)`)
-- Query parameter validation (`Query(default=0, ge=0)`)
-- SSE streaming for workflow status and chat
+**High Priority:**
 
-**Weaknesses:**
-- CSP policy `connect-src 'self'` may block external LLM API calls
-- Several endpoints lack owner/team validation (rely on service layer inconsistently)
-- Pagination not enforced on all list endpoints (e.g., `/documents/search`)
-- No standardized error response format across routers
-- Many endpoints don't declare `response_model`
-- API key authentication only used in some routers
+1. **User enumeration in registration** — `auth.py:115` returns "Email already registered" which lets attackers enumerate valid emails.
+   - Fix: Return generic "Registration failed" regardless of reason.
 
-#### Data Models
+2. **No API key expiry** — `user.py:16` `api_token` lives forever with no rotation mechanism.
+   - Fix: Add `api_token_expires_at` field. Implement rotation policy.
 
-**Strengths:**
-- Good Beanie ODM usage with Pydantic v2
-- Composite indexes for common queries (`[("user_id", 1), ("space", 1)]`)
-- Enum usage for status fields
-- Multi-tenancy via `space` and `team_id` fields
-- Helper methods on models (e.g., `ChatConversation.add_message()`)
+3. **No audit logging for admin actions** — Admin can modify system config, manage users, clear caches with no trail.
+   - Fix: Log all admin actions to a dedicated audit collection.
 
-**Weaknesses:**
-- Models accept unvalidated `dict` fields (`input_config: dict = {}`, `output_config: dict = {}`)
-- `SmartDocument.folder` frequently queried but only implicitly indexed
-- No TTL indexes for temporary data
-- ~~Inconsistent UUID generation across models~~ **FIXED** — consistent `uuid4().hex`
-- ~~No soft delete support~~ `SoftDeleteMixin` now available in `app/models/mixins.py` for incremental adoption
-- String-based statuses where enums should be used (e.g., `User.demo_status`)
-- N+1 query patterns from model relationships
+4. **Rate limiting gaps on expensive endpoints** — No rate limits on extraction, workflow execution, or document search.
+   - Fix: Add per-user rate limits: search 30/min, extraction 10/min, workflow execution 5/min.
 
-#### Services Layer
+**Medium Priority:**
 
-**Strengths:**
-- Clean separation: auth_service, document_service, workflow_service, etc.
-- Thread-safe token accumulation in extraction engine
-- Config resolution pattern (system defaults -> per-user -> override)
-- Async/await properly used throughout
-- File path traversal protection (`_safe_resolve()`)
+5. **Login rate limit too generous** — 5/minute = 300/hour. Insufficient for brute force protection.
+   - Recommendation: Reduce to 3/minute with account lockout after 10 failed attempts.
 
-**Weaknesses:**
-- ~~N+1 queries in `team_service.py:13-28`~~ **FIXED** — batch-fetch with `$in` queries
-- ~~No transaction support: user+team creation in `auth_service.py:94-115`~~ **FIXED** — cleanup-on-failure
-- Mixed error signaling: improving via `AppError` hierarchy (`app/exceptions.py`) — incremental adoption in progress
-- No validation on workflow updates (no check if locked/in-progress)
-- Synchronous I/O mixed with async code in some task files
-- Hard-coded magic values (e.g., folder `"0"` for root)
+6. **No server-side file size enforcement** — Nginx enforces 200MB but no Python-side check.
+   - Fix: Add size validation in `file_service.upload_document()`.
 
-#### Database Setup
+7. **String length validation missing** — Many Pydantic model fields accept unlimited-length strings.
+   - Fix: Add `max_length` constraints to model fields.
 
-**Weaknesses:**
-- ~~`AsyncIOMotorClient` created with no pool size, timeout, or connection settings~~ **FIXED**
-- Settings only validates JWT secret; other critical values unchecked
-- Hardcoded database name "osp" with no validation
-- No migration system for schema evolution
-- `@lru_cache` on settings means ENV changes after startup are ignored
+8. **Code sandbox incomplete** — Runs in-process with 10-second timeout. No memory limits. Potential escape via CPython internals.
+   - For now: Document limitation clearly. Long-term: subprocess or container isolation.
 
-#### Celery Tasks
-
-**Strengths:**
-- Task routing by named queue (documents, workflows, uploads, passive, default)
-- Soft/hard timeout limits (30/31 min)
-- Result expiration (24h)
-- Beat scheduler for periodic tasks
-- Flower monitoring UI
-
-**Weaknesses:**
-- ~~`autoretry_for=(Exception,)` retries on permanent errors~~ **FIXED** — `TRANSIENT_EXCEPTIONS` + `retry_backoff`
-- Creates new sync MongoDB client per task instead of reusing pool
-- 30-min timeout for all task types (should vary)
-- 24h result expiry too short for audit/replay
-- No task prioritization within queues
-- No dead-letter queue for failed tasks
-- No graceful shutdown in `run_celery.sh`
+9. **Graph API token encryption not implemented** — `.env.example` mentions `GRAPH_TOKEN_KEY` but it's unused in code.
+   - Fix: Implement Fernet encryption for M365 tokens at rest, or remove the misleading env var.
 
 ---
 
-## 3. Frontend — B- (7/10)
+## 3. Documentation & Onboarding — 8.5/10
 
-| Area | Grade | Key Issues |
-|------|-------|------------|
-| Component Architecture | B- | Organized by feature, lazy code splitting. Heavy inline styles, no shared component library. |
-| State Management | B+ | WorkspaceContext split into 3 focused slices with memoization. React Query adopted for server state. |
-| TypeScript | B | Strict mode enabled. Some `as` casts, incomplete response types. |
-| API Layer | B | Centralized client with CSRF + auto-retry. Request timeouts added (60s). React Query handles deduplication. |
-| Styling | C | Mix of Tailwind classes and inline style objects. Inconsistent spacing. |
-| Accessibility | C+ | Good patterns in FileRow/UploadZone. Missing focus management for modals. |
-| Testing | F | Vitest installed, zero meaningful test coverage. |
-| Mobile | D | Layouts not optimized for small screens. |
+This is a genuine strength. Vandalizer is better documented than most academic open-source projects.
 
-### Detailed Findings
+| Document | Status | Quality |
+|----------|--------|---------|
+| README.md | Present | Excellent. Project description, feature list, dual quickstart (Docker + local), architecture diagram, badges. |
+| LICENSE.MD | Present | GPLv3. Appropriate for NSF-funded academic software. Copyleft encourages community contribution. |
+| CONTRIBUTING.md | Present | Excellent. Prerequisites, dev setup, coding conventions, PR process, testing instructions. |
+| CODE_OF_CONDUCT.md | Present | Contributor Covenant v2.1. |
+| SECURITY.md | Present | Private email reporting, 48h acknowledgment, 90-day coordinated disclosure. |
+| DEPLOY.md | Present | Exceptional. 11KB. Docker Compose quickstart, production guide, nginx/SSL config, two deployment strategies, rollback procedures, verification checklists. |
+| CHANGELOG.md | Present | Keep a Changelog format. "Unreleased" section populated. Needs version numbers. |
+| .env.example | Present | Well-documented with comments and safe defaults (backend + frontend). |
+| CLAUDE.md | Present | Complete architectural reference for AI-assisted development. |
+| GitHub templates | Present | Bug report, feature request, PR templates. Dependabot configured. |
 
-#### Component Architecture
+### Gaps
 
-**Strengths:**
-- Feature-based organization (auth/, chat/, files/, workspace/, layout/, library/, certification/)
-- Lazy code splitting for routes
-- Error boundary for graceful crash recovery
-- Dynamic theming via CSS variables
-
-**Weaknesses:**
-- Heavy inline `style` objects in ChatInput, ChatMessage, FileRow instead of Tailwind
-- Dropdown menus managed via refs instead of Radix/Headless UI
-- No shared button, input, or dropdown components (high duplication)
-- No loading skeletons during streaming or data fetching
-- Feedback submission silently swallows errors (`catch { /* ignore */ }`)
-
-#### State Management
-
-**Architecture:** Context-based + URL search params + localStorage + React Query
-
-**Contexts (IMPROVED):**
-- `AuthContext` — user, loading, login/logout
-- `TeamContext` — teams, currentTeam, switchTeam
-- `NavigationContext` — workspace mode, open panels (workflow/extraction/automation), tab
-- `ChatStateContext` — conversation, KB, pending message, signals
-- `UIStateContext` — selections, layout, highlights, activity
-- `ToastContext` — notifications
-- `CertificationPanelContext` — learning panel
-- Backwards-compatible `useWorkspace()` facade combines all three workspace slices
-
-**Improvements Made:**
-- ~~WorkspaceContext monolithic~~ **FIXED** — split into 3 focused contexts with `useMemo` on values
-- ~~No React Query~~ **FIXED** — `@tanstack/react-query` adopted with `QueryClientProvider`, 4 core hooks converted
-- React Query provides automatic request deduplication, stale-while-revalidate, and cache invalidation
-
-**Remaining Issues:**
-- Many promises still have `.catch(() => {})` swallowing errors
-- No debouncing on localStorage writes
-- Remaining hooks not yet converted to React Query (incremental migration)
-
-#### API Layer
-
-**Strengths:**
-- Centralized `apiFetch<T>()` with error handling
-- Auto-retry on 401 with token refresh
-- CSRF token handling
-- Proper `ApiError` class with status
-- 60-second request timeout via `AbortController` (added)
-- React Query handles request deduplication and caching (added)
-
-**Remaining Weaknesses:**
-- CSRF token extracted via regex (brittle)
-- No caching headers (ETag, Cache-Control) respected
-- snake_case/camelCase mapping is manual
-
-#### Styling
-
-**Weaknesses:**
-- Inline style objects throughout key components
-- Hardcoded RGB/HEX values not using Tailwind tokens
-- Inconsistent spacing (12px, 15px, 8px)
-- Button styles vary (`rounded-[30px]` vs `rounded-[var(--ui-radius)]`)
-- No mobile-optimized layouts
-- `clsx` in package.json but underused
-
-#### Testing
-
-- Vitest configured but **no test files** in the frontend
-- No component tests, integration tests, or E2E tests
-- No coverage metrics
-- No Storybook for component development
+1. **Frontend README** — Still boilerplate Vite template. Needs project-specific architecture and component overview.
+2. **No static API docs** — OpenAPI/Swagger auto-generated but disabled in production and not committed to repo.
+   - Fix: Commit `openapi.json` to `docs/` or generate as CI artifact.
+3. **No architecture diagrams** — Only ASCII art in README. Needs visual system diagram, data flow, service interaction map.
+4. **No troubleshooting guide** — Common setup issues not documented.
+5. **No Makefile** — Common tasks (dev, test, lint, build) require remembering multiple commands.
+   - Quick win: Add `Makefile` with targets for dev, test, lint, build.
+6. **No database schema reference** — Collections, indexes, relationships not documented outside code.
 
 ---
 
-## 4. Security — B (7/10)
+## 4. Code Quality & Architecture — 8/10
 
-### What's Good
+### Backend: Well-Structured
 
-| Feature | Status |
-|---------|--------|
-| CSRF protection | Double-submit cookie pattern implemented |
-| Security headers | CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Permissions-Policy |
-| JWT auth | Access + refresh tokens with expiration |
-| HttpOnly cookies | Tokens stored in HttpOnly cookies |
-| File validation | Magic byte checking on uploads |
-| Path traversal | `_safe_resolve()` protection on file downloads |
-| Password hashing | werkzeug/bcrypt |
-| Rate limiting | slowapi on auth endpoints |
-| API key auth | Separate auth path for integrations |
+- Clean separation: routers (22 files) → services (20+ files) → models (15+ Beanie documents) → tasks (11 modules)
+- All routers use `Depends(get_current_user)` for auth injection
+- Centralized exception hierarchy (`AppError`, `NotFoundError`, `AuthorizationError`, `ValidationError`, `ConflictError`) with global handler
+- Consistent Beanie ODM usage — no raw MongoDB queries anywhere
+- No wildcard imports. All imports explicit and traceable.
+- Proper connection pooling: Motor `maxPoolSize=50, minPoolSize=5`
 
-### What Needs Work
+### Frontend: Good Patterns, Some Large Files
 
-| Issue | Severity | Detail |
-|-------|----------|--------|
-| ~~CSRF token SameSite=Lax~~ | Medium | **FIXED** — upgraded to SameSite=Strict |
-| User enumeration | Medium | "Email already registered" error in registration response |
-| Login rate limit too generous | Medium | 5/minute allows brute force; should be 3/5min with lockout |
-| ~~Demo user API key bypass~~ | Medium | **FIXED** — demo lock check added to `get_api_key_user` |
-| No API key expiry | Medium | Keys live forever with no rotation mechanism |
-| No string length validation | Low | Model string fields accept unlimited length |
-| CSP allows inline styles | Low | Potential for style-based attacks |
-| CORS permissive in dev | Low | Non-prod allows any origin |
+- React 19 + TypeScript strict mode + TanStack Router + React Query
+- Context-based state management split into Navigation, ChatState, UIState (good separation)
+- React Query for server state, localStorage for preferences, URL params for navigation state
+- DOMPurify integration for all markdown rendering
 
----
+**Large files that need decomposition:**
+- `WorkflowEditorPanel.tsx` — 3,930 lines
+- `Admin.tsx` — 3,114 lines
+- `ExtractionEditorPanel.tsx` — 2,939 lines
+- Recommendation: Break into focused sub-components.
 
-## 5. DevOps & Infrastructure — B- (6.5/10)
+### API Design: Consistent
 
-| Area | Grade | Key Issues |
-|------|-------|------------|
-| Docker | A- | Multi-stage builds, non-root user, health checks. Pinned versions, resource limits added. |
-| CI/CD | B | Backend tests + Bandit + pip-audit. Coverage gates added (70% backend, 60% frontend). |
-| Testing | D+ | 16 backend test files. Near-zero frontend tests. No E2E or load tests. |
-| Monitoring | C | Sentry integration added, structured JSON logging configured. Still needs metrics, tracing, alerting. |
-| Deployment | C- | Docker Compose documented. No k8s, no blue-green, no automated deploy. |
-| Database Ops | C+ | Backup script added, connection pooling configured. Still needs replica set, auth, migrations. |
-| Health Checks | B | `/api/health` now verifies MongoDB, Redis, and ChromaDB. Returns 503 on failure. |
+- RESTful: proper HTTP verbs, plural resource names, nested routes
+- Typed response models on most endpoints
+- Consistent pagination (skip/limit) and error responses
+- CSRF token flow works correctly across frontend/backend
 
-### Detailed Findings
+### Issues
 
-#### Docker (compose.yaml, backend/Dockerfile, frontend/Dockerfile)
-
-**Strengths:**
-- Multi-stage builds minimize image size
-- Non-root `appuser` (uid 1000) in backend
-- Healthchecks on all services
-- Named networks for isolation
-- Volume persistence for mongo, chroma, uploads
-- Nginx with 200MB body size for large uploads
-- SSE streaming support in nginx proxy
-
-**Weaknesses:**
-- ~~No CPU/memory resource limits~~ **FIXED**
-- ~~Most images use `latest` or vague tags~~ **FIXED** — pinned to redis 7.4.0-v3, mongo 7.0.16, chromadb 0.6.3
-- No container vulnerability scanning
-- No TLS between services in compose
-- No log rotation configured
-
-#### CI/CD (.github/workflows/)
-
-**Pipeline:**
-- `ci.yaml` — pytest, Bandit security scan, pip-audit, TypeScript check, Vitest
-- `build-container.yaml` — Docker build + GHCR push
-- `build-demo-containers.yaml` — Demo environment builds
-- `sonarqube-main.yaml` — Quality gate (conditionally, org-specific)
-
-**Weaknesses:**
-- ~~No test coverage enforcement~~ **FIXED** — backend 70% gate via pytest-cov, frontend 60% gate via vitest
-- SonarQube quality gate commented out
-- No deployment job (manual deploys only)
-- No performance/load testing
-- No SBOM generation
-- No secret scanning
-
-#### Monitoring
-
-**IMPROVED** — Sentry SDK and structured JSON logging added.
-- Sentry error tracking configured via `SENTRY_DSN` env var (FastAPI + Celery integrations)
-- Structured JSON logging via `python-json-logger` (configurable via `LOG_FORMAT=json|text`)
-- Celery writes to `logs/celery/*.log` with no rotation
-- Flower UI available for task monitoring
-
-**Still missing:**
-- Log aggregation (ELK, Datadog, Splunk)
-- Metrics (Prometheus)
-- Distributed tracing (OpenTelemetry, Jaeger)
-- Request correlation IDs
-- Frontend error reporting
-
-#### Health Checks
-
-**Backend:** **FIXED** — `/api/health` now checks MongoDB (ping), Redis (ping), and ChromaDB (heartbeat). Returns 503 with per-service status on failure, 200 when all healthy.
-
-**Still missing:**
-- `/ready` endpoint (Kubernetes readiness probe)
-- `/live` endpoint (Kubernetes liveness probe)
-- `/metrics` endpoint for Prometheus
+1. **~9 console.log statements in frontend** — Should be removed before release.
+2. **Minimal backend logging** — Only ~12 `logger.*` calls across all routers. Critical paths (auth failures, file uploads, extractions) lack structured logging.
+3. **Admin router is 1,350 lines** — Mixes stats, leaderboards, config, user management. Candidate for splitting.
 
 ---
 
-## 6. University Domain Fit — D+ (4/10)
+## 5. Testing & CI/CD — 5/10
 
-This is the biggest gap for "revolutionizing university operations."
+This is the weakest area and the biggest risk for open-source credibility.
 
-| Missing Feature | Impact |
-|-----------------|--------|
-| No SSO/SAML integration | Universities require CAS/Shibboleth/SAML; only JWT/cookie auth exists |
-| No institutional system integrations | No Banner, Workday, grants.gov, IRB, IACUC connectivity |
-| No compliance framework | No FERPA awareness, no research data governance, no audit trails |
-| No domain-specific prompts | Generic extraction; no knowledge of grant structures, NSF/NIH formats |
-| No organizational hierarchy | No college/department/PI scoping beyond flat team model |
-| No cross-field validation | Can't express "budget line items must sum to total" |
-| No approval workflows | No human-in-the-loop review chains for sensitive extractions |
-| No data retention policies | Universities have strict records retention requirements |
-| No role-based data access | Researcher data siloed only by team, not by compliance classification |
-| No integration with grants.gov | Research admin's primary workflow tool not connected |
+### Backend Tests: Solid Foundation
 
-### What Would Make This a University Revolution
+- **Framework**: pytest + pytest-asyncio
+- **16 test files, ~2,152 lines** covering:
+  - Auth (routes, helpers, password hashing, token generation)
+  - Core services (extraction engine, workflow engine)
+  - Security (code sandbox, URL validation, file validation, security headers)
+  - Admin routes, document routes, file routes
+  - Config validation, health endpoint
+- **Pattern**: Mocked MongoDB via patched Beanie. No integration tests against real database.
+- **CI threshold**: 70% coverage enforced via `--cov-fail-under=70`
 
-1. **SSO/SAML** — CAS/Shibboleth so every university employee can log in
-2. **Organizational hierarchy** — University > College > Department > PI > Lab
-3. **Grant-aware extraction** — Prompts tuned for NSF, NIH, DOD, DOE proposal formats
-4. **Compliance classification** — Auto-tag documents by FERPA, ITAR, CUI sensitivity
-5. **Approval chains** — Route extractions through PI -> Department -> Sponsored Programs
-6. **Audit trails** — Every extraction, modification, and access logged for compliance
-7. **Institutional integrations** — Pull from Banner/Workday, push to grants.gov
-8. **Budget validation** — Cross-field rules for financial document verification
+### Frontend Tests: Nearly Absent
 
----
+- **1 test file** (`src/api/client.test.ts`, 144 lines) — tests API client fetch/retry logic only
+- **No component tests, no hook tests, no page tests, no routing tests**
+- **CI threshold**: 60% lines but runs with `|| true` (non-blocking!)
+- **TypeScript strict mode** partially compensates — catches type errors at build time
 
-## 7. Critical Bugs
+### CI/CD Pipeline
 
-### Must Fix Before Launch
+| Step | Backend | Frontend |
+|------|---------|----------|
+| Unit tests | pytest with coverage | vitest (non-blocking) |
+| Type checking | None (no mypy) | `tsc --noEmit` |
+| Security scan | bandit + pip-audit | None |
+| Linting | None in CI | None in CI (eslint configured locally) |
+| Docker build | Verified | Verified |
+| SonarQube | Configured | Quality gate commented out |
+| E2E tests | None | None |
+| Pre-commit hooks | None | None |
 
-| # | Bug | Location | Severity | Status |
-|---|-----|----------|----------|--------|
-| 1 | ~~`Workflow.created_at` evaluates at class definition time — all workflows share one timestamp~~ | `backend/app/models/workflow.py:46-47` | Critical | **FIXED** — 17 instances across 9 model files |
-| 2 | ~~User + Team creation has no transaction — partial failure orphans user without team~~ | `backend/app/services/auth_service.py:94-115` | High | **FIXED** — cleanup-on-failure in register + OAuth |
-| 3 | ~~Team UUID generation uses two different algorithms~~ | `auth_service.py` and `team_service.py` | Medium | **FIXED** — both now use `uuid4().hex` |
-| 4 | ~~File de-duplication returns `exists: True` but doesn't return the existing document UUID~~ | `backend/app/services/file_service.py:44-52` | Medium | **FIXED** — now returns `uuid` |
-| 5 | ~~Chat folder resolution fetches all documents per folder with no limit~~ | `backend/app/routers/chat.py:52-63` | Medium | **FIXED** — added `.limit(500)` |
-| 6 | ~~Celery `autoretry_for=(Exception,)` retries on permanent errors~~ | `backend/app/tasks/extraction_tasks.py` | Medium | **FIXED** — 26 instances → `TRANSIENT_EXCEPTIONS` + `retry_backoff` |
-| 7 | ~~Demo user with API key can bypass lock check~~ | `backend/app/dependencies.py:33-38` | Medium | **FIXED** — added demo lock check to `get_api_key_user` |
+### Critical Gaps
 
----
+1. **No E2E tests** — No Playwright or Cypress. Critical user flows (upload → extract → review) are untested end-to-end.
+2. **Frontend test coverage is essentially zero** — 1 file testing the API client. No UI component coverage.
+3. **Frontend CI is non-blocking** — `|| true` means tests can fail and CI still passes.
+4. **No Python type checking** — No mypy or pyright. Pydantic provides runtime validation but no static analysis.
+5. **No linting enforced in CI** — ESLint configured locally but not run in CI. No ruff/black for Python.
+6. **No pre-commit hooks** — No `.pre-commit-config.yaml`.
+7. **No integration tests** — All backend tests mock the database. No tests against real MongoDB.
+8. **SonarQube quality gate commented out** — Configured but not enforced.
 
-## 8. Priority Roadmap to Launch
+### Recommendations
 
-### Phase 1: Fix Critical Issues (1-2 weeks)
-
-- [x] Fix `Workflow.created_at` timestamp bug (fixed 17 instances across 9 models)
-- [x] Add transaction support for user+team creation (cleanup-on-failure in register + OAuth)
-- [x] Add Sentry error tracking (backend — `sentry-sdk[fastapi,celery]`, config via `SENTRY_DSN`)
-- [x] Implement structured JSON logging (`python-json-logger`, configurable via `LOG_FORMAT`)
-- [x] Make `/api/health` check all dependencies (Mongo, Redis, ChromaDB)
-- [x] Fix CSRF token to use SameSite=Strict
-- [x] Fix demo user API key bypass (added demo lock check to `get_api_key_user`)
-- [x] Fix Celery retry to list specific exceptions (26 instances across 11 task files → `TRANSIENT_EXCEPTIONS` + `retry_backoff`)
-
-### Phase 2: Harden for Production (2-4 weeks)
-
-- [ ] Add frontend test coverage (target 60%)
-- [x] Split WorkspaceContext into focused slices (3 contexts: Navigation, ChatState, UI — with memoized values + backwards-compatible `useWorkspace()` facade)
-- [x] Adopt React Query for server state management (QueryClientProvider + converted useWorkflows, useDocuments, useExtractions, useKnowledgeBases)
-- [x] Add database backup automation (`scripts/backup_mongo.sh` — mongodump with gzip + retention pruning)
-- [x] Enforce CI coverage gates (backend 70% via pytest-cov, frontend 60% via vitest coverage)
-- [x] Add request timeouts across all API calls (frontend `apiFetch` 60s default + AbortController; backend httpx already had timeouts)
-- [x] Fix N+1 queries in team_service (`get_user_teams`, `get_team_members` now batch-fetch)
-- [x] Add safety limits to unbounded list endpoints (admin, config, chat folder resolution)
-- [x] Create exception hierarchy and centralized error handler (`app/exceptions.py` + `AppError` handler)
-- [x] Implement soft deletes for audit trail (`app/models/mixins.py` — `SoftDeleteMixin` + `TimestampMixin` ready for adoption)
-- [x] Add MongoDB connection pooling configuration (maxPoolSize=50, timeouts)
-- [x] Pin all Docker image versions + add resource limits (redis 7.4.0-v3, mongo 7.0.16, chromadb 0.6.3)
-- [x] Fix team UUID generation inconsistency (both paths now use `uuid4().hex`)
-
-### Phase 3: University Domain (4-8 weeks)
-
-- [ ] SSO/SAML integration (CAS/Shibboleth)
-- [ ] Organizational hierarchy (University > College > Department > PI)
-- [ ] Domain-specific extraction prompts for grants, contracts, disclosures
-- [ ] Approval/review workflow nodes (human-in-the-loop)
-- [ ] Audit trail for all extractions and modifications
-- [ ] FERPA-aware data classification
-- [ ] Cross-field validation rules for financial documents
-- [ ] Data retention policy enforcement
-
-### Phase 4: Scale & Monitor (8-12 weeks)
-
-- [ ] Kubernetes manifests + Helm charts
-- [ ] Blue-green deployment strategy
-- [ ] Prometheus + Grafana monitoring
-- [ ] Distributed tracing (OpenTelemetry)
-- [ ] Semantic reranking in RAG pipeline
-- [ ] Institutional system integrations (Banner, Workday, grants.gov)
-- [ ] E2E tests with Playwright
-- [ ] Load testing with k6 or locust
-- [ ] CDN for large document serving
-- [ ] API versioning strategy
+- **Immediate**: Remove `|| true` from frontend test step. Add ESLint to CI.
+- **Short-term**: Add component tests for critical UI flows. Add mypy to CI.
+- **Medium-term**: Add Playwright E2E tests for upload → extract → chat flow. Set up test MongoDB in CI.
 
 ---
 
-## 9. Production Checklist
+## 6. Multi-Institution Readiness — 4/10
 
-### Infrastructure
+This is the core gap for national open-source deployment. Currently, Vandalizer is built as a single-institution tool.
 
-- [x] Docker resource limits (CPU, memory) set on all containers
-- [ ] Log rotation configured (Docker logging driver or logrotate)
-- [ ] Container vulnerability scanning in CI
-- [ ] TLS between all services
-- [ ] MongoDB replica set for HA
-- [ ] Redis Sentinel or Cluster for HA
-- [x] All Docker images pinned to specific versions
+### Branding: Heavily Hardcoded
 
-### Security
+| Location | Hardcoded Content |
+|----------|-------------------|
+| `main.py:80` | FastAPI title: "Vandalizer" |
+| `llm_service.py:256-373` | System prompts reference "Vandalizer" by name |
+| `Header.tsx:28-37` | Logo: `joevandal.png`, `Vandalizer_Wordmark_RGB.png` |
+| `Landing.tsx:338` | "AI-powered knowledge extraction, built at the University of Idaho" |
+| `Certification.tsx:326` | "University of Idaho" |
+| `Certification.tsx:961` | "Vandal Workflow Architect (VWA)" credential name |
+| `DemoFeedback.tsx` | "Vandalizer" branding throughout |
+| `Header.tsx:45` | Help link hardcoded to GitHub |
 
-- [ ] All secrets in vault (no .env files in production)
-- [ ] MongoDB authentication enabled
-- [ ] Redis AUTH required
-- [ ] API key rotation/expiry mechanism
-- [ ] Login attempt lockout (3 failures / 5 min)
-- [ ] Input length validation on all string fields
-- [ ] User enumeration fixed (generic error messages)
-- [ ] Dependency vulnerability scan (weekly)
-- [ ] SBOM generated and signed
+**Fix required**: Extract all branding into a `SystemConfig`-driven theming API: app name, logo URL, institution name, help URL. The partial `highlight_color` + `ui_radius` config exists but doesn't cover identity.
 
-### Observability
+### Multi-Tenancy: Partially Implemented
 
-- [x] Sentry/APM for error tracking
-- [x] Structured JSON logging to aggregator (ELK/Datadog)
-- [ ] Request correlation IDs across services
-- [ ] Prometheus metrics + Grafana dashboards
-- [ ] Distributed tracing (OpenTelemetry)
-- [ ] Uptime/SLA monitoring
-- [ ] Frontend error reporting (client-side)
+**What works:**
+- Documents scoped by `user_id` + `space`
+- Many resources have `team_id` field (KnowledgeBase, Automation, Activity)
+- Team membership validated before access
+- Composite indexes prevent cross-user data leaks
 
-### Testing & Quality
+**What's missing:**
+- `SmartDocument` model lacks `team_id` — team isolation relies on user-space combo, not explicit team scoping
+- No database-level tenant isolation — single MongoDB instance stores all tenant data
+- No per-team resource quotas (storage, API calls, users)
 
-- [ ] Frontend test coverage > 60%
-- [ ] Backend test coverage > 70%
+### Storage: Local Filesystem Only
+
+- File storage: `Path(settings.upload_dir) / user_id / {uid}.{extension}` — local disk only
+- ChromaDB: `PersistentClient` with local directory
+- No S3, Azure Blob, or GCS support
+- Celery workers must share filesystem (Docker volume in compose.yaml)
+- Horizontal scaling requires NFS or shared storage
+
+**Fix required**: Abstract file storage behind an interface. Support at minimum local + S3.
+
+### Database Migrations: None
+
+- No migration framework used (Beanie has one built-in but it's not configured)
+- Schema changes rely on Beanie auto-indexing on startup
+- No versioned migration history
+- No documented upgrade path for deploying schema changes across instances
+
+**Risk**: When a new version changes a model, institutions running older versions have no upgrade path.
+
+### Feature Flags: None
+
+- No per-institution feature toggles
+- No way to enable/disable features per team
+- No gradual rollout support
+- No kill switches for expensive operations
+
+### Internationalization: None
+
+- No i18n framework (no react-i18next or similar)
+- All UI strings hardcoded in English throughout components
+- Error messages, labels, placeholders — all English-only
+- Note: For U.S. university deployment, i18n is lower priority but still matters for inclusive access.
+
+---
+
+## 7. Accessibility & Compliance — 3/10
+
+**This is a potential blocker for public university adoption.** Public universities receiving federal funding must comply with Section 508 and WCAG 2.1 AA.
+
+### ARIA & Semantic HTML
+
+- Only ~37 accessibility attributes (`alt=`, `aria-label`, `role=`) found across the entire frontend
+- Expected: hundreds for a complex SPA
+- Logo images lack meaningful alt text (`Header.tsx:28-37`)
+- Checkboxes have no labels (`FileRow.tsx:40-49`)
+- Interactive divs lack `role="button"`
+- Tables in FileList lack proper `<th>` or roles
+
+### Keyboard Navigation
+
+- Partial: `FileRow.tsx` implements `tabIndex={0}` + `onKeyDown` for Enter/Space
+- ChatInput handles Enter/Escape
+- No visible focus indicators observed in most components
+- No focus traps in modals
+- No skip-to-content link
+
+### Screen Reader Support
+
+- Form labels present but inconsistently associated with inputs
+- Links missing descriptive text (icon-only links in header)
+- No live regions (`aria-live`) for dynamic content updates
+- No semantic landmarks beyond basic HTML structure
+
+### Color Contrast
+
+- Dynamic color selection via `--highlight-color` CSS variable may fail WCAG AA contrast ratios
+- `color.ts` has `getContrastTextColor()` but no WCAG contrast validation
+
+### Responsive Design
+
+- Tailwind v4 installed but most components use inline styles with fixed dimensions
+- No responsive breakpoints (`sm:`, `md:`, `lg:`) found in component code
+- Layout assumes desktop viewport (fixed widths, pixel-based spacing)
+- Mobile experience is likely unusable
+
+### What's Needed
+
+1. **Accessibility audit with axe-core** — Add to CI as automated check
+2. **VPAT (Voluntary Product Accessibility Template)** — Required by many university procurement offices
+3. **ARIA labels on all interactive elements** — Systematic pass through all components
+4. **Keyboard navigation** — Focus indicators, focus traps in modals, skip links
+5. **Responsive layout** — Migrate inline styles to Tailwind with responsive variants
+6. **Color contrast validation** — Ensure dynamic theming meets WCAG AA (4.5:1 text, 3:1 UI)
+
+---
+
+## 8. DevOps & Scalability — 6.5/10
+
+### Docker: Production-Grade
+
+- Multi-stage builds (builder + runtime) for both backend and frontend
+- Non-root user (appuser, UID 1000) in backend container
+- Healthchecks on all services (MongoDB, Redis, ChromaDB, API, frontend)
+- Resource limits (memory/CPU) defined in compose.yaml
+- Named volumes for persistent data
+- Restart policy: `unless-stopped`
+
+### Monitoring: Basic
+
+- Sentry integration (optional, via `SENTRY_DSN`). `send_default_pii=False`.
+- Structured JSON logging via `python-json-logger`
+- Health endpoint (`/api/health`) checks MongoDB, Redis, ChromaDB — returns "ok" or "degraded"
+- **Missing**: No Prometheus metrics, no OpenTelemetry, no Grafana dashboards
+- **Missing**: No Celery task metrics, no LLM call metrics (tokens, cost, latency)
+
+### Scalability
+
+**Scales well:**
+- FastAPI is stateless (JWT-based, no server sessions) — multiple API instances behind load balancer work
+- Celery with queue separation (documents | workflows | uploads | passive | default)
+- Motor connection pooling (maxPoolSize=50)
+
+**Bottlenecks:**
+- Shared filesystem for uploads — requires NFS or cloud storage for multi-node
+- ChromaDB in `PersistentClient` mode — must use HTTP client mode for horizontal scaling
+- No distributed locking — concurrent operations on same document may race
+
+### Backup: Minimal
+
+- `scripts/backup_mongo.sh` — mongodump with 30-day retention
+- **Missing**: No backup of uploaded files or ChromaDB embeddings
+- **Missing**: No restore procedure documented
+- **Missing**: No automated scheduling (manual cron required)
+
+### Missing for Production at Scale
+
+- No Kubernetes manifests or Helm charts
+- No Infrastructure-as-Code (Terraform/CloudFormation)
+- No blue-green or canary deployment automation
+- No on-call runbook or incident response documentation
+- No capacity planning metrics
+
+---
+
+## 9. Open-Source Governance
+
+### What's in Place
+
+| Item | Status |
+|------|--------|
+| LICENSE (GPLv3) | Present |
+| CONTRIBUTING.md | Present, comprehensive |
+| CODE_OF_CONDUCT.md | Present (Contributor Covenant v2.1) |
+| SECURITY.md | Present (private reporting, 90-day disclosure) |
+| Issue templates | Present (bug report, feature request) |
+| PR template | Present |
+| Dependabot | Configured (pip, npm, GitHub Actions) |
+| CHANGELOG | Present (Keep a Changelog format) |
+
+### What's Missing
+
+1. **No versioning/releases** — CHANGELOG has "Unreleased" only. No tags, no GitHub Releases.
+   - Fix: Adopt semantic versioning. Tag v1.0.0 for open-source launch.
+
+2. **No governance model** — Who approves PRs? How are architectural decisions made? What's the release cadence?
+   - Fix: Add GOVERNANCE.md defining maintainer roles, decision process, release schedule.
+
+3. **No roadmap** — Potential contributors can't see where the project is heading.
+   - Fix: Add public roadmap (GitHub Projects or ROADMAP.md).
+
+4. **No contributor license agreement (CLA)** — GPLv3 may be sufficient, but some institutions require explicit IP assignment.
+   - Consider: CLA bot or DCO (Developer Certificate of Origin) sign-off.
+
+5. **No community channels** — No Discord, Slack, or mailing list for adopters/contributors.
+
+---
+
+## 10. Priority Roadmap
+
+### Phase 1: Open-Source Minimum (Blocks Public Release)
+
+| Item | Effort | Impact |
+|------|--------|--------|
+| Fix user enumeration in registration | 30min | Security |
+| Remove `|| true` from frontend CI test step | 5min | Quality gate |
+| Add ESLint + ruff to CI | 1hr | Code quality |
+| Extract branding to SystemConfig (app name, logo, institution) | 1-2 days | Multi-institution |
+| Add semantic versioning + tag v1.0.0 | 1hr | Governance |
+| Customize frontend README | 1hr | Onboarding |
+| Add ARIA labels to all interactive elements (systematic pass) | 3-5 days | Accessibility / compliance |
+| Add keyboard focus indicators and skip-to-content link | 1-2 days | Accessibility |
+| Add `team_id` to SmartDocument, enforce in queries | 1 day | Multi-tenancy |
+
+### Phase 2: Adoption Enablers (First 3 Months)
+
+| Item | Effort | Impact |
+|------|--------|--------|
+| Abstract file storage (local + S3) | 3-5 days | Scalability |
+| Add Playwright E2E tests for critical flows | 1 week | Quality |
+| Frontend component tests (15-20 key components) | 1 week | Quality |
+| Add mypy to CI | 1-2 days | Type safety |
+| Implement API key expiry + rotation | 1 day | Security |
+| Add admin audit logging | 2-3 days | Security / compliance |
+| Beanie migration framework setup + documented upgrade path | 2-3 days | Multi-institution |
+| Add rate limits to extraction/workflow/search endpoints | 1 day | Security |
+| Commit static OpenAPI spec to docs/ | 1hr | Documentation |
+| Add Makefile for common dev tasks | 1hr | DX |
+| Responsive layout pass (migrate inline styles to Tailwind) | 1-2 weeks | Accessibility |
+| VPAT document | 1 week | Compliance |
+
+### Phase 3: Scale & Community (3-6 Months)
+
+| Item | Effort | Impact |
+|------|--------|--------|
+| Kubernetes Helm chart | 1 week | Deployment |
+| Prometheus metrics + Grafana dashboards | 1 week | Observability |
+| Per-team resource quotas (storage, API calls) | 1 week | Multi-tenancy |
+| Feature flag system (per-team toggles) | 1 week | Multi-institution |
+| LLM cost tracking + usage dashboards | 1 week | Operations |
+| Community channels (Discord/Slack) | 1 day | Community |
+| GOVERNANCE.md + public roadmap | 1 day | Governance |
+| i18n framework + initial translations | 2 weeks | Internationalization |
+| ChromaDB HTTP client mode for horizontal scaling | 2-3 days | Scalability |
+| Backup automation (files + ChromaDB + MongoDB) | 2-3 days | Operations |
+
+---
+
+## 11. Production Checklist
+
+### Security (Pre-Release)
+
+- [x] No hardcoded secrets in source code
+- [x] JWT secret enforced non-default in production
+- [x] HttpOnly + Secure + SameSite cookies
+- [x] CSRF protection middleware
+- [x] Security headers (CSP, HSTS, X-Frame-Options, X-Content-Type-Options)
+- [x] File upload validation (whitelist + magic bytes)
+- [x] SSRF protection (private IP blocking)
+- [x] Rate limiting on auth endpoints
+- [x] DOMPurify for rendered HTML
+- [x] Dependency scanning (pip-audit + bandit) in CI
+- [ ] Fix user enumeration in registration
+- [ ] API key expiry mechanism
+- [ ] Admin audit logging
+- [ ] Rate limiting on expensive endpoints
+- [ ] Code sandbox hardening or documentation
+
+### Testing
+
+- [x] Backend unit tests with 70% coverage gate
+- [x] Frontend type checking in CI
+- [ ] Frontend test coverage > 60% (currently ~0%, non-blocking)
 - [ ] E2E tests for critical user flows
-- [ ] Load test baseline (throughput, latency p99)
-- [ ] SonarQube quality gate enforced (not commented out)
-- [x] Coverage gates in CI (fail on regression)
+- [ ] Integration tests against real database
+- [ ] Python type checking (mypy) in CI
+- [ ] ESLint enforced in CI
+- [ ] Pre-commit hooks configured
+- [ ] SonarQube quality gate enforced
+
+### Documentation
+
+- [x] README with quickstart
+- [x] CONTRIBUTING.md
+- [x] DEPLOY.md with production guide
+- [x] CODE_OF_CONDUCT.md
+- [x] SECURITY.md
+- [x] CHANGELOG.md
+- [x] .env.example (backend + frontend)
+- [x] GitHub issue/PR templates
+- [x] Dependabot configured
+- [ ] Frontend README (customized)
+- [ ] Static API documentation
+- [ ] Architecture diagrams
+- [ ] Database schema reference
+- [ ] Troubleshooting guide
+
+### Multi-Institution
+
+- [x] Multi-provider LLM support (OpenAI/Ollama/vLLM/OpenRouter)
+- [x] Environment-driven configuration
+- [x] Team-based access control
+- [ ] Configurable branding (name, logo, institution)
+- [ ] Cloud storage support (S3/Azure Blob)
+- [ ] Database migration framework
+- [ ] Per-team resource quotas
+- [ ] Feature flag system
+- [ ] Semantic versioning + releases
+
+### Accessibility
+
+- [ ] WCAG 2.1 AA compliance audit
+- [ ] ARIA labels on all interactive elements
+- [ ] Keyboard navigation complete
+- [ ] Focus indicators visible
+- [ ] Skip-to-content link
+- [ ] Screen reader testing
+- [ ] Color contrast validation (WCAG AA)
+- [ ] Responsive layout (mobile-friendly)
+- [ ] VPAT documentation
+
+### Monitoring & Operations
+
+- [x] Health endpoint with dependency checks
+- [x] Structured JSON logging
+- [x] Sentry integration (optional)
+- [x] MongoDB backup script
+- [ ] Prometheus metrics
+- [ ] Celery task monitoring
+- [ ] LLM usage/cost metrics
+- [ ] Backup of uploaded files + ChromaDB
+- [ ] Restore procedure documented
+- [ ] On-call runbook
 
 ### Deployment
 
-- [ ] Automated deployments (not manual)
-- [ ] Blue-green or canary strategy
-- [ ] Rollback automation
-- [ ] Kubernetes manifests or equivalent orchestration
-- [ ] Infrastructure-as-Code (Terraform/CloudFormation)
-
-### Database
-
-- [x] Automated backups with tested restoration (`scripts/backup_mongo.sh`)
-- [ ] Replica set or equivalent HA
-- [ ] Schema migration strategy
-- [ ] Index optimization for common queries
-- [x] Connection pooling properly configured
-
-### Ops & Maintenance
-
-- [ ] On-call runbook documentation
-- [ ] Incident response procedures
-- [ ] Disaster recovery plan (RTO/RPO defined)
-- [ ] Backup restoration tested monthly
-- [ ] Capacity planning metrics tracked
+- [x] Docker Compose (production-ready)
+- [x] Multi-stage Dockerfiles
+- [x] Healthchecks on all services
+- [x] Resource limits configured
+- [x] Non-root container user
+- [ ] Kubernetes manifests / Helm chart
+- [ ] Infrastructure-as-Code
+- [ ] Blue-green / canary deployment
+- [ ] Automated deployments
 
 ---
 
 ## Final Verdict
 
-**What Vandalizer does well is genuinely impressive.** The extraction pipeline with two-pass consensus voting, the workflow DAG engine, and the quality validation framework are best-in-class for a university-built tool. The architecture is modern and well-chosen (FastAPI + React 19 + Celery + MongoDB).
+**Vandalizer's core capabilities — the extraction engine, workflow DAG, and quality validation — are genuinely impressive and production-grade.** The architecture is modern and well-chosen. The documentation is better than most academic open-source projects. The security posture is solid.
 
-**What's missing is the difference between a powerful internal tool and a university operations revolution.** The platform currently operates as a generic document intelligence system. To transform university research administration, it needs deep domain knowledge baked in — compliance frameworks, institutional integrations, approval chains, and SSO.
+**What separates Vandalizer from being ready for national open-source adoption is institutional flexibility.** The platform is currently built as a University of Idaho tool, not a configurable platform that any university can brand as their own. The three critical gaps are:
 
-**Updated assessment (post Phase 1 + 2)**: All 7 critical bugs fixed. Backend hardened with connection pooling, exception hierarchy, structured logging, Sentry, and transient-only retries. Frontend upgraded with React Query, split WorkspaceContext, and request timeouts. Docker images pinned with resource limits. CI coverage gates enforced. **Ready for departmental launch.** University domain work (Phase 3) is what separates this from a revolution.
+1. **Accessibility** — Public universities must meet Section 508/WCAG 2.1 AA. The current frontend would not pass an accessibility audit. This is a legal requirement, not a nice-to-have.
+
+2. **Institutional identity** — Branding, logos, and institution names are hardcoded throughout. A university IT department evaluating this tool will immediately ask "can we make this ours?" The answer today is "not without forking."
+
+3. **Testing confidence** — The frontend is essentially untested. No university IT department will adopt a tool where UI changes can't be validated by an automated test suite. Backend tests exist but mock the database entirely.
+
+**The path forward is clear and achievable.** Phase 1 (2-3 weeks of focused work) addresses the release blockers. Phase 2 (3 months) makes the project genuinely attractive for adoption. Phase 3 (6 months) builds the community and scale infrastructure for widespread deployment.
+
+**Vandalizer has the potential to be a transformative open-source tool for research administration. The foundation is strong — it needs the institutional polish to match.**

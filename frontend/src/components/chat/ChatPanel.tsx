@@ -473,7 +473,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               e.currentTarget.style.backgroundColor = '#fff'
               e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.12)'
             }}
-            title="Scroll to bottom"
+            aria-label="Scroll to bottom"
           >
             <ArrowDown size={18} />
           </button>

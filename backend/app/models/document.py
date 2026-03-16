@@ -20,6 +20,7 @@ class SmartDocument(Document):
     uuid: str
     space: str
     user_id: str
+    team_id: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     folder: Optional[str] = None
@@ -33,7 +34,10 @@ class SmartDocument(Document):
             "uuid",
             "user_id",
             "space",
+            "team_id",
             [("user_id", 1), ("space", 1)],
             [("user_id", 1), ("folder", 1)],
+            [("team_id", 1), ("space", 1)],
+            [("team_id", 1), ("folder", 1)],
             "created_at",
         ]

@@ -38,12 +38,15 @@ async def list_contents(
         if current_folder and current_folder.team_id:
             is_team_folder = True
 
-    # Build document query  - team folders show all docs, personal folders filter by user
+    # Build document query  - team folders show all docs in team, personal folders filter by user
     if is_team_folder:
-        documents = await SmartDocument.find(
-            SmartDocument.space == space,
-            SmartDocument.folder == folder_id,
-        ).to_list()
+        doc_query: dict = {
+            "space": space,
+            "folder": folder_id,
+        }
+        if team_uuid:
+            doc_query["team_id"] = team_uuid
+        documents = await SmartDocument.find(doc_query).to_list()
     else:
         doc_filters = {"space": space, "folder": folder_id}
         if user_id:

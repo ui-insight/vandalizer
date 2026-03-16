@@ -21,6 +21,8 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
     <tr
       className="cursor-pointer"
       tabIndex={0}
+      role="row"
+      aria-label={`Folder: ${folder.title}`}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
@@ -69,6 +71,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
             checked={!!selected}
             onChange={() => onToggleSelect(folder.uuid)}
             onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${folder.title}`}
             className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
           />
         )}
