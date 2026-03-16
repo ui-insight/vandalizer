@@ -111,6 +111,30 @@ class TestCodeExecutionSandbox:
         result = _run_code("result = type(42).__subclasses__()")
         assert "Code rejected" in str(result["output"])
 
+    def test_format_string_introspection_blocked(self):
+        """Format-string introspection bypass: '{0.__globals__}'.format(re)."""
+        result = _run_code("result = '{0.__globals__}'.format(re)")
+        assert "Code rejected" in str(result["output"])
+
+    def test_format_string_bases_blocked(self):
+        """Variant using __bases__ inside a format string."""
+        result = _run_code("result = '{0.__bases__[0].__subclasses__()}'.format(str)")
+        assert "Code rejected" in str(result["output"])
+
+    def test_format_attribute_blocked(self):
+        """Calling .format() on a string is blocked at the attribute level."""
+        result = _run_code("result = 'hello {0}'.format('world')")
+        assert "Code rejected" in str(result["output"])
+
+    def test_format_map_blocked(self):
+        result = _run_code("result = 'hello {name}'.format_map({'name': 'x'})")
+        assert "Code rejected" in str(result["output"])
+
+    def test_mro_non_dunder_blocked(self):
+        """str.mro() (non-dunder) is also blocked."""
+        result = _run_code("result = str.mro()")
+        assert "Code rejected" in str(result["output"])
+
     def test_syntax_error_handled(self):
         result = _run_code("def def def")
         assert "Code rejected" in str(result["output"])

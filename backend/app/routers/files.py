@@ -2,7 +2,7 @@ import io
 import zipfile
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from fastapi import Request
 
@@ -69,14 +69,14 @@ async def download_head(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings, user_id=user.user_id)
-    if not path or not path.exists():
+    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
     return Response(
         headers={
             "Content-Type": media_type,
-            "Content-Length": str(path.stat().st_size),
+            "Content-Length": str(len(result.data)),
         },
     )
 
@@ -87,15 +87,14 @@ async def download(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings, user_id=user.user_id)
-    if not path or not path.exists():
+    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
-    return FileResponse(
-        path,
-        filename=path.name,
+    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
+    return StreamingResponse(
+        io.BytesIO(result.data),
         media_type=media_type,
-        content_disposition_type="attachment",
+        headers={"Content-Disposition": f'attachment; filename="{result.title}"'},
     )
 
 
@@ -112,11 +111,11 @@ async def download_bulk(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for docid in doc_ids:
-            path = await file_service.download_document(
+            result = await file_service.download_document(
                 docid, settings, user_id=user.user_id
             )
-            if path and path.exists():
-                zf.write(path, path.name)
+            if result:
+                zf.writestr(result.title, result.data)
 
     buf.seek(0)
     return StreamingResponse(
