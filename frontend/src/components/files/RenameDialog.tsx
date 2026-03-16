@@ -35,7 +35,9 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
           </button>
         </div>
         <form onSubmit={handleSubmit}>
+          <label htmlFor="rename-input" className="sr-only">New name</label>
           <input
+            id="rename-input"
             autoFocus
             type="text"
             value={name}

@@ -25,6 +25,9 @@ export function TeamsDropdown() {
       {/* Trigger button - matches Flask .btn .btn-secondary */}
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Account menu: ${currentTeam?.name || 'Account'}`}
         className="flex items-center gap-1.5 rounded-[30px] border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#555] hover:bg-gray-100 transition-all"
       >
         <User className="h-3.5 w-3.5" />
@@ -35,10 +38,14 @@ export function TeamsDropdown() {
       {/* Menu - matches Flask menu.css */}
       {open && (
         <div
+          role="menu"
           className="absolute right-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
           style={{
             borderColor: 'rgba(0,0,0,.15)',
             boxShadow: '0 8px 24px rgba(0,0,0,.12)',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setOpen(false)
           }}
         >
           {/* Team list */}

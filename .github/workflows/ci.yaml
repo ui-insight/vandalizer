@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra dev
 
+      - name: Lint
+        run: uv run pip install ruff && uv run ruff check app/
+
       - name: Run tests with coverage
         run: uv run pip install pytest-cov && uv run pytest -x -q --cov=app --cov-report=term-missing --cov-fail-under=70
 
@@ -56,8 +59,11 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Lint
+        run: npx eslint .
+
       - name: Run tests with coverage
-        run: npx vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=60 || true
+        run: npx vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=60
 
       - name: Build
         run: npm run build

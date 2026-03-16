@@ -146,6 +146,8 @@ export function ChatInput({
           <div ref={addMenuRef} className="relative">
             <button
               onClick={() => setShowAddMenu(!showAddMenu)}
+              aria-expanded={showAddMenu}
+              aria-haspopup="menu"
               className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
             >
               <Plus className="h-3.5 w-3.5" />
@@ -155,10 +157,15 @@ export function ChatInput({
 
             {showAddMenu && (
               <div
+                role="menu"
                 className="absolute left-0 z-[1000] min-w-[220px] rounded-[var(--ui-radius)] border bg-white p-1.5"
                 style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') setShowAddMenu(false)
+                }}
               >
                 <button
+                  role="menuitem"
                   onClick={() => { fileInputRef.current?.click(); setShowAddMenu(false) }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                   style={{ minHeight: 40 }}
@@ -167,6 +174,7 @@ export function ChatInput({
                   <span>Add Document</span>
                 </button>
                 <button
+                  role="menuitem"
                   onClick={() => { setShowLinkInput(true); setShowAddMenu(false) }}
                   className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                   style={{ minHeight: 40 }}
@@ -265,7 +273,9 @@ export function ChatInput({
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
-                title="Export conversation"
+                aria-label="Export conversation"
+                aria-expanded={showExportMenu}
+                aria-haspopup="menu"
               >
                 <Download className="h-4 w-4" />
               </button>
