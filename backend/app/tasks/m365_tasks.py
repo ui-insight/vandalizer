@@ -16,6 +16,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +93,8 @@ def _trigger_text_extraction(doc: dict) -> None:
 @celery_app.task(
     bind=True,
     name="tasks.passive.ingest_email_message",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -194,7 +196,8 @@ def ingest_email_message(
 @celery_app.task(
     bind=True,
     name="tasks.passive.ingest_drive_item",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -288,7 +291,8 @@ def ingest_drive_item(
 @celery_app.task(
     bind=True,
     name="tasks.passive.triage_work_item",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -399,7 +403,8 @@ def _match_workflow(db, work_item: dict, intake: dict):
 @celery_app.task(
     bind=True,
     name="tasks.passive.renew_graph_subscriptions",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -436,7 +441,8 @@ def renew_graph_subscriptions(self) -> dict:
 @celery_app.task(
     bind=True,
     name="tasks.passive.send_daily_digest",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )

@@ -1,8 +1,9 @@
 """Knowledge Base API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.dependencies import get_current_user
+from app.rate_limit import limiter
 from app.models.user import User
 from app.services import group_service
 from app.schemas.knowledge import (
@@ -127,7 +128,8 @@ async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depend
 
 
 @router.post("/{uuid}/add_urls")
-async def add_urls(uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
     kb = await svc.get_knowledge_base(uuid, user.user_id)
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")

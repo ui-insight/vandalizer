@@ -4,6 +4,7 @@ import datetime
 from typing import Optional
 
 from beanie import Document
+from pydantic import Field
 
 
 class Automation(Document):
@@ -21,8 +22,8 @@ class Automation(Document):
     shared_with_team: bool = False
     space: Optional[str] = None
     output_config: dict = {}
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-    updated_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "automation"

@@ -4,6 +4,7 @@ import datetime
 from typing import Optional
 
 from beanie import Document, PydanticObjectId
+from pydantic import Field
 
 
 class WorkflowStepTask(Document):
@@ -43,8 +44,8 @@ class Workflow(Document):
     name: str
     description: Optional[str] = None
     user_id: str
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-    updated_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     steps: list[PydanticObjectId] = []
     attachments: list[PydanticObjectId] = []
     num_executions: int = 0
@@ -62,6 +63,11 @@ class Workflow(Document):
 
     class Settings:
         name = "workflow"
+        indexes = [
+            "user_id",
+            "space",
+            [("user_id", 1), ("space", 1)],
+        ]
 
 
 class WorkflowResult(Document):
@@ -72,7 +78,7 @@ class WorkflowResult(Document):
     num_steps_total: int = 0
     steps_output: dict = {}
     final_output: Optional[dict] = None
-    start_time: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    start_time: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     status: str = "running"
     session_id: str
     current_step_name: Optional[str] = None
@@ -87,6 +93,12 @@ class WorkflowResult(Document):
 
     class Settings:
         name = "workflow_result"
+        indexes = [
+            "session_id",
+            "workflow",
+            "batch_id",
+            "status",
+        ]
 
 
 class WorkflowArtifact(Document):
@@ -97,7 +109,7 @@ class WorkflowArtifact(Document):
     filename: Optional[str] = None
     file_path: Optional[str] = None
     extracted_data: Optional[dict] = None
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "workflow_artifacts"

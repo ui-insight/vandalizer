@@ -439,7 +439,7 @@ async def user_leaderboard(
         team_user_ids = [m.user_id for m in team_memberships]
         all_users = await User.find({"user_id": {"$in": team_user_ids}}).to_list()
     else:
-        all_users = await User.find().to_list()
+        all_users = await User.find().limit(10000).to_list()
     user_map = {u.user_id: u for u in all_users}
 
     # Build result list
@@ -503,11 +503,11 @@ async def team_leaderboard(
                 agg["latencies"].append(delta_ms)
 
     # Fetch team records  - map by str(id)
-    all_teams = await Team.find().to_list()
+    all_teams = await Team.find().limit(10000).to_list()
     team_map = {str(t.id): t for t in all_teams}
 
     # Fetch member counts per team
-    all_memberships = await TeamMembership.find().to_list()
+    all_memberships = await TeamMembership.find().limit(50000).to_list()
     member_counts: dict[str, int] = {}
     for m in all_memberships:
         tid_str = str(m.team) if m.team else ""

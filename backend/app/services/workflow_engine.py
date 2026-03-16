@@ -47,8 +47,8 @@ class UsageAccumulator:
             with self._lock:
                 self.tokens_in += usage.request_tokens or 0
                 self.tokens_out += usage.response_tokens or 0
-        except Exception:
-            pass
+        except (AttributeError, TypeError):
+            pass  # usage() not available on all result types
 
     def add(self, tokens_in: int, tokens_out: int) -> None:
         with self._lock:
@@ -409,6 +409,14 @@ class WebsiteNode(Node):
         url = self.data.get("url", "")
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        from app.utils.url_validation import validate_outbound_url
+
+        try:
+            validate_outbound_url(url)
+        except ValueError as e:
+            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+
         self.report_progress(f"Fetching {url}")
         try:
             with httpx.Client(timeout=30, follow_redirects=True) as client:

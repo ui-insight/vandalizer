@@ -11,6 +11,7 @@ import time
 from celery import chord
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,8 @@ def _get_secure_agent():
 @celery_app.task(
     bind=True,
     name="tasks.upload.validation.chunk",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
     rate_limit="1/s",
@@ -109,7 +111,8 @@ def validate_chunk(
 @celery_app.task(
     bind=True,
     name="tasks.upload.validation.summary",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
     rate_limit="1/s",
@@ -180,7 +183,8 @@ def summarize_results(
 @celery_app.task(
     bind=True,
     name="tasks.upload.validation",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
     rate_limit="1/s",

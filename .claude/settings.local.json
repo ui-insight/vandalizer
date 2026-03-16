@@ -24,7 +24,8 @@
       "Bash(git add:*)",
       "Bash(tail:*)",
       "Bash(head:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(wc:*)"
     ]
   }
 }

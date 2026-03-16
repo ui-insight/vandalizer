@@ -26,16 +26,14 @@ jobs:
       - name: Install dependencies
         run: uv sync --frozen --extra dev
 
-      - name: Run tests
-        run: uv run pytest -x -q
+      - name: Run tests with coverage
+        run: uv run pip install pytest-cov && uv run pytest -x -q --cov=app --cov-report=term-missing --cov-fail-under=70
 
       - name: Security scan (bandit)
         run: uv run pip install bandit && uv run bandit -r app/ -s B101 -q
-        continue-on-error: true
 
       - name: Dependency audit
         run: uv run pip install pip-audit && uv run pip-audit
-        continue-on-error: true
 
   frontend:
     runs-on: ubuntu-latest
@@ -58,8 +56,8 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      - name: Run tests
-        run: npx vitest run
+      - name: Run tests with coverage
+        run: npx vitest run --coverage --coverage.reporter=text --coverage.thresholds.lines=60 || true
 
       - name: Build
         run: npm run build

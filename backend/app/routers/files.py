@@ -4,9 +4,12 @@ import zipfile
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
 from fastapi.responses import FileResponse, StreamingResponse
 
+from fastapi import Request
+
 from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
+from app.rate_limit import limiter
 from app.schemas.documents import (
     MoveFileRequest,
     RenameDocumentRequest,
@@ -18,7 +21,9 @@ router = APIRouter()
 
 
 @router.post("/upload")
+@limiter.limit("30/minute")
 async def upload(
+    request: Request,
     body: UploadRequest,
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),

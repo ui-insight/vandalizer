@@ -8,6 +8,7 @@ import logging
 import os
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,8 @@ def _get_db():
 @celery_app.task(
     bind=True,
     name="tasks.evaluation.generate_plan",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=5,
 )
@@ -57,7 +59,8 @@ def generate_evaluation_plan_task(
 @celery_app.task(
     bind=True,
     name="tasks.evaluation.run_validation",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=5,
 )

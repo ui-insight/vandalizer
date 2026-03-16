@@ -14,6 +14,7 @@ from uuid import uuid4
 from bson import ObjectId
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,8 @@ def _get_db():
 @celery_app.task(
     bind=True,
     name="tasks.passive.process_pending_triggers",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -373,7 +375,8 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
 @celery_app.task(
     bind=True,
     name="tasks.passive.process_outputs",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )
@@ -527,7 +530,8 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 @celery_app.task(
     bind=True,
     name="tasks.passive.cleanup_old_trigger_events",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=10,
 )

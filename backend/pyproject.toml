@@ -29,6 +29,8 @@ dependencies = [
     "redis>=5.0,<6",
     "slowapi>=0.1,<1",
     "fpdf2>=2.8.7,<3",
+    "sentry-sdk[fastapi,celery]>=2.0,<3",
+    "python-json-logger>=3.0,<4",
 ]
 
 [project.optional-dependencies]

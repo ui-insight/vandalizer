@@ -4,6 +4,7 @@ import asyncio
 import logging
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,8 @@ async def _init_and_send_warnings():
 @celery_app.task(
     bind=True,
     name="tasks.demo.process_waitlist",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=30,
 )
@@ -61,7 +63,8 @@ def process_demo_waitlist(self):
 @celery_app.task(
     bind=True,
     name="tasks.demo.check_expirations",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=30,
 )
@@ -74,7 +77,8 @@ def check_demo_expirations(self):
 @celery_app.task(
     bind=True,
     name="tasks.demo.send_expiry_warnings",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=30,
 )

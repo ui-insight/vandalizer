@@ -7,6 +7,7 @@ Task names use 'tasks.workflow_next.*' to coexist with Flask's 'tasks.workflow.*
 import logging
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,8 @@ def _get_db():
 @celery_app.task(
     bind=True,
     name="tasks.workflow_next.execution",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     rate_limit="1/s",
     max_retries=3,
     default_retry_delay=5,
@@ -214,7 +216,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 @celery_app.task(
     bind=True,
     name="tasks.workflow_next.execution_step_test",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=2,
     default_retry_delay=5,
 )

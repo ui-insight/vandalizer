@@ -341,16 +341,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
 
   // Processing overlay - shown when document is still being processed
   const processingOverlay = processing ? (
-    <div style={{
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      zIndex: 50,
-      display: 'flex',
-      justifyContent: 'center',
-      padding: '20px 24px',
-    }}>
+    <div
+      aria-live="polite"
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        display: 'flex',
+        justifyContent: 'center',
+        padding: '20px 24px',
+      }}
+    >
       <div style={{
         width: '100%',
         maxWidth: 420,
@@ -528,13 +531,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
         padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
-        <button onClick={zoomOut} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+        <button onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+        <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
-        <button onClick={zoomIn} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+        <button onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
@@ -579,6 +582,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
                 background: 'none',
               }}
               title="Previous highlight"
+              aria-label="Previous highlight"
             >
               <ChevronLeft size={18} />
             </button>
@@ -607,6 +611,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
                 background: 'none',
               }}
               title="Next highlight"
+              aria-label="Next highlight"
             >
               <ChevronRight size={18} />
             </button>

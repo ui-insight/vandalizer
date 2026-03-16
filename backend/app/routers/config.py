@@ -213,7 +213,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
 
 @router.get("/automation-stats")
 async def get_automation_stats(user: User = Depends(get_current_user)):
-    all_workflows = await Workflow.find().to_list()
+    all_workflows = await Workflow.find().limit(5000).to_list()
     total = len(all_workflows)
 
     passive = [
@@ -231,7 +231,7 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
     week_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
     recent_results = await WorkflowResult.find(
         WorkflowResult.start_time >= week_ago,
-    ).to_list()
+    ).limit(10000).to_list()
 
     today_start = datetime.datetime.now(datetime.timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0

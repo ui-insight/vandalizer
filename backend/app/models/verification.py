@@ -62,6 +62,12 @@ class VerificationRequest(Document):
 
     class Settings:
         name = "verification_request"
+        indexes = [
+            "uuid",
+            "submitter_user_id",
+            "status",
+            "item_id",
+        ]
 
 
 class VerifiedItemMetadata(Document):

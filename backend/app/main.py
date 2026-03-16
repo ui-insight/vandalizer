@@ -1,3 +1,5 @@
+import logging
+import sys
 from contextlib import asynccontextmanager
 from functools import lru_cache
 
@@ -9,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import Settings
 from app.database import init_db
+from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
 from app.routers import activity, admin, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, office, spaces, teams, verification, workflows
@@ -19,13 +22,67 @@ def get_settings() -> Settings:
     return Settings()
 
 
+# ---------------------------------------------------------------------------
+# Structured logging
+# ---------------------------------------------------------------------------
+def _configure_logging(settings: Settings) -> None:
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    if settings.log_format == "json":
+        from pythonjsonlogger.json import JsonFormatter
+
+        handler.setFormatter(
+            JsonFormatter(
+                fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+                rename_fields={"asctime": "timestamp", "levelname": "level"},
+            )
+        )
+    else:
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        )
+    root.handlers = [handler]
+
+
+# ---------------------------------------------------------------------------
+# Sentry
+# ---------------------------------------------------------------------------
+def _init_sentry(settings: Settings) -> None:
+    if not settings.sentry_dsn:
+        return
+    import sentry_sdk
+
+    sentry_sdk.init(
+        dsn=settings.sentry_dsn,
+        environment=settings.environment,
+        traces_sample_rate=0.1 if settings.is_production else 1.0,
+        send_default_pii=False,
+    )
+
+
+_boot_settings = get_settings()
+_configure_logging(_boot_settings)
+_init_sentry(_boot_settings)
+
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
     yield
+    logger.info("Shutting down Vandalizer backend")
 
 
-app = FastAPI(title="Vandalizer", lifespan=lifespan)
+app = FastAPI(
+    title="Vandalizer",
+    lifespan=lifespan,
+    docs_url=None if _boot_settings.is_production else "/api/docs",
+    redoc_url=None if _boot_settings.is_production else "/api/redoc",
+    openapi_url=None if _boot_settings.is_production else "/api/openapi.json",
+)
 app.state.limiter = limiter
 
 
@@ -37,6 +94,16 @@ def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 
 
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _app_error_handler(request: Request, exc: AppError):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.message},
+    )
+
+
+app.add_exception_handler(AppError, _app_error_handler)
 
 
 # ---------------------------------------------------------------------------
@@ -109,4 +176,48 @@ app.include_router(certification.router, prefix="/api/certification", tags=["cer
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    """Health check that verifies all critical dependencies."""
+    checks: dict[str, str] = {}
+    settings = get_settings()
+
+    # MongoDB
+    try:
+        from motor.motor_asyncio import AsyncIOMotorClient
+
+        client = AsyncIOMotorClient(
+            settings.mongo_host, serverSelectionTimeoutMS=2000
+        )
+        await client[settings.mongo_db].command("ping")
+        checks["mongodb"] = "ok"
+    except Exception as e:
+        checks["mongodb"] = f"error: {e}"
+
+    # Redis
+    try:
+        import redis.asyncio as aioredis
+
+        r = aioredis.Redis(
+            host=settings.redis_host, port=6379, db=0, socket_timeout=2
+        )
+        await r.ping()
+        await r.aclose()
+        checks["redis"] = "ok"
+    except Exception as e:
+        checks["redis"] = f"error: {e}"
+
+    # ChromaDB
+    try:
+        import chromadb
+
+        chroma = chromadb.PersistentClient(path=settings.chromadb_persist_dir)
+        chroma.heartbeat()
+        checks["chromadb"] = "ok"
+    except Exception as e:
+        checks["chromadb"] = f"error: {e}"
+
+    all_ok = all(v == "ok" for v in checks.values())
+    status_code = 200 if all_ok else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={"status": "ok" if all_ok else "degraded", "checks": checks},
+    )

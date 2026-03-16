@@ -51,6 +51,7 @@ class LibraryItem(Document):
 
     class Settings:
         name = "library_item"
+        indexes = ["item_id", "added_by_user_id"]
 
 
 class Library(Document):
@@ -69,3 +70,8 @@ class Library(Document):
 
     class Settings:
         name = "library"
+        indexes = [
+            "owner_user_id",
+            "team",
+            [("owner_user_id", 1), ("scope", 1)],
+        ]

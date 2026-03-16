@@ -32,7 +32,15 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
+      role="button"
+      tabIndex={0}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          inputRef.current?.click()
+        }
+      }}
       className={cn(
         'group relative flex cursor-pointer flex-col items-center gap-1 rounded-[var(--ui-radius)] border-2 border-dashed',
         active

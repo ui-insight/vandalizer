@@ -32,11 +32,16 @@ async def create_search_set(title: str, space: str, set_type: str, user_id: str,
     return ss
 
 
-async def list_search_sets(space: str | None = None, user_id: str | None = None) -> list[SearchSet]:
+async def list_search_sets(
+    space: str | None = None,
+    user_id: str | None = None,
+    skip: int = 0,
+    limit: int = 100,
+) -> list[SearchSet]:
     query = {}
     if space:
         query["space"] = space
-    return await SearchSet.find(query).to_list()
+    return await SearchSet.find(query).skip(skip).limit(limit).to_list()
 
 
 async def get_search_set(search_set_uuid: str) -> SearchSet | None:

@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from app.celery_app import celery_app
+from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +110,8 @@ def _get_user_model_name(user_id: str | None, db=None) -> str:
 @celery_app.task(
     bind=True,
     name="tasks.extraction.run",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )
@@ -260,7 +262,8 @@ def perform_extraction_task(
 @celery_app.task(
     bind=True,
     name="tasks.extraction.ingest_recommendation",
-    autoretry_for=(Exception,),
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
     max_retries=3,
     default_retry_delay=5,
 )

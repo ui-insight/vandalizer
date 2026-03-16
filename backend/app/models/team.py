@@ -14,6 +14,7 @@ class Team(Document):
 
     class Settings:
         name = "team"
+        indexes = ["uuid", "owner_user_id"]
 
 
 class TeamMembership(Document):
@@ -24,6 +25,10 @@ class TeamMembership(Document):
 
     class Settings:
         name = "team_membership"
+        indexes = [
+            [("team", 1), ("user_id", 1)],
+            "user_id",
+        ]
 
 
 class TeamInvite(Document):
@@ -39,3 +44,4 @@ class TeamInvite(Document):
 
     class Settings:
         name = "team_invite"
+        indexes = ["token", "email"]

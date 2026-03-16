@@ -2,6 +2,7 @@ import datetime
 from typing import Optional
 
 from beanie import Document
+from pydantic import Field
 
 
 class CertificationProgress(Document):
@@ -15,8 +16,8 @@ class CertificationProgress(Document):
     certified_at: Optional[datetime.datetime] = None
     streak_days: int = 0
     last_activity_date: Optional[str] = None  # YYYY-MM-DD for streak tracking
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
-    updated_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
+    updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:
         name = "certification_progress"

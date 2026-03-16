@@ -49,4 +49,10 @@ async def get_api_key_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
         )
+    # Block locked demo users from API key access too
+    if user.is_demo_user and user.demo_status == "locked":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="DEMO_EXPIRED",
+        )
     return user

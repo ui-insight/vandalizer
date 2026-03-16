@@ -4,6 +4,7 @@ import datetime
 from typing import Optional
 
 from beanie import Document
+from pydantic import Field
 
 
 class SearchSetItem(Document):
@@ -22,6 +23,7 @@ class SearchSetItem(Document):
 
     class Settings:
         name = "search_set_item"
+        indexes = ["searchset"]
 
 
 class SearchSet(Document):
@@ -34,7 +36,7 @@ class SearchSet(Document):
     set_type: str
     user_id: Optional[str] = None
     is_global: bool = False
-    created_at: datetime.datetime = datetime.datetime.now(tz=datetime.timezone.utc)
+    created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     user: Optional[str] = None
     fillable_pdf_url: Optional[str] = None
     verified: bool = False
@@ -44,6 +46,12 @@ class SearchSet(Document):
 
     class Settings:
         name = "search_set"
+        indexes = [
+            "uuid",
+            "user_id",
+            "space",
+            [("user_id", 1), ("space", 1)],
+        ]
 
     async def get_items(self) -> list[SearchSetItem]:
         return await SearchSetItem.find(SearchSetItem.searchset == self.uuid).to_list()

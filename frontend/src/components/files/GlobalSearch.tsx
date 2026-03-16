@@ -83,7 +83,11 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           ref={inputRef}
           value={query}
           onChange={e => handleChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Escape') handleClose()
+          }}
           placeholder="Search document titles and content..."
+          aria-label="Search documents"
           style={{
             flex: 1, border: 'none', background: 'none', outline: 'none',
             fontSize: 15, color: '#111827',
@@ -91,6 +95,7 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
         />
         <button
           onClick={handleClose}
+          aria-label="Close search"
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
         >
           <X size={18} />

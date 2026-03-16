@@ -85,7 +85,15 @@ ALL_MODELS = [
 
 
 async def init_db(settings: Settings) -> None:
-    client = AsyncIOMotorClient(settings.mongo_host)
+    client = AsyncIOMotorClient(
+        settings.mongo_host,
+        maxPoolSize=50,
+        minPoolSize=5,
+        maxIdleTimeMS=30000,
+        serverSelectionTimeoutMS=5000,
+        connectTimeoutMS=5000,
+        socketTimeoutMS=30000,
+    )
     await init_beanie(
         database=client[settings.mongo_db],
         document_models=ALL_MODELS,
