@@ -35,6 +35,14 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = "Vandalizer"
 
+    # File storage backend ("local" or "s3")
+    storage_backend: str = "local"
+    s3_bucket: str = ""
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    s3_endpoint_url: str | None = None
+
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":
         if self.jwt_secret_key == "change-me" and self.environment != "development":

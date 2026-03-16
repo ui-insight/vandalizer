@@ -1,11 +1,13 @@
 """AST-based validation for user-submitted code before exec()."""
 
 import ast
+import re as _re
 
 FORBIDDEN_ATTRIBUTES = frozenset({
     "__subclasses__",
     "__bases__",
     "__mro__",
+    "mro",              # non-dunder form; also a sandbox-escape enabler
     "__class__",
     "__import__",
     "__globals__",
@@ -21,6 +23,13 @@ FORBIDDEN_ATTRIBUTES = frozenset({
     "__getattr__",
     "__setattr__",
     "__delattr__",
+    # Close the format-string introspection bypass:
+    #   "{0.__globals__}".format(re)  —  __globals__ lives in a string
+    #   literal so the Attribute check above won't catch it.  Blocking
+    #   .format / .format_map at the attribute level stops the call site.
+    "format",
+    "format_map",
+    "__format__",
 })
 
 FORBIDDEN_NAMES = frozenset({
@@ -46,7 +55,12 @@ FORBIDDEN_NAMES = frozenset({
     "super",
     "object",
     "__build_class__",
+    "format",           # builtin format() — defense in depth
 })
+
+# Detect dunder attribute references embedded in format-string literals,
+# e.g. "{0.__globals__[__builtins__]}" which would bypass AST attribute checks.
+_DUNDER_FMT_RE = _re.compile(r"\{[^}]*\.__[a-zA-Z_]+[^}]*\}")
 
 
 def validate_sandbox_code(code: str) -> None:
@@ -69,3 +83,13 @@ def validate_sandbox_code(code: str) -> None:
         # Block import statements entirely
         if isinstance(node, (ast.Import, ast.ImportFrom)):
             raise ValueError("Import statements are not allowed")
+
+        # Block format-string introspection: "{0.__globals__}".format(x)
+        # The dunder names live inside the string literal so the Attribute
+        # check above would miss them.
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if _DUNDER_FMT_RE.search(node.value):
+                raise ValueError(
+                    "Forbidden: string literal contains dunder attribute reference "
+                    "(potential format-string introspection attack)"
+                )

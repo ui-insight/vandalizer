@@ -29,6 +29,9 @@ jobs:
       - name: Lint
         run: uv run pip install ruff && uv run ruff check app/
 
+      - name: Type check (mypy)
+        run: uv run mypy app/ --ignore-missing-imports
+
       - name: Run tests with coverage
         run: uv run pip install pytest-cov && uv run pytest -x -q --cov=app --cov-report=term-missing --cov-fail-under=70
 

@@ -33,6 +33,7 @@ from app.models.quality_alert import QualityAlert
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
+from app.models.audit_log import AdminAuditLog
 
 ALL_MODELS = [
     User,
@@ -81,6 +82,7 @@ ALL_MODELS = [
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,
+    AdminAuditLog,
 ]
 
 

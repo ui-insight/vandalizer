@@ -1,5 +1,7 @@
 import base64
+import tempfile
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.config import Settings
@@ -7,6 +9,13 @@ from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
+
+
+@dataclass
+class DownloadResult:
+    data: bytes
+    extension: str
+    title: str
 
 
 async def upload_document(
@@ -62,12 +71,23 @@ async def upload_document(
     if not is_valid_file_content(file_data, extension):
         raise ValueError("File content does not match its extension.")
 
-    # Save file
-    relative_path = Path(user_id) / f"{uid}.{extension}"
-    upload_dir = Path(settings.upload_dir) / user_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = upload_dir / f"{uid}.{extension}"
-    file_path.write_bytes(file_data)
+    # Save file via storage backend
+    from app.services.storage import get_storage
+
+    storage = get_storage(settings)
+    relative_path_str = f"{user_id}/{uid}.{extension}"
+    await storage.write(relative_path_str, file_data)
+
+    # Celery tasks need a local filesystem path; use public_path() for local
+    # storage or write a temporary file for remote backends (e.g. S3).
+    local_path = storage.public_path(relative_path_str)
+    if local_path is None:
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{extension}")
+        tmp.write(file_data)
+        tmp.close()
+        local_path = tmp.name
+
+    relative_path = Path(relative_path_str)
 
     document = SmartDocument(
         title=safe_name,
@@ -93,7 +113,7 @@ async def upload_document(
     task_id = dispatch_upload_tasks(
         document_uuid=uid,
         extension=extension,
-        document_path=str(file_path),
+        document_path=local_path,
         user_id=user_id,
     )
     document.task_id = task_id
@@ -102,26 +122,25 @@ async def upload_document(
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
 
-def _safe_resolve(settings: Settings, relative_path: str) -> Path | None:
-    """Resolve *relative_path* under the upload dir, rejecting traversal."""
-    upload_root = Path(settings.upload_dir).resolve()
-    resolved = (upload_root / relative_path).resolve()
-    if not resolved.is_relative_to(upload_root):
-        return None
-    return resolved
-
-
 async def download_document(
     doc_uuid: str, settings: Settings, *, user_id: str | None = None
-) -> Path | None:
+) -> DownloadResult | None:
     filters = [SmartDocument.uuid == doc_uuid]
     if user_id is not None:
         filters.append(SmartDocument.user_id == user_id)
     doc = await SmartDocument.find_one(*filters)
     if not doc:
         return None
-    download_path = doc.downloadpath or doc.path
-    return _safe_resolve(settings, download_path)
+    from app.services.storage import get_storage
+
+    storage = get_storage(settings)
+    relative_path = doc.downloadpath or doc.path
+    try:
+        data = await storage.read(relative_path)
+    except Exception:
+        return None
+    ext = doc.extension or Path(relative_path).suffix.lstrip(".")
+    return DownloadResult(data=data, extension=ext, title=doc.title or doc_uuid)
 
 
 async def delete_document(
@@ -133,11 +152,11 @@ async def delete_document(
     doc = await SmartDocument.find_one(*filters)
     if not doc:
         return False
-    # Delete file
-    download_path = doc.downloadpath or doc.path
-    file_path = _safe_resolve(settings, download_path)
-    if file_path and file_path.exists():
-        file_path.unlink()
+    from app.services.storage import get_storage
+
+    storage = get_storage(settings)
+    relative_path = doc.downloadpath or doc.path
+    await storage.delete(relative_path)
     await doc.delete()
     return True
 
