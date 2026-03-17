@@ -23,11 +23,12 @@ from app.services.config_service import get_user_model_name
 # Workflow CRUD
 # ---------------------------------------------------------------------------
 
-async def create_workflow(name: str, user_id: str, space: str | None = None, description: str | None = None) -> Workflow:
+async def create_workflow(name: str, user_id: str, space: str | None = None, description: str | None = None, team_id: str | None = None) -> Workflow:
     wf = Workflow(
         name=name,
         description=description,
         user_id=user_id,
+        team_id=team_id,
         space=space,
         created_by_user_id=user_id,
     )
@@ -130,7 +131,7 @@ async def delete_workflow(workflow_id: str) -> bool:
     return True
 
 
-async def duplicate_workflow(workflow_id: str, user_id: str) -> dict | None:
+async def duplicate_workflow(workflow_id: str, user_id: str, team_id: str | None = None) -> dict | None:
     original = await get_workflow(workflow_id)
     if not original:
         return None
@@ -139,6 +140,7 @@ async def duplicate_workflow(workflow_id: str, user_id: str) -> dict | None:
         name=f"{original['name']} (Copy)",
         description=original.get("description"),
         user_id=user_id,
+        team_id=team_id,
         space=original.get("space"),
         created_by_user_id=user_id,
     )

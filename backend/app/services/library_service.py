@@ -362,7 +362,7 @@ async def clone_to_personal(item_id: str, user_id: str) -> dict | None:
     if not item:
         return None
 
-    new_obj_id = await _clone_underlying_object(item, user_id)
+    new_obj_id = await _clone_underlying_object(item, user_id, team_id=None)
     if not new_obj_id:
         return None
 
@@ -382,7 +382,7 @@ async def share_to_team(item_id: str, user_id: str, team_id: str) -> dict | None
     if not item:
         return None
 
-    new_obj_id = await _clone_underlying_object(item, user_id)
+    new_obj_id = await _clone_underlying_object(item, user_id, team_id=team_id)
     if not new_obj_id:
         return None
 
@@ -592,7 +592,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
     }
 
 
-async def _clone_underlying_object(item: LibraryItem, user_id: str) -> PydanticObjectId | None:
+async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: str | None = None) -> PydanticObjectId | None:
     """Clone the underlying workflow or search set. Returns new object ID."""
     if item.kind == LibraryItemKind.WORKFLOW:
         original = await Workflow.get(item.item_id)
@@ -602,6 +602,7 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str) -> PydanticO
             name=f"{original.name} (Copy)",
             description=original.description,
             user_id=user_id,
+            team_id=team_id,
             created_by_user_id=user_id,
             space=original.space,
             input_config=original.input_config,

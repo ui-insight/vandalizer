@@ -96,6 +96,7 @@ class ChatConversation(Document):
     uuid: str
     title: str
     user_id: str
+    team_id: Optional[str] = None
     messages: list[PydanticObjectId] = []
     file_attachments: list[PydanticObjectId] = []
     url_attachments: list[PydanticObjectId] = []
@@ -107,7 +108,9 @@ class ChatConversation(Document):
         indexes = [
             "uuid",
             "user_id",
+            "team_id",
             [("user_id", 1), ("updated_at", -1)],
+            [("team_id", 1), ("updated_at", -1)],
         ]
 
     async def add_message(

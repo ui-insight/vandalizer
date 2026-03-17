@@ -44,6 +44,7 @@ class Workflow(Document):
     name: str
     description: Optional[str] = None
     user_id: str
+    team_id: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     steps: list[PydanticObjectId] = []
@@ -65,8 +66,10 @@ class Workflow(Document):
         name = "workflow"
         indexes = [
             "user_id",
+            "team_id",
             "space",
             [("user_id", 1), ("space", 1)],
+            [("team_id", 1), ("space", 1)],
         ]
 
 
