@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, office, spaces, teams, verification, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, office, organizations, spaces, teams, verification, workflows
 
 
 @lru_cache
@@ -172,6 +172,20 @@ app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])
 app.include_router(browser_automation.router, prefix="/api/browser-automation", tags=["browser-automation"])
 app.include_router(certification.router, prefix="/api/certification", tags=["certification"])
+app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
+app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics (optional)
+# ---------------------------------------------------------------------------
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
+except ImportError:
+    pass
 
 
 @app.get("/api/health")

@@ -10,11 +10,12 @@ class Team(Document):
     uuid: str
     name: str
     owner_user_id: str
+    organization_id: Optional[str] = None  # org uuid for university hierarchy
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
         name = "team"
-        indexes = ["uuid", "owner_user_id"]
+        indexes = ["uuid", "owner_user_id", "organization_id"]
 
 
 class TeamMembership(Document):

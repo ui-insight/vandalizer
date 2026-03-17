@@ -34,6 +34,28 @@ async def _require_admin(user: User) -> User:
     return user
 
 
+def _sanitize_providers(providers: list[dict]) -> list[dict]:
+    """Replace client_secret values with '***' in OAuth provider dicts."""
+    sanitized = []
+    for p in providers:
+        p_copy = dict(p)
+        if "client_secret" in p_copy and p_copy["client_secret"]:
+            p_copy["client_secret"] = "***"
+        sanitized.append(p_copy)
+    return sanitized
+
+
+def _sanitize_models(models: list[dict]) -> list[dict]:
+    """Replace api_key values with '***' in model config dicts."""
+    sanitized = []
+    for m in models:
+        m_copy = dict(m)
+        if "api_key" in m_copy and m_copy["api_key"]:
+            m_copy["api_key"] = "***"
+        sanitized.append(m_copy)
+    return sanitized
+
+
 async def _audit(user: User, action: str, detail: str, payload: dict | None = None) -> None:
     """Fire-and-forget audit log entry for state-changing admin actions."""
     entry = AdminAuditLog(user_id=user.user_id, action=action, detail=detail, payload=payload)
@@ -1022,8 +1044,8 @@ async def get_config(
         "extraction_config": cfg.get_extraction_config(),
         "quality_config": cfg.get_quality_config(),
         "auth_methods": cfg.auth_methods,
-        "oauth_providers": cfg.oauth_providers,
-        "available_models": cfg.available_models,
+        "oauth_providers": _sanitize_providers(cfg.oauth_providers),
+        "available_models": _sanitize_models(cfg.available_models),
         "ocr_endpoint": cfg.ocr_endpoint,
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
@@ -1098,7 +1120,7 @@ async def add_model(
     clear_agent_caches()
     await _audit(user, "add_model", f"Added model: {body.name} ({body.tag})")
 
-    return {"status": "ok", "models": cfg.available_models}
+    return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
 
 
 # ---------------------------------------------------------------------------
@@ -1136,7 +1158,7 @@ async def update_model(
     clear_agent_caches()
     await _audit(user, "update_model", f"Updated model at index {index}: {body.tag}")
 
-    return {"status": "ok", "models": cfg.available_models}
+    return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
 
 
 # ---------------------------------------------------------------------------
@@ -1183,7 +1205,7 @@ async def add_oauth_provider(
     await cfg.save()
     await _audit(user, "add_oauth_provider", f"Added OAuth provider: {body.provider}")
 
-    return {"status": "ok", "providers": cfg.oauth_providers}
+    return {"status": "ok", "providers": _sanitize_providers(cfg.oauth_providers)}
 
 
 # ---------------------------------------------------------------------------
@@ -1208,7 +1230,7 @@ async def update_oauth_provider(
     await cfg.save()
     await _audit(user, "update_oauth_provider", f"Updated OAuth provider at index {index}: {body.provider}")
 
-    return {"status": "ok", "providers": cfg.oauth_providers}
+    return {"status": "ok", "providers": _sanitize_providers(cfg.oauth_providers)}
 
 
 # ---------------------------------------------------------------------------
@@ -1554,3 +1576,98 @@ async def isolated_users(user: User = Depends(get_current_user)):
         IsolatedUserItem(user_id=u.user_id, name=u.name, email=u.email)
         for u in users
     ]
+
+
+# ---------------------------------------------------------------------------
+# 24. Retention Dashboard
+# ---------------------------------------------------------------------------
+
+@router.get("/retention/dashboard")
+async def retention_dashboard(user: User = Depends(get_current_user)):
+    """Get retention policy status and document counts by classification."""
+    await _require_admin(user)
+
+    config = await SystemConfig.get_config()
+    retention_config = config.get_retention_config()
+    classification_config = config.get_classification_config()
+
+    # Count documents by classification
+    pipeline = [
+        {"$match": {"soft_deleted": {"$ne": True}}},
+        {"$group": {"_id": "$classification", "count": {"$sum": 1}}},
+    ]
+    counts_raw = await SmartDocument.aggregate(pipeline).to_list()
+    counts = {item["_id"] or "unclassified": item["count"] for item in counts_raw}
+
+    # Count pending deletions
+    pending = await SmartDocument.find(
+        SmartDocument.scheduled_deletion_at != None,  # noqa: E711
+        SmartDocument.soft_deleted != True,  # noqa: E712
+    ).count()
+
+    # Count soft-deleted
+    soft_deleted = await SmartDocument.find(SmartDocument.soft_deleted == True).count()  # noqa: E712
+
+    # Count holds
+    holds = await SmartDocument.find(SmartDocument.retention_hold == True).count()  # noqa: E712
+
+    return {
+        "retention_config": retention_config,
+        "classification_config": classification_config,
+        "document_counts": counts,
+        "pending_deletions": pending,
+        "soft_deleted": soft_deleted,
+        "retention_holds": holds,
+    }
+
+
+@router.put("/retention/config")
+async def update_retention_config(user: User = Depends(get_current_user)):
+    """Update retention configuration."""
+    await _require_admin(user)
+    from fastapi import Request
+    # This endpoint is defined but config updates go through the existing config endpoints
+    return {"detail": "Use PUT /api/config to update retention_config"}
+
+
+# ---------------------------------------------------------------------------
+# 25. Classification Dashboard
+# ---------------------------------------------------------------------------
+
+@router.get("/classification/dashboard")
+async def classification_dashboard(user: User = Depends(get_current_user)):
+    """Get classification status overview."""
+    await _require_admin(user)
+
+    config = await SystemConfig.get_config()
+    classification_config = config.get_classification_config()
+
+    pipeline = [
+        {"$match": {"soft_deleted": {"$ne": True}}},
+        {"$group": {"_id": "$classification", "count": {"$sum": 1}}},
+    ]
+    counts_raw = await SmartDocument.aggregate(pipeline).to_list()
+    counts = {item["_id"] or "unclassified": item["count"] for item in counts_raw}
+
+    # Recent classifications
+    recent = await SmartDocument.find(
+        SmartDocument.classified_at != None,  # noqa: E711
+    ).sort(-SmartDocument.classified_at).limit(10).to_list()
+
+    recent_list = [
+        {
+            "uuid": doc.uuid,
+            "title": doc.title,
+            "classification": doc.classification,
+            "confidence": doc.classification_confidence,
+            "classified_at": doc.classified_at.isoformat() if doc.classified_at else None,
+            "classified_by": doc.classified_by,
+        }
+        for doc in recent
+    ]
+
+    return {
+        "config": classification_config,
+        "counts": counts,
+        "recent_classifications": recent_list,
+    }

@@ -787,6 +787,28 @@ class PackageBuilderNode(Node):
         }
 
 
+class ApprovalNode(Node):
+    """Workflow step that pauses execution for human review."""
+
+    def __init__(self, data: dict) -> None:
+        super().__init__("Approval")
+        self.data = data
+
+    def process(self, inputs):
+        review_instructions = self.data.get("review_instructions", "Please review the workflow output.")
+        assigned_to = self.data.get("assigned_to_user_ids", [])
+
+        return {
+            "output": inputs.get("output"),
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "_approval_pause": True,
+            "_review_instructions": review_instructions,
+            "_assigned_to_user_ids": assigned_to,
+            "_data_for_review": inputs.get("output"),
+        }
+
+
 class BrowserAutomationNode(Node):
     """Workflow step that drives a Chrome extension browser session."""
 
@@ -900,24 +922,30 @@ class WorkflowEngine:
     def get_topological_order(self) -> list[Node]:
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self, workflow_result_updater=None):
+    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None):
         """Execute workflow. Returns (final_output, step_data_list).
 
         Args:
             workflow_result_updater: Optional callable(update_dict) for progress.
+            start_index: Index to start execution from (for resumption after approval).
+            initial_output: Output to feed into the first node when resuming.
         """
         data = []
         nodes = self.get_topological_order()
 
-        latest_output = None
+        latest_output = initial_output
         for idx, node in enumerate(nodes):
+            # Skip already-executed nodes when resuming
+            if idx < start_index:
+                continue
+
             if workflow_result_updater:
                 workflow_result_updater({
                     "current_step_name": node.name,
                     "current_step_detail": f"Starting {node.name}",
                 })
 
-            if idx == 0:
+            if idx == 0 and latest_output is None:
                 output = node.process({})
             else:
                 if isinstance(node, MultiTaskNode):
@@ -930,9 +958,13 @@ class WorkflowEngine:
                                     "current_step_preview": preview,
                                 }) if workflow_result_updater else None
                         )
-                output = node.process(latest_output)
+                output = node.process(latest_output or {})
 
             latest_output = output
+
+            # Check for approval pause signal
+            if latest_output and latest_output.get("_approval_pause"):
+                return latest_output, data
 
             if workflow_result_updater:
                 step_name = sanitize_step_name(node.name)
@@ -1075,6 +1107,9 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "KnowledgeBaseQuery":
                     n = KnowledgeBaseQueryNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "Approval":
+                    n = ApprovalNode(data=task_data)
                     tasks.append(n)
                 else:
                     logger.warning("Unknown task type '%s' in step '%s' — skipping", task_name, step_name)

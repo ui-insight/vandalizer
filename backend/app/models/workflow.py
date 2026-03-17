@@ -90,6 +90,9 @@ class WorkflowResult(Document):
     trigger_type: Optional[str] = None
     is_passive: bool = False
     input_context: Optional[dict] = None
+    # Approval workflow fields
+    paused_at_step_index: Optional[int] = None
+    approval_request_id: Optional[str] = None
     # Batch run fields
     batch_id: Optional[str] = None
     document_title: Optional[str] = None

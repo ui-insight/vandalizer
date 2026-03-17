@@ -216,7 +216,7 @@ def get_agent_model(
     if model_config and model_config.get("external", False) and api_protocol == "openai":
         model_name = agent_model.split("/")[-1] if "/" in agent_model else agent_model
         from openai import AsyncOpenAI
-        client_kwargs: dict = {"api_key": api_key}
+        client_kwargs: dict = {"api_key": api_key, "timeout": 120.0}
         if endpoint:
             client_kwargs["base_url"] = endpoint
         client = AsyncOpenAI(**client_kwargs)

@@ -12,7 +12,7 @@ from app.rate_limit import limiter
 from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
-from app.services import auth_service
+from app.services import auth_service, audit_service
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -80,6 +80,13 @@ async def login(
             detail="Invalid credentials",
         )
     _set_tokens(response, user, settings)
+    await audit_service.log_event(
+        action="user.login",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+        ip_address=request.client.host if request.client else None,
+    )
     user_resp = await _user_response(user)
     result = user_resp.model_dump()
 
@@ -339,3 +346,87 @@ async def oauth_azure_callback(
     response = RedirectResponse(f"{settings.frontend_url}/")
     _set_tokens(response, user, settings)
     return response
+
+
+# ---------------------------------------------------------------------------
+# SAML SSO
+# ---------------------------------------------------------------------------
+
+@router.get("/saml/login")
+async def saml_login(request: Request, settings: Settings = Depends(get_settings)):
+    """Initiate SAML login — redirects to IdP."""
+    config = await SystemConfig.get_config()
+    saml_provider = None
+    for p in config.oauth_providers:
+        if p.get("provider") == "saml":
+            saml_provider = p
+            break
+
+    if not saml_provider:
+        raise HTTPException(status_code=400, detail="SAML not configured")
+
+    from app.services.saml_service import build_authn_request
+    redirect_url = build_authn_request(saml_provider, request)
+    return RedirectResponse(redirect_url)
+
+
+@router.post("/saml/acs")
+async def saml_acs(request: Request, settings: Settings = Depends(get_settings)):
+    """SAML Assertion Consumer Service — receives IdP response."""
+    config = await SystemConfig.get_config()
+    saml_provider = None
+    for p in config.oauth_providers:
+        if p.get("provider") == "saml":
+            saml_provider = p
+            break
+
+    if not saml_provider:
+        raise HTTPException(status_code=400, detail="SAML not configured")
+
+    form_data = await request.form()
+    post_data = dict(form_data)
+
+    from app.services.saml_service import process_saml_response
+    try:
+        attrs = process_saml_response(saml_provider, request, post_data)
+    except ValueError as e:
+        landing = saml_provider.get("error_redirect", settings.frontend_url + "/login")
+        return RedirectResponse(f"{landing}?error=saml_failed&detail={e}")
+
+    user = await auth_service.resolve_saml_user(
+        uid=attrs["uid"],
+        email=attrs["email"],
+        display_name=attrs["display_name"],
+        department=attrs.get("department"),
+    )
+
+    await audit_service.log_event(
+        action="user.login",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+        detail={"method": "saml"},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    response = RedirectResponse(f"{settings.frontend_url}/")
+    _set_tokens(response, user, settings)
+    return response
+
+
+@router.get("/saml/metadata")
+async def saml_metadata(request: Request):
+    """Return SP metadata XML for IdP configuration."""
+    config = await SystemConfig.get_config()
+    saml_provider = None
+    for p in config.oauth_providers:
+        if p.get("provider") == "saml":
+            saml_provider = p
+            break
+
+    if not saml_provider:
+        raise HTTPException(status_code=400, detail="SAML not configured")
+
+    from app.services.saml_service import get_sp_metadata
+    metadata_xml = get_sp_metadata(saml_provider, request)
+    return Response(content=metadata_xml, media_type="application/xml")

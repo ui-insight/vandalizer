@@ -35,20 +35,28 @@ async def graph_webhook(request: Request):
 
     dispatched = 0
 
+    _CLIENT_STATE_RE = re.compile(r"^vandalizer:[a-f0-9\-]{8,}:[a-f0-9\-]{8,}$")
+
     for notification in notifications:
         client_state = notification.get("clientState", "")
         resource = notification.get("resource", "")
         change_type = notification.get("changeType", "")
 
+        # Validate clientState format strictly
+        if not _CLIENT_STATE_RE.match(client_state):
+            logger.warning("Invalid clientState format: %s", client_state)
+            continue
+
         # Parse user_id and intake_config_id from clientState
         # Format: "vandalizer:{user_id}:{intake_config_uuid}"
         parts = client_state.split(":")
-        if len(parts) < 3 or parts[0] != "vandalizer":
-            logger.warning("Unknown clientState: %s", client_state)
-            continue
-
         user_id = parts[1]
         intake_config_id = parts[2]
+
+        # Validate ID lengths (ObjectId = 24 chars, UUID = 32-36 chars)
+        if not (24 <= len(user_id) <= 36 and 24 <= len(intake_config_id) <= 36):
+            logger.warning("Invalid ID lengths in clientState: user_id=%s, config_id=%s", user_id, intake_config_id)
+            continue
 
         # Route based on resource type
         if "/messages/" in resource or "/messages" in resource:

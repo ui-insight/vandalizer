@@ -27,6 +27,9 @@ const Verification = lazy(() => import('./pages/Verification'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
+const Organizations = lazy(() => import('./pages/Organizations'))
+const AuditLog = lazy(() => import('./pages/AuditLog'))
+const Approvals = lazy(() => import('./pages/Approvals'))
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
   const { openPanel } = useCertificationPanel()
@@ -243,6 +246,36 @@ const certificationRoute = createRoute({
   ),
 })
 
+const organizationsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/organizations',
+  component: () => (
+    <ProtectedRoute>
+      <Organizations />
+    </ProtectedRoute>
+  ),
+})
+
+const auditLogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/audit',
+  component: () => (
+    <ProtectedRoute>
+      <AuditLog />
+    </ProtectedRoute>
+  ),
+})
+
+const approvalsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/approvals',
+  component: () => (
+    <ProtectedRoute>
+      <Approvals />
+    </ProtectedRoute>
+  ),
+})
+
 const demoStatusRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/demo/status/$uuid',
@@ -271,6 +304,9 @@ const routeTree = rootRoute.addChildren([
   demoRoute,
   demoFeedbackRoute,
   demoStatusRoute,
+  organizationsRoute,
+  auditLogRoute,
+  approvalsRoute,
 ])
 
 export const router = createRouter({ routeTree })

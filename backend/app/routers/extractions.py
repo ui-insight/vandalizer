@@ -825,3 +825,56 @@ async def run_validation_v2(request: Request, req: RunValidationV2Request, user:
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Cross-Field Validation Rules
+# ---------------------------------------------------------------------------
+
+@router.get("/search-sets/{uuid}/cross-field-rules")
+async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)):
+    """Get cross-field validation rules for a search set."""
+    ss = await svc.get_search_set(uuid, user.user_id)
+    if not ss:
+        raise HTTPException(status_code=404, detail="Search set not found")
+    return {"rules": ss.cross_field_rules}
+
+
+@router.put("/search-sets/{uuid}/cross-field-rules")
+async def update_cross_field_rules(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    """Update cross-field validation rules for a search set."""
+    body = await request.json()
+    rules = body.get("rules", [])
+
+    ss = await svc.get_search_set(uuid, user.user_id)
+    if not ss:
+        raise HTTPException(status_code=404, detail="Search set not found")
+
+    ss.cross_field_rules = rules
+    await ss.save()
+    return {"rules": ss.cross_field_rules}
+
+
+@router.post("/search-sets/{uuid}/validate-cross-field")
+async def validate_cross_field(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    """Run cross-field validation rules against provided extraction data."""
+    body = await request.json()
+    data = body.get("data", {})
+
+    ss = await svc.get_search_set(uuid, user.user_id)
+    if not ss:
+        raise HTTPException(status_code=404, detail="Search set not found")
+
+    if not ss.cross_field_rules:
+        return {"results": [], "message": "No cross-field rules defined"}
+
+    from app.services.cross_field_validation import CrossFieldValidator
+    validator = CrossFieldValidator()
+    results = validator.validate(data, ss.cross_field_rules)
+
+    passed = sum(1 for r in results if r["passed"])
+    total = len(results)
+    return {
+        "results": results,
+        "summary": {"passed": passed, "failed": total - passed, "total": total},
+    }

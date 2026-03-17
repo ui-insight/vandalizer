@@ -27,6 +27,9 @@ from app.models.feedback import ExtractionQualityRecord
 from app.models.verification import VerificationStatus, VerificationRequest
 from app.models.office import IntakeConfig, WorkItem
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.organization import Organization
+from app.models.audit_log import AuditLog
+from app.models.approval import ApprovalRequest
 
 __all__ = [
     "User",
@@ -66,4 +69,7 @@ __all__ = [
     "WorkItem",
     "KnowledgeBase",
     "KnowledgeBaseSource",
+    "Organization",
+    "AuditLog",
+    "ApprovalRequest",
 ]

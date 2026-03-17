@@ -26,6 +26,7 @@ celery.conf.task_routes = {
     "tasks.passive.*": {"queue": "passive"},
     "tasks.activity.*": {"queue": "default"},
     "tasks.demo.*": {"queue": "default"},
+    "tasks.retention.*": {"queue": "default"},
 }
 
 celery.conf.beat_schedule = {
@@ -61,6 +62,23 @@ celery.conf.beat_schedule = {
     "quality-monitor-daily": {
         "task": "tasks.passive.quality_monitor",
         "schedule": 86400.0,
+    },
+    # Data retention tasks
+    "retention-schedule-deletions": {
+        "task": "tasks.retention.schedule_deletions",
+        "schedule": crontab(hour=2, minute=0),  # daily at 2am
+    },
+    "retention-execute-soft-deletes": {
+        "task": "tasks.retention.execute_soft_deletes",
+        "schedule": crontab(hour=3, minute=0),  # daily at 3am
+    },
+    "retention-execute-hard-deletes": {
+        "task": "tasks.retention.execute_hard_deletes",
+        "schedule": crontab(hour=4, minute=0),  # daily at 4am
+    },
+    "retention-cleanup-ancillary": {
+        "task": "tasks.retention.cleanup_ancillary",
+        "schedule": crontab(hour=5, minute=0),  # daily at 5am
     },
 }
 

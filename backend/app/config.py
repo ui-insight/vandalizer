@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
     max_context_length: int = 100000
+    max_upload_size_mb: int = 500
 
     # Observability
     sentry_dsn: str = ""
@@ -49,6 +50,15 @@ class Settings(BaseSettings):
                 "jwt_secret_key must be changed from the default 'change-me' "
                 "in non-development environments. Generate one with: "
                 "python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_openai_api_key(self) -> "Settings":
+        if not self.openai_api_key and self.environment not in ("development", "test"):
+            raise ValueError(
+                "openai_api_key must be set in non-development/test environments. "
+                "Set the OPENAI_API_KEY environment variable."
             )
         return self
 

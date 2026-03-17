@@ -118,6 +118,82 @@ async def resolve_oauth_user(
     return user
 
 
+async def resolve_saml_user(
+    uid: str,
+    email: str | None,
+    display_name: str | None,
+    department: str | None = None,
+) -> User:
+    """Find or create a user from SAML assertion attributes.
+
+    Similar to resolve_oauth_user but also maps department to organization.
+    """
+    user = await User.find_one(User.user_id == uid)
+    if not user and email:
+        user = await User.find_one(User.email == email)
+
+    if user:
+        changed = False
+        if display_name and user.name != display_name:
+            user.name = display_name
+            changed = True
+        if email and user.email != email:
+            user.email = email
+            changed = True
+        # Auto-map org from department if not already set
+        if department and not user.organization_id:
+            from app.models.organization import Organization
+            org = await Organization.find_one(Organization.name == department)
+            if org:
+                user.organization_id = org.uuid
+                changed = True
+        if changed:
+            await user.save()
+        return user
+
+    # Create new SAML user
+    user = User(
+        user_id=uid,
+        email=email or uid,
+        password_hash=None,
+        name=display_name or uid,
+    )
+
+    # Auto-map organization from department
+    if department:
+        from app.models.organization import Organization
+        org = await Organization.find_one(Organization.name == department)
+        if org:
+            user.organization_id = org.uuid
+
+    await user.insert()
+
+    try:
+        team_uuid = uuid.uuid4().hex
+        team = Team(
+            uuid=team_uuid,
+            name=f"{display_name or uid}'s Team",
+            owner_user_id=uid,
+            organization_id=user.organization_id,
+        )
+        await team.insert()
+
+        membership = TeamMembership(
+            team=team.id,
+            user_id=uid,
+            role="owner",
+        )
+        await membership.insert()
+
+        user.current_team = team.id
+        await user.save()
+    except Exception:
+        await user.delete()
+        raise
+
+    return user
+
+
 async def register(user_id: str, email: str, password: str, name: str | None = None) -> User:
     # Normalize to lowercase to match Flask behavior
     user_id = user_id.strip().lower()
