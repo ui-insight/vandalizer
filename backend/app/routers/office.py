@@ -3,12 +3,13 @@
 import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
 from app.models.office import IntakeConfig, WorkItem
 from app.models.user import User
+from app.rate_limit import limiter
 
 router = APIRouter()
 
@@ -67,7 +68,8 @@ async def list_intakes(user: User = Depends(get_current_user)):
 
 
 @router.post("/intakes")
-async def create_intake(req: CreateIntakeRequest, user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)):
     from beanie import PydanticObjectId
 
     intake = IntakeConfig(
@@ -86,7 +88,9 @@ async def create_intake(req: CreateIntakeRequest, user: User = Depends(get_curre
 
 
 @router.patch("/intakes/{intake_uuid}")
+@limiter.limit("30/minute")
 async def update_intake(
+    request: Request,
     intake_uuid: str,
     req: UpdateIntakeRequest,
     user: User = Depends(get_current_user),
@@ -118,7 +122,8 @@ async def update_intake(
 
 
 @router.delete("/intakes/{intake_uuid}")
-async def delete_intake(intake_uuid: str, user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def delete_intake(request: Request, intake_uuid: str, user: User = Depends(get_current_user)):
     intake = await IntakeConfig.find_one(
         IntakeConfig.uuid == intake_uuid,
         IntakeConfig.owner_user_id == user.user_id,
@@ -149,15 +154,16 @@ async def list_work_items(
 
 @router.get("/workitems/{item_uuid}")
 async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)):
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid)
+    item = await WorkItem.find_one(WorkItem.uuid == item_uuid, WorkItem.owner_user_id == user.user_id)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     return _work_item_to_dict(item)
 
 
 @router.post("/workitems/{item_uuid}/approve")
-async def approve_work_item(item_uuid: str, user: User = Depends(get_current_user)):
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid)
+@limiter.limit("30/minute")
+async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)):
+    item = await WorkItem.find_one(WorkItem.uuid == item_uuid, WorkItem.owner_user_id == user.user_id)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     if item.status != "awaiting_review":
@@ -174,7 +180,9 @@ async def approve_work_item(item_uuid: str, user: User = Depends(get_current_use
 
 
 @router.post("/intakes/{intake_uuid}/subscribe")
+@limiter.limit("10/minute")
 async def create_graph_subscription(
+    request: Request,
     intake_uuid: str,
     user: User = Depends(get_current_user),
 ):
@@ -278,7 +286,9 @@ async def delete_graph_subscription(
 
 
 @router.post("/intakes/{intake_uuid}/triage/{item_uuid}")
+@limiter.limit("20/minute")
 async def manual_triage(
+    request: Request,
     intake_uuid: str,
     item_uuid: str,
     user: User = Depends(get_current_user),
@@ -306,7 +316,9 @@ async def manual_triage(
 
 
 @router.post("/intakes/{intake_uuid}/process/{item_uuid}")
+@limiter.limit("20/minute")
 async def manual_process(
+    request: Request,
     intake_uuid: str,
     item_uuid: str,
     user: User = Depends(get_current_user),

@@ -2,7 +2,7 @@ import io
 import zipfile
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from fastapi import Request
 
@@ -28,6 +28,15 @@ async def upload(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
+    # Resolve team_id from user's current team
+    team_id: str | None = None
+    if user.current_team:
+        from app.models.team import Team
+
+        team = await Team.get(user.current_team)
+        if team:
+            team_id = team.uuid
+
     try:
         result = await file_service.upload_document(
             blob=body.contentAsBase64String,
@@ -38,6 +47,7 @@ async def upload(
             settings=settings,
             folder=body.folder,
             root_folder_name=body.rootFolderName,
+            team_id=team_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -59,14 +69,14 @@ async def download_head(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings, user_id=user.user_id)
-    if not path or not path.exists():
+    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
+    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
     return Response(
         headers={
             "Content-Type": media_type,
-            "Content-Length": str(path.stat().st_size),
+            "Content-Length": str(len(result.data)),
         },
     )
 
@@ -77,15 +87,14 @@ async def download(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    path = await file_service.download_document(docid, settings, user_id=user.user_id)
-    if not path or not path.exists():
+    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(path.suffix.lower(), "application/octet-stream")
-    return FileResponse(
-        path,
-        filename=path.name,
+    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
+    return StreamingResponse(
+        io.BytesIO(result.data),
         media_type=media_type,
-        content_disposition_type="attachment",
+        headers={"Content-Disposition": f'attachment; filename="{result.title}"'},
     )
 
 
@@ -102,11 +111,11 @@ async def download_bulk(
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for docid in doc_ids:
-            path = await file_service.download_document(
+            result = await file_service.download_document(
                 docid, settings, user_id=user.user_id
             )
-            if path and path.exists():
-                zf.write(path, path.name)
+            if result:
+                zf.writestr(result.title, result.data)
 
     buf.seek(0)
     return StreamingResponse(
@@ -134,7 +143,7 @@ async def rename(
     user: User = Depends(get_current_user),
 ):
     try:
-        ok = await file_service.rename_document(body.uuid, body.newName)
+        ok = await file_service.rename_document(body.uuid, body.newName, user_id=user.user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not ok:
@@ -147,7 +156,7 @@ async def move(
     body: MoveFileRequest,
     user: User = Depends(get_current_user),
 ):
-    ok = await file_service.move_document(body.fileUUID, body.folderID)
+    ok = await file_service.move_document(body.fileUUID, body.folderID, user_id=user.user_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}

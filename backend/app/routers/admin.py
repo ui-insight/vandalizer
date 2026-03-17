@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
+from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
 from app.services.llm_service import clear_agent_caches
 from app.models.team import Team, TeamMembership
@@ -53,6 +54,12 @@ def _sanitize_models(models: list[dict]) -> list[dict]:
             m_copy["api_key"] = "***"
         sanitized.append(m_copy)
     return sanitized
+
+
+async def _audit(user: User, action: str, detail: str, payload: dict | None = None) -> None:
+    """Fire-and-forget audit log entry for state-changing admin actions."""
+    entry = AdminAuditLog(user_id=user.user_id, action=action, detail=detail, payload=payload)
+    await entry.insert()
 
 
 async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
@@ -1047,6 +1054,7 @@ async def update_config(
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
+    await _audit(user, "update_config", "Updated system configuration")
 
     return {"status": "ok"}
 
@@ -1082,6 +1090,7 @@ async def add_model(
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
+    await _audit(user, "add_model", f"Added model: {body.name} ({body.tag})")
 
     return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
 
@@ -1119,6 +1128,7 @@ async def update_model(
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
+    await _audit(user, "update_model", f"Updated model at index {index}: {body.tag}")
 
     return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
 
@@ -1143,6 +1153,7 @@ async def delete_model(
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
+    await _audit(user, "delete_model", f"Deleted model at index {index}: {removed.get('tag', '?')}")
 
     return {"status": "ok", "removed": removed, "models": cfg.available_models}
 
@@ -1164,6 +1175,7 @@ async def add_oauth_provider(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    await _audit(user, "add_oauth_provider", f"Added OAuth provider: {body.provider}")
 
     return {"status": "ok", "providers": _sanitize_providers(cfg.oauth_providers)}
 
@@ -1188,6 +1200,7 @@ async def update_oauth_provider(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    await _audit(user, "update_oauth_provider", f"Updated OAuth provider at index {index}: {body.provider}")
 
     return {"status": "ok", "providers": _sanitize_providers(cfg.oauth_providers)}
 
@@ -1211,6 +1224,7 @@ async def delete_oauth_provider(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    await _audit(user, "delete_oauth_provider", f"Deleted OAuth provider at index {index}: {removed.get('provider', '?')}")
 
     return {"status": "ok", "removed": removed, "providers": cfg.oauth_providers}
 
@@ -1231,6 +1245,7 @@ async def update_auth_methods(
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
+    await _audit(user, "update_auth_methods", f"Updated auth methods: {body.methods}")
 
     return {"status": "ok", "auth_methods": cfg.auth_methods}
 
@@ -1271,6 +1286,7 @@ async def regression_suite(
     user: User = Depends(get_current_user),
 ):
     await _require_admin(user)
+    await _audit(user, "run_regression_suite", f"Ran regression suite (model={model})")
     from app.services.quality_service import run_regression_suite
     return await run_regression_suite(user.user_id, model)
 
@@ -1327,6 +1343,7 @@ async def acknowledge_alert(
     alert.acknowledged_by = user.user_id
     alert.acknowledged_at = datetime.datetime.now(datetime.timezone.utc)
     await alert.save()
+    await _audit(user, "acknowledge_alert", f"Acknowledged quality alert: {uuid}")
     return {"ok": True}
 
 

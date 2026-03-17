@@ -43,11 +43,19 @@ async def get_api_key_user(
     x_api_key: str = Header(...),
 ) -> User:
     """Authenticate via x-api-key header (for external API integrations)."""
+    import datetime
+
     user = await User.find_one(User.api_token == x_api_key)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key",
+        )
+    # Check token expiry
+    if user.api_token_expires_at and user.api_token_expires_at < datetime.datetime.now(datetime.timezone.utc):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key expired",
         )
     # Block locked demo users from API key access too
     if user.is_demo_user and user.demo_status == "locked":

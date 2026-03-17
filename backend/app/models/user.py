@@ -15,6 +15,7 @@ class User(Document):
     current_team: Optional[PydanticObjectId] = None
     api_token: Optional[str] = None
     api_token_created_at: Optional[datetime.datetime] = None
+    api_token_expires_at: Optional[datetime.datetime] = None
     browser_automation_session_id: Optional[str] = None
     m365_enabled: bool = False
     m365_connected_at: Optional[datetime.datetime] = None

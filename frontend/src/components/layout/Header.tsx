@@ -14,6 +14,7 @@ export function Header() {
 
   return (
     <header
+      role="banner"
       className="flex items-center justify-between bg-white shrink-0"
       style={{
         height: 69,
@@ -23,11 +24,11 @@ export function Header() {
     >
       {/* Left: Logo images - matches Flask navbar-header */}
       <div className="flex items-center">
-        <button onClick={handleLogoClick} className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
+        <button onClick={handleLogoClick} aria-label="Go to home page" className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
           {/* Joe Vandal icon */}
           <img
             src="/images/joevandal.png"
-            alt="Joe Vandal Logo"
+            alt=""
             style={{ width: 25, height: 40, marginTop: 4 }}
           />
           {/* Vandalizer wordmark */}

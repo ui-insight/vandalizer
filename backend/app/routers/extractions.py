@@ -179,7 +179,9 @@ async def import_search_set(
 
 
 @router.post("/search-sets/{uuid}/upload-template", response_model=SearchSetResponse)
+@limiter.limit("10/minute")
 async def upload_pdf_template(
+    request: Request,
     uuid: str,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
@@ -275,7 +277,9 @@ async def upload_pdf_template(
 
 
 @router.post("/search-sets/{uuid}/generate-template")
+@limiter.limit("10/minute")
 async def generate_pdf_template(
+    request: Request,
     uuid: str,
     user: User = Depends(get_current_user),
 ):
@@ -450,7 +454,8 @@ async def delete_item(item_id: str, user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 @router.post("/search-sets/{uuid}/build-from-document")
-async def build_from_document(uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def build_from_document(request: Request, uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)):
     """Use AI to analyze selected documents and generate extraction fields."""
     try:
         entities = await svc.build_from_documents(
@@ -512,7 +517,9 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
 
 
 @router.post("/run-integrated")
+@limiter.limit("10/minute")
 async def run_extraction_integrated(
+    request: Request,
     search_set_uuid: str = Form(...),
     document_uuids: Optional[str] = Form(None),
     files: list[UploadFile] = File(default=[]),
@@ -772,7 +779,9 @@ async def get_extraction_quality_contract(
 
 
 @router.post("/search-sets/{uuid}/improvement-suggestions")
+@limiter.limit("5/minute")
 async def get_extraction_suggestions(
+    request: Request,
     uuid: str, user: User = Depends(get_current_user),
 ):
     """Use LLM to suggest improvements based on the latest validation run."""
@@ -787,7 +796,8 @@ async def get_extraction_suggestions(
 
 
 @router.post("/validate")
-async def run_validation(req: RunValidationRequest, user: User = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)):
     try:
         result = await val_svc.run_validation(
             search_set_uuid=req.search_set_uuid,
@@ -802,7 +812,8 @@ async def run_validation(req: RunValidationRequest, user: User = Depends(get_cur
 
 
 @router.post("/validate-v2")
-async def run_validation_v2(req: RunValidationV2Request, user: User = Depends(get_current_user)):
+@limiter.limit("10/minute")
+async def run_validation_v2(request: Request, req: RunValidationV2Request, user: User = Depends(get_current_user)):
     try:
         result = await val_svc.run_validation_v2(
             search_set_uuid=req.search_set_uuid,

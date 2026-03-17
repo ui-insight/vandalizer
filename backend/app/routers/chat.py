@@ -151,7 +151,9 @@ async def chat(
 
 
 @router.post("/add-link")
+@limiter.limit("20/minute")
 async def add_link(
+    request: Request,
     body: AddLinkRequest,
     user: User = Depends(get_current_user),
 ):
@@ -237,7 +239,9 @@ async def add_link(
 
 
 @router.post("/add-document")
+@limiter.limit("10/minute")
 async def add_document(
+    request: Request,
     files: list[UploadFile] = File(...),
     current_space_id: Optional[str] = Form(None),
     current_activity_id: Optional[str] = Form(None),

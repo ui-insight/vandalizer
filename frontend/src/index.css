@@ -22,6 +22,17 @@ html {
   font-family: "Public Sans", Arial, sans-serif;
 }
 
+/* Global keyboard focus indicator */
+:focus-visible {
+  outline: 2px solid var(--highlight-color, #eab308);
+  outline-offset: 2px;
+}
+
+/* Remove focus ring for mouse users */
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* Rail shimmer animation for running activities */
 @keyframes rail-shimmer {
   0% { background-position: 200% 50%; }

@@ -24,6 +24,8 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
     <tr
       className="hover:bg-[#a6b5c945]"
       tabIndex={0}
+      role="row"
+      aria-label={`Document: ${doc.title}`}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
@@ -52,6 +54,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
             checked={!!selected}
             onChange={() => onToggleSelect(doc.uuid)}
             onClick={(e) => e.stopPropagation()}
+            aria-label={`Select ${doc.title}`}
             className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
           />
         )}
