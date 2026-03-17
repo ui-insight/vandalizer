@@ -44,7 +44,8 @@ router = APIRouter()
 
 @router.post("", response_model=WorkflowResponse)
 async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
-    wf = await svc.create_workflow(req.name, user.user_id, req.space, req.description)
+    team_id = str(user.current_team) if user.current_team else None
+    wf = await svc.create_workflow(req.name, user.user_id, req.space, req.description, team_id=team_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, space=wf.space, num_executions=wf.num_executions,
@@ -224,7 +225,8 @@ async def import_workflow(
         raise HTTPException(status_code=400, detail="Invalid JSON file")
 
     try:
-        wf = await eis.import_workflow(data, user.user_id, space)
+        team_id = str(user.current_team) if user.current_team else None
+        wf = await eis.import_workflow(data, user.user_id, space, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -263,7 +265,8 @@ async def delete_workflow(workflow_id: str, user: User = Depends(get_current_use
 
 @router.post("/{workflow_id}/duplicate", response_model=WorkflowResponse)
 async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
-    wf = await svc.duplicate_workflow(workflow_id, user.user_id)
+    team_id = str(user.current_team) if user.current_team else None
+    wf = await svc.duplicate_workflow(workflow_id, user.user_id, team_id=team_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return WorkflowResponse(**wf)

@@ -65,12 +65,14 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
+    team_id = str(user.current_team) if user.current_team else None
     if not activity_id or len(str(activity_id).strip()) < 10:
         # New conversation
         conversation = ChatConversation(
             title=message.strip(),
             uuid=str(uuid.uuid4()),
             user_id=user_id,
+            team_id=team_id,
         )
         conversation.generate_title()
         await conversation.insert()
@@ -79,7 +81,7 @@ async def chat(
             type=ActivityType.CONVERSATION,
             title=None,
             user_id=user_id,
-            team_id=str(user.current_team) if user.current_team else None,
+            team_id=team_id,
             conversation_id=conversation.uuid,
             space=body.current_space_id,
         )
@@ -112,6 +114,7 @@ async def chat(
                     title=message.strip(),
                     uuid=str(uuid.uuid4()),
                     user_id=user_id,
+                    team_id=team_id,
                 )
                 conversation.generate_title()
                 await conversation.insert()
@@ -165,6 +168,7 @@ async def add_link(
     if not body.current_activity_id or len(str(body.current_activity_id).strip()) == 0:
         conversation = ChatConversation(
             user_id=user_id,
+            team_id=str(user.current_team) if user.current_team else None,
             uuid=str(uuid.uuid4()),
             title="Link Attached",
         )
@@ -257,6 +261,7 @@ async def add_document(
             title="Attachments Added",
             uuid=str(uuid.uuid4()),
             user_id=user_id,
+            team_id=str(user.current_team) if user.current_team else None,
         )
         await conversation.insert()
         activity = await activity_service.activity_start(

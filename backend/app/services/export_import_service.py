@@ -95,7 +95,7 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     return _envelope("workflow", user_email, [item])
 
 
-async def import_workflow(data: dict, user_id: str, space: str) -> dict:
+async def import_workflow(data: dict, user_id: str, space: str, team_id: str | None = None) -> dict:
     """Import a workflow from export data. Returns the new workflow dict."""
     err = validate_export_data(data)
     if err:
@@ -109,6 +109,7 @@ async def import_workflow(data: dict, user_id: str, space: str) -> dict:
         name=f"{item['name']} (Imported)",
         description=item.get("description"),
         user_id=user_id,
+        team_id=team_id,
         space=space,
         created_by_user_id=user_id,
         input_config=item.get("input_config", {}),

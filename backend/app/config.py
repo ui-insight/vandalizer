@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
-    openai_api_key: str = ""
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
     max_context_length: int = 100000
