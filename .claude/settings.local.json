@@ -25,7 +25,8 @@
       "Bash(tail:*)",
       "Bash(head:*)",
       "Bash(cd:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(uv lock:*)"
     ]
   }
 }

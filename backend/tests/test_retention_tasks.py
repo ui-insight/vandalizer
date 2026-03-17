@@ -9,6 +9,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 
+class _Field:
+    """Dummy descriptor that supports comparison operators for Beanie-style queries."""
+
+    def __le__(self, other): return True
+    def __ge__(self, other): return True
+    def __lt__(self, other): return True
+    def __gt__(self, other): return True
+    def __eq__(self, other): return True
+    def __ne__(self, other): return True
+    def __hash__(self): return id(self)
+
+
 class TestScheduleDeletions:
     @pytest.mark.asyncio
     async def test_finds_expired_docs_and_schedules(self):
@@ -34,11 +46,11 @@ class TestScheduleDeletions:
              patch("app.models.document.SmartDocument") as MockDoc:
             MockConfig.get_config = AsyncMock(return_value=mock_config)
             MockDoc.find = MagicMock(return_value=mock_find_query)
-            MockDoc.classification = "classification"
-            MockDoc.created_at = "created_at"
-            MockDoc.soft_deleted = "soft_deleted"
-            MockDoc.retention_hold = "retention_hold"
-            MockDoc.scheduled_deletion_at = "scheduled_deletion_at"
+            MockDoc.classification = _Field()
+            MockDoc.created_at = _Field()
+            MockDoc.soft_deleted = _Field()
+            MockDoc.retention_hold = _Field()
+            MockDoc.scheduled_deletion_at = _Field()
 
             from app.tasks.retention_tasks import _schedule_deletions
             await _schedule_deletions()
@@ -85,9 +97,9 @@ class TestExecuteSoftDeletes:
              patch("app.config.Settings"), \
              patch("app.models.document.SmartDocument") as MockDoc:
             MockDoc.find = MagicMock(return_value=mock_find_query)
-            MockDoc.scheduled_deletion_at = "scheduled_deletion_at"
-            MockDoc.soft_deleted = "soft_deleted"
-            MockDoc.retention_hold = "retention_hold"
+            MockDoc.scheduled_deletion_at = _Field()
+            MockDoc.soft_deleted = _Field()
+            MockDoc.retention_hold = _Field()
 
             from app.tasks.retention_tasks import _execute_soft_deletes
             await _execute_soft_deletes()
@@ -141,8 +153,8 @@ class TestExecuteHardDeletes:
             MockSettings.return_value.chromadb_persist_dir = "/tmp/chroma"
             MockConfig.get_config = AsyncMock(return_value=mock_config)
             MockDoc.find = MagicMock(return_value=mock_find_query)
-            MockDoc.soft_deleted = "soft_deleted"
-            MockDoc.retention_hold = "retention_hold"
+            MockDoc.soft_deleted = _Field()
+            MockDoc.retention_hold = _Field()
 
             from app.tasks.retention_tasks import _execute_hard_deletes
             await _execute_hard_deletes()
@@ -205,11 +217,11 @@ class TestCleanupAncillary:
              patch("app.models.workflow.WorkflowResult") as MockWF:
             MockConfig.get_config = AsyncMock(return_value=mock_config)
             MockActivity.find = MagicMock(return_value=mock_activity_query)
-            MockActivity.created_at = "created_at"
+            MockActivity.created_at = _Field()
             MockChat.find = MagicMock(return_value=mock_chat_query)
-            MockChat.created_at = "created_at"
+            MockChat.created_at = _Field()
             MockWF.find = MagicMock(return_value=mock_wf_query)
-            MockWF.start_time = "start_time"
+            MockWF.start_time = _Field()
 
             from app.tasks.retention_tasks import _cleanup_ancillary
             await _cleanup_ancillary()
