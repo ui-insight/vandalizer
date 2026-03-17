@@ -5,6 +5,36 @@ from app.models.team import Team, TeamMembership
 from app.utils.security import hash_password, verify_password
 
 
+async def _auto_join_default_team(user: User, *, set_current: bool = True) -> None:
+    """If a default team is configured in SystemConfig, silently add the user
+    as a member if they aren't already.
+
+    set_current=True  → also switch user.current_team (used on first registration).
+    set_current=False → just ensure membership exists; don't override their
+                        chosen current_team (used on subsequent logins).
+    """
+    from app.models.system_config import SystemConfig
+
+    cfg = await SystemConfig.get_config()
+    if not cfg.default_team_id:
+        return
+
+    team = await Team.find_one(Team.uuid == cfg.default_team_id)
+    if not team:
+        return
+
+    existing = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == user.user_id,
+    )
+    if not existing:
+        membership = TeamMembership(team=team.id, user_id=user.user_id, role="member")
+        await membership.insert()
+        if set_current:
+            user.current_team = team.id
+            await user.save()
+
+
 async def authenticate(user_id: str, password: str) -> User | None:
     # Normalize to lowercase to match Flask's normalize_identity behavior
     normalized = user_id.strip().lower()
@@ -15,6 +45,8 @@ async def authenticate(user_id: str, password: str) -> User | None:
         return None
     if not verify_password(password, user.password_hash):
         return None
+    # Silently backfill default-team membership for pre-existing users
+    await _auto_join_default_team(user, set_current=False)
     return user
 
 
@@ -45,6 +77,8 @@ async def resolve_oauth_user(
             changed = True
         if changed:
             await user.save()
+        # Silently backfill default-team membership for pre-existing users
+        await _auto_join_default_team(user, set_current=False)
         return user
 
     # Create new OAuth-only user
@@ -80,6 +114,7 @@ async def resolve_oauth_user(
         await user.delete()
         raise
 
+    await _auto_join_default_team(user, set_current=True)
     return user
 
 
@@ -128,4 +163,5 @@ async def register(user_id: str, email: str, password: str, name: str | None = N
         await user.delete()
         raise
 
+    await _auto_join_default_team(user, set_current=True)
     return user

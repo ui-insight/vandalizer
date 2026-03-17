@@ -193,14 +193,55 @@ export interface SystemConfigData {
   llm_endpoint: string
   highlight_color: string
   ui_radius: string
+  default_team_id: string
 }
 
 export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string; default_team_id?: string }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
+}
+
+// Admin Team Management
+
+export interface AdminTeamItem {
+  team_id: string
+  uuid: string
+  name: string
+  owner_user_id: string
+  member_count: number
+  is_default: boolean
+}
+
+export interface IsolatedUserItem {
+  user_id: string
+  name: string | null
+  email: string | null
+}
+
+export function adminListAllTeams() {
+  return apiFetch<AdminTeamItem[]>('/api/admin/teams/all')
+}
+
+export function adminCreateTeam(name: string) {
+  return apiFetch<AdminTeamItem>('/api/admin/teams/create', { method: 'POST', body: JSON.stringify({ name }) })
+}
+
+export function adminAddUserToTeam(teamUuid: string, userId: string, role: string = 'member') {
+  return apiFetch<{ ok: boolean }>(`/api/admin/teams/${teamUuid}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: userId, role }),
+  })
+}
+
+export function adminRemoveUserFromTeam(teamUuid: string, userId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/admin/teams/${teamUuid}/members/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+}
+
+export function getIsolatedUsers() {
+  return apiFetch<IsolatedUserItem[]>('/api/admin/users/isolated')
 }
 
 // Models

@@ -25,7 +25,9 @@ import {
   deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
+  adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
 } from '../api/admin'
+import { getTeamMembers } from '../api/teams'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
   getPostExperienceResponses,
@@ -39,8 +41,11 @@ import type {
   WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
+  AdminTeamItem, IsolatedUserItem,
 } from '../api/admin'
 import { relativeTime } from '../utils/time'
+import { ModelCharacterBars } from '../components/ModelEffortPicker'
+import type { ModelInfo } from '../types/workflow'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -859,30 +864,158 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
 }
 
 function TeamsTab() {
-  const [teams, setTeams] = useState<TeamLeaderboardItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [subTab, setSubTab] = useState<'manage' | 'stats' | 'isolated'>('manage')
+
+  // ── Manage sub-tab state ──────────────────────────────────────────────────
+  const [allTeams, setAllTeams] = useState<AdminTeamItem[]>([])
+  const [loadingAll, setLoadingAll] = useState(true)
+  const [newTeamName, setNewTeamName] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [expandedTeamUuid, setExpandedTeamUuid] = useState<string | null>(null)
+  const [teamMembers, setTeamMembers] = useState<Record<string, { user_id: string; name: string | null; email: string | null; role: string }[]>>({})
+  const [addUserInputs, setAddUserInputs] = useState<Record<string, string>>({})
+  const [addUserLoading, setAddUserLoading] = useState<Record<string, boolean>>({})
+  const [defaultTeamUuid, setDefaultTeamUuid] = useState<string>('')
+  const [settingDefault, setSettingDefault] = useState(false)
+
+  // ── Stats sub-tab state ───────────────────────────────────────────────────
+  const [statsTeams, setStatsTeams] = useState<TeamLeaderboardItem[]>([])
+  const [loadingStats, setLoadingStats] = useState(false)
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
 
-  useEffect(() => {
-    getTeamLeaderboard().then(setTeams).finally(() => setLoading(false))
+  // ── Isolated sub-tab state ───────────────────────────────────────────────
+  const [isolated, setIsolated] = useState<IsolatedUserItem[]>([])
+  const [isolatedLoaded, setIsolatedLoaded] = useState(false)
+  const [loadingIsolated, setLoadingIsolated] = useState(false)
+  const [assignTargets, setAssignTargets] = useState<Record<string, string>>({})
+  const [assignLoading, setAssignLoading] = useState<Record<string, boolean>>({})
+
+  // Per-team add-user error messages
+  const [addUserErrors, setAddUserErrors] = useState<Record<string, string>>({})
+
+  const refreshAllTeams = useCallback(() => {
+    setLoadingAll(true)
+    adminListAllTeams().then(t => {
+      setAllTeams(t)
+      const def = t.find(x => x.is_default)
+      if (def) setDefaultTeamUuid(def.uuid)
+    }).finally(() => setLoadingAll(false))
   }, [])
 
-  const handleSort = (key: string) => {
-    setSort(prev => ({
-      key: key as TeamSortKey,
-      dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc',
-    }))
+  const refreshIsolated = useCallback(() => {
+    setLoadingIsolated(true)
+    getIsolatedUsers().then(users => {
+      setIsolated(users)
+      setIsolatedLoaded(true)
+    }).finally(() => setLoadingIsolated(false))
+  }, [])
+
+  useEffect(() => {
+    refreshAllTeams()
+    refreshIsolated()  // Load eagerly so badge shows immediately
+    getSystemConfig().then(cfg => {
+      if (cfg.default_team_id) setDefaultTeamUuid(cfg.default_team_id)
+    }).catch(() => {})
+  }, [refreshAllTeams, refreshIsolated])
+
+  useEffect(() => {
+    if (subTab === 'stats' && statsTeams.length === 0) {
+      setLoadingStats(true)
+      getTeamLeaderboard().then(setStatsTeams).finally(() => setLoadingStats(false))
+    }
+  }, [subTab, statsTeams.length])
+
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) return
+    setCreating(true)
+    try {
+      await adminCreateTeam(newTeamName.trim())
+      setNewTeamName('')
+      refreshAllTeams()
+    } finally {
+      setCreating(false)
+    }
   }
 
-  const filtered = useMemo(() => {
-    let list = teams
+  const handleSetDefault = async (teamUuid: string) => {
+    setSettingDefault(true)
+    try {
+      await updateSystemConfig({ default_team_id: teamUuid === defaultTeamUuid ? '' : teamUuid })
+      setDefaultTeamUuid(teamUuid === defaultTeamUuid ? '' : teamUuid)
+      refreshAllTeams()
+    } finally {
+      setSettingDefault(false)
+    }
+  }
+
+  const handleExpandTeam = async (teamUuid: string) => {
+    if (expandedTeamUuid === teamUuid) {
+      setExpandedTeamUuid(null)
+      return
+    }
+    setExpandedTeamUuid(teamUuid)
+    if (!teamMembers[teamUuid]) {
+      const members = await getTeamMembers(teamUuid)
+      setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
+    }
+  }
+
+  const handleAddUser = async (teamUuid: string) => {
+    const userId = (addUserInputs[teamUuid] || '').trim()
+    if (!userId) return
+    setAddUserErrors(prev => ({ ...prev, [teamUuid]: '' }))
+    setAddUserLoading(prev => ({ ...prev, [teamUuid]: true }))
+    try {
+      await adminAddUserToTeam(teamUuid, userId)
+      setAddUserInputs(prev => ({ ...prev, [teamUuid]: '' }))
+      const members = await getTeamMembers(teamUuid)
+      setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
+      refreshAllTeams()
+      refreshIsolated()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'User not found'
+      setAddUserErrors(prev => ({ ...prev, [teamUuid]: msg }))
+    } finally {
+      setAddUserLoading(prev => ({ ...prev, [teamUuid]: false }))
+    }
+  }
+
+  const handleRemoveUser = async (teamUuid: string, userId: string, userName: string) => {
+    if (!window.confirm(`Remove ${userName} from this team?`)) return
+    await adminRemoveUserFromTeam(teamUuid, userId)
+    const members = await getTeamMembers(teamUuid)
+    setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
+    refreshAllTeams()
+    refreshIsolated()
+  }
+
+  const handleAssignIsolated = async (userId: string) => {
+    const teamUuid = assignTargets[userId]
+    if (!teamUuid) return
+    setAssignLoading(prev => ({ ...prev, [userId]: true }))
+    try {
+      await adminAddUserToTeam(teamUuid, userId)
+      setIsolated(prev => prev.filter(u => u.user_id !== userId))
+    } catch {
+      // assignment failed — leave user in list
+    } finally {
+      setAssignLoading(prev => ({ ...prev, [userId]: false }))
+    }
+  }
+
+  // Stats tab helpers
+  const handleSort = (key: string) => {
+    setSort(prev => ({ key: key as TeamSortKey, dir: prev.key === key && prev.dir === 'desc' ? 'asc' : 'desc' }))
+  }
+  const filteredStats = useMemo(() => {
+    let list = statsTeams
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(t => t.name.toLowerCase().includes(q))
     }
-    const sorted = [...list].sort((a, b) => {
+    return [...list].sort((a, b) => {
       let cmp = 0
       switch (sort.key) {
         case 'name': cmp = a.name.localeCompare(b.name); break
@@ -894,84 +1027,299 @@ function TeamsTab() {
       }
       return sort.dir === 'asc' ? cmp : -cmp
     })
-    return sorted
-  }, [teams, search, sort])
-
-  const maxTokens = teams.length > 0 ? Math.max(...teams.map(t => t.tokens_total), 1) : 1
-
-  const handleExport = () => {
-    downloadCSV('teams.csv',
-      ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
-      filtered.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
-    )
-  }
-
-  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading teams...</div>
+  }, [statsTeams, search, sort])
+  const maxTokens = statsTeams.length > 0 ? Math.max(...statsTeams.map(t => t.tokens_total), 1) : 1
 
   if (selectedTeamId) {
     return <TeamDrillDown teamId={selectedTeamId} onBack={() => setSelectedTeamId(null)} />
   }
 
+  const subTabStyle = (key: string) => ({
+    padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', border: 'none',
+    background: subTab === key ? 'var(--highlight-color, #eab308)' : 'transparent',
+    color: subTab === key ? '#000' : '#6b7280',
+    fontFamily: 'inherit',
+  } as React.CSSProperties)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search teams..." />
-        <div style={{ flex: 1 }} />
-        <ExportButton onClick={handleExport} />
+      {/* Sub-tab bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}>
+        <button style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
+        <button style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
+        <button style={subTabStyle('isolated')} onClick={() => setSubTab('isolated')}>
+          Isolated Users {isolatedLoaded && isolated.length > 0 ? `(${isolated.length})` : ''}
+        </button>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-          Team Leaderboard ({filtered.length})
+      {/* ── Manage Teams ─────────────────────────────────────────── */}
+      {subTab === 'manage' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Create team */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Create New Team</div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                value={newTeamName}
+                onChange={e => setNewTeamName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleCreateTeam()}
+                placeholder="Team name (e.g. Research Administration)"
+                style={{ flex: 1, padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, fontFamily: 'inherit' }}
+              />
+              <button
+                onClick={handleCreateTeam}
+                disabled={!newTeamName.trim() || creating}
+                style={{
+                  padding: '8px 18px', background: 'var(--highlight-color, #eab308)', color: '#000',
+                  border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  opacity: !newTeamName.trim() || creating ? 0.5 : 1, fontFamily: 'inherit',
+                }}
+              >
+                <Plus size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                Create
+              </button>
+            </div>
+          </div>
+
+          {/* Teams list */}
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+            <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+              All Teams ({allTeams.length})
+              <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+                Click a team to manage its members. Star to set as the default for new users.
+              </span>
+            </div>
+            {loadingAll ? (
+              <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+            ) : allTeams.length === 0 ? (
+              <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>No teams yet.</div>
+            ) : allTeams.map(team => (
+              <div key={team.uuid} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                {/* Team row */}
+                <div
+                  style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}
+                  onClick={() => handleExpandTeam(team.uuid)}
+                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#fafafa')}
+                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                    backgroundColor: team.is_default ? 'rgba(234,179,8,0.15)' : '#ede9fe',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Building2 size={16} color={team.is_default ? '#b45309' : '#7c3aed'} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {team.name}
+                      {team.is_default && (
+                        <span style={{ fontSize: 11, background: '#fef3c7', color: '#92400e', padding: '1px 7px', borderRadius: 10, fontWeight: 600 }}>
+                          Default
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>
+                      {team.member_count} member{team.member_count !== 1 ? 's' : ''}
+                    </div>
+                  </div>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleSetDefault(team.uuid) }}
+                    disabled={settingDefault}
+                    title={team.is_default ? 'Remove as default' : 'Set as default for new users'}
+                    style={{
+                      padding: '4px 10px', fontSize: 12, fontWeight: 500,
+                      border: `1px solid ${team.is_default ? '#fbbf24' : '#e5e7eb'}`,
+                      background: team.is_default ? '#fef3c7' : '#fff',
+                      color: team.is_default ? '#92400e' : '#6b7280',
+                      borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit',
+                    }}
+                  >
+                    {team.is_default ? '★ Default' : '☆ Set Default'}
+                  </button>
+                  {expandedTeamUuid === team.uuid ? <ChevronUp size={16} color="#9ca3af" /> : <ChevronDown size={16} color="#9ca3af" />}
+                </div>
+
+                {/* Expanded member panel */}
+                {expandedTeamUuid === team.uuid && (
+                  <div style={{ background: '#f9fafb', borderTop: '1px solid #f3f4f6', padding: '12px 20px' }}>
+                    {/* Add user */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          value={addUserInputs[team.uuid] || ''}
+                          onChange={e => {
+                            setAddUserInputs(prev => ({ ...prev, [team.uuid]: e.target.value }))
+                            setAddUserErrors(prev => ({ ...prev, [team.uuid]: '' }))
+                          }}
+                          onKeyDown={e => e.key === 'Enter' && handleAddUser(team.uuid)}
+                          placeholder="User ID or email address..."
+                          style={{
+                            flex: 1, padding: '6px 10px', fontSize: 13, fontFamily: 'inherit',
+                            border: `1px solid ${addUserErrors[team.uuid] ? '#fca5a5' : '#d1d5db'}`,
+                            borderRadius: 6,
+                          }}
+                        />
+                        <button
+                          onClick={() => handleAddUser(team.uuid)}
+                          disabled={addUserLoading[team.uuid] || !addUserInputs[team.uuid]?.trim()}
+                          style={{
+                            padding: '6px 14px', background: '#111', color: '#fff',
+                            border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                            opacity: addUserLoading[team.uuid] || !addUserInputs[team.uuid]?.trim() ? 0.5 : 1,
+                          }}
+                        >
+                          {addUserLoading[team.uuid] ? 'Adding…' : 'Add'}
+                        </button>
+                      </div>
+                      {addUserErrors[team.uuid] && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#dc2626' }}>{addUserErrors[team.uuid]}</div>
+                      )}
+                    </div>
+
+                    {/* Members list */}
+                    {(teamMembers[team.uuid] || []).length === 0 ? (
+                      <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0' }}>No members yet.</div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {(teamMembers[team.uuid] || []).map(m => (
+                          <div key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 8px', background: '#fff', borderRadius: 6, border: '1px solid #f3f4f6' }}>
+                            <div style={{ flex: 1 }}>
+                              <span style={{ fontSize: 13, fontWeight: 500 }}>{m.name || m.user_id}</span>
+                              {m.email && <span style={{ fontSize: 12, color: '#9ca3af', marginLeft: 8 }}>{m.email}</span>}
+                            </div>
+                            <span style={{
+                              fontSize: 11, padding: '2px 7px', borderRadius: 8, fontWeight: 600,
+                              background: m.role === 'owner' ? '#ede9fe' : m.role === 'admin' ? '#dbeafe' : '#f3f4f6',
+                              color: m.role === 'owner' ? '#6d28d9' : m.role === 'admin' ? '#1d4ed8' : '#374151',
+                            }}>
+                              {m.role}
+                            </span>
+                            {m.role !== 'owner' && (
+                              <button
+                                onClick={() => handleRemoveUser(team.uuid, m.user_id, m.name || m.user_id)}
+                                style={{ padding: '3px 8px', background: 'transparent', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 5, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
-        {filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No teams found.</div>
-        ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
-                <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((t) => (
-                <tr key={t.team_id} onClick={() => setSelectedTeamId(t.team_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-                      }}>
-                        <Building2 size={16} color="#7c3aed" />
-                      </div>
-                      <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
-                        <div style={{ width: `${(t.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
-                      </div>
-                      <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>
-                        {formatNumber(t.tokens_total)}
-                      </span>
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.workflows_completed}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.active_users}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.member_count}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(t.avg_latency_ms)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      )}
+
+      {/* ── Usage Stats ──────────────────────────────────────────── */}
+      {subTab === 'stats' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <SearchInput value={search} onChange={setSearch} placeholder="Search teams..." />
+            <div style={{ flex: 1 }} />
+            <ExportButton onClick={() => downloadCSV('teams.csv',
+              ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
+              filteredStats.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
+            )} />
+          </div>
+          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
+              Team Leaderboard ({filteredStats.length})
+            </div>
+            {loadingStats ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
+            ) : filteredStats.length === 0 ? (
+              <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No teams found.</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                    <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} />
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStats.map((t) => (
+                    <tr key={t.team_id} onClick={() => setSelectedTeamId(t.team_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            <Building2 size={16} color="#7c3aed" />
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ flex: 1, height: 6, backgroundColor: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ width: `${(t.tokens_total / maxTokens) * 100}%`, height: '100%', backgroundColor: 'var(--highlight-color, #eab308)', borderRadius: 3 }} />
+                          </div>
+                          <span style={{ fontSize: 13, fontFamily: 'ui-monospace, monospace', color: '#374151', minWidth: 60, textAlign: 'right' }}>{formatNumber(t.tokens_total)}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.workflows_completed}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.active_users}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 14, fontFamily: 'ui-monospace, monospace' }}>{t.member_count}</td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>{formatDuration(t.avg_latency_ms)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Isolated Users ───────────────────────────────────────── */}
+      {subTab === 'isolated' && (
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+          <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
+            Isolated Users — only on their personal team ({isolated.length})
+          </div>
+          {loadingIsolated && !isolatedLoaded ? (
+            <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+          ) : isolated.length === 0 ? (
+            <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
+              No isolated users — everyone is on at least one shared team.
+            </div>
+          ) : isolated.map(u => (
+            <div key={u.user_id} style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 14, fontWeight: 500 }}>{u.name || u.user_id}</div>
+                {u.email && <div style={{ fontSize: 12, color: '#9ca3af' }}>{u.email}</div>}
+              </div>
+              <select
+                value={assignTargets[u.user_id] || ''}
+                onChange={e => setAssignTargets(prev => ({ ...prev, [u.user_id]: e.target.value }))}
+                style={{ padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: 6, fontSize: 13, fontFamily: 'inherit' }}
+              >
+                <option value="">Select team...</option>
+                {allTeams.map(t => (
+                  <option key={t.uuid} value={t.uuid}>{t.name}{t.is_default ? ' (default)' : ''}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => handleAssignIsolated(u.user_id)}
+                disabled={!assignTargets[u.user_id] || assignLoading[u.user_id]}
+                style={{
+                  padding: '6px 14px', background: 'var(--highlight-color, #eab308)', color: '#000',
+                  border: 'none', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  opacity: !assignTargets[u.user_id] || assignLoading[u.user_id] ? 0.5 : 1,
+                }}
+              >
+                Add to Team
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -2377,33 +2725,29 @@ function ConfigTab() {
                   padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
                   border: '1px solid #e5e7eb',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 14, fontWeight: 500 }}>{m.name}</span>
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{m.tag}</span>
-                    {m.external && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>External</span>
-                    )}
-                    {m.thinking && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>Thinking</span>
-                    )}
-                    {m.api_protocol && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>{m.api_protocol}</span>
-                    )}
-                    {m.api_key && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#d1fae5', color: '#065f46', fontWeight: 600 }}>API Key</span>
-                    )}
-                    {m.speed && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.speed === 'fast' ? '#d1fae5' : m.speed === 'slow' ? '#ffedd5' : '#f3f4f6', color: m.speed === 'fast' ? '#065f46' : m.speed === 'slow' ? '#9a3412' : '#6b7280', fontWeight: 600 }}>{m.speed}</span>
-                    )}
-                    {m.tier && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.tier === 'high' ? '#dbeafe' : m.tier === 'basic' ? '#fef9c3' : '#f3f4f6', color: m.tier === 'high' ? '#1e40af' : m.tier === 'basic' ? '#854d0e' : '#6b7280', fontWeight: 600 }}>{m.tier} tier</span>
-                    )}
-                    {m.privacy && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: m.privacy === 'internal' ? '#d1fae5' : '#fef3c7', color: m.privacy === 'internal' ? '#065f46' : '#92400e', fontWeight: 600 }}>{m.privacy}</span>
-                    )}
-                    {m.endpoint && (
-                      <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
-                    )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    {/* Identity & capability badges */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{m.name}</span>
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{m.tag}</span>
+                      {m.external && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>External</span>
+                      )}
+                      {m.thinking && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>Thinking</span>
+                      )}
+                      {m.api_protocol && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>{m.api_protocol}</span>
+                      )}
+                      {m.api_key && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#d1fae5', color: '#065f46', fontWeight: 600 }}>API Key ✓</span>
+                      )}
+                      {m.endpoint && (
+                        <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace, monospace' }}>{m.endpoint}</span>
+                      )}
+                    </div>
+                    {/* Characteristic bars (replaces speed / tier / privacy pills) */}
+                    <ModelCharacterBars model={m as ModelInfo} />
                   </div>
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button

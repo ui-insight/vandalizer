@@ -842,6 +842,44 @@ class BrowserAutomationNode(Node):
             service.end_session(session_id)
 
 
+class KnowledgeBaseQueryNode(Node):
+    """Workflow step that queries a knowledge base and returns matching chunks as context."""
+
+    def __init__(self, data: dict) -> None:
+        super().__init__("KnowledgeBaseQuery")
+        self.data = data
+
+    def process(self, inputs):
+        from app.services.document_manager import DocumentManager
+
+        kb_uuid = self.data.get("kb_uuid", "").strip()
+        query = self.data.get("query", "").strip()
+        k = int(self.data.get("k", 8))
+
+        if not kb_uuid:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        if not query:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        self.report_progress(f"Querying knowledge base…")
+
+        dm = DocumentManager()
+        results = dm.query_kb(kb_uuid, query, k=k)
+
+        if not results:
+            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+
+        # Format as plain text context block so downstream LLM steps can use it naturally
+        parts = []
+        for i, r in enumerate(results, 1):
+            source = r["metadata"].get("source_name", "Unknown source")
+            parts.append(f"[{i}] {source}\n{r['content']}")
+
+        output = "\n\n---\n\n".join(parts)
+        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+
+
 # ---------------------------------------------------------------------------
 # Workflow Engine
 # ---------------------------------------------------------------------------
@@ -1034,6 +1072,9 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "BrowserAutomation":
                     n = BrowserAutomationNode(data=task_data)
+                    tasks.append(n)
+                elif task_name == "KnowledgeBaseQuery":
+                    n = KnowledgeBaseQueryNode(data=task_data)
                     tasks.append(n)
                 else:
                     logger.warning("Unknown task type '%s' in step '%s' — skipping", task_name, step_name)

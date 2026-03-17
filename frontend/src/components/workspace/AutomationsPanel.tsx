@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
+import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
@@ -26,22 +27,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     window.addEventListener('automations-updated', handler)
     return () => window.removeEventListener('automations-updated', handler)
   }, [openAutomationId])
-  const [creating, setCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleCreate = async () => {
-    setCreating(true)
-    setError(null)
-    try {
-      const auto = await create('New Automation')
-      openAutomation(auto.id)
-    } catch (err) {
-      console.error('Failed to create automation:', err)
-      setError(err instanceof Error ? err.message : 'Failed to create automation')
-    } finally {
-      setCreating(false)
-    }
-  }
+  const [showWizard, setShowWizard] = useState(false)
 
   const getActionName = (auto: Automation): string => {
     if (auto.action_type === 'workflow' && auto.action_id) {
@@ -80,8 +66,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       >
         <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Automations</span>
         <button
-          onClick={handleCreate}
-          disabled={creating}
+          onClick={() => setShowWizard(true)}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -94,25 +79,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             backgroundColor: 'var(--highlight-color, #eab308)',
             border: 'none',
             borderRadius: 6,
-            cursor: creating ? 'default' : 'pointer',
-            opacity: creating ? 0.6 : 1,
+            cursor: 'pointer',
           }}
         >
-          {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
+          <Plus style={{ width: 14, height: 14 }} />
           New
         </button>
       </div>
-
-      {/* Error */}
-      {error && (
-        <div style={{
-          margin: '8px 12px 0', padding: '8px 12px', fontSize: 12,
-          color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: 6,
-          border: '1px solid #fecaca',
-        }}>
-          {error}
-        </div>
-      )}
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
@@ -204,6 +177,19 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           50% { border-color: rgba(234, 179, 8, 0.5); }
         }
       `}</style>
+
+      {showWizard && (
+        <AutomationCreationWizard
+          workflows={workflows}
+          searchSets={searchSets}
+          onClose={() => setShowWizard(false)}
+          onCreate={id => {
+            setShowWizard(false)
+            refresh()
+            openAutomation(id)
+          }}
+        />
+      )}
     </div>
   )
 }

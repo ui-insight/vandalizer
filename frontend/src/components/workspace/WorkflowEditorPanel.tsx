@@ -23,6 +23,8 @@ import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, Vali
 import { listSearchSets } from '../../api/extractions'
 import { getModels } from '../../api/config'
 import { listContents, searchDocuments } from '../../api/documents'
+import { listKnowledgeBases } from '../../api/knowledge'
+import type { KnowledgeBase } from '../../types/knowledge'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet, ModelInfo } from '../../types/workflow'
 import type { Document as VDoc } from '../../types/document'
@@ -59,6 +61,7 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false },
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true },
   { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true },
+  { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true },
   { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true },
   { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
@@ -1088,6 +1091,7 @@ function EditStepOverlay({
                       : task.name === 'CodeNode' ? 'Run Python code'
                       : task.name === 'CrawlerNode' ? 'Web crawler'
                       : task.name === 'ResearchNode' ? 'Deep AI research'
+                      : task.name === 'KnowledgeBaseQuery' ? 'Search knowledge base'
                       : task.name === 'APINode' ? 'HTTP API request'
                       : task.name === 'DocumentRenderer' ? 'Render document'
                       : task.name === 'FormFiller' ? 'Fill template'
@@ -1371,6 +1375,9 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
   const [models, setModels] = useState<ModelInfo[]>([])
 
+  // Knowledge base list for KnowledgeBaseQuery tasks
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([])
+
   // Test step
   const [testing, setTesting] = useState(false)
   const [testProgress, setTestProgress] = useState(0)
@@ -1395,6 +1402,13 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
   useEffect(() => {
     if (LLM_TASKS.includes(task.name)) {
       getModels().then(setModels).catch(() => {})
+    }
+  }, [task.name])
+
+  // Load knowledge bases for KnowledgeBaseQuery tasks
+  useEffect(() => {
+    if (task.name === 'KnowledgeBaseQuery') {
+      listKnowledgeBases().then(setKnowledgeBases).catch(() => {})
     }
   }, [task.name])
 
@@ -1546,6 +1560,7 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                   : task.name === 'CodeNode' ? 'Run Python code on input data'
                   : task.name === 'CrawlerNode' ? 'Crawl multiple pages from a starting URL'
                   : task.name === 'ResearchNode' ? 'Deep multi-pass AI analysis'
+                  : task.name === 'KnowledgeBaseQuery' ? 'Search a knowledge base and inject results as context'
                   : task.name === 'APINode' ? 'Make HTTP API requests'
                   : task.name === 'DocumentRenderer' ? 'Render output as a downloadable file'
                   : task.name === 'FormFiller' ? 'Fill a template with data'
@@ -1882,6 +1897,75 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                     outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                   }}
                 />
+              </div>
+            )}
+
+            {task.name === 'KnowledgeBaseQuery' && (
+              <div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Knowledge Base
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={getTextValue('kb_uuid')}
+                      onChange={e => setTextValue('kb_uuid', e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: getTextValue('kb_uuid') ? '#374151' : '#9ca3af',
+                        appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="">Select a knowledge base…</option>
+                      {knowledgeBases.map(kb => (
+                        <option key={kb.uuid} value={kb.uuid}>
+                          {kb.title}{kb.status !== 'ready' ? ` (${kb.status})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Search Query
+                  </label>
+                  <textarea
+                    value={getTextValue('query')}
+                    onChange={e => setTextValue('query', e.target.value)}
+                    placeholder="e.g., What are the eligibility requirements?"
+                    rows={3}
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
+                    }}
+                  />
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                    The top matching chunks are returned as text and passed to the next step.
+                  </div>
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Results to retrieve
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={getTextValue('k') || '8'}
+                    onChange={e => setTextValue('k', e.target.value)}
+                    style={{
+                      width: 80, padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
               </div>
             )}
 

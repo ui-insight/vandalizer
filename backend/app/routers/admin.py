@@ -143,6 +143,31 @@ class ConfigUpdateRequest(BaseModel):
     quality_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     llm_endpoint: Optional[str] = None
+    default_team_id: Optional[str] = None
+
+
+class AdminTeamItem(BaseModel):
+    team_id: str
+    uuid: str
+    name: str
+    owner_user_id: str
+    member_count: int
+    is_default: bool
+
+
+class AdminCreateTeamRequest(BaseModel):
+    name: str
+
+
+class AdminAddUserRequest(BaseModel):
+    user_id: str
+    role: str = "member"
+
+
+class IsolatedUserItem(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
 
 
 class ModelAddRequest(BaseModel):
@@ -1003,6 +1028,7 @@ async def get_config(
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
+        "default_team_id": cfg.default_team_id or "",
     }
 
 
@@ -1027,6 +1053,8 @@ async def update_config(
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.llm_endpoint is not None:
         cfg.llm_endpoint = body.llm_endpoint
+    if body.default_team_id is not None:
+        cfg.default_team_id = body.default_team_id or None
 
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
@@ -1365,3 +1393,164 @@ async def quality_contract(
     await _require_admin(user)
     from app.services.quality_service import get_quality_contract_status
     return await get_quality_contract_status(item_kind, item_id)
+
+
+# ---------------------------------------------------------------------------
+# 19. GET /admin/teams/all  - All teams (admin management view)
+# ---------------------------------------------------------------------------
+
+@router.get("/teams/all", response_model=list[AdminTeamItem])
+async def admin_list_all_teams(user: User = Depends(get_current_user)):
+    await _require_admin(user)
+
+    cfg = await SystemConfig.get_config()
+    all_teams = await Team.find().limit(10000).to_list()
+    all_memberships = await TeamMembership.find().limit(100000).to_list()
+
+    member_counts: dict[str, int] = {}
+    for m in all_memberships:
+        key = str(m.team)
+        member_counts[key] = member_counts.get(key, 0) + 1
+
+    return [
+        AdminTeamItem(
+            team_id=str(t.id),
+            uuid=t.uuid,
+            name=t.name,
+            owner_user_id=t.owner_user_id,
+            member_count=member_counts.get(str(t.id), 0),
+            is_default=(cfg.default_team_id == t.uuid),
+        )
+        for t in all_teams
+    ]
+
+
+# ---------------------------------------------------------------------------
+# 20. POST /admin/teams/create  - Create a team (admin)
+# ---------------------------------------------------------------------------
+
+@router.post("/teams/create", response_model=AdminTeamItem)
+async def admin_create_team(
+    body: AdminCreateTeamRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+
+    from app.services import team_service
+
+    team = await team_service.create_team(body.name, user.user_id)
+    await _audit(user, "admin_create_team", f"Created team: {body.name}")
+
+    return AdminTeamItem(
+        team_id=str(team.id),
+        uuid=team.uuid,
+        name=team.name,
+        owner_user_id=team.owner_user_id,
+        member_count=1,
+        is_default=False,
+    )
+
+
+# ---------------------------------------------------------------------------
+# 21. POST /admin/teams/{team_uuid}/members  - Add user to team (no invite)
+# ---------------------------------------------------------------------------
+
+@router.post("/teams/{team_uuid}/members")
+async def admin_add_user_to_team(
+    team_uuid: str,
+    body: AdminAddUserRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    target = await User.find_one(User.user_id == body.user_id)
+    if not target:
+        target = await User.find_one(User.email == body.user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    existing = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == target.user_id,
+    )
+    if existing:
+        existing.role = body.role
+        await existing.save()
+    else:
+        await TeamMembership(team=team.id, user_id=target.user_id, role=body.role).insert()
+
+    await _audit(user, "admin_add_team_member", f"Added {target.user_id} to team {team.name} as {body.role}")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# 22. DELETE /admin/teams/{team_uuid}/members/{user_id}  - Remove user
+# ---------------------------------------------------------------------------
+
+@router.delete("/teams/{team_uuid}/members/{user_id}")
+async def admin_remove_user_from_team(
+    team_uuid: str,
+    user_id: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    membership = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == user_id,
+    )
+    if not membership:
+        raise HTTPException(status_code=404, detail="User not in team")
+
+    await membership.delete()
+
+    # If this was their current_team, clear it
+    target = await User.find_one(User.user_id == user_id)
+    if target and target.current_team == team.id:
+        target.current_team = None
+        await target.save()
+
+    await _audit(user, "admin_remove_team_member", f"Removed {user_id} from team {team.name}")
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# 23. GET /admin/users/isolated  - Users with no shared team
+# ---------------------------------------------------------------------------
+
+@router.get("/users/isolated", response_model=list[IsolatedUserItem])
+async def isolated_users(user: User = Depends(get_current_user)):
+    await _require_admin(user)
+
+    all_memberships = await TeamMembership.find().limit(100000).to_list()
+
+    # Count memberships per user and members per team
+    user_team_ids: dict[str, set] = {}
+    team_member_counts: dict[str, int] = {}
+    for m in all_memberships:
+        tid = str(m.team)
+        user_team_ids.setdefault(m.user_id, set()).add(tid)
+        team_member_counts[tid] = team_member_counts.get(tid, 0) + 1
+
+    # Isolated = all their teams have exactly 1 member (just themselves)
+    isolated_ids = [
+        uid for uid, team_ids in user_team_ids.items()
+        if all(team_member_counts.get(tid, 1) == 1 for tid in team_ids)
+    ]
+
+    if not isolated_ids:
+        return []
+
+    users = await User.find({"user_id": {"$in": isolated_ids}}).to_list()
+    return [
+        IsolatedUserItem(user_id=u.user_id, name=u.name, email=u.email)
+        for u in users
+    ]

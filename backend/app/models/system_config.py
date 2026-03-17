@@ -95,6 +95,9 @@ class SystemConfig(Document):
     auth_methods: list[str] = ["password"]
     oauth_providers: list[dict] = []
 
+    # Default team for new user auto-assignment
+    default_team_id: Optional[str] = None
+
     # Metadata
     updated_at: Optional[datetime.datetime] = None
     updated_by: Optional[str] = None
