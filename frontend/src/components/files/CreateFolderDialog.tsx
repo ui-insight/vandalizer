@@ -35,7 +35,9 @@ export function CreateFolderDialog({ onSubmit, onClose, title }: CreateFolderDia
           </button>
         </div>
         <form onSubmit={handleSubmit}>
+          <label htmlFor="folder-name-input" className="sr-only">Folder name</label>
           <input
+            id="folder-name-input"
             autoFocus
             type="text"
             placeholder="Folder name"

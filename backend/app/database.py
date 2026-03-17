@@ -34,7 +34,7 @@ from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
 from app.models.organization import Organization
-from app.models.audit_log import AuditLog
+from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 
 ALL_MODELS = [
@@ -86,6 +86,7 @@ ALL_MODELS = [
     CertificationProgress,
     Organization,
     AuditLog,
+    AdminAuditLog,
     ApprovalRequest,
 ]
 

@@ -369,7 +369,8 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
 
 
 @router.post("/steps/test")
-async def test_step(req: TestStepRequest, user: User = Depends(get_current_user)):
+@limiter.limit("20/minute")
+async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
     task_id = await svc.test_step(
         req.task_name, req.task_data, req.document_uuids, user.user_id, req.model
     )
@@ -404,7 +405,9 @@ async def get_workflow_quality_sparkline(
 
 
 @router.post("/{workflow_id}/improvement-suggestions")
+@limiter.limit("5/minute")
 async def get_workflow_suggestions(
+    request: Request,
     workflow_id: str, user: User = Depends(get_current_user),
 ):
     """Use LLM to suggest improvements based on the latest validation run."""
@@ -439,7 +442,8 @@ async def update_validation_plan(
 
 
 @router.post("/{workflow_id}/validation-plan/generate", response_model=ValidationPlanResponse)
-async def generate_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)):
     try:
         checks = await svc.generate_validation_plan(workflow_id)
         return ValidationPlanResponse(checks=checks)
@@ -490,7 +494,9 @@ async def validate_workflow(workflow_id: str, user: User = Depends(get_current_u
 
 
 @router.post("/run-integrated")
+@limiter.limit("10/minute")
 async def run_workflow_integrated(
+    request: Request,
     workflow_id: str = Form(...),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),

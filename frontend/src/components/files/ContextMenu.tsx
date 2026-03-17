@@ -57,6 +57,7 @@ export function ContextMenu({
   return (
     <div
       ref={ref}
+      role="menu"
       style={{
         top: pos.top,
         left: pos.left,
@@ -64,10 +65,14 @@ export function ContextMenu({
         boxShadow: '0 8px 24px rgba(0,0,0,.12)',
       }}
       className="fixed z-[1000] min-w-[160px] rounded-lg border bg-white p-1.5"
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') onClose()
+      }}
     >
       {items.map((item) => (
         <button
           key={item.label}
+          role="menuitem"
           onClick={() => {
             item.action()
             onClose()

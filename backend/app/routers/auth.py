@@ -118,8 +118,11 @@ async def register(
         user = await auth_service.register(
             body.user_id or body.email, body.email, body.password, body.name
         )
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Registration failed. Please check your details and try again.",
+        )
     _set_tokens(response, user, settings)
     return await _user_response(user)
 
@@ -149,14 +152,23 @@ async def update_profile(
     return await _user_response(user)
 
 
+_API_TOKEN_EXPIRY_DAYS = 365
+
+
 @router.post("/api-token/generate")
 async def generate_api_token(user: User = Depends(get_current_user)):
-    """Generate a new API token for the current user."""
+    """Generate a new API token for the current user (expires in 365 days)."""
     token = secrets.token_urlsafe(32)
+    now = datetime.datetime.now(datetime.timezone.utc)
     user.api_token = token
-    user.api_token_created_at = datetime.datetime.now(datetime.timezone.utc)
+    user.api_token_created_at = now
+    user.api_token_expires_at = now + datetime.timedelta(days=_API_TOKEN_EXPIRY_DAYS)
     await user.save()
-    return {"api_token": token, "created_at": user.api_token_created_at.isoformat()}
+    return {
+        "api_token": token,
+        "created_at": user.api_token_created_at.isoformat(),
+        "expires_at": user.api_token_expires_at.isoformat(),
+    }
 
 
 @router.post("/api-token/revoke")
@@ -164,6 +176,7 @@ async def revoke_api_token(user: User = Depends(get_current_user)):
     """Revoke the current user's API token."""
     user.api_token = None
     user.api_token_created_at = None
+    user.api_token_expires_at = None
     await user.save()
     return {"ok": True}
 
@@ -171,9 +184,16 @@ async def revoke_api_token(user: User = Depends(get_current_user)):
 @router.get("/api-token/status")
 async def api_token_status(user: User = Depends(get_current_user)):
     """Check if the current user has an active API token."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    expired = (
+        user.api_token_expires_at is not None
+        and user.api_token_expires_at < now
+    )
     return {
         "has_token": user.api_token is not None,
         "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,
+        "expires_at": user.api_token_expires_at.isoformat() if user.api_token_expires_at else None,
+        "expired": expired,
     }
 
 
