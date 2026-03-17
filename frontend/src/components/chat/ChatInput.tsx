@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
 import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
-import { ModelEffortPicker, effortLabelForModel } from '../ModelEffortPicker'
+import { ModelEffortPicker } from '../ModelEffortPicker'
 
 interface Props {
   onSend: (message: string) => void
@@ -83,14 +83,9 @@ export function ChatInput({
   // Deduplicate models by tag
   const uniqueModels = models.filter((m, i, arr) => arr.findIndex(x => x.tag === m.tag) === i)
 
-  const effortLabel = uniqueModels.length > 0 && selectedModel
-    ? effortLabelForModel(uniqueModels, selectedModel)
+  const displayModel = selectedModel
+    ? (uniqueModels.find(m => m.tag === selectedModel)?.tag || selectedModel)
     : null
-  const displayModel = effortLabel
-    ? `${effortLabel} effort`
-    : selectedModel
-      ? (uniqueModels.find(m => m.tag === selectedModel)?.tag || selectedModel.split('/').pop() || selectedModel)
-      : null
 
   return (
     <div

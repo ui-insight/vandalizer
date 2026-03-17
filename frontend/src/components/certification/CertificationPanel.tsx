@@ -8,6 +8,7 @@ import {
   Maximize2,
   Minimize2,
   PanelBottom,
+  PanelLeft,
   PanelRight,
   ShieldCheck,
   Star,
@@ -136,6 +137,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 
 const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] = [
   { mode: 'floating', icon: Maximize2, label: 'Float' },
+  { mode: 'docked-left', icon: PanelLeft, label: 'Dock left' },
   { mode: 'docked-right', icon: PanelRight, label: 'Dock right' },
   { mode: 'docked-bottom', icon: PanelBottom, label: 'Dock bottom' },
   { mode: 'collapsed', icon: Minimize2, label: 'Collapse' },
@@ -320,6 +322,7 @@ export function CertificationPanel() {
   const containerClass = cn(
     'fixed z-[9000] bg-white flex flex-col',
     mode === 'floating' && 'shadow-2xl border border-gray-200 cert-panel-enter',
+    mode === 'docked-left' && 'top-[69px] left-0 bottom-0 border-r border-gray-200 cert-panel-dock-left',
     mode === 'docked-right' && 'top-[69px] right-0 bottom-0 border-l border-gray-200 cert-panel-dock-right',
     mode === 'docked-bottom' && 'left-0 right-0 bottom-0 border-t border-gray-200 cert-panel-dock-bottom',
   )
@@ -335,11 +338,13 @@ export function CertificationPanel() {
           left: dragPos ? dragPos.x : '50%',
           transform: dragPos ? undefined : 'translate(-50%, -50%)',
         }
-      : mode === 'docked-right'
+      : mode === 'docked-left'
         ? { width: 440 }
-        : mode === 'docked-bottom'
-          ? { height: 360 }
-          : {}),
+        : mode === 'docked-right'
+          ? { width: 440 }
+          : mode === 'docked-bottom'
+            ? { height: 360 }
+            : {}),
   }
 
   // Panel content (shared across floating / docked modes)
@@ -497,7 +502,7 @@ export function CertificationPanel() {
           <span className="text-sm font-bold text-gray-900 flex-1">Certification</span>
 
           {/* Mode toggles */}
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-0.5" onPointerDown={e => e.stopPropagation()}>
             {MODE_ICONS.map(({ mode: m, icon: Icon, label }) => (
               <button
                 key={m}
@@ -513,7 +518,7 @@ export function CertificationPanel() {
             ))}
           </div>
 
-          <button onClick={closePanel} title="Close" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
+          <button onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Close" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
             <X size={14} />
           </button>
         </div>

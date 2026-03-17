@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     s3_secret_access_key: str | None = None
     s3_endpoint_url: str | None = None
 
+    # LLM API keys
+    openai_api_key: str = ""
+
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":
         if self.jwt_secret_key == "change-me" and self.environment != "development":

@@ -49,7 +49,8 @@ async def create_automation(req: CreateAutomationRequest, user: User = Depends(g
     team_id = str(user.current_team) if user.current_team else None
     auto = await svc.create_automation(
         req.name, user.user_id, req.space, req.description,
-        req.trigger_type, req.action_type, req.action_id,
+        req.trigger_type, trigger_config=req.trigger_config,
+        action_type=req.action_type, action_id=req.action_id,
         team_id=team_id, shared_with_team=req.shared_with_team,
         output_config=req.output_config,
     )

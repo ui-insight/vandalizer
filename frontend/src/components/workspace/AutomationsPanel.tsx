@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Loader2 } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'

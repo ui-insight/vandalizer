@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X, FolderOpen, Globe, Loader2 } from 'lucide-react'
 import { createAutomation } from '../../api/automations'
+import { apiFetch } from '../../api/client'
 import type { ActionType, TriggerType } from '../../types/automation'
 import type { Workflow } from '../../types/workflow'
 
@@ -24,7 +25,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[
   { value: 'task', label: 'Run Task', description: 'Execute a standalone task' },
 ]
 
-const TOTAL_STEPS = 3
+const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
 
 export function AutomationCreationWizard({ onClose, onCreate, workflows, searchSets }: Props) {
   const [step, setStep] = useState(1)
@@ -37,6 +38,24 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   const [error, setError] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
+  // Folder watch config state
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
+  const [foldersLoading, setFoldersLoading] = useState(false)
+  const [watchFolderId, setWatchFolderId] = useState('')
+  const [fileTypes, setFileTypes] = useState<string[]>(['pdf', 'docx', 'xlsx', 'html'])
+  const [excludePatterns, setExcludePatterns] = useState('')
+  const [batchMode, setBatchMode] = useState(false)
+
+  // Dynamic step count: folder_watch adds a config step
+  const hasFolderStep = triggerType === 'folder_watch'
+  const totalSteps = hasFolderStep ? 4 : 3
+
+  // Map logical step to content:
+  // folder_watch: 1=name, 2=trigger, 3=folder config, 4=action
+  // api:          1=name, 2=trigger, 3=action
+  const actionStep = hasFolderStep ? 4 : 3
+  const folderStep = 3 // only used when hasFolderStep
+
   useEffect(() => {
     if (step === 1) nameRef.current?.focus()
   }, [step])
@@ -47,10 +66,22 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // Load folders when entering the folder config step
+  useEffect(() => {
+    if (hasFolderStep && step === folderStep && folders.length === 0) {
+      setFoldersLoading(true)
+      apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
+        .then(setFolders)
+        .catch(() => {})
+        .finally(() => setFoldersLoading(false))
+    }
+  }, [step, hasFolderStep, folderStep, folders.length])
+
   const canAdvance = (): boolean => {
     if (step === 1) return name.trim().length > 0
     if (step === 2) return true
-    if (step === 3) return actionId.length > 0
+    if (hasFolderStep && step === folderStep) return watchFolderId.length > 0
+    if (step === actionStep) return actionId.length > 0
     return false
   }
 
@@ -59,14 +90,36 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
     setActionId('')
   }
 
+  // When trigger type changes away from folder_watch, reset folder config and
+  // clamp step if we're on the folder step that no longer exists
+  const handleTriggerTypeChange = (type: TriggerType) => {
+    setTriggerType(type)
+    if (type !== 'folder_watch') {
+      setWatchFolderId('')
+      setFileTypes(['pdf', 'docx', 'xlsx', 'html'])
+      setExcludePatterns('')
+      setBatchMode(false)
+    }
+  }
+
   const handleCreate = async () => {
     setCreating(true)
     setError(null)
     try {
+      const triggerConfig = triggerType === 'folder_watch'
+        ? {
+            folder_id: watchFolderId || undefined,
+            file_types: fileTypes,
+            exclude_patterns: excludePatterns || undefined,
+            batch_mode: batchMode,
+          }
+        : undefined
+
       const auto = await createAutomation({
         name: name.trim(),
         description: description.trim() || undefined,
         trigger_type: triggerType,
+        trigger_config: triggerConfig,
         action_type: actionType,
         action_id: actionId || undefined,
       })
@@ -75,6 +128,12 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
       setError(err instanceof Error ? err.message : 'Failed to create automation')
       setCreating(false)
     }
+  }
+
+  const handleFileTypeToggle = (type: string) => {
+    setFileTypes(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    )
   }
 
   const inputStyle: React.CSSProperties = {
@@ -130,7 +189,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
               New Automation
             </div>
             <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
-              Step {step} of {TOTAL_STEPS}
+              Step {step} of {totalSteps}
             </div>
           </div>
           <button
@@ -145,7 +204,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
         <div style={{ height: 3, backgroundColor: '#f3f4f6', margin: '16px 0 0' }}>
           <div style={{
             height: '100%',
-            width: `${(step / TOTAL_STEPS) * 100}%`,
+            width: `${(step / totalSteps) * 100}%`,
             backgroundColor: '#3b82f6',
             borderRadius: '0 2px 2px 0',
             transition: 'width 0.25s ease',
@@ -207,7 +266,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
                   return (
                     <button
                       key={opt.value}
-                      onClick={() => setTriggerType(opt.value)}
+                      onClick={() => handleTriggerTypeChange(opt.value)}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 14,
                         padding: '14px 16px',
@@ -240,16 +299,92 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
                   )
                 })}
               </div>
-              {triggerType === 'folder_watch' && (
-                <div style={{ marginTop: 14, padding: '10px 14px', backgroundColor: '#f0f9ff', borderRadius: 8, fontSize: 12, color: '#0369a1', border: '1px solid #bae6fd' }}>
-                  You'll configure which folder to watch after creation.
-                </div>
-              )}
             </div>
           )}
 
-          {/* Step 3: Action */}
-          {step === 3 && (
+          {/* Step 3 (folder_watch only): Folder Config */}
+          {hasFolderStep && step === folderStep && (
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+                Configure folder watch
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Watch Folder <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                {foldersLoading ? (
+                  <div style={{ padding: '10px 14px', fontSize: 13, color: '#9ca3af' }}>Loading folders...</div>
+                ) : (
+                  <select
+                    value={watchFolderId}
+                    onChange={e => setWatchFolderId(e.target.value)}
+                    style={selectStyle}
+                  >
+                    <option value="">-- Select a folder to watch --</option>
+                    {folders.map(f => (
+                      <option key={f.uuid} value={f.uuid}>{f.path}</option>
+                    ))}
+                  </select>
+                )}
+                {!foldersLoading && folders.length === 0 && (
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>No folders yet — create one in the workspace first.</div>
+                )}
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  File Types
+                </label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {FILE_TYPE_OPTIONS.map(type => (
+                    <button
+                      key={type}
+                      onClick={() => handleFileTypeToggle(type)}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                        borderRadius: 14, cursor: 'pointer',
+                        backgroundColor: fileTypes.includes(type) ? '#dbeafe' : '#f3f4f6',
+                        color: fileTypes.includes(type) ? '#1d4ed8' : '#6b7280',
+                        border: fileTypes.includes(type) ? '1px solid #93c5fd' : '1px solid #e5e7eb',
+                      }}
+                    >
+                      .{type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Exclude Patterns <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span>
+                </label>
+                <input
+                  type="text"
+                  value={excludePatterns}
+                  onChange={e => setExcludePatterns(e.target.value)}
+                  placeholder="e.g. draft*, temp_*"
+                  style={inputStyle}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
+                />
+              </div>
+
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={batchMode}
+                  onChange={e => setBatchMode(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                />
+                <span style={{ fontWeight: 500 }}>Batch mode</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; wait and process files together</span>
+              </label>
+            </div>
+          )}
+
+          {/* Action step (step 3 for API, step 4 for folder_watch) */}
+          {step === actionStep && (
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
                 What should happen when it triggers?
@@ -348,7 +483,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
         }}>
           {/* Step dots */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {[1, 2, 3].map(s => (
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
               <div key={s} style={{
                 height: 8,
                 width: s === step ? 22 : 8,
@@ -369,7 +504,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
               <button onClick={onClose} style={btnSecondary}>Cancel</button>
             )}
 
-            {step < TOTAL_STEPS ? (
+            {step < totalSteps ? (
               <button onClick={() => setStep(s => s + 1)} disabled={!canAdvance()} style={btnPrimary(canAdvance())}>
                 Next
               </button>

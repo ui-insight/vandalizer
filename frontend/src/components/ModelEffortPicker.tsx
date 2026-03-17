@@ -1,25 +1,15 @@
 /**
- * ModelEffortPicker — converts raw model metadata into a Low / Med / High effort
- * radio-button picker with Intelligence / Speed / Privacy characteristic bars.
+ * ModelEffortPicker — displays the system-configured models as a radio-button
+ * list with Intelligence / Speed / Privacy characteristic bars.
  *
  * Also exports:
  *   ModelCharacterBars   — standalone mini bars for use in admin model list rows
- *   effortLabelForModel  — returns "Low" | "Med" | "High" for a given model tag
  */
 import type { ModelInfo } from '../types/workflow'
 
 // ---------------------------------------------------------------------------
 // Scoring helpers
 // ---------------------------------------------------------------------------
-
-/** Higher score = more capable / slower. */
-function modelScore(m: ModelInfo): number {
-  let s = m.tier === 'high' ? 3 : m.tier === 'standard' ? 2 : m.tier === 'basic' ? 1 : 1.5
-  if (m.thinking) s += 1.5
-  if (m.speed === 'fast') s -= 0.3
-  else if (m.speed === 'slow') s += 0.3
-  return s
-}
 
 function getIntelligenceScore(m: ModelInfo): number {
   let v = m.tier === 'high' ? 0.85 : m.tier === 'standard' ? 0.60 : m.tier === 'basic' ? 0.35 : 0.50
@@ -33,39 +23,6 @@ function getSpeedScore(m: ModelInfo): number {
 
 function getPrivacyScore(m: ModelInfo): number {
   return m.privacy === 'internal' ? 0.92 : m.privacy === 'external' ? 0.22 : 0.60
-}
-
-// ---------------------------------------------------------------------------
-// Effort-level assignment
-// ---------------------------------------------------------------------------
-
-type EffortLevel = 'low' | 'med' | 'high'
-
-const EFFORT_META: Record<EffortLevel, { label: string; description: string }> = {
-  low:  { label: 'Low',    description: 'Fast & efficient' },
-  med:  { label: 'Medium', description: 'Balanced performance' },
-  high: { label: 'High',   description: 'Maximum capability' },
-}
-
-/** Assign the sorted models to Low / Med / High buckets. */
-function assignEffortModels(models: ModelInfo[]): Record<EffortLevel, ModelInfo | null> {
-  if (models.length === 0) return { low: null, med: null, high: null }
-  const sorted = [...models].sort((a, b) => modelScore(a) - modelScore(b))
-  const n = sorted.length
-  return {
-    low:  sorted[0],
-    med:  sorted[Math.floor((n - 1) / 2)],
-    high: sorted[n - 1],
-  }
-}
-
-/** Returns "Low" | "Med" | "High" if the tag maps to a known effort level, else null. */
-export function effortLabelForModel(models: ModelInfo[], tag: string): string | null {
-  const assigned = assignEffortModels(models)
-  for (const [level, model] of Object.entries(assigned) as [EffortLevel, ModelInfo | null][]) {
-    if (model?.tag === tag) return EFFORT_META[level].label
-  }
-  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +68,7 @@ export function ModelCharacterBars({ model }: { model: ModelInfo }) {
 }
 
 // ---------------------------------------------------------------------------
-// ModelEffortPicker — 3-card radio picker for chat / user settings
+// ModelEffortPicker — list of system-configured models
 // ---------------------------------------------------------------------------
 
 interface PickerProps {
@@ -129,24 +86,14 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
     )
   }
 
-  const assigned = assignEffortModels(models)
-  const levels: EffortLevel[] = ['low', 'med', 'high']
-
-  // Which level is currently selected?
-  const selectedLevel = levels.find(l => assigned[l]?.tag === selectedModel) ?? null
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
-      {levels.map(level => {
-        const model = assigned[level]
-        if (!model) return null
-
-        const selected = selectedLevel === level || (selectedLevel === null && model.tag === selectedModel)
-        const meta = EFFORT_META[level]
+      {models.map(model => {
+        const selected = model.tag === selectedModel
 
         return (
           <button
-            key={level}
+            key={model.tag}
             onClick={() => onChange(model.tag)}
             style={{
               display: 'flex',
@@ -163,7 +110,7 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
               transition: 'border-color 0.12s, background-color 0.12s',
             }}
           >
-            {/* Row 1: radio dot + label + model tag */}
+            {/* Row 1: radio dot + model name + tag */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                 <div style={{
@@ -172,17 +119,11 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
                   backgroundColor: '#fff',
                   transition: 'border 0.12s',
                 }} />
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{meta.label}</span>
-                  <span style={{ fontSize: 11, color: '#9ca3af' }}>{meta.description}</span>
-                </div>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{model.tag}</span>
+                {model.external && (
+                  <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>external</span>
+                )}
               </div>
-              <span style={{
-                fontSize: 10, color: '#b0b7c3', fontFamily: 'ui-monospace, monospace',
-                maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {model.tag || model.name}
-              </span>
             </div>
 
             {/* Row 2: characteristic bars */}

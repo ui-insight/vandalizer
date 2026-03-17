@@ -9,6 +9,7 @@ class CreateAutomationRequest(BaseModel):
     space: Optional[str] = None
     description: Optional[str] = None
     trigger_type: Optional[str] = None
+    trigger_config: Optional[dict] = None
     action_type: Optional[str] = None
     action_id: Optional[str] = None
     shared_with_team: bool = False
