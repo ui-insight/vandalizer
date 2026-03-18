@@ -35,9 +35,27 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
 
   const handleUse = () => {
     if (item.kind === 'workflow') {
-      navigate({ to: '/', search: { openWorkflow: item.item_id } })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: item.item_id,
+          extraction: undefined,
+          automation: undefined,
+        },
+      })
     } else {
-      navigate({ to: '/', search: { openExtraction: item.item_id } })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: undefined,
+          extraction: item.item_id,
+          automation: undefined,
+        },
+      })
     }
   }
 

@@ -49,7 +49,8 @@ class TestCreateOrganization:
 
             from app.services.organization_service import create_organization
 
-            result = await create_organization(name="CS Dept", org_type="department")
+            # Only 'university' can be a root node (no parent)
+            result = await create_organization(name="Main University", org_type="university")
             assert result is mock_instance
             mock_instance.insert.assert_awaited_once()
 
@@ -129,20 +130,22 @@ class TestGetOrgTree:
         root = _make_org(uuid="root", name="University", org_type="university", parent_id=None)
         dept = _make_org(uuid="dept-1", name="CS", org_type="department", parent_id="root")
 
-        # First call to find (roots): returns [root]
-        # Second call to find (children of root): returns [dept]
-        # Third call to find (children of dept): returns []
-        mock_roots = MagicMock()
-        mock_roots.to_list = AsyncMock(return_value=[root])
-        mock_children_of_root = MagicMock()
-        mock_children_of_root.to_list = AsyncMock(return_value=[dept])
-        mock_no_children = MagicMock()
-        mock_no_children.to_list = AsyncMock(return_value=[])
+        # get_org_tree now uses find_all() + in-memory assembly
+        mock_all_orgs = MagicMock()
+        mock_all_orgs.to_list = AsyncMock(return_value=[root, dept])
 
-        with patch("app.services.organization_service.Organization") as MockOrg:
-            MockOrg.find = MagicMock(
-                side_effect=[mock_roots, mock_children_of_root, mock_no_children]
-            )
+        # Also needs User.find() and Team.find() for counts
+        mock_no_users = MagicMock()
+        mock_no_users.to_list = AsyncMock(return_value=[])
+        mock_no_teams = MagicMock()
+        mock_no_teams.to_list = AsyncMock(return_value=[])
+
+        with patch("app.services.organization_service.Organization") as MockOrg, \
+             patch("app.services.organization_service.User") as MockUser, \
+             patch("app.services.organization_service.Team") as MockTeam:
+            MockOrg.find_all = MagicMock(return_value=mock_all_orgs)
+            MockUser.find = MagicMock(return_value=mock_no_users)
+            MockTeam.find = MagicMock(return_value=mock_no_teams)
 
             from app.services.organization_service import get_org_tree
 
@@ -180,18 +183,13 @@ class TestGetVisibleOrgIds:
         dept = _make_org(uuid="dept-1", org_type="department")
         child = _make_org(uuid="unit-1", org_type="unit", parent_id="dept-1")
 
-        # Calls: find_one for user's org, find for descendants of dept-1,
-        # find for descendants of unit-1
-        mock_children_of_dept = MagicMock()
-        mock_children_of_dept.to_list = AsyncMock(return_value=[child])
-        mock_no_children = MagicMock()
-        mock_no_children.to_list = AsyncMock(return_value=[])
+        # get_descendant_ids now uses find_all() + in-memory BFS
+        mock_all_orgs = MagicMock()
+        mock_all_orgs.to_list = AsyncMock(return_value=[dept, child])
 
         with patch("app.services.organization_service.Organization") as MockOrg:
             MockOrg.find_one = AsyncMock(return_value=dept)
-            MockOrg.find = MagicMock(
-                side_effect=[mock_children_of_dept, mock_no_children]
-            )
+            MockOrg.find_all = MagicMock(return_value=mock_all_orgs)
 
             from app.services.organization_service import get_visible_org_ids
 

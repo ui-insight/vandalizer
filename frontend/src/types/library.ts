@@ -85,7 +85,7 @@ export interface VerifiedItemMetadata {
   display_name: string | null
   description: string | null
   markdown: string | null
-  group_ids: string[]
+  organization_ids: string[]
   updated_at?: string | null
   updated_by_user_id?: string | null
   quality_score?: number | null
@@ -106,7 +106,7 @@ export interface VerifiedCatalogItem {
   display_name: string | null
   description: string | null
   markdown: string | null
-  group_ids: string[]
+  organization_ids: string[]
   quality_score: number | null
   quality_tier: string | null
   quality_grade: string | null
@@ -132,20 +132,3 @@ export interface ExaminerUser {
   is_examiner: boolean
 }
 
-export interface Group {
-  id: string
-  uuid: string
-  name: string
-  description: string | null
-  created_by_user_id: string
-  created_at: string | null
-  member_count?: number
-}
-
-export interface GroupMember {
-  user_id: string
-  name: string | null
-  email: string | null
-  added_by_user_id?: string
-  created_at?: string | null
-}

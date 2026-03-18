@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText, RotateCcw, ExternalLink } from 'lucide-react'
-import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listGroups, listCollections } from '../../api/library'
-import type { VerificationRequest, VerificationStatus, Group, VerifiedCollection } from '../../types/library'
+import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
+import type { VerificationRequest, VerificationStatus, VerifiedCollection } from '../../types/library'
+import { listOrganizationsFlat } from '../../api/organizations'
+import type { Organization } from '../../api/organizations'
 
 type QueueView = 'pending' | 'mine'
 type StatusFilter = '' | 'submitted' | 'in_review' | 'returned'
@@ -65,14 +67,14 @@ export function VerificationQueue() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
-  const [groups, setGroups] = useState<Group[]>([])
+  const [orgs, setOrgs] = useState<Organization[]>([])
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [reviewGroupIds, setReviewGroupIds] = useState<string[]>([])
+  const [reviewOrgIds, setReviewOrgIds] = useState<string[]>([])
   const [reviewCollectionIds, setReviewCollectionIds] = useState<string[]>([])
 
-  // Load groups and collections for assignment at approval time
+  // Load orgs and collections for assignment at approval time
   useEffect(() => {
-    listGroups().then(d => setGroups(d.groups)).catch(() => {})
+    listOrganizationsFlat().then(d => setOrgs(d.organizations)).catch(() => {})
     listCollections().then(d => setCollections(d.collections)).catch(() => {})
   }, [])
 
@@ -96,21 +98,39 @@ export function VerificationQueue() {
   }, [refresh])
 
   const handleAction = async (uuid: string, action: 'approved' | 'rejected' | 'in_review' | 'returned') => {
-    const gIds = action === 'approved' && reviewGroupIds.length > 0 ? reviewGroupIds : undefined
+    const oIds = action === 'approved' && reviewOrgIds.length > 0 ? reviewOrgIds : undefined
     const cIds = action === 'approved' && reviewCollectionIds.length > 0 ? reviewCollectionIds : undefined
-    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined, gIds, cIds)
+    await updateVerificationStatus(uuid, action, reviewNotes.trim() || undefined, oIds, cIds)
     setReviewingId(null)
     setReviewNotes('')
-    setReviewGroupIds([])
+    setReviewOrgIds([])
     setReviewCollectionIds([])
     refresh()
   }
 
   const handleOpen = (req: VerificationRequest) => {
     if (req.item_kind === 'workflow') {
-      navigate({ to: '/', search: { openWorkflow: req.item_id } })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: req.item_id,
+          extraction: undefined,
+          automation: undefined,
+        },
+      })
     } else if (req.item_uuid) {
-      navigate({ to: '/', search: { openExtraction: req.item_uuid } })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: undefined,
+          extraction: req.item_uuid,
+          automation: undefined,
+        },
+      })
     }
   }
 
@@ -267,7 +287,7 @@ export function VerificationQueue() {
                           {!isReviewing ? (
                             <>
                               <button
-                                onClick={() => { setReviewingId(req.uuid); setReviewGroupIds([]); setReviewCollectionIds([]) }}
+                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
                                 className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
                                 title="Review"
                               >
@@ -288,7 +308,7 @@ export function VerificationQueue() {
                                 <XCircle className="h-4 w-4" />
                               </button>
                               <button
-                                onClick={() => { setReviewingId(req.uuid); setReviewGroupIds([]); setReviewCollectionIds([]) }}
+                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
                                 className="p-1.5 rounded hover:bg-orange-50 text-orange-600"
                                 title="Return for Improvement"
                               >
@@ -304,24 +324,24 @@ export function VerificationQueue() {
                                 rows={2}
                                 className="text-xs border border-gray-300 rounded p-2 resize-none focus:outline-none focus:ring-1 focus:ring-gray-400"
                               />
-                              {/* Groups assignment */}
-                              {groups.length > 0 && (
+                              {/* Organization visibility */}
+                              {orgs.length > 0 && (
                                 <div>
-                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Groups</div>
+                                  <div className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide mb-1">Organization Visibility</div>
                                   <div className="max-h-24 overflow-y-auto space-y-0.5">
-                                    {groups.map(g => (
-                                      <label key={g.uuid} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
+                                    {orgs.map(o => (
+                                      <label key={o.uuid} className="flex items-center gap-1.5 text-xs text-gray-700 cursor-pointer hover:bg-gray-50 rounded px-1 py-0.5">
                                         <input
                                           type="checkbox"
-                                          checked={reviewGroupIds.includes(g.uuid)}
+                                          checked={reviewOrgIds.includes(o.uuid)}
                                           onChange={(e) => {
-                                            setReviewGroupIds(prev =>
-                                              e.target.checked ? [...prev, g.uuid] : prev.filter(id => id !== g.uuid)
+                                            setReviewOrgIds(prev =>
+                                              e.target.checked ? [...prev, o.uuid] : prev.filter(id => id !== o.uuid)
                                             )
                                           }}
                                           className="h-3 w-3 rounded border-gray-300 text-gray-900 focus:ring-gray-400"
                                         />
-                                        <span className="truncate">{g.name}</span>
+                                        <span className="truncate">{o.name}</span>
                                       </label>
                                     ))}
                                   </div>
@@ -373,7 +393,7 @@ export function VerificationQueue() {
                                   onClick={() => {
                                     setReviewingId(null)
                                     setReviewNotes('')
-                                    setReviewGroupIds([])
+                                    setReviewOrgIds([])
                                     setReviewCollectionIds([])
                                   }}
                                   className="px-2 py-1 text-xs font-medium rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
@@ -392,32 +412,43 @@ export function VerificationQueue() {
                 {isExpanded && (
                   <div className="border-t border-gray-100 px-4 py-3 bg-gray-50/50">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-9">
-                      {req.validation_snapshot && (
-                        <DetailSection label="Validation Results">
-                          {req.item_kind === 'search_set' || req.item_kind === 'search-set' ? (
-                            <div className="space-y-1">
-                              {(req.validation_snapshot as Record<string, unknown>).aggregate_accuracy != null && (
-                                <div className="text-xs">Accuracy: <span className="font-medium">{Math.round(((req.validation_snapshot as Record<string, unknown>).aggregate_accuracy as number) * 100)}%</span></div>
-                              )}
-                              {(req.validation_snapshot as Record<string, unknown>).aggregate_consistency != null && (
-                                <div className="text-xs">Consistency: <span className="font-medium">{Math.round(((req.validation_snapshot as Record<string, unknown>).aggregate_consistency as number) * 100)}%</span></div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="space-y-1">
-                              {(req.validation_snapshot as Record<string, unknown>).grade && (
-                                <div className="text-xs">Grade: <span className="font-semibold">{(req.validation_snapshot as Record<string, unknown>).grade as string}</span></div>
-                              )}
-                              {(req.validation_snapshot as Record<string, unknown>).summary && (
-                                <div className="text-xs">{(req.validation_snapshot as Record<string, unknown>).summary as string}</div>
-                              )}
-                            </div>
-                          )}
-                          {req.validation_score != null && (
-                            <div className="text-xs mt-1">Quality Score: <span className="font-medium">{Math.round(req.validation_score)}%</span> ({req.validation_tier || 'unrated'})</div>
-                          )}
-                        </DetailSection>
-                      )}
+                      {req.validation_snapshot && (() => {
+                        const snapshot = req.validation_snapshot as Record<string, unknown>
+                        const aggregateAccuracy =
+                          typeof snapshot.aggregate_accuracy === 'number' ? snapshot.aggregate_accuracy : null
+                        const aggregateConsistency =
+                          typeof snapshot.aggregate_consistency === 'number' ? snapshot.aggregate_consistency : null
+                        const grade = typeof snapshot.grade === 'string' ? snapshot.grade : null
+                        const summary = typeof snapshot.summary === 'string' ? snapshot.summary : null
+                        const isSearchSet = req.item_kind === 'search_set'
+
+                        return (
+                          <DetailSection label="Validation Results">
+                            {isSearchSet ? (
+                              <div className="space-y-1">
+                                {aggregateAccuracy != null && (
+                                  <div className="text-xs">Accuracy: <span className="font-medium">{Math.round(aggregateAccuracy * 100)}%</span></div>
+                                )}
+                                {aggregateConsistency != null && (
+                                  <div className="text-xs">Consistency: <span className="font-medium">{Math.round(aggregateConsistency * 100)}%</span></div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-1">
+                                {grade && (
+                                  <div className="text-xs">Grade: <span className="font-semibold">{grade}</span></div>
+                                )}
+                                {summary && (
+                                  <div className="text-xs">{summary}</div>
+                                )}
+                              </div>
+                            )}
+                            {req.validation_score != null && (
+                              <div className="text-xs mt-1">Quality Score: <span className="font-medium">{Math.round(req.validation_score)}%</span> ({req.validation_tier || 'unrated'})</div>
+                            )}
+                          </DetailSection>
+                        )
+                      })()}
                       {req.return_guidance && (
                         <DetailSection label="Improvement Guidance">
                           <p className="whitespace-pre-wrap text-orange-700">{req.return_guidance}</p>

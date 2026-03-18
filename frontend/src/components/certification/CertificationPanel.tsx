@@ -20,7 +20,7 @@ import { useCertificationPanel, type PanelMode } from '../../contexts/Certificat
 import { useCertification } from '../../hooks/useCertification'
 import { useToast } from '../../contexts/ToastContext'
 import { cn } from '../../lib/cn'
-import type { ModuleDefinition, ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../../types/certification'
+import type { ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../../types/certification'
 import { LEVEL_CONFIG, LEVEL_THRESHOLDS, TOTAL_XP, TIERS } from './constants'
 import { CertifiedBanner } from './CertifiedBanner'
 import { CelebrationOverlay } from './CelebrationOverlay'

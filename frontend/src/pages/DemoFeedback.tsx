@@ -93,7 +93,7 @@ export default function DemoFeedback() {
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link to="/landing" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+          <Link to="/landing" search={{ error: undefined }} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" />
             <span className="text-xl font-bold text-white">Vandalizer</span>
           </Link>
@@ -120,10 +120,11 @@ export default function DemoFeedback() {
               <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-6" />
               <h2 className="text-2xl font-bold text-white mb-4">Invalid Link</h2>
               <p className="text-gray-400">{error}</p>
-              <Link
-                to="/landing"
-                className="inline-block mt-6 rounded-lg bg-white/10 px-6 py-3 font-bold text-white hover:bg-white/20 transition-colors"
-              >
+                <Link
+                  to="/landing"
+                  search={{ error: undefined }}
+                  className="inline-block mt-6 rounded-lg bg-white/10 px-6 py-3 font-bold text-white hover:bg-white/20 transition-colors"
+                >
                 Go to Homepage
               </Link>
             </div>
@@ -138,6 +139,7 @@ export default function DemoFeedback() {
                 </p>
                 <Link
                   to="/landing"
+                  search={{ error: undefined }}
                   className="inline-block rounded-lg bg-[#f1b300] px-6 py-3 font-bold text-black hover:bg-[#d49e00] transition-colors"
                 >
                   Back to Homepage

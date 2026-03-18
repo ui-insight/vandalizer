@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from app.dependencies import get_current_user
 from app.rate_limit import limiter
 from app.models.user import User
-from app.services import group_service
+from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
     AddUrlsRequest,
@@ -29,7 +29,7 @@ def _kb_response(kb) -> KBResponse:
         status=kb.status,
         shared_with_team=kb.shared_with_team,
         verified=kb.verified,
-        group_ids=kb.group_ids,
+        organization_ids=kb.organization_ids,
         total_sources=kb.total_sources,
         sources_ready=kb.sources_ready,
         sources_failed=kb.sources_failed,
@@ -56,9 +56,9 @@ def _source_response(s) -> KBSourceResponse:
 @router.get("/list", response_model=list[KBResponse])
 async def list_knowledge_bases(user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    user_group_uuids = await group_service.get_user_group_uuids(user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kbs = await svc.list_knowledge_bases(
-        user.user_id, team_id=team_id, user_group_uuids=user_group_uuids,
+        user.user_id, team_id=team_id, user_org_ancestry=user_org_ancestry,
     )
     return [_kb_response(kb) for kb in kbs]
 
@@ -91,7 +91,7 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
 async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = Depends(get_current_user)):
     kb = await svc.update_knowledge_base(
         uuid, user.user_id, title=req.title, description=req.description,
-        shared_with_team=req.shared_with_team, group_ids=req.group_ids,
+        shared_with_team=req.shared_with_team, organization_ids=req.organization_ids,
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")

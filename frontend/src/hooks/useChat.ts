@@ -114,6 +114,11 @@ export function useChat() {
     setError(null)
   }, [])
 
+  const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
+    setActivityId(newActivityId)
+    setConversationUuid(newConversationUuid)
+  }, [])
+
   return {
     messages,
     streamingContent,
@@ -126,5 +131,6 @@ export function useChat() {
     send,
     loadHistory,
     reset,
+    setActivity,
   }
 }

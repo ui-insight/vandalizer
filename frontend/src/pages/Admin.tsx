@@ -5,7 +5,7 @@ import {
   ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
-  ArrowLeft, FileText,
+  ArrowLeft, FileText, FolderTree, X,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -21,13 +21,15 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig,
-  addModel, updateModel, deleteModel, addOAuthProvider, updateOAuthProvider,
+  addModel, updateModel, deleteModel, addOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
 } from '../api/admin'
 import { getTeamMembers } from '../api/teams'
+import * as orgApi from '../api/organizations'
+import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
   getPostExperienceResponses,
@@ -38,7 +40,7 @@ import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
   TeamDetailResponse, UserDetailResponse,
-  WorkflowEventItem, PaginatedWorkflows, SystemConfigData,
+  PaginatedWorkflows, SystemConfigData,
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
   AdminTeamItem, IsolatedUserItem,
@@ -53,12 +55,13 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'workflows' | 'quality' | 'demo' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'demo' | 'debugging' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
   { key: 'users', label: 'Users', icon: Users },
   { key: 'teams', label: 'Teams', icon: Building2 },
+  { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
   { key: 'demo', label: 'Demo', icon: Zap },
@@ -74,14 +77,20 @@ function formatNumber(n: number): string {
   return n.toString()
 }
 
+function parseUtcDate(d: string): Date {
+  // Backend stores UTC but may omit timezone suffix; ensure JS treats it as UTC
+  if (!d.endsWith('Z') && !d.includes('+') && !d.includes('-', 10)) return new Date(d + 'Z')
+  return new Date(d)
+}
+
 function formatDate(d: string | null): string {
   if (!d) return '-'
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return parseUtcDate(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 function formatDateTime(d: string | null): string {
   if (!d) return '-'
-  return new Date(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return parseUtcDate(d).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
 function formatDuration(ms: number | null): string {
@@ -365,7 +374,7 @@ function UsageTab() {
                     <Pie data={tokenDonut} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
                       {tokenDonut.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip formatter={(v: number | undefined) => formatNumber(v ?? 0)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1335,7 +1344,7 @@ function WorkflowsTab() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const searchDebounce = useRef<ReturnType<typeof setTimeout>>()
+  const searchDebounce = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -1752,7 +1761,7 @@ function QualityTab() {
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
               <Tooltip
                 contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                formatter={(value: number) => [`${value}%`, 'Avg Score']}
+                formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Avg Score']}
               />
               <Line type="monotone" dataKey="avg_score" stroke="#22c55e" strokeWidth={2} dot={false} name="Avg Score" />
             </LineChart>
@@ -1968,7 +1977,7 @@ function QualityTab() {
                                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
                                           <Tooltip
                                             contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                                            formatter={(value: number) => [`${value}%`, 'Score']}
+                                            formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Score']}
                                           />
                                           <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Score" />
                                         </LineChart>
@@ -2237,7 +2246,7 @@ function ConfigTab() {
         res = await addModel(newModel)
       }
       if (cfg) setCfg({ ...cfg, available_models: res.models })
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
       setShowModelForm(false)
       setEditingModelIndex(null)
     } catch (e) {
@@ -2338,364 +2347,6 @@ function ConfigTab() {
         </div>
       )}
 
-      {/* Extraction Configuration */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <Cpu size={18} color="#6b7280" /> Extraction Configuration
-        </div>
-        <div style={sectionBodyStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-            {/* Mode */}
-            <div>
-              <label style={labelStyle}>Extraction Mode</label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {['one_pass', 'two_pass'].map(mode => (
-                  <button
-                    key={mode}
-                    onClick={() => setExtractionMode(mode)}
-                    style={{
-                      padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer', textTransform: 'capitalize',
-                      backgroundColor: extractionMode === mode ? 'var(--highlight-color, #eab308)' : '#fff',
-                      color: extractionMode === mode ? 'var(--highlight-text-color, #000)' : '#374151',
-                    }}
-                  >
-                    {mode.replace('_', '-')}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Mode-specific options */}
-            {extractionMode === 'one_pass' ? (
-              <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>One-Pass Settings</div>
-                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={onePassThinking} onChange={e => setOnePassThinking(e.target.checked)} style={checkStyle} />
-                  Thinking
-                </label>
-                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={onePassStructured} onChange={e => setOnePassStructured(e.target.checked)} style={checkStyle} />
-                  Structured
-                </label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                  <select value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
-                    <option value="">Default</option>
-                    {cfg?.available_models?.map(m => (
-                      <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ) : (
-              <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Two-Pass Settings</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 1 (Draft)</div>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={twoPassP1Thinking} onChange={e => setTwoPassP1Thinking(e.target.checked)} style={checkStyle} />
-                      Thinking
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={twoPassP1Structured} onChange={e => setTwoPassP1Structured(e.target.checked)} style={checkStyle} />
-                      Structured
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
-                        <option value="">Default</option>
-                        {cfg?.available_models?.map(m => (
-                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 2 (Final)</div>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={twoPassP2Thinking} onChange={e => setTwoPassP2Thinking(e.target.checked)} style={checkStyle} />
-                      Thinking
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
-                      <input type="checkbox" checked={twoPassP2Structured} onChange={e => setTwoPassP2Structured(e.target.checked)} style={checkStyle} />
-                      Structured
-                    </label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
-                      <select value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
-                        <option value="">Default</option>
-                        {cfg?.available_models?.map(m => (
-                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Chunking */}
-            <div>
-              <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-                <input type="checkbox" checked={chunkingEnabled} onChange={e => setChunkingEnabled(e.target.checked)} style={checkStyle} />
-                Enable Chunking
-              </label>
-              {chunkingEnabled && (
-                <div style={{ marginTop: 12, paddingLeft: 24 }}>
-                  <label style={labelStyle}>Max Keys Per Chunk</label>
-                  <input
-                    type="number" min={1} max={100} value={maxKeysPerChunk}
-                    onChange={e => setMaxKeysPerChunk(Number(e.target.value))}
-                    style={{ ...inputStyle, maxWidth: 120 }}
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Repetition */}
-            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-              <input type="checkbox" checked={repetitionEnabled} onChange={e => setRepetitionEnabled(e.target.checked)} style={checkStyle} />
-              Enable Repetition/Consensus
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Endpoints */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <Globe size={18} color="#6b7280" /> Endpoints
-        </div>
-        <div style={sectionBodyStyle}>
-          <div>
-            <label style={labelStyle}>OCR Endpoint</label>
-            <input
-              type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
-              placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Quality & Verification Gates */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <ShieldCheck size={18} color="#6b7280" /> Quality &amp; Verification Gates
-        </div>
-        <div style={sectionBodyStyle}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
-              <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
-              Require validation before verification submission
-            </label>
-
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-              <div>
-                <label style={labelStyle}>Min Extraction Accuracy (%)</label>
-                <input type="number" min={0} max={100} value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Min Extraction Consistency (%)</label>
-                <input type="number" min={0} max={100} value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
-              </div>
-              <div>
-                <label style={labelStyle}>Min Workflow Grade</label>
-                <select value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
-                  <option value="A">A</option>
-                  <option value="B">B</option>
-                  <option value="C">C</option>
-                  <option value="D">D</option>
-                  <option value="F">F</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-                <div>
-                  <label style={labelStyle}>Excellent threshold</label>
-                  <input type="number" min={0} max={100} value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Good threshold</label>
-                  <input type="number" min={0} max={100} value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
-                </div>
-                <div>
-                  <label style={labelStyle}>Fair threshold</label>
-                  <input type="number" min={0} max={100} value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Save config button */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          onClick={handleSaveConfig}
-          disabled={saving}
-          style={{
-            padding: '10px 24px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-            backgroundColor: '#111827', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            opacity: saving ? 0.6 : 1,
-          }}
-        >
-          {saving ? 'Saving...' : 'Save Configuration'}
-        </button>
-        {saved && <span style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
-      </div>
-
-      {/* Authentication */}
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
-          <Lock size={18} color="#6b7280" /> Authentication
-        </div>
-        <div style={sectionBodyStyle}>
-          <div style={{ marginBottom: 20 }}>
-            <label style={labelStyle}>Auth Methods</label>
-            <div style={{ display: 'flex', gap: 16 }}>
-              {['password', 'oauth'].map(m => (
-                <label key={m} style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer', textTransform: 'capitalize' }}>
-                  <input
-                    type="checkbox"
-                    checked={authMethods.includes(m)}
-                    onChange={e => {
-                      if (e.target.checked) setAuthMethods(prev => [...prev, m])
-                      else setAuthMethods(prev => prev.filter(x => x !== m))
-                    }}
-                    style={checkStyle}
-                  />
-                  {m === 'oauth' ? 'OAuth / SAML' : m}
-                </label>
-              ))}
-            </div>
-            <button
-              onClick={handleSaveAuthMethods}
-              disabled={authSaving}
-              style={{
-                marginTop: 12, padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
-                fontSize: 13, fontWeight: 500, cursor: 'pointer', background: '#fff',
-              }}
-            >
-              {authSaving ? 'Saving...' : 'Update Methods'}
-            </button>
-          </div>
-
-          {/* OAuth Providers */}
-          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>OAuth / SAML Providers</label>
-              <button
-                onClick={() => setShowAddProvider(!showAddProvider)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
-                  borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
-                  fontSize: 13, fontWeight: 500, cursor: 'pointer', background: '#fff',
-                }}
-              >
-                <Plus size={14} /> Add Provider
-              </button>
-            </div>
-
-            {cfg?.oauth_providers && cfg.oauth_providers.length > 0 ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {cfg.oauth_providers.map((p, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
-                    border: '1px solid #e5e7eb',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Globe size={16} color="#6b7280" />
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
-                      <span style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
-                      }}>
-                        {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteProvider(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div style={{ fontSize: 13, color: '#9ca3af', padding: '8px 0' }}>No providers configured.</div>
-            )}
-
-            {showAddProvider && (
-              <div style={{ marginTop: 12, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>New Provider</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Type</label>
-                    <select
-                      value={newProvider.provider}
-                      onChange={e => setNewProvider({ ...newProvider, provider: e.target.value })}
-                      style={inputStyle}
-                    >
-                      <option value="oauth">OAuth 2.0</option>
-                      <option value="azure">Azure AD</option>
-                      <option value="saml">SAML</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Display Name</label>
-                    <input value={newProvider.display_name} onChange={e => setNewProvider({ ...newProvider, display_name: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Client ID</label>
-                    <input value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Client Secret</label>
-                    <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Redirect URI</label>
-                    <input value={newProvider.redirect_uri} onChange={e => setNewProvider({ ...newProvider, redirect_uri: e.target.value })} style={inputStyle} />
-                  </div>
-                  {newProvider.provider === 'azure' && (
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <label style={labelStyle}>Tenant ID</label>
-                      <input value={newProvider.tenant_id} onChange={e => setNewProvider({ ...newProvider, tenant_id: e.target.value })} style={inputStyle} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-                  <button
-                    onClick={handleAddProvider}
-                    style={{
-                      padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                      background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    Add Provider
-                  </button>
-                  <button
-                    onClick={() => setShowAddProvider(false)}
-                    style={{
-                      padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
-                      background: '#fff', fontSize: 13, cursor: 'pointer',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Available Models */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -2703,7 +2354,7 @@ function ConfigTab() {
           <div style={{ flex: 1 }} />
           <button
             onClick={() => {
-              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '' })
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
               setEditingModelIndex(null)
               setShowModelForm(!showModelForm)
             }}
@@ -2876,6 +2527,169 @@ function ConfigTab() {
         </div>
       </div>
 
+      {/* Authentication */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Lock size={18} color="#6b7280" /> Authentication
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Auth Methods</label>
+            <div style={{ display: 'flex', gap: 16 }}>
+              {['password', 'oauth'].map(m => (
+                <label key={m} style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer', textTransform: 'capitalize' }}>
+                  <input
+                    type="checkbox"
+                    checked={authMethods.includes(m)}
+                    onChange={e => {
+                      if (e.target.checked) setAuthMethods(prev => [...prev, m])
+                      else setAuthMethods(prev => prev.filter(x => x !== m))
+                    }}
+                    style={checkStyle}
+                  />
+                  {m === 'oauth' ? 'OAuth / SAML' : m}
+                </label>
+              ))}
+            </div>
+            <button
+              onClick={handleSaveAuthMethods}
+              disabled={authSaving}
+              style={{
+                marginTop: 12, padding: '6px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                fontSize: 13, fontWeight: 500, cursor: 'pointer', background: '#fff',
+              }}
+            >
+              {authSaving ? 'Saving...' : 'Update Methods'}
+            </button>
+          </div>
+
+          {/* OAuth Providers */}
+          <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 20 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>OAuth / SAML Providers</label>
+              <button
+                onClick={() => setShowAddProvider(!showAddProvider)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
+                  borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                  fontSize: 13, fontWeight: 500, cursor: 'pointer', background: '#fff',
+                }}
+              >
+                <Plus size={14} /> Add Provider
+              </button>
+            </div>
+
+            {cfg?.oauth_providers && cfg.oauth_providers.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {cfg.oauth_providers.map((p, i) => (
+                  <div key={i} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #e5e7eb',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <Globe size={16} color="#6b7280" />
+                      <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
+                      <span style={{
+                        fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
+                      }}>
+                        {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteProvider(i)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ fontSize: 13, color: '#9ca3af', padding: '8px 0' }}>No providers configured.</div>
+            )}
+
+            {showAddProvider && (
+              <div style={{ marginTop: 12, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>New Provider</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Type</label>
+                    <select
+                      value={newProvider.provider}
+                      onChange={e => setNewProvider({ ...newProvider, provider: e.target.value })}
+                      style={inputStyle}
+                    >
+                      <option value="oauth">OAuth 2.0</option>
+                      <option value="azure">Azure AD</option>
+                      <option value="saml">SAML</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Display Name</label>
+                    <input value={newProvider.display_name} onChange={e => setNewProvider({ ...newProvider, display_name: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Client ID</label>
+                    <input value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Client Secret</label>
+                    <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={labelStyle}>Redirect URI</label>
+                    <input value={newProvider.redirect_uri} onChange={e => setNewProvider({ ...newProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                  </div>
+                  {newProvider.provider === 'azure' && (
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <label style={labelStyle}>Tenant ID</label>
+                      <input value={newProvider.tenant_id} onChange={e => setNewProvider({ ...newProvider, tenant_id: e.target.value })} style={inputStyle} />
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                  <button
+                    onClick={handleAddProvider}
+                    style={{
+                      padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                      background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    }}
+                  >
+                    Add Provider
+                  </button>
+                  <button
+                    onClick={() => setShowAddProvider(false)}
+                    style={{
+                      padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                      background: '#fff', fontSize: 13, cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Endpoints */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Globe size={18} color="#6b7280" /> Endpoints
+        </div>
+        <div style={sectionBodyStyle}>
+          <div>
+            <label style={labelStyle}>OCR Endpoint</label>
+            <input
+              type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
+              placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* UI Theme */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -2922,6 +2736,201 @@ function ConfigTab() {
             {themeSaved && <span style={{ fontSize: 13, color: '#16a34a' }}>Theme saved!</span>}
           </div>
         </div>
+      </div>
+
+      {/* Extraction Configuration */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Cpu size={18} color="#6b7280" /> Extraction Configuration
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {/* Mode */}
+            <div>
+              <label style={labelStyle}>Extraction Mode</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {['one_pass', 'two_pass'].map(mode => (
+                  <button
+                    key={mode}
+                    onClick={() => setExtractionMode(mode)}
+                    style={{
+                      padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer', textTransform: 'capitalize',
+                      backgroundColor: extractionMode === mode ? 'var(--highlight-color, #eab308)' : '#fff',
+                      color: extractionMode === mode ? 'var(--highlight-text-color, #000)' : '#374151',
+                    }}
+                  >
+                    {mode.replace('_', '-')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode-specific options */}
+            {extractionMode === 'one_pass' ? (
+              <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>One-Pass Settings</div>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={onePassThinking} onChange={e => setOnePassThinking(e.target.checked)} style={checkStyle} />
+                  Thinking
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={onePassStructured} onChange={e => setOnePassStructured(e.target.checked)} style={checkStyle} />
+                  Structured
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                  <select value={onePassModel} onChange={e => setOnePassModel(e.target.value)} style={{ ...inputStyle, maxWidth: 260 }}>
+                    <option value="">Default</option>
+                    {cfg?.available_models?.map(m => (
+                      <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)' }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Two-Pass Settings</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 1 (Draft)</div>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP1Thinking} onChange={e => setTwoPassP1Thinking(e.target.checked)} style={checkStyle} />
+                      Thinking
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP1Structured} onChange={e => setTwoPassP1Structured(e.target.checked)} style={checkStyle} />
+                      Structured
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                      <select value={twoPassP1Model} onChange={e => setTwoPassP1Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                        <option value="">Default</option>
+                        {cfg?.available_models?.map(m => (
+                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>Pass 2 (Final)</div>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 8, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP2Thinking} onChange={e => setTwoPassP2Thinking(e.target.checked)} style={checkStyle} />
+                      Thinking
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, marginBottom: 12, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={twoPassP2Structured} onChange={e => setTwoPassP2Structured(e.target.checked)} style={checkStyle} />
+                      Structured
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+                      <select value={twoPassP2Model} onChange={e => setTwoPassP2Model(e.target.value)} style={{ ...inputStyle, maxWidth: 200 }}>
+                        <option value="">Default</option>
+                        {cfg?.available_models?.map(m => (
+                          <option key={m.tag} value={m.name}>{m.tag || m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Chunking */}
+            <div>
+              <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                <input type="checkbox" checked={chunkingEnabled} onChange={e => setChunkingEnabled(e.target.checked)} style={checkStyle} />
+                Enable Chunking
+              </label>
+              {chunkingEnabled && (
+                <div style={{ marginTop: 12, paddingLeft: 24 }}>
+                  <label style={labelStyle}>Max Keys Per Chunk</label>
+                  <input
+                    type="number" min={1} max={100} value={maxKeysPerChunk}
+                    onChange={e => setMaxKeysPerChunk(Number(e.target.value))}
+                    style={{ ...inputStyle, maxWidth: 120 }}
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Repetition */}
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={repetitionEnabled} onChange={e => setRepetitionEnabled(e.target.checked)} style={checkStyle} />
+              Enable Repetition/Consensus
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Quality & Verification Gates */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <ShieldCheck size={18} color="#6b7280" /> Quality &amp; Verification Gates
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+              <input type="checkbox" checked={requireValidation} onChange={e => setRequireValidation(e.target.checked)} style={checkStyle} />
+              Require validation before verification submission
+            </label>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+              <div>
+                <label style={labelStyle}>Min Extraction Accuracy (%)</label>
+                <input type="number" min={0} max={100} value={minAccuracy} onChange={e => setMinAccuracy(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Extraction Consistency (%)</label>
+                <input type="number" min={0} max={100} value={minConsistency} onChange={e => setMinConsistency(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+              </div>
+              <div>
+                <label style={labelStyle}>Min Workflow Grade</label>
+                <select value={minWorkflowGrade} onChange={e => setMinWorkflowGrade(e.target.value)} style={{ ...inputStyle, maxWidth: 120 }}>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                  <option value="D">D</option>
+                  <option value="F">F</option>
+                </select>
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Quality Tiers</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+                <div>
+                  <label style={labelStyle}>Excellent threshold</label>
+                  <input type="number" min={0} max={100} value={excellentThreshold} onChange={e => setExcellentThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Good threshold</label>
+                  <input type="number" min={0} max={100} value={goodThreshold} onChange={e => setGoodThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Fair threshold</label>
+                  <input type="number" min={0} max={100} value={fairThreshold} onChange={e => setFairThreshold(Number(e.target.value))} style={{ ...inputStyle, maxWidth: 120 }} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Save config button */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <button
+          onClick={handleSaveConfig}
+          disabled={saving}
+          style={{
+            padding: '10px 24px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+            backgroundColor: '#111827', color: '#fff', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            opacity: saving ? 0.6 : 1,
+          }}
+        >
+          {saving ? 'Saving...' : 'Save Configuration'}
+        </button>
+        {saved && <span style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
       </div>
     </div>
   )
@@ -3367,6 +3376,541 @@ function DebuggingTab() {
   )
 }
 
+const ORG_TYPE_LABELS: Record<string, string> = {
+  university: 'University', college: 'College', central_office: 'Central Office',
+  department: 'Department', unit: 'Unit',
+}
+const ORG_TYPE_COLORS: Record<string, string> = {
+  university: 'bg-purple-100 text-purple-800', college: 'bg-blue-100 text-blue-800',
+  central_office: 'bg-amber-100 text-amber-800', department: 'bg-green-100 text-green-800',
+  unit: 'bg-gray-100 text-gray-800',
+}
+const VALID_CHILD_TYPES: Record<string, string[]> = {
+  university: ['college', 'central_office'], college: ['department'],
+  central_office: ['department'], department: ['unit'], unit: [],
+}
+const DEPTH_TYPE_DEFAULTS = ['university', 'college', 'department', 'unit'] as const
+
+function OrgNodeRow({
+  org, depth = 0, onEdit, onDelete, onAddChild, onTypeChange, onDrop, onReload, onSelect, selectedUuid,
+}: {
+  org: Organization; depth?: number
+  onEdit: (o: Organization) => void; onDelete: (o: Organization) => void
+  onAddChild: (parentId: string, parentType: string) => void
+  onTypeChange: (uuid: string, newType: string) => void
+  onDrop: (draggedUuid: string, targetUuid: string) => void
+  onReload: () => void
+  onSelect: (o: Organization) => void
+  selectedUuid: string | null
+}) {
+  const [expanded, setExpanded] = useState(depth < 2)
+  const [dragOver, setDragOver] = useState(false)
+  const hasChildren = org.children && org.children.length > 0
+  const childTypes = VALID_CHILD_TYPES[org.org_type] || []
+  const totalMembers = (org.user_count || 0) + (org.team_count || 0)
+  const isSelected = selectedUuid === org.uuid
+
+  return (
+    <div>
+      <div
+        className={`flex items-center gap-2 rounded-lg px-3 py-2 transition-colors ${
+          dragOver ? 'bg-blue-50 ring-2 ring-blue-300' : isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+        }`}
+        style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        draggable
+        onDragStart={e => { e.dataTransfer.setData('text/plain', org.uuid); e.dataTransfer.effectAllowed = 'move' }}
+        onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={e => { e.preventDefault(); setDragOver(false); const uuid = e.dataTransfer.getData('text/plain'); if (uuid && uuid !== org.uuid) onDrop(uuid, org.uuid) }}
+      >
+        <button onClick={() => setExpanded(!expanded)} className="flex h-5 w-5 items-center justify-center shrink-0">
+          {hasChildren ? <ChevronRight className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? 'rotate-90' : ''}`} /> : <span className="w-4" />}
+        </button>
+        <button onClick={() => onSelect(org)} className="flex items-center gap-2 min-w-0 flex-1 text-left">
+          <Building2 className="h-4 w-4 text-gray-500 shrink-0" />
+          <span className="font-medium text-gray-900 truncate">{org.name}</span>
+        </button>
+        <select
+          value={org.org_type}
+          onChange={e => onTypeChange(org.uuid, e.target.value)}
+          className={`rounded-full px-2 py-0.5 text-xs font-medium border-0 cursor-pointer ${ORG_TYPE_COLORS[org.org_type] || 'bg-gray-100 text-gray-600'}`}
+        >
+          {Object.entries(ORG_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        {totalMembers > 0 && (
+          <button onClick={() => onSelect(org)}
+            className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600 hover:bg-gray-200" title="Manage members">
+            <Users className="h-3 w-3" />{totalMembers}
+          </button>
+        )}
+        <div className="flex items-center gap-0.5 shrink-0">
+          {childTypes.length > 0 && (
+            <button onClick={() => onAddChild(org.uuid, org.org_type)}
+              className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Add child">
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button onClick={() => onEdit(org)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="Rename">
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button onClick={() => onDelete(org)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600" title="Delete">
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+      {expanded && hasChildren && org.children!.map(child => (
+        <OrgNodeRow key={child.uuid} org={child} depth={depth + 1} onEdit={onEdit} onDelete={onDelete}
+          onAddChild={onAddChild} onTypeChange={onTypeChange} onDrop={onDrop} onReload={onReload}
+          onSelect={onSelect} selectedUuid={selectedUuid} />
+      ))}
+    </div>
+  )
+}
+
+function OrgMemberPanel({ org, onClose, onReload }: { org: Organization; onClose: () => void; onReload: () => void }) {
+  const [members, setMembers] = useState<{ users: OrgMember[]; teams: OrgTeam[] } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [searchQ, setSearchQ] = useState('')
+  const [searchResults, setSearchResults] = useState<OrgMember[]>([])
+  const [searching, setSearching] = useState(false)
+  const [teams, setTeams] = useState<{ uuid: string; name: string }[]>([])
+
+  const loadMembers = useCallback(async () => {
+    try { const data = await orgApi.getOrgMembers(org.uuid); setMembers(data) }
+    catch { setMembers({ users: [], teams: [] }) }
+    finally { setLoading(false) }
+  }, [org.uuid])
+
+  useEffect(() => { loadMembers() }, [loadMembers])
+
+  // Load all teams for the dropdown
+  useEffect(() => {
+    adminListAllTeams().then(data => setTeams(data.map((t: AdminTeamItem) => ({ uuid: t.uuid, name: t.name }))))
+      .catch(() => {})
+  }, [])
+
+  // Debounced user search
+  useEffect(() => {
+    if (!searchQ.trim()) { setSearchResults([]); return }
+    const timer = setTimeout(async () => {
+      setSearching(true)
+      try { const data = await orgApi.searchUsers(searchQ.trim()); setSearchResults(data.users) }
+      catch { setSearchResults([]) }
+      finally { setSearching(false) }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQ])
+
+  const assignUser = async (userId: string) => {
+    await orgApi.assignUserToOrg(org.uuid, userId)
+    setSearchQ(''); setSearchResults([]); loadMembers(); onReload()
+  }
+  const unassignUser = async (userId: string) => {
+    await orgApi.unassignUserFromOrg(org.uuid, userId)
+    loadMembers(); onReload()
+  }
+  const assignTeam = async (teamUuid: string) => {
+    await orgApi.assignTeamToOrg(org.uuid, teamUuid)
+    loadMembers(); onReload()
+  }
+  const unassignTeam = async (teamUuid: string) => {
+    await orgApi.unassignTeamFromOrg(org.uuid, teamUuid)
+    loadMembers(); onReload()
+  }
+
+  const memberUserIds = new Set(members?.users.map(u => u.user_id) || [])
+  const memberTeamUuids = new Set(members?.teams.map(t => t.uuid) || [])
+
+  return (
+    <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+          <Users className="h-4 w-4" /> Members of &ldquo;{org.name}&rdquo;
+        </h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">Close</button>
+      </div>
+
+      {/* Add user search */}
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Add User</label>
+        <input type="text" value={searchQ} onChange={e => setSearchQ(e.target.value)}
+          placeholder="Search by name or email..." className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" />
+        {searchQ.trim() && (
+          <div className="mt-1 rounded border border-gray-200 bg-white max-h-32 overflow-y-auto">
+            {searching ? <div className="p-2 text-xs text-gray-400">Searching...</div>
+            : searchResults.length === 0 ? <div className="p-2 text-xs text-gray-400">No results</div>
+            : searchResults.map(u => (
+              <div key={u.user_id} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50">
+                <span className="text-sm text-gray-700 truncate">{u.name || u.user_id}{u.email ? ` (${u.email})` : ''}</span>
+                {memberUserIds.has(u.user_id) ? <span className="text-xs text-gray-400">Assigned</span>
+                : <button onClick={() => assignUser(u.user_id)}
+                    className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700">Add</button>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Add team dropdown */}
+      <div className="mb-3">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Add Team</label>
+        <select onChange={e => { if (e.target.value) { assignTeam(e.target.value); e.target.value = '' } }}
+          className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" defaultValue="">
+          <option value="" disabled>Select a team...</option>
+          {teams.filter(t => !memberTeamUuids.has(t.uuid)).map(t => <option key={t.uuid} value={t.uuid}>{t.name}</option>)}
+        </select>
+      </div>
+
+      {/* Current members */}
+      {loading ? <div className="text-sm text-gray-400">Loading...</div> : (
+        <div>
+          {(members?.users.length || 0) > 0 && (
+            <div className="mb-2">
+              <div className="text-xs font-semibold text-gray-500 mb-1">Users ({members!.users.length})</div>
+              {members!.users.map(u => (
+                <div key={u.user_id} className="flex items-center justify-between py-1">
+                  <span className="text-sm text-gray-700">{u.name || u.user_id}{u.email ? ` (${u.email})` : ''}</span>
+                  <button onClick={() => unassignUser(u.user_id)} className="text-xs text-red-600 hover:text-red-800">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {(members?.teams.length || 0) > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-1">Teams ({members!.teams.length})</div>
+              {members!.teams.map(t => (
+                <div key={t.uuid} className="flex items-center justify-between py-1">
+                  <span className="text-sm text-gray-700">{t.name}</span>
+                  <button onClick={() => unassignTeam(t.uuid)} className="text-xs text-red-600 hover:text-red-800">Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          {!members?.users.length && !members?.teams.length && (
+            <div className="text-sm text-gray-400">No users or teams assigned yet.</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function parseCSV(text: string): { name: string; parent_name: string; org_type: string }[] {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length < 2) return []
+  const header = lines[0].toLowerCase().split(',').map(h => h.trim())
+  const nameIdx = header.findIndex(h => h === 'name')
+  const parentIdx = header.findIndex(h => h === 'parent' || h === 'parent_name')
+  if (nameIdx < 0) return []
+
+  const rows: { name: string; parent_name: string; org_type: string }[] = []
+  // Build depth map for auto-type assignment
+  const depthOf: Record<string, number> = {}
+
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i].split(',').map(c => c.trim())
+    const name = cols[nameIdx] || ''
+    const parent = parentIdx >= 0 ? (cols[parentIdx] || '') : ''
+    if (!name) continue
+    const parentDepth = parent ? (depthOf[parent] ?? 0) : -1
+    const myDepth = parentDepth + 1
+    depthOf[name] = myDepth
+    const autoType = DEPTH_TYPE_DEFAULTS[Math.min(myDepth, DEPTH_TYPE_DEFAULTS.length - 1)]
+    rows.push({ name, parent_name: parent, org_type: autoType })
+  }
+  return rows
+}
+
+function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [rows, setRows] = useState<{ name: string; parent_name: string; org_type: string }[]>([])
+  const [importing, setImporting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      const parsed = parseCSV(text)
+      if (parsed.length === 0) { setError('No valid rows found. CSV must have a "name" column.'); return }
+      setError(null)
+      setRows(parsed)
+    }
+    reader.readAsText(file)
+  }
+
+  const handleImport = async () => {
+    setImporting(true); setError(null)
+    try {
+      await orgApi.importOrganizations(rows)
+      onImported(); onClose()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Import failed') }
+    finally { setImporting(false) }
+  }
+
+  const updateRow = (idx: number, field: 'name' | 'parent_name' | 'org_type', value: string) => {
+    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  }
+  const removeRow = (idx: number) => setRows(prev => prev.filter((_, i) => i !== idx))
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[85vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b">
+          <h3 className="text-lg font-semibold text-gray-900">Import Organization Structure</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {rows.length === 0 ? (
+            <div>
+              <p className="text-sm text-gray-600 mb-3">
+                Upload a CSV with your university&apos;s organizational structure. The CSV should have columns:
+              </p>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4 font-mono text-xs text-gray-700">
+                name,parent<br/>
+                University of Idaho,<br/>
+                College of Engineering,University of Idaho<br/>
+                College of Science,University of Idaho<br/>
+                Department of Computer Science,College of Engineering<br/>
+                Department of Physics,College of Science
+              </div>
+              <p className="text-xs text-gray-500 mb-3">
+                The <strong>name</strong> column is required. The <strong>parent</strong> column references the parent node by name. Rows without a parent become root nodes. Types (university, college, department, unit) are auto-detected based on depth.
+              </p>
+              <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" />
+              <button onClick={() => fileRef.current?.click()}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                <Download className="h-4 w-4" /> Choose CSV File
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-gray-600 mb-2">
+                {rows.length} organizations to import. Review and edit types before importing.
+              </p>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Parent</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Type</th>
+                      <th className="px-3 py-2 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {rows.map((r, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-3 py-1.5">
+                          <input value={r.name} onChange={e => updateRow(i, 'name', e.target.value)}
+                            className="w-full border-0 bg-transparent text-sm p-0 focus:ring-0" />
+                        </td>
+                        <td className="px-3 py-1.5 text-gray-500">{r.parent_name || '(root)'}</td>
+                        <td className="px-3 py-1.5">
+                          <select value={r.org_type} onChange={e => updateRow(i, 'org_type', e.target.value)}
+                            className={`rounded-full px-2 py-0.5 text-xs font-medium border-0 cursor-pointer ${ORG_TYPE_COLORS[r.org_type] || 'bg-gray-100'}`}>
+                            {Object.entries(ORG_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                          </select>
+                        </td>
+                        <td className="px-3 py-1.5">
+                          <button onClick={() => removeRow(i)} className="text-gray-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button onClick={() => setRows([])} className="text-xs text-gray-500 hover:text-gray-700">Clear & re-upload</button>
+              </div>
+            </div>
+          )}
+          {error && (
+            <div className="flex items-center gap-2 text-sm text-red-700 bg-red-50 rounded-lg px-4 py-3">
+              <AlertCircle className="h-4 w-4 shrink-0" />{error}
+            </div>
+          )}
+        </div>
+        {rows.length > 0 && (
+          <div className="flex items-center justify-end gap-2 px-6 py-4 border-t">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
+            <button onClick={handleImport} disabled={importing}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {importing ? 'Importing...' : `Import ${rows.length} Organizations`}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function OrganizationsTab() {
+  const [tree, setTree] = useState<Organization[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+  const [createParentId, setCreateParentId] = useState<string | undefined>()
+  const [editOrg, setEditOrg] = useState<Organization | null>(null)
+  const [formName, setFormName] = useState('')
+  const [formType, setFormType] = useState('department')
+  const [allowedTypes, setAllowedTypes] = useState<string[]>(Object.keys(ORG_TYPE_LABELS))
+  const [showImport, setShowImport] = useState(false)
+  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null)
+
+  const loadTree = async () => {
+    setError(null)
+    try { const data = await orgApi.getOrgTree(); setTree(data.tree) }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to load tree') }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { loadTree() }, [])
+
+  const handleCreate = async () => {
+    if (!formName.trim()) return
+    setError(null)
+    try {
+      await orgApi.createOrganization({ name: formName.trim(), org_type: formType, parent_id: createParentId })
+      setShowCreate(false); setFormName(''); setCreateParentId(undefined); loadTree()
+    } catch (e) { setError(e instanceof Error ? e.message : 'Failed to create organization') }
+  }
+  const handleUpdate = async () => {
+    if (!editOrg || !formName.trim()) return
+    setError(null)
+    try { await orgApi.updateOrganization(editOrg.uuid, { name: formName.trim() }); setEditOrg(null); setFormName(''); loadTree() }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to update') }
+  }
+  const handleDelete = async (org: Organization) => {
+    if (!confirm(`Delete "${org.name}"? Children will be re-parented to its parent.`)) return
+    setError(null)
+    if (selectedOrg?.uuid === org.uuid) setSelectedOrg(null)
+    try { await orgApi.deleteOrganization(org.uuid); loadTree() }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to delete') }
+  }
+  const handleTypeChange = async (uuid: string, newType: string) => {
+    setError(null)
+    try { await orgApi.updateOrgType(uuid, newType); loadTree() }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to change type') }
+  }
+  const handleDrop = async (draggedUuid: string, targetUuid: string) => {
+    setError(null)
+    try { await orgApi.moveOrganization(draggedUuid, targetUuid); loadTree() }
+    catch (e) { setError(e instanceof Error ? e.message : 'Failed to move') }
+  }
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <FolderTree className="h-6 w-6 text-gray-700" />
+          <h2 className="text-xl font-bold text-gray-900">Organization Hierarchy</h2>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <Download className="h-4 w-4" /> Import CSV
+          </button>
+          <button onClick={() => {
+            setShowCreate(true); setCreateParentId(undefined); setFormName('')
+            setAllowedTypes(tree.length === 0 ? ['university'] : Object.keys(ORG_TYPE_LABELS))
+            setFormType(tree.length === 0 ? 'university' : 'college')
+          }} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+            <Plus className="h-4 w-4" /> Add
+          </button>
+        </div>
+      </div>
+
+      {/* Explanation */}
+      <div className="mb-4 rounded-lg bg-gray-50 border border-gray-200 px-4 py-3 text-sm text-gray-600">
+        <strong className="text-gray-800">What is this?</strong> The org hierarchy models your university&apos;s structure
+        (University &rarr; Colleges &rarr; Departments &rarr; Units). When you assign users and teams to org nodes, it controls
+        what verified items and knowledge bases they can see. Users in a department see items scoped to their department and
+        any parent college/university. <strong>Drag nodes</strong> to rearrange, <strong>click a node</strong> to manage its members.
+      </div>
+
+      {error && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />{error}
+        </div>
+      )}
+
+      {/* Create/Edit form */}
+      {(showCreate || editOrg) && (
+        <div className="mb-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 font-medium text-sm">{editOrg ? `Rename: ${editOrg.name}` : createParentId ? 'Add child node' : 'Create organization'}</h3>
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <input type="text" value={formName} onChange={e => setFormName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && (editOrg ? handleUpdate() : handleCreate())}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="e.g., College of Science" autoFocus />
+            </div>
+            {!editOrg && (
+              <select value={formType} onChange={e => setFormType(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                {allowedTypes.map(k => <option key={k} value={k}>{ORG_TYPE_LABELS[k] || k}</option>)}
+              </select>
+            )}
+            <button onClick={editOrg ? handleUpdate : handleCreate}
+              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+              {editOrg ? 'Save' : 'Create'}
+            </button>
+            <button onClick={() => { setShowCreate(false); setEditOrg(null); setFormName(''); setError(null) }}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Tree + member panel side by side */}
+      <div className={`flex gap-4 ${selectedOrg ? '' : ''}`}>
+        <div className={`rounded-lg border border-gray-200 bg-white shadow-sm ${selectedOrg ? 'flex-1 min-w-0' : 'w-full'}`}>
+          {loading ? (
+            <div className="p-8 text-center text-gray-500">Loading...</div>
+          ) : tree.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <Building2 className="mx-auto mb-3 h-10 w-10 text-gray-300" />
+              <p className="font-medium text-gray-700 mb-1">No organizations yet</p>
+              <p className="text-sm">Create a root &ldquo;University&rdquo; node to get started, or import your structure from a CSV file.</p>
+            </div>
+          ) : (
+            <div className="py-1">
+              {tree.map(org => (
+                <OrgNodeRow key={org.uuid} org={org}
+                  onEdit={o => { setEditOrg(o); setFormName(o.name) }}
+                  onDelete={handleDelete}
+                  onAddChild={(parentId, parentType) => {
+                    const ct = VALID_CHILD_TYPES[parentType] || []
+                    setShowCreate(true); setCreateParentId(parentId); setFormName('')
+                    setAllowedTypes(ct.length > 0 ? ct : Object.keys(ORG_TYPE_LABELS))
+                    setFormType(ct[0] || 'department')
+                  }}
+                  onTypeChange={handleTypeChange}
+                  onDrop={handleDrop}
+                  onReload={loadTree}
+                  onSelect={o => setSelectedOrg(prev => prev?.uuid === o.uuid ? null : o)}
+                  selectedUuid={selectedOrg?.uuid || null}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Member management panel */}
+        {selectedOrg && (
+          <div className="w-80 shrink-0">
+            <OrgMemberPanel org={selectedOrg} onClose={() => setSelectedOrg(null)} onReload={loadTree} />
+          </div>
+        )}
+      </div>
+
+      {/* Import dialog */}
+      {showImport && <ImportDialog onClose={() => setShowImport(false)} onImported={loadTree} />}
+    </div>
+  )
+}
+
 export default function Admin() {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
@@ -3380,7 +3924,7 @@ export default function Admin() {
   // Examiners see analytics tabs but NOT config/quality/demo/debugging
   const visibleTabs = isGlobalAdmin
     ? TABS
-    : TABS.filter(t => !['config', 'quality', 'demo', 'debugging'].includes(t.key))
+    : TABS.filter(t => !['config', 'quality', 'demo', 'debugging', 'organizations'].includes(t.key))
 
   if (!hasAccess) {
     return (
@@ -3446,6 +3990,7 @@ export default function Admin() {
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
+          {activeTab === 'organizations' && isGlobalAdmin && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
           {activeTab === 'demo' && isGlobalAdmin && <DemoTab />}

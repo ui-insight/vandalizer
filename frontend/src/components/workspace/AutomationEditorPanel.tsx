@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Zap, Copy, Check } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
-import { listContents } from '../../api/documents'
 import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
-import type { Folder } from '../../types/document'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
@@ -97,11 +95,11 @@ export function AutomationEditorPanel() {
   }
 
   const handleActionTypeChange = async (type: ActionType) => {
-    await save({ action_type: type, action_id: null })
+    await save({ action_type: type, action_id: undefined })
   }
 
   const handleActionSelect = async (id: string) => {
-    await save({ action_id: id || null })
+    await save({ action_id: id || undefined })
   }
 
   if (loading) {
@@ -214,7 +212,7 @@ export function AutomationEditorPanel() {
           defaultValue={automation.description || ''}
           onBlur={e => {
             const v = e.target.value.trim()
-            if (v !== (automation.description || '')) debouncedSave({ description: v || null })
+            if (v !== (automation.description || '')) debouncedSave({ description: v || undefined })
           }}
           placeholder="Add a description..."
           style={{
@@ -844,8 +842,15 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
   const notifyOwner = (notif.notify_owner as boolean) ?? true
   const conditions = (notif.conditions as string) || 'always'
 
-  const updateNotification = (patch: Record<string, unknown>) => {
-    const base = { channel: 'email', recipients: [], notify_owner: true, conditions: 'always', ...notif, ...patch }
+  const updateNotification = (patch: Record<string, unknown> & { recipients_str?: string }) => {
+    const base: Record<string, unknown> & { recipients: string[] } = {
+      channel: 'email',
+      recipients: [],
+      notify_owner: true,
+      conditions: 'always',
+      ...notif,
+      ...patch,
+    }
     if (patch.recipients_str !== undefined) {
       base.recipients = (patch.recipients_str as string).split(',').map((s: string) => s.trim()).filter(Boolean)
       delete base.recipients_str

@@ -201,6 +201,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
       // Render page on canvas
       const ctx = canvas.getContext('2d')!
       await page.render({
+        canvas,
         canvasContext: ctx,
         viewport,
         transform: [dpr, 0, 0, dpr, 0, 0],

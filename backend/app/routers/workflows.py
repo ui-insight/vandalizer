@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.user import User
+from app.services.access_control import get_authorized_workflow
 from app.schemas.workflows import (
     AddStepRequest,
     AddTaskRequest,
@@ -59,7 +60,7 @@ async def list_workflows(
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
 ):
-    workflows = await svc.list_workflows(space=space, skip=skip, limit=limit)
+    workflows = await svc.list_workflows(user=user, space=space, skip=skip, limit=limit)
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,
@@ -71,6 +72,7 @@ async def list_workflows(
 
 @router.get("/status", response_model=WorkflowStatusResponse)
 async def get_workflow_status(session_id: str, user: User = Depends(get_current_user)):
+    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
     status = await svc.get_workflow_status(session_id)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
@@ -79,6 +81,7 @@ async def get_workflow_status(session_id: str, user: User = Depends(get_current_
 
 @router.get("/batch-status", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)):
+    # TODO: authorize by tracing batch_id → WorkflowResult → Workflow ownership
     status = await svc.get_batch_status(batch_id)
     if not status:
         raise HTTPException(status_code=404, detail="Batch not found")
@@ -88,6 +91,7 @@ async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)
 @router.get("/status/stream")
 async def stream_workflow_status(session_id: str, user: User = Depends(get_current_user)):
     """SSE endpoint that streams workflow status updates until completion."""
+    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
 
     async def event_generator():
         last_json = ""
@@ -137,6 +141,7 @@ async def download_results(
     user: User = Depends(get_current_user),
 ):
     """Download workflow results in specified format."""
+    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
     status = await svc.get_workflow_status(session_id)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
@@ -181,6 +186,95 @@ async def download_results(
             headers={"Content-Disposition": 'attachment; filename="results.csv"'},
         )
 
+    if format == "text":
+        if isinstance(output_data, str):
+            text = output_data
+        elif isinstance(output_data, dict):
+            parts = []
+            for k, v in output_data.items():
+                parts.append(f"{k}: {v}")
+            text = "\n".join(parts)
+        elif isinstance(output_data, list):
+            text = "\n".join(str(item) for item in output_data)
+        else:
+            text = str(output_data)
+        return StreamingResponse(
+            io.BytesIO(text.encode()),
+            media_type="text/plain",
+            headers={"Content-Disposition": 'attachment; filename="results.txt"'},
+        )
+
+    if format == "pdf":
+        # Build a plain-text representation, then wrap in a simple PDF
+        if isinstance(output_data, str):
+            text = output_data
+        elif isinstance(output_data, dict):
+            text = json.dumps(output_data, indent=2, default=str)
+        elif isinstance(output_data, list):
+            text = json.dumps(output_data, indent=2, default=str)
+        else:
+            text = str(output_data)
+
+        # Minimal PDF generation without external dependencies
+        lines = text.split("\n")
+        pdf_lines: list[str] = []
+        for line in lines:
+            # Escape special PDF characters
+            safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            pdf_lines.append(safe)
+
+        # Build PDF objects
+        objects: list[str] = []
+        offsets: list[int] = []
+
+        def _add_obj(content: str) -> int:
+            idx = len(objects) + 1
+            objects.append(f"{idx} 0 obj\n{content}\nendobj\n")
+            return idx
+
+        catalog_id = _add_obj("<< /Type /Catalog /Pages 2 0 R >>")
+        _pages_id = _add_obj("")  # placeholder, will be replaced
+
+        # Build page content stream
+        stream_lines = ["BT", "/F1 10 Tf", "36 756 Td", "12 TL"]
+        for pl in pdf_lines:
+            stream_lines.append(f"({pl}) '")
+        stream_lines.append("ET")
+        stream_body = "\n".join(stream_lines)
+        stream_id = _add_obj(f"<< /Length {len(stream_body)} >>\nstream\n{stream_body}\nendstream")
+
+        font_id = _add_obj("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>")
+        page_id = _add_obj(
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            f"/Contents {stream_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >>"
+        )
+        # Fix pages object
+        objects[1] = f"2 0 obj\n<< /Type /Pages /Kids [{page_id} 0 R] /Count 1 >>\nendobj\n"
+
+        pdf_buf = io.BytesIO()
+        pdf_buf.write(b"%PDF-1.4\n")
+        for obj in objects:
+            offsets.append(pdf_buf.tell())
+            pdf_buf.write(obj.encode("latin-1", errors="replace"))
+        xref_offset = pdf_buf.tell()
+        pdf_buf.write(b"xref\n")
+        pdf_buf.write(f"0 {len(objects) + 1}\n".encode())
+        pdf_buf.write(b"0000000000 65535 f \n")
+        for off in offsets:
+            pdf_buf.write(f"{off:010d} 00000 n \n".encode())
+        pdf_buf.write(b"trailer\n")
+        pdf_buf.write(f"<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n".encode())
+        pdf_buf.write(b"startxref\n")
+        pdf_buf.write(f"{xref_offset}\n".encode())
+        pdf_buf.write(b"%%EOF\n")
+        pdf_buf.seek(0)
+
+        return StreamingResponse(
+            pdf_buf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": 'attachment; filename="results.pdf"'},
+        )
+
     # Default: JSON
     json_bytes = json.dumps(output_data, indent=2, default=str).encode()
     return StreamingResponse(
@@ -193,6 +287,10 @@ async def download_results(
 @router.get("/{workflow_id}/export")
 async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     """Download workflow definition as a shareable JSON file."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     from app.services import export_import_service as eis
 
     try:
@@ -235,7 +333,7 @@ async def import_workflow(
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
 async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
-    wf = await svc.get_workflow(workflow_id)
+    wf = await svc.get_workflow(workflow_id, user=user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return WorkflowResponse(**wf)
@@ -244,7 +342,7 @@ async def get_workflow(workflow_id: str, user: User = Depends(get_current_user))
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
 async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
     wf = await svc.update_workflow(
-        workflow_id, name=req.name, description=req.description, input_config=req.input_config,
+        workflow_id, user=user, name=req.name, description=req.description, input_config=req.input_config,
     )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -257,7 +355,7 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
 
 @router.delete("/{workflow_id}")
 async def delete_workflow(workflow_id: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_workflow(workflow_id)
+    ok = await svc.delete_workflow(workflow_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return {"ok": True}
@@ -266,7 +364,7 @@ async def delete_workflow(workflow_id: str, user: User = Depends(get_current_use
 @router.post("/{workflow_id}/duplicate", response_model=WorkflowResponse)
 async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    wf = await svc.duplicate_workflow(workflow_id, user.user_id, team_id=team_id)
+    wf = await svc.duplicate_workflow(workflow_id, user=user, user_id=user.user_id, team_id=team_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return WorkflowResponse(**wf)
@@ -278,7 +376,7 @@ async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_
 
 @router.post("/{workflow_id}/steps")
 async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(get_current_user)):
-    step = await svc.add_step(workflow_id, req.name, req.data, req.is_output)
+    step = await svc.add_step(workflow_id, req.name, user=user, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return step
@@ -286,7 +384,7 @@ async def add_step(workflow_id: str, req: AddStepRequest, user: User = Depends(g
 
 @router.patch("/steps/{step_id}")
 async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends(get_current_user)):
-    step = await svc.update_step(step_id, name=req.name, data=req.data, is_output=req.is_output)
+    step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
     return step
@@ -294,7 +392,7 @@ async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends
 
 @router.delete("/steps/{step_id}")
 async def delete_step(step_id: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_step(step_id)
+    ok = await svc.delete_step(step_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Step not found")
     return {"ok": True}
@@ -306,7 +404,7 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)):
 
 @router.post("/steps/{step_id}/tasks")
 async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)):
-    task = await svc.add_task(step_id, req.name, req.data)
+    task = await svc.add_task(step_id, req.name, user=user, data=req.data)
     if not task:
         raise HTTPException(status_code=404, detail="Step not found")
     return task
@@ -314,7 +412,7 @@ async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_c
 
 @router.patch("/tasks/{task_id}")
 async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends(get_current_user)):
-    task = await svc.update_task(task_id, name=req.name, data=req.data)
+    task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
@@ -322,7 +420,7 @@ async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends
 
 @router.delete("/tasks/{task_id}")
 async def delete_task(task_id: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_task(task_id)
+    ok = await svc.delete_task(task_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Task not found")
     return {"ok": True}
@@ -336,13 +434,16 @@ async def delete_task(task_id: str, user: User = Depends(get_current_user)):
 @limiter.limit("20/minute")
 async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowRequest, user: User = Depends(get_current_user)):
     from app.models.activity import ActivityType
-    from app.models.workflow import Workflow
     from app.services import activity_service
     from beanie import PydanticObjectId
 
-    # Look up workflow name for activity title
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    # Authorize and look up workflow name and step count for activity
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     initial_title = wf.name if wf else "Workflow Run"
+    # steps count excludes the trigger step
+    num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0
 
     activity = await activity_service.activity_start(
         type=ActivityType.WORKFLOW_RUN,
@@ -350,6 +451,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         user_id=user.user_id,
         team_id=str(user.current_team) if user.current_team else None,
         workflow=PydanticObjectId(workflow_id),
+        steps_total=num_steps,
     )
 
     try:
@@ -357,12 +459,14 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
             batch_id = await svc.run_workflow_batch(
                 workflow_id, req.document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
+                user=user,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:
             session_id = await svc.run_workflow(
                 workflow_id, req.document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
+                user=user,
             )
             return {"session_id": session_id, "activity_id": str(activity.id)}
     except ValueError as e:
@@ -382,7 +486,7 @@ async def test_step(request: Request, req: TestStepRequest, user: User = Depends
 
 @router.post("/{workflow_id}/reorder-steps")
 async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User = Depends(get_current_user)):
-    ok = await svc.reorder_steps(workflow_id, req.step_ids)
+    ok = await svc.reorder_steps(workflow_id, req.step_ids, user=user)
     if not ok:
         raise HTTPException(status_code=400, detail="Invalid step IDs or workflow not found")
     return {"ok": True}
@@ -392,6 +496,9 @@ async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User =
 async def get_workflow_quality_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
 ):
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     from app.services.quality_service import get_quality_history
     return {"runs": await get_quality_history("workflow", workflow_id, limit)}
 
@@ -401,6 +508,9 @@ async def get_workflow_quality_sparkline(
     workflow_id: str, limit: int = 10, user: User = Depends(get_current_user),
 ):
     """Return compact score history for sparkline visualization."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     from app.services.quality_service import get_quality_history
     runs = await get_quality_history("workflow", workflow_id, limit)
     scores = [{"score": r["score"], "created_at": r["created_at"]} for r in reversed(runs)]
@@ -414,6 +524,10 @@ async def get_workflow_suggestions(
     workflow_id: str, user: User = Depends(get_current_user),
 ):
     """Use LLM to suggest improvements based on the latest validation run."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
 
     latest = await get_latest_validation("workflow", workflow_id)
@@ -427,7 +541,7 @@ async def get_workflow_suggestions(
 @router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
 async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        checks = await svc.get_validation_plan(workflow_id)
+        checks = await svc.get_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -438,7 +552,7 @@ async def update_validation_plan(
     workflow_id: str, req: UpdateValidationPlanRequest, user: User = Depends(get_current_user),
 ):
     try:
-        checks = await svc.update_validation_plan(workflow_id, [c.model_dump() for c in req.checks])
+        checks = await svc.update_validation_plan(workflow_id, [c.model_dump() for c in req.checks], user=user)
         return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -448,7 +562,7 @@ async def update_validation_plan(
 @limiter.limit("5/minute")
 async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        checks = await svc.generate_validation_plan(workflow_id)
+        checks = await svc.generate_validation_plan(workflow_id, user=user)
         return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -457,7 +571,7 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
 @router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
 async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        inputs = await svc.get_validation_inputs(workflow_id)
+        inputs = await svc.get_validation_inputs(workflow_id, user=user)
         return ValidationInputsResponse(inputs=inputs)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -468,7 +582,7 @@ async def update_validation_inputs(
     workflow_id: str, req: UpdateValidationInputsRequest, user: User = Depends(get_current_user),
 ):
     try:
-        inputs = await svc.update_validation_inputs(workflow_id, [i.model_dump() for i in req.inputs])
+        inputs = await svc.update_validation_inputs(workflow_id, [i.model_dump() for i in req.inputs], user=user)
         return ValidationInputsResponse(inputs=inputs)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -478,6 +592,9 @@ async def update_validation_inputs(
 async def create_temp_documents(
     workflow_id: str, req: CreateTempDocumentsRequest, user: User = Depends(get_current_user),
 ):
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
     uuids = await svc.create_temp_documents_from_text(req.texts, user.user_id)
     return {"document_uuids": uuids}
 
@@ -485,7 +602,7 @@ async def create_temp_documents(
 @router.post("/{workflow_id}/validate", response_model=ValidateWorkflowResponse)
 async def validate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        result = await svc.validate_workflow(workflow_id)
+        result = await svc.validate_workflow(workflow_id, user=user)
         return ValidateWorkflowResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -564,6 +681,7 @@ async def run_workflow_integrated(
     try:
         session_id = await svc.run_workflow(
             workflow_id, doc_uuids, user.user_id,
+            user=user,
         )
         return {
             "status": "queued",

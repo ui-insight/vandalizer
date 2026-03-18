@@ -70,7 +70,7 @@ class TestCreateFolder:
 
             resp = await client.post(
                 "/api/folders/create",
-                json={"name": "New Folder", "parent_id": "0", "space": "default"},
+                json={"name": "New Folder", "parent_id": "0"},
                 cookies=cookies,
                 headers=headers,
             )
@@ -104,7 +104,7 @@ class TestRenameFolder:
 
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
-        mock_svc.rename_folder.assert_called_once_with("folder-uuid", "Renamed Folder")
+        mock_svc.rename_folder.assert_called_once_with("folder-uuid", "Renamed Folder", user)
 
     @pytest.mark.asyncio
     async def test_rename_nonexistent_folder(self, client):
@@ -149,7 +149,7 @@ class TestDeleteFolder:
 
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
-        mock_svc.delete_folder.assert_called_once_with("folder-uuid-123")
+        mock_svc.delete_folder.assert_called_once_with("folder-uuid-123", user)
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_folder(self, client):

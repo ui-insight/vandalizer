@@ -79,10 +79,10 @@ export function submitKBForVerification(kbUuid: string, data: {
   })
 }
 
-export function setKBGroups(uuid: string, groupIds: string[]) {
+export function setKBOrganizations(uuid: string, organizationIds: string[]) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/update`, {
     method: 'POST',
-    body: JSON.stringify({ group_ids: groupIds }),
+    body: JSON.stringify({ organization_ids: organizationIds }),
   })
 }
 

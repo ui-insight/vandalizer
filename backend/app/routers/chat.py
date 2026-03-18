@@ -297,20 +297,21 @@ async def add_document(
             ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
 
             # Use document_readers for proper text extraction (PDF, DOCX, etc.)
-            # For PDFs, go straight to OCR to match the main files pipeline.
-            from app.services.document_readers import extract_text_from_file, ocr_extract_text_from_pdf
+            from app.services.document_readers import extract_text_from_file
 
             suffix = f".{ext}" if ext else ""
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(file_content)
                 tmp_path = tmp.name
             try:
-                if ext == "pdf":
-                    content_text = ocr_extract_text_from_pdf(tmp_path)
-                else:
-                    content_text = extract_text_from_file(tmp_path, ext or "txt")
+                content_text = extract_text_from_file(tmp_path, ext or "txt")
             finally:
                 os.unlink(tmp_path)
+
+            logger.info(
+                "Chat attachment %s: extracted %d chars",
+                file.filename, len(content_text),
+            )
 
             max_content_length = 50000
             if len(content_text) > max_content_length:
@@ -384,6 +385,35 @@ async def remove_document(
     if conversation:
         conversation.file_attachments = [
             a for a in conversation.file_attachments if a != att.id
+        ]
+        await conversation.save()
+
+    await att.delete()
+    return {"success": True}
+
+
+@router.delete("/remove-link/{attachment_id}")
+async def remove_link(
+    attachment_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Remove a URL attachment from chat."""
+    from beanie import PydanticObjectId
+
+    user_id = user.user_id
+    att = await UrlAttachment.find_one(
+        UrlAttachment.id == PydanticObjectId(attachment_id),
+        UrlAttachment.user_id == user_id,
+    )
+    if not att:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    conversation = await ChatConversation.find_one(
+        {"url_attachments": att.id, "user_id": user_id}
+    )
+    if conversation:
+        conversation.url_attachments = [
+            a for a in conversation.url_attachments if a != att.id
         ]
         await conversation.save()
 

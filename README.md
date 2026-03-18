@@ -32,12 +32,34 @@ cp backend/.env.example backend/.env
 # Build and start everything
 docker compose up --build -d
 
+# Bootstrap the first admin account and optional shared default team
+docker compose exec \
+  -e ADMIN_EMAIL=admin@example.edu \
+  -e ADMIN_PASSWORD='change-me-now' \
+  -e ADMIN_NAME='Initial Admin' \
+  -e DEFAULT_TEAM_NAME='Research Administration' \
+  api python bootstrap_install.py
+
 # Verify
 curl http://localhost:8001/api/health
-# → {"status":"ok"}
+# → {"status":"ok","checks":{...}}
 ```
 
 The frontend is available at `http://localhost` and the API at `http://localhost:8001`.
+
+Bootstrap notes:
+
+- `DEFAULT_TEAM_NAME` is optional. If omitted, users will start in their personal team only.
+- New users always get a personal team. When a default team is configured, they also auto-join it on first registration or SSO login.
+- The bootstrap admin also keeps a personal team. After the first login, switch to the shared default team in the UI if that should be the primary workspace.
+- Persistent Docker volumes in the default compose setup:
+  - `mongo-data`: MongoDB application data
+  - `uploads`: uploaded source documents
+  - `chroma-data`: ChromaDB embeddings and vector index
+- Common operator commands:
+  - `docker compose restart api celery frontend`
+  - `docker compose logs -f api`
+  - `docker compose down`
 
 ### Option B: Local development
 
@@ -54,17 +76,30 @@ cp backend/.env.example backend/.env
 
 # Install and run the backend
 cd backend
-uv sync
-uvicorn app.main:app --reload --port 8001
+uv sync --extra dev
+uv run uvicorn app.main:app --reload --port 8001
 
 # In another terminal — start the frontend
 cd frontend
-npm install
+npm ci
 npm run dev
 
 # In another terminal — start Celery workers
 cd backend
 ./run_celery.sh
+```
+
+### Verification commands
+
+```bash
+# Backend
+cd backend
+uv run pytest -q
+
+# Frontend
+cd frontend
+npm test
+npm run build
 ```
 
 ## Environment Variables

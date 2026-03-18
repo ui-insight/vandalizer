@@ -25,8 +25,13 @@ async def client():
 @pytest.mark.asyncio
 async def test_health_endpoint(client):
     resp = await client.get("/api/health")
-    assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    # Health endpoint now returns dependency checks; without live services
+    # it returns 503/degraded, but the shape must include "status" and "checks".
+    assert resp.status_code in (200, 503)
+    assert "status" in body
+    assert body["status"] in ("ok", "degraded")
+    assert "checks" in body
 
 
 @pytest.mark.asyncio

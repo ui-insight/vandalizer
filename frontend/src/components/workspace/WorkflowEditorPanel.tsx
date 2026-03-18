@@ -6,7 +6,7 @@ import {
   MousePointerClick, PenTool, ClipboardCheck, Flag,
   AlertTriangle, ChevronDown, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
-  ArrowRight, Pause, ChevronRight, TrendingUp, RefreshCw,
+  ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -19,7 +19,7 @@ import {
   getValidationInputs, updateValidationInputs,
   exportWorkflowUrl, importWorkflow,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationResult, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus } from '../../api/workflows'
+import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { getModels } from '../../api/config'
 import { listContents, searchDocuments } from '../../api/documents'
@@ -461,7 +461,13 @@ export function WorkflowEditorPanel() {
         )}
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
-        {activeTab === 'validate' && <ValidateTab workflowId={openWorkflowId} selectedDocUuids={selectedDocUuids} />}
+        {activeTab === 'validate' && (
+          <ValidateTab
+            workflowId={openWorkflowId}
+            selectedDocUuids={selectedDocUuids}
+            bumpActivitySignal={bumpActivitySignal}
+          />
+        )}
       </div>
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
@@ -820,7 +826,7 @@ function Connector({ position }: { position: 'top' | 'bottom' }) {
   return (
     <div style={{
       position: 'absolute', left: '50%', transform: 'translateX(-50%)',
-      ...(isTop ? { top: -10 } : { bottom: -10 }),
+      ...(isTop ? { top: -13 } : { bottom: -13 }),
       width: 22, height: 11,
       border: '2px solid #e0e0e0',
       ...(isTop
@@ -1423,7 +1429,7 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await listContents('default')
+        const res = await listContents()
         const filtered = res.documents.filter(d =>
           d.title.toLowerCase().includes(docSearchQuery.toLowerCase())
         )
@@ -1655,7 +1661,7 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                   />
                 </div>
 
-                {taskData.search_set_uuid && (
+                {Boolean(taskData.search_set_uuid) && (
                   <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
                     <span style={{ fontWeight: 600 }}>Linked extraction:</span>{' '}
                     <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
@@ -2570,10 +2576,12 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
             Completed
           </div>
           <div
+            className="chat-markdown"
             style={{
               backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
               padding: 12, fontSize: 13, lineHeight: 1.6,
-              maxHeight: 300, overflowY: 'auto', color: '#374151',
+              maxHeight: '60vh', overflowY: 'auto', overflowX: 'auto',
+              color: '#374151', wordBreak: 'break-word',
             }}
             dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
           />
@@ -2734,12 +2742,16 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
                   }} />
                 )}
               </div>
-              {isExpanded && itemDone && item.final_output && (
-                <div style={{
-                  borderTop: '1px solid #e5e7eb', padding: 12,
-                  backgroundColor: '#f9fafb', fontSize: 13, lineHeight: 1.6,
-                  maxHeight: 200, overflowY: 'auto', color: '#374151',
-                }}>
+              {isExpanded && itemDone && Boolean(item.final_output) && (
+                <div
+                  className="chat-markdown"
+                  style={{
+                    borderTop: '1px solid #e5e7eb', padding: 12,
+                    backgroundColor: '#f9fafb', fontSize: 13, lineHeight: 1.6,
+                    maxHeight: '40vh', overflowY: 'auto', overflowX: 'auto',
+                    color: '#374151', wordBreak: 'break-word',
+                  }}
+                >
                   <div dangerouslySetInnerHTML={{
                     __html: renderOutput((item.final_output as Record<string, unknown>)?.output ?? item.final_output),
                   }} />
@@ -3128,7 +3140,15 @@ const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: str
 }
 
 
-function ValidateTab({ workflowId, selectedDocUuids }: { workflowId: string | null; selectedDocUuids: string[] }) {
+function ValidateTab({
+  workflowId,
+  selectedDocUuids,
+  bumpActivitySignal,
+}: {
+  workflowId: string | null
+  selectedDocUuids: string[]
+  bumpActivitySignal: () => void
+}) {
   // Plan state
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
   const [planLoading, setPlanLoading] = useState(false)
@@ -3276,6 +3296,9 @@ function ValidateTab({ workflowId, selectedDocUuids }: { workflowId: string | nu
       // Run the workflow
       setRunProgress('Starting workflow...')
       const { session_id } = await runWorkflow(workflowId, { document_uuids: docUuids })
+      if (!session_id) {
+        throw new Error('Workflow session did not start')
+      }
       bumpActivitySignal()
 
       // Stream status until complete

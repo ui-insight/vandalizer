@@ -66,7 +66,7 @@ async def client():
 class TestGetOrgTree:
     @pytest.mark.asyncio
     async def test_returns_tree(self, client):
-        user = _make_user()
+        user = _make_user(is_admin=True)
         cookies, headers = _auth()
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \

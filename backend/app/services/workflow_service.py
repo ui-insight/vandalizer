@@ -1,8 +1,10 @@
 """Workflow CRUD service."""
 
+from __future__ import annotations
+
 import datetime
 import uuid as uuid_mod
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from beanie import PydanticObjectId
 from celery.result import AsyncResult
@@ -16,7 +18,11 @@ from app.models.workflow import (
     WorkflowStep,
     WorkflowStepTask,
 )
+from app.services.access_control import get_authorized_workflow, get_team_access_context
 from app.services.config_service import get_user_model_name
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 # ---------------------------------------------------------------------------
@@ -37,22 +43,35 @@ async def create_workflow(name: str, user_id: str, space: str | None = None, des
 
 
 async def list_workflows(
+    user: User,
     space: str | None = None,
-    user_id: str | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Workflow]:
-    query = {}
+    team_access = await get_team_access_context(user)
+
+    # Build OR query: owned by user OR belongs to one of user's teams
+    conditions: list[dict] = [{"user_id": user.user_id}]
+    if team_access.team_uuids:
+        conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+
+    query: dict = {"$or": conditions}
     if space:
         query["space"] = space
+
     return await Workflow.find(query).skip(skip).limit(limit).to_list()
 
 
-async def get_workflow(workflow_id: str) -> dict | None:
+async def get_workflow(workflow_id: str, user: User | None = None) -> dict | None:
     """Get workflow with dereferenced steps and tasks."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
-    if not wf:
-        return None
+    if user is not None:
+        wf = await get_authorized_workflow(workflow_id, user)
+        if not wf:
+            return None
+    else:
+        wf = await Workflow.get(PydanticObjectId(workflow_id))
+        if not wf:
+            return None
 
     steps = []
     for step_id in wf.steps:
@@ -92,11 +111,12 @@ async def get_workflow(workflow_id: str) -> dict | None:
 
 async def update_workflow(
     workflow_id: str,
+    user: User,
     name: str | None = None,
     description: str | None = None,
     input_config: dict | None = None,
 ) -> Workflow | None:
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         return None
     if name is not None:
@@ -110,8 +130,8 @@ async def update_workflow(
     return wf
 
 
-async def delete_workflow(workflow_id: str) -> bool:
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+async def delete_workflow(workflow_id: str, user: User) -> bool:
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         return False
     # Delete steps and tasks
@@ -131,7 +151,12 @@ async def delete_workflow(workflow_id: str) -> bool:
     return True
 
 
-async def duplicate_workflow(workflow_id: str, user_id: str, team_id: str | None = None) -> dict | None:
+async def duplicate_workflow(workflow_id: str, user: User, user_id: str, team_id: str | None = None) -> dict | None:
+    # Authorize access to the original workflow before duplicating
+    wf_check = await get_authorized_workflow(workflow_id, user)
+    if not wf_check:
+        return None
+
     original = await get_workflow(workflow_id)
     if not original:
         return None
@@ -180,11 +205,28 @@ async def duplicate_workflow(workflow_id: str, user_id: str, team_id: str | None
 
 
 # ---------------------------------------------------------------------------
+# Authorization helpers for step / task lookups
+# ---------------------------------------------------------------------------
+
+async def _get_workflow_for_step(step_id: PydanticObjectId) -> Workflow | None:
+    """Find the parent workflow that contains a given step."""
+    return await Workflow.find_one(Workflow.steps == step_id)
+
+
+async def _get_workflow_for_task(task_id: PydanticObjectId) -> Workflow | None:
+    """Find the parent workflow that contains a given task (via its step)."""
+    step = await WorkflowStep.find_one(WorkflowStep.tasks == task_id)
+    if not step:
+        return None
+    return await Workflow.find_one(Workflow.steps == step.id)
+
+
+# ---------------------------------------------------------------------------
 # Step CRUD
 # ---------------------------------------------------------------------------
 
-async def add_step(workflow_id: str, name: str, data: dict = {}, is_output: bool = False) -> dict | None:
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+async def add_step(workflow_id: str, name: str, user: User, data: dict = {}, is_output: bool = False) -> dict | None:
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         return None
 
@@ -197,10 +239,20 @@ async def add_step(workflow_id: str, name: str, data: dict = {}, is_output: bool
     return {"id": str(step.id), "name": step.name, "data": step.data, "is_output": step.is_output, "tasks": []}
 
 
-async def update_step(step_id: str, name: str | None = None, data: dict | None = None, is_output: bool | None = None) -> dict | None:
+async def update_step(step_id: str, user: User, name: str | None = None, data: dict | None = None, is_output: bool | None = None) -> dict | None:
     step = await WorkflowStep.get(PydanticObjectId(step_id))
     if not step:
         return None
+
+    # Authorize via parent workflow
+    parent_wf = await _get_workflow_for_step(step.id)
+    if not parent_wf:
+        return None
+    from app.services.access_control import can_manage_workflow
+    team_access = await get_team_access_context(user)
+    if not can_manage_workflow(parent_wf, user, team_access):
+        return None
+
     if name is not None:
         step.name = name
     if data is not None:
@@ -211,15 +263,21 @@ async def update_step(step_id: str, name: str | None = None, data: dict | None =
     return {"id": str(step.id), "name": step.name, "data": step.data, "is_output": step.is_output}
 
 
-async def delete_step(step_id: str) -> bool:
+async def delete_step(step_id: str, user: User) -> bool:
     step = await WorkflowStep.get(PydanticObjectId(step_id))
     if not step:
         return False
-    # Remove from parent workflow
+
+    # Authorize via parent workflow
     wf = await Workflow.find_one(Workflow.steps == step.id)
     if wf:
+        from app.services.access_control import can_manage_workflow
+        team_access = await get_team_access_context(user)
+        if not can_manage_workflow(wf, user, team_access):
+            return False
         wf.steps = [s for s in wf.steps if s != step.id]
         await wf.save()
+
     # Delete tasks
     for task_id in step.tasks:
         task = await WorkflowStepTask.get(task_id)
@@ -233,9 +291,18 @@ async def delete_step(step_id: str) -> bool:
 # Task CRUD
 # ---------------------------------------------------------------------------
 
-async def add_task(step_id: str, name: str, data: dict = {}) -> dict | None:
+async def add_task(step_id: str, name: str, user: User, data: dict = {}) -> dict | None:
     step = await WorkflowStep.get(PydanticObjectId(step_id))
     if not step:
+        return None
+
+    # Authorize via parent workflow
+    parent_wf = await _get_workflow_for_step(step.id)
+    if not parent_wf:
+        return None
+    from app.services.access_control import can_manage_workflow
+    team_access = await get_team_access_context(user)
+    if not can_manage_workflow(parent_wf, user, team_access):
         return None
 
     task = WorkflowStepTask(name=name, data=data)
@@ -246,10 +313,20 @@ async def add_task(step_id: str, name: str, data: dict = {}) -> dict | None:
     return {"id": str(task.id), "name": task.name, "data": task.data}
 
 
-async def update_task(task_id: str, name: str | None = None, data: dict | None = None) -> dict | None:
+async def update_task(task_id: str, user: User, name: str | None = None, data: dict | None = None) -> dict | None:
     task = await WorkflowStepTask.get(PydanticObjectId(task_id))
     if not task:
         return None
+
+    # Authorize via parent workflow
+    parent_wf = await _get_workflow_for_task(task.id)
+    if not parent_wf:
+        return None
+    from app.services.access_control import can_manage_workflow
+    team_access = await get_team_access_context(user)
+    if not can_manage_workflow(parent_wf, user, team_access):
+        return None
+
     if name is not None:
         task.name = name
     if data is not None:
@@ -258,10 +335,19 @@ async def update_task(task_id: str, name: str | None = None, data: dict | None =
     return {"id": str(task.id), "name": task.name, "data": task.data}
 
 
-async def delete_task(task_id: str) -> bool:
+async def delete_task(task_id: str, user: User) -> bool:
     task = await WorkflowStepTask.get(PydanticObjectId(task_id))
     if not task:
         return False
+
+    # Authorize via parent workflow
+    parent_wf = await _get_workflow_for_task(task.id)
+    if parent_wf:
+        from app.services.access_control import can_manage_workflow
+        team_access = await get_team_access_context(user)
+        if not can_manage_workflow(parent_wf, user, team_access):
+            return False
+
     # Remove from parent step
     step = await WorkflowStep.find_one(WorkflowStep.tasks == task.id)
     if step:
@@ -281,11 +367,17 @@ async def run_workflow(
     user_id: str,
     model: str | None = None,
     activity_id: str | None = None,
+    user: User | None = None,
 ) -> str:
     """Start workflow execution. Returns session_id for polling."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
-    if not wf:
-        raise ValueError("Workflow not found")
+    if user is not None:
+        wf = await get_authorized_workflow(workflow_id, user)
+        if not wf:
+            raise ValueError("Workflow not found")
+    else:
+        wf = await Workflow.get(PydanticObjectId(workflow_id))
+        if not wf:
+            raise ValueError("Workflow not found")
 
     if not model:
         model = await get_user_model_name(user_id)
@@ -339,6 +431,7 @@ async def run_workflow_batch(
     user_id: str,
     model: str | None = None,
     activity_id: str | None = None,
+    user: User | None = None,
 ) -> str:
     """Start a batched workflow execution — one run per document.
 
@@ -346,9 +439,14 @@ async def run_workflow_batch(
     """
     from app.models.document import SmartDocument
 
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
-    if not wf:
-        raise ValueError("Workflow not found")
+    if user is not None:
+        wf = await get_authorized_workflow(workflow_id, user)
+        if not wf:
+            raise ValueError("Workflow not found")
+    else:
+        wf = await Workflow.get(PydanticObjectId(workflow_id))
+        if not wf:
+            raise ValueError("Workflow not found")
 
     if not model:
         model = await get_user_model_name(user_id)
@@ -473,9 +571,9 @@ def get_test_status(task_id: str) -> dict:
 # Step reordering
 # ---------------------------------------------------------------------------
 
-async def reorder_steps(workflow_id: str, step_ids: list[str]) -> bool:
+async def reorder_steps(workflow_id: str, step_ids: list[str], user: User) -> bool:
     """Reorder steps in a workflow by providing the full ordered list of step IDs."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         return False
 
@@ -495,17 +593,17 @@ async def reorder_steps(workflow_id: str, step_ids: list[str]) -> bool:
 # Validation Plan
 # ---------------------------------------------------------------------------
 
-async def get_validation_plan(workflow_id: str) -> list[dict]:
+async def get_validation_plan(workflow_id: str, user: User) -> list[dict]:
     """Return the workflow's persisted validation plan."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise ValueError("Workflow not found")
     return wf.validation_plan
 
 
-async def update_validation_plan(workflow_id: str, checks: list[dict]) -> list[dict]:
+async def update_validation_plan(workflow_id: str, checks: list[dict], user: User) -> list[dict]:
     """Replace the workflow's validation plan with *checks*."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise ValueError("Workflow not found")
     wf.validation_plan = checks
@@ -518,15 +616,15 @@ async def update_validation_plan(workflow_id: str, checks: list[dict]) -> list[d
 # Validation Inputs
 # ---------------------------------------------------------------------------
 
-async def get_validation_inputs(workflow_id: str) -> list[dict]:
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+async def get_validation_inputs(workflow_id: str, user: User) -> list[dict]:
+    wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise ValueError("Workflow not found")
     return wf.validation_inputs
 
 
-async def update_validation_inputs(workflow_id: str, inputs: list[dict]) -> list[dict]:
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
+async def update_validation_inputs(workflow_id: str, inputs: list[dict], user: User) -> list[dict]:
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise ValueError("Workflow not found")
     wf.validation_inputs = inputs
@@ -565,11 +663,16 @@ async def create_temp_documents_from_text(texts: list[dict], user_id: str) -> li
     return uuids
 
 
-async def generate_validation_plan(workflow_id: str) -> list[dict]:
+async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     """Use an LLM to auto-generate quality check definitions from the workflow structure."""
     import json as _json
     from app.services.llm_service import create_chat_agent
     from app.models.system_config import SystemConfig
+
+    # Authorize before proceeding (manage=True since this modifies the plan)
+    wf_check = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf_check:
+        raise ValueError("Workflow not found")
 
     wf_data = await get_workflow(workflow_id)
     if not wf_data:
@@ -669,11 +772,16 @@ async def generate_validation_plan(workflow_id: str) -> list[dict]:
 # Validation Execution
 # ---------------------------------------------------------------------------
 
-async def validate_workflow(workflow_id: str) -> dict:
+async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     """Evaluate the last execution's output against the persisted validation plan."""
-    wf = await Workflow.get(PydanticObjectId(workflow_id))
-    if not wf:
-        raise ValueError("Workflow not found")
+    if user is not None:
+        wf = await get_authorized_workflow(workflow_id, user)
+        if not wf:
+            raise ValueError("Workflow not found")
+    else:
+        wf = await Workflow.get(PydanticObjectId(workflow_id))
+        if not wf:
+            raise ValueError("Workflow not found")
 
     plan = wf.validation_plan
     if not plan:

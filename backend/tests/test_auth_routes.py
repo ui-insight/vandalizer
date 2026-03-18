@@ -30,6 +30,7 @@ def _make_user(**overrides):
         "demo_status": None,
         "api_token": None,
         "api_token_created_at": None,
+        "api_token_expires_at": None,
     }
     defaults.update(overrides)
     user = MagicMock()

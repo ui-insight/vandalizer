@@ -22,7 +22,10 @@ ENV VIRTUAL_ENV=/app/.venv \
 COPY --from=builder /app/.venv /app/.venv
 
 COPY app ./app
+COPY bootstrap_install.py ./
+COPY create_admin.py ./
 COPY run_celery.sh ./
+COPY setup_default_team.py ./
 
 RUN mkdir -p /app/static/uploads /app/static/db && \
     chown -R appuser:appuser /app

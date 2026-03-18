@@ -28,7 +28,7 @@ class UploadRequest(BaseModel):
     contentAsBase64String: str
     fileName: str
     extension: str
-    space: str
+    space: Optional[str] = None
     folder: Optional[str] = None
     rootFolderName: Optional[str] = None
 
@@ -46,7 +46,7 @@ class PollStatusResponse(BaseModel):
 class CreateFolderRequest(BaseModel):
     name: str
     parent_id: str
-    space: str
+    space: Optional[str] = None
     folder_type: str = "individual"
 
 
@@ -66,5 +66,5 @@ class MoveFileRequest(BaseModel):
 
 
 class ListRequest(BaseModel):
-    space: str
+    space: Optional[str] = None
     folder: Optional[str] = None

@@ -1,8 +1,8 @@
-import { apiFetch } from './client'
+import { apiFetch, csrfHeaders } from './client'
 import type {
   Library, LibraryItem, LibraryFolder, LibraryItemKind,
   VerificationRequest, VerifiedCatalogItem, VerifiedItemMetadata,
-  VerifiedCollection, ExaminerUser, Group, GroupMember,
+  VerifiedCollection, ExaminerUser,
 } from '../types/library'
 
 // Library CRUD
@@ -118,6 +118,7 @@ export async function previewCatalogImport(file: File): Promise<CatalogPreviewIt
   const res = await fetch('/api/verification/catalog/preview-import', {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -140,6 +141,7 @@ export async function importCatalogItems(
   const res = await fetch('/api/verification/catalog/import', {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -188,7 +190,7 @@ export function updateVerificationStatus(
   requestUuid: string,
   status: string,
   reviewerNotes?: string,
-  groupIds?: string[],
+  organizationIds?: string[],
   collectionIds?: string[],
 ) {
   return apiFetch<VerificationRequest>(`/api/verification/${requestUuid}/status`, {
@@ -196,7 +198,7 @@ export function updateVerificationStatus(
     body: JSON.stringify({
       status,
       reviewer_notes: reviewerNotes,
-      group_ids: groupIds,
+      organization_ids: organizationIds,
       collection_ids: collectionIds,
     }),
   })
@@ -216,7 +218,7 @@ export function getItemMetadata(itemKind: string, itemId: string) {
   return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`)
 }
 
-export function updateItemMetadata(itemKind: string, itemId: string, data: { display_name?: string; description?: string; markdown?: string; group_ids?: string[] }) {
+export function updateItemMetadata(itemKind: string, itemId: string, data: { display_name?: string; description?: string; markdown?: string; organization_ids?: string[] }) {
   return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`, {
     method: 'PUT',
     body: JSON.stringify(data),
@@ -283,49 +285,3 @@ export function searchUsersForExaminer(query: string) {
   return apiFetch<{ users: ExaminerUser[] }>(`/api/verification/examiners/search?q=${encodeURIComponent(query)}`)
 }
 
-// Groups
-
-export function listGroups() {
-  return apiFetch<{ groups: Group[] }>('/api/verification/groups')
-}
-
-export function createGroup(data: { name: string; description?: string }) {
-  return apiFetch<Group>('/api/verification/groups', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  })
-}
-
-export function updateGroup(uuid: string, data: { name?: string; description?: string }) {
-  return apiFetch<Group>(`/api/verification/groups/${uuid}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  })
-}
-
-export function deleteGroup(uuid: string) {
-  return apiFetch<{ ok: boolean }>(`/api/verification/groups/${uuid}`, { method: 'DELETE' })
-}
-
-export function listGroupMembers(uuid: string) {
-  return apiFetch<{ members: GroupMember[] }>(`/api/verification/groups/${uuid}/members`)
-}
-
-export function addGroupMember(groupUuid: string, userId: string) {
-  return apiFetch<{ ok: boolean }>(`/api/verification/groups/${groupUuid}/members`, {
-    method: 'POST',
-    body: JSON.stringify({ user_id: userId }),
-  })
-}
-
-export function removeGroupMember(groupUuid: string, userId: string) {
-  return apiFetch<{ ok: boolean }>(`/api/verification/groups/${groupUuid}/members/${userId}`, {
-    method: 'DELETE',
-  })
-}
-
-export function searchUsersForGroup(query: string) {
-  return apiFetch<{ users: { user_id: string; name: string | null; email: string | null }[] }>(
-    `/api/verification/groups/search-users?q=${encodeURIComponent(query)}`,
-  )
-}

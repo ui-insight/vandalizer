@@ -16,7 +16,7 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
 
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId } = useWorkspace()
-  const { automations, loading, create, refresh } = useAutomations()
+  const { automations, loading, refresh } = useAutomations()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
 

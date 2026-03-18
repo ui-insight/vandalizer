@@ -15,7 +15,7 @@ interface TeamContextValue {
 export const TeamContext = createContext<TeamContextValue | null>(null)
 
 export function TeamProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -44,11 +44,10 @@ export function TeamProvider({ children }: { children: ReactNode }) {
   const switchTeam = useCallback(
     async (teamUuid: string) => {
       await teamsApi.switchTeam(teamUuid)
-      // Re-fetch teams to pick up the new current_team; consumers
-      // should react to the changed currentTeam via context.
-      await refreshTeams()
+      // Refresh both user (for current_team_uuid) and teams list
+      await Promise.all([refreshUser(), refreshTeams()])
     },
-    [refreshTeams],
+    [refreshUser, refreshTeams],
   )
 
   const createTeam = useCallback(

@@ -8,7 +8,21 @@ export interface Organization {
   metadata: Record<string, unknown>
   created_at: string | null
   updated_at: string | null
+  user_count?: number
+  team_count?: number
   children?: Organization[]
+}
+
+export interface OrgMember {
+  user_id: string
+  name: string | null
+  email: string | null
+}
+
+export interface OrgTeam {
+  uuid: string
+  name: string
+  owner_user_id: string
 }
 
 export function getOrgTree(): Promise<{ tree: Organization[] }> {
@@ -74,4 +88,60 @@ export function assignTeamToOrg(
   return apiFetch(`/api/organizations/${orgUuid}/assign-team/${teamUuid}`, {
     method: 'POST',
   })
+}
+
+export function getMyOrg(): Promise<{
+  organization: Organization | null
+  ancestry: Organization[]
+}> {
+  return apiFetch('/api/organizations/me')
+}
+
+export function getOrgMembers(orgUuid: string): Promise<{
+  users: OrgMember[]
+  teams: OrgTeam[]
+}> {
+  return apiFetch(`/api/organizations/${orgUuid}/members`)
+}
+
+export function listOrganizationsFlat(): Promise<{ organizations: Organization[] }> {
+  return apiFetch('/api/organizations/flat')
+}
+
+export function moveOrganization(uuid: string, newParentId: string | null): Promise<Organization> {
+  return apiFetch(`/api/organizations/${uuid}/move`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ new_parent_id: newParentId }),
+  })
+}
+
+export function updateOrgType(uuid: string, orgType: string): Promise<Organization> {
+  return apiFetch(`/api/organizations/${uuid}/type`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ org_type: orgType }),
+  })
+}
+
+export function importOrganizations(
+  nodes: { name: string; parent_name?: string; org_type: string }[],
+): Promise<{ created: Organization[]; count: number }> {
+  return apiFetch('/api/organizations/import', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nodes }),
+  })
+}
+
+export function unassignUserFromOrg(orgUuid: string, userId: string): Promise<{ detail: string }> {
+  return apiFetch(`/api/organizations/${orgUuid}/unassign-user/${userId}`, { method: 'POST' })
+}
+
+export function unassignTeamFromOrg(orgUuid: string, teamUuid: string): Promise<{ detail: string }> {
+  return apiFetch(`/api/organizations/${orgUuid}/unassign-team/${teamUuid}`, { method: 'POST' })
+}
+
+export function searchUsers(query: string): Promise<{ users: OrgMember[] }> {
+  return apiFetch(`/api/verification/examiners/search?q=${encodeURIComponent(query)}`)
 }

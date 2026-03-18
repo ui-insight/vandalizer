@@ -21,7 +21,7 @@ export function LeftPanel() {
   const [contentMatches, setContentMatches] = useState<ContentMatch[]>([])
   const [currentFolder, setCurrentFolder] = useState<string | null>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   // Open a document when requested from another panel (e.g. validation tab)

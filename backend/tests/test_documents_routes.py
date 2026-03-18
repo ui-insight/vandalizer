@@ -50,7 +50,7 @@ async def client():
 class TestDocumentListAuth:
     @pytest.mark.asyncio
     async def test_unauthenticated_rejected(self, client):
-        resp = await client.get("/api/documents/list?space=default")
+        resp = await client.get("/api/documents/list")
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
@@ -65,16 +65,16 @@ class TestDocumentListAuth:
             mock_svc.list_contents = AsyncMock(return_value={"folders": [], "documents": []})
 
             resp = await client.get(
-                "/api/documents/list?space=default",
+                "/api/documents/list",
                 cookies=cookies,
                 headers=headers,
             )
 
         assert resp.status_code == 200
-        # Verify user_id was passed
+        # Verify the current user object was passed through
         mock_svc.list_contents.assert_called_once()
         call_kwargs = mock_svc.list_contents.call_args
-        assert call_kwargs.kwargs.get("user_id") == "testuser"
+        assert call_kwargs.kwargs.get("user") is user
 
 
 class TestDocumentTeamValidation:
@@ -97,7 +97,7 @@ class TestDocumentTeamValidation:
             MockMembership.find_one = AsyncMock(return_value=None)  # not a member
 
             resp = await client.get(
-                "/api/documents/list?space=default&team_uuid=other-team-uuid",
+                "/api/documents/list?team_uuid=other-team-uuid",
                 cookies=cookies,
                 headers=headers,
             )
@@ -129,7 +129,7 @@ class TestDocumentTeamValidation:
             mock_svc.list_contents = AsyncMock(return_value={"folders": [], "documents": []})
 
             resp = await client.get(
-                "/api/documents/list?space=default&team_uuid=my-team-uuid",
+                "/api/documents/list?team_uuid=my-team-uuid",
                 cookies=cookies,
                 headers=headers,
             )

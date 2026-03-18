@@ -9,7 +9,7 @@ export interface UploadProgress {
   uuid?: string
 }
 
-export function useUpload(space: string, folderId: string | null, onComplete: () => void) {
+export function useUpload(folderId: string | null, onComplete: () => void) {
   const [uploads, setUploads] = useState<UploadProgress[]>([])
   const [lastUploadedUuid, setLastUploadedUuid] = useState<string | null>(null)
 
@@ -38,7 +38,6 @@ export function useUpload(space: string, folderId: string | null, onComplete: ()
             contentAsBase64String: base64,
             fileName: file.name,
             extension: ext,
-            space,
             folder: folderId ?? undefined,
           })
 
@@ -63,7 +62,7 @@ export function useUpload(space: string, folderId: string | null, onComplete: ()
       onComplete()
       setTimeout(() => setUploads([]), 3000)
     },
-    [space, folderId, onComplete],
+    [folderId, onComplete],
   )
 
   const clearLastUploaded = useCallback(() => setLastUploadedUuid(null), [])

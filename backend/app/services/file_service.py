@@ -7,6 +7,8 @@ from pathlib import Path
 from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
+from app.models.user import User
+from app.services import access_control
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
 
@@ -18,19 +20,27 @@ class DownloadResult:
     title: str
 
 
+def _safe_resolve(settings: Settings, relative_path: str) -> Path | None:
+    root = Path(settings.upload_dir).resolve()
+    target = (root / relative_path).resolve()
+    if not target.is_relative_to(root):
+        return None
+    return target
+
+
 async def upload_document(
     blob: str,
     filename: str,
     raw_extension: str,
     space: str,
-    user_id: str,
+    user: User,
     settings: Settings,
     folder: str | None = None,
     root_folder_name: str | None = None,
-    team_id: str | None = None,
 ) -> dict:
     safe_name = secure_filename(filename)
     extension = raw_extension.lower().lstrip(".")
+    user_id = user.user_id
 
     if not is_allowed_file(safe_name):
         raise ValueError(f"File type '{extension}' is not allowed.")
@@ -44,29 +54,49 @@ async def upload_document(
             f"exceeds {settings.max_upload_size_mb}MB limit."
         )
 
-    # Create folder if requested
     target_folder = folder
+    parent_folder: SmartFolder | None = None
+    team_id: str | None = None
+    effective_space = user.user_id
+
+    if target_folder and target_folder != "0":
+        parent_folder = await access_control.get_authorized_folder(target_folder, user)
+        if not parent_folder:
+            raise ValueError("Folder not found.")
+        team_id = parent_folder.team_id
+        effective_space = parent_folder.space or user.user_id
+
     if root_folder_name:
         new_folder = SmartFolder(
             title=root_folder_name,
-            user_id=user_id,
-            space=space,
+            user_id=user_id if not team_id else None,
+            space=effective_space,
             parent_id=folder or "0",
             uuid=uuid.uuid4().hex,
+            team_id=team_id,
         )
         await new_folder.insert()
-        target_folder = str(new_folder.id)
+        target_folder = new_folder.uuid
 
     if not target_folder:
         target_folder = "0"
 
     # De-duplicate
-    existing = await SmartDocument.find_one(
-        SmartDocument.title == safe_name,
-        SmartDocument.user_id == user_id,
-        SmartDocument.space == space,
-        SmartDocument.folder == target_folder,
-    )
+    if team_id:
+        existing = await SmartDocument.find_one(
+            SmartDocument.title == safe_name,
+            SmartDocument.team_id == team_id,
+            SmartDocument.folder == target_folder,
+            SmartDocument.soft_deleted != True,  # noqa: E712
+        )
+    else:
+        existing = await SmartDocument.find_one(
+            SmartDocument.title == safe_name,
+            SmartDocument.user_id == user_id,
+            SmartDocument.space == effective_space,
+            SmartDocument.folder == target_folder,
+            SmartDocument.soft_deleted != True,  # noqa: E712
+        )
     if existing:
         return {"complete": True, "exists": True, "uuid": existing.uuid}
 
@@ -116,7 +146,7 @@ async def upload_document(
         uuid=uid,
         user_id=user_id,
         team_id=team_id,
-        space=space,
+        space=effective_space,
         folder=target_folder,
         task_id=None,
         task_status="layout",
@@ -139,12 +169,9 @@ async def upload_document(
 
 
 async def download_document(
-    doc_uuid: str, settings: Settings, *, user_id: str | None = None
+    doc_uuid: str, settings: Settings, *, user: User
 ) -> DownloadResult | None:
-    filters = [SmartDocument.uuid == doc_uuid]
-    if user_id is not None:
-        filters.append(SmartDocument.user_id == user_id)
-    doc = await SmartDocument.find_one(*filters)
+    doc = await access_control.get_authorized_document(doc_uuid, user)
     if not doc:
         return None
     from app.services.storage import get_storage
@@ -160,12 +187,9 @@ async def download_document(
 
 
 async def delete_document(
-    doc_uuid: str, settings: Settings, *, user_id: str | None = None
+    doc_uuid: str, settings: Settings, *, user: User
 ) -> bool:
-    filters = [SmartDocument.uuid == doc_uuid]
-    if user_id is not None:
-        filters.append(SmartDocument.user_id == user_id)
-    doc = await SmartDocument.find_one(*filters)
+    doc = await access_control.get_authorized_document(doc_uuid, user, manage=True)
     if not doc:
         return False
     from app.services.storage import get_storage
@@ -177,13 +201,10 @@ async def delete_document(
     return True
 
 
-async def rename_document(doc_uuid: str, new_title: str, *, user_id: str | None = None) -> bool:
+async def rename_document(doc_uuid: str, new_title: str, *, user: User) -> bool:
     if not new_title.strip():
         raise ValueError("File name cannot be empty.")
-    filters = [SmartDocument.uuid == doc_uuid]
-    if user_id is not None:
-        filters.append(SmartDocument.user_id == user_id)
-    doc = await SmartDocument.find_one(*filters)
+    doc = await access_control.get_authorized_document(doc_uuid, user, manage=True)
     if not doc:
         return False
     doc.title = new_title
@@ -193,13 +214,21 @@ async def rename_document(doc_uuid: str, new_title: str, *, user_id: str | None 
     return True
 
 
-async def move_document(file_uuid: str, folder_id: str, *, user_id: str | None = None) -> bool:
-    filters = [SmartDocument.uuid == file_uuid]
-    if user_id is not None:
-        filters.append(SmartDocument.user_id == user_id)
-    doc = await SmartDocument.find_one(*filters)
+async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
+    doc = await access_control.get_authorized_document(file_uuid, user, manage=True)
     if not doc:
         return False
+
+    target_team_id: str | None = None
+    if folder_id != "0":
+        folder = await access_control.get_authorized_folder(folder_id, user)
+        if not folder:
+            return False
+        target_team_id = folder.team_id
+
+    if doc.team_id != target_team_id:
+        raise ValueError("Cannot move files between personal and team folders.")
+
     doc.folder = folder_id
     await doc.save()
     return True

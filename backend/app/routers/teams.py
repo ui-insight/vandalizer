@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
+from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.schemas.teams import (
     ChangeRoleRequest,
@@ -23,22 +24,32 @@ async def list_teams(user: User = Depends(get_current_user)):
 @router.get("/{team_uuid}/members")
 async def list_members(team_uuid: str, user: User = Depends(get_current_user)):
     """List members of a team."""
-    from app.models.team import Team
-
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    membership = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == user.user_id,
+    )
+    if not membership and not user.is_admin:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
     return await team_service.get_team_members(team.id)
 
 
 @router.get("/{team_uuid}/invites")
 async def list_invites(team_uuid: str, user: User = Depends(get_current_user)):
     """List pending invites for a team."""
-    from app.models.team import Team
-
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    membership = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == user.user_id,
+    )
+    if not membership and not user.is_admin:
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+    if membership and membership.role not in ("owner", "admin") and not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin or owner role required")
     return await team_service.get_team_invites(team.id)
 
 

@@ -18,12 +18,46 @@ cp backend/.env.example backend/.env
 # 3. Build and start everything
 docker compose up --build -d
 
-# 4. Verify
+# 4. Bootstrap the first admin account and optional shared default team
+docker compose exec \
+  -e ADMIN_EMAIL=admin@example.edu \
+  -e ADMIN_PASSWORD='change-me-now' \
+  -e ADMIN_NAME='Initial Admin' \
+  -e DEFAULT_TEAM_NAME='Research Administration' \
+  api python bootstrap_install.py
+
+# 5. Verify
 curl http://localhost:8001/api/health
-# → {"status":"ok"}
+# → {"status":"ok","checks":{...}}
 ```
 
 The frontend is available at `http://localhost:80` and proxies API requests to the backend on port 8001.
+
+What the bootstrap command does:
+
+- creates or updates the initial admin account
+- optionally creates a shared default team and marks it as the auto-join team for new users
+- reuses an existing default team only when it is already owned by the bootstrap admin
+
+First-login behavior:
+
+- every user gets a personal team
+- if `DEFAULT_TEAM_NAME` is set, new users also auto-join that shared team on first registration or SSO login
+- the bootstrap admin keeps both the personal team and the shared default team; switch teams in the UI if you want the shared team to be your active workspace
+
+Persistence in the default compose setup:
+
+- `mongo-data`: MongoDB records
+- `uploads`: uploaded files
+- `chroma-data`: vector index / embeddings
+
+Common operator commands:
+
+```bash
+docker compose restart api celery frontend
+docker compose logs -f api
+docker compose down
+```
 
 To stop all services:
 ```bash
@@ -68,7 +102,7 @@ The Flask app stores `LibraryItem.obj` as a MongoEngine `GenericReferenceField`.
 
 ```bash
 # Install dependencies (pymongo is the only requirement)
-uv sync
+uv sync --extra dev
 
 # Preview what will change
 python migrate.py --dry-run --mongo-host mongodb://localhost:27017/ --db-name osp
@@ -92,8 +126,7 @@ python migrate.py --mongo-host mongodb://localhost:27018/ --db-name osp
 
 ```bash
 cd frontend
-
-npm install
+npm ci
 npm run build
 ```
 
@@ -349,7 +382,7 @@ docker compose down web
 
 Run through this checklist after switching over:
 
-- [ ] `GET /api/health` returns `{"status":"ok"}`
+- [ ] `GET /api/health` returns `"status":"ok"` and populated health checks
 - [ ] Login works with an existing user's credentials
 - [ ] Documents list loads (confirms MongoDB collection names match)
 - [ ] Document search returns results (confirms ChromaDB path is correct)

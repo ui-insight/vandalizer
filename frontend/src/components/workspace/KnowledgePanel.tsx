@@ -4,9 +4,9 @@ import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
-import { listGroups } from '../../api/library'
+import { listOrganizationsFlat } from '../../api/organizations'
+import type { Organization } from '../../api/organizations'
 import type { KnowledgeBaseDetail, KnowledgeBaseSource } from '../../types/knowledge'
-import type { Group } from '../../types/library'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
@@ -30,17 +30,17 @@ export function KnowledgePanel() {
   const { user } = useAuth()
   const { knowledgeBases, loading, create, remove, refresh } = useKnowledgeBases()
   const [creating, setCreating] = useState(false)
-  const [allGroups, setAllGroups] = useState<Group[]>([])
-  const [showGroupsModal, setShowGroupsModal] = useState(false)
-  const [savingGroups, setSavingGroups] = useState(false)
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([])
+  const [allOrgs, setAllOrgs] = useState<Organization[]>([])
+  const [showOrgsModal, setShowOrgsModal] = useState(false)
+  const [savingOrgs, setSavingOrgs] = useState(false)
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([])
 
   const isExaminerOrAdmin = !!(user?.is_examiner || user?.is_admin)
 
-  // Load groups for badges/assignment
+  // Load orgs for badges/assignment
   useEffect(() => {
     if (isExaminerOrAdmin) {
-      listGroups().then(data => setAllGroups(data.groups)).catch(() => {})
+      listOrganizationsFlat().then(data => setAllOrgs(data.organizations)).catch(() => {})
     }
   }, [isExaminerOrAdmin])
   const [error, setError] = useState<string | null>(null)
@@ -158,24 +158,24 @@ export function KnowledgePanel() {
     }
   }
 
-  const handleOpenGroupsModal = () => {
+  const handleOpenOrgsModal = () => {
     if (!selectedKB) return
-    setSelectedGroupIds(selectedKB.group_ids || [])
-    setShowGroupsModal(true)
+    setSelectedOrgIds(selectedKB.organization_ids || [])
+    setShowOrgsModal(true)
   }
 
-  const handleSaveGroups = async () => {
+  const handleSaveOrgs = async () => {
     if (!selectedKB) return
-    setSavingGroups(true)
+    setSavingOrgs(true)
     try {
-      await api.setKBGroups(selectedKB.uuid, selectedGroupIds)
+      await api.setKBOrganizations(selectedKB.uuid, selectedOrgIds)
       loadDetail(selectedKB.uuid)
       refresh()
-      setShowGroupsModal(false)
+      setShowOrgsModal(false)
     } catch (err) {
-      console.error('Failed to update groups:', err)
+      console.error('Failed to update org visibility:', err)
     } finally {
-      setSavingGroups(false)
+      setSavingOrgs(false)
     }
   }
 
@@ -427,27 +427,27 @@ export function KnowledgePanel() {
               )}
               {selectedKB.verified && isExaminerOrAdmin && (
                 <button
-                  onClick={handleOpenGroupsModal}
+                  onClick={handleOpenOrgsModal}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 6,
                     padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                    color: (selectedKB.group_ids?.length ?? 0) > 0 ? '#2563eb' : '#e5e5e5',
-                    backgroundColor: (selectedKB.group_ids?.length ?? 0) > 0 ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
-                    border: (selectedKB.group_ids?.length ?? 0) > 0 ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid #3a3a3a',
+                    color: (selectedKB.organization_ids?.length ?? 0) > 0 ? '#2563eb' : '#e5e5e5',
+                    backgroundColor: (selectedKB.organization_ids?.length ?? 0) > 0 ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
+                    border: (selectedKB.organization_ids?.length ?? 0) > 0 ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid #3a3a3a',
                     borderRadius: 6, cursor: 'pointer',
                   }}
                 >
                   <Tag size={13} />
-                  Manage Groups
+                  Org Visibility
                 </button>
               )}
             </div>
 
-            {/* Group badges */}
-            {(selectedKB.group_ids?.length ?? 0) > 0 && (
+            {/* Org visibility badges */}
+            {(selectedKB.organization_ids?.length ?? 0) > 0 && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-                {selectedKB.group_ids.map(gid => {
-                  const group = allGroups.find(g => g.uuid === gid)
+                {selectedKB.organization_ids.map(gid => {
+                  const o = allOrgs.find(x => x.uuid === gid)
                   return (
                     <span
                       key={gid}
@@ -459,7 +459,7 @@ export function KnowledgePanel() {
                       }}
                     >
                       <Tag size={10} />
-                      {group?.name || gid}
+                      {o?.name || gid}
                     </span>
                   )
                 })}
@@ -614,7 +614,7 @@ export function KnowledgePanel() {
             </div>
           </div>
         )}
-        {showGroupsModal && (
+        {showOrgsModal && (
           <div style={{
             position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
@@ -624,25 +624,25 @@ export function KnowledgePanel() {
               border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
             }}>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
-                Manage Groups
+                Organization Visibility
               </div>
               <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
-                No groups selected = visible to everyone. Selected groups restrict visibility to group members only.
+                No orgs selected = visible to everyone. Selected orgs restrict visibility to users in those orgs and below.
               </div>
-              {allGroups.length === 0 ? (
+              {allOrgs.length === 0 ? (
                 <div style={{ fontSize: 13, color: '#888', padding: '20px 0', textAlign: 'center' }}>
-                  No groups available. Create groups in the Verification page.
+                  No organizations available. Set up the org hierarchy in the admin page.
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
-                  {allGroups.map(group => (
+                  {allOrgs.map(org => (
                     <label
-                      key={group.uuid}
+                      key={org.uuid}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 10px', borderRadius: 6,
-                        backgroundColor: selectedGroupIds.includes(group.uuid) ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
-                        border: selectedGroupIds.includes(group.uuid)
+                        backgroundColor: selectedOrgIds.includes(org.uuid) ? 'rgba(37, 99, 235, 0.1)' : '#2a2a2a',
+                        border: selectedOrgIds.includes(org.uuid)
                           ? '1px solid rgba(37, 99, 235, 0.3)'
                           : '1px solid #3a3a3a',
                         cursor: 'pointer',
@@ -650,21 +650,19 @@ export function KnowledgePanel() {
                     >
                       <input
                         type="checkbox"
-                        checked={selectedGroupIds.includes(group.uuid)}
+                        checked={selectedOrgIds.includes(org.uuid)}
                         onChange={() => {
-                          setSelectedGroupIds(prev =>
-                            prev.includes(group.uuid)
-                              ? prev.filter(id => id !== group.uuid)
-                              : [...prev, group.uuid]
+                          setSelectedOrgIds(prev =>
+                            prev.includes(org.uuid)
+                              ? prev.filter(id => id !== org.uuid)
+                              : [...prev, org.uuid]
                           )
                         }}
                         style={{ accentColor: '#2563eb' }}
                       />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>{group.name}</div>
-                        {group.description && (
-                          <div style={{ fontSize: 11, color: '#888' }}>{group.description}</div>
-                        )}
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>{org.name}</div>
+                        <div style={{ fontSize: 11, color: '#888' }}>{org.org_type}</div>
                       </div>
                     </label>
                   ))}
@@ -672,7 +670,7 @@ export function KnowledgePanel() {
               )}
               <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                 <button
-                  onClick={() => setShowGroupsModal(false)}
+                  onClick={() => setShowOrgsModal(false)}
                   style={{
                     padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
                     color: '#aaa', backgroundColor: 'transparent', border: '1px solid #3a3a3a',
@@ -682,18 +680,18 @@ export function KnowledgePanel() {
                   Cancel
                 </button>
                 <button
-                  onClick={handleSaveGroups}
-                  disabled={savingGroups}
+                  onClick={handleSaveOrgs}
+                  disabled={savingOrgs}
                   style={{
                     padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
                     color: 'var(--highlight-text-color, #000)',
                     backgroundColor: 'var(--highlight-color, #eab308)',
                     border: 'none', borderRadius: 6,
-                    cursor: savingGroups ? 'default' : 'pointer',
-                    opacity: savingGroups ? 0.6 : 1,
+                    cursor: savingOrgs ? 'default' : 'pointer',
+                    opacity: savingOrgs ? 0.6 : 1,
                   }}
                 >
-                  {savingGroups ? 'Saving...' : 'Save'}
+                  {savingOrgs ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </div>
@@ -825,10 +823,10 @@ export function KnowledgePanel() {
                     <span>{kb.total_sources} sources</span>
                     <span>{kb.total_chunks} chunks</span>
                   </div>
-                  {(kb.group_ids?.length ?? 0) > 0 && (
+                  {(kb.organization_ids?.length ?? 0) > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                      {kb.group_ids.map(gid => {
-                        const group = allGroups.find(g => g.uuid === gid)
+                      {kb.organization_ids.map(gid => {
+                        const o = allOrgs.find(x => x.uuid === gid)
                         return (
                           <span
                             key={gid}
@@ -839,7 +837,7 @@ export function KnowledgePanel() {
                             }}
                           >
                             <Tag size={9} />
-                            {group?.name || gid}
+                            {o?.name || gid}
                           </span>
                         )
                       })}

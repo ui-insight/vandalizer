@@ -1,6 +1,6 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, Search, AlertTriangle, Eye, Shield, ArrowRight, ShieldCheck, Download, Upload } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
@@ -24,11 +24,9 @@ import {
   importSearchSet,
 } from '../../api/extractions'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
-import { searchDocuments } from '../../api/documents'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { getModels } from '../../api/config'
 import { submitForVerification } from '../../api/library'
-import { useTeams } from '../../hooks/useTeams'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -53,7 +51,6 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal } = useWorkspace()
-  const { currentTeam } = useTeams()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -419,7 +416,6 @@ export function ExtractionEditorPanel() {
           onRemoveItem={remove}
           onUpdateItem={update}
           onReorder={reorder}
-          pdfTitle={searchSet?.title ?? ''}
           searchSetUuid={openExtractionId ?? undefined}
           onHighlightValue={setHighlightTerms}
         />
@@ -662,7 +658,6 @@ function DesignTab({
   onRemoveItem,
   onUpdateItem,
   onReorder,
-  pdfTitle,
   searchSetUuid,
   onHighlightValue,
 }: {
@@ -677,7 +672,6 @@ function DesignTab({
   onRemoveItem: (id: string) => void
   onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
   onReorder: (itemIds: string[]) => void
-  pdfTitle: string
   searchSetUuid?: string
   onHighlightValue: (terms: string[]) => void
 }) {
@@ -1965,7 +1959,7 @@ function ValidateTab({
   }
 
   const fillFromExtraction = async (src: SourceLocal) => {
-    if (!src.document_uuid || fillAbortRef.current) return
+    if (!src.document_uuid) return
     // Abort any previous in-flight request
     fillAbortRef.current?.abort()
     const abort = new AbortController()
@@ -2764,7 +2758,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
-          formatter={(value: number) => [`${value}%`, 'Score']}
+          formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Score']}
         />
         <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} />
       </LineChart>
@@ -2814,7 +2808,7 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
             <span style={valStyle}>{bool(onePass.thinking)}</span>
             <span style={labelStyle}>Structured</span>
             <span style={valStyle}>{bool(onePass.structured)}</span>
-            {onePass.model && <>
+            {typeof onePass.model === 'string' && <>
               <span style={labelStyle}>Model override</span>
               <span style={valStyle}>{String(onePass.model)}</span>
             </>}
@@ -2835,7 +2829,7 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
                   <span style={valStyle}>{bool(p1.thinking)}</span>
                   <span style={labelStyle}>Structured</span>
                   <span style={valStyle}>{bool(p1.structured)}</span>
-                  {p1.model && <>
+                  {typeof p1.model === 'string' && <>
                     <span style={labelStyle}>Model</span>
                     <span style={valStyle}>{String(p1.model)}</span>
                   </>}
@@ -2850,7 +2844,7 @@ function _renderConfigDetails(config?: Record<string, unknown> | null): React.Re
                   <span style={valStyle}>{bool(p2.thinking)}</span>
                   <span style={labelStyle}>Structured</span>
                   <span style={valStyle}>{bool(p2.structured)}</span>
-                  {p2.model && <>
+                  {typeof p2.model === 'string' && <>
                     <span style={labelStyle}>Model</span>
                     <span style={valStyle}>{String(p2.model)}</span>
                   </>}

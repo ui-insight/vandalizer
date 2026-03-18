@@ -5,7 +5,7 @@ import {
   addToCollection, removeFromCollection, listVerifiedItems,
 } from '../../api/library'
 import type { VerifiedCollection, VerifiedCatalogItem } from '../../types/library'
-import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 
 export function CollectionsManager() {
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
@@ -27,7 +27,7 @@ export function CollectionsManager() {
   const [addSearch, setAddSearch] = useState('')
   const [loadingItems, setLoadingItems] = useState(false)
 
-  const { openWorkflow, openExtraction } = useWorkspace()
+  const workspace = useOptionalWorkspace()
 
   // Lookup map: item_id → VerifiedCatalogItem
   const itemMap = useMemo(() => {
@@ -309,11 +309,11 @@ export function CollectionsManager() {
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
-                                {item && (
+                                {item && workspace && (
                                   <button
                                     onClick={() => {
-                                      if (item.kind === 'workflow') openWorkflow(item.item_id)
-                                      else openExtraction(item.item_id)
+                                      if (item.kind === 'workflow') workspace.openWorkflow(item.item_id)
+                                      else workspace.openExtraction(item.item_id)
                                     }}
                                     className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
                                     title="Open"

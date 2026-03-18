@@ -22,7 +22,12 @@ from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
-from app.services.llm_service import create_chat_agent, VANDALIZER_CONTEXT
+from app.services.llm_service import (
+    create_chat_agent,
+    DOCUMENT_CHAT_SYSTEM_PROMPT,
+    HELP_CHAT_SYSTEM_PROMPT,
+    VANDALIZER_CONTEXT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +186,11 @@ async def chat_stream(
             )
 
     file_attachments = await conversation.get_file_attachments()
+    logger.info(
+        "Chat file attachments: count=%d with_content=%d",
+        len(file_attachments),
+        sum(1 for a in file_attachments if a.content),
+    )
     for att in file_attachments:
         if att.content:
             attachment_context += (
@@ -195,7 +205,7 @@ async def chat_stream(
     if previous_messages:
         previous_messages = previous_messages[:-1]
 
-    # Build prompt — keep it clean; system prompt handles behavior
+    # Build prompt and select appropriate system prompt
     full_text = _get_full_text(documents)
     if document_uuids:
         logger.info(
@@ -205,7 +215,6 @@ async def chat_stream(
             sum(1 for d in documents if d.raw_text),
             len(full_text),
         )
-    agent = create_chat_agent(model_name, system_config_doc=sys_config_doc)
 
     parts: list[str] = []
 
@@ -227,6 +236,7 @@ async def chat_stream(
     if attachment_context:
         parts.append(attachment_context)
 
+    # Select system prompt based on whether we have document context
     if parts:
         context_block = "\n\n".join(parts)
         prompt = (
@@ -235,8 +245,9 @@ async def chat_stream(
             f"{context_block}\n"
             "--- END REFERENCE DOCUMENTS ---"
         )
+        system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif include_onboarding_context:
-        # Inject Vandalizer onboarding context only when explicitly requested
+        # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
         prompt = (
             "--- BEGIN ONBOARDING CONTEXT ---\n"
@@ -244,8 +255,12 @@ async def chat_stream(
             "--- END ONBOARDING CONTEXT ---\n\n"
             f"User question: {message}"
         )
+        system_prompt = HELP_CHAT_SYSTEM_PROMPT
     else:
         prompt = message
+        system_prompt = None  # uses default
+
+    agent = create_chat_agent(model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc)
 
     # Stream the response
     full_response: list[str] = []

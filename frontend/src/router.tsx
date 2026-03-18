@@ -34,7 +34,19 @@ const Approvals = lazy(() => import('./pages/Approvals'))
 function CertificationRedirect() {
   const { openPanel } = useCertificationPanel()
   const navigate = useNavigate()
-  useEffect(() => { openPanel(); navigate({ to: '/' }) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    openPanel()
+    navigate({
+      to: '/',
+      search: {
+        mode: undefined,
+        tab: undefined,
+        workflow: undefined,
+        extraction: undefined,
+        automation: undefined,
+      },
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
   return null
 }
 
@@ -62,13 +74,13 @@ const landingRoute = createRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: () => <Navigate to="/landing" />,
+  component: () => <Navigate to="/landing" search={{ error: undefined }} />,
 })
 
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
-  component: () => <Navigate to="/landing" />,
+  component: () => <Navigate to="/landing" search={{ error: undefined }} />,
 })
 
 const indexRoute = createRoute({

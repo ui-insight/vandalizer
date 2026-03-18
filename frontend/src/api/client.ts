@@ -6,9 +6,17 @@ export class ApiError extends Error {
   }
 }
 
-function getCsrfToken(): string | null {
+export function getCsrfToken(): string | null {
   const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
   return match ? decodeURIComponent(match[1]) : null
+}
+
+/** Return a headers object with the CSRF token set (for raw fetch calls). */
+export function csrfHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { ...extra }
+  const csrf = getCsrfToken()
+  if (csrf) headers['X-CSRF-Token'] = csrf
+  return headers
 }
 
 async function refreshToken(): Promise<boolean> {

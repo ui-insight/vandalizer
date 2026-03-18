@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardCheck, Cloud, FileText, FolderOpen, Globe, MessageSquare, Settings, Shield, Users, Workflow, Zap } from 'lucide-react'
+import { BookOpen, ClipboardCheck, Cloud, FileText, FolderOpen, Globe, MessageSquare, Shield, Users, Workflow, Zap } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'

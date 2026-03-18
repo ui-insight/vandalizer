@@ -1,7 +1,7 @@
 import { apiFetch } from './client'
 import type { Folder } from '../types/document'
 
-export function createFolder(data: { name: string; parent_id: string; space: string; folder_type?: string }) {
+export function createFolder(data: { name: string; parent_id: string; folder_type?: string }) {
   return apiFetch<Folder>('/api/folders/create', {
     method: 'POST',
     body: JSON.stringify(data),

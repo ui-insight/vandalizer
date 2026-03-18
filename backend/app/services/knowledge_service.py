@@ -28,7 +28,7 @@ def _get_dm() -> DocumentManager:
 async def list_knowledge_bases(
     user_id: str,
     team_id: str | None = None,
-    user_group_uuids: list[str] | None = None,
+    user_org_ancestry: list[str] | None = None,
 ) -> list[KnowledgeBase]:
     if team_id:
         kbs = await KnowledgeBase.find(
@@ -46,14 +46,14 @@ async def list_knowledge_bases(
             ]},
         ).sort(-KnowledgeBase.created_at).to_list()
 
-    # Group filtering: exclude KBs with groups the user doesn't belong to
+    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to
     # Never filter out user's own KBs
-    if user_group_uuids is not None:
+    if user_org_ancestry is not None:
         kbs = [
             kb for kb in kbs
             if kb.user_id == user_id
-            or not kb.group_ids
-            or bool(set(kb.group_ids) & set(user_group_uuids))
+            or not kb.organization_ids
+            or bool(set(kb.organization_ids) & set(user_org_ancestry))
         ]
 
     return kbs
@@ -90,7 +90,7 @@ async def update_knowledge_base(
     uuid: str, user_id: str,
     title: str | None = None, description: str | None = None,
     shared_with_team: bool | None = None,
-    group_ids: list[str] | None = None,
+    organization_ids: list[str] | None = None,
 ) -> KnowledgeBase | None:
     kb = await get_knowledge_base(uuid, user_id)
     if not kb:
@@ -103,8 +103,8 @@ async def update_knowledge_base(
         kb.description = description[:5000] or None
     if shared_with_team is not None:
         kb.shared_with_team = shared_with_team
-    if group_ids is not None:
-        kb.group_ids = group_ids
+    if organization_ids is not None:
+        kb.organization_ids = organization_ids
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
     return kb

@@ -28,26 +28,16 @@ async def upload(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    # Resolve team_id from user's current team
-    team_id: str | None = None
-    if user.current_team:
-        from app.models.team import Team
-
-        team = await Team.get(user.current_team)
-        if team:
-            team_id = team.uuid
-
     try:
         result = await file_service.upload_document(
             blob=body.contentAsBase64String,
             filename=body.fileName,
             raw_extension=body.extension,
-            space=body.space,
-            user_id=user.user_id,
+            space=body.space or user.user_id,
+            user=user,
             settings=settings,
             folder=body.folder,
             root_folder_name=body.rootFolderName,
-            team_id=team_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -69,7 +59,7 @@ async def download_head(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
     media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
@@ -87,7 +77,7 @@ async def download(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    result = await file_service.download_document(docid, settings, user_id=user.user_id)
+    result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
     media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
@@ -112,7 +102,7 @@ async def download_bulk(
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for docid in doc_ids:
             result = await file_service.download_document(
-                docid, settings, user_id=user.user_id
+                docid, settings, user=user
             )
             if result:
                 zf.writestr(result.title, result.data)
@@ -131,7 +121,7 @@ async def delete(
     user: User = Depends(get_current_user),
     settings: Settings = Depends(get_settings),
 ):
-    ok = await file_service.delete_document(doc_uuid, settings, user_id=user.user_id)
+    ok = await file_service.delete_document(doc_uuid, settings, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}
@@ -143,7 +133,7 @@ async def rename(
     user: User = Depends(get_current_user),
 ):
     try:
-        ok = await file_service.rename_document(body.uuid, body.newName, user_id=user.user_id)
+        ok = await file_service.rename_document(body.uuid, body.newName, user=user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     if not ok:
@@ -156,7 +146,10 @@ async def move(
     body: MoveFileRequest,
     user: User = Depends(get_current_user),
 ):
-    ok = await file_service.move_document(body.fileUUID, body.folderID, user_id=user.user_id)
+    try:
+        ok = await file_service.move_document(body.fileUUID, body.folderID, user=user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if not ok:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"ok": True}

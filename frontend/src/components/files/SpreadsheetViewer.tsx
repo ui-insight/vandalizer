@@ -11,7 +11,7 @@ interface SpreadsheetViewerProps {
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
-export function SpreadsheetViewer({ docUuid, processing, taskStatus }: SpreadsheetViewerProps) {
+export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus }: SpreadsheetViewerProps) {
   const [zoom, setZoom] = useState(2)
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<string[][]>([])

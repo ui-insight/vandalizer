@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.services import verification_service as svc
-from app.services import group_service
+from app.services import organization_service
 
 router = APIRouter()
 
@@ -44,7 +44,7 @@ class SubmitRequest(BaseModel):
 class UpdateStatusRequest(BaseModel):
     status: str  # "approved", "rejected", "in_review"
     reviewer_notes: Optional[str] = None
-    group_ids: Optional[list[str]] = None
+    organization_ids: Optional[list[str]] = None
     collection_ids: Optional[list[str]] = None
 
 
@@ -52,7 +52,7 @@ class MetadataUpdateRequest(BaseModel):
     display_name: Optional[str] = None
     description: Optional[str] = None
     markdown: Optional[str] = None
-    group_ids: Optional[list[str]] = None
+    organization_ids: Optional[list[str]] = None
 
 
 class CreateCollectionRequest(BaseModel):
@@ -140,13 +140,9 @@ async def list_verified_items(
     search: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
 ):
-    # Admins/examiners see all items unfiltered (Catalog view)
-    if user.is_admin or user.is_examiner:
-        user_group_uuids = None
-    else:
-        user_group_uuids = await group_service.get_user_group_uuids(user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     items = await svc.list_verified_items(
-        kind_filter=kind, search=search, user_group_uuids=user_group_uuids,
+        kind_filter=kind, search=search, user_org_ancestry=user_org_ancestry,
     )
     return {"items": items}
 
@@ -168,6 +164,8 @@ async def update_item_metadata(
     req: MetadataUpdateRequest,
     user: User = Depends(get_current_user),
 ):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
     result = await svc.update_item_metadata(
         item_kind=item_kind,
         item_id=item_id,
@@ -175,17 +173,93 @@ async def update_item_metadata(
         display_name=req.display_name,
         description=req.description,
         markdown=req.markdown,
-        group_ids=req.group_ids,
+        organization_ids=req.organization_ids,
     )
     return result
 
 
-@router.post("/verified/{item_kind}/{item_id}/unverify")
+# ---------------------------------------------------------------------------
+# Upload test files for verification submission
+# ---------------------------------------------------------------------------
+
+
+@router.post("/upload-test-file")
+async def upload_test_file(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Upload a test file for a verification submission. Returns metadata."""
+    import os
+    import uuid
+
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No file provided")
+
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:  # 10 MB limit
+        raise HTTPException(status_code=400, detail="File too large (max 10 MB)")
+
+    stored_name = f"{uuid.uuid4().hex}_{file.filename}"
+    upload_dir = os.path.join("uploads", "test_files")
+    os.makedirs(upload_dir, exist_ok=True)
+    file_path = os.path.join(upload_dir, stored_name)
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    return {
+        "original_name": file.filename,
+        "stored_name": stored_name,
+        "path": file_path,
+    }
+
+
+@router.get("/download-test-file/{stored_name}")
+async def download_test_file(
+    stored_name: str,
+    user: User = Depends(get_current_user),
+):
+    """Download a test file by stored name."""
+    import os
+
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
+
+    file_path = os.path.join("uploads", "test_files", stored_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    # Extract original name from stored_name (uuid_originalname)
+    parts = stored_name.split("_", 1)
+    original_name = parts[1] if len(parts) > 1 else stored_name
+
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    return StreamingResponse(
+        io.BytesIO(content),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{original_name}"'},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Verification request status updates
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Unverify
+# ---------------------------------------------------------------------------
+
+
+@router.delete("/verified/{item_kind}/{item_id}")
 async def unverify_item(
     item_kind: str,
     item_id: str,
     user: User = Depends(get_current_user),
 ):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
     result = await svc.unverify_item(item_id, item_kind)
     return result
 
@@ -196,11 +270,10 @@ async def unverify_item(
 
 
 @router.get("/collections")
-async def list_collections(
-    user: User = Depends(get_current_user),
-):
-    collections = await svc.list_collections()
-    return {"collections": collections}
+async def list_collections(user: User = Depends(get_current_user)):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
+    return {"collections": await svc.list_collections()}
 
 
 @router.post("/collections")
@@ -208,11 +281,9 @@ async def create_collection(
     req: CreateCollectionRequest,
     user: User = Depends(get_current_user),
 ):
-    result = await svc.create_collection(
-        title=req.title,
-        description=req.description,
-        user_id=user.user_id,
-    )
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
+    result = await svc.create_collection(title=req.title, user_id=user.user_id, description=req.description)
     return result
 
 
@@ -222,11 +293,9 @@ async def update_collection(
     req: UpdateCollectionRequest,
     user: User = Depends(get_current_user),
 ):
-    result = await svc.update_collection(
-        collection_id=collection_id,
-        title=req.title,
-        description=req.description,
-    )
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
+    result = await svc.update_collection(collection_id, title=req.title, description=req.description)
     if not result:
         raise HTTPException(status_code=404, detail="Collection not found")
     return result
@@ -237,6 +306,8 @@ async def delete_collection(
     collection_id: str,
     user: User = Depends(get_current_user),
 ):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
     ok = await svc.delete_collection(collection_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -249,6 +320,8 @@ async def add_to_collection(
     req: AddToCollectionRequest,
     user: User = Depends(get_current_user),
 ):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
     result = await svc.add_to_collection(collection_id, req.item_id)
     if not result:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -265,118 +338,6 @@ async def remove_from_collection(
     if not result:
         raise HTTPException(status_code=404, detail="Collection not found")
     return result
-
-
-# ---------------------------------------------------------------------------
-# Group management (admin/examiner)
-# ---------------------------------------------------------------------------
-
-
-class CreateGroupRequest(BaseModel):
-    name: str
-    description: Optional[str] = None
-
-
-class UpdateGroupRequest(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-
-
-class AddGroupMemberRequest(BaseModel):
-    user_id: str
-
-
-@router.get("/groups")
-async def list_groups(user: User = Depends(get_current_user)):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    groups = await group_service.list_groups()
-    return {"groups": groups}
-
-
-@router.post("/groups")
-async def create_group(req: CreateGroupRequest, user: User = Depends(get_current_user)):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    if not req.name.strip():
-        raise HTTPException(status_code=400, detail="Name is required")
-    result = await group_service.create_group(
-        name=req.name, user_id=user.user_id, description=req.description,
-    )
-    return result
-
-
-@router.patch("/groups/{group_uuid}")
-async def update_group(
-    group_uuid: str,
-    req: UpdateGroupRequest,
-    user: User = Depends(get_current_user),
-):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    result = await group_service.update_group(
-        group_uuid, name=req.name, description=req.description,
-    )
-    if not result:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return result
-
-
-@router.delete("/groups/{group_uuid}")
-async def delete_group(group_uuid: str, user: User = Depends(get_current_user)):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    ok = await group_service.delete_group(group_uuid)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return {"ok": True}
-
-
-@router.get("/groups/search-users")
-async def search_users_for_groups(
-    q: str = Query(..., min_length=1),
-    user: User = Depends(get_current_user),
-):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    users = await group_service.search_users(q)
-    return {"users": users}
-
-
-@router.get("/groups/{group_uuid}/members")
-async def list_group_members(group_uuid: str, user: User = Depends(get_current_user)):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    members = await group_service.list_group_members(group_uuid)
-    return {"members": members}
-
-
-@router.post("/groups/{group_uuid}/members")
-async def add_group_member(
-    group_uuid: str,
-    req: AddGroupMemberRequest,
-    user: User = Depends(get_current_user),
-):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    ok = await group_service.add_user_to_group(group_uuid, req.user_id, user.user_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Group not found")
-    return {"ok": True}
-
-
-@router.delete("/groups/{group_uuid}/members/{member_user_id}")
-async def remove_group_member(
-    group_uuid: str,
-    member_user_id: str,
-    user: User = Depends(get_current_user),
-):
-    if not (user.is_admin or user.is_examiner):
-        raise HTTPException(status_code=403, detail="Admin or examiner access required")
-    ok = await group_service.remove_user_from_group(group_uuid, member_user_id)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Group or member not found")
-    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -408,92 +369,8 @@ async def set_examiner(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/examiners/search")
-async def search_users_for_examiner(
-    q: str = Query(..., min_length=1),
-    user: User = Depends(get_current_user),
-):
-    if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    users = await svc.search_users(q)
-    return {"users": users}
-
-
 # ---------------------------------------------------------------------------
-# Catalog export / import
-# ---------------------------------------------------------------------------
-
-
-@router.get("/catalog/export")
-async def export_catalog(user: User = Depends(get_current_user)):
-    """Download full verified catalog as a shareable JSON file."""
-    from app.services import export_import_service as eis
-
-    data = await eis.export_catalog(user.email or user.user_id)
-    json_bytes = json.dumps(data, indent=2, default=str).encode()
-    return StreamingResponse(
-        io.BytesIO(json_bytes),
-        media_type="application/json",
-        headers={"Content-Disposition": 'attachment; filename="catalog.vandalizer.json"'},
-    )
-
-
-@router.post("/catalog/preview-import")
-async def preview_catalog_import(
-    file: UploadFile = File(...),
-    user: User = Depends(get_current_user),
-):
-    """Parse a catalog export and return item list for selection UI (no DB writes)."""
-    from app.services import export_import_service as eis
-
-    content = await file.read()
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON file")
-
-    try:
-        preview = eis.preview_catalog_import(data)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return {"items": preview}
-
-
-@router.post("/catalog/import")
-async def import_catalog(
-    file: UploadFile = File(...),
-    selected_indices: str = Form(...),
-    space: str = Form("default"),
-    user: User = Depends(get_current_user),
-):
-    """Import selected catalog items from an export file."""
-    from app.services import export_import_service as eis
-
-    content = await file.read()
-    try:
-        data = json.loads(content)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON file")
-
-    try:
-        indices = json.loads(selected_indices)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid selected_indices")
-
-    if not isinstance(indices, list):
-        raise HTTPException(status_code=400, detail="selected_indices must be an array")
-
-    try:
-        results = await eis.import_catalog_items(data, indices, user.user_id, space)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    return {"imported": results}
-
-
-# ---------------------------------------------------------------------------
-# Individual request (keep at bottom to avoid path conflicts)
+# Catch-all request routes (must be last to avoid shadowing named routes)
 # ---------------------------------------------------------------------------
 
 
@@ -504,7 +381,7 @@ async def get_request(
 ):
     result = await svc.get_request(request_uuid)
     if not result:
-        raise HTTPException(status_code=404, detail="Verification request not found")
+        raise HTTPException(status_code=404, detail="Request not found")
     return result
 
 
@@ -514,14 +391,17 @@ async def update_status(
     req: UpdateStatusRequest,
     user: User = Depends(get_current_user),
 ):
+    if not (user.is_admin or user.is_examiner):
+        raise HTTPException(status_code=403, detail="Admin or examiner access required")
+
     result = await svc.update_status(
         request_uuid=request_uuid,
         new_status=req.status,
         reviewer_user_id=user.user_id,
         reviewer_notes=req.reviewer_notes,
-        group_ids=req.group_ids,
+        organization_ids=req.organization_ids,
         collection_ids=req.collection_ids,
     )
     if not result:
-        raise HTTPException(status_code=404, detail="Verification request not found")
+        raise HTTPException(status_code=404, detail="Request not found")
     return result

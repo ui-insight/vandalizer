@@ -60,8 +60,8 @@ class TestFileDownloadAuth:
         assert resp.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_download_calls_service_with_user_id(self, client):
-        """Verify that user_id is passed to file_service.download_document."""
+    async def test_download_calls_service_with_user(self, client):
+        """Verify that the current user is passed to file_service.download_document."""
         user = _make_user()
         cookies, headers = _auth_cookies()
 
@@ -77,10 +77,10 @@ class TestFileDownloadAuth:
                 headers=headers,
             )
 
-        # Should call download_document with user_id kwarg
+        # Should call download_document with user kwarg
         mock_svc.download_document.assert_called_once()
         call_kwargs = mock_svc.download_document.call_args
-        assert call_kwargs.kwargs.get("user_id") == "testuser"
+        assert call_kwargs.kwargs.get("user") is user
 
     @pytest.mark.asyncio
     async def test_download_file_not_found(self, client):
@@ -104,7 +104,7 @@ class TestFileDownloadAuth:
 
 class TestFileDeleteAuth:
     @pytest.mark.asyncio
-    async def test_delete_calls_service_with_user_id(self, client):
+    async def test_delete_calls_service_with_user(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
@@ -122,7 +122,7 @@ class TestFileDeleteAuth:
 
         mock_svc.delete_document.assert_called_once()
         call_kwargs = mock_svc.delete_document.call_args
-        assert call_kwargs.kwargs.get("user_id") == "testuser"
+        assert call_kwargs.kwargs.get("user") is user
 
     @pytest.mark.asyncio
     async def test_delete_unauthenticated(self, client):
@@ -134,7 +134,7 @@ class TestFileDeleteAuth:
 
 class TestBulkDownloadAuth:
     @pytest.mark.asyncio
-    async def test_bulk_download_passes_user_id(self, client):
+    async def test_bulk_download_passes_user(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
@@ -151,10 +151,10 @@ class TestBulkDownloadAuth:
                 headers=headers,
             )
 
-        # Should have been called for each doc with user_id
+        # Should have been called for each doc with user
         assert mock_svc.download_document.call_count == 2
         for call in mock_svc.download_document.call_args_list:
-            assert call.kwargs.get("user_id") == "testuser"
+            assert call.kwargs.get("user") is user
 
 
 class TestPathTraversal:

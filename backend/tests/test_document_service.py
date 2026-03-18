@@ -8,6 +8,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.services.access_control import TeamAccessContext
+
 
 def _make_folder(uuid="f1", title="Folder 1", parent_id="0", space="default", team_id=None, is_shared_team_root=False):
     f = MagicMock()
@@ -63,6 +65,13 @@ def _make_document(
     return d
 
 
+def _make_user(user_id="user1"):
+    user = MagicMock()
+    user.user_id = user_id
+    user.is_admin = False
+    return user
+
+
 def _mock_find_chain(items):
     """Create a mock that supports .find(...).to_list()."""
     chain = MagicMock()
@@ -75,14 +84,16 @@ class TestListContents:
     async def test_returns_folders_and_documents(self):
         folders = [_make_folder(uuid="f1", title="My Folder")]
         docs = [_make_document(uuid="d1", title="My Doc")]
+        user = _make_user()
 
         with patch("app.services.document_service.SmartFolder") as MockFolder, \
-             patch("app.services.document_service.SmartDocument") as MockDoc:
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))):
             MockFolder.find = MagicMock(return_value=_mock_find_chain(folders))
             MockDoc.find = MagicMock(return_value=_mock_find_chain(docs))
 
             from app.services.document_service import list_contents
-            result = await list_contents(space="default", user_id="user1")
+            result = await list_contents(user=user)
 
         assert len(result["folders"]) == 1
         assert result["folders"][0]["title"] == "My Folder"
@@ -92,24 +103,23 @@ class TestListContents:
         assert result["documents"][0]["uuid"] == "d1"
 
     @pytest.mark.asyncio
-    async def test_filters_by_space_excludes_soft_deleted(self):
-        """Documents with soft_deleted=True should not appear."""
+    async def test_root_listing_scopes_to_user_and_excludes_soft_deleted(self):
         active_doc = _make_document(uuid="d1", soft_deleted=False)
-        # soft_deleted doc is filtered at the DB query level, so we just
-        # verify the service passes the right filters.
+        user = _make_user()
         with patch("app.services.document_service.SmartFolder") as MockFolder, \
-             patch("app.services.document_service.SmartDocument") as MockDoc:
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))):
             MockFolder.find = MagicMock(return_value=_mock_find_chain([]))
             MockDoc.find = MagicMock(return_value=_mock_find_chain([active_doc]))
 
             from app.services.document_service import list_contents
-            result = await list_contents(space="research", user_id="user1")
+            result = await list_contents(user=user)
 
-        # The find call should include soft_deleted filter
         call_args = MockDoc.find.call_args
-        filters = call_args[0][0]  # first positional arg is the dict filter
+        filters = call_args[0][0]
         assert filters["soft_deleted"] == {"$ne": True}
-        assert filters["space"] == "research"
+        assert filters["user_id"] == "user1"
+        assert filters["folder"] == "0"
 
         assert len(result["documents"]) == 1
         assert result["documents"][0]["soft_deleted"] is False
@@ -120,36 +130,45 @@ class TestListContents:
         team_folder = _make_folder(uuid="tf1", team_id="team-abc")
         doc1 = _make_document(uuid="d1", folder="tf1")
         doc2 = _make_document(uuid="d2", folder="tf1")
+        user = _make_user()
 
         with patch("app.services.document_service.SmartFolder") as MockFolder, \
-             patch("app.services.document_service.SmartDocument") as MockDoc:
+             patch("app.services.document_service.SmartDocument") as MockDoc, \
+             patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids={"team-abc"}, roles_by_uuid={"team-abc": "member"}))), \
+             patch("app.services.document_service.access_control.get_authorized_folder", new=AsyncMock(return_value=team_folder)):
             MockFolder.find = MagicMock(return_value=_mock_find_chain([]))
-            MockFolder.find_one = AsyncMock(return_value=team_folder)
-            # For team folders the code uses SmartDocument.find with positional filters
             MockDoc.find = MagicMock(return_value=_mock_find_chain([doc1, doc2]))
 
             from app.services.document_service import list_contents
-            result = await list_contents(space="default", folder="tf1", user_id="user1")
+            result = await list_contents(folder="tf1", user=user)
 
         assert len(result["documents"]) == 2
-        # Verify that the doc query used Beanie-style positional filters (not dict with user_id)
         call_args = MockDoc.find.call_args
-        # Team folder branch uses positional args, not a dict with user_id
-        if isinstance(call_args[0][0], dict):
-            assert "user_id" not in call_args[0][0]
+        filters = call_args[0][0]
+        assert filters["team_id"] == "team-abc"
+        assert "user_id" not in filters
+
+    @pytest.mark.asyncio
+    async def test_unauthorized_folder_returns_empty_result(self):
+        user = _make_user()
+
+        with patch("app.services.document_service.access_control.get_team_access_context", new=AsyncMock(return_value=TeamAccessContext(team_uuids=set(), roles_by_uuid={}))), \
+             patch("app.services.document_service.access_control.get_authorized_folder", new=AsyncMock(return_value=None)):
+            from app.services.document_service import list_contents
+            result = await list_contents(folder="private-folder", user=user)
+
+        assert result == {"folders": [], "documents": []}
 
 
 class TestPollStatus:
     @pytest.mark.asyncio
     async def test_readying_status_returns_messages(self):
         doc = _make_document(task_status="readying", processing=True, valid=True)
+        user = _make_user()
 
-        with patch("app.services.document_service.SmartDocument") as MockDoc:
-            MockDoc.find_one = AsyncMock(return_value=doc)
-            MockDoc.uuid = "uuid"
-
+        with patch("app.services.document_service.access_control.get_authorized_document", new=AsyncMock(return_value=doc)):
             from app.services.document_service import poll_status
-            result = await poll_status("d1")
+            result = await poll_status("d1", user)
 
         assert result is not None
         assert result["status"] == "readying"
@@ -160,13 +179,11 @@ class TestPollStatus:
     @pytest.mark.asyncio
     async def test_complete_status_returns_complete_true(self):
         doc = _make_document(task_status="complete", processing=False)
+        user = _make_user()
 
-        with patch("app.services.document_service.SmartDocument") as MockDoc:
-            MockDoc.find_one = AsyncMock(return_value=doc)
-            MockDoc.uuid = "uuid"
-
+        with patch("app.services.document_service.access_control.get_authorized_document", new=AsyncMock(return_value=doc)):
             from app.services.document_service import poll_status
-            result = await poll_status("d1")
+            result = await poll_status("d1", user)
 
         assert result is not None
         assert result["status"] == "complete"
@@ -175,11 +192,9 @@ class TestPollStatus:
 
     @pytest.mark.asyncio
     async def test_missing_doc_returns_none(self):
-        with patch("app.services.document_service.SmartDocument") as MockDoc:
-            MockDoc.find_one = AsyncMock(return_value=None)
-            MockDoc.uuid = "uuid"
-
+        user = _make_user()
+        with patch("app.services.document_service.access_control.get_authorized_document", new=AsyncMock(return_value=None)):
             from app.services.document_service import poll_status
-            result = await poll_status("nonexistent")
+            result = await poll_status("nonexistent", user)
 
         assert result is None

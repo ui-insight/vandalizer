@@ -60,16 +60,13 @@ export function LibraryTab() {
 
   // Collections (Explore tab)
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
-  const [collectionsLoading, setCollectionsLoading] = useState(false)
 
   // Fetch collections when Explore tab is active
   useEffect(() => {
     if (scope !== 'explore') { setCollections([]); return }
-    setCollectionsLoading(true)
     listCollections()
       .then(data => setCollections(data.collections))
       .catch(() => {})
-      .finally(() => setCollectionsLoading(false))
   }, [scope])
 
   // Close + New menu on outside click

@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useEffect, type DragEvent } from 'react'
 import { Plus, Folder as FolderIcon, Upload, Trash2, Download } from 'lucide-react'
-import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
@@ -49,16 +48,14 @@ interface FileBrowserProps {
 }
 
 export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onFolderSelectionChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
-  const { user } = useAuth()
   const { currentTeam } = useTeams()
-  const space = user?.user_id || ''
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
   const setCurrentFolder = onFolderNavigate ?? setInternalFolder
-  const { documents, folders, loading, refresh } = useDocuments(space, currentFolder, currentTeam?.uuid)
+  const { documents, folders, loading, refresh } = useDocuments(currentFolder, currentTeam?.uuid)
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
-  const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(space, currentFolder, refresh)
+  const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(currentFolder, refresh)
 
   // Auto-open the first document after upload
   useEffect(() => {
@@ -322,14 +319,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       await createFolder({
         name,
         parent_id: currentFolder || '0',
-        space,
         ...(createTeamFolder ? { folder_type: 'team' } : {}),
       })
       setShowCreateFolder(false)
       setCreateTeamFolder(false)
       refresh()
     },
-    [currentFolder, space, createTeamFolder, refresh],
+    [currentFolder, createTeamFolder, refresh],
   )
 
   const handleDelete = useCallback(

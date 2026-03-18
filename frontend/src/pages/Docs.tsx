@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Footer } from '../components/layout/Footer'
 import {
@@ -30,6 +30,8 @@ const sections = [
   { id: 'contributing', label: 'Contributing', icon: GitPullRequest },
   { id: 'about', label: 'About & Funding', icon: GraduationCap },
 ] as const
+
+type SectionId = (typeof sections)[number]['id']
 
 // ---------------------------------------------------------------------------
 // Inline section components
@@ -584,7 +586,7 @@ function About() {
 // Section component map
 // ---------------------------------------------------------------------------
 
-const sectionComponents: Record<string, () => JSX.Element> = {
+const sectionComponents: Record<SectionId, ComponentType> = {
   'getting-started': GettingStarted,
   installation: Installation,
   'user-guide': UserGuide,
@@ -600,7 +602,7 @@ const sectionComponents: Record<string, () => JSX.Element> = {
 // ---------------------------------------------------------------------------
 
 export default function Docs() {
-  const [activeSection, setActiveSection] = useState(sections[0].id)
+  const [activeSection, setActiveSection] = useState<SectionId>(sections[0].id)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const sectionRefs = useRef<Map<string, HTMLElement>>(new Map())
 
@@ -610,7 +612,7 @@ export default function Docs() {
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            setActiveSection(entry.target.id)
+            setActiveSection(entry.target.id as SectionId)
           }
         }
       },
@@ -630,7 +632,7 @@ export default function Docs() {
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-6">
-            <Link to="/landing" className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
+            <Link to="/landing" search={{ error: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
               Vandalizer
             </Link>
             <span className="text-sm text-[#f1b300] font-medium">Docs</span>
