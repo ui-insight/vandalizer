@@ -128,6 +128,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 onClick={() => setThinkingExpanded(!thinkingExpanded)}
                 aria-expanded={thinkingExpanded}
                 aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
+                className={duration == null ? 'thinking-shimmer' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

@@ -50,7 +50,7 @@ class KnowledgeBase(Document):
     space: Optional[str] = None
     shared_with_team: bool = False
     verified: bool = False
-    group_ids: list[str] = Field(default_factory=list)  # Group uuid strings
+    organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
     status: str = "empty"  # empty | building | ready | error
     total_sources: int = 0
     sources_ready: int = 0

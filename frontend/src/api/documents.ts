@@ -1,11 +1,12 @@
 import { apiFetch } from './client'
 import type { ListContentsResponse, PollStatusResponse } from '../types/document'
 
-export function listContents(space: string, folder?: string, teamUuid?: string) {
-  const params = new URLSearchParams({ space })
+export function listContents(folder?: string, teamUuid?: string) {
+  const params = new URLSearchParams()
   if (folder) params.set('folder', folder)
   if (teamUuid) params.set('team_uuid', teamUuid)
-  return apiFetch<ListContentsResponse>(`/api/documents/list?${params}`)
+  const query = params.toString()
+  return apiFetch<ListContentsResponse>(`/api/documents/list${query ? `?${query}` : ''}`)
 }
 
 export function pollStatus(docid: string) {

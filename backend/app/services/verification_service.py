@@ -147,7 +147,7 @@ async def update_status(
     new_status: str,
     reviewer_user_id: str,
     reviewer_notes: str | None = None,
-    group_ids: list[str] | None = None,
+    organization_ids: list[str] | None = None,
     collection_ids: list[str] | None = None,
 ) -> dict | None:
     """Approve or reject a verification request."""
@@ -174,13 +174,13 @@ async def update_status(
         else:
             await _mark_item_verified(req.item_id, req.item_kind)
 
-        # Assign groups if provided
-        if group_ids is not None:
+        # Assign org visibility if provided
+        if organization_ids is not None:
             await update_item_metadata(
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
                 user_id=reviewer_user_id,
-                group_ids=group_ids,
+                organization_ids=organization_ids,
             )
 
         # Add to collections if provided
@@ -215,9 +215,9 @@ async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
 async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
-    user_group_uuids: list[str] | None = None,
+    user_org_ancestry: list[str] | None = None,
 ) -> list[dict]:
-    """List all verified library items, optionally filtered by kind, search, and groups."""
+    """List all verified library items, optionally filtered by kind, search, and org visibility."""
     query: dict = {"verified": True}
     if kind_filter:
         query["kind"] = kind_filter
@@ -246,10 +246,10 @@ async def list_verified_items(
             VerifiedItemMetadata.item_id == str(item.item_id),
         )
 
-        # Group filtering: if item has groups and user doesn't match, skip
-        meta_group_ids = meta.group_ids if meta else []
-        if user_group_uuids is not None and meta_group_ids:
-            if not set(meta_group_ids) & set(user_group_uuids):
+        # Org visibility: if item is scoped to orgs and user's ancestry doesn't match, skip
+        item_org_ids = meta.organization_ids if meta else []
+        if user_org_ancestry is not None and item_org_ids:
+            if not set(item_org_ids) & set(user_org_ancestry):
                 continue
 
         results.append({
@@ -263,7 +263,7 @@ async def list_verified_items(
             "display_name": meta.display_name if meta else None,
             "description": meta.description if meta else None,
             "markdown": meta.markdown if meta else None,
-            "group_ids": meta_group_ids,
+            "organization_ids": item_org_ids,
             "quality_score": meta.quality_score if meta else None,
             "quality_tier": meta.quality_tier if meta else None,
             "quality_grade": meta.quality_grade if meta else None,
@@ -288,7 +288,7 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "display_name": meta.display_name,
         "description": meta.description,
         "markdown": meta.markdown,
-        "group_ids": meta.group_ids,
+        "organization_ids": meta.organization_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
         "quality_score": meta.quality_score,
@@ -306,7 +306,7 @@ async def update_item_metadata(
     display_name: str | None = None,
     description: str | None = None,
     markdown: str | None = None,
-    group_ids: list[str] | None = None,
+    organization_ids: list[str] | None = None,
 ) -> dict:
     """Upsert metadata for a verified item."""
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -321,8 +321,8 @@ async def update_item_metadata(
             meta.description = description
         if markdown is not None:
             meta.markdown = markdown
-        if group_ids is not None:
-            meta.group_ids = group_ids
+        if organization_ids is not None:
+            meta.organization_ids = organization_ids
         meta.updated_at = now
         meta.updated_by_user_id = user_id
         await meta.save()
@@ -333,7 +333,7 @@ async def update_item_metadata(
             display_name=display_name,
             description=description,
             markdown=markdown,
-            group_ids=group_ids or [],
+            organization_ids=organization_ids or [],
             updated_at=now,
             updated_by_user_id=user_id,
         )
@@ -346,7 +346,7 @@ async def update_item_metadata(
         "display_name": meta.display_name,
         "description": meta.description,
         "markdown": meta.markdown,
-        "group_ids": meta.group_ids,
+        "organization_ids": meta.organization_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
     }
@@ -468,14 +468,16 @@ async def remove_from_collection(collection_id: str, item_id: str) -> dict | Non
 
 
 async def list_examiners() -> list[dict]:
-    """List all users with examiner status."""
-    users = await User.find(User.is_examiner == True).to_list()  # noqa: E712
+    """List all users with examiner status (includes admins)."""
+    users = await User.find(
+        {"$or": [{"is_examiner": True}, {"is_admin": True}]}
+    ).to_list()
     return [
         {
             "user_id": u.user_id,
             "name": u.name,
             "email": u.email,
-            "is_examiner": u.is_examiner,
+            "is_examiner": u.is_examiner or u.is_admin,
         }
         for u in users
     ]

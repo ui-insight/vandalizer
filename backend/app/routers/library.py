@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from app.dependencies import get_current_user
 from app.models.library import Library, LibraryScope
 from app.models.user import User
-from app.services import group_service
+from app.services import organization_service
 from app.schemas.library import (
     AddItemRequest,
     CloneRequest,
@@ -224,18 +224,18 @@ async def list_items(
     search: Optional[str] = Query(None),
     user: User = Depends(get_current_user),
 ):
-    # Check if this is a verified-scope library; if so, apply group filtering
+    # Check if this is a verified-scope library; if so, apply org visibility filtering
     from beanie import PydanticObjectId
-    user_group_uuids = None
+    user_org_ancestry = None
     try:
         lib = await Library.get(PydanticObjectId(library_id))
         if lib and lib.scope == LibraryScope.VERIFIED:
-            user_group_uuids = await group_service.get_user_group_uuids(user.user_id)
+            user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     except Exception:
         pass
     items = await svc.get_library_items(
         library_id, user.user_id, kind=kind, folder=folder, search=search,
-        user_group_uuids=user_group_uuids,
+        user_org_ancestry=user_org_ancestry,
     )
     return [LibraryItemResponse(**i) for i in items]
 

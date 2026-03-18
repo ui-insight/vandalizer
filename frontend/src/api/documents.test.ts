@@ -20,23 +20,22 @@ afterEach(() => {
 })
 
 describe('documents API', () => {
-  it('listContents sends space, folder, teamUuid params', async () => {
+  it('listContents sends folder and teamUuid params', async () => {
     const response = { folders: [], documents: [] }
     mockFetch.mockResolvedValueOnce(jsonResponse(response))
 
     const { listContents } = await import('./documents')
-    const result = await listContents('research', 'folder-uuid', 'team-uuid-1')
+    const result = await listContents('folder-uuid', 'team-uuid-1')
 
     const calledUrl = mockFetch.mock.calls[0][0] as string
     expect(calledUrl).toContain('/api/documents/list')
-    expect(calledUrl).toContain('space=research')
     expect(calledUrl).toContain('folder=folder-uuid')
     expect(calledUrl).toContain('team_uuid=team-uuid-1')
     expect(result.folders).toEqual([])
     expect(result.documents).toEqual([])
   })
 
-  it('listContents works with only space param', async () => {
+  it('listContents works without query params', async () => {
     const response = {
       folders: [{ id: '1', title: 'Folder', uuid: 'f1', parent_id: '0', is_shared_team_root: false }],
       documents: [{ id: '2', title: 'Doc', uuid: 'd1', extension: 'pdf' }],
@@ -44,10 +43,10 @@ describe('documents API', () => {
     mockFetch.mockResolvedValueOnce(jsonResponse(response))
 
     const { listContents } = await import('./documents')
-    const result = await listContents('default')
+    const result = await listContents()
 
     const calledUrl = mockFetch.mock.calls[0][0] as string
-    expect(calledUrl).toContain('space=default')
+    expect(calledUrl).toBe('/api/documents/list')
     expect(calledUrl).not.toContain('folder=')
     expect(calledUrl).not.toContain('team_uuid=')
     expect(result.folders).toHaveLength(1)

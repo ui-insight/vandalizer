@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, csrfHeaders } from './client'
 import type { Workflow, WorkflowStatus } from '../types/workflow'
 
 // Workflow CRUD
@@ -184,6 +184,7 @@ export async function importWorkflow(file: File, space: string): Promise<Workflo
   const res = await fetch('/api/workflows/import', {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {

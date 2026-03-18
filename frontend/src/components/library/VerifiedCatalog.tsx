@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
-import { QualityBadge } from './QualityBadge'
 import { QualityContractBadge } from './QualityContractBadge'
 import { CatalogImportDialog } from './CatalogImportDialog'
-import { listVerifiedItems, updateItemMetadata, unverifyItem, listGroups, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
+import { listVerifiedItems, updateItemMetadata, unverifyItem, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
 import type { CatalogPreviewItem } from '../../api/library'
-import type { VerifiedCatalogItem, VerifiedCollection, Group } from '../../types/library'
+import type { VerifiedCatalogItem, VerifiedCollection } from '../../types/library'
+import { listOrganizationsFlat } from '../../api/organizations'
+import type { Organization } from '../../api/organizations'
 
 type KindFilter = '' | 'workflow' | 'search_set'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
@@ -40,17 +41,17 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
   const [displayName, setDisplayName] = useState(item.display_name || '')
   const [description, setDescription] = useState(item.description || '')
   const [markdown, setMarkdown] = useState(item.markdown || '')
-  const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>(item.group_ids || [])
-  const [allGroups, setAllGroups] = useState<Group[]>([])
+  const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>(item.organization_ids || [])
+  const [allOrgs, setAllOrgs] = useState<Organization[]>([])
   const [saving, setSaving] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   useEffect(() => {
-    listGroups().then(data => setAllGroups(data.groups)).catch(() => {})
+    listOrganizationsFlat().then(data => setAllOrgs(data.organizations)).catch(() => {})
   }, [])
 
-  const toggleGroup = (uuid: string) => {
-    setSelectedGroupIds(prev =>
+  const toggleOrg = (uuid: string) => {
+    setSelectedOrgIds(prev =>
       prev.includes(uuid) ? prev.filter(id => id !== uuid) : [...prev, uuid]
     )
   }
@@ -62,7 +63,7 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
         display_name: displayName || undefined,
         description: description || undefined,
         markdown: markdown || undefined,
-        group_ids: selectedGroupIds,
+        organization_ids: selectedOrgIds,
       })
       onSaved()
       onClose()
@@ -129,25 +130,28 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
               />
             )}
           </div>
-          {allGroups.length > 0 && (
+          {allOrgs.length > 0 && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Groups (visibility restriction)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Organization Visibility</label>
               <p className="text-xs text-gray-500 mb-2">
-                No groups selected = visible to everyone. Selected groups restrict visibility to group members only.
+                No orgs selected = visible to everyone. Selected orgs restrict visibility to users in those orgs and below.
               </p>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                {allGroups.map(group => (
-                  <label key={group.uuid} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+                {allOrgs.map(org => (
+                  <label key={org.uuid} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={selectedGroupIds.includes(group.uuid)}
-                      onChange={() => toggleGroup(group.uuid)}
+                      checked={selectedOrgIds.includes(org.uuid)}
+                      onChange={() => toggleOrg(org.uuid)}
                       className="rounded border-gray-300"
                     />
-                    <span className="text-sm text-gray-700">{group.name}</span>
-                    {group.description && (
-                      <span className="text-xs text-gray-400 truncate">{group.description}</span>
-                    )}
+                    <span className="text-sm text-gray-700">{org.name}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                      org.org_type === 'university' ? 'bg-purple-100 text-purple-700' :
+                      org.org_type === 'college' ? 'bg-blue-100 text-blue-700' :
+                      org.org_type === 'department' ? 'bg-green-100 text-green-700' :
+                      'bg-gray-100 text-gray-600'
+                    }`}>{org.org_type}</span>
                   </label>
                 ))}
               </div>
@@ -243,19 +247,19 @@ export function VerifiedCatalog() {
   const [kindFilter, setKindFilter] = useState<KindFilter>('')
   const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
   const [editingItem, setEditingItem] = useState<VerifiedCatalogItem | null>(null)
-  const [groupMap, setGroupMap] = useState<Record<string, string>>({})
+  const [orgMap, setOrgMap] = useState<Record<string, string>>({})
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
   const [importPreview, setImportPreview] = useState<CatalogPreviewItem[] | null>(null)
   const [importFile, setImportFile] = useState<File | null>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
 
-  // Load groups and collections
+  // Load orgs and collections
   useEffect(() => {
-    listGroups()
+    listOrganizationsFlat()
       .then(data => {
         const map: Record<string, string> = {}
-        for (const g of data.groups) map[g.uuid] = g.name
-        setGroupMap(map)
+        for (const o of data.organizations) map[o.uuid] = o.name
+        setOrgMap(map)
       })
       .catch(() => {})
     refreshCollections()
@@ -414,12 +418,12 @@ export function VerifiedCatalog() {
                       ))}
                     </div>
                   )}
-                  {item.group_ids?.length > 0 && (
+                  {item.organization_ids?.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">
-                      {item.group_ids.map(gid => (
-                        <span key={gid} className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
+                      {item.organization_ids.map(oid => (
+                        <span key={oid} className="text-xs px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
                           <Tag className="h-3 w-3" />
-                          {groupMap[gid] || gid}
+                          {orgMap[oid] || oid}
                         </span>
                       ))}
                     </div>

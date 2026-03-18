@@ -22,6 +22,13 @@ def _make_settings(**overrides):
     return Settings(**defaults)
 
 
+def _make_user(user_id: str = "testuser"):
+    user = MagicMock()
+    user.user_id = user_id
+    user.is_admin = False
+    return user
+
+
 class TestUploadSizeLimits:
     @pytest.mark.asyncio
     async def test_oversized_file_pre_decode(self):
@@ -41,7 +48,7 @@ class TestUploadSizeLimits:
                 filename="big_file.pdf",
                 raw_extension="pdf",
                 space="default",
-                user_id="testuser",
+                user=_make_user(),
                 settings=settings,
             )
 
@@ -67,7 +74,7 @@ class TestUploadSizeLimits:
                     filename="big_file.pdf",
                     raw_extension="pdf",
                     space="default",
-                    user_id="testuser",
+                    user=_make_user(),
                     settings=settings,
                 )
 
@@ -79,27 +86,24 @@ class TestUploadSizeLimits:
         # Create a small file (100 bytes)
         file_data = b"small content here"
         blob = base64.b64encode(file_data).decode()
+        user = _make_user()
 
         mock_doc = MagicMock()
         mock_doc.id = "doc-id-1"
         mock_doc.uuid = "DOC-UUID-1"
         mock_doc.insert = AsyncMock()
         mock_doc.save = AsyncMock()
+        mock_storage = MagicMock()
+        mock_storage.write = AsyncMock()
+        mock_storage.public_path = MagicMock(return_value="/tmp/test-uploads/testuser/DOC-UUID-1.pdf")
 
         with patch("app.services.file_service.is_allowed_file", return_value=True), \
              patch("app.services.file_service.is_valid_file_content", return_value=True), \
              patch("app.services.file_service.SmartDocument") as MockDoc, \
-             patch("app.services.file_service.Path") as MockPath, \
+             patch("app.services.storage.get_storage", return_value=mock_storage), \
              patch("app.tasks.upload_tasks.dispatch_upload_tasks", return_value="task-123"):
             MockDoc.find_one = AsyncMock(return_value=None)  # no duplicate
             MockDoc.return_value = mock_doc
-            # Make Path operations work
-            mock_path_instance = MagicMock()
-            MockPath.return_value = mock_path_instance
-            MockPath.__truediv__ = MagicMock(return_value=mock_path_instance)
-            mock_path_instance.__truediv__ = MagicMock(return_value=mock_path_instance)
-            mock_path_instance.mkdir = MagicMock()
-            mock_path_instance.write_bytes = MagicMock()
 
             from app.services.file_service import upload_document
 
@@ -108,7 +112,7 @@ class TestUploadSizeLimits:
                 filename="small_file.pdf",
                 raw_extension="pdf",
                 space="default",
-                user_id="testuser",
+                user=user,
                 settings=settings,
             )
 
@@ -129,6 +133,6 @@ class TestUploadSizeLimits:
                 filename="script.py",
                 raw_extension="py",
                 space="default",
-                user_id="testuser",
+                user=_make_user(),
                 settings=settings,
             )

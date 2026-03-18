@@ -7,7 +7,20 @@ export function Login() {
   const { user, loading } = useAuth()
 
   if (loading) return null
-  if (user) return <Navigate to="/" />
+  if (user) {
+    return (
+      <Navigate
+        to="/"
+        search={{
+          mode: undefined,
+          tab: undefined,
+          workflow: undefined,
+          extraction: undefined,
+          automation: undefined,
+        }}
+      />
+    )
+  }
 
   return (
     <AuthLayout title="Sign in to Vandalizer">

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { MessageSquare, Plus, Trash2, Clock } from 'lucide-react'
+import { MessageSquare, Plus, Trash2 } from 'lucide-react'
 import { AppLayout } from '../components/layout/AppLayout'
 import { ChatPanel } from '../components/chat/ChatPanel'
 import { listConversations, deleteHistory } from '../api/chat'
@@ -9,7 +9,7 @@ export function Chat() {
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [activeConvo, setActiveConvo] = useState<string | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [sidebarCollapsed] = useState(false)
 
   const loadConversations = useCallback(() => {
     listConversations(100)

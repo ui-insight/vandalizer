@@ -5,7 +5,6 @@ import {
   MonitorPlay,
   Circle,
   Play,
-  Square,
   MousePointer,
   FormInput,
   ScanSearch,

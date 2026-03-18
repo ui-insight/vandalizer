@@ -1,5 +1,5 @@
-import { useState, useRef, type ReactNode, type LucideIcon } from 'react'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { useState, useRef, type ReactNode } from 'react'
+import { ChevronLeft, ChevronRight, Loader2, type LucideIcon } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
 export interface WizardStep {

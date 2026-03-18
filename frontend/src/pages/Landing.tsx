@@ -205,7 +205,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
             href="/api/auth/saml/login"
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d4a017]"
           >
-            {(samlProvider as Record<string, string>).display_name || 'Sign in with University SSO'}
+            {samlProvider.display_name || 'Sign in with University SSO'}
           </a>
         </div>
       )}
@@ -267,7 +267,20 @@ export default function Landing() {
   if (user && demoExpired && demoFeedbackToken) {
     return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
   }
-  if (user && !demoExpired) return <Navigate to="/" />
+  if (user && !demoExpired) {
+    return (
+      <Navigate
+        to="/"
+        search={{
+          mode: undefined,
+          tab: undefined,
+          workflow: undefined,
+          extraction: undefined,
+          automation: undefined,
+        }}
+      />
+    )
+  }
 
   return (
     <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen relative">

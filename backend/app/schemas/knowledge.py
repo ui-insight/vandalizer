@@ -14,7 +14,7 @@ class UpdateKBRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     shared_with_team: Optional[bool] = None
-    group_ids: Optional[list[str]] = None
+    organization_ids: Optional[list[str]] = None
 
 
 class AddDocumentsRequest(BaseModel):
@@ -47,7 +47,7 @@ class KBResponse(BaseModel):
     status: str
     shared_with_team: bool = False
     verified: bool = False
-    group_ids: list[str] = []
+    organization_ids: list[str] = []
     total_sources: int = 0
     sources_ready: int = 0
     sources_failed: int = 0

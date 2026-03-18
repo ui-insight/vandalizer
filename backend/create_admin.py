@@ -27,6 +27,44 @@ from app.database import init_db
 from app.models.user import User
 
 
+async def ensure_admin(email: str, password: str, name: str = "Admin") -> tuple[User, str]:
+    """Create or update the bootstrap admin user.
+
+    Returns ``(user, status)`` where status is one of:
+    - ``created``: new admin account was created
+    - ``updated``: existing user was promoted to admin/examiner
+    - ``unchanged``: existing user already had the expected permissions
+    """
+    normalized_email = email.strip().lower()
+
+    existing = await User.find_one(User.email == normalized_email)
+    if existing:
+        changed = False
+        if not existing.is_admin:
+            existing.is_admin = True
+            changed = True
+        if not existing.is_examiner:
+            existing.is_examiner = True
+            changed = True
+        if changed:
+            await existing.save()
+            return existing, "updated"
+        return existing, "unchanged"
+
+    from app.services.auth_service import register
+
+    user = await register(
+        user_id=normalized_email,
+        email=normalized_email,
+        password=password,
+        name=name,
+    )
+    user.is_admin = True
+    user.is_examiner = True
+    await user.save()
+    return user, "created"
+
+
 async def main():
     settings = Settings()
     await init_db(settings)
@@ -40,41 +78,21 @@ async def main():
         print("Usage: ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=secret python create_admin.py")
         sys.exit(1)
 
-    # Check if user already exists
-    existing = await User.find_one(User.email == email.strip().lower())
-    if existing:
-        changed = False
-        if not existing.is_admin:
-            existing.is_admin = True
-            changed = True
-        if not existing.is_examiner:
-            existing.is_examiner = True
-            changed = True
-        if changed:
-            await existing.save()
-            print(f"Updated existing user '{existing.user_id}' with admin + examiner access.")
-        else:
-            print(f"Admin user '{existing.user_id}' already exists with correct permissions.")
+    user, status = await ensure_admin(email, password, name)
+
+    if status == "updated":
+        print(f"Updated existing user '{user.user_id}' with admin + examiner access.")
         return
 
-    # Create new admin via the register flow
-    from app.services.auth_service import register
+    if status == "unchanged":
+        print(f"Admin user '{user.user_id}' already exists with correct permissions.")
+        return
 
-    user = await register(
-        user_id=email.strip().lower(),
-        email=email.strip().lower(),
-        password=password,
-        name=name,
-    )
-    user.is_admin = True
-    user.is_examiner = True
-    await user.save()
-
-    print(f"Created admin user:")
-    print(f"  Email:    {email}")
+    print("Created admin user:")
+    print(f"  Email:    {email.strip().lower()}")
     print(f"  Name:     {name}")
-    print(f"  Admin:    Yes")
-    print(f"  Examiner: Yes")
+    print("  Admin:    Yes")
+    print("  Examiner: Yes")
 
 
 if __name__ == "__main__":

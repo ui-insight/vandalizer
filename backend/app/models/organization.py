@@ -16,7 +16,7 @@ class Organization(Document):
 
     uuid: str
     name: str
-    org_type: str  # university | college | central_office | department | unit
+    org_type: str  # university, college, central_office, department, unit
     parent_id: Optional[str] = None  # parent org uuid (None for root)
     metadata: dict = {}
     created_at: datetime.datetime = Field(

@@ -291,7 +291,7 @@ async def get_library_items(
     kind: str | None = None,
     folder: str | None = None,
     search: str | None = None,
-    user_group_uuids: list[str] | None = None,
+    user_org_ancestry: list[str] | None = None,
 ) -> list[dict]:
     lib = await Library.get(PydanticObjectId(library_id))
     if not lib:
@@ -304,7 +304,7 @@ async def get_library_items(
     if folder is not None:
         items = [i for i in items if i.folder == folder]
 
-    # Import metadata for group filtering and quality data
+    # Import metadata for org visibility filtering and quality data
     from app.models.verification import VerifiedItemMetadata
     from app.services.quality_service import get_latest_validation, compute_quality_tier
 
@@ -327,9 +327,9 @@ async def get_library_items(
                 VerifiedItemMetadata.item_id == quality_lookup_id,
             )
 
-            # Group filtering for verified-scope libraries
+            # Org visibility filtering for verified-scope libraries
             if lib.scope == LibraryScope.VERIFIED and item.verified:
-                if user_group_uuids is not None and meta and meta.group_ids and not (set(meta.group_ids) & set(user_group_uuids)):
+                if user_org_ancestry is not None and meta and meta.organization_ids and not (set(meta.organization_ids) & set(user_org_ancestry)):
                     continue
 
             # Attach quality metadata for all scopes

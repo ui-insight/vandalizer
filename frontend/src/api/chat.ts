@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, csrfHeaders } from './client'
 import type { ChatMessage, UrlAttachment, FileAttachment, StreamChunk } from '../types/chat'
 
 export async function streamChat(
@@ -15,7 +15,7 @@ export async function streamChat(
   const res = await fetch('/api/chat', {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
       message,
       document_uuids: documentUuids,
@@ -110,6 +110,7 @@ export async function addDocument(
   const res = await fetch('/api/chat/add-document', {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: formData,
   })
 
@@ -123,6 +124,12 @@ export async function addDocument(
 
 export function removeDocument(attachmentId: string) {
   return apiFetch<{ success: boolean }>(`/api/chat/remove-document/${attachmentId}`, {
+    method: 'DELETE',
+  })
+}
+
+export function removeLink(attachmentId: string) {
+  return apiFetch<{ success: boolean }>(`/api/chat/remove-link/${attachmentId}`, {
     method: 'DELETE',
   })
 }

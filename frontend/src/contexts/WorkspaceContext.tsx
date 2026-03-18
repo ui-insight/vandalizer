@@ -108,14 +108,30 @@ function getStoredNumber(key: string, fallback: number): number {
   }
 }
 
-type NavSearch = (prev: Record<string, unknown>) => Record<string, unknown>
+type WorkspaceSearchState = {
+  mode: WorkspaceMode | undefined
+  tab: RightTab | undefined
+  workflow: string | undefined
+  extraction: string | undefined
+  automation: string | undefined
+}
+
+function emptyWorkspaceSearch(): WorkspaceSearchState {
+  return {
+    mode: undefined,
+    tab: undefined,
+    workflow: undefined,
+    extraction: undefined,
+    automation: undefined,
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Provider — wraps all three contexts
 // ---------------------------------------------------------------------------
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate()
+  const navigate = useNavigate({ from: '/' })
   const search = useSearch({ from: '/' })
 
   // ── URL-derived state ───────────────────────────────────────────────────
@@ -143,43 +159,53 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
 
+  const updateSearch = useCallback(
+    (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
+      navigate({
+        search: (prev) => updater({ ...emptyWorkspaceSearch(), ...prev }),
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
   // ── Navigation callbacks ────────────────────────────────────────────────
 
   const setWorkspaceMode = useCallback((mode: WorkspaceMode) => {
     localStorage.setItem('workspace:mode', mode)
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, mode: mode === 'chat' ? undefined : mode })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, mode: mode === 'chat' ? undefined : mode }))
+  }, [updateSearch])
 
   const setActiveRightTab = useCallback((tab: RightTab) => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, tab: tab === 'assistant' ? undefined : tab }))
+  }, [updateSearch])
 
   const openWorkflow = useCallback((id: string) => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined }))
+  }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, workflow: undefined }))
+  }, [updateSearch])
 
   const openExtraction = useCallback((uuid: string) => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
+  }, [updateSearch])
 
   const closeExtraction = useCallback(() => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, extraction: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, extraction: undefined }))
+  }, [updateSearch])
 
   const openAutomation = useCallback((id: string) => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, automation: id, workflow: undefined, extraction: undefined }))
+  }, [updateSearch])
 
   const closeAutomation = useCallback(() => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, automation: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, automation: undefined }))
+  }, [updateSearch])
 
   const resetToHome = useCallback(() => {
-    navigate({ search: {}, replace: true })
+    updateSearch(() => emptyWorkspaceSearch())
     localStorage.setItem('workspace:mode', 'chat')
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
@@ -187,19 +213,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setHighlightTerms([])
     setActiveKBUuid(null)
     setActiveKBTitle(null)
-  }, [navigate])
+  }, [updateSearch])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
 
   const triggerNewChat = useCallback(() => {
     setNewChatSignal(prev => prev + 1)
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch])
 
   const sendChatMessage = useCallback((message: string) => {
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
+    updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
     setPendingChatMessage(message)
-  }, [navigate])
+  }, [updateSearch])
 
   const clearPendingChatMessage = useCallback(() => {
     setPendingChatMessage(null)
@@ -209,8 +235,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBUuid(uuid)
     setActiveKBTitle(title)
     localStorage.setItem('workspace:mode', 'chat')
-    navigate({ search: ((prev: Record<string, unknown>) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined })) as NavSearch, replace: true })
-  }, [navigate])
+    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch])
 
   const deactivateKB = useCallback(() => {
     setActiveKBUuid(null)

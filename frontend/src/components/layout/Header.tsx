@@ -8,7 +8,16 @@ export function Header() {
   const workspace = useOptionalWorkspace()
 
   const handleLogoClick = () => {
-    navigate({ to: '/' })
+    navigate({
+      to: '/',
+      search: {
+        mode: undefined,
+        tab: undefined,
+        workflow: undefined,
+        extraction: undefined,
+        automation: undefined,
+      },
+    })
     workspace?.resetToHome()
   }
 

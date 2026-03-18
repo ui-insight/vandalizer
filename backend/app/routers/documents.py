@@ -8,18 +8,19 @@ from app.dependencies import get_current_user
 from app.models.document import SmartDocument
 from app.models.team import Team, TeamMembership
 from app.models.user import User
-from app.services import audit_service, document_service
+from app.services import access_control, audit_service, document_service
 
 router = APIRouter()
 
 
 @router.get("/list")
 async def list_documents(
-    space: str,
+    space: str | None = None,
     folder: str | None = None,
     team_uuid: str | None = None,
     user: User = Depends(get_current_user),
 ):
+    # `space` is retained as a legacy query parameter for backwards compatibility.
     # Use provided team_uuid, or fall back to user's current team
     if not team_uuid and user.current_team:
         team = await Team.get(user.current_team)
@@ -37,9 +38,7 @@ async def list_documents(
             if not membership:
                 raise HTTPException(status_code=403, detail="Not a member of this team")
 
-    return await document_service.list_contents(
-        space, folder, user_id=user.user_id, team_uuid=team_uuid
-    )
+    return await document_service.list_contents(user=user, folder=folder, team_uuid=team_uuid)
 
 
 @router.get("/search")
@@ -100,7 +99,7 @@ async def poll_status(
     docid: str,
     user: User = Depends(get_current_user),
 ):
-    result = await document_service.poll_status(docid)
+    result = await document_service.poll_status(docid, user)
     if result is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return result
@@ -126,7 +125,9 @@ async def reclassify_document(
     if body.classification not in valid_levels:
         raise HTTPException(status_code=400, detail=f"Classification must be one of {valid_levels}")
 
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    doc = await access_control.get_authorized_document(
+        doc_uuid, user, manage=True, allow_admin=True
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -167,7 +168,9 @@ async def set_retention_hold(
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    doc = await access_control.get_authorized_document(
+        doc_uuid, user, manage=True, allow_admin=True
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
@@ -200,7 +203,9 @@ async def remove_retention_hold(
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+    doc = await access_control.get_authorized_document(
+        doc_uuid, user, manage=True, allow_admin=True
+    )
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 

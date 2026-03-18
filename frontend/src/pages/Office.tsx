@@ -12,7 +12,6 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
-  Shield,
   Eye,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'

@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Clock, MessageSquare, Eye } from 'lucide-react'
+import { CheckCircle, XCircle, Clock, Eye } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
-import { useAuth } from '../hooks/useAuth'
 import * as api from '../api/approvals'
 import type { ApprovalRequest } from '../api/approvals'
 
@@ -18,7 +17,6 @@ function formatTime(ts: string | null): string {
 }
 
 export default function Approvals() {
-  const { user } = useAuth()
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')

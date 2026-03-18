@@ -227,6 +227,11 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         try:
             from datetime import datetime, timezone
             doc_uuids = trigger_step_data.get("doc_uuids", [])
+            # Read step counts from the WorkflowResult
+            wr_doc = db.workflow_result.find_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"num_steps_completed": 1, "num_steps_total": 1},
+            )
             usage_update = {
                 "status": "completed",
                 "finished_at": datetime.now(timezone.utc),
@@ -235,6 +240,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "tokens_input": engine.usage.tokens_in,
                 "tokens_output": engine.usage.tokens_out,
                 "total_tokens": engine.usage.tokens_in + engine.usage.tokens_out,
+                "steps_completed": (wr_doc or {}).get("num_steps_completed", 0),
+                "steps_total": (wr_doc or {}).get("num_steps_total", 0),
             }
             db.activity_event.update_one(
                 {"_id": ObjectId(activity_id)},

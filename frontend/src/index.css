@@ -110,7 +110,24 @@ html {
   66%  { background-size: calc(100%/3) 100%, calc(100%/3) 100%, calc(100%/3) 0%   }
 }
 
+/* Thinking shimmer - subtle left-to-right highlight sweep */
+.thinking-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 60%, transparent 100%);
+  background-size: 200% 100%;
+  animation: thinking-shimmer 2s ease-in-out infinite;
+  border-radius: 6px;
+  padding: 2px 6px;
+}
+
+@keyframes thinking-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .thinking-shimmer {
+    animation: none !important;
+  }
   .rail-shimmer-running {
     animation: none !important;
     background: var(--highlight-color, #f1b300) !important;

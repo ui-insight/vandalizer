@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from './client'
+import { apiFetch, ApiError, csrfHeaders } from './client'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
@@ -329,6 +329,7 @@ export async function importSearchSet(file: File, space: string): Promise<Search
   const res = await fetch('/api/extractions/search-sets/import', {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -346,6 +347,7 @@ export async function uploadPdfTemplate(uuid: string, file: File): Promise<Searc
   const res = await fetch(`/api/extractions/search-sets/${uuid}/upload-template`, {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -361,6 +363,7 @@ export async function generateExampleTemplate(uuid: string): Promise<void> {
   const res = await fetch(`/api/extractions/search-sets/${uuid}/generate-template`, {
     method: 'POST',
     credentials: 'include',
+    headers: csrfHeaders(),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Generation failed' }))

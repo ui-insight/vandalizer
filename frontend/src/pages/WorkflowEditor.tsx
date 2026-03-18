@@ -11,7 +11,17 @@ export default function WorkflowEditor() {
 
   useEffect(() => {
     if (id) {
-      navigate({ to: '/', search: { openWorkflow: id }, replace: true })
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: id,
+          extraction: undefined,
+          automation: undefined,
+        },
+        replace: true,
+      })
     } else {
       navigate({ to: '/workflows', replace: true })
     }

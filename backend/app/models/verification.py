@@ -76,7 +76,7 @@ class VerifiedItemMetadata(Document):
     display_name: Optional[str] = None
     description: Optional[str] = None
     markdown: Optional[str] = None
-    group_ids: list[str] = Field(default_factory=list)  # Group uuid strings
+    organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
 
     # Quality fields (populated by quality_service)
     quality_score: Optional[float] = None

@@ -7,13 +7,13 @@ interface ContentsResult {
   folders: Folder[]
 }
 
-export function useDocuments(space: string, folderId: string | null, teamUuid?: string) {
+export function useDocuments(folderId: string | null, teamUuid?: string) {
   const qc = useQueryClient()
-  const queryKey = ['documents', space, folderId, teamUuid] as const
+  const queryKey = ['documents', folderId, teamUuid] as const
 
   const { data, isLoading: loading } = useQuery<ContentsResult>({
     queryKey,
-    queryFn: () => listContents(space, folderId ?? undefined, teamUuid),
+    queryFn: () => listContents(folderId ?? undefined, teamUuid),
     // Auto-poll every 3s when any document is still processing
     refetchInterval: (query) => {
       const docs = query.state.data?.documents

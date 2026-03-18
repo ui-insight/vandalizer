@@ -296,10 +296,7 @@ export function TeamSettings() {
                 </div>
                 {t.uuid !== currentTeam?.uuid && (
                   <button
-                    onClick={() => {
-                      switchTeam(t.uuid)
-                      refreshTeams()
-                    }}
+                    onClick={() => switchTeam(t.uuid)}
                     className="text-xs text-highlight hover:brightness-75"
                   >
                     Switch

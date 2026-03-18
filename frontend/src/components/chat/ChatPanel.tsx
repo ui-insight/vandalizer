@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { FileInput, Loader2, BookOpen, X, ArrowDown } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { addLink, addDocument, removeDocument } from '../../api/chat'
+import { addLink, addDocument, removeDocument, removeLink } from '../../api/chat'
 import { getUserConfig, updateUserConfig } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 
@@ -60,6 +60,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     error,
     send,
     loadHistory,
+    setActivity,
   } = useChat()
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
@@ -194,6 +195,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (result.attachments) {
         setFileAttachments((prev) => [...prev, ...result.attachments])
       }
+      if (result.activity_id && result.conversation_uuid) {
+        setActivity(result.activity_id, result.conversation_uuid)
+      }
     } catch {
       // Error handling
     } finally {
@@ -214,6 +218,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           created_at: new Date().toISOString(),
         },
       ])
+      if (result.activity_id && result.conversation_uuid) {
+        setActivity(result.activity_id, result.conversation_uuid)
+      }
     } catch {
       // Error handling
     } finally {
@@ -225,6 +232,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     try {
       await removeDocument(id)
       setFileAttachments((prev) => prev.filter((a) => a.id !== id))
+    } catch {
+      // Error handling
+    }
+  }
+
+  const handleRemoveUrl = async (id: string) => {
+    try {
+      await removeLink(id)
+      setUrlAttachments((prev) => prev.filter((a) => a.id !== id))
     } catch {
       // Error handling
     }
@@ -262,6 +278,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         fileAttachments={fileAttachments}
         urlAttachments={urlAttachments}
         onRemoveFile={handleRemoveFile}
+        onRemoveUrl={handleRemoveUrl}
       />
 
       {attachLoading && (
@@ -428,11 +445,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {/* Loading indicator */}
+        {/* Loading indicator — matches the compact thinking style */}
         {isStreaming && !streamingContent && !thinkingContent && (
-          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)', display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div className="chat-loader" />
-            <StreamingLabel />
+          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
+            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+              <ChevronRight size={14} />
+              <StreamingLabel />
+            </div>
           </div>
         )}
 
@@ -538,4 +557,3 @@ function downloadBlob(blob: Blob, filename: string) {
   a.click()
   URL.revokeObjectURL(url)
 }
-

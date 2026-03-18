@@ -1,59 +1,74 @@
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
+from app.models.user import User
+from app.services import access_control
 
 
 async def list_contents(
-    space: str,
+    *,
+    user: User,
     folder: str | None = None,
-    user_id: str | None = None,
     team_uuid: str | None = None,
 ) -> dict:
     folder_id = folder or "0"
+    team_access = await access_control.get_team_access_context(user)
 
-    # Build folder query
-    folder_query = {
-        "space": space,
-        "parent_id": folder_id,
-    }
-    folders = await SmartFolder.find(folder_query).to_list()
+    folders: list[SmartFolder] = []
+    documents: list[SmartDocument] = []
 
-    # Also include team folders at root level
-    team_folders = []
-    if folder_id == "0" and team_uuid:
-        team_folders = await SmartFolder.find(
-            SmartFolder.team_id == team_uuid,
-            SmartFolder.parent_id == "0",
-            SmartFolder.space == space,
-        ).to_list()
-        # Merge, avoiding duplicates
-        existing_uuids = {f.uuid for f in folders}
-        for tf in team_folders:
-            if tf.uuid not in existing_uuids:
-                folders.append(tf)
-
-    # Check if current folder is a team folder
-    is_team_folder = False
     if folder_id != "0":
-        current_folder = await SmartFolder.find_one(SmartFolder.uuid == folder_id)
-        if current_folder and current_folder.team_id:
-            is_team_folder = True
+        current_folder = await access_control.get_authorized_folder(
+            folder_id, user, team_access=team_access
+        )
+        if not current_folder:
+            return {"folders": [], "documents": []}
 
-    # Build document query  - team folders show all docs in team, personal folders filter by user
-    # Exclude soft-deleted documents from all queries
-    if is_team_folder:
-        doc_query: dict = {
-            "space": space,
-            "folder": folder_id,
-            "soft_deleted": {"$ne": True},
-        }
-        if team_uuid:
-            doc_query["team_id"] = team_uuid
-        documents = await SmartDocument.find(doc_query).to_list()
+        if current_folder.team_id:
+            folders = await SmartFolder.find(
+                SmartFolder.parent_id == current_folder.uuid,
+                SmartFolder.team_id == current_folder.team_id,
+            ).to_list()
+            documents = await SmartDocument.find(
+                {
+                    "folder": current_folder.uuid,
+                    "team_id": current_folder.team_id,
+                    "soft_deleted": {"$ne": True},
+                }
+            ).to_list()
+        else:
+            folders = await SmartFolder.find(
+                SmartFolder.parent_id == current_folder.uuid,
+                SmartFolder.user_id == user.user_id,
+            ).to_list()
+            documents = await SmartDocument.find(
+                {
+                    "folder": current_folder.uuid,
+                    "user_id": user.user_id,
+                    "soft_deleted": {"$ne": True},
+                }
+            ).to_list()
     else:
-        doc_filters = {"space": space, "folder": folder_id, "soft_deleted": {"$ne": True}}
-        if user_id:
-            doc_filters["user_id"] = user_id
-        documents = await SmartDocument.find(doc_filters).to_list()
+        folders = await SmartFolder.find(
+            SmartFolder.parent_id == "0",
+            SmartFolder.user_id == user.user_id,
+        ).to_list()
+        if team_uuid and (team_uuid in team_access.team_uuids or user.is_admin):
+            team_folders = await SmartFolder.find(
+                SmartFolder.parent_id == "0",
+                SmartFolder.team_id == team_uuid,
+            ).to_list()
+            existing_uuids = {f.uuid for f in folders}
+            for folder_doc in team_folders:
+                if folder_doc.uuid not in existing_uuids:
+                    folders.append(folder_doc)
+
+        documents = await SmartDocument.find(
+            {
+                "folder": "0",
+                "user_id": user.user_id,
+                "soft_deleted": {"$ne": True},
+            }
+        ).to_list()
 
     return {
         "folders": [
@@ -92,9 +107,8 @@ async def list_contents(
         ],
     }
 
-
-async def poll_status(doc_uuid: str) -> dict | None:
-    doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+async def poll_status(doc_uuid: str, user: User) -> dict | None:
+    doc = await access_control.get_authorized_document(doc_uuid, user)
     if not doc:
         return None
 
