@@ -10,6 +10,7 @@ from app.dependencies import get_current_user
 from app.models.approval import ApprovalRequest
 from app.models.user import User
 from app.models.workflow import WorkflowResult
+from app.services import access_control
 from app.services import audit_service
 
 router = APIRouter()
@@ -37,6 +38,19 @@ def _approval_to_dict(a: ApprovalRequest) -> dict:
     }
 
 
+async def _can_access_approval(approval: ApprovalRequest, user: User) -> bool:
+    if user.is_admin:
+        return True
+    if user.user_id in (approval.assigned_to_user_ids or []):
+        return True
+    workflow = await access_control.get_authorized_workflow(
+        str(approval.workflow_id),
+        user,
+        manage=True,
+    )
+    return workflow is not None
+
+
 @router.get("/")
 async def list_approvals(
     status: Optional[str] = "pending",
@@ -47,19 +61,11 @@ async def list_approvals(
     if status:
         filters["status"] = status
 
-    # Show approvals assigned to current user, or all if admin
+    approvals = await ApprovalRequest.find(
+        filters
+    ).sort(-ApprovalRequest.created_at).to_list()
     if not user.is_admin:
-        approvals = await ApprovalRequest.find(
-            {"$or": [
-                {"assigned_to_user_ids": user.user_id},
-                {"assigned_to_user_ids": {"$size": 0}},  # unassigned = anyone can review
-            ]},
-            filters,
-        ).sort(-ApprovalRequest.created_at).to_list()
-    else:
-        approvals = await ApprovalRequest.find(
-            filters
-        ).sort(-ApprovalRequest.created_at).to_list()
+        approvals = [a for a in approvals if await _can_access_approval(a, user)]
 
     return {"approvals": [_approval_to_dict(a) for a in approvals]}
 
@@ -67,23 +73,18 @@ async def list_approvals(
 @router.get("/count")
 async def approval_count(user: User = Depends(get_current_user)):
     """Get count of pending approvals for badge display."""
-    if user.is_admin:
-        count = await ApprovalRequest.find(ApprovalRequest.status == "pending").count()
-    else:
-        count = await ApprovalRequest.find(
-            ApprovalRequest.status == "pending",
-            {"$or": [
-                {"assigned_to_user_ids": user.user_id},
-                {"assigned_to_user_ids": {"$size": 0}},
-            ]},
-        ).count()
-    return {"count": count}
+    approvals = await ApprovalRequest.find(ApprovalRequest.status == "pending").to_list()
+    if not user.is_admin:
+        approvals = [a for a in approvals if await _can_access_approval(a, user)]
+    return {"count": len(approvals)}
 
 
 @router.get("/{approval_uuid}")
 async def get_approval(approval_uuid: str, user: User = Depends(get_current_user)):
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
     if not approval:
+        raise HTTPException(status_code=404, detail="Approval request not found")
+    if not await _can_access_approval(approval, user):
         raise HTTPException(status_code=404, detail="Approval request not found")
     return _approval_to_dict(approval)
 
@@ -101,10 +102,8 @@ async def approve_request(
     if approval.status != "pending":
         raise HTTPException(status_code=400, detail=f"Cannot approve: status is {approval.status}")
 
-    # Check authorization
-    if approval.assigned_to_user_ids and user.user_id not in approval.assigned_to_user_ids:
-        if not user.is_admin:
-            raise HTTPException(status_code=403, detail="Not assigned to this approval")
+    if not await _can_access_approval(approval, user):
+        raise HTTPException(status_code=403, detail="Not authorized to review this approval")
 
     approval.status = "approved"
     approval.reviewer_user_id = user.user_id
@@ -144,9 +143,8 @@ async def reject_request(
     if approval.status != "pending":
         raise HTTPException(status_code=400, detail=f"Cannot reject: status is {approval.status}")
 
-    if approval.assigned_to_user_ids and user.user_id not in approval.assigned_to_user_ids:
-        if not user.is_admin:
-            raise HTTPException(status_code=403, detail="Not assigned to this approval")
+    if not await _can_access_approval(approval, user):
+        raise HTTPException(status_code=403, detail="Not authorized to review this approval")
 
     approval.status = "rejected"
     approval.reviewer_user_id = user.user_id

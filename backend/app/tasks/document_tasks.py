@@ -69,20 +69,6 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
     extension = (extension or "").lower().lstrip(".")
 
     try:
-        # For PDFs that already have raw_text, just ensure processing is cleared
-        if extension == "pdf" and doc.get("raw_text", "").strip():
-            raw_text = doc["raw_text"]
-            token_count = len(raw_text) // 4
-            db.smart_document.update_one(
-                {"uuid": document_uuid},
-                {"$set": {
-                    "processing": False,
-                    "task_status": "complete",
-                    "token_count": token_count,
-                }},
-            )
-            return raw_text
-
         db.smart_document.update_one(
             {"uuid": document_uuid},
             {"$set": {"processing": True, "task_status": "extracting"}},

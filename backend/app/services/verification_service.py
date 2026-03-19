@@ -40,18 +40,25 @@ async def submit_for_verification(
     test_files: list[dict] | None = None,
 ) -> dict:
     """Create a verification request for a library item."""
-    # For knowledge bases, look up by uuid string; for others, by ObjectId
+    # Look up by uuid string for knowledge_base and search_set; ObjectId for others
     if item_kind == "knowledge_base":
         obj = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
         if not obj:
             raise ValueError("Item not found")
         obj_id = obj.id
+    elif item_kind == "search_set":
+        # Search sets may be referenced by UUID or ObjectId
+        try:
+            obj_id = PydanticObjectId(item_id)
+            obj = await SearchSet.get(obj_id)
+        except Exception:
+            obj = await SearchSet.find_one(SearchSet.uuid == item_id)
+        if not obj:
+            raise ValueError("Item not found")
+        obj_id = obj.id
     else:
         obj_id = PydanticObjectId(item_id)
-        if item_kind == "workflow":
-            obj = await Workflow.get(obj_id)
-        else:
-            obj = await SearchSet.get(obj_id)
+        obj = await Workflow.get(obj_id)
         if not obj:
             raise ValueError("Item not found")
 
@@ -76,6 +83,27 @@ async def submit_for_verification(
     # Quality gate: require validation before submission
     if gates.get("require_validation") and not latest:
         raise ValueError("This item must be validated before submitting for verification. Run validation first.")
+
+    # Enforce minimum sample size thresholds
+    if latest:
+        result_snap = latest.get("result_snapshot", {})
+        min_tc = gates.get("min_test_cases", 0)
+        min_runs = gates.get("min_runs", 0)
+        min_score_gate = gates.get("min_score", 0)
+
+        num_tc = len(result_snap.get("test_cases", result_snap.get("sources", [])))
+        num_runs_val = result_snap.get("num_runs", 1)
+        val_score = latest.get("score", 0)
+
+        issues = []
+        if min_tc > 0 and num_tc < min_tc:
+            issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
+        if min_runs > 0 and num_runs_val < min_runs:
+            issues.append(f"Validation used {num_runs_val} run(s), minimum is {min_runs}")
+        if min_score_gate > 0 and val_score < min_score_gate:
+            issues.append(f"Quality score is {val_score:.0f}, minimum is {min_score_gate}")
+        if issues:
+            raise ValueError("Submission requirements not met: " + "; ".join(issues))
 
     validation_snapshot = latest.get("result_snapshot") if latest else None
     validation_score = latest.get("score") if latest else None
@@ -205,6 +233,160 @@ async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
     return results
+
+
+async def get_reviewer_rubric(request_uuid: str) -> dict | None:
+    """Generate a structured reviewer rubric/checklist for a verification request.
+
+    Returns a checklist of items the reviewer should verify, pre-populated
+    with automated checks where possible.
+    """
+    req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
+    if not req:
+        return None
+
+    from app.services.quality_service import get_latest_validation, check_verification_readiness
+
+    item_ref = str(req.item_id)
+    # For search sets, use uuid
+    if req.item_kind == "search_set":
+        ss = await SearchSet.find_one(SearchSet.id == req.item_id)
+        if ss:
+            item_ref = ss.uuid
+
+    readiness = await check_verification_readiness(req.item_kind, item_ref)
+    latest = await get_latest_validation(req.item_kind, item_ref)
+
+    result = latest.get("result_snapshot", {}) if latest else {}
+    score = latest.get("score") if latest else None
+    num_tc = len(result.get("test_cases", result.get("sources", [])))
+    num_runs = result.get("num_runs", 0)
+
+    checklist = []
+
+    # Automated checks
+    checklist.append({
+        "category": "validation",
+        "item": "Validation has been run",
+        "status": "pass" if latest else "fail",
+        "automated": True,
+        "detail": f"Score: {score:.0f}" if score else "No validation found",
+    })
+
+    checklist.append({
+        "category": "validation",
+        "item": f"Minimum test cases (\u22653)",
+        "status": "pass" if num_tc >= 3 else "warning",
+        "automated": True,
+        "detail": f"{num_tc} test case(s) used",
+    })
+
+    checklist.append({
+        "category": "validation",
+        "item": f"Minimum runs per test case (\u22653)",
+        "status": "pass" if num_runs >= 3 else "warning",
+        "automated": True,
+        "detail": f"{num_runs} run(s) per test case",
+    })
+
+    # Check challenging fields
+    challenging = result.get("challenging_fields", [])
+    checklist.append({
+        "category": "quality",
+        "item": "No challenging fields (all fields \u226590% accuracy & consistency)",
+        "status": "pass" if not challenging else "warning",
+        "automated": True,
+        "detail": f"{len(challenging)} field(s) below threshold" if challenging else "All fields performing well",
+    })
+
+    # Check cross-field rules
+    cf_score = result.get("cross_field_score")
+    if cf_score is not None:
+        checklist.append({
+            "category": "quality",
+            "item": "Cross-field validation passing",
+            "status": "pass" if cf_score >= 0.9 else "warning",
+            "automated": True,
+            "detail": f"{cf_score * 100:.0f}% cross-field compliance",
+        })
+
+    # Manual checks for the reviewer
+    checklist.append({
+        "category": "review",
+        "item": "Test cases use representative, diverse source documents",
+        "status": "pending",
+        "automated": False,
+        "detail": "Reviewer should verify test cases cover typical document variations",
+    })
+
+    checklist.append({
+        "category": "review",
+        "item": "Expected values in test cases are correct",
+        "status": "pending",
+        "automated": False,
+        "detail": "Reviewer should spot-check expected values against source documents",
+    })
+
+    checklist.append({
+        "category": "review",
+        "item": "Extraction fields are well-defined and unambiguous",
+        "status": "pending",
+        "automated": False,
+        "detail": "Reviewer should check that field names and descriptions are clear",
+    })
+
+    checklist.append({
+        "category": "review",
+        "item": "Submission metadata is complete",
+        "status": "pass" if req.summary and req.description else "warning",
+        "automated": True,
+        "detail": "Summary and description provided" if req.summary and req.description else "Missing summary or description",
+    })
+
+    return {
+        "request_uuid": request_uuid,
+        "readiness": readiness,
+        "checklist": checklist,
+        "automated_pass_count": sum(1 for c in checklist if c["automated"] and c["status"] == "pass"),
+        "automated_total": sum(1 for c in checklist if c["automated"]),
+        "manual_pending_count": sum(1 for c in checklist if not c["automated"] and c["status"] == "pending"),
+    }
+
+
+async def check_auto_approve(request_uuid: str) -> dict:
+    """Check if a verification request qualifies for auto-approval based on config thresholds.
+
+    Returns dict with 'auto_approve': bool and 'reason': str.
+    """
+    req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
+    if not req:
+        return {"auto_approve": False, "reason": "Request not found"}
+
+    sys_cfg = await SystemConfig.get_config()
+    qc = sys_cfg.get_quality_config()
+    auto_cfg = qc.get("auto_approve", {})
+
+    if not auto_cfg.get("enabled", False):
+        return {"auto_approve": False, "reason": "Auto-approve is not enabled"}
+
+    min_score = auto_cfg.get("min_score", 95)
+    min_test_cases = auto_cfg.get("min_test_cases", 5)
+    min_runs = auto_cfg.get("min_runs", 3)
+
+    if not req.validation_score or req.validation_score < min_score:
+        return {"auto_approve": False, "reason": f"Score {req.validation_score or 0:.0f} < {min_score} threshold"}
+
+    snap = req.validation_snapshot or {}
+    num_tc = len(snap.get("test_cases", snap.get("sources", [])))
+    num_runs_val = snap.get("num_runs", 1)
+
+    if num_tc < min_test_cases:
+        return {"auto_approve": False, "reason": f"{num_tc} test cases < {min_test_cases} minimum"}
+
+    if num_runs_val < min_runs:
+        return {"auto_approve": False, "reason": f"{num_runs_val} runs < {min_runs} minimum"}
+
+    return {"auto_approve": True, "reason": f"Score {req.validation_score:.0f} with {num_tc} test cases and {num_runs_val} runs meets auto-approve thresholds"}
 
 
 # ---------------------------------------------------------------------------
@@ -357,6 +539,17 @@ async def unverify_item(item_id: str, item_kind: str) -> dict:
     from app.services.library_service import get_or_create_verified_library
 
     obj_id = PydanticObjectId(item_id)
+    if item_kind == "workflow":
+        wf = await Workflow.get(obj_id)
+        if wf:
+            wf.verified = False
+            await wf.save()
+    elif item_kind == "search_set":
+        ss = await SearchSet.get(obj_id)
+        if ss:
+            ss.verified = False
+            await ss.save()
+
     items = await LibraryItem.find(
         LibraryItem.item_id == obj_id,
         LibraryItem.kind == LibraryItemKind(item_kind),

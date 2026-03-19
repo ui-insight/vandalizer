@@ -18,10 +18,28 @@ from app.schemas.automations import (
     CreateAutomationRequest,
     UpdateAutomationRequest,
 )
+from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def _validate_action_target(
+    action_type: str | None,
+    action_id: str | None,
+    user: User,
+) -> None:
+    if not action_type or not action_id:
+        return
+    if action_type in ("workflow", "task"):
+        workflow = await get_authorized_workflow(action_id, user)
+        if not workflow:
+            raise HTTPException(status_code=404, detail="Linked workflow not found")
+    elif action_type == "extraction":
+        search_set = await get_authorized_search_set(action_id, user)
+        if not search_set:
+            raise HTTPException(status_code=404, detail="Linked extraction not found")
 
 
 def _to_response(auto) -> AutomationResponse:
@@ -46,6 +64,7 @@ def _to_response(auto) -> AutomationResponse:
 
 @router.post("", response_model=AutomationResponse)
 async def create_automation(req: CreateAutomationRequest, user: User = Depends(get_current_user)):
+    await _validate_action_target(req.action_type, req.action_id, user)
     team_id = str(user.current_team) if user.current_team else None
     auto = await svc.create_automation(
         req.name, user.user_id, req.space, req.description,
@@ -160,7 +179,7 @@ async def get_active_automations(user: User = Depends(get_current_user)):
 
 @router.get("/{automation_id}", response_model=AutomationResponse)
 async def get_automation(automation_id: str, user: User = Depends(get_current_user)):
-    auto = await svc.get_automation(automation_id)
+    auto = await svc.get_automation(automation_id, user=user)
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
     return _to_response(auto)
@@ -168,8 +187,17 @@ async def get_automation(automation_id: str, user: User = Depends(get_current_us
 
 @router.patch("/{automation_id}", response_model=AutomationResponse)
 async def update_automation(automation_id: str, req: UpdateAutomationRequest, user: User = Depends(get_current_user)):
+    current = await svc.get_automation(automation_id, user=user, manage=True)
+    if not current:
+        raise HTTPException(status_code=404, detail="Automation not found")
+
+    action_type = req.action_type if req.action_type is not None else current.action_type
+    action_id = req.action_id if req.action_id is not None else current.action_id
+    await _validate_action_target(action_type, action_id, user)
+
     auto = await svc.update_automation(
         automation_id,
+        user=user,
         name=req.name,
         description=req.description,
         enabled=req.enabled,
@@ -187,7 +215,7 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
 
 @router.delete("/{automation_id}")
 async def delete_automation(automation_id: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_automation(automation_id)
+    ok = await svc.delete_automation(automation_id, user=user)
     if not ok:
         raise HTTPException(status_code=404, detail="Automation not found")
     return {"ok": True}
@@ -218,7 +246,7 @@ async def trigger_automation(
     from app.services import activity_service
     from app.tasks.upload_tasks import dispatch_upload_tasks
 
-    auto = await svc.get_automation(automation_id)
+    auto = await svc.get_automation(automation_id, user=user)
     if not auto:
         raise HTTPException(status_code=404, detail="Automation not found")
     if not auto.enabled:
@@ -299,11 +327,13 @@ async def trigger_automation(
             type=ActivityType.WORKFLOW_RUN,
             title=f"API: {auto.name}",
             user_id=user.user_id,
+            workflow=PydanticObjectId(auto.action_id),
         )
         try:
             session_id = await workflow_service.run_workflow(
                 auto.action_id, all_doc_uuids, user.user_id,
                 activity_id=str(activity.id),
+                user=user,
             )
             return {
                 "status": "queued",
@@ -319,7 +349,7 @@ async def trigger_automation(
     elif auto.action_type == "extraction":
         from app.services import search_set_service
 
-        ss = await search_set_service.get_search_set(auto.action_id)
+        ss = await get_authorized_search_set(auto.action_id, user)
         if not ss:
             raise HTTPException(status_code=404, detail="Linked extraction not found")
 

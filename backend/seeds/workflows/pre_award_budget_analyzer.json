@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-pre-award-budget-analyzer",
+    "display_name": "Budget Analyzer",
+    "description": "Extracts budget line items from a proposal or award document, checks for arithmetic errors, and flags potentially disallowed costs.",
+    "quality_tier": "gold",
+    "collections": ["pre-award", "financial"]
+  },
+  "items": [
+    {
+      "name": "Budget Analyzer",
+      "description": "Extracts budget data and performs validation checks for common errors and compliance issues.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Budget Fields",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Senior Personnel Costs, Other Personnel Costs, Fringe Benefits, Fringe Benefit Rate, Equipment, Travel Domestic, Travel Foreign, Participant Support Costs, Materials and Supplies, Subcontracts, Consultant Costs, Other Direct Costs, Total Direct Costs, Indirect Costs, Indirect Cost Rate, Indirect Cost Base, Total Project Cost, Cost Sharing Amount, Number of Budget Periods, Annual Budget Amounts"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Budget Analysis",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a grants budget specialist reviewing an extracted budget. Perform the following analysis:\n\n## Arithmetic Verification\n- Do the personnel + fringe + other categories sum to Total Direct Costs?\n- Is the indirect cost rate applied correctly to the appropriate base (MTDC)?\n- Does Total Direct + Indirect = Total Project Cost?\n\n## Compliance Flags\n- Are there any potentially unallowable costs (entertainment, alcohol, lobbying, first-class travel)?\n- Is equipment properly categorized (items >$5,000)?\n- Are participant support costs separated from other categories?\n- For subawards, is only the first $25K of each included in the indirect cost base?\n\n## Reasonableness Check\n- Is the fringe benefit rate within normal institutional ranges (20-35% typical)?\n- Is the indirect cost rate consistent with the stated rate?\n- Are travel costs reasonable for the scope of work?\n\nPresent findings as:\n1. **Summary Table** - Budget category, amount, status (OK/Warning/Error)\n2. **Issues Found** - Numbered list with severity\n3. **Recommendations** - Actions to resolve issues",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

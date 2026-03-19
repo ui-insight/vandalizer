@@ -57,7 +57,15 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
 
     Falls back gracefully if the OCR service is unavailable.
     """
-    ocr_endpoint = os.environ.get("OCR_ENDPOINT", "")
+    # OCR endpoint is stored in the database via admin config (SystemConfig)
+    from pymongo import MongoClient
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    db = client[settings.mongo_db]
+    cfg = db.system_config.find_one({})
+    ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
+
     if not ocr_endpoint:
         logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
         return ""
@@ -70,7 +78,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
             with httpx.Client(timeout=120.0) as client:
                 with open(pdf_path, "rb") as f:
                     resp = client.post(
-                        ocr_endpoint.rstrip("/") + "/convert",
+                        ocr_endpoint,
                         files={"file": (os.path.basename(pdf_path), f, "application/pdf")},
                     )
                 if resp.status_code == 200:
@@ -102,10 +110,14 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
 
     try:
         if file_extension == "pdf":
+            # Prefer OCR when available — it handles scanned pages,
+            # complex layouts, and image-heavy PDFs far better than PyPDF2.
+            ocr_text = ocr_extract_text_from_pdf(file_path)
+            if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
+                return ocr_text
+            # Fall back to PyPDF2 if OCR unavailable or returned nothing
+            logger.info("OCR returned %d chars, falling back to PyPDF2", len(ocr_text))
             text = extract_text_from_pdf(file_path)
-            if len(text.strip()) < MIN_PDF_TEXT_LENGTH:
-                logger.info("PDF text too short (%d chars), trying OCR...", len(text))
-                text = ocr_extract_text_from_pdf(file_path)
             return text
 
         elif file_extension in ("html", "htm"):

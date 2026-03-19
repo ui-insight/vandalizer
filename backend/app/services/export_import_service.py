@@ -95,7 +95,12 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
     return _envelope("workflow", user_email, [item])
 
 
-async def import_workflow(data: dict, user_id: str, space: str, team_id: str | None = None) -> dict:
+async def import_workflow(
+    data: dict,
+    user_id: str,
+    space: str | None = None,
+    team_id: str | None = None,
+) -> dict:
     """Import a workflow from export data. Returns the new workflow dict."""
     err = validate_export_data(data)
     if err:
@@ -196,7 +201,7 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
     return _envelope("search_set", user_email, [export_item])
 
 
-async def import_search_set(data: dict, user_id: str, space: str) -> SearchSet:
+async def import_search_set(data: dict, user_id: str, space: str | None = None) -> SearchSet:
     """Import a search set from export data. Returns the new SearchSet."""
     err = validate_export_data(data)
     if err:
@@ -210,7 +215,7 @@ async def import_search_set(data: dict, user_id: str, space: str) -> SearchSet:
     clone = SearchSet(
         title=f"{item['title']} (Imported)",
         uuid=new_uuid,
-        space=space,
+        space=space or "default",
         status="active",
         set_type=item.get("set_type", "extraction"),
         user_id=user_id,
@@ -324,7 +329,8 @@ async def import_catalog_items(
     data: dict,
     selected_indices: list[int],
     user_id: str,
-    space: str,
+    space: str | None = None,
+    team_id: str | None = None,
 ) -> list[dict]:
     """Import selected catalog items. Returns list of created item summaries."""
     err = validate_export_data(data)
@@ -343,7 +349,7 @@ async def import_catalog_items(
 
         if item_kind == "workflow":
             wrapper = _envelope("workflow", "", [definition])
-            wf = await import_workflow(wrapper, user_id, space)
+            wf = await import_workflow(wrapper, user_id, space, team_id=team_id)
             results.append({"kind": "workflow", "id": wf["id"], "name": wf["name"]})
         elif item_kind == "search_set":
             wrapper = _envelope("search_set", "", [definition])

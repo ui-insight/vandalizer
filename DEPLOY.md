@@ -59,6 +59,8 @@ docker compose logs -f api
 docker compose down
 ```
 
+For backup, restore, upgrade, and rollback of the current Docker Compose install path, use [OPERATIONS.md](OPERATIONS.md).
+
 To stop all services:
 ```bash
 docker compose down

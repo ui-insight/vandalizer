@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 class CreateSearchSetRequest(BaseModel):
     title: str
-    space: str
+    space: Optional[str] = None
     set_type: str = "extraction"
     extraction_config: Optional[dict] = None
 

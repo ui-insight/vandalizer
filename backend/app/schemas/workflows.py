@@ -156,9 +156,17 @@ class ValidationCheckResult(BaseModel):
     status: str  # PASS, FAIL, WARN, SKIP
     detail: Optional[str] = None
     check_id: Optional[str] = None
+    consistency: Optional[float] = None  # 0-1, fraction of runs that agree
+    run_statuses: Optional[list[str]] = None  # Status from each run
+    run_details: Optional[list[str]] = None  # Detail from each run
 
 
 class ValidateWorkflowResponse(BaseModel):
     grade: str  # A-F
     summary: str
     checks: list[ValidationCheckResult]
+    score: Optional[float] = None  # Continuous 0-100
+    check_pass_rate: Optional[float] = None  # 0-1
+    consistency: Optional[float] = None  # 0-1
+    num_runs: int = 1
+    num_checks: int = 0

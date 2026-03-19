@@ -10,33 +10,50 @@ Target outcome: a release that an outside university can install, operate, upgra
 
 ## Current Status
 
-As of `2026-03-18`, the roadmap status is:
+As of `2026-03-19`, the roadmap status is:
 
 - `In progress`: P0 item 1, tenant isolation and object-level authorization
 - `In progress`: P0 item 2, document governance authorization
 - `Completed locally`: P0 item 3, frontend production build
 - `Partially complete`: P1 item 4, backend test cleanup
 - `In progress`: P1 items 5-7
-- `Not started`: P2/P3 items
+- `In progress`: P2 items 8 and 10, global stats/admin-style scoping plus backup/restore operations
+- `Not started`: remaining P2/P3 items
 
 Recent completed work:
 
 - Added shared backend access-control helpers and applied them to file, folder, document, breadcrumb, move, rename, delete, poll-status, classification, and retention-hold flows.
+- Added a formal authorization matrix in docs and normalized shared helper checks across mixed team UUID / team ObjectId storage.
+- Extended helper-based authorization into library, library-folder, and library-item flows.
+- Extended helper-based authorization into search-set CRUD, validation, export, and document-selection flows.
+- Added verified-library and team-library backed access checks for workflows and search sets.
 - Stopped trusting caller-supplied `space` for the active file-browser/document-list path.
 - Removed `space` from the active frontend file browser, upload, folder-create, and document-picker request path.
-- Restored the backend test suite to green locally: `406 passed`.
+- Removed active `space` parameters from search-set creation/import and workflow import in the frontend API layer.
+- Added reviewer/admin-gated verified-catalog export, preview-import, and import routes in the backend to match the existing frontend flows.
+- Hardened verification queue, request-detail, collection mutation, submission-target, and trial-run routes so they no longer rely on frontend-only gating.
+- Scoped `/api/config/automation-stats` to the caller's visible workflows instead of installation-wide workflow/run data.
+- Scoped team-admin analytics drill-down routes so document counts reflect team-visible documents rather than all documents owned by team members.
+- Redacted installation-wide `is_admin` and `is_examiner` user flags from team-scoped analytics views.
+- Tightened approval visibility/action so only assigned reviewers, workflow managers, or admins can review a given approval.
+- Locked the legacy `spaces` API to owner-scoped list, update, and delete behavior instead of installation-wide visibility and mutation.
+- Bound office manual triage/process routes to owned work items on the owned intake, and required authorized workflow binding when an intake references a default workflow.
+- Removed the active frontend `space` parameter from catalog import.
+- Verified the documented backend test command locally: `cd backend && uv run pytest -q` now passes at `538 passed`.
 - Restored the frontend production build locally: `npm run build` passes.
 - Restored the frontend test suite locally: `59 passed`.
 - Updated the package-publish workflow to build backend and frontend images from the same contexts used by local compose.
 - Added a canonical `bootstrap_install.py` path for first admin plus optional default-team setup.
 - Updated the main install docs to include the bootstrap flow, first-login behavior, persistence locations, and verified local test/build commands.
+- Added a current-compose [OPERATIONS.md](OPERATIONS.md) runbook for health checks, backups, restore, upgrades, and rollback.
 - Updated the image-publish workflow so container pushes happen only after a successful `CI` run on `main` (or manual dispatch).
+- Added focused auth regression coverage for the new search-set and library-backed authorization paths.
 
 Still open before the related roadmap items can be closed:
 
-- The authorization model is improved but not yet fully documented as a formal matrix.
-- Legacy `space` usage still exists in workflow/search-set/certification paths.
-- Install/bootstrap docs are materially better, but backup/restore, upgrade/rollback, and broader operator guidance are still open.
+- The authorization model now has a formal matrix, but a manual adversarial audit and the remaining broader analytics/admin-surface review are still open.
+- Legacy `space` usage is materially reduced, but it still exists in automation/workflow metadata paths and stale product copy.
+- Install/bootstrap docs are materially better and a current operations guide now exists, but restore drills, S3 guidance, and release-specific upgrade/rollback notes are still open.
 - CI and release automation still need to enforce the now-green local frontend/backend checks.
 
 ## Release Gates
@@ -100,9 +117,24 @@ Exit criteria:
 Progress so far:
 
 - Added shared access-control helpers and routed document, file, and folder access through them.
+- Added a formal authorization matrix in `AUTHORIZATION_MATRIX.md`.
+- Normalized helper-based team access checks to handle both team UUIDs and Mongo ObjectId-style team identifiers.
 - Tightened authorization for list, poll-status, rename, delete, move, breadcrumbs, classification, and retention-hold flows.
+- Tightened workflow result polling/download, workflow run/test document selection, automation access, knowledge-base access, and chat document/folder/knowledge-base selection flows.
+- Added helper-based authorization for libraries, library folders, library items, and verified-library org scoping.
+- Added helper-based authorization for search-set CRUD, item CRUD, validation/test-case paths, and extraction document selection.
+- Added library-backed workflow/search-set access so verified items and team-shared search sets can be opened through authorized library paths.
+- Added reviewer/admin enforcement for verification queue, collection mutation, and verified-catalog export/import routes.
+- Added route-level authorization for verification submission targets and request-detail visibility.
+- Added verified-item metadata visibility checks so direct metadata lookup no longer bypasses org-scoped verified-item access.
+- Added approval authorization checks based on assignment or manage access to the parent workflow.
+- Locked legacy space list/update/delete operations to the owning user.
+- Hardened office intake/work-item routes so manual actions cannot target foreign work items and intake workflow binding cannot point at an unauthorized workflow.
+- Scoped automation dashboard stats to the caller's visible workflows rather than installation-wide counts.
 - Removed active dependence on caller-supplied `space` in the file browser path.
-- Backend tests covering the touched authorization paths are passing.
+- Focused backend authorization tests covering the touched paths are passing (`98 passed` across access-control, extraction-auth, verification-route, config-route, and workflow-auth suites).
+- Follow-up approval, verification, and legacy-space auth suites are also passing (`40 passed` across approval-route, verification-route, space-route, config-route, extraction-auth, and workflow-auth suites).
+- Office/approval/verification/space route follow-up coverage is also passing (`25 passed` across office-route, approval-route, verification-route, and space-route suites).
 
 ### 2. Fix document governance endpoints to honor ownership and tenant scope
 
@@ -187,7 +219,7 @@ Exit criteria:
 
 Progress so far:
 
-- The local backend suite now passes at `406 passed`.
+- The documented backend suite command now passes locally at `538 passed` via `cd backend && uv run pytest -q`.
 - The remaining gap for closing this item is to confirm the exact CI command path, keep it green on `main`, and verify coverage expectations.
 
 ### 5. Make install/bootstrap reproducible from one canonical path
@@ -297,6 +329,8 @@ Progress so far:
 
 ### 8. Scope global stats, analytics, and admin-style surfaces correctly
 
+Status: `In progress`
+
 Problem:
 
 - Some endpoints aggregate installation-wide data for any authenticated user or without sufficient tenant scoping.
@@ -314,6 +348,15 @@ Required improvements:
 Exit criteria:
 
 - Non-admin users cannot infer other teams' or the whole installation's usage patterns.
+
+Progress so far:
+
+- `/api/config/automation-stats` is now scoped to the caller's visible workflows instead of installation-wide data.
+- Verified-catalog export/preview-import/import is now explicitly reviewer/admin gated in the backend instead of depending on frontend-only access control.
+- Team-admin user and team drill-down routes now scope document counts to team-visible documents instead of installation-wide personal-document totals.
+- Team-scoped analytics views now redact installation-wide `is_admin` and `is_examiner` flags for member records.
+- Targeted route coverage for the new analytics scoping is passing in `backend/tests/test_admin_routes.py`.
+- The broader audit of analytics, quality dashboards, and admin-style summary endpoints is still open.
 
 ### 9. Formalize the data model for universities and organizations
 
@@ -345,6 +388,8 @@ Exit criteria:
 
 ### 10. Improve backup, restore, and disaster recovery
 
+Status: `In progress`
+
 Problem:
 
 - There is backup scripting, but the operator story is not yet complete enough for risk-averse universities.
@@ -364,6 +409,14 @@ Required improvements:
 Exit criteria:
 
 - An operator can restore a failed deployment into a new environment.
+
+Progress so far:
+
+- The repo now includes a current-compose [OPERATIONS.md](OPERATIONS.md) runbook instead of relying only on the older migration-oriented deployment guide.
+- The operations guide now documents the actual persistent data set for the default install path: MongoDB, uploads, ChromaDB, and `backend/.env`.
+- The operations guide now includes concrete backup commands for MongoDB, uploads, and ChromaDB using the running Compose services.
+- The operations guide now includes a restore order, smoke checks, and basic upgrade/rollback procedures for the current package.
+- Restore drills, S3-backed storage guidance, and release-by-release migration notes are still open.
 
 ### 11. Strengthen observability and production operations
 

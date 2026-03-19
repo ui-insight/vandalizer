@@ -14,8 +14,8 @@ export function useSearchSets(space?: string) {
   const refresh = () => qc.invalidateQueries({ queryKey })
 
   const createMutation = useMutation({
-    mutationFn: (args: { title: string; space: string }) =>
-      api.createSearchSet({ title: args.title, space: args.space }),
+    mutationFn: (args: { title: string }) =>
+      api.createSearchSet({ title: args.title }),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
@@ -29,8 +29,8 @@ export function useSearchSets(space?: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
-  const create = async (title: string, currentSpace: string) =>
-    createMutation.mutateAsync({ title, space: currentSpace })
+  const create = async (title: string, _currentSpace: string) =>
+    createMutation.mutateAsync({ title })
 
   const remove = async (uuid: string) => {
     await removeMutation.mutateAsync(uuid)

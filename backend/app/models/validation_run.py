@@ -26,6 +26,7 @@ class ValidationRun(Document):
     num_checks: int = 0
     checks_passed: int = 0
     checks_failed: int = 0
+    score_breakdown: dict = {}  # raw_score, sample_size_factor, penalty details
     result_snapshot: dict = {}  # Full validation result payload
     extraction_config: dict = {}  # Extraction config used for this run
     config_hash: Optional[str] = None

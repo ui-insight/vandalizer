@@ -160,6 +160,8 @@ export function WorkflowEditorPanel() {
     try {
       const wf = await getWorkflow(openWorkflowId)
       setWorkflow(wf)
+    } catch {
+      setWorkflow(null)
     } finally {
       setLoading(false)
     }
@@ -380,7 +382,7 @@ export function WorkflowEditorPanel() {
               if (!f) return
               e.target.value = ''
               try {
-                const result = await importWorkflow(f, workflow.space || 'default')
+                const result = await importWorkflow(f)
                 openWorkflow(result.id)
               } catch (err: unknown) {
                 alert(err instanceof Error ? err.message : 'Import failed')

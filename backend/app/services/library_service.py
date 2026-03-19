@@ -1,8 +1,10 @@
 """Library CRUD service  - libraries, items, folders, clone/fork, search."""
 
+from __future__ import annotations
+
 import datetime
 import uuid as uuid_mod
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from beanie import PydanticObjectId
 from bson import ObjectId as BsonObjectId
@@ -18,6 +20,10 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
 from app.models.team import Team
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
+from app.services import access_control
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
@@ -140,13 +146,20 @@ async def _backfill_verified_library(lib: Library) -> None:
         await lib.save()
 
 
-async def list_libraries(user_id: str, team_id: str | None = None) -> list[dict]:
-    personal = await get_or_create_personal_library(user_id)
+async def list_libraries(user: User, team_id: str | None = None) -> list[dict]:
+    personal = await get_or_create_personal_library(user.user_id)
     results = [_library_to_dict(personal)]
 
     if team_id:
-        team_lib = await get_or_create_team_library(user_id, team_id)
-        results.append(_library_to_dict(team_lib))
+        try:
+            team_oid = await _resolve_team_oid(team_id)
+        except ValueError:
+            team_oid = None
+        if team_oid:
+            team_access = await access_control.get_team_access_context(user)
+            if access_control.can_view_team(str(team_oid), team_access):
+                team_lib = await get_or_create_team_library(user.user_id, team_id)
+                results.append(_library_to_dict(team_lib))
 
     verified = await get_or_create_verified_library()
     results.append(_library_to_dict(verified))
@@ -154,8 +167,8 @@ async def list_libraries(user_id: str, team_id: str | None = None) -> list[dict]
     return results
 
 
-async def get_library(library_id: str, user_id: str) -> dict | None:
-    lib = await Library.get(PydanticObjectId(library_id))
+async def get_library(library_id: str, user: User) -> dict | None:
+    lib = await access_control.get_authorized_library(library_id, user)
     if not lib:
         return None
     return _library_to_dict(lib)
@@ -163,11 +176,11 @@ async def get_library(library_id: str, user_id: str) -> dict | None:
 
 async def update_library(
     library_id: str,
-    user_id: str,
+    user: User,
     title: str | None = None,
     description: str | None = None,
 ) -> dict | None:
-    lib = await Library.get(PydanticObjectId(library_id))
+    lib = await access_control.get_authorized_library(library_id, user, manage=True)
     if not lib:
         return None
     if title is not None:
@@ -179,8 +192,8 @@ async def update_library(
     return _library_to_dict(lib)
 
 
-async def delete_library(library_id: str, user_id: str) -> bool:
-    lib = await Library.get(PydanticObjectId(library_id))
+async def delete_library(library_id: str, user: User) -> bool:
+    lib = await access_control.get_authorized_library(library_id, user, manage=True)
     if not lib:
         return False
     # Cascade delete items
@@ -199,22 +212,34 @@ async def delete_library(library_id: str, user_id: str) -> bool:
 
 async def add_item(
     library_id: str,
-    user_id: str,
+    user: User,
     item_id: str,
     kind: str,
     note: str | None = None,
     tags: list[str] | None = None,
     folder: str | None = None,
 ) -> dict | None:
-    lib = await Library.get(PydanticObjectId(library_id))
+    lib = await access_control.get_authorized_library(library_id, user, manage=True)
     if not lib:
+        return None
+    if kind == LibraryItemKind.WORKFLOW.value:
+        if not await access_control.get_authorized_workflow(item_id, user):
+            return None
+    elif kind == LibraryItemKind.SEARCH_SET.value:
+        try:
+            search_set = await SearchSet.get(PydanticObjectId(item_id))
+        except Exception:
+            search_set = None
+        if not search_set or not await access_control.get_authorized_search_set(search_set.uuid, user):
+            return None
+    else:
         return None
 
     now = datetime.datetime.now(datetime.timezone.utc)
     li = LibraryItem(
         item_id=PydanticObjectId(item_id),
         kind=LibraryItemKind(kind),
-        added_by_user_id=user_id,
+        added_by_user_id=user.user_id,
         note=note,
         tags=tags or [],
         folder=folder,
@@ -229,8 +254,8 @@ async def add_item(
     return await _dereference_item(li)
 
 
-async def remove_item(library_id: str, item_id: str, user_id: str) -> bool:
-    lib = await Library.get(PydanticObjectId(library_id))
+async def remove_item(library_id: str, item_id: str, user: User) -> bool:
+    lib = await access_control.get_authorized_library(library_id, user, manage=True)
     if not lib:
         return False
     item_oid = PydanticObjectId(item_id)
@@ -246,13 +271,13 @@ async def remove_item(library_id: str, item_id: str, user_id: str) -> bool:
 
 async def update_item(
     item_id: str,
-    user_id: str,
+    user: User,
     note: str | None = None,
     tags: list[str] | None = None,
     pinned: bool | None = None,
     favorited: bool | None = None,
 ) -> dict | None:
-    item = await LibraryItem.get(PydanticObjectId(item_id))
+    item = await access_control.get_authorized_library_item(item_id, user, manage=True)
     if not item:
         return None
     # Use targeted $set to avoid overwriting fields on old documents
@@ -275,9 +300,9 @@ async def update_item(
     return await _dereference_item(item)
 
 
-async def touch_item(item_id: str) -> bool:
+async def touch_item(item_id: str, user: User) -> bool:
     """Update the last_used_at timestamp for a library item."""
-    item = await LibraryItem.get(PydanticObjectId(item_id))
+    item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
         return False
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -287,20 +312,20 @@ async def touch_item(item_id: str) -> bool:
 
 async def get_library_items(
     library_id: str,
-    user_id: str,
+    user: User,
     kind: str | None = None,
     folder: str | None = None,
     search: str | None = None,
     user_org_ancestry: list[str] | None = None,
 ) -> list[dict]:
-    lib = await Library.get(PydanticObjectId(library_id))
+    lib = await access_control.get_authorized_library(library_id, user)
     if not lib:
         return []
 
     items = await LibraryItem.find({"_id": {"$in": lib.items}}).to_list()
 
     if kind:
-        items = [i for i in items if i.kind == kind]
+        items = [i for i in items if i.kind.value == kind]
     if folder is not None:
         items = [i for i in items if i.folder == folder]
 
@@ -357,19 +382,19 @@ async def get_library_items(
 # ---------------------------------------------------------------------------
 
 
-async def clone_to_personal(item_id: str, user_id: str) -> dict | None:
-    item = await LibraryItem.get(PydanticObjectId(item_id))
+async def clone_to_personal(item_id: str, user: User) -> dict | None:
+    item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
         return None
 
-    new_obj_id = await _clone_underlying_object(item, user_id, team_id=None)
+    new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=None)
     if not new_obj_id:
         return None
 
-    personal_lib = await get_or_create_personal_library(user_id)
+    personal_lib = await get_or_create_personal_library(user.user_id)
     return await add_item(
         library_id=str(personal_lib.id),
-        user_id=user_id,
+        user=user,
         item_id=str(new_obj_id),
         kind=item.kind.value,
         note=f"Cloned from library item",
@@ -377,19 +402,27 @@ async def clone_to_personal(item_id: str, user_id: str) -> dict | None:
     )
 
 
-async def share_to_team(item_id: str, user_id: str, team_id: str) -> dict | None:
-    item = await LibraryItem.get(PydanticObjectId(item_id))
+async def share_to_team(item_id: str, user: User, team_id: str) -> dict | None:
+    item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
         return None
 
-    new_obj_id = await _clone_underlying_object(item, user_id, team_id=team_id)
+    team_access = await access_control.get_team_access_context(user)
+    try:
+        team_oid = await _resolve_team_oid(team_id)
+    except ValueError:
+        return None
+    if not access_control.can_manage_team(str(team_oid), team_access):
+        return None
+
+    new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
     if not new_obj_id:
         return None
 
-    team_lib = await get_or_create_team_library(user_id, team_id)
+    team_lib = await get_or_create_team_library(user.user_id, team_id)
     return await add_item(
         library_id=str(team_lib.id),
-        user_id=user_id,
+        user=user,
         item_id=str(new_obj_id),
         kind=item.kind.value,
         note=f"Shared to team",
@@ -404,26 +437,39 @@ async def share_to_team(item_id: str, user_id: str, team_id: str) -> dict | None
 
 async def create_folder(
     scope: str,
-    user_id: str,
+    user: User,
     name: str,
     parent_id: str | None = None,
     team_id: str | None = None,
 ) -> dict:
-    team_oid = await _resolve_team_oid(team_id) if team_id else None
+    team_oid = None
+    if scope == LibraryScope.TEAM.value:
+        if not team_id:
+            raise ValueError("team_id is required for team folders")
+        team_oid = await _resolve_team_oid(team_id)
+        team_access = await access_control.get_team_access_context(user)
+        if not access_control.can_manage_team(str(team_oid), team_access):
+            raise ValueError("Team not accessible")
+
+    if parent_id:
+        parent = await access_control.get_authorized_library_folder(parent_id, user)
+        if not parent or parent.scope.value != scope:
+            raise ValueError("Parent folder not found")
+
     folder = LibraryFolder(
         uuid=str(uuid_mod.uuid4()),
         name=name,
         parent_id=parent_id,
         scope=LibraryScope(scope),
-        owner_user_id=user_id,
+        owner_user_id=user.user_id,
         team=team_oid,
     )
     await folder.insert()
     return _folder_to_dict(folder)
 
 
-async def rename_folder(folder_uuid: str, user_id: str, new_name: str) -> dict | None:
-    folder = await LibraryFolder.find_one(LibraryFolder.uuid == folder_uuid)
+async def rename_folder(folder_uuid: str, user: User, new_name: str) -> dict | None:
+    folder = await access_control.get_authorized_library_folder(folder_uuid, user, manage=True)
     if not folder:
         return None
     folder.name = new_name
@@ -432,8 +478,8 @@ async def rename_folder(folder_uuid: str, user_id: str, new_name: str) -> dict |
     return _folder_to_dict(folder, item_count=item_count)
 
 
-async def delete_folder(folder_uuid: str, user_id: str) -> bool:
-    folder = await LibraryFolder.find_one(LibraryFolder.uuid == folder_uuid)
+async def delete_folder(folder_uuid: str, user: User) -> bool:
+    folder = await access_control.get_authorized_library_folder(folder_uuid, user, manage=True)
     if not folder:
         return False
     # Move items in this folder to root
@@ -450,10 +496,21 @@ async def delete_folder(folder_uuid: str, user_id: str) -> bool:
     return True
 
 
-async def move_items(item_ids: list[str], folder_uuid: str | None, user_id: str) -> bool:
+async def move_items(item_ids: list[str], folder_uuid: str | None, user: User) -> bool:
+    target_folder = None
+    if folder_uuid:
+        target_folder = await access_control.get_authorized_library_folder(
+            folder_uuid,
+            user,
+            manage=True,
+        )
+        if not target_folder:
+            return False
     for iid in item_ids:
-        item = await LibraryItem.get(PydanticObjectId(iid))
+        item = await access_control.get_authorized_library_item(iid, user, manage=True)
         if item:
+            if target_folder and item.folder == folder_uuid:
+                continue
             item.folder = folder_uuid
             await item.save()
     return True
@@ -461,12 +518,23 @@ async def move_items(item_ids: list[str], folder_uuid: str | None, user_id: str)
 
 async def list_folders(
     scope: str,
-    user_id: str,
+    user: User,
     team_id: str | None = None,
 ) -> list[dict]:
-    query: dict = {"scope": scope, "owner_user_id": user_id}
-    if team_id:
-        query["team"] = await _resolve_team_oid(team_id)
+    query: dict = {"scope": scope}
+    if scope == LibraryScope.TEAM.value:
+        if not team_id:
+            return []
+        try:
+            team_oid = await _resolve_team_oid(team_id)
+        except ValueError:
+            return []
+        team_access = await access_control.get_team_access_context(user)
+        if not access_control.can_view_team(str(team_oid), team_access):
+            return []
+        query["team"] = team_oid
+    else:
+        query["owner_user_id"] = user.user_id
     folders = await LibraryFolder.find(query).to_list()
 
     # Count items per folder
@@ -490,39 +558,35 @@ async def list_folders(
 
 
 async def search_libraries(
-    user_id: str,
+    user: User,
     query: str,
     team_id: str | None = None,
     kind: str | None = None,
 ) -> list[dict]:
-    # Gather libraries to search
-    personal = await get_or_create_personal_library(user_id)
-    libs = [personal]
-    if team_id:
-        team_lib = await get_or_create_team_library(user_id, team_id)
-        libs.append(team_lib)
-
-    all_item_ids: list[PydanticObjectId] = []
+    results: list[dict] = []
+    seen_item_ids: set[str] = set()
+    libs = await list_libraries(user, team_id=team_id)
     for lib in libs:
-        all_item_ids.extend(lib.items)
+        user_org_ancestry = None
+        if lib["scope"] == LibraryScope.VERIFIED.value:
+            from app.services import organization_service
 
-    if not all_item_ids:
-        return []
-
-    items = await LibraryItem.find({"_id": {"$in": all_item_ids}}).to_list()
-    if kind:
-        items = [i for i in items if i.kind == kind]
-
-    results = []
-    for item in items:
-        deref = await _dereference_item(item)
-        if not deref:
-            continue
-        name_lower = deref.get("name", "").lower()
-        tags_str = " ".join(deref.get("tags", [])).lower()
-        note_str = (deref.get("note") or "").lower()
-        if query.lower() in name_lower or query.lower() in tags_str or query.lower() in note_str:
-            results.append(deref)
+            user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+        items = await get_library_items(
+            lib["id"],
+            user,
+            kind=kind,
+            user_org_ancestry=user_org_ancestry,
+        )
+        for item in items:
+            if item["id"] in seen_item_ids:
+                continue
+            name_lower = item.get("name", "").lower()
+            tags_str = " ".join(item.get("tags", [])).lower()
+            note_str = (item.get("note") or "").lower()
+            if query.lower() in name_lower or query.lower() in tags_str or query.lower() in note_str:
+                seen_item_ids.add(item["id"])
+                results.append(item)
 
     return results
 

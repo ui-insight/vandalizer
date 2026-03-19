@@ -1,0 +1,45 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "search_set",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "ss-dod-contract",
+    "display_name": "DOD Contract Extraction Template",
+    "description": "Extract standard fields from Department of Defense contracts, grants, and research agreements including DFARS-specific categories.",
+    "quality_tier": "gold",
+    "domain": "dod",
+    "collections": ["federal-agency"]
+  },
+  "items": [
+    {
+      "title": "DOD Contract/Grant",
+      "set_type": "extraction",
+      "extraction_config": {},
+      "items": [
+        {"searchphrase": "Contract Number", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Award Number", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Contractor Name", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "CAGE Code", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "PI Name", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Program Manager", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Statement of Work Summary", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Period of Performance Start", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Period of Performance End", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Total Estimated Cost", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Direct Labor", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Fringe Benefits", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Overhead", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Subcontracts", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Materials and Supplies", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Equipment", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Travel", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Other Direct Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "G&A Rate", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Fee/Profit", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Security Classification", "searchtype": "extraction", "is_optional": false, "enum_values": ["Unclassified", "CUI", "Confidential", "Secret"]}
+      ],
+      "test_cases": []
+    }
+  ]
+}

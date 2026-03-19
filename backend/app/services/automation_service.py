@@ -6,6 +6,8 @@ from typing import Optional
 from beanie import PydanticObjectId
 
 from app.models.automation import Automation
+from app.models.user import User
+from app.services.access_control import get_authorized_automation
 
 
 async def create_automation(
@@ -57,12 +59,20 @@ async def list_automations(
     return await Automation.find(user_query).to_list()
 
 
-async def get_automation(automation_id: str) -> Automation | None:
+async def get_automation(
+    automation_id: str,
+    user: User | None = None,
+    *,
+    manage: bool = False,
+) -> Automation | None:
+    if user is not None:
+        return await get_authorized_automation(automation_id, user, manage=manage)
     return await Automation.get(PydanticObjectId(automation_id))
 
 
 async def update_automation(
     automation_id: str,
+    user: User,
     name: str | None = None,
     description: str | None = None,
     enabled: bool | None = None,
@@ -73,7 +83,7 @@ async def update_automation(
     shared_with_team: bool | None = None,
     output_config: dict | None = None,
 ) -> Automation | None:
-    auto = await Automation.get(PydanticObjectId(automation_id))
+    auto = await get_authorized_automation(automation_id, user, manage=True)
     if not auto:
         return None
     if name is not None:
@@ -99,8 +109,8 @@ async def update_automation(
     return auto
 
 
-async def delete_automation(automation_id: str) -> bool:
-    auto = await Automation.get(PydanticObjectId(automation_id))
+async def delete_automation(automation_id: str, user: User) -> bool:
+    auto = await get_authorized_automation(automation_id, user, manage=True)
     if not auto:
         return False
     await auto.delete()

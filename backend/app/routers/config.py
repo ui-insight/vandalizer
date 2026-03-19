@@ -30,6 +30,7 @@ from app.services.config_service import (
     reconcile_user_model_config,
     resolve_model_name,
 )
+from app.services import workflow_service
 
 router = APIRouter()
 
@@ -213,11 +214,15 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
 
 @router.get("/automation-stats")
 async def get_automation_stats(user: User = Depends(get_current_user)):
-    all_workflows = await Workflow.find().limit(5000).to_list()
-    total = len(all_workflows)
+    visible_workflows = await workflow_service.list_workflows(
+        user=user,
+        skip=0,
+        limit=5000,
+    )
+    total = len(visible_workflows)
 
     passive = [
-        w for w in all_workflows
+        w for w in visible_workflows
         if w.input_config.get("folder_watch", {}).get("enabled")
     ]
     passive_count = len(passive)
@@ -229,9 +234,14 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
 
     # Recent runs (last 7 days)
     week_ago = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
-    recent_results = await WorkflowResult.find(
-        WorkflowResult.start_time >= week_ago,
-    ).limit(10000).to_list()
+    workflow_ids = [wf.id for wf in visible_workflows if getattr(wf, "id", None)]
+    if workflow_ids:
+        recent_results = await WorkflowResult.find({
+            "workflow": {"$in": workflow_ids},
+            "start_time": {"$gte": week_ago},
+        }).limit(10000).to_list()
+    else:
+        recent_results = []
 
     today_start = datetime.datetime.now(datetime.timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0

@@ -3,7 +3,7 @@ import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
 
-export function createSearchSet(data: { title: string; space: string; set_type?: string; extraction_config?: Record<string, unknown> }) {
+export function createSearchSet(data: { title: string; set_type?: string; extraction_config?: Record<string, unknown> }) {
   return apiFetch<SearchSet>('/api/extractions/search-sets', {
     method: 'POST',
     body: JSON.stringify({ set_type: 'extraction', ...data }),
@@ -257,6 +257,17 @@ export function runValidationV2(data: {
 
 // Quality history
 
+export interface ScoreBreakdown {
+  raw_score: number
+  final_score: number
+  sample_size_factor: number
+  sample_size_penalty: number
+  num_test_cases: number
+  num_runs: number
+  test_cases_needed: number
+  runs_needed: number
+}
+
 export interface QualityHistoryRun {
   uuid: string
   score: number
@@ -267,6 +278,7 @@ export interface QualityHistoryRun {
   created_at: string
   num_test_cases: number
   num_runs?: number
+  score_breakdown?: ScoreBreakdown | null
   extraction_config?: Record<string, unknown> | null
 }
 
@@ -316,16 +328,40 @@ export function getExtractionImprovementSuggestions(uuid: string) {
   })
 }
 
+export interface TuningResult {
+  label: string
+  model: string
+  config_override: Record<string, unknown>
+  accuracy: number
+  consistency: number
+  score: number
+  elapsed_seconds: number
+  error?: string
+}
+
+export interface FindBestSettingsResult {
+  best: TuningResult
+  results: TuningResult[]
+  recommendation: string
+  search_set_uuid: string
+}
+
+export function findBestSettings(uuid: string, numRuns = 2, maxCandidates = 8) {
+  return apiFetch<FindBestSettingsResult>(`/api/extractions/search-sets/${uuid}/find-best-settings`, {
+    method: 'POST',
+    body: JSON.stringify({ num_runs: numRuns, max_candidates: maxCandidates }),
+  })
+}
+
 // Export / Import
 
 export function exportSearchSetUrl(uuid: string) {
   return `/api/extractions/search-sets/${uuid}/export`
 }
 
-export async function importSearchSet(file: File, space: string): Promise<SearchSet> {
+export async function importSearchSet(file: File): Promise<SearchSet> {
   const form = new FormData()
   form.append('file', file)
-  form.append('space', space)
   const res = await fetch('/api/extractions/search-sets/import', {
     method: 'POST',
     credentials: 'include',

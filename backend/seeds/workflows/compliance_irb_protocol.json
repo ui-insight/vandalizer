@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-compliance-irb-protocol",
+    "display_name": "IRB Protocol Pre-Review",
+    "description": "Pre-screens a human subjects research protocol for completeness and appropriate review level before IRB submission.",
+    "quality_tier": "gold",
+    "collections": ["compliance"]
+  },
+  "items": [
+    {
+      "name": "IRB Protocol Pre-Review",
+      "description": "Evaluates a human subjects protocol for completeness, appropriate review type, and adequate protections.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Protocol Fields",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Protocol Title, PI Name, IRB Review Type Requested, Study Population, Number of Participants, Recruitment Methods, Informed Consent Process, Risk Level, Data Collection Methods, Data Security Plan, Vulnerable Populations Involved, Deception Used, Funding Source, Study Duration, Inclusion Criteria, Exclusion Criteria"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Protocol Completeness Review",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are an IRB analyst reviewing a human subjects protocol submission for completeness. Evaluate:\n\n## Review Type Assessment\n- Is the requested review type (exempt, expedited, full board) appropriate?\n- Per 45 CFR 46, does this study qualify for the claimed exemption category?\n- If expedited, does it fit an approved expedited category?\n\n## Required Sections Checklist\nFor each, rate as **Complete** / **Incomplete** / **Needs Revision**:\n- Study purpose and design\n- Subject population and eligibility\n- Recruitment procedures\n- Informed consent process and document\n- Study procedures description\n- Risk/benefit analysis\n- Data collection and management\n- Privacy and confidentiality protections\n- Data security plan\n\n## Special Considerations\n- Are vulnerable populations (children, prisoners, pregnant women, cognitively impaired) involved? If so, are additional protections described?\n- Is deception used? If so, is a debriefing plan included?\n- Is the consent process appropriate for the population (language, literacy, capacity)?\n- Are HIPAA considerations addressed if applicable?\n\n## Pre-Review Summary\nProvide specific feedback the PI should address before formal IRB submission.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@ from app.dependencies import get_api_key_user, get_current_user
 from app.rate_limit import limiter
 from app.models.activity import ActivityStatus, ActivityType
 from app.models.user import User
-from app.services import activity_service
+from app.services import access_control, activity_service
 from app.schemas.extractions import (
     BuildFromDocumentRequest,
     CreateSearchSetRequest,
@@ -82,13 +82,55 @@ async def _ss_response(ss) -> SearchSetResponse:
     )
 
 
+async def _get_search_set_or_404(uuid: str, user: User, *, manage: bool = False):
+    ss = await access_control.get_authorized_search_set(
+        uuid,
+        user,
+        manage=manage,
+        allow_admin=True,
+    )
+    if not ss:
+        raise HTTPException(status_code=404, detail="SearchSet not found")
+    return ss
+
+
+async def _get_search_set_item_or_404(item_id: str, user: User):
+    item = await svc.get_search_set_item(item_id)
+    if not item or not item.searchset:
+        raise HTTPException(status_code=404, detail="Item not found")
+    await _get_search_set_or_404(item.searchset, user, manage=True)
+    return item
+
+
+async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
+    team_access = await access_control.get_team_access_context(user)
+    authorized: list[str] = []
+    for doc_uuid in document_uuids:
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
+        authorized.append(doc.uuid)
+    return authorized
+
+
 # ---------------------------------------------------------------------------
 # SearchSet CRUD
 # ---------------------------------------------------------------------------
 
 @router.post("/search-sets", response_model=SearchSetResponse)
 async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
-    ss = await svc.create_search_set(req.title, req.space, req.set_type, user.user_id, extraction_config=req.extraction_config)
+    ss = await svc.create_search_set(
+        req.title,
+        user.user_id,
+        req.space,
+        req.set_type,
+        extraction_config=req.extraction_config,
+    )
     return await _ss_response(ss)
 
 
@@ -99,20 +141,19 @@ async def list_search_sets(
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
 ):
-    sets = await svc.list_search_sets(space=space, skip=skip, limit=limit)
+    sets = await svc.list_search_sets(space=space, user=user, skip=skip, limit=limit)
     return [await _ss_response(ss) for ss in sets]
 
 
 @router.get("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
-    ss = await svc.get_search_set(uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(uuid, user)
     return await _ss_response(ss)
 
 
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user, manage=True)
     ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
@@ -121,6 +162,7 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
 
 @router.delete("/search-sets/{uuid}")
 async def delete_search_set(uuid: str, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user, manage=True)
     ok = await svc.delete_search_set(uuid)
     if not ok:
         raise HTTPException(status_code=404, detail="SearchSet not found")
@@ -129,6 +171,7 @@ async def delete_search_set(uuid: str, user: User = Depends(get_current_user)):
 
 @router.post("/search-sets/{uuid}/clone", response_model=SearchSetResponse)
 async def clone_search_set(uuid: str, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user)
     ss = await svc.clone_search_set(uuid, user.user_id)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
@@ -141,6 +184,7 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     import io
     from app.services import export_import_service as eis
 
+    await _get_search_set_or_404(uuid, user)
     try:
         data = await eis.export_search_set(uuid, user.email or user.user_id)
     except ValueError as e:
@@ -158,7 +202,7 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),
-    space: str = Form("default"),
+    space: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
     """Import an extraction from an exported JSON file."""
@@ -199,9 +243,7 @@ async def upload_pdf_template(
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
-    ss = await svc.get_search_set(uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
 
     settings = Settings()
     file_bytes = await file.read()
@@ -289,9 +331,7 @@ async def generate_pdf_template(
     from app.models.search_set import SearchSetItem
     from app.services.pdf_service import generate_fillable_template
 
-    ss = await svc.get_search_set(uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
 
     items = await SearchSetItem.find(SearchSetItem.searchset == uuid).to_list()
     if ss.item_order:
@@ -336,9 +376,7 @@ async def export_pdf(
     from app.models.search_set import SearchSetItem
     from app.services.pdf_service import generate_extraction_pdf
 
-    ss = await svc.get_search_set(uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(uuid, user)
 
     items = await SearchSetItem.find(SearchSetItem.searchset == uuid).to_list()
     # Respect item_order if present
@@ -393,6 +431,7 @@ async def export_pdf(
 
 @router.post("/search-sets/{uuid}/items", response_model=SearchSetItemResponse)
 async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user, manage=True)
     item = await svc.add_item(
         uuid, req.searchphrase, req.searchtype, req.title, user.user_id,
         is_optional=req.is_optional, enum_values=req.enum_values or [],
@@ -406,6 +445,7 @@ async def add_item(uuid: str, req: SearchSetItemRequest, user: User = Depends(ge
 
 @router.get("/search-sets/{uuid}/items", response_model=list[SearchSetItemResponse])
 async def list_items(uuid: str, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user)
     items = await svc.list_items(uuid)
     return [
         SearchSetItemResponse(
@@ -420,6 +460,7 @@ async def list_items(uuid: str, user: User = Depends(get_current_user)):
 
 @router.patch("/items/{item_id}", response_model=SearchSetItemResponse)
 async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_item_or_404(item_id, user)
     item = await svc.update_item(
         item_id, searchphrase=req.searchphrase, title=req.title,
         is_optional=req.is_optional, enum_values=req.enum_values,
@@ -435,6 +476,7 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
 
 @router.post("/search-sets/{uuid}/reorder-items")
 async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(uuid, user, manage=True)
     ok = await svc.reorder_items(uuid, req.item_ids)
     if not ok:
         raise HTTPException(status_code=404, detail="SearchSet not found")
@@ -443,6 +485,7 @@ async def reorder_items(uuid: str, req: ReorderItemsRequest, user: User = Depend
 
 @router.delete("/items/{item_id}")
 async def delete_item(item_id: str, user: User = Depends(get_current_user)):
+    await _get_search_set_item_or_404(item_id, user)
     ok = await svc.delete_item(item_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -457,10 +500,12 @@ async def delete_item(item_id: str, user: User = Depends(get_current_user)):
 @limiter.limit("10/minute")
 async def build_from_document(request: Request, uuid: str, req: BuildFromDocumentRequest, user: User = Depends(get_current_user)):
     """Use AI to analyze selected documents and generate extraction fields."""
+    await _get_search_set_or_404(uuid, user)
+    document_uuids = await _authorize_documents(req.document_uuids, user)
     try:
         entities = await svc.build_from_documents(
             search_set_uuid=uuid,
-            document_uuids=req.document_uuids,
+            document_uuids=document_uuids,
             user_id=user.user_id,
             model=req.model,
         )
@@ -473,8 +518,9 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
 @limiter.limit("30/minute")
 async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):
     # Look up the search set for the activity title
-    ss = await svc.get_search_set(req.search_set_uuid)
-    title = ss.title if ss else req.search_set_uuid
+    ss = await _get_search_set_or_404(req.search_set_uuid, user)
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+    title = ss.title
 
     # Create activity event
     activity = await activity_service.activity_start(
@@ -488,7 +534,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
     try:
         results = await svc.run_extraction_sync(
             search_set_uuid=req.search_set_uuid,
-            document_uuids=req.document_uuids,
+            document_uuids=document_uuids,
             user_id=user.user_id,
             model=req.model,
             extraction_config_override=req.extraction_config_override,
@@ -496,7 +542,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         await activity_service.activity_update(
             activity.id,
-            documents_touched=len(req.document_uuids),
+            documents_touched=len(document_uuids),
         )
 
         # Fire-and-forget auto-validation if test cases exist
@@ -579,9 +625,10 @@ async def run_extraction_integrated(
         raise HTTPException(status_code=400, detail="No documents or files provided")
 
     # Look up the search set
-    ss = await svc.get_search_set(search_set_uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(search_set_uuid, user)
+    existing_doc_uuids = await _authorize_documents(all_doc_uuids, user)
+    new_doc_uuids = [doc_uuid for doc_uuid in all_doc_uuids if doc_uuid not in existing_doc_uuids]
+    all_doc_uuids = existing_doc_uuids + new_doc_uuids
 
     # Create activity
     activity = await activity_service.activity_start(
@@ -646,6 +693,9 @@ def _tc_response(tc) -> TestCaseResponse:
 
 @router.post("/test-cases", response_model=TestCaseResponse)
 async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
+    if req.document_uuid:
+        await _authorize_documents([req.document_uuid], user)
     tc = await val_svc.create_test_case(
         search_set_uuid=req.search_set_uuid,
         label=req.label,
@@ -660,12 +710,19 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
 async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(search_set_uuid, user, manage=True)
     tcs = await val_svc.list_test_cases(search_set_uuid)
     return [_tc_response(tc) for tc in tcs]
 
 
 @router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
 async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = Depends(get_current_user)):
+    current = await val_svc.get_test_case(uuid)
+    if not current:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    await _get_search_set_or_404(current.search_set_uuid, user, manage=True)
+    if req.document_uuid:
+        await _authorize_documents([req.document_uuid], user)
     tc = await val_svc.update_test_case(
         uuid,
         label=req.label,
@@ -681,16 +738,54 @@ async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = D
 
 @router.delete("/test-cases/{uuid}")
 async def delete_test_case(uuid: str, user: User = Depends(get_current_user)):
+    current = await val_svc.get_test_case(uuid)
+    if not current:
+        raise HTTPException(status_code=404, detail="Test case not found")
+    await _get_search_set_or_404(current.search_set_uuid, user, manage=True)
     ok = await val_svc.delete_test_case(uuid)
     if not ok:
         raise HTTPException(status_code=404, detail="Test case not found")
     return {"ok": True}
 
 
+@router.post("/test-cases/from-extraction")
+@limiter.limit("10/minute")
+async def create_test_cases_from_extraction(request: Request, user: User = Depends(get_current_user)):
+    """Run extraction on documents and auto-create test cases from results.
+
+    The 'extract once, review, save as test case' flow. Users can then
+    edit the expected_values on each test case to correct any mistakes.
+    """
+    body = await request.json()
+    search_set_uuid = body.get("search_set_uuid")
+    document_uuids = body.get("document_uuids", [])
+    model = body.get("model")
+
+    if not search_set_uuid:
+        raise HTTPException(status_code=400, detail="search_set_uuid is required")
+    if not document_uuids:
+        raise HTTPException(status_code=400, detail="At least one document_uuid is required")
+
+    await _get_search_set_or_404(search_set_uuid, user, manage=True)
+    await _authorize_documents(document_uuids, user)
+
+    try:
+        test_cases = await val_svc.create_test_cases_from_extraction(
+            search_set_uuid=search_set_uuid,
+            document_uuids=document_uuids,
+            user_id=user.user_id,
+            model=model,
+        )
+        return {"test_cases": [_tc_response(tc) for tc in test_cases], "count": len(test_cases)}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.get("/search-sets/{uuid}/quality-history")
 async def get_extraction_quality_history(
     uuid: str, limit: int = 50, user: User = Depends(get_current_user),
 ):
+    await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_history
     return {"runs": await get_quality_history("search_set", uuid, limit)}
 
@@ -700,6 +795,7 @@ async def get_extraction_quality_sparkline(
     uuid: str, limit: int = 10, user: User = Depends(get_current_user),
 ):
     """Return compact score history for sparkline visualization."""
+    await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_history
     runs = await get_quality_history("search_set", uuid, limit)
     scores = [{"score": r["score"], "created_at": r["created_at"]} for r in reversed(runs)]
@@ -716,9 +812,7 @@ async def get_extraction_quality_status(
     from app.models.verification import VerifiedItemMetadata
     from app.services.quality_service import get_latest_validation
 
-    ss = await svc.get_search_set(uuid)
-    if not ss:
-        raise HTTPException(status_code=404, detail="SearchSet not found")
+    ss = await _get_search_set_or_404(uuid, user)
 
     meta = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == "search_set",
@@ -774,8 +868,17 @@ async def get_extraction_quality_contract(
     uuid: str, user: User = Depends(get_current_user),
 ):
     """Return quality contract status for a search set."""
+    await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_contract_status
     return await get_quality_contract_status("search_set", uuid)
+
+
+@router.get("/search-sets/{uuid}/verification-readiness")
+async def check_verification_readiness(uuid: str, user: User = Depends(get_current_user)):
+    """Check if a search set meets minimum thresholds for verification submission."""
+    await _get_search_set_or_404(uuid, user)
+    from app.services.quality_service import check_verification_readiness as check_ready
+    return await check_ready("search_set", uuid)
 
 
 @router.post("/search-sets/{uuid}/improvement-suggestions")
@@ -785,6 +888,7 @@ async def get_extraction_suggestions(
     uuid: str, user: User = Depends(get_current_user),
 ):
     """Use LLM to suggest improvements based on the latest validation run."""
+    await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
 
     latest = await get_latest_validation("search_set", uuid)
@@ -795,9 +899,40 @@ async def get_extraction_suggestions(
     return {"suggestions": suggestions}
 
 
+@router.post("/search-sets/{uuid}/find-best-settings")
+@limiter.limit("3/minute")
+async def find_best_settings(
+    request: Request,
+    uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Try multiple extraction configurations and return which works best.
+
+    Requires test cases with expected values. Tests each available model
+    and strategy combination, then ranks by accuracy + consistency score.
+    """
+    await _get_search_set_or_404(uuid, user, manage=True)
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    num_runs = body.get("num_runs", 2)
+    max_candidates = body.get("max_candidates", 8)
+
+    from app.services.extraction_tuning_service import find_best_settings as _find_best
+    try:
+        result = await _find_best(
+            search_set_uuid=uuid,
+            user_id=user.user_id,
+            num_runs=min(num_runs, 5),
+            max_candidates=min(max_candidates, 12),
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/validate")
 @limiter.limit("10/minute")
 async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
     try:
         result = await val_svc.run_validation(
             search_set_uuid=req.search_set_uuid,
@@ -814,6 +949,10 @@ async def run_validation(request: Request, req: RunValidationRequest, user: User
 @router.post("/validate-v2")
 @limiter.limit("10/minute")
 async def run_validation_v2(request: Request, req: RunValidationV2Request, user: User = Depends(get_current_user)):
+    await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
+    document_uuids = [source.document_uuid for source in req.sources if source.document_uuid]
+    if document_uuids:
+        await _authorize_documents(document_uuids, user)
     try:
         result = await val_svc.run_validation_v2(
             search_set_uuid=req.search_set_uuid,
@@ -834,9 +973,7 @@ async def run_validation_v2(request: Request, req: RunValidationV2Request, user:
 @router.get("/search-sets/{uuid}/cross-field-rules")
 async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)):
     """Get cross-field validation rules for a search set."""
-    ss = await svc.get_search_set(uuid, user.user_id)
-    if not ss:
-        raise HTTPException(status_code=404, detail="Search set not found")
+    ss = await _get_search_set_or_404(uuid, user)
     return {"rules": ss.cross_field_rules}
 
 
@@ -846,9 +983,7 @@ async def update_cross_field_rules(uuid: str, request: Request, user: User = Dep
     body = await request.json()
     rules = body.get("rules", [])
 
-    ss = await svc.get_search_set(uuid, user.user_id)
-    if not ss:
-        raise HTTPException(status_code=404, detail="Search set not found")
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
 
     ss.cross_field_rules = rules
     await ss.save()
@@ -861,9 +996,7 @@ async def validate_cross_field(uuid: str, request: Request, user: User = Depends
     body = await request.json()
     data = body.get("data", {})
 
-    ss = await svc.get_search_set(uuid, user.user_id)
-    if not ss:
-        raise HTTPException(status_code=404, detail="Search set not found")
+    ss = await _get_search_set_or_404(uuid, user)
 
     if not ss.cross_field_rules:
         return {"results": [], "message": "No cross-field rules defined"}

@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-financial-fa-rate-validator",
+    "display_name": "F&A Rate Validator",
+    "description": "Validates that the correct facilities and administrative (indirect cost) rate is applied to an award, checking the MTDC base and sponsor caps.",
+    "quality_tier": "gold",
+    "collections": ["financial"]
+  },
+  "items": [
+    {
+      "name": "F&A Rate Validator",
+      "description": "Verifies correct application of indirect cost rates against the institution's negotiated rate agreement.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Rate Data",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Award Number, Sponsor Agency, F&A Rate Applied, F&A Rate Base, MTDC Calculation, Rate Agreement Date, Rate Type, On-Campus vs Off-Campus, F&A Rate Cap, Excluded Costs from MTDC, Subaward Amounts, Equipment Costs, Participant Support Costs, Total Direct Costs, Indirect Costs Charged"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rate Validation",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are an indirect cost rate specialist. Validate the F&A rate application:\n\n## Rate Verification\n- Is the correct rate being applied per the institution's negotiated rate agreement?\n- Is the rate type correct (provisional, predetermined, fixed, final)?\n- Is the on-campus vs off-campus designation appropriate?\n\n## MTDC Base Calculation\nVerify the Modified Total Direct Cost base excludes:\n- Equipment (items >$5,000)\n- Patient care costs\n- Rental costs of off-site facilities\n- Tuition remission\n- Scholarships and fellowships\n- Participant support costs\n- Subaward amounts exceeding $25,000 per subaward\n\n## Sponsor Cap\n- Does the sponsor impose an F&A rate cap?\n- If capped, is the correct (lower) rate being applied?\n- What is the revenue impact of any cap (difference between negotiated and capped rate)?\n\n## Validation Results\nFor each element:\n- **Correct** - rate/base matches expected value\n- **Incorrect** - expected vs actual values shown\n- **Unable to Verify** - insufficient information\n\nInclude the financial impact of any errors found.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

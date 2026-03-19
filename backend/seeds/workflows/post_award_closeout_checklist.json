@@ -1,0 +1,67 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-post-award-closeout",
+    "display_name": "Closeout Checklist Generator",
+    "description": "Generates a comprehensive, timeline-ordered closeout checklist from award terms and conditions.",
+    "quality_tier": "gold",
+    "collections": ["post-award"]
+  },
+  "items": [
+    {
+      "name": "Closeout Checklist Generator",
+      "description": "Extracts award terms and generates a timeline-ordered closeout checklist with deadlines and responsible parties.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Award Terms",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Award Number, Award End Date, Sponsor Agency, Final Report Deadline, Final Financial Report Deadline, Equipment Disposition Requirements, IP/Patent Requirements, Records Retention Period, Subrecipient Closeout Requirements, Cost Sharing Documentation Required, Invention Disclosure Deadline, Property Report Deadline"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generate Checklist",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a post-award specialist generating a closeout checklist. Based on the extracted award terms, create a comprehensive, timeline-ordered closeout checklist.\n\nFor each item include:\n- **Task**: What needs to be done\n- **Deadline**: Specific date or days-after-expiration\n- **Responsible Party**: PI, Department Admin, OSP, Grants Accounting, etc.\n- **Status**: Checkbox placeholder\n\nInclude these categories:\n1. Final technical/progress report\n2. Final financial report (SF-425 or equivalent)\n3. Final invention/patent statement\n4. Equipment disposition or inventory\n5. Subrecipient closeout notifications\n6. Records retention setup\n7. Cost sharing documentation finalization\n8. Return of unexpended funds\n9. Personnel effort certification closeout\n10. Account deactivation\n\nOrganize by deadline, earliest first.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Format as Document",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "Format the closeout checklist as a clean, professional markdown document with:\n- A header with award number and dates\n- A timeline table (Deadline | Task | Responsible Party | Status)\n- Grouped sections by category\n- Checkbox items suitable for tracking"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

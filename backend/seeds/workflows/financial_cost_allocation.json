@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-financial-cost-allocation",
+    "display_name": "Cost Allocation Analyzer",
+    "description": "Reviews cost allocations for compliance with 2 CFR 200 Uniform Guidance, checking allowability, allocability, and reasonableness.",
+    "quality_tier": "gold",
+    "collections": ["financial"]
+  },
+  "items": [
+    {
+      "name": "Cost Allocation Analyzer",
+      "description": "Evaluates cost allocations against federal uniform guidance requirements.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Cost Data",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Award Number, Cost Category, Direct Cost Description, Cost Amount, Allocation Methodology, Benefiting Projects, Time Period, Supporting Documentation, Special Award Conditions, Cost Type"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Allowability Assessment",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a cost accounting specialist for sponsored programs. Review cost allocations for compliance with 2 CFR 200 (Uniform Guidance):\n\n## Allowability (2 CFR 200.403)\nFor each cost, determine if it is allowable:\n- Is it necessary and reasonable for the award?\n- Is it consistent with institutional policies?\n- Is it treated consistently (not charged as direct on some awards and indirect on others)?\n- Is it adequately documented?\n\n## Specific Cost Categories (2 CFR 200.420-475)\nCheck against specific provisions:\n- **Unallowable costs**: entertainment, alcohol, lobbying, fines/penalties, bad debts, fundraising\n- **Requires prior approval**: equipment >$5K, foreign travel, participant support, subawards\n- **Conditional allowability**: memberships, advertising, insurance\n\n## Allocability (2 CFR 200.405)\n- Does each cost benefit the specific award?\n- Is the allocation methodology reasonable and consistently applied?\n- Is there adequate documentation linking costs to the project?\n\n## Classification\nFor each cost item:\n- **Allowable** - cite relevant 2 CFR 200 section\n- **Questionable** - explain concern\n- **Unallowable** - cite prohibition\n\nPresent as a structured review table with recommendations.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,8 +1,10 @@
 """SearchSet CRUD service."""
 
+from __future__ import annotations
+
 import asyncio
 import uuid as uuid_mod
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from beanie import PydanticObjectId
 
@@ -11,17 +13,27 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
+from app.services import access_control
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 # ---------------------------------------------------------------------------
 # SearchSet CRUD
 # ---------------------------------------------------------------------------
 
-async def create_search_set(title: str, space: str, set_type: str, user_id: str, extraction_config: dict | None = None) -> SearchSet:
+async def create_search_set(
+    title: str,
+    user_id: str,
+    space: str | None,
+    set_type: str,
+    extraction_config: dict | None = None,
+) -> SearchSet:
     ss = SearchSet(
         title=title,
         uuid=str(uuid_mod.uuid4()),
-        space=space,
+        space=space or "default",
         status="active",
         set_type=set_type,
         user_id=user_id,
@@ -34,18 +46,42 @@ async def create_search_set(title: str, space: str, set_type: str, user_id: str,
 
 async def list_search_sets(
     space: str | None = None,
-    user_id: str | None = None,
+    user: User | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[SearchSet]:
     query = {}
     if space:
         query["space"] = space
-    return await SearchSet.find(query).skip(skip).limit(limit).to_list()
+    search_sets = await SearchSet.find(query).skip(skip).limit(limit).to_list()
+    if user is None:
+        return search_sets
+
+    visible: list[SearchSet] = []
+    team_access = await access_control.get_team_access_context(user)
+    for search_set in search_sets:
+        if access_control.can_view_search_set(search_set, user):
+            visible.append(search_set)
+            continue
+        if await access_control.has_library_backed_object_access(
+            "search_set",
+            str(search_set.id),
+            user,
+            team_access,
+        ):
+            visible.append(search_set)
+    return visible
 
 
 async def get_search_set(search_set_uuid: str) -> SearchSet | None:
     return await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
+
+
+async def get_search_set_item(item_id: str) -> SearchSetItem | None:
+    try:
+        return await SearchSetItem.get(PydanticObjectId(item_id))
+    except Exception:
+        return None
 
 
 async def update_search_set(search_set_uuid: str, title: str | None = None, extraction_config: dict | None = None) -> SearchSet | None:
@@ -175,7 +211,7 @@ async def reorder_items(search_set_uuid: str, item_ids: list[str]) -> bool:
 
 
 async def delete_item(item_id: str) -> bool:
-    item = await SearchSetItem.get(PydanticObjectId(item_id))
+    item = await get_search_set_item(item_id)
     if not item:
         return False
     await item.delete()

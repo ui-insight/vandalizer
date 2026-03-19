@@ -77,7 +77,13 @@ async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_c
 
 @router.get("/{uuid}", response_model=KBDetailResponse)
 async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
-    kb = await svc.get_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     sources = await svc.get_kb_sources(kb.uuid)
@@ -89,9 +95,15 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
 
 @router.post("/{uuid}/update")
 async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.update_knowledge_base(
-        uuid, user.user_id, title=req.title, description=req.description,
-        shared_with_team=req.shared_with_team, organization_ids=req.organization_ids,
+        uuid,
+        user,
+        title=req.title,
+        description=req.description,
+        shared_with_team=req.shared_with_team,
+        organization_ids=req.organization_ids,
+        user_org_ancestry=user_org_ancestry,
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
@@ -100,7 +112,8 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
 
 @router.post("/{uuid}/share")
 async def share_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
-    kb = await svc.share_with_team(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.share_with_team(uuid, user, user_org_ancestry=user_org_ancestry)
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True, "shared_with_team": kb.shared_with_team}
@@ -108,7 +121,8 @@ async def share_knowledge_base(uuid: str, user: User = Depends(get_current_user)
 
 @router.delete("/{uuid}")
 async def delete_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    ok = await svc.delete_knowledge_base(uuid, user, user_org_ancestry=user_org_ancestry)
     if not ok:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True}
@@ -116,21 +130,38 @@ async def delete_knowledge_base(uuid: str, user: User = Depends(get_current_user
 
 @router.post("/{uuid}/add_documents")
 async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depends(get_current_user)):
-    kb = await svc.get_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     if not req.document_uuids:
         raise HTTPException(status_code=400, detail="No documents provided")
     kb.status = "building"
     await kb.save()
-    added = await svc.add_documents(kb, req.document_uuids)
+    try:
+        added = await svc.add_documents(kb, req.document_uuids, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True, "added": added}
 
 
 @router.post("/{uuid}/add_urls")
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
-    kb = await svc.get_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     if not req.urls:
@@ -148,7 +179,14 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
 
 @router.delete("/{uuid}/source/{source_uuid}")
 async def remove_source(uuid: str, source_uuid: str, user: User = Depends(get_current_user)):
-    kb = await svc.get_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     ok = await svc.remove_source(kb, source_uuid)
@@ -159,7 +197,13 @@ async def remove_source(uuid: str, source_uuid: str, user: User = Depends(get_cu
 
 @router.get("/{uuid}/status", response_model=KBStatusResponse)
 async def get_status(uuid: str, user: User = Depends(get_current_user)):
-    kb = await svc.get_knowledge_base(uuid, user.user_id)
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     sources = await svc.get_kb_sources(kb.uuid)

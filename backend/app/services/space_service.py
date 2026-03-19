@@ -1,11 +1,16 @@
 import uuid
 
 from app.models.space import Space
+from app.models.user import User
 
 
-async def list_spaces() -> list[dict]:
-    """List all spaces."""
-    spaces = await Space.find_all().to_list()
+def _space_owned_by_user(space: Space, user: User) -> bool:
+    return space.user == user.user_id
+
+
+async def list_spaces(user: User) -> list[dict]:
+    """List spaces owned by the current user."""
+    spaces = await Space.find(Space.user == user.user_id).to_list()
     return [
         {
             "id": str(s.id),
@@ -28,10 +33,10 @@ async def create_space(title: str, user_id: str | None = None) -> Space:
     return space
 
 
-async def update_space(space_uuid: str, title: str | None = None) -> Space | None:
-    """Update a space."""
+async def update_space(space_uuid: str, user: User, title: str | None = None) -> Space | None:
+    """Update a space owned by the current user."""
     space = await Space.find_one(Space.uuid == space_uuid)
-    if not space:
+    if not space or not _space_owned_by_user(space, user):
         return None
     if title is not None:
         space.title = title
@@ -39,10 +44,10 @@ async def update_space(space_uuid: str, title: str | None = None) -> Space | Non
     return space
 
 
-async def delete_space(space_uuid: str) -> bool:
-    """Delete a space."""
+async def delete_space(space_uuid: str, user: User) -> bool:
+    """Delete a space owned by the current user."""
     space = await Space.find_one(Space.uuid == space_uuid)
-    if not space:
+    if not space or not _space_owned_by_user(space, user):
         return False
     await space.delete()
     return True

@@ -264,7 +264,7 @@ export function LibraryTab() {
       } else {
         // extraction, prompt, or formatter — all stored as SearchSets
         const config = createDesc.trim() ? { content: createDesc.trim() } : undefined
-        const ss = await createSearchSet({ title: createName.trim(), space: 'default', set_type: createModalType ?? 'extraction', extraction_config: config })
+        const ss = await createSearchSet({ title: createName.trim(), set_type: createModalType ?? 'extraction', extraction_config: config })
         if (personalLib) {
           await addItemToLibrary(personalLib.id, { item_id: ss.id, kind: 'search_set' })
         }

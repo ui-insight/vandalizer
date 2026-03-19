@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-post-award-progress-report",
+    "display_name": "Progress Report Analyzer",
+    "description": "Reviews a progress report for completeness, alignment with project objectives, and adequacy of explanations for any delays or problems.",
+    "quality_tier": "gold",
+    "collections": ["post-award"]
+  },
+  "items": [
+    {
+      "name": "Progress Report Analyzer",
+      "description": "Evaluates a progress report for completeness and quality before submission to the sponsor.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Report Fields",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Award Number, Reporting Period, PI Name, Project Objectives, Accomplishments, Problems Encountered, Budget Expenditures to Date, Remaining Budget, Publications, Patents, Personnel Changes, Students Supported, Plans for Next Period, Data Sharing Activities"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report Quality Analysis",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a post-award administrator reviewing a progress report before sponsor submission. Evaluate:\n\n## Completeness\n- Are all required sections present and substantive (not just placeholders)?\n- Is the reporting period clearly stated?\n- Are accomplishments specific and measurable?\n\n## Alignment\n- Do reported accomplishments align with the stated project objectives?\n- Is progress proportional to the time elapsed and budget spent?\n- Are any objectives behind schedule?\n\n## Problems & Mitigation\n- Are problems/delays adequately described?\n- Are mitigation plans realistic and specific?\n- Is there risk of not completing the project on time/budget?\n\n## Budget Status\n- Is the expenditure rate reasonable for the reporting period?\n- Are there unexplained large unspent balances?\n- Does spending align with planned activities?\n\n## Outputs\n- Are publications and presentations properly cited?\n- Are student/trainee outcomes reported?\n\nProduce a structured assessment with specific suggestions for improvement before submission.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

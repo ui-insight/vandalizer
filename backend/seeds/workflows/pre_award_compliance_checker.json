@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-pre-award-compliance-checker",
+    "display_name": "Sponsor Compliance Checker",
+    "description": "Checks a proposal against solicitation requirements, identifying formatting violations, missing sections, and eligibility concerns.",
+    "quality_tier": "gold",
+    "collections": ["pre-award", "compliance"]
+  },
+  "items": [
+    {
+      "name": "Sponsor Compliance Checker",
+      "description": "Verifies that a proposal meets sponsor formatting, content, and eligibility requirements.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Requirements",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Sponsor Agency, FOA/Solicitation Number, Page Limits, Font Requirements, Margin Requirements, Required Sections, Submission Method, Certifications Required, Budget Constraints, Eligibility Requirements, Deadline, Format Requirements"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Compliance Review",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a sponsored programs compliance officer reviewing a proposal against sponsor requirements. Based on the extracted solicitation requirements and the full document, produce a compliance review:\n\n## Formatting Compliance\n- Page limits: within bounds?\n- Font size and type: compliant?\n- Margins: meet requirements?\n- File format and naming conventions\n\n## Content Compliance\n- All required sections present?\n- Required certifications and assurances included?\n- Biographical sketches in correct format?\n- Budget within sponsor constraints?\n\n## Eligibility\n- PI meets eligibility requirements?\n- Institution eligible?\n- Any restrictions on foreign participation?\n\nFor each item, rate as:\n- **Compliant** - meets requirements\n- **Non-Compliant** - specific violation identified\n- **Unable to Determine** - insufficient information in document\n\nEnd with a **Go/No-Go Recommendation** and list of items that must be corrected before submission.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

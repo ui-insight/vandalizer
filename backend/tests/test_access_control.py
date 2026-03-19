@@ -4,14 +4,23 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.models.library import LibraryScope
 from app.services.access_control import (
     TeamAccessContext,
+    can_manage_automation,
     can_manage_document,
     can_manage_folder,
+    can_manage_knowledge_base,
+    can_manage_library,
+    can_manage_library_folder,
     can_manage_search_set,
     can_manage_workflow,
+    can_view_automation,
     can_view_document,
     can_view_folder,
+    can_view_knowledge_base,
+    can_view_library,
+    can_view_library_folder,
     can_view_search_set,
     can_view_workflow,
     get_authorized_document,
@@ -64,10 +73,57 @@ def _make_search_set(user_id="user1", is_global=False):
     return ss
 
 
-def _team_access(team_uuids=None, roles=None):
+def _make_automation(user_id="user1", team_id=None, shared_with_team=False):
+    auto = MagicMock()
+    auto.user_id = user_id
+    auto.team_id = team_id
+    auto.shared_with_team = shared_with_team
+    return auto
+
+
+def _make_knowledge_base(
+    user_id="user1",
+    team_id=None,
+    shared_with_team=False,
+    verified=False,
+    organization_ids=None,
+):
+    kb = MagicMock()
+    kb.user_id = user_id
+    kb.team_id = team_id
+    kb.shared_with_team = shared_with_team
+    kb.verified = verified
+    kb.organization_ids = organization_ids or []
+    return kb
+
+
+def _make_library(scope=LibraryScope.PERSONAL, owner_user_id="user1", team=None):
+    lib = MagicMock()
+    lib.scope = scope
+    lib.owner_user_id = owner_user_id
+    lib.team = team
+    return lib
+
+
+def _make_library_folder(
+    scope=LibraryScope.PERSONAL,
+    owner_user_id="user1",
+    team=None,
+):
+    folder = MagicMock()
+    folder.scope = scope
+    folder.owner_user_id = owner_user_id
+    folder.team = team
+    folder.uuid = "library-folder-uuid"
+    return folder
+
+
+def _team_access(team_uuids=None, roles=None, team_object_ids=None, object_roles=None):
     return TeamAccessContext(
         team_uuids=team_uuids or set(),
+        team_object_ids=team_object_ids or set(),
         roles_by_uuid=roles or {},
+        roles_by_object_id=object_roles or {},
     )
 
 
@@ -283,6 +339,15 @@ class TestCanViewWorkflow:
         assert can_view_workflow(wf, user, access, allow_admin=False) is False
         assert can_view_workflow(wf, user, access, allow_admin=True) is True
 
+    def test_team_object_id_membership_allows_view(self):
+        user = _make_user("member1")
+        wf = _make_workflow("owner1", team_id="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "member"},
+        )
+        assert can_view_workflow(wf, user, access) is True
+
 
 # ---------------------------------------------------------------------------
 # TestCanManageWorkflow
@@ -323,6 +388,172 @@ class TestCanManageWorkflow:
         access = _team_access()
         assert can_manage_workflow(wf, user, access, allow_admin=False) is False
         assert can_manage_workflow(wf, user, access, allow_admin=True) is True
+
+    def test_team_object_id_admin_role_allows_manage(self):
+        user = _make_user("team-admin")
+        wf = _make_workflow("owner1", team_id="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_manage_workflow(wf, user, access) is True
+
+
+# ---------------------------------------------------------------------------
+# TestAutomationAccess
+# ---------------------------------------------------------------------------
+
+
+class TestAutomationAccess:
+    def test_owner_can_view_and_manage(self):
+        user = _make_user("owner1")
+        auto = _make_automation(user_id="owner1")
+        access = _team_access()
+        assert can_view_automation(auto, user, access) is True
+        assert can_manage_automation(auto, user, access) is True
+
+    def test_team_member_can_view_shared_automation(self):
+        user = _make_user("member1")
+        auto = _make_automation(
+            user_id="owner1",
+            team_id="team-obj-1",
+            shared_with_team=True,
+        )
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "member"},
+        )
+        assert can_view_automation(auto, user, access) is True
+        assert can_manage_automation(auto, user, access) is False
+
+    def test_team_admin_can_manage_shared_automation(self):
+        user = _make_user("admin1")
+        auto = _make_automation(
+            user_id="owner1",
+            team_id="team-obj-1",
+            shared_with_team=True,
+        )
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_manage_automation(auto, user, access) is True
+
+
+# ---------------------------------------------------------------------------
+# TestKnowledgeBaseAccess
+# ---------------------------------------------------------------------------
+
+
+class TestKnowledgeBaseAccess:
+    def test_owner_can_view_and_manage(self):
+        user = _make_user("owner1")
+        kb = _make_knowledge_base(user_id="owner1")
+        access = _team_access()
+        assert can_view_knowledge_base(kb, user, access) is True
+        assert can_manage_knowledge_base(kb, user, access) is True
+
+    def test_verified_kb_requires_org_visibility_when_scoped(self):
+        user = _make_user("viewer")
+        kb = _make_knowledge_base(
+            user_id="owner1",
+            verified=True,
+            organization_ids=["org-a"],
+        )
+        access = _team_access()
+        assert can_view_knowledge_base(
+            kb,
+            user,
+            access,
+            user_org_ancestry=["org-a", "org-b"],
+        ) is True
+        assert can_view_knowledge_base(
+            kb,
+            user,
+            access,
+            user_org_ancestry=["org-b"],
+        ) is False
+
+    def test_team_admin_can_manage_shared_kb(self):
+        user = _make_user("team-admin")
+        kb = _make_knowledge_base(
+            user_id="owner1",
+            team_id="team-obj-1",
+            shared_with_team=True,
+        )
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_manage_knowledge_base(kb, user, access) is True
+
+
+# ---------------------------------------------------------------------------
+# TestLibraryAccess
+# ---------------------------------------------------------------------------
+
+
+class TestLibraryAccess:
+    def test_owner_can_view_and_manage_personal_library(self):
+        user = _make_user("owner1")
+        lib = _make_library(owner_user_id="owner1")
+        access = _team_access()
+        assert can_view_library(lib, user, access) is True
+        assert can_manage_library(lib, user, access) is True
+
+    def test_team_member_can_view_but_not_manage_team_library(self):
+        user = _make_user("member1")
+        lib = _make_library(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "member"},
+        )
+        assert can_view_library(lib, user, access) is True
+        assert can_manage_library(lib, user, access) is False
+
+    def test_team_admin_can_manage_team_library(self):
+        user = _make_user("admin1")
+        lib = _make_library(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_manage_library(lib, user, access) is True
+
+    def test_any_authenticated_user_can_view_verified_library(self):
+        user = _make_user("viewer")
+        lib = _make_library(scope=LibraryScope.VERIFIED, owner_user_id="system")
+        access = _team_access()
+        assert can_view_library(lib, user, access) is True
+        assert can_manage_library(lib, user, access) is False
+
+
+class TestLibraryFolderAccess:
+    def test_owner_can_manage_personal_library_folder(self):
+        user = _make_user("owner1")
+        folder = _make_library_folder(owner_user_id="owner1")
+        access = _team_access()
+        assert can_view_library_folder(folder, user, access) is True
+        assert can_manage_library_folder(folder, user, access) is True
+
+    def test_team_member_can_view_team_library_folder(self):
+        user = _make_user("member1")
+        folder = _make_library_folder(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "member"},
+        )
+        assert can_view_library_folder(folder, user, access) is True
+        assert can_manage_library_folder(folder, user, access) is False
+
+    def test_team_admin_can_manage_team_library_folder(self):
+        user = _make_user("admin1")
+        folder = _make_library_folder(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_manage_library_folder(folder, user, access) is True
 
 
 # ---------------------------------------------------------------------------
@@ -427,7 +658,9 @@ class TestGetTeamAccessContext:
             result = await get_team_access_context(user)
 
         assert result.team_uuids == {"team-uuid-1"}
+        assert result.team_object_ids == {"team-obj-id-1"}
         assert result.roles_by_uuid == {"team-uuid-1": "member"}
+        assert result.roles_by_object_id == {"team-obj-id-1": "member"}
 
     async def test_user_with_multiple_teams(self):
         user = _make_user("busy-user")
@@ -473,10 +706,16 @@ class TestGetTeamAccessContext:
             result = await get_team_access_context(user)
 
         assert result.team_uuids == {"team-uuid-1", "team-uuid-2", "team-uuid-3"}
+        assert result.team_object_ids == {"team-obj-id-1", "team-obj-id-2", "team-obj-id-3"}
         assert result.roles_by_uuid == {
             "team-uuid-1": "owner",
             "team-uuid-2": "member",
             "team-uuid-3": "admin",
+        }
+        assert result.roles_by_object_id == {
+            "team-obj-id-1": "owner",
+            "team-obj-id-2": "member",
+            "team-obj-id-3": "admin",
         }
 
 
@@ -712,6 +951,26 @@ class TestGetAuthorizedWorkflow:
 
         assert result is wf
 
+    async def test_verified_library_access_can_authorize_workflow(self):
+        user = _make_user("viewer")
+        wf = _make_workflow("owner1", team_id=None)
+        wf.id = "workflow-oid"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+            ) as mock_library_access,
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+            mock_library_access.return_value = True
+
+            result = await get_authorized_workflow("wf-id", user, team_access=_team_access())
+
+        assert result is wf
+
     async def test_invalid_id_returns_none(self):
         """If PydanticObjectId raises, the function catches and returns None."""
         user = _make_user("user1")
@@ -755,9 +1014,14 @@ class TestGetAuthorizedSearchSet:
         user = _make_user("outsider")
         ss = _make_search_set("owner1", is_global=False)
 
-        with patch(
-            "app.models.search_set.SearchSet"
-        ) as MockSS:
+        with (
+            patch("app.models.search_set.SearchSet") as MockSS,
+            patch(
+                "app.services.access_control.get_team_access_context",
+                new_callable=AsyncMock,
+            ) as mock_ctx,
+        ):
+            mock_ctx.return_value = _team_access()
             MockSS.find_one = AsyncMock(return_value=ss)
             MockSS.uuid = "uuid"
 
@@ -797,9 +1061,14 @@ class TestGetAuthorizedSearchSet:
         user = _make_user("random-user")
         ss = _make_search_set("owner1", is_global=True)
 
-        with patch(
-            "app.models.search_set.SearchSet"
-        ) as MockSS:
+        with (
+            patch("app.models.search_set.SearchSet") as MockSS,
+            patch(
+                "app.services.access_control.get_team_access_context",
+                new_callable=AsyncMock,
+            ) as mock_ctx,
+        ):
+            mock_ctx.return_value = _team_access()
             MockSS.find_one = AsyncMock(return_value=ss)
             MockSS.uuid = "uuid"
 
@@ -808,3 +1077,28 @@ class TestGetAuthorizedSearchSet:
             )
 
         assert result is None
+
+    async def test_library_backed_access_can_authorize_search_set(self):
+        user = _make_user("viewer")
+        ss = _make_search_set("owner1", is_global=False)
+        ss.id = "search-set-oid"
+
+        with (
+            patch("app.models.search_set.SearchSet") as MockSS,
+            patch(
+                "app.services.access_control.get_team_access_context",
+                new_callable=AsyncMock,
+            ) as mock_ctx,
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+            ) as mock_library_access,
+        ):
+            mock_ctx.return_value = _team_access()
+            MockSS.find_one = AsyncMock(return_value=ss)
+            MockSS.uuid = "uuid"
+            mock_library_access.return_value = True
+
+            result = await get_authorized_search_set("ss-uuid", user)
+
+        assert result is ss

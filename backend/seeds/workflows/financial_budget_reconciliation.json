@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-financial-budget-reconciliation",
+    "display_name": "Budget Reconciliation",
+    "description": "Compares a financial report against the original budget, identifying variances and flagging categories that need sponsor approval for rebudgeting.",
+    "quality_tier": "gold",
+    "collections": ["financial"]
+  },
+  "items": [
+    {
+      "name": "Budget Reconciliation",
+      "description": "Extracts financial data and performs variance analysis against the original budget.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Financial Data",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Award Number, Budget Period, Original Budget Amount, Personnel Expenditures, Fringe Benefits Expenditures, Travel Expenditures, Equipment Purchases, Supplies Expenditures, Subcontract Expenditures, Other Direct Costs, Indirect Costs Charged, Total Expenditures, Remaining Balance, Obligated Amount, Carryforward Amount"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reconciliation Analysis",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a grants accountant performing a budget reconciliation. Analyze the extracted financial data:\n\n## Variance Analysis\nFor each budget category, calculate:\n- Original budget amount\n- Actual expenditures\n- Variance ($ and %)\n- Flag if >25% over or under budget\n\n## Spending Rate Assessment\n- What is the overall obligation vs expenditure rate?\n- Is the burn rate appropriate for the project timeline?\n- Does the 90-day pre-expiration spending rule apply?\n- Are there unexplained large unspent balances?\n\n## Rebudgeting Requirements\n- Do any line items require sponsor approval for rebudgeting?\n- Most sponsors require prior approval for budget transfers >25% of total\n- Flag any categories where rebudgeting approval may be needed\n\n## Carryforward\n- Is there a carryforward balance?\n- Does the award allow automatic carryforward or require prior approval?\n\nPresent as:\n1. **Reconciliation Table** - Category | Budget | Actual | Variance | Status\n2. **Findings** - Issues requiring attention\n3. **Recommendations** - Actions needed",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

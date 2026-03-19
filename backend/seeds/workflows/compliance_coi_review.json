@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-compliance-coi-review",
+    "display_name": "Conflict of Interest Review",
+    "description": "Screens a proposal or disclosure for conflict of interest concerns, assessing financial relationships and recommending management plans.",
+    "quality_tier": "gold",
+    "collections": ["compliance"]
+  },
+  "items": [
+    {
+      "name": "Conflict of Interest Review",
+      "description": "Analyzes investigator disclosures for potential conflicts of interest and recommends mitigation strategies.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract COI Fields",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "PI Name, Co-Investigators, Sponsor/Funder, External Entity Relationships, Financial Interests Disclosed, Equity Holdings, Consulting Arrangements, IP/Licensing Relationships, Travel Sponsored by External Entities, Management/Board Positions, Significant Financial Interest Threshold"
+              }
+            }
+          ]
+        },
+        {
+          "name": "COI Risk Assessment",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a research compliance officer specializing in conflict of interest (per 42 CFR Part 50 / 2 CFR 200.112). Based on the extracted disclosure information, assess:\n\n## Financial Conflict Screening\n- Are any disclosed financial interests related to the proposed research?\n- Do any financial interests exceed the $5,000/5% significant financial interest threshold?\n- Are there any equity holdings in entities that could benefit from research outcomes?\n\n## Relationship Analysis\n- Do any relationships with the sponsor create a real or apparent conflict?\n- Are consulting arrangements with interested entities disclosed?\n- Are there management or board positions that could influence research design or outcomes?\n\n## Risk Assessment\nRate overall COI risk as **Low**, **Medium**, or **High** with explanation.\n\n## Recommended Actions\nIf Medium or High risk:\n- Disclosure to research team and IRB\n- Independent monitoring of research\n- Modification of research plan\n- Divestiture of financial interest\n- Severance of conflicting relationship\n\nPresent as a structured COI review memo.",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -132,12 +132,10 @@ export async function previewCatalogImport(file: File): Promise<CatalogPreviewIt
 export async function importCatalogItems(
   file: File,
   selectedIndices: number[],
-  space: string,
 ): Promise<{ imported: { kind: string; id?: string; uuid?: string; name: string }[] }> {
   const form = new FormData()
   form.append('file', file)
   form.append('selected_indices', JSON.stringify(selectedIndices))
-  form.append('space', space)
   const res = await fetch('/api/verification/catalog/import', {
     method: 'POST',
     credentials: 'include',
@@ -284,4 +282,3 @@ export function setExaminer(userId: string, isExaminer: boolean) {
 export function searchUsersForExaminer(query: string) {
   return apiFetch<{ users: ExaminerUser[] }>(`/api/verification/examiners/search?q=${encodeURIComponent(query)}`)
 }
-

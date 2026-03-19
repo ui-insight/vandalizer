@@ -84,6 +84,36 @@ async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
     return user, str(user.current_team)
 
 
+async def _get_team_by_identifier(team_id: str) -> Team | None:
+    """Resolve a team from either its Mongo ObjectId string or UUID."""
+    if len(team_id) == 24:
+        try:
+            team = await Team.find_one({"_id": BsonObjectId(team_id)})
+            if team:
+                return team
+        except Exception:
+            pass
+    return await Team.find_one(Team.uuid == team_id)
+
+
+def _team_scope_identifiers(team: Team | None, *, fallback: str | None = None) -> list[str]:
+    """Return all known identifiers that may appear on team-scoped resources."""
+    identifiers: set[str] = set()
+    if fallback:
+        identifiers.add(fallback)
+    if team:
+        if getattr(team, "uuid", None):
+            identifiers.add(team.uuid)
+        if getattr(team, "id", None):
+            identifiers.add(str(team.id))
+    return sorted(identifiers)
+
+
+def _can_view_platform_role_flags(team_scope: str | None) -> bool:
+    """Only global admins should see installation-wide role flags in analytics views."""
+    return team_scope is None
+
+
 # ---------------------------------------------------------------------------
 # Pydantic request / response schemas
 # ---------------------------------------------------------------------------
@@ -462,6 +492,7 @@ async def user_leaderboard(
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
+    show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
     query_filter: dict = {}
     if team_scope:
@@ -486,7 +517,6 @@ async def user_leaderboard(
 
     # Fetch user records — scope to team members when team-scoped
     if team_scope:
-        from app.models.team import TeamMembership
         team_memberships = await TeamMembership.find(
             TeamMembership.team == PydanticObjectId(team_scope)
         ).to_list()
@@ -505,8 +535,12 @@ async def user_leaderboard(
                 user_id=uid,
                 name=u.name if u else None,
                 email=u.email if u else None,
-                is_admin=u.is_admin if u else False,
-                is_examiner=getattr(u, "is_examiner", False) if u else False,
+                is_admin=(u.is_admin if u and show_platform_role_flags else False),
+                is_examiner=(
+                    getattr(u, "is_examiner", False)
+                    if u and show_platform_role_flags
+                    else False
+                ),
                 tokens_total=agg["tokens_total"],
                 workflows_run=agg["workflows_run"],
                 conversations=agg["conversations"],
@@ -607,12 +641,10 @@ async def team_detail(
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Fetch team record
-    try:
-        team = await Team.find_one({"_id": BsonObjectId(team_id)}) if len(team_id) == 24 else None
-    except Exception:
-        team = None
+    team = await _get_team_by_identifier(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+    team_scope_ids = _team_scope_identifiers(team, fallback=team_id)
 
     now = datetime.datetime.utcnow()
     cutoff = now - datetime.timedelta(days=days)
@@ -737,7 +769,7 @@ async def team_detail(
 
     # Document count
     doc_count = await SmartDocument.find(
-        {"user_id": {"$in": member_user_ids}}
+        {"team_id": {"$in": team_scope_ids}}
     ).count()
 
     # Recent workflows
@@ -790,6 +822,7 @@ async def user_detail(
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
+    show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
     # Team admins: verify the target user is a member of their team
     if team_scope:
@@ -882,7 +915,11 @@ async def user_detail(
     ]
 
     # Document count
-    doc_count = await SmartDocument.find({"user_id": user_id}).count()
+    doc_query: dict = {"user_id": user_id}
+    if team_scope:
+        scoped_team = await _get_team_by_identifier(team_scope)
+        doc_query["team_id"] = {"$in": _team_scope_identifiers(scoped_team, fallback=team_scope)}
+    doc_count = await SmartDocument.find(doc_query).count()
 
     # Recent workflows
     wf_filter: dict = {"user_id": user_id, "type": "workflow_run"}
@@ -910,8 +947,12 @@ async def user_detail(
 
     return UserDetailResponse(
         user_id=user_id, name=target_user.name, email=target_user.email,
-        is_admin=target_user.is_admin,
-        is_examiner=getattr(target_user, "is_examiner", False),
+        is_admin=target_user.is_admin if show_platform_role_flags else False,
+        is_examiner=(
+            getattr(target_user, "is_examiner", False)
+            if show_platform_role_flags
+            else False
+        ),
         tokens_in=tokens_in, tokens_out=tokens_out,
         workflows_started=workflows_started,
         workflows_completed=workflows_completed,

@@ -367,6 +367,7 @@ class TestWorkflowRunAuthz:
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows._authorize_documents", new_callable=AsyncMock, return_value=["doc-1"]), \
              patch("app.routers.workflows.get_authorized_workflow", new_callable=AsyncMock, return_value=mock_wf_doc), \
              patch("app.services.activity_service.activity_start", new_callable=AsyncMock, return_value=mock_activity_obj), \
              patch("beanie.PydanticObjectId", side_effect=lambda x: x):

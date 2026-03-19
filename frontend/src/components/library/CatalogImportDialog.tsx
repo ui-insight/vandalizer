@@ -67,7 +67,7 @@ export function CatalogImportDialog({
   const handleImport = async () => {
     setImporting(true)
     try {
-      await importCatalogItems(file, Array.from(selected), 'default')
+      await importCatalogItems(file, Array.from(selected))
       onImported()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Import failed')

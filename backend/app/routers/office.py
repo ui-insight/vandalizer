@@ -10,8 +10,31 @@ from app.dependencies import get_current_user
 from app.models.office import IntakeConfig, WorkItem
 from app.models.user import User
 from app.rate_limit import limiter
+from app.services import access_control
 
 router = APIRouter()
+
+
+async def _get_owned_intake(intake_uuid: str, user: User) -> IntakeConfig | None:
+    return await IntakeConfig.find_one(
+        IntakeConfig.uuid == intake_uuid,
+        IntakeConfig.owner_user_id == user.user_id,
+    )
+
+
+async def _get_owned_work_item(
+    item_uuid: str,
+    user: User,
+    *,
+    intake: IntakeConfig | None = None,
+) -> WorkItem | None:
+    filters = [
+        WorkItem.uuid == item_uuid,
+        WorkItem.owner_user_id == user.user_id,
+    ]
+    if intake is not None:
+        filters.append(WorkItem.intake_config == intake.id)
+    return await WorkItem.find_one(*filters)
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +95,11 @@ async def list_intakes(user: User = Depends(get_current_user)):
 async def create_intake(request: Request, req: CreateIntakeRequest, user: User = Depends(get_current_user)):
     from beanie import PydanticObjectId
 
+    if req.default_workflow:
+        workflow = await access_control.get_authorized_workflow(req.default_workflow, user)
+        if not workflow:
+            raise HTTPException(status_code=404, detail="Workflow not found")
+
     intake = IntakeConfig(
         name=req.name,
         intake_type=req.intake_type,
@@ -95,10 +123,7 @@ async def update_intake(
     req: UpdateIntakeRequest,
     user: User = Depends(get_current_user),
 ):
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
 
@@ -124,10 +149,7 @@ async def update_intake(
 @router.delete("/intakes/{intake_uuid}")
 @limiter.limit("30/minute")
 async def delete_intake(request: Request, intake_uuid: str, user: User = Depends(get_current_user)):
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
     await intake.delete()
@@ -154,7 +176,7 @@ async def list_work_items(
 
 @router.get("/workitems/{item_uuid}")
 async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)):
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid, WorkItem.owner_user_id == user.user_id)
+    item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     return _work_item_to_dict(item)
@@ -163,7 +185,7 @@ async def get_work_item(item_uuid: str, user: User = Depends(get_current_user)):
 @router.post("/workitems/{item_uuid}/approve")
 @limiter.limit("30/minute")
 async def approve_work_item(request: Request, item_uuid: str, user: User = Depends(get_current_user)):
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid, WorkItem.owner_user_id == user.user_id)
+    item = await _get_owned_work_item(item_uuid, user)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
     if item.status != "awaiting_review":
@@ -189,10 +211,7 @@ async def create_graph_subscription(
     """Create a Graph subscription for an IntakeConfig."""
     from app.services.graph_client import GraphClient
 
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
 
@@ -253,10 +272,7 @@ async def delete_graph_subscription(
     from app.services.graph_client import GraphClient
     from app.models.passive import GraphSubscription
 
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
 
@@ -294,14 +310,11 @@ async def manual_triage(
     user: User = Depends(get_current_user),
 ):
     """Manually trigger triage for a work item."""
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
 
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid)
+    item = await _get_owned_work_item(item_uuid, user, intake=intake)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
 
@@ -324,19 +337,20 @@ async def manual_process(
     user: User = Depends(get_current_user),
 ):
     """Manually process a work item through its matched workflow."""
-    intake = await IntakeConfig.find_one(
-        IntakeConfig.uuid == intake_uuid,
-        IntakeConfig.owner_user_id == user.user_id,
-    )
+    intake = await _get_owned_intake(intake_uuid, user)
     if not intake:
         raise HTTPException(status_code=404, detail="Intake not found")
 
-    item = await WorkItem.find_one(WorkItem.uuid == item_uuid)
+    item = await _get_owned_work_item(item_uuid, user, intake=intake)
     if not item:
         raise HTTPException(status_code=404, detail="Work item not found")
 
     if not item.matched_workflow:
         raise HTTPException(status_code=400, detail="No matched workflow. Run triage first.")
+
+    workflow = await access_control.get_authorized_workflow(str(item.matched_workflow), user)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Matched workflow not found")
 
     item.status = "processing"
     item.updated_at = datetime.datetime.now(datetime.timezone.utc)

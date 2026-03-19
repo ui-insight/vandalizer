@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-compliance-export-control",
+    "display_name": "Export Control Screening",
+    "description": "Screens a project description or agreement for potential export control concerns under EAR, ITAR, and OFAC regulations.",
+    "quality_tier": "gold",
+    "collections": ["compliance"]
+  },
+  "items": [
+    {
+      "name": "Export Control Screening",
+      "description": "Identifies potential export control issues in research projects involving foreign collaborators, restricted technology, or access limitations.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Project Details",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "Project Title, Sponsor Agency, Foreign Collaborators, Countries Involved, Technology Areas, Equipment and Materials, Software Used, Publication Restrictions, Access Restrictions, Fundamental Research Statement, ITAR/EAR References, Controlled Unclassified Information, Foreign National Participation"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export Control Analysis",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are an export control compliance officer at a university. Screen this project for potential export control issues:\n\n## Fundamental Research Exclusion\n- Does this qualify as fundamental research (published without restriction)?\n- Are there any publication or dissemination restrictions?\n- Are there access restrictions that would remove the fundamental research exclusion?\n\n## Country & Party Screening\n- Are any countries involved on the sanctioned/embargoed list (OFAC)?\n- Are there foreign nationals who may need a Technology Control Plan?\n- Are any foreign collaborators or institutions of concern?\n\n## Technology Assessment\n- Could any technology, equipment, or software be controlled under EAR (Commerce Control List)?\n- Could any items fall under ITAR (US Munitions List)?\n- Are there dual-use technology concerns?\n\n## CUI Assessment\n- Does the project involve Controlled Unclassified Information?\n- Are there DFARS/NIST 800-171 cybersecurity requirements?\n\n## Risk Rating\nRate export control risk as **Low** / **Medium** / **High** and specify:\n- Which regulations may apply (EAR, ITAR, OFAC)\n- Recommended next steps (Technology Control Plan, license application, restricted party screening)\n- Whether an Empowered Official review is needed",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -134,7 +134,9 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 
 ## Documentation
 
+- [Authorization Matrix](AUTHORIZATION_MATRIX.md)
 - [Deployment Guide](DEPLOY.md)
+- [Operations Guide](OPERATIONS.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)

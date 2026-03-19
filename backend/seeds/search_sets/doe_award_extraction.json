@@ -1,0 +1,45 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "search_set",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "ss-doe-award",
+    "display_name": "DOE Award Extraction Template",
+    "description": "Extract standard fields from Department of Energy awards, cooperative agreements, and lab contracts including SF-424A budget categories.",
+    "quality_tier": "gold",
+    "domain": "doe",
+    "collections": ["federal-agency"]
+  },
+  "items": [
+    {
+      "title": "DOE Award",
+      "set_type": "extraction",
+      "extraction_config": {},
+      "items": [
+        {"searchphrase": "Award Number", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "FOA Number", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "PI Name", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Institution", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "DOE Program Office", "searchtype": "extraction", "is_optional": true, "enum_values": ["BES", "ASCR", "FES", "HEP", "NP", "ARPA-E", "EERE", "FE", "NE", "OE", "SC"]},
+        {"searchphrase": "Project Title", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Project Start Date", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Project End Date", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Total Federal Funding", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Cost Sharing Amount", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Personnel Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Fringe Benefits", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Equipment", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Travel", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Supplies", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Contractual/Subawards", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Other Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Indirect Charges", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Direct Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Total Project Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "NEPA Status", "searchtype": "extraction", "is_optional": true, "enum_values": ["Categorical Exclusion", "Environmental Assessment", "Environmental Impact Statement", "Not Applicable"]}
+      ],
+      "test_cases": []
+    }
+  ]
+}

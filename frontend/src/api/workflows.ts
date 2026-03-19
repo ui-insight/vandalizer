@@ -177,10 +177,9 @@ export function exportWorkflowUrl(id: string) {
   return `/api/workflows/${id}/export`
 }
 
-export async function importWorkflow(file: File, space: string): Promise<Workflow> {
+export async function importWorkflow(file: File): Promise<Workflow> {
   const form = new FormData()
   form.append('file', file)
-  form.append('space', space)
   const res = await fetch('/api/workflows/import', {
     method: 'POST',
     credentials: 'include',

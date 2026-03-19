@@ -18,7 +18,12 @@ from app.models.workflow import (
     WorkflowStep,
     WorkflowStepTask,
 )
-from app.services.access_control import get_authorized_workflow, get_team_access_context
+from app.services.access_control import (
+    can_view_workflow,
+    get_authorized_document,
+    get_authorized_workflow,
+    get_team_access_context,
+)
 from app.services.config_service import get_user_model_name
 
 if TYPE_CHECKING:
@@ -54,6 +59,8 @@ async def list_workflows(
     conditions: list[dict] = [{"user_id": user.user_id}]
     if team_access.team_uuids:
         conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+    if team_access.team_object_ids:
+        conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
 
     query: dict = {"$or": conditions}
     if space:
@@ -374,6 +381,19 @@ async def run_workflow(
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:
             raise ValueError("Workflow not found")
+        team_access = await get_team_access_context(user)
+        authorized_document_uuids: list[str] = []
+        for doc_uuid in document_uuids:
+            document = await get_authorized_document(
+                doc_uuid,
+                user,
+                team_access=team_access,
+                allow_admin=True,
+            )
+            if not document:
+                raise ValueError(f"Document not found: {doc_uuid}")
+            authorized_document_uuids.append(document.uuid)
+        document_uuids = authorized_document_uuids
     else:
         wf = await Workflow.get(PydanticObjectId(workflow_id))
         if not wf:
@@ -409,8 +429,30 @@ async def run_workflow(
     return session_id
 
 
-async def get_workflow_status(session_id: str) -> dict | None:
+async def _get_authorized_workflow_result(
+    session_id: str,
+    user: User,
+) -> WorkflowResult | None:
     result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
+    if not result or not result.workflow:
+        return None
+
+    workflow = await Workflow.get(result.workflow)
+    if not workflow:
+        return None
+
+    team_access = await get_team_access_context(user)
+    if not can_view_workflow(workflow, user, team_access):
+        return None
+
+    return result
+
+
+async def get_workflow_status(session_id: str, user: User | None = None) -> dict | None:
+    if user is not None:
+        result = await _get_authorized_workflow_result(session_id, user)
+    else:
+        result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
     if not result:
         return None
     return {
@@ -443,6 +485,19 @@ async def run_workflow_batch(
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:
             raise ValueError("Workflow not found")
+        team_access = await get_team_access_context(user)
+        authorized_document_uuids: list[str] = []
+        for doc_uuid in document_uuids:
+            document = await get_authorized_document(
+                doc_uuid,
+                user,
+                team_access=team_access,
+                allow_admin=True,
+            )
+            if not document:
+                raise ValueError(f"Document not found: {doc_uuid}")
+            authorized_document_uuids.append(document.uuid)
+        document_uuids = authorized_document_uuids
     else:
         wf = await Workflow.get(PydanticObjectId(workflow_id))
         if not wf:
@@ -487,7 +542,7 @@ async def run_workflow_batch(
     return batch_id
 
 
-async def get_batch_status(batch_id: str) -> dict | None:
+async def get_batch_status(batch_id: str, user: User | None = None) -> dict | None:
     """Return aggregated status for a batch run."""
     results = await WorkflowResult.find(
         WorkflowResult.batch_id == batch_id,
@@ -495,6 +550,17 @@ async def get_batch_status(batch_id: str) -> dict | None:
 
     if not results:
         return None
+
+    if user is not None:
+        first = results[0]
+        if not first.workflow:
+            return None
+        workflow = await Workflow.get(first.workflow)
+        if not workflow:
+            return None
+        team_access = await get_team_access_context(user)
+        if not can_view_workflow(workflow, user, team_access):
+            return None
 
     total = len(results)
     completed = sum(1 for r in results if r.status == "completed")
@@ -663,6 +729,85 @@ async def create_temp_documents_from_text(texts: list[dict], user_id: str) -> li
     return uuids
 
 
+# ---------------------------------------------------------------------------
+# Expected Output (ground-truth storage for deterministic validation)
+# ---------------------------------------------------------------------------
+
+async def save_expected_output(
+    workflow_id: str,
+    session_id: str,
+    user: User,
+    label: str | None = None,
+) -> dict:
+    """Mark a completed workflow execution as the 'expected output' for validation.
+
+    This is the workflow equivalent of extraction test cases — it stores
+    ground truth that future validations can compare against deterministically.
+    """
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise ValueError("Workflow not found")
+
+    # Find the specified WorkflowResult
+    wr = await WorkflowResult.find_one(
+        WorkflowResult.session_id == session_id,
+        WorkflowResult.workflow == wf.id,
+        WorkflowResult.status == "completed",
+    )
+    if not wr:
+        raise ValueError("Completed workflow result not found for this session")
+
+    output_text = _serialize_output(wr.final_output)
+    if output_text is None:
+        raise ValueError("Binary outputs cannot be saved as expected output")
+
+    # Store as a validation input with expected output
+    expected_entry = {
+        "id": str(uuid_mod.uuid4()),
+        "type": "expected_output",
+        "session_id": session_id,
+        "label": label or f"Expected output from {session_id[:8]}",
+        "output_text": output_text[:50_000],
+        "output_snapshot": wr.final_output,
+        "steps_output_snapshot": wr.steps_output,
+    }
+
+    # Append to validation_inputs
+    wf.validation_inputs = [
+        inp for inp in wf.validation_inputs
+        if inp.get("type") != "expected_output" or inp.get("session_id") != session_id
+    ]
+    wf.validation_inputs.append(expected_entry)
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+
+    return expected_entry
+
+
+async def get_expected_outputs(workflow_id: str, user: User) -> list[dict]:
+    """Return all stored expected outputs for a workflow."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise ValueError("Workflow not found")
+    return [inp for inp in wf.validation_inputs if inp.get("type") == "expected_output"]
+
+
+async def delete_expected_output(workflow_id: str, expected_id: str, user: User) -> bool:
+    """Remove a stored expected output."""
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        return False
+    before = len(wf.validation_inputs)
+    wf.validation_inputs = [
+        inp for inp in wf.validation_inputs if inp.get("id") != expected_id
+    ]
+    if len(wf.validation_inputs) == before:
+        return False
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return True
+
+
 async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     """Use an LLM to auto-generate quality check definitions from the workflow structure."""
     import json as _json
@@ -773,7 +918,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
-    """Evaluate the last execution's output against the persisted validation plan."""
+    """Evaluate the last N executions' output against the persisted validation plan."""
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:
@@ -789,11 +934,18 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
 
     wf_data = await get_workflow(workflow_id)
 
-    # Find the most recent completed WorkflowResult
+    # Find the last N completed WorkflowResults for consistency measurement
+    num_runs = min(3, await WorkflowResult.find(
+        WorkflowResult.workflow == wf.id,
+        WorkflowResult.status == "completed",
+    ).count())
+    if num_runs == 0:
+        num_runs = 1  # Will trigger the no-results path below
+
     last_results = await WorkflowResult.find(
         WorkflowResult.workflow == wf.id,
         WorkflowResult.status == "completed",
-    ).sort("-_id").limit(1).to_list()
+    ).sort("-_id").limit(max(num_runs, 1)).to_list()
 
     if not last_results:
         # All checks SKIP
@@ -806,26 +958,33 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
             }
             for c in plan
         ]
-        return _build_result(checks, workflow_id, wf_data)
+        return await _build_result(checks, workflow_id, wf_data, num_runs=0, output_comparison=None)
 
-    wr = last_results[0]
-    output_text = _serialize_output(wr.final_output)
-    steps_output = wr.steps_output
+    # Evaluate each execution independently
+    all_run_checks = []
+    for wr in last_results:
+        output_text = _serialize_output(wr.final_output)
+        if output_text is None:
+            # Skip binary outputs
+            run_checks = [
+                {"check_id": c["id"], "name": c["name"], "status": "SKIP",
+                 "detail": "Binary output cannot be evaluated as text."}
+                for c in plan
+            ]
+        else:
+            run_checks = await _evaluate_checks_against_output(plan, output_text, wr.steps_output, wf_data)
+        all_run_checks.append(run_checks)
 
-    if output_text is None:
-        checks = [
-            {
-                "check_id": c["id"],
-                "name": c["name"],
-                "status": "SKIP",
-                "detail": "Binary output cannot be evaluated as text.",
-            }
-            for c in plan
-        ]
-        return _build_result(checks, workflow_id, wf_data)
+    # Merge multi-run results with consistency tracking
+    checks = _merge_multi_run_checks(plan, all_run_checks)
 
-    checks = await _evaluate_checks_against_output(plan, output_text, steps_output, wf_data)
-    return await _build_result(checks, workflow_id, wf_data)
+    # Deterministic comparison against stored expected outputs
+    expected_outputs = [inp for inp in wf.validation_inputs if inp.get("type") == "expected_output"]
+    output_comparison = None
+    if expected_outputs and last_results:
+        output_comparison = _compare_outputs(last_results, expected_outputs)
+
+    return await _build_result(checks, workflow_id, wf_data, num_runs=len(all_run_checks), output_comparison=output_comparison)
 
 
 def _serialize_output(final_output: dict | None) -> str | None:
@@ -953,27 +1112,235 @@ async def _evaluate_checks_against_output(
     return checks
 
 
-async def _build_result(checks: list[dict], workflow_id: str, wf_data: dict | None) -> dict:
-    """Compute grade, persist, and return the validation result dict."""
+def _merge_multi_run_checks(plan: list[dict], all_run_checks: list[list[dict]]) -> list[dict]:
+    """Merge check results from multiple runs, computing per-check consistency.
+
+    For each check, reports the most common status, consistency (fraction of
+    runs that agree), and details from all runs.
+    """
+    from collections import Counter
+
+    num_runs = len(all_run_checks)
+    if num_runs == 0:
+        return []
+    if num_runs == 1:
+        # Single run — no consistency measurement, return as-is
+        for c in all_run_checks[0]:
+            c["consistency"] = 1.0
+            c["run_statuses"] = [c["status"]]
+            c["run_details"] = [c["detail"]]
+        return all_run_checks[0]
+
+    merged = []
+    for i, check_def in enumerate(plan):
+        check_id = check_def["id"]
+        # Collect statuses and details across runs
+        statuses = []
+        details = []
+        for run_checks in all_run_checks:
+            # Find this check in the run results
+            for rc in run_checks:
+                if rc.get("check_id") == check_id:
+                    statuses.append(rc["status"])
+                    details.append(rc.get("detail", ""))
+                    break
+            else:
+                statuses.append("SKIP")
+                details.append("Check not evaluated in this run")
+
+        # Most common status = consensus
+        counter = Counter(statuses)
+        consensus_status, consensus_count = counter.most_common(1)[0]
+        consistency = consensus_count / len(statuses)
+
+        # Build merged detail
+        if consistency == 1.0:
+            merged_detail = details[0]  # All agree, use first detail
+        else:
+            # Show disagreement
+            status_summary = ", ".join(f"Run {j+1}: {s}" for j, s in enumerate(statuses))
+            merged_detail = f"Inconsistent across runs ({status_summary}). {details[0]}"
+
+        merged.append({
+            "check_id": check_id,
+            "name": check_def["name"],
+            "status": consensus_status,
+            "detail": merged_detail,
+            "consistency": consistency,
+            "run_statuses": statuses,
+            "run_details": details,
+        })
+
+    return merged
+
+
+def _compare_outputs(
+    results: list["WorkflowResult"],
+    expected_outputs: list[dict],
+) -> dict:
+    """Compare actual workflow outputs against stored expected outputs.
+
+    For structured output (JSON/dict), does field-level comparison.
+    For text output, does normalized text similarity.
+    Returns comparison metrics that can feed into the quality score.
+    """
+    import json as _json
+
+    comparisons = []
+    for expected in expected_outputs:
+        exp_snapshot = expected.get("output_snapshot", {})
+        exp_output = exp_snapshot.get("output", exp_snapshot) if isinstance(exp_snapshot, dict) else exp_snapshot
+
+        for wr in results:
+            actual_output = wr.final_output
+            if isinstance(actual_output, dict):
+                actual_output = actual_output.get("output", actual_output)
+
+            # Structured comparison for dict/JSON outputs
+            if isinstance(exp_output, dict) and isinstance(actual_output, dict):
+                total_fields = 0
+                matching_fields = 0
+                field_details = []
+
+                for key in set(list(exp_output.keys()) + list(actual_output.keys())):
+                    total_fields += 1
+                    exp_val = str(exp_output.get(key, ""))
+                    act_val = str(actual_output.get(key, ""))
+
+                    # Use extraction validation's normalization for comparison
+                    from app.services.extraction_validation_service import _values_match, _is_not_found
+
+                    if _is_not_found(exp_val) and _is_not_found(act_val):
+                        matched = True
+                    elif exp_val and act_val and _values_match(act_val, exp_val):
+                        matched = True
+                    else:
+                        matched = exp_val == act_val
+
+                    if matched:
+                        matching_fields += 1
+                    field_details.append({
+                        "field": key,
+                        "expected": exp_val[:200],
+                        "actual": act_val[:200],
+                        "matched": matched,
+                    })
+
+                accuracy = matching_fields / total_fields if total_fields > 0 else 0.0
+                comparisons.append({
+                    "expected_label": expected.get("label", ""),
+                    "accuracy": accuracy,
+                    "total_fields": total_fields,
+                    "matching_fields": matching_fields,
+                    "fields": field_details,
+                })
+
+            elif isinstance(exp_output, list) and isinstance(actual_output, list):
+                # List comparison — compare lengths and items
+                total = max(len(exp_output), len(actual_output))
+                matching = 0
+                if total > 0:
+                    for i in range(min(len(exp_output), len(actual_output))):
+                        if str(exp_output[i]) == str(actual_output[i]):
+                            matching += 1
+                    accuracy = matching / total
+                else:
+                    accuracy = 1.0
+                comparisons.append({
+                    "expected_label": expected.get("label", ""),
+                    "accuracy": accuracy,
+                    "total_fields": total,
+                    "matching_fields": matching,
+                })
+
+            else:
+                # Text comparison — normalized
+                exp_text = str(exp_output).strip().lower()
+                act_text = str(actual_output).strip().lower()
+                accuracy = 1.0 if exp_text == act_text else 0.0
+                comparisons.append({
+                    "expected_label": expected.get("label", ""),
+                    "accuracy": accuracy,
+                })
+
+    if not comparisons:
+        return {"has_expected": False}
+
+    avg_accuracy = sum(c["accuracy"] for c in comparisons) / len(comparisons)
+    return {
+        "has_expected": True,
+        "comparisons": comparisons,
+        "output_accuracy": round(avg_accuracy, 4),
+    }
+
+
+async def _build_result(
+    checks: list[dict],
+    workflow_id: str,
+    wf_data: dict | None,
+    num_runs: int = 1,
+    output_comparison: dict | None = None,
+) -> dict:
+    """Compute continuous score (0-100), grade, and persist the validation result."""
     statuses = [c["status"] for c in checks]
     fail_count = statuses.count("FAIL")
     warn_count = statuses.count("WARN")
     pass_count = statuses.count("PASS")
+    skip_count = statuses.count("SKIP")
     total = len(checks)
+    evaluated = total - skip_count
 
-    if fail_count == 0 and warn_count == 0:
+    # Continuous check pass rate: PASS=1.0, WARN=0.5, FAIL=0.0, SKIP=excluded
+    if evaluated > 0:
+        check_score_sum = pass_count * 1.0 + warn_count * 0.5
+        check_pass_rate = check_score_sum / evaluated
+    else:
+        check_pass_rate = 0.0
+
+    # Consistency across runs (average per-check consistency)
+    consistencies = [c.get("consistency", 1.0) for c in checks if c["status"] != "SKIP"]
+    avg_consistency = sum(consistencies) / len(consistencies) if consistencies else 0.0
+
+    # Continuous score: 60% check pass rate + 40% consistency (mirrors extraction formula)
+    accuracy_component = check_pass_rate * 100
+    consistency_component = avg_consistency * 100
+    score = min(100.0, max(0.0, accuracy_component * 0.6 + consistency_component * 0.4))
+
+    # If we have ground-truth output comparison, blend it in
+    output_accuracy = None
+    if output_comparison and output_comparison.get("has_expected"):
+        output_accuracy = output_comparison["output_accuracy"]
+        # Reweight: 40% check pass rate + 30% consistency + 30% output accuracy
+        score = min(100.0, max(0.0,
+            accuracy_component * 0.4 + consistency_component * 0.3 + output_accuracy * 100 * 0.3
+        ))
+
+    # Map continuous score to letter grade for backward compatibility
+    if score >= 90:
         grade = "A"
-    elif fail_count == 0 and warn_count <= 1:
+    elif score >= 80:
         grade = "B"
-    elif fail_count == 0:
+    elif score >= 70:
         grade = "C"
-    elif fail_count == 1:
+    elif score >= 60:
         grade = "D"
     else:
         grade = "F"
 
-    summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"
-    result_dict = {"grade": grade, "summary": summary, "checks": checks}
+    consistency_note = f", {avg_consistency*100:.0f}% consistent" if num_runs > 1 else ""
+    summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures{consistency_note}"
+
+    result_dict = {
+        "grade": grade,
+        "summary": summary,
+        "checks": checks,
+        "score": round(score, 1),
+        "check_pass_rate": round(check_pass_rate, 4),
+        "consistency": round(avg_consistency, 4),
+        "num_runs": num_runs,
+        "num_checks": total,
+        "output_comparison": output_comparison,
+    }
 
     from app.services.quality_service import persist_validation_run
     await persist_validation_run(

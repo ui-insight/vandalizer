@@ -11,6 +11,8 @@ from bs4 import BeautifulSoup
 
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.user import User
+from app.services import access_control
 from app.services.document_manager import DocumentManager
 
 logger = logging.getLogger(__name__)
@@ -73,10 +75,20 @@ async def create_knowledge_base(
     return kb
 
 
-async def get_knowledge_base(uuid: str, user_id: str) -> KnowledgeBase | None:
-    return await KnowledgeBase.find_one(
-        KnowledgeBase.uuid == uuid,
-        KnowledgeBase.user_id == user_id,
+async def get_knowledge_base(
+    uuid: str,
+    user: User,
+    *,
+    manage: bool = False,
+    user_org_ancestry: list[str] | None = None,
+    allow_admin: bool = False,
+) -> KnowledgeBase | None:
+    return await access_control.get_authorized_knowledge_base(
+        uuid,
+        user,
+        manage=manage,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=allow_admin,
     )
 
 
@@ -87,12 +99,19 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
 
 
 async def update_knowledge_base(
-    uuid: str, user_id: str,
+    uuid: str, user: User,
     title: str | None = None, description: str | None = None,
     shared_with_team: bool | None = None,
     organization_ids: list[str] | None = None,
+    user_org_ancestry: list[str] | None = None,
 ) -> KnowledgeBase | None:
-    kb = await get_knowledge_base(uuid, user_id)
+    kb = await get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         return None
     if title is not None:
@@ -109,10 +128,20 @@ async def update_knowledge_base(
     await kb.save()
     return kb
 
-
-async def share_with_team(uuid: str, user_id: str) -> KnowledgeBase | None:
-    """Toggle shared_with_team for a KB owned by user_id."""
-    kb = await get_knowledge_base(uuid, user_id)
+async def share_with_team(
+    uuid: str,
+    user: User,
+    *,
+    user_org_ancestry: list[str] | None = None,
+) -> KnowledgeBase | None:
+    """Toggle shared_with_team for an authorized knowledge base."""
+    kb = await get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         return None
     kb.shared_with_team = not kb.shared_with_team
@@ -121,8 +150,19 @@ async def share_with_team(uuid: str, user_id: str) -> KnowledgeBase | None:
     return kb
 
 
-async def delete_knowledge_base(uuid: str, user_id: str) -> bool:
-    kb = await get_knowledge_base(uuid, user_id)
+async def delete_knowledge_base(
+    uuid: str,
+    user: User,
+    *,
+    user_org_ancestry: list[str] | None = None,
+) -> bool:
+    kb = await get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
     if not kb:
         return False
     # Delete ChromaDB collection
@@ -157,14 +197,22 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
 
 
 async def add_documents(
-    kb: KnowledgeBase, document_uuids: list[str],
+    kb: KnowledgeBase,
+    document_uuids: list[str],
+    user: User,
 ) -> int:
     """Add SmartDocuments to a KB and ingest them. Returns count added."""
     added = 0
+    team_access = await access_control.get_team_access_context(user)
     for doc_uuid in document_uuids:
-        doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
         if not doc:
-            continue
+            raise ValueError(f"Document not found: {doc_uuid}")
         # Skip duplicates
         existing = await KnowledgeBaseSource.find_one(
             KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,

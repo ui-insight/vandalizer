@@ -17,6 +17,17 @@ from app.models.verification import VerifiedItemMetadata
 _GRADE_SCORES = {"A": 95, "B": 85, "C": 75, "D": 55, "F": 30}
 
 
+def _sample_size_factor(num_test_cases: int, num_runs: int) -> float:
+    """Discount factor based on sample size. Returns 0.0-1.0.
+
+    Reaches 1.0 at >=3 test cases with >=3 runs each.
+    Penalizes single test case / single run configurations.
+    """
+    tc_factor = min(1.0, num_test_cases / 3.0)
+    run_factor = min(1.0, num_runs / 3.0)
+    return tc_factor * run_factor
+
+
 def compute_config_hash(config: dict) -> str:
     """Deterministic SHA256 hash of a config dict."""
     return hashlib.sha256(json.dumps(config or {}, sort_keys=True).encode()).hexdigest()
@@ -41,9 +52,41 @@ async def persist_validation_run(
     if run_type == "extraction":
         acc_val = accuracy if accuracy is not None else 0.0
         con_val = consistency if consistency is not None else 0.0
-        score = min(100.0, max(0.0, acc_val * 60 + con_val * 40))
+        # Cross-field compliance if present in result
+        cf_score = result.get("cross_field_score")
+        if cf_score is not None:
+            score = min(100.0, max(0.0, acc_val * 50 + con_val * 30 + cf_score * 20))
+        else:
+            score = min(100.0, max(0.0, acc_val * 60 + con_val * 40))
     else:
-        score = float(_GRADE_SCORES.get(grade or "F", 30))
+        # Prefer continuous score from result if available (new multi-run system)
+        result_score = result.get("score")
+        if result_score is not None:
+            score = float(result_score)
+        else:
+            # Fallback for old-style grade-only results
+            score = float(_GRADE_SCORES.get(grade or "F", 30))
+
+    # Apply sample size factor - low sample sizes reduce effective score
+    raw_score = score
+    num_tc = len(result.get("test_cases", result.get("sources", [])))
+    num_runs_val = result.get("num_runs", 1)
+    ssf = _sample_size_factor(num_tc, num_runs_val)
+    if ssf < 1.0:
+        # Blend toward 50 (neutral) based on how much confidence we lack
+        score = score * ssf + 50.0 * (1.0 - ssf)
+
+    # Store score breakdown so the UI can explain penalties
+    score_breakdown = {
+        "raw_score": round(raw_score, 1),
+        "final_score": round(score, 1),
+        "sample_size_factor": round(ssf, 3),
+        "sample_size_penalty": round(raw_score - score, 1) if ssf < 1.0 else 0,
+        "num_test_cases": num_tc,
+        "num_runs": num_runs_val,
+        "test_cases_needed": max(0, 3 - num_tc),
+        "runs_needed": max(0, 3 - num_runs_val),
+    }
 
     # Count checks for workflow validation
     checks = result.get("checks", [])
@@ -66,6 +109,7 @@ async def persist_validation_run(
         consistency=consistency,
         grade=grade,
         score=score,
+        score_breakdown=score_breakdown,
         model=model,
         num_runs=result.get("num_runs", 1),
         num_test_cases=num_test_cases,
@@ -181,25 +225,39 @@ async def get_latest_validation(
 
 async def get_quality_summary() -> dict:
     """Aggregate stats: avg score, total runs, validated vs unvalidated items."""
-    all_runs = await ValidationRun.find_all().to_list()
-    total_runs = len(all_runs)
+    # Use aggregation to avoid loading all runs into memory
+    pipeline = [
+        {"$group": {
+            "_id": {"item_kind": "$item_kind", "item_id": "$item_id"},
+            "latest_score": {"$last": "$score"},
+            "run_count": {"$sum": 1},
+        }},
+        {"$group": {
+            "_id": None,
+            "total_runs": {"$sum": "$run_count"},
+            "items_validated": {"$sum": 1},
+            "score_sum": {"$sum": "$latest_score"},
+            "score_count": {"$sum": {"$cond": [{"$gt": ["$latest_score", None]}, 1, 0]}},
+        }},
+    ]
+    agg_result = await ValidationRun.aggregate(pipeline).to_list()
 
-    # Distinct items that have been validated
-    validated_items = set()
-    score_sum = 0.0
-    score_count = 0
-    for r in all_runs:
-        validated_items.add((r.item_kind, r.item_id))
-        score_sum += r.score
-        score_count += 1
+    if agg_result:
+        agg = agg_result[0]
+        total_runs = agg.get("total_runs", 0)
+        items_validated = agg.get("items_validated", 0)
+        score_sum = agg.get("score_sum", 0)
+        score_count = agg.get("score_count", 0)
+        avg_score = score_sum / score_count if score_count > 0 else 0.0
+    else:
+        total_runs = 0
+        items_validated = 0
+        avg_score = 0.0
 
-    avg_score = score_sum / score_count if score_count > 0 else 0.0
-
-    # Count total verified items
+    # Count total verified items and below-threshold
     all_meta = await VerifiedItemMetadata.find_all().to_list()
     total_verified = len(all_meta)
 
-    # Items below threshold
     sys_cfg = await SystemConfig.get_config()
     qc = sys_cfg.get_quality_config()
     fair_min = qc.get("quality_tiers", {}).get("fair", {}).get("min_score", 50)
@@ -208,7 +266,7 @@ async def get_quality_summary() -> dict:
     return {
         "avg_score": round(avg_score, 1),
         "total_runs": total_runs,
-        "items_validated": len(validated_items),
+        "items_validated": items_validated,
         "total_verified": total_verified,
         "items_below_threshold": below_threshold,
     }
@@ -286,8 +344,13 @@ async def run_regression_suite(
                 current_score = min(100.0, max(0.0, current_score * 60 + (result.get("aggregate_consistency", 0) or 0) * 40))
             elif kind == "workflow":
                 result = await workflow_service.validate_workflow(item_id_str)
-                grade = result.get("grade", "F")
-                current_score = float(_GRADE_SCORES.get(grade, 30))
+                # Prefer continuous score from new multi-run system
+                result_score = result.get("score")
+                if result_score is not None:
+                    current_score = float(result_score)
+                else:
+                    grade = result.get("grade", "F")
+                    current_score = float(_GRADE_SCORES.get(grade, 30))
             else:
                 continue
 
@@ -338,22 +401,14 @@ async def generate_improvement_suggestions(
     For workflows: analyses failing/warning checks and suggests fixes.
     Returns a markdown string of suggestions.
     """
+    from app.services.config_service import get_default_model_name
     from app.services.llm_service import create_chat_agent
 
     sys_cfg = await SystemConfig.get_config()
-    sys_config_doc = {
-        "available_models": sys_cfg.available_models,
-        "llm_endpoint": sys_cfg.llm_endpoint,
-    }
+    sys_config_doc = sys_cfg.model_dump() if sys_cfg else {}
 
-    # Pick the default model
-    default_model = None
-    for m in sys_cfg.available_models:
-        if m.get("default"):
-            default_model = m.get("model_id") or m.get("model_name")
-            break
-    if not default_model and sys_cfg.available_models:
-        default_model = sys_cfg.available_models[0].get("model_id") or sys_cfg.available_models[0].get("model_name")
+    # Use the same model resolution path as chat/extraction
+    default_model = await get_default_model_name()
     if not default_model:
         default_model = "gpt-4o-mini"
 
@@ -501,6 +556,59 @@ async def get_quality_contract_status(item_kind: str, item_id: str) -> dict:
     }
 
 
+async def check_verification_readiness(
+    item_kind: str,
+    item_id: str,
+) -> dict:
+    """Check if an item meets minimum thresholds for verification submission.
+
+    Returns dict with 'ready' bool, 'issues' list, and 'recommendations' list.
+    """
+    sys_cfg = await SystemConfig.get_config()
+    qc = sys_cfg.get_quality_config()
+    gates = qc.get("verification_gates", {})
+
+    min_test_cases = gates.get("min_test_cases", 3)
+    min_runs = gates.get("min_runs", 3)
+    min_score = gates.get("min_score", 70)
+
+    issues: list[str] = []
+    recommendations: list[str] = []
+
+    # Check latest validation
+    latest = await get_latest_validation(item_kind, item_id)
+    if not latest:
+        issues.append("No validation runs found. Run validation first.")
+        return {"ready": False, "issues": issues, "recommendations": ["Run validation with at least 3 test cases and 3 runs per test case."]}
+
+    result = latest.get("result_snapshot", {})
+    num_tc = len(result.get("test_cases", result.get("sources", [])))
+    num_runs = result.get("num_runs", 1)
+    score = latest.get("score", 0)
+
+    if num_tc < min_test_cases:
+        issues.append(f"Only {num_tc} test case(s) used. Minimum is {min_test_cases}.")
+        recommendations.append(f"Add at least {min_test_cases - num_tc} more test case(s) with diverse source documents.")
+
+    if num_runs < min_runs:
+        issues.append(f"Only {num_runs} run(s) per test case. Minimum is {min_runs}.")
+        recommendations.append(f"Re-run validation with at least {min_runs} runs for reliable consistency measurement.")
+
+    if score < min_score:
+        issues.append(f"Quality score is {score:.0f}. Minimum for submission is {min_score}.")
+        recommendations.append("Review challenging fields and improve extraction prompts or field definitions.")
+
+    # Check cross-field rules if any exist
+    if item_kind == "search_set":
+        from app.models.search_set import SearchSet
+        ss = await SearchSet.find_one(SearchSet.uuid == item_id)
+        if ss and ss.cross_field_rules and result.get("cross_field_score") is None:
+            recommendations.append("Cross-field rules are defined but haven't been validated. Consider running cross-field validation.")
+
+    ready = len(issues) == 0
+    return {"ready": ready, "issues": issues, "recommendations": recommendations}
+
+
 async def get_quality_items(
     sort: str = "score",
     order: str = "asc",
@@ -624,6 +732,7 @@ def _run_to_dict(r: ValidationRun) -> dict:
         "consistency": r.consistency,
         "grade": r.grade,
         "score": r.score,
+        "score_breakdown": r.score_breakdown if hasattr(r, 'score_breakdown') and r.score_breakdown else None,
         "model": r.model,
         "num_runs": r.num_runs,
         "num_test_cases": r.num_test_cases,

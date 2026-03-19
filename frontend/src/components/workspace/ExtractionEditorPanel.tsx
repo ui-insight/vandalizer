@@ -23,7 +23,8 @@ import {
   exportSearchSetUrl,
   importSearchSet,
 } from '../../api/extractions'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult } from '../../api/extractions'
+import { findBestSettings } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { getModels } from '../../api/config'
 import { submitForVerification } from '../../api/library'
@@ -67,7 +68,7 @@ export function ExtractionEditorPanel() {
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
-  const { scores: sparklineScores } = useQualitySparkline('search_set', openExtractionId ?? undefined)
+  const { scores: sparklineScores, refresh: refreshSparkline } = useQualitySparkline('search_set', openExtractionId ?? undefined)
 
   const { items, loading: itemsLoading, refresh: refreshItems, add, remove, update, reorder } =
     useSearchSetItems(openExtractionId)
@@ -78,10 +79,15 @@ export function ExtractionEditorPanel() {
     try {
       const ss = await getSearchSet(openExtractionId)
       setSearchSet(ss)
+    } catch {
+      setSearchSet(null)
     } finally {
       setLoading(false)
     }
-  }, [openExtractionId])
+    // Also refresh sparkline and quality status
+    refreshSparkline()
+    getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
+  }, [openExtractionId, refreshSparkline])
 
   useEffect(() => {
     refresh()
@@ -443,7 +449,7 @@ export function ExtractionEditorPanel() {
               if (!f) return
               e.target.value = ''
               try {
-                const result = await importSearchSet(f, searchSet?.space || 'default')
+                const result = await importSearchSet(f)
                 openExtraction(result.uuid)
               } catch (err: unknown) {
                 alert(err instanceof Error ? err.message : 'Import failed')
@@ -477,6 +483,7 @@ export function ExtractionEditorPanel() {
             items={items}
             extractionConfig={config}
             onUpdateItem={update}
+            onValidationComplete={refresh}
           />
         </div>
       )}
@@ -1805,11 +1812,13 @@ function ValidateTab({
   items,
   extractionConfig,
   onUpdateItem,
+  onValidationComplete,
 }: {
   searchSetUuid: string
   items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   extractionConfig: ExtractionConfig
   onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
+  onValidationComplete?: () => void
 }) {
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const [sources, setSources] = useState<SourceLocal[]>([])
@@ -1818,11 +1827,18 @@ function ValidateTab({
   const [validating, setValidating] = useState(false)
   const [results, setResults] = useState<ValidationV2Result | null>(null)
   const [showDocPicker, setShowDocPicker] = useState(false)
+  const [pendingDocs, setPendingDocs] = useState<{ uuid: string; title: string }[] | null>(null)
+  const [autoFilling, setAutoFilling] = useState(false)
   const [expandedSource, setExpandedSource] = useState<string | null>(null)
   const [qualityHistory, setQualityHistory] = useState<QualityHistoryRun[]>([])
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
+  const [tuning, setTuning] = useState(false)
+  const [tuningResults, setTuningResults] = useState<TuningResult[] | null>(null)
+  const [tuningRecommendation, setTuningRecommendation] = useState<string | null>(null)
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
@@ -1838,7 +1854,7 @@ function ValidateTab({
     setLoadingSources(true)
     listTestCases(searchSetUuid)
       .then(cases => {
-        setSources(cases.map(tc => ({
+        const mapped = cases.map(tc => ({
           id: tc.uuid,
           source_type: tc.source_type as 'document' | 'text',
           document_uuid: tc.document_uuid ?? undefined,
@@ -1846,7 +1862,9 @@ function ValidateTab({
           source_text: tc.source_text ?? undefined,
           expected_values: tc.expected_values,
           expanded: false,
-        })))
+        }))
+        setSources(mapped)
+        if (mapped.length > 0) setSourcesCollapsed(true)
       })
       .catch(() => {})
       .finally(() => setLoadingSources(false))
@@ -1876,7 +1894,7 @@ function ValidateTab({
     }
   }
 
-  const addDocuments = async (docs: { uuid: string; title: string }[]) => {
+  const addDocuments = async (docs: { uuid: string; title: string }[], autoFill: boolean = false) => {
     const created = await Promise.all(
       docs.map(d =>
         createTestCase({
@@ -1897,6 +1915,15 @@ function ValidateTab({
       expanded: false,
     }))
     setSources(prev => [...prev, ...newSources])
+
+    // Auto-fill expected values by running extraction on each document
+    if (autoFill) {
+      setAutoFilling(true)
+      for (const src of newSources) {
+        await fillFromExtraction(src).catch(() => {})
+      }
+      setAutoFilling(false)
+    }
   }
 
   const addTextSource = async () => {
@@ -2006,13 +2033,19 @@ function ValidateTab({
     setValidating(true)
     setSuggestions(null)
     try {
-      const apiSources: ValidationSource[] = sources.map((s, i) => ({
-        source_type: s.source_type,
-        document_uuid: s.document_uuid,
-        label: s.document_title || (s.source_type === 'text' ? `Text Chunk ${i + 1}` : undefined),
-        source_text: s.source_text,
-        expected_values: s.expected_values,
-      }))
+      const apiSources: ValidationSource[] = sources.map((s, i) => {
+        // For document sources, only send label if it's a real title (not a UUID)
+        const isUuidLike = s.document_title && /^[0-9a-f-]{20,}$/i.test(s.document_title)
+        const label = isUuidLike ? undefined
+          : s.document_title || (s.source_type === 'text' ? `Text Chunk ${i + 1}` : undefined)
+        return {
+          source_type: s.source_type,
+          document_uuid: s.document_uuid,
+          label,
+          source_text: s.source_text,
+          expected_values: s.expected_values,
+        }
+      })
       const res = await runValidationV2({
         search_set_uuid: searchSetUuid,
         sources: apiSources,
@@ -2022,8 +2055,19 @@ function ValidateTab({
       getExtractionQualityHistory(searchSetUuid)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
+      // Auto-fetch LLM suggestions if accuracy or consistency < 95%
+      const acc = res.aggregate_accuracy ?? 1
+      const con = res.aggregate_consistency ?? 1
+      if (acc < 0.95 || con < 0.95) {
+        setLoadingSuggestions(true)
+        getExtractionImprovementSuggestions(searchSetUuid)
+          .then(r => setSuggestions(r.suggestions))
+          .catch(() => {})
+          .finally(() => setLoadingSuggestions(false))
+      }
     } finally {
       setValidating(false)
+      onValidationComplete?.()
     }
   }
 
@@ -2033,11 +2077,70 @@ function ValidateTab({
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* 1. Source Management */}
       <div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 12 }}>
-          Validation Sources
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, marginBottom: sourcesCollapsed ? 0 : 12,
+            cursor: sources.length > 0 ? 'pointer' : 'default',
+            userSelect: 'none',
+          }}
+          onClick={() => sources.length > 0 && setSourcesCollapsed(c => !c)}
+        >
+          {sources.length > 0 && (
+            sourcesCollapsed
+              ? <ChevronRight style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              : <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af' }} />
+          )}
+          <span style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
+            Validation Sources
+          </span>
+          {sources.length > 0 && sourcesCollapsed && (
+            <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
+              ({sources.length} source{sources.length !== 1 ? 's' : ''})
+            </span>
+          )}
         </div>
 
-        {loadingSources ? (
+        {/* Sample size penalty alert — always visible, even when collapsed */}
+        {qualityHistory.length > 0 && qualityHistory[0].score_breakdown && qualityHistory[0].score_breakdown.sample_size_penalty > 0 && (() => {
+          const bd = qualityHistory[0].score_breakdown!
+          // Hide alert if user has already addressed the issues
+          const needMoreDocs = bd.test_cases_needed > 0 && sources.length < 3
+          const needMoreRuns = bd.runs_needed > 0 && numRuns < 3
+          if (!needMoreDocs && !needMoreRuns) {
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '8px 14px', borderRadius: 8, marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
+                backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
+              }}>
+                <ShieldCheck style={{ width: 14, height: 14, color: '#059669', flexShrink: 0 }} />
+                <span style={{ fontSize: 12, color: '#065f46' }}>
+                  Sample size requirements met. Run validation again to update your score.
+                </span>
+              </div>
+            )
+          }
+          return (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 14px', borderRadius: 8, marginTop: sourcesCollapsed ? 10 : 0, marginBottom: sourcesCollapsed ? 0 : 12,
+              backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+            }}>
+              <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1, fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
+                <strong>Quality score reduced due to low sample size</strong>
+                {' '}&mdash;{' '}
+                Raw score: <strong>{Math.round(bd.raw_score)}%</strong>, final: <strong>{Math.round(bd.final_score)}%</strong>
+                <div style={{ marginTop: 4, fontSize: 11, color: '#78350f' }}>
+                  {needMoreDocs && <>Add <strong>{3 - sources.length}</strong> more test document{3 - sources.length !== 1 ? 's' : ''} (need 3 total). </>}
+                  {needMoreRuns && <>Increase to <strong>3</strong> runs per validation (currently {numRuns}).</>}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
+
+        {sourcesCollapsed ? null : loadingSources ? (
           <div style={{
             textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0',
             border: '1px dashed #d1d5db', borderRadius: 8,
@@ -2085,7 +2188,8 @@ function ValidateTab({
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {sources.map((src, i) => {
-              const label = src.document_title || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
+              const isUuidLike = src.document_title && /^[0-9a-f-]{20,}$/i.test(src.document_title)
+              const label = (!isUuidLike && src.document_title) || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
               return (
                 <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2228,40 +2332,42 @@ function ValidateTab({
         )}
 
         {/* Add buttons */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          <button
-            onClick={() => setShowDocPicker(true)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#202124', cursor: 'pointer',
-            }}
-          >
-            <Plus style={{ width: 12, height: 12 }} /> Add Documents
-          </button>
-          <button
-            onClick={addTextSource}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#202124', cursor: 'pointer',
-            }}
-          >
-            <Plus style={{ width: 12, height: 12 }} /> Add Text
-          </button>
-        </div>
+        {!sourcesCollapsed && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <button
+              onClick={() => setShowDocPicker(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                color: '#202124', cursor: 'pointer',
+              }}
+            >
+              <Plus style={{ width: 12, height: 12 }} /> Add Documents
+            </button>
+            <button
+              onClick={addTextSource}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                color: '#202124', cursor: 'pointer',
+              }}
+            >
+              <Plus style={{ width: 12, height: 12 }} /> Add Text
+            </button>
+          </div>
+        )}
 
         {/* Quick add selected docs */}
-        {selectedDocUuids.length > 0 && (
+        {!sourcesCollapsed && selectedDocUuids.length > 0 && (
           <button
             onClick={() => {
               // We don't have titles here, so use UUIDs as labels
               const newDocs = selectedDocUuids
                 .filter(uuid => !existingUuids.includes(uuid))
                 .map(uuid => ({ uuid, title: `Document ${uuid.slice(0, 8)}...` }))
-              if (newDocs.length > 0) addDocuments(newDocs)
+              if (newDocs.length > 0) setPendingDocs(newDocs)
             }}
             style={{
               marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -2308,7 +2414,105 @@ function ValidateTab({
               <><Play style={{ width: 14, height: 14 }} /> Run Validation</>
             )}
           </button>
+          <button
+            onClick={async () => {
+              setTuning(true)
+              setTuningResults(null)
+              setTuningRecommendation(null)
+              try {
+                const res = await findBestSettings(searchSetUuid, numRuns)
+                setTuningResults(res.results)
+                setTuningRecommendation(res.recommendation)
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : 'Failed to find best settings'
+                setTuningRecommendation(msg)
+              } finally {
+                setTuning(false)
+              }
+            }}
+            disabled={tuning || validating || sources.length === 0}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
+              color: '#374151',
+              cursor: tuning || validating || sources.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: tuning || validating || sources.length === 0 ? 0.5 : 1,
+            }}
+          >
+            {tuning ? (
+              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Testing configs...</>
+            ) : (
+              <><Sparkles style={{ width: 14, height: 14 }} /> Find Best Settings</>
+            )}
+          </button>
         </div>
+
+        {/* Tuning results */}
+        {(tuningResults || tuningRecommendation) && (
+          <div style={{
+            marginTop: 12, padding: 16, borderRadius: 8,
+            border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+              <Sparkles style={{ width: 14, height: 14, color: '#7c3aed' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>Settings Comparison</span>
+              <button
+                onClick={() => { setTuningResults(null); setTuningRecommendation(null) }}
+                style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
+              >
+                <X style={{ width: 12, height: 12 }} />
+              </button>
+            </div>
+            {tuningResults && tuningResults.length > 0 && (
+              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
+                <thead>
+                  <tr style={{ borderBottom: '2px solid #ddd6fe' }}>
+                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
+                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
+                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tuningResults.map((r, i) => {
+                    const scoreColor = r.score >= 90 ? '#059669' : r.score >= 70 ? '#d97706' : '#dc2626'
+                    return (
+                      <tr key={i} style={{
+                        borderBottom: '1px solid #ede9fe',
+                        backgroundColor: i === 0 ? '#ede9fe' : 'transparent',
+                      }}>
+                        <td style={{ padding: '4px 6px', fontWeight: i === 0 ? 700 : 400 }}>
+                          {r.label}{i === 0 && ' *'}
+                        </td>
+                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
+                          {r.error ? '—' : Math.round(r.score)}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
+                          {r.error ? '—' : `${Math.round(r.accuracy * 100)}%`}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
+                          {r.error ? '—' : `${Math.round(r.consistency * 100)}%`}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#6b7280' }}>
+                          {r.error ? '—' : `${r.elapsed_seconds.toFixed(1)}s`}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+            {tuningRecommendation && (
+              <div style={{ fontSize: 12, color: '#5b21b6', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {tuningRecommendation}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Progress display */}
         {validating && (
@@ -2324,7 +2528,50 @@ function ValidateTab({
         )}
       </div>
 
-      {/* 3. Quality History Chart */}
+      {/* LLM Improvement Suggestions — shown above quality history */}
+      {(suggestions || loadingSuggestions || (results && (
+        (results.aggregate_accuracy !== null && results.aggregate_accuracy < 0.95) ||
+        results.aggregate_consistency < 0.95
+      ))) && (
+        <div style={{
+          border: '1px solid #fde68a', borderRadius: 8, padding: 16,
+          backgroundColor: '#fffbeb',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
+            </div>
+            {!suggestions && !loadingSuggestions && (
+              <button
+                onClick={handleGetSuggestions}
+                disabled={loadingSuggestions}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
+                  color: '#92400e', cursor: 'pointer',
+                }}
+              >
+                Get AI Suggestions
+              </button>
+            )}
+          </div>
+          {loadingSuggestions && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e' }}>
+              <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+              Analyzing validation results...
+            </div>
+          )}
+          {suggestions && (
+            <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {suggestions}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 3. Quality History — graph only, expandable run table */}
       {qualityHistory.length > 1 && (
         <div style={{
           border: '1px solid #e5e7eb', borderRadius: 8, padding: 16,
@@ -2339,72 +2586,167 @@ function ValidateTab({
             <QualityHistoryChart runs={qualityHistory} />
           </div>
 
-          {/* Run comparison table */}
-          <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 12 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
-                <th style={{ width: 20, padding: '4px 2px' }} />
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Date</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
-              </tr>
-            </thead>
-            <tbody>
-              {qualityHistory.map((run) => {
-                const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
-                const isExpanded = expandedRunId === run.uuid
-                return (
-                  <Fragment key={run.uuid}>
-                    <tr
-                      style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
-                      onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
-                    >
-                      <td style={{ padding: '4px 2px', color: '#9ca3af' }}>
-                        {isExpanded
-                          ? <ChevronDown style={{ width: 12, height: 12 }} />
-                          : <ChevronRight style={{ width: 12, height: 12 }} />}
-                      </td>
-                      <td style={{ padding: '4px 6px', color: '#374151' }}>
-                        {new Date(run.created_at).toLocaleDateString()}
-                      </td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                        {Math.round(run.score)}
-                      </td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                        {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '—'}
-                      </td>
-                      <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                        {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '—'}
-                      </td>
-                      <td style={{ padding: '4px 6px' }}>
-                        <span style={{
-                          display: 'inline-block', padding: '1px 6px', borderRadius: 4,
-                          backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 10,
-                        }}>
-                          {_summarizeConfig(run.extraction_config)}
-                        </span>
-                      </td>
-                      <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
-                        {run.model || '—'}
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      <tr>
-                        <td colSpan={7} style={{ padding: '8px 6px 12px 24px', backgroundColor: '#f9fafb' }}>
-                          {_renderConfigDetails(run.extraction_config)}
+          {/* Expand toggle for run details */}
+          <button
+            onClick={() => setHistoryExpanded(!historyExpanded)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, marginTop: 8,
+              fontSize: 11, color: '#6b7280', background: 'none', border: 'none',
+              cursor: 'pointer', padding: '4px 0', fontFamily: 'inherit',
+            }}
+          >
+            {historyExpanded
+              ? <ChevronDown style={{ width: 12, height: 12 }} />
+              : <ChevronRight style={{ width: 12, height: 12 }} />}
+            {historyExpanded ? 'Hide run details' : 'Show all runs'}
+          </button>
+
+          {/* Collapsible run comparison table */}
+          {historyExpanded && (
+            <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 4 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                  <th style={{ width: 20, padding: '4px 2px' }} />
+                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Date</th>
+                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
+                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
+                  <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
+                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
+                  <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
+                </tr>
+              </thead>
+              <tbody>
+                {qualityHistory.map((run) => {
+                  const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
+                  const isExpanded = expandedRunId === run.uuid
+                  return (
+                    <Fragment key={run.uuid}>
+                      <tr
+                        style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                        onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
+                      >
+                        <td style={{ padding: '4px 2px', color: '#9ca3af' }}>
+                          {isExpanded
+                            ? <ChevronDown style={{ width: 12, height: 12 }} />
+                            : <ChevronRight style={{ width: 12, height: 12 }} />}
+                        </td>
+                        <td style={{ padding: '4px 6px', color: '#374151' }}>
+                          {new Date(run.created_at).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
+                          {Math.round(run.score)}
+                          {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
+                            <span title={`Raw score: ${Math.round(run.score_breakdown.raw_score)} (reduced due to small sample size)`}
+                              style={{ color: '#d97706', fontSize: 9, marginLeft: 2, verticalAlign: 'super' }}>*</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
+                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
+                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '—'}
+                        </td>
+                        <td style={{ padding: '4px 6px' }}>
+                          <span style={{
+                            display: 'inline-block', padding: '1px 6px', borderRadius: 4,
+                            backgroundColor: '#f3f4f6', color: '#4b5563', fontSize: 10,
+                          }}>
+                            {_summarizeConfig(run.extraction_config)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
+                          {run.model || '—'}
                         </td>
                       </tr>
-                    )}
-                  </Fragment>
-                )
-              })}
-            </tbody>
-          </table>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={7} style={{ padding: '8px 6px 12px 24px', backgroundColor: '#f9fafb' }}>
+                            {run.score_breakdown && run.score_breakdown.sample_size_penalty > 0 && (
+                              <div style={{
+                                display: 'flex', alignItems: 'flex-start', gap: 8,
+                                padding: '8px 12px', marginBottom: 8, borderRadius: 6,
+                                backgroundColor: '#fffbeb', border: '1px solid #fde68a',
+                              }}>
+                                <AlertTriangle style={{ width: 14, height: 14, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
+                                <div style={{ fontSize: 11, color: '#92400e', lineHeight: 1.5 }}>
+                                  <strong>Score reduced by sample size confidence penalty</strong>
+                                  <br />
+                                  Raw score: <strong>{Math.round(run.score_breakdown.raw_score)}</strong> → Final: <strong>{Math.round(run.score_breakdown.final_score)}</strong> ({`-${Math.round(run.score_breakdown.sample_size_penalty)} pts`})
+                                  <br />
+                                  <span style={{ color: '#78350f' }}>
+                                    {run.score_breakdown.test_cases_needed > 0 && run.score_breakdown.runs_needed > 0
+                                      ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} and increase to ${3} runs per test case to reach full confidence.`
+                                      : run.score_breakdown.test_cases_needed > 0
+                                        ? `Add ${run.score_breakdown.test_cases_needed} more test case${run.score_breakdown.test_cases_needed > 1 ? 's' : ''} to reach full confidence.`
+                                        : `Increase to ${3} runs per test case to reach full confidence.`
+                                    }
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                            {_renderConfigDetails(run.extraction_config)}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </tbody>
+            </table>
+          )}
         </div>
       )}
+
+      {/* Submit to public library nudge — shown directly after suggestions/history, not in results */}
+      {results && (() => {
+        // Use the actual quality score (includes sample size penalty) if available
+        const latestScore = qualityHistory.length > 0 ? qualityHistory[0].score : null
+        const displayScore = latestScore ?? Math.round((results.executive_summary.mean_accuracy ?? 0) * 60 + (results.executive_summary.mean_consistency ?? 0) * 40)
+        if (displayScore < 80) return null
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 12,
+            padding: '12px 16px', borderRadius: 8,
+            backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
+          }}>
+            <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
+            <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
+              <strong>Great results!</strong> This extraction scored {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
+            </div>
+            {submitLibraryResult === 'success' ? (
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+            ) : (
+              <button
+                disabled={submittingToLibrary}
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  setSubmittingToLibrary(true)
+                  try {
+                    await submitForVerification({
+                      item_kind: 'search_set',
+                      item_id: searchSetUuid,
+                    })
+                    setSubmitLibraryResult('success')
+                  } catch {
+                    setSubmitLibraryResult('error')
+                  } finally {
+                    setSubmittingToLibrary(false)
+                  }
+                }}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
+                  color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
+                  opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
+                }}
+              >
+                {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
+              </button>
+            )}
+          </div>
+        )
+      })()}
 
       {/* 4. Results — Executive Summary */}
       {results && (
@@ -2467,57 +2809,6 @@ function ValidateTab({
               </div>
             </div>
           </div>
-
-          {/* Submit to public library nudge */}
-          {(() => {
-            const acc = results.executive_summary.mean_accuracy ?? 0
-            const con = results.executive_summary.mean_consistency ?? 0
-            const unified = acc * 60 + con * 40
-            if (unified < 80) return null
-            return (
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 12,
-                padding: '12px 16px', borderRadius: 8,
-                backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
-              }}>
-                <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
-                <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
-                  <strong>Great results!</strong> This extraction scored {Math.round(unified)}%. Consider sharing it with the public library so others can benefit.
-                </div>
-                {submitLibraryResult === 'success' ? (
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
-                ) : (
-                  <button
-                    disabled={submittingToLibrary}
-                    onClick={async (e) => {
-                      e.stopPropagation()
-                      setSubmittingToLibrary(true)
-                      try {
-                        await submitForVerification({
-                          item_kind: 'search_set',
-                          item_id: searchSetUuid,
-                        })
-                        setSubmitLibraryResult('success')
-                      } catch {
-                        setSubmitLibraryResult('error')
-                      } finally {
-                        setSubmittingToLibrary(false)
-                      }
-                    }}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                      color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
-                      opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
-                  </button>
-                )}
-              </div>
-            )
-          })()}
 
           {/* 5. Per-Run Reproducibility */}
           {results.executive_summary.per_run_reproducibility.length > 0 && (
@@ -2686,66 +2977,90 @@ function ValidateTab({
             </div>
           )}
 
-          {/* 9. LLM Suggestions */}
-          {results.aggregate_accuracy !== null && (
-            results.aggregate_accuracy < 0.9 || results.aggregate_consistency < 0.9
-          ) && (
-            <div style={{
-              border: '1px solid #fde68a', borderRadius: 8, padding: 16,
-              backgroundColor: '#fffbeb',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
-                  <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
-                </div>
-                {!suggestions && (
-                  <button
-                    onClick={handleGetSuggestions}
-                    disabled={loadingSuggestions}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                      borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
-                      color: '#92400e', cursor: loadingSuggestions ? 'not-allowed' : 'pointer',
-                      opacity: loadingSuggestions ? 0.6 : 1,
-                    }}
-                  >
-                    {loadingSuggestions ? (
-                      <><Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> Analyzing...</>
-                    ) : (
-                      'Get AI Suggestions'
-                    )}
-                  </button>
-                )}
-              </div>
-              {suggestions && (
-                <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                  {suggestions}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 
       {/* Document Picker Dialog */}
       {showDocPicker && (
         <DocumentPickerDialog
-          onSelect={addDocuments}
+          onSelect={(docs) => {
+            setShowDocPicker(false)
+            setPendingDocs(docs)
+          }}
           onClose={() => setShowDocPicker(false)}
           excludeUuids={existingUuids}
         />
+      )}
+
+      {/* Auto-populate prompt after selecting documents */}
+      {pendingDocs && (
+        <div style={{
+          position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        }}>
+          <div style={{
+            backgroundColor: '#fff', borderRadius: 12, padding: 24, maxWidth: 440, width: '90%',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#202124', marginBottom: 8 }}>
+              Auto-populate expected values?
+            </div>
+            <div style={{ fontSize: 13, color: '#5f6368', lineHeight: 1.6, marginBottom: 20 }}>
+              Run extraction on {pendingDocs.length === 1 ? 'this document' : `these ${pendingDocs.length} documents`} and
+              use the results as expected values. You can review and correct them afterwards.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                disabled={autoFilling}
+                onClick={() => {
+                  const docs = pendingDocs
+                  setPendingDocs(null)
+                  addDocuments(docs, false)
+                }}
+                style={{
+                  padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                No, add empty
+              </button>
+              <button
+                disabled={autoFilling}
+                onClick={() => {
+                  const docs = pendingDocs
+                  setPendingDocs(null)
+                  addDocuments(docs, true)
+                }}
+                style={{
+                  padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                  borderRadius: 8, border: 'none',
+                  backgroundColor: '#191919', color: '#fff',
+                  cursor: autoFilling ? 'not-allowed' : 'pointer',
+                  opacity: autoFilling ? 0.6 : 1,
+                }}
+              >
+                {autoFilling ? 'Extracting...' : 'Yes, auto-populate'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
 }
 
 function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
-  const data = [...runs].reverse().map(r => ({
-    date: new Date(r.created_at).toLocaleDateString(),
-    score: Math.round(r.score),
-  }))
+  const data = [...runs].reverse().map(r => {
+    // Use raw score (pre-penalty) for the chart so users see actual quality
+    const rawScore = r.score_breakdown?.raw_score ?? r.score
+    return {
+      date: new Date(r.created_at).toLocaleDateString(),
+      score: Math.round(rawScore),
+      adjusted: Math.round(r.score),
+      hasPenalty: r.score_breakdown ? r.score_breakdown.sample_size_penalty > 0 : false,
+    }
+  })
 
   const latestScore = data.length > 0 ? data[data.length - 1].score : 0
   const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#d97706' : '#dc2626'
@@ -2758,9 +3073,12 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
-          formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Score']}
+          formatter={(value: number | undefined, name: string) => {
+            const label = name === 'score' ? 'Quality' : 'Adjusted'
+            return [`${value ?? 0}%`, label]
+          }}
         />
-        <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} />
+        <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} name="score" />
       </LineChart>
     </ResponsiveContainer>
   )

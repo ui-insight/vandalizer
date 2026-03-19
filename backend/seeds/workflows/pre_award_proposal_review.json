@@ -1,0 +1,54 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-pre-award-proposal-review",
+    "display_name": "Proposal Readiness Review",
+    "description": "Scans a proposal draft and produces a readiness checklist identifying missing sections, incomplete information, and formatting issues before submission.",
+    "quality_tier": "gold",
+    "collections": ["pre-award"]
+  },
+  "items": [
+    {
+      "name": "Proposal Readiness Review",
+      "description": "Analyzes a proposal draft for completeness and produces a structured readiness checklist with gaps identified.",
+      "steps": [
+        {
+          "name": "Document",
+          "data": {},
+          "is_output": false,
+          "tasks": []
+        },
+        {
+          "name": "Extract Proposal Metadata",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Extraction",
+              "data": {
+                "searchphrases": "PI Name, Co-PI Names, Sponsor Agency, Program/FOA Number, Submission Deadline, Budget Total, Project Title, Project Period, Abstract, Budget Justification Present, Facilities Description Present, Data Management Plan Present, References Present, Biographical Sketches Present, Current and Pending Support Present"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness Analysis",
+          "data": {},
+          "is_output": true,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are a research administration specialist performing a proposal readiness review. Given the extracted proposal metadata and the full document text, produce a Proposal Readiness Checklist.\n\nFor each of the following categories, rate as **Complete**, **Incomplete**, or **Missing** and provide a brief explanation:\n\n1. **Investigator Information** - PI and Co-PI names, roles, and institutional affiliations\n2. **Sponsor & Program Identification** - Agency, FOA/program number, submission deadline\n3. **Project Narrative** - Abstract, project description, specific aims\n4. **Budget** - Budget total, budget justification, cost categories\n5. **Timeline** - Project period, milestones\n6. **Required Attachments** - Biographical sketches, current & pending support, facilities, data management plan, references\n7. **Compliance** - Human subjects, animal use, export control considerations mentioned\n\nEnd with:\n- **Overall Readiness Score**: Ready / Needs Work / Not Ready\n- **Prioritized Action Items**: Numbered list of what must be addressed before submission",
+                "input_source": "workflow_documents"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

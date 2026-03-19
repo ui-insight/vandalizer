@@ -26,6 +26,7 @@ from app.models.chat import (
 )
 from app.models.user import User
 from app.schemas.chat import AddLinkRequest, ChatDownloadRequest, ChatRequest
+from app.services import access_control, organization_service
 from app.services import activity_service
 from app.services.chat_service import chat_stream
 
@@ -47,6 +48,32 @@ async def chat(
     message = body.message
     activity_id = body.activity_id
     document_uuids = list(body.document_uuids)
+    team_access = await access_control.get_team_access_context(user)
+
+    authorized_document_uuids: list[str] = []
+    for doc_uuid in document_uuids:
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
+        authorized_document_uuids.append(doc.uuid)
+    document_uuids = authorized_document_uuids
+
+    if body.knowledge_base_uuid:
+        user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+        kb = await access_control.get_authorized_knowledge_base(
+            body.knowledge_base_uuid,
+            user,
+            user_org_ancestry=user_org_ancestry,
+            allow_admin=True,
+            team_access=team_access,
+        )
+        if not kb:
+            raise HTTPException(status_code=404, detail="Knowledge base not found")
 
     # Resolve folder selections: find all documents inside selected folders
     if body.folder_uuids:
@@ -54,11 +81,27 @@ async def chat(
 
         existing = set(document_uuids)
         for folder_uuid in body.folder_uuids:
+            folder = await access_control.get_authorized_folder(
+                folder_uuid,
+                user,
+                team_access=team_access,
+                allow_admin=True,
+            )
+            if not folder:
+                raise HTTPException(status_code=404, detail=f"Folder not found: {folder_uuid}")
             folder_docs = await SmartDocument.find(
                 SmartDocument.folder == folder_uuid,
             ).limit(500).to_list()
             for doc in folder_docs:
-                if doc.uuid not in existing:
+                if (
+                    doc.uuid not in existing
+                    and access_control.can_view_document(
+                        doc,
+                        user,
+                        team_access,
+                        allow_admin=True,
+                    )
+                ):
                     document_uuids.append(doc.uuid)
                     existing.add(doc.uuid)
 

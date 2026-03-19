@@ -1,0 +1,29 @@
+{
+  "collections": [
+    {
+      "slug": "pre-award",
+      "title": "Pre-Award & Proposal Development",
+      "description": "Workflows for proposal preparation, budget analysis, and sponsor compliance checking."
+    },
+    {
+      "slug": "post-award",
+      "title": "Award Management & Post-Award",
+      "description": "Tools for progress reporting, closeout procedures, and cost share tracking."
+    },
+    {
+      "slug": "compliance",
+      "title": "Compliance & Regulatory",
+      "description": "Workflows for conflict of interest review, export control screening, and IRB protocol analysis."
+    },
+    {
+      "slug": "financial",
+      "title": "Financial Management",
+      "description": "Budget reconciliation, cost allocation analysis, and F&A rate validation."
+    },
+    {
+      "slug": "federal-agency",
+      "title": "Federal Agency Templates",
+      "description": "Extraction templates for NSF, NIH, DOD, and DOE award documents."
+    }
+  ]
+}

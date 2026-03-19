@@ -12,7 +12,8 @@ from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.user import User
-from app.services.access_control import get_authorized_workflow
+from app.services import access_control
+from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.schemas.workflows import (
     AddStepRequest,
     AddTaskRequest,
@@ -37,6 +38,22 @@ from app.rate_limit import limiter
 from app.services import workflow_service as svc
 
 router = APIRouter()
+
+
+async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
+    team_access = await access_control.get_team_access_context(user)
+    authorized: list[str] = []
+    for doc_uuid in document_uuids:
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
+        authorized.append(doc.uuid)
+    return authorized
 
 
 # ---------------------------------------------------------------------------
@@ -72,8 +89,7 @@ async def list_workflows(
 
 @router.get("/status", response_model=WorkflowStatusResponse)
 async def get_workflow_status(session_id: str, user: User = Depends(get_current_user)):
-    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
-    status = await svc.get_workflow_status(session_id)
+    status = await svc.get_workflow_status(session_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
     return WorkflowStatusResponse(**status)
@@ -81,8 +97,7 @@ async def get_workflow_status(session_id: str, user: User = Depends(get_current_
 
 @router.get("/batch-status", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)):
-    # TODO: authorize by tracing batch_id → WorkflowResult → Workflow ownership
-    status = await svc.get_batch_status(batch_id)
+    status = await svc.get_batch_status(batch_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Batch not found")
     return status
@@ -91,13 +106,15 @@ async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)
 @router.get("/status/stream")
 async def stream_workflow_status(session_id: str, user: User = Depends(get_current_user)):
     """SSE endpoint that streams workflow status updates until completion."""
-    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
+    initial_status = await svc.get_workflow_status(session_id, user=user)
+    if not initial_status:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
 
     async def event_generator():
         last_json = ""
         not_found_retries = 0
         while True:
-            status = await svc.get_workflow_status(session_id)
+            status = await svc.get_workflow_status(session_id, user=user)
             if not status:
                 not_found_retries += 1
                 # Allow a few retries for the workflow result to appear in the DB
@@ -141,8 +158,7 @@ async def download_results(
     user: User = Depends(get_current_user),
 ):
     """Download workflow results in specified format."""
-    # TODO: authorize by tracing session_id → WorkflowResult → Workflow ownership
-    status = await svc.get_workflow_status(session_id)
+    status = await svc.get_workflow_status(session_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
@@ -310,7 +326,7 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
 @router.post("/import")
 async def import_workflow(
     file: UploadFile = File(...),
-    space: str = Form("default"),
+    space: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
     """Import a workflow from an exported JSON file."""
@@ -441,6 +457,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    document_uuids = await _authorize_documents(req.document_uuids, user)
     initial_title = wf.name if wf else "Workflow Run"
     # steps count excludes the trigger step
     num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0
@@ -455,16 +472,16 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     )
 
     try:
-        if req.batch_mode and len(req.document_uuids) > 1:
+        if req.batch_mode and len(document_uuids) > 1:
             batch_id = await svc.run_workflow_batch(
-                workflow_id, req.document_uuids, user.user_id, req.model,
+                workflow_id, document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
                 user=user,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:
             session_id = await svc.run_workflow(
-                workflow_id, req.document_uuids, user.user_id, req.model,
+                workflow_id, document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
                 user=user,
             )
@@ -478,8 +495,15 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
 @router.post("/steps/test")
 @limiter.limit("20/minute")
 async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+    if req.task_name == "Extraction":
+        search_set_uuid = (req.task_data or {}).get("search_set_uuid")
+        if search_set_uuid:
+            ss = await get_authorized_search_set(search_set_uuid, user)
+            if not ss:
+                raise HTTPException(status_code=404, detail="Search set not found")
     task_id = await svc.test_step(
-        req.task_name, req.task_data, req.document_uuids, user.user_id, req.model
+        req.task_name, req.task_data, document_uuids, user.user_id, req.model
     )
     return {"task_id": task_id}
 
@@ -608,6 +632,42 @@ async def validate_workflow(workflow_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{workflow_id}/save-expected-output")
+async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
+    """Mark a completed workflow execution as expected output for validation."""
+    body = await request.json()
+    session_id = body.get("session_id")
+    label = body.get("label")
+    if not session_id:
+        raise HTTPException(status_code=400, detail="session_id is required")
+    try:
+        result = await svc.save_expected_output(workflow_id, session_id, user, label=label)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{workflow_id}/expected-outputs")
+async def get_expected_outputs(workflow_id: str, user: User = Depends(get_current_user)):
+    """List stored expected outputs for a workflow."""
+    try:
+        outputs = await svc.get_expected_outputs(workflow_id, user)
+        return {"expected_outputs": outputs}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.delete("/{workflow_id}/expected-outputs/{expected_id}")
+async def delete_expected_output(
+    workflow_id: str, expected_id: str, user: User = Depends(get_current_user),
+):
+    """Remove a stored expected output."""
+    ok = await svc.delete_expected_output(workflow_id, expected_id, user)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Expected output not found")
+    return {"ok": True}
+
+
 # ---------------------------------------------------------------------------
 # External API integration endpoints (x-api-key auth)
 # ---------------------------------------------------------------------------
@@ -676,6 +736,7 @@ async def run_workflow_integrated(
         type=ActivityType.WORKFLOW_RUN,
         title=f"API Workflow {workflow_id}",
         user_id=user.user_id,
+        workflow=PydanticObjectId(workflow_id),
     )
 
     try:

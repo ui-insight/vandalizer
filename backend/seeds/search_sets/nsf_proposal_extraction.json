@@ -1,0 +1,48 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "search_set",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "ss-nsf-proposal",
+    "display_name": "NSF Proposal Extraction Template",
+    "description": "Extract standard fields from NSF grant proposals and award documents including budget categories per the NSF PAPPG.",
+    "quality_tier": "gold",
+    "domain": "nsf",
+    "collections": ["federal-agency"]
+  },
+  "items": [
+    {
+      "title": "NSF Grant Proposal",
+      "set_type": "extraction",
+      "extraction_config": {},
+      "items": [
+        {"searchphrase": "Award Number", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "PI Name", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Co-PI Names", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Institution", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "NSF Directorate", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "NSF Division", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Program Officer", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Award Amount", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Award Start Date", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Award End Date", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Project Title", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Abstract", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Senior Personnel Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Other Personnel Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Fringe Benefits", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Equipment", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Travel Domestic", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Travel Foreign", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Participant Support Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Other Direct Costs", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Direct Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Indirect Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Indirect Cost Rate", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Project Cost", "searchtype": "extraction", "is_optional": false, "enum_values": []}
+      ],
+      "test_cases": []
+    }
+  ]
+}

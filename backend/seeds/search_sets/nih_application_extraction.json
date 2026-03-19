@@ -1,0 +1,44 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "search_set",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "ss-nih-application",
+    "display_name": "NIH Application Extraction Template",
+    "description": "Extract standard fields from NIH grant applications and awards including activity codes, scores, and PHS 398 budget categories.",
+    "quality_tier": "gold",
+    "domain": "nih",
+    "collections": ["federal-agency"]
+  },
+  "items": [
+    {
+      "title": "NIH Grant Application",
+      "set_type": "extraction",
+      "extraction_config": {},
+      "items": [
+        {"searchphrase": "Grant Number", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Activity Code", "searchtype": "extraction", "is_optional": false, "enum_values": ["R01", "R21", "R03", "R15", "K99", "R00", "U01", "P01", "T32", "F31", "F32", "K01", "K08", "K23"]},
+        {"searchphrase": "PI Name", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Co-Investigators", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Institution", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "NIH Institute/Center", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Study Section", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Impact Score", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Percentile", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "FOA Number", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Project Title", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Project Period Start", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Project Period End", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Total Direct Costs Year 1", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Indirect Costs Year 1", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Costs Year 1", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Total Project Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
+        {"searchphrase": "Specific Aims", "searchtype": "extraction", "is_optional": true, "enum_values": []},
+        {"searchphrase": "Human Subjects", "searchtype": "extraction", "is_optional": false, "enum_values": ["Yes", "No"]},
+        {"searchphrase": "Vertebrate Animals", "searchtype": "extraction", "is_optional": false, "enum_values": ["Yes", "No"]}
+      ],
+      "test_cases": []
+    }
+  ]
+}

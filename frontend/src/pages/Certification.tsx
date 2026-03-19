@@ -556,23 +556,23 @@ export const MODULES: ModuleDefinition[] = [
     description: 'The final module before your Vandal Workflow Architect certification. Demonstrate that you can organize, verify, and share production-ready workflows across your team. Complete this and you earn your VWA credential.',
     objectives: [
       'Mark a workflow as verified in the workflow settings',
-      'Use workflows across 2+ different spaces',
+      'Use workflows across personal and team contexts',
       'No new documents needed - uses workflows you have already built',
     ],
     tips: [
-      'Create a second space from the Spaces page if you only have one',
+      'Switch into a shared team if you want to practice collaboration flows',
       'Export workflows as .vandalizer.json files to share with teammates',
       'Verified workflows signal to your team that a workflow is production-ready',
     ],
     lessons: [
       {
-        title: 'Organizing with spaces',
-        content: 'As your team builds more workflows, organization becomes critical. Spaces provide logical grouping for documents, workflows, and folders.\n\nThink of spaces like projects or departments:\n\u2022 "NSF Grants" \u2014 All workflows and documents related to NSF grant processing.\n\u2022 "Compliance" \u2014 Workflows for compliance review across all agencies.\n\u2022 "Internal Reports" \u2014 Workflows for generating internal summaries.',
+        title: 'Organizing for reuse',
+        content: 'As your team builds more workflows, organization becomes critical. Use personal work for drafting, then move the workflows your team should reuse into shared team libraries and verified collections.\n\nThink about organization in terms of ownership and audience:\n\u2022 **Personal work** \u2014 early drafts, experiments, and one-off variations.\n\u2022 **Team libraries** \u2014 shared workflows your group actively maintains.\n\u2022 **Verified collections** \u2014 approved workflows that set team standards.',
         variant: 'concept',
       },
       {
         title: 'Key terms',
-        content: 'Space \u2014 A logical grouping of documents, workflows, and folders.\n\nVerified \u2014 A flag indicating the workflow has been tested, validated, and approved for production use.\n\nExport (.vandalizer.json) \u2014 A JSON file containing the complete workflow definition. Can be shared and imported.\n\nTeam \u2014 A group of users who share access to spaces and workflows. Members have roles: owner, admin, or member.',
+        content: 'Personal work \u2014 Workflows and resources that only you can see and edit.\n\nVerified \u2014 A flag indicating the workflow has been tested, validated, and approved for production use.\n\nExport (.vandalizer.json) \u2014 A JSON file containing the complete workflow definition. Can be shared and imported.\n\nTeam \u2014 A group of users who share access to team workflows, libraries, and folders. Members have roles: owner, admin, or member.',
         variant: 'key-terms',
       },
       {
@@ -582,12 +582,12 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Sharing workflows across teams',
-        content: 'Workflows can be shared in two ways:\n\n\u2022 **Same team, different spaces** \u2014 Duplicate workflows across spaces and adapt them.\n\u2022 **Cross-team sharing via export/import** \u2014 Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nSharing verified workflows establishes organizational standards.',
+        content: 'Workflows can be shared in two ways:\n\n\u2022 **Within the same team** \u2014 Duplicate or adapt workflows inside the team workspace and library.\n\u2022 **Cross-team sharing via export/import** \u2014 Export a workflow as a .vandalizer.json file. Send it to a colleague, who can import it.\n\nSharing verified workflows establishes organizational standards.',
         variant: 'concept',
       },
       {
         title: 'Establish your workflow governance',
-        content: '1. If you don\'t already have multiple spaces, create a second space.\n2. Build or duplicate a workflow in this new space.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes.\n5. Mark the workflow as verified in the workflow settings.\n6. Try exporting and importing the workflow.\n7. You now have a verified, portable, well-documented workflow.',
+        content: '1. Pick a workflow that is ready to share beyond your personal work.\n2. Build or duplicate that workflow into the team context where others should reuse it.\n3. Make sure your workflow has a clear description.\n4. If you completed Module 8, ensure your validation plan passes.\n5. Mark the workflow as verified in the workflow settings.\n6. Try exporting and importing the workflow.\n7. You now have a verified, portable, well-documented workflow.',
         variant: 'walkthrough',
       },
       {

@@ -265,7 +265,7 @@ class TestReject:
 class TestAuthorizationChecks:
     @pytest.mark.asyncio
     async def test_unassigned_user_on_assigned_approval_gets_403(self, client):
-        """A non-admin user not in assigned_to_user_ids is rejected with 403."""
+        """A non-admin user not assigned and not managing the workflow is rejected."""
         user = _make_user(user_id="outsider", is_admin=False)
         cookies, headers = _auth("outsider")
 
@@ -276,9 +276,14 @@ class TestAuthorizationChecks:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.approvals.ApprovalRequest") as MockApproval:
+             patch("app.routers.approvals.ApprovalRequest") as MockApproval, \
+             patch(
+                 "app.routers.approvals.access_control.get_authorized_workflow",
+                 new_callable=AsyncMock,
+             ) as mock_get_workflow:
             MockUser.find_one = AsyncMock(return_value=user)
             MockApproval.find_one = AsyncMock(return_value=approval)
+            mock_get_workflow.return_value = None
 
             resp = await client.post(
                 "/api/approvals/approval-uuid-1/approve",
@@ -288,4 +293,89 @@ class TestAuthorizationChecks:
             )
 
         assert resp.status_code == 403
-        assert "Not assigned" in resp.json()["detail"]
+        assert "Not authorized" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_unrelated_user_cannot_view_unassigned_approval(self, client):
+        user = _make_user(user_id="outsider", is_admin=False)
+        cookies, headers = _auth("outsider")
+        approval = _make_approval(status="pending", assigned_to_user_ids=[])
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.approvals.ApprovalRequest") as MockApproval, \
+             patch(
+                 "app.routers.approvals.access_control.get_authorized_workflow",
+                 new_callable=AsyncMock,
+             ) as mock_get_workflow:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockApproval.find_one = AsyncMock(return_value=approval)
+            mock_get_workflow.return_value = None
+
+            resp = await client.get(
+                "/api/approvals/approval-uuid-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_workflow_manager_can_approve_unassigned_approval(self, client):
+        user = _make_user(user_id="owner", is_admin=False)
+        cookies, headers = _auth("owner")
+        approval = _make_approval(status="pending", assigned_to_user_ids=[])
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "owner", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.approvals.ApprovalRequest") as MockApproval, \
+             patch("app.routers.approvals.audit_service") as mock_audit, \
+             patch("app.celery_app.celery") as mock_celery, \
+             patch(
+                 "app.routers.approvals.access_control.get_authorized_workflow",
+                 new_callable=AsyncMock,
+             ) as mock_get_workflow:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockApproval.find_one = AsyncMock(return_value=approval)
+            mock_get_workflow.return_value = object()
+            mock_audit.log_event = AsyncMock()
+
+            resp = await client.post(
+                "/api/approvals/approval-uuid-1/approve",
+                json={"comments": "Owner approved"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert approval.status == "approved"
+        approval.save.assert_awaited_once()
+        mock_celery.send_task.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_count_excludes_unrelated_unassigned_approvals(self, client):
+        user = _make_user(user_id="outsider", is_admin=False)
+        cookies, headers = _auth("outsider")
+        approval = _make_approval(status="pending", assigned_to_user_ids=[])
+        mock_query = MagicMock()
+        mock_query.to_list = AsyncMock(return_value=[approval])
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.approvals.ApprovalRequest") as MockApproval, \
+             patch(
+                 "app.routers.approvals.access_control.get_authorized_workflow",
+                 new_callable=AsyncMock,
+             ) as mock_get_workflow:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockApproval.find = MagicMock(return_value=mock_query)
+            mock_get_workflow.return_value = None
+
+            resp = await client.get(
+                "/api/approvals/count",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["count"] == 0
