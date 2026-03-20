@@ -44,3 +44,8 @@ htmlcov/
 backend/data/chromadb/
 frontend/.vite/
 node_modules/
+
+# Internal planning docs (not for public release)
+deploy_roadmap.md
+risk-plan.md
+status.sh

@@ -4,9 +4,7 @@
 
 **Please do not file public GitHub issues for security vulnerabilities.**
 
-If you discover a security vulnerability in Vandalizer, please report it responsibly by emailing:
-
-**jbrunsfeld@uidaho.edu**
+If you discover a security vulnerability in Vandalizer, please report it responsibly using [GitHub Security Advisories](https://github.com/ui-insight/vandalizer/security/advisories/new).
 
 ### What to include
 

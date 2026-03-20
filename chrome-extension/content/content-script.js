@@ -35,8 +35,8 @@ class BrowserAutomationContent {
         const title = document.title.toLowerCase();
 
         const loginIndicators = [
-            '/login', '/signin', '/auth/login', 'sso.uidaho.edu',
-            'duosecurity.com', 'shibboleth'
+            '/login', '/signin', '/auth/login',
+            'duosecurity.com', 'shibboleth', '/saml/', '/adfs/', '/cas/login'
         ];
 
         const isLoginPage = loginIndicators.some(indicator => url.includes(indicator)) ||

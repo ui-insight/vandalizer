@@ -61,6 +61,8 @@ docker compose down
 
 For backup, restore, upgrade, and rollback of the current Docker Compose install path, use [OPERATIONS.md](OPERATIONS.md).
 
+Before tagging or handing off an operator-facing release, use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) to rehearse the bootstrap flow and curate the matching release notes.
+
 To stop all services:
 ```bash
 docker compose down
@@ -144,7 +146,7 @@ MONGO_DB=osp
 REDIS_HOST=redis
 JWT_SECRET_KEY=<generate-a-strong-random-secret>
 UPLOAD_DIR=/app/static/uploads
-FRONTEND_URL=https://vandalizer.uidaho.edu
+FRONTEND_URL=https://vandalizer.example.edu
 ENVIRONMENT=production
 OPENAI_API_KEY=<your-key>
 CHROMADB_PERSIST_DIR=../app/static/db
@@ -301,13 +303,13 @@ Create `nginx.conf` at the repo root:
 ```nginx
 server {
     listen 80;
-    server_name vandalizer.uidaho.edu;
+    server_name vandalizer.example.edu;
     return 301 https://$host$request_uri;
 }
 
 server {
     listen 443 ssl;
-    server_name vandalizer.uidaho.edu;
+    server_name vandalizer.example.edu;
 
     ssl_certificate     /etc/nginx/certs/cert.pem;
     ssl_certificate_key /etc/nginx/certs/key.pem;
@@ -355,7 +357,7 @@ docker compose build api
 docker compose up -d api nginx
 
 # 3. Verify
-curl -k https://vandalizer.uidaho.edu/api/health
+curl -k https://vandalizer.example.edu/api/health
 # → {"status":"ok"}
 ```
 
