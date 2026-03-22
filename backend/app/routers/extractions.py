@@ -3,6 +3,7 @@
 import json
 from typing import Optional
 
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -658,7 +659,12 @@ async def get_extraction_status(
     user: User = Depends(get_api_key_user),
 ):
     """Check extraction status by activity ID."""
-    activity = await activity_service.get_activity(activity_id, user.user_id)
+    try:
+        activity_oid = PydanticObjectId(activity_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Activity not found") from exc
+
+    activity = await activity_service.get_activity(activity_oid, user.user_id)
     if not activity:
         raise HTTPException(status_code=404, detail="Activity not found")
     return {

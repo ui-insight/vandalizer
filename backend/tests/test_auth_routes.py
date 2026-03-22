@@ -230,7 +230,7 @@ class TestAuthRegister:
             mock_svc.register = AsyncMock(return_value=user)
             resp = await client.post("/api/auth/register", json={
                 "email": "new@example.com",
-                "password": "strong-password",
+                "password": "StrongPass1",
                 "name": "New User",
             })
 
@@ -244,7 +244,7 @@ class TestAuthRegister:
             mock_svc.register = AsyncMock(side_effect=ValueError("User already exists"))
             resp = await client.post("/api/auth/register", json={
                 "email": "existing@example.com",
-                "password": "password",
+                "password": "StrongPass1",
             })
 
         assert resp.status_code == 400

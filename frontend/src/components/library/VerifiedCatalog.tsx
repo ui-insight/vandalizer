@@ -8,7 +8,7 @@ import type { VerifiedCatalogItem, VerifiedCollection } from '../../types/librar
 import { listOrganizationsFlat } from '../../api/organizations'
 import type { Organization } from '../../api/organizations'
 
-type KindFilter = '' | 'workflow' | 'search_set'
+type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
 
 function meetsQualityFilter(tier: string | null, filter: QualityFilter): boolean {
@@ -19,14 +19,23 @@ function meetsQualityFilter(tier: string | null, filter: QualityFilter): boolean
 }
 
 function KindBadge({ kind }: { kind: string }) {
-  const isWorkflow = kind === 'workflow'
+  if (kind === 'workflow') {
+    return (
+      <span className="text-xs px-2 py-0.5 rounded border bg-purple-50 text-purple-700 border-purple-200">
+        Workflow
+      </span>
+    )
+  }
+  if (kind === 'knowledge_base') {
+    return (
+      <span className="text-xs px-2 py-0.5 rounded border bg-sky-50 text-sky-700 border-sky-200">
+        Knowledge Base
+      </span>
+    )
+  }
   return (
-    <span className={`text-xs px-2 py-0.5 rounded border ${
-      isWorkflow
-        ? 'bg-purple-50 text-purple-700 border-purple-200'
-        : 'bg-teal-50 text-teal-700 border-teal-200'
-    }`}>
-      {isWorkflow ? 'Workflow' : 'Extraction'}
+    <span className="text-xs px-2 py-0.5 rounded border bg-teal-50 text-teal-700 border-teal-200">
+      Extraction
     </span>
   )
 }
@@ -309,7 +318,7 @@ export function VerifiedCatalog() {
           />
         </div>
         <div className="flex items-center gap-2">
-          {([['', 'All'], ['workflow', 'Workflows'], ['search_set', 'Extractions']] as [KindFilter, string][]).map(([val, label]) => (
+          {([['', 'All'], ['workflow', 'Workflows'], ['search_set', 'Extractions'], ['knowledge_base', 'Knowledge Bases']] as [KindFilter, string][]).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setKindFilter(val)}
@@ -408,6 +417,16 @@ export function VerifiedCatalog() {
                   </div>
                   {item.description && (
                     <p className="text-xs text-gray-600 line-clamp-2">{item.description}</p>
+                  )}
+                  {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (
+                    <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500">
+                      {item.total_sources != null && (
+                        <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>
+                      )}
+                      {item.total_chunks != null && (
+                        <span>{item.total_chunks.toLocaleString()} chunks</span>
+                      )}
+                    </div>
                   )}
                   {item.tags.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-2">

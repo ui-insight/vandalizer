@@ -1,6 +1,5 @@
 """LLM service  - provider classes and agent creation, ported from agents.py."""
 
-import os
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,7 +14,7 @@ from pydantic_ai.profiles.openai import (
 from pydantic_ai.providers.openrouter import OpenRouterProvider
 from pydantic_ai.tools import RunContext
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+from app.utils.encryption import decrypt_value
 
 # ---------------------------------------------------------------------------
 # Agent caches  - prevent context leaks across requests
@@ -206,8 +205,9 @@ def get_agent_model(
     if thinking_override is not None:
         thinking_enabled = thinking_override
 
-    # Resolve per-model API key, falling back to env var or placeholder
-    api_key = (model_config.get("api_key", "") if model_config else "") or OPENAI_API_KEY or "no-api-key"
+    # Resolve per-model API key from system config (decrypt if encrypted)
+    raw_key = (model_config.get("api_key", "") if model_config else "") or ""
+    api_key = decrypt_value(raw_key) if raw_key else "no-api-key"
 
     endpoint = _get_model_endpoint_sync(agent_model, system_config_doc)
     api_protocol = detect_api_protocol(agent_model, model_config)

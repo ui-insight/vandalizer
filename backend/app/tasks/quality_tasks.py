@@ -113,9 +113,51 @@ async def _quality_monitor_async():
         ).to_list()
 
         from app.models.extraction_test_case import ExtractionTestCase
+        from app.models.kb_test_query import KBTestQuery
         from app.services import extraction_validation_service
 
         for meta in items_to_revalidate:
+            if meta.item_kind == "knowledge_base":
+                # Auto-revalidate knowledge bases
+                test_queries = await KBTestQuery.find(
+                    KBTestQuery.knowledge_base_uuid == meta.item_id,
+                ).to_list()
+                if not test_queries:
+                    continue
+                try:
+                    prev_score = meta.quality_score
+                    prev_tier = meta.quality_tier
+
+                    from app.services import kb_validation_service
+                    await kb_validation_service.run_kb_validation(
+                        kb_uuid=meta.item_id,
+                        user_id="system",
+                    )
+
+                    await meta.sync()
+                    if prev_score is not None and meta.quality_score is not None:
+                        delta = prev_score - meta.quality_score
+                        if delta >= degradation_threshold:
+                            await QualityAlert(
+                                alert_type="regression",
+                                item_kind=meta.item_kind,
+                                item_id=meta.item_id,
+                                item_name=meta.display_name or meta.item_id,
+                                severity="critical" if delta >= 20 else "warning",
+                                message=f"Quality dropped by {delta:.1f} points ({prev_score:.1f} -> {meta.quality_score:.1f})",
+                                previous_score=prev_score,
+                                current_score=meta.quality_score,
+                                previous_tier=prev_tier,
+                                current_tier=meta.quality_tier,
+                                created_at=now,
+                            ).insert()
+                except Exception as e:
+                    logger.warning(
+                        "Auto-revalidation failed for knowledge_base %s: %s",
+                        meta.item_id, e,
+                    )
+                continue
+
             if meta.item_kind != "search_set":
                 continue
             # Only revalidate if test cases exist

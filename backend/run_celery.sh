@@ -38,11 +38,11 @@ case "${1:-help}" in
     start)
         echo "Starting Celery workers for vandalizer-next..."
 
-        start_worker "documents" "documents" 3
-        start_worker "workflows" "workflows" 2
-        start_worker "uploads"   "uploads"   2
-        start_worker "passive"   "passive"   1
-        start_worker "default"   "default"   1
+        start_worker "documents" "documents" 8
+        start_worker "workflows" "workflows" 6
+        start_worker "uploads"   "uploads"   4
+        start_worker "passive"   "passive"   2
+        start_worker "default"   "default"   2
 
         echo "Starting Celery Beat..."
         celery -A "$CELERY_APP" beat \

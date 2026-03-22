@@ -10,6 +10,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
+from app.services.access_control import TeamAccessContext
 from app.utils.security import create_access_token
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
@@ -33,6 +34,41 @@ def _auth(user_id="testuser"):
     token = create_access_token(user_id, _TEST_SETTINGS)
     csrf = secrets.token_urlsafe(32)
     return {"access_token": token, "csrf_token": csrf}, {"X-CSRF-Token": csrf}
+
+
+def _make_document(
+    doc_uuid="doc-uuid",
+    *,
+    user_id="testuser",
+    team_id=None,
+    title="Test Document",
+    classification=None,
+    retention_hold=False,
+):
+    doc = MagicMock()
+    doc.uuid = doc_uuid
+    doc.user_id = user_id
+    doc.team_id = team_id
+    doc.title = title
+    doc.classification = classification
+    doc.classification_confidence = None
+    doc.classified_at = None
+    doc.classified_by = None
+    doc.retention_hold = retention_hold
+    doc.retention_hold_reason = None
+    doc.scheduled_deletion_at = "scheduled" if retention_hold else None
+    doc.save = AsyncMock()
+    return doc
+
+
+def _team_access(*, roles_by_uuid=None):
+    roles_by_uuid = roles_by_uuid or {}
+    return TeamAccessContext(
+        team_uuids=set(roles_by_uuid.keys()),
+        team_object_ids=set(),
+        roles_by_uuid=roles_by_uuid,
+        roles_by_object_id={},
+    )
 
 
 @pytest.fixture
@@ -142,3 +178,229 @@ class TestDocumentSearch:
     async def test_search_unauthenticated(self, client):
         resp = await client.get("/api/documents/search?q=test")
         assert resp.status_code == 401
+
+
+class TestDocumentGovernanceAuth:
+    @pytest.mark.asyncio
+    async def test_owner_can_reclassify_personal_document(self, client):
+        user = _make_user("owner1")
+        doc = _make_document(doc_uuid="doc-1", user_id="owner1")
+        cookies, headers = _auth("owner1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access()
+
+            resp = await client.patch(
+                "/api/documents/doc-1/classify",
+                json={"classification": "ferpa", "reason": "Contains student records"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["classification"] == "ferpa"
+        assert resp.json()["classified_by"] == "owner1"
+        assert doc.classification == "ferpa"
+        assert doc.classified_by == "owner1"
+        doc.save.assert_awaited_once()
+        mock_log_event.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_other_users_personal_document_cannot_be_reclassified(self, client):
+        user = _make_user("outsider")
+        doc = _make_document(doc_uuid="doc-2", user_id="owner1")
+        cookies, headers = _auth("outsider")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access()
+
+            resp = await client.patch(
+                "/api/documents/doc-2/classify",
+                json={"classification": "internal"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        doc.save.assert_not_awaited()
+        mock_log_event.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_non_member_cannot_reclassify_other_teams_document(self, client):
+        user = _make_user("outsider")
+        doc = _make_document(doc_uuid="doc-3", user_id="owner1", team_id="team-abc")
+        cookies, headers = _auth("outsider")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access()
+
+            resp = await client.patch(
+                "/api/documents/doc-3/classify",
+                json={"classification": "internal"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        doc.save.assert_not_awaited()
+        mock_log_event.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_team_admin_can_reclassify_team_document(self, client):
+        user = _make_user("team-admin")
+        doc = _make_document(doc_uuid="doc-4", user_id="owner1", team_id="team-abc")
+        cookies, headers = _auth("team-admin")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "team-admin", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access(roles_by_uuid={"team-abc": "admin"})
+
+            resp = await client.patch(
+                "/api/documents/doc-4/classify",
+                json={"classification": "cui", "reason": "Contains export-controlled details"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["classification"] == "cui"
+        assert doc.classification == "cui"
+        doc.save.assert_awaited_once()
+        mock_log_event.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_non_admin_owner_cannot_apply_retention_hold(self, client):
+        user = _make_user("owner1")
+        cookies, headers = _auth("owner1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "owner1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.documents.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/doc-5/retention-hold",
+                json={"reason": "Preserve for litigation"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "Admin access required"
+        mock_get_doc.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_non_admin_team_admin_cannot_apply_retention_hold(self, client):
+        user = _make_user("team-admin")
+        cookies, headers = _auth("team-admin")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "team-admin", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.documents.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/doc-6/retention-hold",
+                json={"reason": "Preserve for litigation"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "Admin access required"
+        mock_get_doc.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_admin_can_apply_retention_hold_to_another_users_document(self, client):
+        user = _make_user("platform-admin")
+        user.is_admin = True
+        doc = _make_document(doc_uuid="doc-7", user_id="owner1")
+        cookies, headers = _auth("platform-admin")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "platform-admin", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access()
+
+            resp = await client.post(
+                "/api/documents/doc-7/retention-hold",
+                json={"reason": "Preserve for litigation"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["retention_hold"] is True
+        assert doc.retention_hold is True
+        assert doc.retention_hold_reason == "Preserve for litigation"
+        assert doc.scheduled_deletion_at is None
+        doc.save.assert_awaited_once()
+        mock_log_event.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_admin_can_remove_retention_hold_from_other_teams_document(self, client):
+        user = _make_user("platform-admin")
+        user.is_admin = True
+        doc = _make_document(
+            doc_uuid="doc-8",
+            user_id="owner1",
+            team_id="team-abc",
+            retention_hold=True,
+        )
+        doc.retention_hold_reason = "Existing hold"
+        cookies, headers = _auth("platform-admin")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "platform-admin", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.services.access_control.SmartDocument") as MockDocument, \
+             patch("app.services.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.documents.audit_service.log_event", new_callable=AsyncMock) as mock_log_event:
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockDocument.find_one = AsyncMock(return_value=doc)
+            MockDocument.uuid = "uuid"
+            mock_team_access.return_value = _team_access()
+
+            resp = await client.delete(
+                "/api/documents/doc-8/retention-hold",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["retention_hold"] is False
+        assert doc.retention_hold is False
+        assert doc.retention_hold_reason is None
+        doc.save.assert_awaited_once()
+        mock_log_event.assert_awaited_once()

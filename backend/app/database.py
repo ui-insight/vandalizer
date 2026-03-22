@@ -26,6 +26,8 @@ from app.models.verification import VerificationRequest, VerifiedItemMetadata, V
 from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.kb_test_query import KBTestQuery
+from app.models.kb_suggestion import KBSuggestion
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
@@ -72,6 +74,8 @@ ALL_MODELS = [
     Automation,
     KnowledgeBase,
     KnowledgeBaseSource,
+    KBTestQuery,
+    KBSuggestion,
     ExtractionTestCase,
     ValidationRun,
     QualityAlert,
@@ -91,8 +95,8 @@ ALL_MODELS = [
 async def init_db(settings: Settings) -> None:
     client = AsyncIOMotorClient(
         settings.mongo_host,
-        maxPoolSize=50,
-        minPoolSize=5,
+        maxPoolSize=100,
+        minPoolSize=10,
         maxIdleTimeMS=30000,
         serverSelectionTimeoutMS=5000,
         connectTimeoutMS=5000,

@@ -434,7 +434,7 @@ async def list_verified_items(
             if not set(item_org_ids) & set(user_org_ancestry):
                 continue
 
-        results.append({
+        entry = {
             "id": str(item.id),
             "item_id": str(item.item_id),
             "kind": item.kind.value,
@@ -451,7 +451,18 @@ async def list_verified_items(
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
-        })
+        }
+
+        # Add KB-specific metrics
+        if item.kind == LibraryItemKind.KNOWLEDGE_BASE:
+            kb = await KnowledgeBase.get(item.item_id)
+            if kb:
+                entry["total_sources"] = kb.total_sources
+                entry["total_chunks"] = kb.total_chunks
+                entry["sources_ready"] = kb.sources_ready
+                entry["kb_status"] = kb.status
+
+        results.append(entry)
     return results
 
 
@@ -549,6 +560,11 @@ async def unverify_item(item_id: str, item_kind: str) -> dict:
         if ss:
             ss.verified = False
             await ss.save()
+    elif item_kind == "knowledge_base":
+        kb = await KnowledgeBase.get(obj_id)
+        if kb:
+            kb.verified = False
+            await kb.save()
 
     items = await LibraryItem.find(
         LibraryItem.item_id == obj_id,
@@ -715,11 +731,38 @@ async def search_users(query: str, limit: int = 20) -> list[dict]:
 
 
 async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
-    """Set verified=True on a KnowledgeBase by its MongoDB _id."""
+    """Set verified=True on a KnowledgeBase and add to the verified library."""
+    from app.services.library_service import get_or_create_verified_library
+
     kb = await KnowledgeBase.get(item_id)
-    if kb:
-        kb.verified = True
-        await kb.save()
+    if not kb:
+        return
+    kb.verified = True
+    await kb.save()
+
+    # Add a verified LibraryItem to the global verified library
+    verified_lib = await get_or_create_verified_library()
+    verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
+
+    existing_in_verified = await LibraryItem.find(
+        {"_id": {"$in": list(verified_item_ids)}},
+        {"item_id": item_id, "kind": "knowledge_base"},
+    ).to_list() if verified_item_ids else []
+
+    if not existing_in_verified:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        new_item = LibraryItem(
+            item_id=item_id,
+            kind=LibraryItemKind.KNOWLEDGE_BASE,
+            added_by_user_id="system",
+            verified=True,
+            tags=[],
+            created_at=now,
+        )
+        await new_item.insert()
+        verified_lib.items.append(new_item.id)
+        verified_lib.updated_at = now
+        await verified_lib.save()
 
 
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
@@ -777,12 +820,16 @@ async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
 
 
 async def _request_to_dict(req: VerificationRequest) -> dict:
-    # Resolve item_uuid for search_set items so the frontend can open them
+    # Resolve item_uuid for search_set and knowledge_base items
     item_uuid = None
     if req.item_kind == "search_set":
         ss = await SearchSet.get(req.item_id)
         if ss and hasattr(ss, "uuid"):
             item_uuid = ss.uuid
+    elif req.item_kind == "knowledge_base":
+        kb = await KnowledgeBase.get(req.item_id)
+        if kb:
+            item_uuid = kb.uuid
 
     return {
         "id": str(req.id),
@@ -824,6 +871,7 @@ def _collection_to_dict(col: VerifiedCollection) -> dict:
         "title": col.title,
         "description": col.description,
         "promo_image_url": col.promo_image_url,
+        "featured": col.featured,
         "item_ids": col.item_ids,
         "created_by_user_id": col.created_by_user_id,
         "created_at": col.created_at.isoformat() if col.created_at else None,

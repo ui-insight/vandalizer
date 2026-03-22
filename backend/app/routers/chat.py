@@ -10,6 +10,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 import httpx
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 
@@ -33,6 +34,19 @@ from app.services.chat_service import chat_stream
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+async def _get_authorized_activity(activity_id: str, user: User) -> ActivityEvent:
+    """Resolve an activity only when it belongs to the caller."""
+    try:
+        activity_oid = PydanticObjectId(activity_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Activity not found") from exc
+
+    activity = await activity_service.get_activity(activity_oid, user.user_id)
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+    return activity
 
 
 @router.post("")
@@ -141,28 +155,25 @@ async def chat(
             await activity.save()
     else:
         # Resume existing conversation
-        from beanie import PydanticObjectId
-
-        activity = await ActivityEvent.get(PydanticObjectId(activity_id))
-        if activity:
-            activity.status = ActivityStatus.RUNNING.value
-            activity.last_updated_at = datetime.now(timezone.utc)
-            await activity.save()
-            conversation = await ChatConversation.find_one(
-                ChatConversation.uuid == activity.conversation_id,
-                ChatConversation.user_id == user_id,
+        activity = await _get_authorized_activity(activity_id, user)
+        activity.status = ActivityStatus.RUNNING.value
+        activity.last_updated_at = datetime.now(timezone.utc)
+        await activity.save()
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == activity.conversation_id,
+            ChatConversation.user_id == user_id,
+        )
+        if not conversation:
+            conversation = ChatConversation(
+                title=message.strip(),
+                uuid=str(uuid.uuid4()),
+                user_id=user_id,
+                team_id=team_id,
             )
-            if not conversation:
-                conversation = ChatConversation(
-                    title=message.strip(),
-                    uuid=str(uuid.uuid4()),
-                    user_id=user_id,
-                    team_id=team_id,
-                )
-                conversation.generate_title()
-                await conversation.insert()
-                activity.conversation_id = conversation.uuid
-                await activity.save()
+            conversation.generate_title()
+            await conversation.insert()
+            activity.conversation_id = conversation.uuid
+            await activity.save()
 
     if not conversation:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
@@ -225,17 +236,14 @@ async def add_link(
             space=body.current_space_id,
         )
     else:
-        from beanie import PydanticObjectId
-
-        activity = await ActivityEvent.get(PydanticObjectId(body.current_activity_id))
-        if activity:
-            activity.status = ActivityStatus.RUNNING.value
-            activity.last_updated_at = datetime.now(timezone.utc)
-            await activity.save()
-            conversation = await ChatConversation.find_one(
-                ChatConversation.uuid == activity.conversation_id,
-                ChatConversation.user_id == user_id,
-            )
+        activity = await _get_authorized_activity(body.current_activity_id, user)
+        activity.status = ActivityStatus.RUNNING.value
+        activity.last_updated_at = datetime.now(timezone.utc)
+        await activity.save()
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == activity.conversation_id,
+            ChatConversation.user_id == user_id,
+        )
 
     if not conversation or not activity:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
@@ -316,17 +324,14 @@ async def add_document(
             space=current_space_id,
         )
     else:
-        from beanie import PydanticObjectId
-
-        activity = await ActivityEvent.get(PydanticObjectId(current_activity_id))
-        if activity:
-            activity.status = ActivityStatus.RUNNING.value
-            activity.last_updated_at = datetime.now(timezone.utc)
-            await activity.save()
-            conversation = await ChatConversation.find_one(
-                ChatConversation.uuid == activity.conversation_id,
-                ChatConversation.user_id == user_id,
-            )
+        activity = await _get_authorized_activity(current_activity_id, user)
+        activity.status = ActivityStatus.RUNNING.value
+        activity.last_updated_at = datetime.now(timezone.utc)
+        await activity.save()
+        conversation = await ChatConversation.find_one(
+            ChatConversation.uuid == activity.conversation_id,
+            ChatConversation.user_id == user_id,
+        )
 
     if not conversation or not activity:
         raise HTTPException(status_code=500, detail="Failed to create conversation")

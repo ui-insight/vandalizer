@@ -97,3 +97,107 @@ export function getKBStatus(uuid: string) {
     sources: { uuid: string; status: string; error_message: string; chunk_count: number }[]
   }>(`/api/knowledge/${uuid}/status`)
 }
+
+// Validation
+
+export function runKBValidation(uuid: string) {
+  return apiFetch<Record<string, unknown>>(`/api/knowledge/${uuid}/validate`, {
+    method: 'POST',
+  })
+}
+
+export function getKBSourceHealth(uuid: string) {
+  return apiFetch<{
+    total: number
+    healthy: number
+    unhealthy: number
+    ratio: number
+    details: { uuid: string; source_type: string; name: string; status: string; error?: string }[]
+  }>(`/api/knowledge/${uuid}/source-health`)
+}
+
+export function getKBQuality(uuid: string) {
+  return apiFetch<{
+    history: Record<string, unknown>[]
+    contract: Record<string, unknown>
+  }>(`/api/knowledge/${uuid}/quality`)
+}
+
+// Test queries
+
+export function listKBTestQueries(uuid: string) {
+  return apiFetch<{
+    test_queries: {
+      uuid: string
+      query: string
+      expected_source_labels: string[]
+      expected_answer_contains: string | null
+      created_at: string | null
+    }[]
+  }>(`/api/knowledge/${uuid}/test-queries`)
+}
+
+export function createKBTestQuery(uuid: string, data: {
+  query: string
+  expected_source_labels?: string[]
+  expected_answer_contains?: string
+}) {
+  return apiFetch<Record<string, unknown>>(`/api/knowledge/${uuid}/test-queries`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteKBTestQuery(uuid: string, queryUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/test-queries/${queryUuid}`, {
+    method: 'DELETE',
+  })
+}
+
+// Clone
+
+export function cloneKnowledgeBase(uuid: string, title?: string) {
+  return apiFetch<Record<string, unknown>>(`/api/knowledge/${uuid}/clone`, {
+    method: 'POST',
+    body: JSON.stringify({ title }),
+  })
+}
+
+// Suggestions
+
+export function submitKBSuggestion(uuid: string, data: {
+  suggestion_type: string
+  url?: string
+  document_uuid?: string
+  note?: string
+}) {
+  return apiFetch<Record<string, unknown>>(`/api/knowledge/${uuid}/suggestions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function listKBSuggestions(uuid: string) {
+  return apiFetch<{
+    suggestions: {
+      uuid: string
+      suggestion_type: string
+      url: string | null
+      document_uuid: string | null
+      note: string | null
+      status: string
+      suggested_by_name: string | null
+      suggested_by_user_id: string
+      reviewed_by_user_id: string | null
+      reviewed_at: string | null
+      created_at: string | null
+    }[]
+  }>(`/api/knowledge/${uuid}/suggestions`)
+}
+
+export function reviewKBSuggestion(kbUuid: string, suggestionUuid: string, accept: boolean) {
+  return apiFetch<Record<string, unknown>>(`/api/knowledge/${kbUuid}/suggestions/${suggestionUuid}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ accept }),
+  })
+}

@@ -100,3 +100,77 @@ class TestListConversations:
         assert data[0]["uuid"] == "conv-uuid-1"
         assert data[0]["title"] == "My Chat"
         assert data[0]["message_count"] == 2
+
+
+class TestChatActivityAuthz:
+    @pytest.mark.asyncio
+    async def test_chat_rejects_foreign_activity_id(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.chat.access_control.get_team_access_context", new_callable=AsyncMock) as mock_team_access, \
+             patch("app.routers.chat.activity_service.get_activity", new_callable=AsyncMock) as mock_get_activity:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_team_access.return_value = MagicMock()
+            mock_get_activity.return_value = None
+
+            resp = await client.post(
+                "/api/chat",
+                json={
+                    "message": "resume this",
+                    "activity_id": "507f1f77bcf86cd799439011",
+                },
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Activity not found"
+
+    @pytest.mark.asyncio
+    async def test_add_link_rejects_foreign_activity_id(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.chat.activity_service.get_activity", new_callable=AsyncMock) as mock_get_activity:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_get_activity.return_value = None
+
+            resp = await client.post(
+                "/api/chat/add-link",
+                json={
+                    "link": "https://example.com",
+                    "current_activity_id": "507f1f77bcf86cd799439011",
+                },
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Activity not found"
+
+    @pytest.mark.asyncio
+    async def test_add_document_rejects_foreign_activity_id(self, client):
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.chat.activity_service.get_activity", new_callable=AsyncMock) as mock_get_activity:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_get_activity.return_value = None
+
+            resp = await client.post(
+                "/api/chat/add-document",
+                data={"current_activity_id": "507f1f77bcf86cd799439011"},
+                files={"files": ("note.txt", b"hello", "text/plain")},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Activity not found"

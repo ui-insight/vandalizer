@@ -158,13 +158,14 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
   onSubmit: (answers: Record<string, string>) => void
   submitting: boolean
 }) {
-  const questions = MODULE_ASSESSMENTS[moduleId]
-  if (!questions) return null
-
-  const isCompleted = existingAnswers && questions.questions.every(q => existingAnswers[q.key])
   const [answers, setAnswers] = useState<Record<string, string>>(existingAnswers || {})
+  const assessment = MODULE_ASSESSMENTS[moduleId]
 
-  const allAnswered = questions.questions.every(q => answers[q.key])
+  if (!assessment) return null
+
+  const isCompleted = existingAnswers && assessment.questions.every(q => existingAnswers[q.key])
+
+  const allAnswered = assessment.questions.every(q => answers[q.key])
 
   if (isCompleted) {
     return (
@@ -178,7 +179,7 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
           <Stars count={3} size={14} />
         </div>
         <div className="space-y-3">
-          {questions.questions.map(q => (
+          {assessment.questions.map(q => (
             <div key={q.key}>
               <p className="text-xs font-medium text-green-700 mb-0.5">{q.question}</p>
               <p className="text-sm text-green-900">{existingAnswers![q.key]}</p>
@@ -196,14 +197,14 @@ export function SelfAssessment({ moduleId, existingAnswers, onSubmit, submitting
     >
       <div className="flex items-center gap-2 mb-1">
         <Lightbulb size={18} className="text-blue-600" />
-        <h4 className="text-sm font-semibold text-blue-800">{questions.title}</h4>
+        <h4 className="text-sm font-semibold text-blue-800">{assessment.title}</h4>
       </div>
       <p className="text-xs text-gray-500 mb-4">
-        {questions.subtitle}
+        {assessment.subtitle}
       </p>
 
       <div className="space-y-5">
-        {questions.questions.map(q => (
+        {assessment.questions.map(q => (
           <div key={q.key}>
             <p className="text-sm font-medium text-gray-900 mb-2">{q.question}</p>
             <div className="space-y-1.5">

@@ -256,6 +256,7 @@ SMTP_HOST="" SMTP_PORT="587" SMTP_USER="" SMTP_PASSWORD="" SMTP_USE_TLS="true"
 SMTP_FROM_EMAIL="" SMTP_FROM_NAME="Vandalizer"
 ADMIN_EMAIL="" ADMIN_PASSWORD="" ADMIN_NAME="Admin"
 JWT_SECRET=""
+CONFIG_ENCRYPTION_KEY=""
 SENTRY_DSN=""
 DEFAULT_TEAM_NAME=""
 BASE_URL="http://localhost"
@@ -313,7 +314,7 @@ step_llm() {
       _prompt "OpenAI API key" "sk-..."
       LLM_API_KEY="$_REPLY"
       if [[ -z "$LLM_API_KEY" || "$LLM_API_KEY" == "sk-..." ]]; then
-        warn "No API key entered — you can add OPENAI_API_KEY to .env later"
+        warn "No API key entered — you can configure LLM keys in the admin UI later"
         LLM_API_KEY=""
       else
         _item "API key  ${DIM}${LLM_API_KEY:0:8}…${LLM_API_KEY: -4}${RESET}"
@@ -339,7 +340,7 @@ step_llm() {
       ;;
     4)
       LLM_PROVIDER="none"
-      warn "Skipping LLM setup — add OPENAI_API_KEY to backend/.env before using AI features"
+      warn "Skipping LLM setup — configure LLM models in the admin UI before using AI features"
       ;;
   esac
   _section_end
@@ -473,7 +474,10 @@ step_secrets() {
   _blank
 
   JWT_SECRET="$(python3 -c "import secrets; print(secrets.token_urlsafe(64))")"
-  _item "JWT secret  ${DIM}${JWT_SECRET:0:16}…${RESET}  ${GREEN}(generated)${RESET}"
+  _item "JWT secret              ${DIM}${JWT_SECRET:0:16}…${RESET}  ${GREEN}(generated)${RESET}"
+
+  CONFIG_ENCRYPTION_KEY="$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")"
+  _item "Config encryption key   ${DIM}${CONFIG_ENCRYPTION_KEY:0:16}…${RESET}  ${GREEN}(generated)${RESET}"
 
   _blank
   if _confirm "Configure Sentry error tracking? (optional)" "n"; then
@@ -539,6 +543,7 @@ step_review() {
     _item "Default team ${DIM}none${RESET}"
   fi
   _item "JWT secret   ${DIM}${JWT_SECRET:0:16}…${RESET}"
+  _item "Encryption   ${DIM}${CONFIG_ENCRYPTION_KEY:0:16}…${RESET}"
   [[ -n "$SENTRY_DSN" ]] && _item "Sentry       ${DIM}configured${RESET}"
 
   _blank
@@ -579,13 +584,16 @@ JWT_ALGORITHM=HS256
 JWT_ACCESS_EXPIRE_MINUTES=30
 JWT_REFRESH_EXPIRE_DAYS=60
 
+# ── Config Encryption ───────────────────────────────────────
+CONFIG_ENCRYPTION_KEY=${CONFIG_ENCRYPTION_KEY}
+
 # ── Application ──────────────────────────────────────────────
 ENVIRONMENT=${ENVIRONMENT}
 FRONTEND_URL=${FRONTEND_URL}
 LOG_FORMAT=json
 
 # ── LLM ──────────────────────────────────────────────────────
-OPENAI_API_KEY=${LLM_API_KEY}
+# LLM API keys are configured per-model via System Config in the admin UI.
 INSIGHT_ENDPOINT=${LLM_ENDPOINT}
 
 # ── ChromaDB ─────────────────────────────────────────────────
@@ -800,8 +808,8 @@ success_screen() {
     echo -e "  ${ACCENT}│${RESET}                                                          ${ACCENT}│${RESET}"
   fi
   if [[ "$LLM_PROVIDER" == "none" ]]; then
-    echo -e "  ${ACCENT}│${RESET}   ${YELLOW}⚠  Remember to add OPENAI_API_KEY to backend/.env${RESET}    ${ACCENT}│${RESET}"
-    echo -e "  ${ACCENT}│${RESET}   ${YELLOW}   then run: docker compose restart api celery${RESET}        ${ACCENT}│${RESET}"
+    echo -e "  ${ACCENT}│${RESET}   ${YELLOW}⚠  Configure LLM models in Admin → System Config${RESET}    ${ACCENT}│${RESET}"
+    echo -e "  ${ACCENT}│${RESET}   ${YELLOW}   to enable AI features${RESET}                              ${ACCENT}│${RESET}"
     echo -e "  ${ACCENT}│${RESET}                                                          ${ACCENT}│${RESET}"
   fi
   echo -e "  ${ACCENT}╰──────────────────────────────────────────────────────────╯${RESET}"

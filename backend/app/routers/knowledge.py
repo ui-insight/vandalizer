@@ -21,6 +21,31 @@ from app.services import knowledge_service as svc
 router = APIRouter()
 
 
+async def _get_kb_or_404(uuid: str, user: User, *, manage: bool = False):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=manage,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    return kb
+
+
+async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
+    from app.models.kb_suggestion import KBSuggestion
+
+    suggestion = await KBSuggestion.find_one(
+        {"uuid": suggestion_uuid, "knowledge_base_uuid": kb_uuid},
+    )
+    if not suggestion:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    return suggestion
+
+
 def _kb_response(kb) -> KBResponse:
     return KBResponse(
         uuid=kb.uuid,
@@ -193,6 +218,227 @@ async def remove_source(uuid: str, source_uuid: str, user: User = Depends(get_cu
     if not ok:
         raise HTTPException(status_code=404, detail="Source not found")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Validation
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{uuid}/validate")
+async def validate_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.services import kb_validation_service
+    result = await kb_validation_service.run_kb_validation(kb.uuid, user.user_id)
+    return result
+
+
+@router.get("/{uuid}/source-health")
+async def get_source_health(uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.services import kb_validation_service
+    return await kb_validation_service.check_source_health(kb.uuid)
+
+
+@router.get("/{uuid}/quality")
+async def get_kb_quality(uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.services import quality_service
+    history = await quality_service.get_quality_history("knowledge_base", kb.uuid)
+    contract = await quality_service.get_quality_contract_status("knowledge_base", kb.uuid)
+    return {"history": history, "contract": contract}
+
+
+# ---------------------------------------------------------------------------
+# Test Queries
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{uuid}/test-queries")
+async def list_test_queries(uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_test_query import KBTestQuery
+    queries = await KBTestQuery.find(
+        KBTestQuery.knowledge_base_uuid == kb.uuid,
+    ).sort("-created_at").to_list()
+    return {"test_queries": [
+        {
+            "uuid": q.uuid,
+            "query": q.query,
+            "expected_source_labels": q.expected_source_labels,
+            "expected_answer_contains": q.expected_answer_contains,
+            "created_at": q.created_at.isoformat() if q.created_at else None,
+        }
+        for q in queries
+    ]}
+
+
+@router.post("/{uuid}/test-queries")
+async def create_test_query(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    body = await request.json()
+    query = body.get("query", "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+    from app.models.kb_test_query import KBTestQuery
+    tq = KBTestQuery(
+        knowledge_base_uuid=kb.uuid,
+        query=query,
+        expected_source_labels=body.get("expected_source_labels", []),
+        expected_answer_contains=body.get("expected_answer_contains"),
+        user_id=user.user_id,
+    )
+    await tq.insert()
+    return {
+        "uuid": tq.uuid,
+        "query": tq.query,
+        "expected_source_labels": tq.expected_source_labels,
+        "expected_answer_contains": tq.expected_answer_contains,
+        "created_at": tq.created_at.isoformat() if tq.created_at else None,
+    }
+
+
+@router.delete("/{uuid}/test-queries/{query_uuid}")
+async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_test_query import KBTestQuery
+    tq = await KBTestQuery.find_one(
+        KBTestQuery.uuid == query_uuid,
+        KBTestQuery.knowledge_base_uuid == kb.uuid,
+    )
+    if not tq:
+        raise HTTPException(status_code=404, detail="Test query not found")
+    await tq.delete()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Clone
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{uuid}/clone")
+async def clone_knowledge_base(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    kb = await _get_kb_or_404(uuid, user)
+    body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+    new_title = body.get("title")
+    try:
+        clone = await svc.clone_knowledge_base(kb, user, new_title=new_title)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return _kb_response(clone)
+
+
+# ---------------------------------------------------------------------------
+# Suggestions
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{uuid}/suggestions")
+async def create_suggestion(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    kb = await _get_kb_or_404(uuid, user)
+    body = await request.json()
+    suggestion_type = body.get("suggestion_type", "general")
+    try:
+        suggestion = await svc.create_suggestion(
+            kb_uuid=kb.uuid,
+            user=user,
+            suggestion_type=suggestion_type,
+            url=body.get("url"),
+            document_uuid=body.get("document_uuid"),
+            note=body.get("note"),
+        )
+    except ValueError as e:
+        status_code = 404 if str(e) == "Knowledge base not found" else 400
+        raise HTTPException(status_code=status_code, detail=str(e))
+    return {
+        "uuid": suggestion.uuid,
+        "suggestion_type": suggestion.suggestion_type,
+        "status": suggestion.status,
+        "note": suggestion.note,
+        "url": suggestion.url,
+        "document_uuid": suggestion.document_uuid,
+        "created_at": suggestion.created_at.isoformat() if suggestion.created_at else None,
+    }
+
+
+@router.get("/{uuid}/suggestions")
+async def list_suggestions(uuid: str, user: User = Depends(get_current_user)):
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    suggestions = await svc.list_suggestions(kb.uuid)
+    return {"suggestions": [
+        {
+            "uuid": s.uuid,
+            "suggestion_type": s.suggestion_type,
+            "url": s.url,
+            "document_uuid": s.document_uuid,
+            "note": s.note,
+            "status": s.status,
+            "suggested_by_name": s.suggested_by_name,
+            "suggested_by_user_id": s.suggested_by_user_id,
+            "reviewed_by_user_id": s.reviewed_by_user_id,
+            "reviewed_at": s.reviewed_at.isoformat() if s.reviewed_at else None,
+            "created_at": s.created_at.isoformat() if s.created_at else None,
+        }
+        for s in suggestions
+    ]}
+
+
+@router.patch("/{uuid}/suggestions/{suggestion_uuid}")
+async def review_suggestion(uuid: str, suggestion_uuid: str, request: Request, user: User = Depends(get_current_user)):
+    kb = await _get_kb_or_404(uuid, user, manage=True)
+    suggestion = await _get_kb_suggestion_or_404(kb.uuid, suggestion_uuid)
+    body = await request.json()
+    accept = body.get("accept", False)
+    try:
+        suggestion = await svc.review_suggestion(kb, suggestion, user, accept)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "uuid": suggestion.uuid,
+        "status": suggestion.status,
+        "reviewed_at": suggestion.reviewed_at.isoformat() if suggestion.reviewed_at else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Status
+# ---------------------------------------------------------------------------
 
 
 @router.get("/{uuid}/status", response_model=KBStatusResponse)

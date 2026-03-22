@@ -8,9 +8,11 @@ Brief description of the changes in this PR.
 
 ## Test Plan
 
-- [ ] Backend tests pass (`cd backend && uv run pytest`)
-- [ ] Frontend builds cleanly (`cd frontend && npx tsc --noEmit && npm run build`)
+- [ ] Shared checks pass (`make ci`)
+- [ ] Release check passes if packaging or deployment changed (`make release-check`)
 - [ ] Manually tested the affected feature(s)
+- [ ] Updated `CHANGELOG.md` for user-facing or operator-facing changes
+- [ ] Updated deploy/release docs (`README.md`, `DEPLOY.md`, `OPERATIONS.md`, or `RELEASE_CHECKLIST.md`) if the install or release path changed
 
 ## Related Issues
 

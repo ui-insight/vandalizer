@@ -1,4 +1,4 @@
-name: Build and Push Docker Image
+name: Publish Continuous Images
 on:
   workflow_run:
     workflows: ["CI"]
@@ -34,12 +34,15 @@ jobs:
         shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
-            echo "ref_name=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
-            echo "sha_short=$(printf '%s' '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> "$GITHUB_OUTPUT"
+            raw_ref='${{ github.event.workflow_run.head_branch }}'
+            sha_short="$(printf '%s' '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)"
           else
-            echo "ref_name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-            echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+            raw_ref="${GITHUB_REF_NAME}"
+            sha_short="$(git rev-parse --short HEAD)"
           fi
+          sanitized_ref="$(printf '%s' "${raw_ref}" | tr '/:@ ' '-' | tr -cd '[:alnum:]._-' | sed 's/^-*//; s/-*$//')"
+          echo "ref_name=${sanitized_ref}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=${sha_short}" >> "$GITHUB_OUTPUT"
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -52,5 +55,5 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
-          tags: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ steps.vars.outputs.ref_name }}
+          tags: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:sha-${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ steps.vars.outputs.ref_name }}
           file: ${{ matrix.dockerfile }}

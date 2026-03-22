@@ -258,11 +258,17 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         models = sys_config.get("available_models", [])
         model = models[0]["name"] if models else "gpt-4o-mini"
 
+        # Check if the workflow owner is an admin (gates code execution)
+        wf_user_id = workflow.get("user_id")
+        wf_user_doc = db.user.find_one({"user_id": wf_user_id}) if wf_user_id else None
+        wf_is_admin = bool(wf_user_doc and wf_user_doc.get("is_admin"))
+
         engine = build_workflow_engine(
             steps_data=steps_data,
             model=model,
-            user_id=workflow.get("user_id"),
+            user_id=wf_user_id,
             system_config_doc=sys_config,
+            allow_code_execution=wf_is_admin,
         )
 
         final_output, data = engine.execute()

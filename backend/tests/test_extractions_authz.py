@@ -4,12 +4,14 @@ import secrets
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from beanie import PydanticObjectId
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
 from app.utils.security import create_access_token
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
+_ACTIVITY_ID = "507f1f77bcf86cd799439011"
 
 
 def _make_user(user_id="user1"):
@@ -23,6 +25,9 @@ def _make_user(user_id="user1"):
     user.current_team = None
     user.is_demo_user = False
     user.demo_status = None
+    user.api_token = "test-api-key"
+    user.api_token_created_at = None
+    user.api_token_expires_at = None
     return user
 
 
@@ -111,3 +116,54 @@ class TestSearchSetRouteAuthz:
         assert "document not found" in resp.json()["detail"].lower()
         mock_activity.activity_start.assert_not_called()
         mock_svc.run_extraction_sync.assert_not_called()
+
+
+class TestExtractionStatusAuthz:
+    @pytest.mark.asyncio
+    async def test_status_uses_object_id_lookup_for_owned_activity(self, client):
+        user = _make_user("api-user")
+        activity = MagicMock()
+        activity.status = "completed"
+        activity.title = "Extraction Run"
+        activity.started_at = None
+        activity.finished_at = None
+        activity.error = None
+        activity.documents_touched = 2
+        activity.result_snapshot = {"rows": 2}
+
+        with (
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.activity_service.get_activity", new_callable=AsyncMock) as mock_get_activity,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_get_activity.return_value = activity
+
+            resp = await client.get(
+                f"/api/extractions/status/{_ACTIVITY_ID}",
+                headers={"x-api-key": "test-api-key"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "completed"
+        lookup_id, lookup_user_id = mock_get_activity.await_args.args
+        assert lookup_id == PydanticObjectId(_ACTIVITY_ID)
+        assert lookup_user_id == "api-user"
+
+    @pytest.mark.asyncio
+    async def test_status_rejects_invalid_activity_id(self, client):
+        user = _make_user("api-user")
+
+        with (
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.activity_service.get_activity", new_callable=AsyncMock) as mock_get_activity,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.get(
+                "/api/extractions/status/not-an-object-id",
+                headers={"x-api-key": "test-api-key"},
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Activity not found"
+        mock_get_activity.assert_not_awaited()

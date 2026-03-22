@@ -73,6 +73,8 @@ export interface ModelInfo {
   tier: string;
   privacy: string;
   supports_structured: boolean;
+  multimodal: boolean;
+  supports_pdf: boolean;
 }
 
 export interface UserConfig {

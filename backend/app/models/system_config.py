@@ -26,6 +26,12 @@ DEFAULT_QUALITY_CONFIG = {
         "degradation_alert_threshold": 10,
         "auto_review_on_degradation": True,
     },
+    "kb_verification_gates": {
+        "min_sources": 3,
+        "min_chunks": 50,
+        "min_source_health": 0.8,
+        "min_retrieval_precision": 0.6,
+    },
 }
 
 
@@ -70,6 +76,7 @@ DEFAULT_EXTRACTION_CONFIG = {
     },
     "chunking": {"enabled": False, "max_keys_per_chunk": 10},
     "repetition": {"enabled": False},
+    "use_images": False,
 }
 
 

@@ -98,6 +98,7 @@ class VerifiedCollection(Document):
     title: str
     description: Optional[str] = None
     promo_image_url: Optional[str] = None
+    featured: bool = False
     item_ids: list[str] = Field(default_factory=list)  # list of LibraryItem IDs
     created_by_user_id: str
     created_at: datetime.datetime = Field(

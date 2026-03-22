@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.automation import Automation
@@ -18,6 +18,7 @@ from app.schemas.automations import (
     CreateAutomationRequest,
     UpdateAutomationRequest,
 )
+from app.services import access_control
 from app.services.access_control import get_authorized_search_set, get_authorized_workflow
 from app.services import automation_service as svc
 
@@ -40,6 +41,22 @@ async def _validate_action_target(
         search_set = await get_authorized_search_set(action_id, user)
         if not search_set:
             raise HTTPException(status_code=404, detail="Linked extraction not found")
+
+
+async def _authorize_existing_documents(document_uuids: list[str], user: User) -> list[str]:
+    team_access = await access_control.get_team_access_context(user)
+    authorized_document_uuids: list[str] = []
+    for doc_uuid in document_uuids:
+        doc = await access_control.get_authorized_document(
+            doc_uuid,
+            user,
+            team_access=team_access,
+            allow_admin=True,
+        )
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Document not found: {doc_uuid}")
+        authorized_document_uuids.append(doc.uuid)
+    return authorized_document_uuids
 
 
 def _to_response(auto) -> AutomationResponse:
@@ -229,7 +246,7 @@ async def delete_automation(automation_id: str, user: User = Depends(get_current
 @router.post("/{automation_id}/trigger")
 @limiter.limit("20/minute")
 async def trigger_automation(
-    request,
+    request: Request,
     automation_id: str,
     files: list[UploadFile] = File(default=[]),
     document_uuids: Optional[str] = Form(None),
@@ -255,11 +272,14 @@ async def trigger_automation(
         raise HTTPException(status_code=400, detail="Automation has no action configured")
 
     settings = Settings()
+    existing_doc_uuids: list[str] = []
     all_doc_uuids: list[str] = []
 
     # Parse existing document UUIDs
     if document_uuids:
-        all_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
+        existing_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
+        existing_doc_uuids = await _authorize_existing_documents(existing_doc_uuids, user)
+        all_doc_uuids.extend(existing_doc_uuids)
 
     # Handle plain text input — create a temporary document
     if text and text.strip():

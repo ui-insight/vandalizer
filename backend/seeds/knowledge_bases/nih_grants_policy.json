@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-nih-gps",
+    "display_name": "NIH Grants Policy Statement",
+    "description": "NIH Grants Policy Statement (GPS) - the authoritative reference for NIH grant application, review, and management policies.",
+    "quality_tier": "gold",
+    "collections": ["federal-agency", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "NIH Grants Policy Statement",
+    "description": "Knowledge base covering NIH application requirements, review criteria, terms of award, and administrative requirements from the NIH GPS.",
+    "sources": [
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/nihgps/index.htm"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/how-to-apply-application-guide.html"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/guide/notice-files/NOT-OD-24-084.html"}
+    ]
+  }]
+}

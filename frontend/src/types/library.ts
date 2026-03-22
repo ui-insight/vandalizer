@@ -1,5 +1,5 @@
 export type LibraryScope = 'personal' | 'team' | 'verified'
-export type LibraryItemKind = 'workflow' | 'search_set'
+export type LibraryItemKind = 'workflow' | 'search_set' | 'knowledge_base'
 
 export interface Library {
   id: string
@@ -112,6 +112,11 @@ export interface VerifiedCatalogItem {
   quality_grade: string | null
   last_validated_at: string | null
   validation_run_count: number
+  // KB-specific fields
+  total_sources?: number
+  total_chunks?: number
+  sources_ready?: number
+  kb_status?: string
 }
 
 export interface VerifiedCollection {
@@ -119,6 +124,7 @@ export interface VerifiedCollection {
   title: string
   description: string | null
   promo_image_url: string | null
+  featured: boolean
   item_ids: string[]
   created_by_user_id: string
   created_at: string

@@ -15,6 +15,7 @@ from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
 from app.services.llm_service import clear_agent_caches
+from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.document import SmartDocument
@@ -39,8 +40,10 @@ def _sanitize_providers(providers: list[dict]) -> list[dict]:
     sanitized = []
     for p in providers:
         p_copy = dict(p)
-        if "client_secret" in p_copy and p_copy["client_secret"]:
-            p_copy["client_secret"] = "***"
+        secret = p_copy.get("client_secret", "")
+        if secret:
+            # Decrypt to check if a real value exists, then mask it
+            p_copy["client_secret"] = "***" if decrypt_value(secret) else ""
         sanitized.append(p_copy)
     return sanitized
 
@@ -50,8 +53,10 @@ def _sanitize_models(models: list[dict]) -> list[dict]:
     sanitized = []
     for m in models:
         m_copy = dict(m)
-        if "api_key" in m_copy and m_copy["api_key"]:
-            m_copy["api_key"] = "***"
+        key = m_copy.get("api_key", "")
+        if key:
+            # Decrypt to check if a real value exists, then mask it
+            m_copy["api_key"] = "***" if decrypt_value(key) else ""
         sanitized.append(m_copy)
     return sanitized
 
@@ -93,7 +98,7 @@ async def _get_team_by_identifier(team_id: str) -> Team | None:
                 return team
         except Exception:
             pass
-    return await Team.find_one(Team.uuid == team_id)
+    return await Team.find_one({"uuid": team_id})
 
 
 def _team_scope_identifiers(team: Team | None, *, fallback: str | None = None) -> list[str]:
@@ -107,6 +112,14 @@ def _team_scope_identifiers(team: Team | None, *, fallback: str | None = None) -
         if getattr(team, "id", None):
             identifiers.add(str(team.id))
     return sorted(identifiers)
+
+
+async def _resolve_team_scope(team_id: str | None) -> tuple[Team | None, list[str]]:
+    """Resolve a team plus every identifier that may be stored on scoped records."""
+    if not team_id:
+        return None, []
+    team = await _get_team_by_identifier(team_id)
+    return team, _team_scope_identifiers(team, fallback=team_id)
 
 
 def _can_view_platform_role_flags(team_scope: str | None) -> bool:
@@ -234,6 +247,8 @@ class ModelAddRequest(BaseModel):
     tier: Optional[str] = ""
     privacy: Optional[str] = ""
     supports_structured: bool = True
+    multimodal: bool = False
+    supports_pdf: bool = False
 
 
 class OAuthProviderRequest(BaseModel):
@@ -332,7 +347,8 @@ async def usage_stats(
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
     query_filter: dict = {"started_at": {"$gte": cutoff}}
     if team_scope:
-        query_filter["team_id"] = team_scope
+        _, team_scope_ids = await _resolve_team_scope(team_scope)
+        query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
     conversations = 0
@@ -393,7 +409,8 @@ async def usage_timeseries(
 
     query_filter: dict = {"started_at": {"$gte": prev_cutoff}}
     if team_scope:
-        query_filter["team_id"] = team_scope
+        _, team_scope_ids = await _resolve_team_scope(team_scope)
+        query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
     # Build daily buckets for current period
@@ -495,8 +512,10 @@ async def user_leaderboard(
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
     query_filter: dict = {}
+    scoped_team: Team | None = None
     if team_scope:
-        query_filter["team_id"] = team_scope
+        scoped_team, team_scope_ids = await _resolve_team_scope(team_scope)
+        query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
     # Aggregate per user
@@ -517,8 +536,10 @@ async def user_leaderboard(
 
     # Fetch user records — scope to team members when team-scoped
     if team_scope:
+        if not scoped_team:
+            return []
         team_memberships = await TeamMembership.find(
-            TeamMembership.team == PydanticObjectId(team_scope)
+            TeamMembership.team == scoped_team.id
         ).to_list()
         team_user_ids = [m.user_id for m in team_memberships]
         all_users = await User.find({"user_id": {"$in": team_user_ids}}).to_list()
@@ -565,23 +586,36 @@ async def team_leaderboard(
 
     query_filter: dict = {}
     if team_scope:
-        query_filter["team_id"] = team_scope
+        _, team_scope_ids = await _resolve_team_scope(team_scope)
+        query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
-    # Aggregate per team
+    all_teams = await Team.find().limit(10000).to_list()
+    team_lookup: dict[str, Team] = {}
+    for team in all_teams:
+        team_lookup[str(team.id)] = team
+        if getattr(team, "uuid", None):
+            team_lookup[team.uuid] = team
+
+    # Aggregate per canonical team id so mixed UUID/ObjectId activity history rolls up together.
     team_agg: dict[str, dict] = {}
     for ev in events:
-        tid = ev.team_id
-        if not tid:
+        raw_tid = ev.team_id
+        if not raw_tid:
             continue
+        team = team_lookup.get(raw_tid)
+        tid = str(team.id) if team else raw_tid
         if tid not in team_agg:
             team_agg[tid] = {
                 "tokens_total": 0,
                 "workflows_completed": 0,
                 "user_ids": set(),
                 "latencies": [],
+                "team": team,
             }
         agg = team_agg[tid]
+        if team and not agg.get("team"):
+            agg["team"] = team
         agg["tokens_total"] += (ev.tokens_input or 0) + (ev.tokens_output or 0)
         agg["user_ids"].add(ev.user_id)
         if ev.type == "workflow_run" and ev.status == "completed":
@@ -589,10 +623,6 @@ async def team_leaderboard(
             if ev.started_at and ev.finished_at:
                 delta_ms = int((ev.finished_at - ev.started_at).total_seconds() * 1000)
                 agg["latencies"].append(delta_ms)
-
-    # Fetch team records  - map by str(id)
-    all_teams = await Team.find().limit(10000).to_list()
-    team_map = {str(t.id): t for t in all_teams}
 
     # Fetch member counts per team
     all_memberships = await TeamMembership.find().limit(50000).to_list()
@@ -603,7 +633,7 @@ async def team_leaderboard(
 
     result: list[TeamLeaderboardItem] = []
     for tid, agg in team_agg.items():
-        t = team_map.get(tid)
+        t = agg.get("team") or team_lookup.get(tid)
         avg_lat = None
         if agg["latencies"]:
             avg_lat = sum(agg["latencies"]) / len(agg["latencies"])
@@ -636,22 +666,25 @@ async def team_detail(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
-    # Team admins can only see their own team
-    if team_scope and team_scope != team_id:
-        raise HTTPException(status_code=403, detail="Access denied")
-
     # Fetch team record
     team = await _get_team_by_identifier(team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
     team_scope_ids = _team_scope_identifiers(team, fallback=team_id)
 
+    # Team admins can only see their own team, regardless of whether the route
+    # uses the team's UUID or ObjectId-style identifier.
+    if team_scope:
+        _, caller_scope_ids = await _resolve_team_scope(team_scope)
+        if not set(team_scope_ids) & set(caller_scope_ids):
+            raise HTTPException(status_code=403, detail="Access denied")
+
     now = datetime.datetime.utcnow()
     cutoff = now - datetime.timedelta(days=days)
     prev_cutoff = cutoff - datetime.timedelta(days=days)
 
     events = await ActivityEvent.find(
-        {"team_id": team_id, "started_at": {"$gte": prev_cutoff}}
+        {"team_id": {"$in": team_scope_ids}, "started_at": {"$gte": prev_cutoff}}
     ).to_list()
 
     # Split current vs previous period
@@ -728,7 +761,7 @@ async def team_detail(
 
     # Members
     memberships = await TeamMembership.find(
-        TeamMembership.team == BsonObjectId(team_id)
+        TeamMembership.team == team.id
     ).to_list()
     member_user_ids = [m.user_id for m in memberships]
     member_role_map = {m.user_id: m.role for m in memberships}
@@ -774,7 +807,7 @@ async def team_detail(
 
     # Recent workflows
     recent_wf_events = await ActivityEvent.find(
-        {"team_id": team_id, "type": "workflow_run"}
+        {"team_id": {"$in": team_scope_ids}, "type": "workflow_run"}
     ).sort(-ActivityEvent.started_at).limit(20).to_list()
 
     recent_workflows = []
@@ -823,11 +856,16 @@ async def user_detail(
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
+    scoped_team: Team | None = None
+    team_scope_ids: list[str] = []
 
     # Team admins: verify the target user is a member of their team
     if team_scope:
+        scoped_team, team_scope_ids = await _resolve_team_scope(team_scope)
+        if not scoped_team:
+            raise HTTPException(status_code=403, detail="Admin access required")
         membership = await TeamMembership.find_one(
-            TeamMembership.team == BsonObjectId(team_scope),
+            TeamMembership.team == scoped_team.id,
             TeamMembership.user_id == user_id,
         )
         if not membership:
@@ -844,7 +882,7 @@ async def user_detail(
 
     query_filter: dict = {"user_id": user_id, "started_at": {"$gte": prev_cutoff}}
     if team_scope:
-        query_filter["team_id"] = team_scope
+        query_filter["team_id"] = {"$in": team_scope_ids}
     events = await ActivityEvent.find(query_filter).to_list()
 
     cur_events = [e for e in events if e.started_at and e.started_at >= cutoff]
@@ -917,14 +955,13 @@ async def user_detail(
     # Document count
     doc_query: dict = {"user_id": user_id}
     if team_scope:
-        scoped_team = await _get_team_by_identifier(team_scope)
-        doc_query["team_id"] = {"$in": _team_scope_identifiers(scoped_team, fallback=team_scope)}
+        doc_query["team_id"] = {"$in": team_scope_ids}
     doc_count = await SmartDocument.find(doc_query).count()
 
     # Recent workflows
     wf_filter: dict = {"user_id": user_id, "type": "workflow_run"}
     if team_scope:
-        wf_filter["team_id"] = team_scope
+        wf_filter["team_id"] = {"$in": team_scope_ids}
     recent_wf_events = await ActivityEvent.find(wf_filter).sort(
         -ActivityEvent.started_at
     ).limit(20).to_list()
@@ -981,7 +1018,8 @@ async def workflow_events(
 
     query_filter: dict = {"type": "workflow_run"}
     if team_scope:
-        query_filter["team_id"] = team_scope
+        _, team_scope_ids = await _resolve_team_scope(team_scope)
+        query_filter["team_id"] = {"$in": team_scope_ids}
     if status:
         query_filter["status"] = status
     if search:
@@ -1000,8 +1038,20 @@ async def workflow_events(
     team_ids = list({ev.team_id for ev in events if ev.team_id})
     all_users = await User.find({"user_id": {"$in": user_ids}}).to_list() if user_ids else []
     user_map = {u.user_id: u for u in all_users}
-    all_teams = await Team.find({"_id": {"$in": [BsonObjectId(t) for t in team_ids if len(t) == 24]}}).to_list() if team_ids else []
-    team_map = {str(t.id): t for t in all_teams}
+    object_id_team_ids = [BsonObjectId(t) for t in team_ids if len(t) == 24]
+    uuid_team_ids = [t for t in team_ids if len(t) != 24]
+    team_map: dict[str, Team] = {}
+    if object_id_team_ids or uuid_team_ids:
+        team_query: dict[str, dict[str, list]] = {"$or": []}
+        if object_id_team_ids:
+            team_query["$or"].append({"_id": {"$in": object_id_team_ids}})
+        if uuid_team_ids:
+            team_query["$or"].append({"uuid": {"$in": uuid_team_ids}})
+        all_teams = await Team.find(team_query).to_list()
+        for team in all_teams:
+            team_map[str(team.id)] = team
+            if getattr(team, "uuid", None):
+                team_map[team.uuid] = team
 
     items: list[WorkflowEventItem] = []
     for ev in events:
@@ -1034,7 +1084,8 @@ async def workflow_events(
     # Compute summary stats across all matching workflows (not just this page)
     summary_filter: dict = {"type": "workflow_run"}
     if team_scope:
-        summary_filter["team_id"] = team_scope
+        _, team_scope_ids = await _resolve_team_scope(team_scope)
+        summary_filter["team_id"] = {"$in": team_scope_ids}
     if search:
         summary_filter["title"] = {"$regex": re.escape(search), "$options": "i"}
     all_wf_events = await ActivityEvent.find(summary_filter).to_list()
@@ -1148,11 +1199,13 @@ async def add_model(
             "thinking": body.thinking,
             "endpoint": body.endpoint or "",
             "api_protocol": body.api_protocol or "",
-            "api_key": body.api_key or "",
+            "api_key": encrypt_value(body.api_key or ""),
             "speed": body.speed or "",
             "tier": body.tier or "",
             "privacy": body.privacy or "",
             "supports_structured": body.supports_structured,
+            "multimodal": body.multimodal,
+            "supports_pdf": body.supports_pdf,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1180,6 +1233,13 @@ async def update_model(
     if index < 0 or index >= len(cfg.available_models):
         raise HTTPException(status_code=404, detail="Model index out of range")
 
+    # If the client sends '***', preserve the existing (encrypted) key
+    new_api_key = body.api_key or ""
+    if new_api_key == "***":
+        new_api_key = cfg.available_models[index].get("api_key", "")
+    else:
+        new_api_key = encrypt_value(new_api_key)
+
     cfg.available_models[index] = {
         "name": body.name,
         "tag": body.tag,
@@ -1187,11 +1247,13 @@ async def update_model(
         "thinking": body.thinking,
         "endpoint": body.endpoint or "",
         "api_protocol": body.api_protocol or "",
-        "api_key": body.api_key or "",
+        "api_key": new_api_key,
         "speed": body.speed or "",
         "tier": body.tier or "",
         "privacy": body.privacy or "",
         "supports_structured": body.supports_structured,
+        "multimodal": body.multimodal,
+        "supports_pdf": body.supports_pdf,
     }
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
@@ -1240,6 +1302,8 @@ async def add_oauth_provider(
 
     cfg = await SystemConfig.get_config()
     provider_dict = body.model_dump(exclude_none=True)
+    if provider_dict.get("client_secret"):
+        provider_dict["client_secret"] = encrypt_value(provider_dict["client_secret"])
     cfg.oauth_providers.append(provider_dict)
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
@@ -1265,7 +1329,13 @@ async def update_oauth_provider(
     if index < 0 or index >= len(cfg.oauth_providers):
         raise HTTPException(status_code=404, detail="Provider index out of range")
 
-    cfg.oauth_providers[index] = body.model_dump(exclude_none=True)
+    provider_dict = body.model_dump(exclude_none=True)
+    # If the client sends '***', preserve the existing (encrypted) secret
+    if provider_dict.get("client_secret") == "***":
+        provider_dict["client_secret"] = cfg.oauth_providers[index].get("client_secret", "")
+    elif provider_dict.get("client_secret"):
+        provider_dict["client_secret"] = encrypt_value(provider_dict["client_secret"])
+    cfg.oauth_providers[index] = provider_dict
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()

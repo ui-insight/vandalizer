@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:coverage": "vitest run --coverage --coverage.reporter=text",
+    "test:e2e": "playwright test",
+    "ci": "npm run typecheck && npm run lint && npm run test:coverage -- --coverage.thresholds.lines=60 && npm run build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.0",
@@ -37,6 +40,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.0",
     "@vitejs/plugin-react": "^5.1.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

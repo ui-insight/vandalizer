@@ -7,7 +7,11 @@
 
 **AI-powered document intelligence for research administration.**
 
-Vandalizer is an open-source platform built at the University of Idaho for AI-powered document review, extraction, and chat. Upload documents, run LLM-powered extraction workflows, chat with your documents via RAG, and collaborate in teams.
+Vandalizer is an open-source, self-hosted platform for AI-powered document review and data extraction, purpose-built for research administration offices at universities. It gives offices of sponsored programs, grants offices, compliance teams, and other university units a single tool for processing the large volumes of grant proposals, award documents, and regulatory filings that flow through every funding cycle.
+
+These offices typically review hundreds of documents per cycle to extract deadlines, budgets, compliance requirements, PI information, and sponsor-specific terms. Much of this work is manual, repetitive, and error-prone. Vandalizer automates it with configurable LLM-powered extraction workflows that pull structured data from uploaded documents, chain tasks into repeatable pipelines, and let staff ask natural-language questions against their document collections with citation-backed answers.
+
+The project was developed at the University of Idaho under the NSF GRANTED program (Award [#2427549](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2427549)) and is designed to be adopted by other institutions. It is fully self-hosted, runs on commodity infrastructure, and supports any OpenAI-compatible LLM provider including local models via Ollama.
 
 ## Features
 
@@ -27,7 +31,7 @@ cd vandalizer
 
 # Configure environment
 cp backend/.env.example backend/.env
-# Edit backend/.env — set OPENAI_API_KEY and JWT_SECRET_KEY
+# Edit backend/.env — set JWT_SECRET_KEY (LLM keys are configured in the admin UI)
 
 # Build and start everything
 docker compose up --build -d
@@ -40,15 +44,17 @@ docker compose exec \
   -e DEFAULT_TEAM_NAME='Research Administration' \
   api python bootstrap_install.py
 
-# Verify
-curl http://localhost:8001/api/health
-# → {"status":"ok","checks":{...}}
+# Verify everything is set up correctly
+./status.sh
 ```
+
+The status script checks Docker services, API health, environment config, admin accounts, the verified catalog, and storage volumes — and gives actionable recommendations for anything that's missing or misconfigured.
 
 The frontend is available at `http://localhost` and the API at `http://localhost:8001`.
 
 Bootstrap notes:
 
+- The bootstrap script also seeds the **verified catalog** — pre-built workflows and extraction templates for common grant types (NSF, NIH, DOD, DOE) — so they're available immediately in the Explore system.
 - `DEFAULT_TEAM_NAME` is optional. If omitted, users will start in their personal team only.
 - New users always get a personal team. When a default team is configured, they also auto-join it on first registration or SSO login.
 - The bootstrap admin also keeps a personal team. After the first login, switch to the shared default team in the UI if that should be the primary workspace.
@@ -72,35 +78,40 @@ docker compose up -d redis mongo chromadb
 
 # Configure environment
 cp backend/.env.example backend/.env
-# Edit backend/.env — set OPENAI_API_KEY
+# Edit backend/.env — set JWT_SECRET_KEY (LLM keys are configured in the admin UI)
 
 # Install and run the backend
+make backend-install
 cd backend
-uv sync --extra dev
 uv run uvicorn app.main:app --reload --port 8001
 
 # In another terminal — start the frontend
+make frontend-install
 cd frontend
-npm ci
 npm run dev
 
 # In another terminal — start Celery workers
 cd backend
 ./run_celery.sh
+
+# Check that everything is running and seed data is in place
+./status.sh
 ```
 
 ### Verification commands
 
 ```bash
-# Backend
-cd backend
-uv run pytest -q
+make backend-install frontend-install
+make ci
 
-# Frontend
-cd frontend
-npm test
-npm run build
+# Optional non-gating backend static analysis backlog
+make backend-static
+
+# Release-grade validation, including both Docker builds
+make release-check
 ```
+
+Before tagging an operator-facing release, walk through [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md).
 
 ## Environment Variables
 
@@ -108,13 +119,25 @@ Copy `.env.example` to `.env`. Key variables:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | API key for LLM provider |
 | `MONGO_HOST` | Yes | MongoDB connection host |
 | `MONGO_DB` | Yes | MongoDB database name (default: `osp`) |
 | `REDIS_HOST` | Yes | Redis connection host |
 | `JWT_SECRET_KEY` | Yes | Secret key for JWT authentication |
 
 See `.env.example` for the full list.
+
+## LLM Configuration
+
+LLM models are configured at runtime through the admin UI — no environment variables or server restarts required.
+
+Navigate to **Admin → System Config → Models** to add LLM providers. Each model entry includes:
+
+- **Name** — model identifier (e.g., `gpt-4o`, `claude-sonnet-4-20250514`, `llama3.1:70b`)
+- **API Key** — provider API key (stored encrypted in the database)
+- **Endpoint** — API URL (leave empty for OpenAI-hosted models)
+- **Protocol** — `openai`, `ollama`, or `vllm`
+
+Vandalizer supports any OpenAI-compatible API including OpenAI, Azure OpenAI, Ollama (local models), vLLM, and OpenRouter.
 
 ## Architecture
 
@@ -131,12 +154,14 @@ React Frontend  -->  FastAPI Backend  -->  MongoDB
 - **Task Queues**: Celery with named queues (uploads, documents, workflows, etc.)
 - **Vector Store**: ChromaDB for document embeddings and RAG
 - **Package Manager**: `uv` (Python), `npm` (frontend)
+- **Canonical checks**: root `make` targets (`make backend-ci`, `make frontend-ci`, `make backend-static`, `make release-check`)
 
 ## Documentation
 
 - [Authorization Matrix](AUTHORIZATION_MATRIX.md)
 - [Deployment Guide](DEPLOY.md)
 - [Operations Guide](OPERATIONS.md)
+- [Release Checklist](RELEASE_CHECKLIST.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)

@@ -95,15 +95,15 @@ function GettingStarted() {
         <div className="mt-3 text-gray-500"># Start infrastructure</div>
         <div>docker compose up -d redis mongo chromadb</div>
         <div className="mt-3 text-gray-500"># Install backend dependencies & run</div>
-        <div>cp .env.example .env && uv sync && python run.py</div>
+        <div>cp backend/.env.example backend/.env && make backend-install && cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
         <div className="mt-3 text-gray-500"># In another terminal — start frontend</div>
-        <div>cd vandalizer-next/frontend && npm install && npm run dev</div>
+        <div>cd frontend && npm install && npm run dev</div>
       </div>
 
       <h3 className="text-xl font-bold text-white mt-8">Prerequisites</h3>
       <ul className="space-y-1 text-gray-300 text-sm">
         <li>
-          <span className="text-[#f1b300]">&#x2022;</span> Python &ge; 3.11, &lt; 3.12
+          <span className="text-[#f1b300]">&#x2022;</span> Python &ge; 3.11, &lt; 3.13
         </li>
         <li>
           <span className="text-[#f1b300]">&#x2022;</span> Node.js &ge; 20
@@ -115,9 +115,6 @@ function GettingStarted() {
           <span className="text-[#f1b300]">&#x2022;</span>{' '}
           <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">uv</code>{' '}
           package manager
-        </li>
-        <li>
-          <span className="text-[#f1b300]">&#x2022;</span> An OpenAI-compatible API key
         </li>
       </ul>
     </div>
@@ -154,15 +151,10 @@ function Installation() {
           </thead>
           <tbody className="text-gray-300">
             {[
-              ['OPENAI_API_KEY', 'Yes', 'API key for LLM provider'],
-              ['FLASK_ENV', 'Yes', 'development / testing / production'],
-              ['SECRET_KEY', 'Yes', 'Flask secret key for sessions'],
-              ['SECURITY_PASSWORD_SALT', 'Yes', 'Salt for password hashing'],
-              ['MONGO_HOST', 'Yes', 'MongoDB connection host'],
-              ['redis_host', 'Yes', 'Redis connection host'],
-              ['CLIENT_ID', 'No', 'Azure OAuth client ID'],
-              ['CLIENT_SECRET', 'No', 'Azure OAuth client secret'],
-              ['TENANT_NAME', 'No', 'Azure AD tenant name'],
+              ['MONGO_HOST', 'Yes', 'MongoDB connection string'],
+              ['MONGO_DB', 'Yes', 'Database name (default: osp)'],
+              ['REDIS_HOST', 'Yes', 'Redis connection host'],
+              ['JWT_SECRET_KEY', 'Yes', 'Secret for JWT authentication'],
             ].map(([name, req, desc]) => (
               <tr key={name} className="border-b border-white/5">
                 <td className="py-2 pr-4">
@@ -177,25 +169,28 @@ function Installation() {
           </tbody>
         </table>
       </div>
+      <p className="text-gray-400 text-sm mt-3">
+        LLM models, API keys, and endpoints are configured per-model in Admin &rarr; System Config.
+      </p>
 
       <h3 className="text-xl font-bold text-white mt-8">Docker Compose (Recommended)</h3>
       <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
         <div className="text-gray-500"># Start all infrastructure services</div>
         <div>docker compose up -d redis mongo chromadb</div>
         <div className="mt-3 text-gray-500"># Start the backend</div>
-        <div>uv sync && python run.py</div>
+        <div>make backend-install && cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
         <div className="mt-3 text-gray-500"># Start Celery workers</div>
         <div>./run_celery.sh start</div>
         <div className="mt-3 text-gray-500"># Start the frontend</div>
-        <div>cd vandalizer-next/frontend && npm install && npm run dev</div>
+        <div>cd frontend && npm install && npm run dev</div>
       </div>
 
       <h3 className="text-xl font-bold text-white mt-8">Production Deployment</h3>
       <p className="text-gray-300 leading-relaxed">
-        For production, use Gunicorn with the provided configuration:
+        For production, use uvicorn with multiple workers:
       </p>
       <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
-        <div>gunicorn wsgi_app <span className="text-gray-500"># Configured in gunicorn.conf.py, port 8000</span></div>
+        <div>uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4 <span className="text-gray-500"># Production uvicorn server</span></div>
       </div>
 
       <h3 className="text-xl font-bold text-white mt-8">Infrastructure Requirements</h3>
@@ -326,8 +321,8 @@ function Architecture() {
       <h3 className="text-xl font-bold text-white mt-8">System Overview</h3>
       <div className="bg-[#262626] rounded-lg p-4 font-mono text-xs sm:text-sm text-gray-300 overflow-x-auto leading-relaxed">
         <pre>{`┌─────────────┐     ┌─────────────┐     ┌──────────────┐
-│   React     │────▶│   Flask     │────▶│   MongoDB    │
-│   Frontend  │     │   Backend   │     │   (osp db)   │
+│   React     │────▶│  FastAPI    │────▶│   MongoDB    │
+│   Frontend  │     │  Backend    │     │              │
 └─────────────┘     └──────┬──────┘     └──────────────┘
                            │
                     ┌──────┴──────┐
@@ -346,9 +341,9 @@ function Architecture() {
       <p className="text-gray-300 leading-relaxed">
         All data models are defined in{' '}
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">
-          app/models.py
+          backend/app/models/
         </code>{' '}
-        using MongoEngine. Key models include{' '}
+        using Beanie ODM (Pydantic v2). Key models include{' '}
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">
           SmartDocument
         </code>
@@ -415,10 +410,10 @@ function ApiReference() {
     <div className="space-y-6">
       <h2 className="text-3xl font-bold text-white">API Reference</h2>
       <p className="text-gray-300 text-lg leading-relaxed">
-        The Vandalizer backend exposes a RESTful API organized into blueprint-based route groups.
+        The Vandalizer backend exposes a RESTful API organized into router-based route groups.
         Interactive API documentation is available via Swagger UI at{' '}
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">
-          /api/docs
+          /docs
         </code>{' '}
         when the server is running.
       </p>
@@ -469,11 +464,11 @@ function Contributing() {
       <h3 className="text-xl font-bold text-white mt-8">Development Setup</h3>
       <div className="bg-[#262626] rounded-lg p-4 font-mono text-sm text-gray-300 overflow-x-auto">
         <div className="text-gray-500"># Backend</div>
-        <div>uv sync && cp .env.example .env</div>
+        <div>cp backend/.env.example backend/.env && make backend-install</div>
         <div>docker compose up -d redis mongo chromadb</div>
-        <div>python run.py</div>
+        <div>cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
         <div className="mt-3 text-gray-500"># Frontend</div>
-        <div>cd vandalizer-next/frontend && npm install && npm run dev</div>
+        <div>cd frontend && npm install && npm run dev</div>
         <div className="mt-3 text-gray-500"># Celery workers</div>
         <div>./run_celery.sh start</div>
       </div>
@@ -516,7 +511,7 @@ function Contributing() {
         <li>
           Ensure tests pass:{' '}
           <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">
-            tox run
+            make ci
           </code>
         </li>
         <li>Submit a pull request against the main branch</li>
@@ -524,11 +519,11 @@ function Contributing() {
 
       <h3 className="text-xl font-bold text-white mt-8">Testing</h3>
       <p className="text-gray-300 leading-relaxed">
-        End-to-end tests use pytest and Selenium. Run{' '}
-        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">tox run</code>{' '}
-        for headless browser tests or{' '}
-        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">pytest</code>{' '}
-        for local execution.
+        Tests use pytest with httpx for API testing. Run{' '}
+        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">make ci</code>{' '}
+        for the full test suite or{' '}
+        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">make backend-test</code>{' '}
+        for backend tests only.
       </p>
     </div>
   )

@@ -3073,7 +3073,7 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
-          formatter={(value: number | undefined, name: string) => {
+          formatter={(value: number | undefined, name?: string) => {
             const label = name === 'score' ? 'Quality' : 'Adjusted'
             return [`${value ?? 0}%`, label]
           }}

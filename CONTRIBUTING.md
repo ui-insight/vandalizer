@@ -27,14 +27,12 @@ docker compose up -d redis mongo chromadb
 ### 2. Backend
 
 ```bash
-cd backend
-
-# Install Python dependencies (including test tools)
-uv sync --extra dev
+make backend-install
 
 # Copy and configure environment
+cd backend
 cp .env.example .env
-# Edit .env with your settings (OPENAI_API_KEY, JWT_SECRET_KEY, etc.)
+# Edit .env with your settings (JWT_SECRET_KEY, etc. — LLM keys are configured in the admin UI)
 
 # Run the FastAPI dev server (port 8001)
 uvicorn app.main:app --reload --port 8001
@@ -50,8 +48,8 @@ cd backend
 ### 4. Frontend
 
 ```bash
+make frontend-install
 cd frontend
-npm install
 npm run dev
 ```
 
@@ -89,25 +87,39 @@ Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`
 
 1. Fork the repository and create a feature branch from `main`
 2. Make your changes with clear, descriptive commits
-3. Ensure backend tests pass: `cd backend && uv run pytest`
-4. Ensure the frontend builds cleanly: `cd frontend && npx tsc --noEmit && npm run build`
+3. Run the shared repo checks: `make ci`
+4. For packaging or deployment changes, run `make release-check`
 5. Submit a pull request against the `main` branch
 6. Fill out the PR template with a description, changes, and test plan
 
 ## Testing
 
 ```bash
-# Backend tests (requires dev deps: uv sync --extra dev)
-cd backend
-uv run pytest
-
-# Frontend type check
-cd frontend
-npx tsc --noEmit
+make backend-ci
+make frontend-ci
+make ci
+make backend-static
 ```
 
 Tests run without any infrastructure (no MongoDB/Redis needed). The test suite covers
 config validation, JWT token handling, file validation, and a health endpoint smoke test.
+
+## Canonical Check Commands
+
+Use the repo-root `Makefile` so local commands, CI, and release validation stay aligned:
+
+```bash
+make backend-install
+make backend-ci
+make backend-static
+make frontend-install
+make frontend-ci
+make release-check
+```
+
+`make backend-static` runs the current backend lint, typecheck, and security backlog without gating releases.
+
+`make release-check` runs the current release-gating checks plus the backend/frontend Docker builds that ship in releases.
 
 ## Reporting Issues
 

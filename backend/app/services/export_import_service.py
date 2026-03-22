@@ -39,7 +39,7 @@ def validate_export_data(data: dict) -> str | None:
         return "Not a Vandalizer export file (missing vandalizer_export flag)"
     if data.get("schema_version") != SCHEMA_VERSION:
         return f"Unsupported schema version (expected {SCHEMA_VERSION})"
-    if data.get("export_type") not in ("workflow", "search_set", "catalog"):
+    if data.get("export_type") not in ("workflow", "search_set", "knowledge_base", "catalog"):
         return "Unknown export_type"
     if not isinstance(data.get("items"), list) or len(data["items"]) == 0:
         return "Export file contains no items"
@@ -252,6 +252,104 @@ async def import_search_set(data: dict, user_id: str, space: str | None = None) 
 
 
 # ---------------------------------------------------------------------------
+# Knowledge base export / import
+# ---------------------------------------------------------------------------
+
+
+async def export_knowledge_base(kb_uuid: str, user_email: str) -> dict:
+    """Export a knowledge base as a manifest with source list and cached content."""
+    from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        raise ValueError("Knowledge base not found")
+
+    sources = await KnowledgeBaseSource.find(
+        KnowledgeBaseSource.knowledge_base_uuid == kb_uuid,
+    ).to_list()
+
+    sources_out = []
+    for src in sources:
+        entry = {
+            "source_type": src.source_type,
+            "url": src.url,
+            "url_title": src.url_title,
+            "document_uuid": src.document_uuid,
+            "content": (src.content or "")[:100000],  # Truncate for export
+        }
+        sources_out.append(entry)
+
+    item = {
+        "title": kb.title,
+        "description": kb.description,
+        "sources": sources_out,
+    }
+    return _envelope("knowledge_base", user_email, [item])
+
+
+async def import_knowledge_base(
+    data: dict,
+    user_id: str,
+    space: str | None = None,
+    team_id: str | None = None,
+) -> "KnowledgeBase":
+    """Import a knowledge base from export data."""
+    from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+    from app.services import knowledge_service
+
+    err = validate_export_data(data)
+    if err:
+        raise ValueError(err)
+    if data["export_type"] != "knowledge_base":
+        raise ValueError("Expected a knowledge_base export file")
+
+    item = data["items"][0]
+    kb = KnowledgeBase(
+        title=f"{item['title']} (Imported)",
+        description=item.get("description"),
+        user_id=user_id,
+        team_id=team_id,
+        space=space,
+    )
+    await kb.insert()
+
+    for src_data in item.get("sources", []):
+        src = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type=src_data.get("source_type", "url"),
+            url=src_data.get("url"),
+            url_title=src_data.get("url_title"),
+            document_uuid=src_data.get("document_uuid"),
+            content=src_data.get("content"),
+        )
+        await src.insert()
+
+        # Ingest from cached content or re-fetch
+        if src.content:
+            from app.services.document_manager import DocumentManager
+            import asyncio
+            dm = DocumentManager()
+            try:
+                chunk_count = await asyncio.to_thread(
+                    dm.add_to_kb, kb.uuid, src.uuid,
+                    src.url_title or src.url or "Imported", src.content,
+                )
+                src.chunk_count = chunk_count
+                src.status = "ready"
+                await src.save()
+            except Exception:
+                src.status = "error"
+                await src.save()
+        elif src.source_type == "url" and src.url:
+            await knowledge_service._ingest_url_source(src, kb)
+        elif src.source_type == "document" and src.document_uuid:
+            await knowledge_service._ingest_document_source(src, kb)
+
+    await knowledge_service.recalculate_stats(kb)
+    return kb
+
+
+# ---------------------------------------------------------------------------
 # Catalog export / import
 # ---------------------------------------------------------------------------
 
@@ -290,6 +388,30 @@ async def export_catalog(user_email: str) -> dict:
 
         catalog_items.append({
             "item_kind": item_kind,
+            "metadata": {
+                "display_name": vi.get("display_name") or vi.get("name"),
+                "description": vi.get("description"),
+                "quality_tier": vi.get("quality_tier"),
+                "quality_grade": vi.get("quality_grade"),
+            },
+            "definition": definition,
+        })
+
+    # Also include verified knowledge bases (which are in LibraryItem now)
+    from app.models.knowledge import KnowledgeBase as KB
+    for vi in verified:
+        if vi["kind"] != "knowledge_base":
+            continue
+        kb = await KB.get(PydanticObjectId(vi["item_id"]))
+        if not kb:
+            continue
+        try:
+            kb_export = await export_knowledge_base(kb.uuid, user_email)
+            definition = kb_export["items"][0]
+        except Exception:
+            continue
+        catalog_items.append({
+            "item_kind": "knowledge_base",
             "metadata": {
                 "display_name": vi.get("display_name") or vi.get("name"),
                 "description": vi.get("description"),
@@ -355,5 +477,9 @@ async def import_catalog_items(
             wrapper = _envelope("search_set", "", [definition])
             ss = await import_search_set(wrapper, user_id, space)
             results.append({"kind": "search_set", "uuid": ss.uuid, "name": ss.title})
+        elif item_kind == "knowledge_base":
+            wrapper = _envelope("knowledge_base", "", [definition])
+            kb = await import_knowledge_base(wrapper, user_id, space, team_id=team_id)
+            results.append({"kind": "knowledge_base", "uuid": kb.uuid, "name": kb.title})
 
     return results

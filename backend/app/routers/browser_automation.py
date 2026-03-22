@@ -7,11 +7,14 @@ import asyncio
 import json
 import logging
 
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Cookie, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
 from app.models.user import User
+from app.models.workflow import Workflow, WorkflowResult
+from app.services import access_control
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,6 +29,27 @@ class NavigateRequest(BaseModel):
     url: str
 
 
+async def _get_authorized_workflow_result(workflow_result_id: str, user: User) -> WorkflowResult:
+    try:
+        workflow_result_oid = PydanticObjectId(workflow_result_id)
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail="Workflow result not found") from exc
+
+    result = await WorkflowResult.get(workflow_result_oid)
+    if not result or not result.workflow:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    workflow = await Workflow.get(result.workflow)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    team_access = await access_control.get_team_access_context(user)
+    if not access_control.can_view_workflow(workflow, user, team_access):
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    return result
+
+
 # ---------------------------------------------------------------------------
 # REST endpoints for session management
 # ---------------------------------------------------------------------------
@@ -35,8 +59,9 @@ class NavigateRequest(BaseModel):
 async def create_session(req: CreateSessionRequest, user: User = Depends(get_current_user)):
     from app.services.browser_automation import BrowserAutomationService
 
+    workflow_result = await _get_authorized_workflow_result(req.workflow_result_id, user)
     service = BrowserAutomationService.get_instance()
-    session = service.create_session(user.user_id, req.workflow_result_id, req.allowed_domains)
+    session = service.create_session(user.user_id, str(workflow_result.id), req.allowed_domains)
     return {
         "session_id": session.session_id,
         "state": session.state.value,

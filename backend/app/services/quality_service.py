@@ -58,6 +58,9 @@ async def persist_validation_run(
             score = min(100.0, max(0.0, acc_val * 50 + con_val * 30 + cf_score * 20))
         else:
             score = min(100.0, max(0.0, acc_val * 60 + con_val * 40))
+    elif run_type == "kb_validation":
+        # Knowledge base validation: score is pre-computed in kb_validation_service
+        score = float(result.get("raw_score", 0))
     else:
         # Prefer continuous score from result if available (new multi-run system)
         result_score = result.get("score")
@@ -351,6 +354,17 @@ async def run_regression_suite(
                 else:
                     grade = result.get("grade", "F")
                     current_score = float(_GRADE_SCORES.get(grade, 30))
+            elif kind == "knowledge_base":
+                from app.models.knowledge import KnowledgeBase as KB
+                kb = await KB.get(item.item_id)
+                if not kb:
+                    continue
+                from app.services import kb_validation_service
+                result = await kb_validation_service.run_kb_validation(
+                    kb_uuid=kb.uuid,
+                    user_id=user_id,
+                )
+                current_score = float(result.get("raw_score", 0))
             else:
                 continue
 
@@ -414,6 +428,8 @@ async def generate_improvement_suggestions(
 
     if item_kind == "search_set":
         prompt = _build_extraction_suggestion_prompt(result)
+    elif item_kind == "knowledge_base":
+        prompt = _build_kb_suggestion_prompt(result)
     else:
         prompt = _build_workflow_suggestion_prompt(result)
 
@@ -478,6 +494,41 @@ def _build_workflow_suggestion_prompt(result: dict) -> str:
         lines.append(f"  - [{status}] {c.get('name', 'Unknown')}: {c.get('detail', 'No detail')}{flag}")
 
     lines.append("\n---\nBased on these results, suggest specific improvements to raise the workflow quality to an A grade (all checks passing, no warnings). Focus on:\n1. Checks that failed — what might cause the failure and how to fix it\n2. Checks with warnings — how to address the concern\n3. General workflow structure improvements")
+    return "\n".join(lines)
+
+
+def _build_kb_suggestion_prompt(result: dict) -> str:
+    health = result.get("source_health", {})
+    coverage = result.get("chunk_coverage", {})
+    retrieval = result.get("retrieval_precision", {})
+    lines = [
+        "## Knowledge Base Validation Results",
+        f"- Source Health: {health.get('healthy', 0)}/{health.get('total', 0)} sources healthy ({health.get('ratio', 0) * 100:.0f}%)",
+        f"- Chunk Coverage: {coverage.get('with_chunks', 0)}/{coverage.get('total', 0)} sources with chunks ({coverage.get('ratio', 0) * 100:.0f}%)",
+        f"- Total Chunks: {coverage.get('total_chunks', 0)}",
+        f"- Retrieval Precision: {retrieval.get('avg_precision', 0) * 100:.0f}% ({retrieval.get('total_queries', 0)} test queries)",
+        "",
+    ]
+    # Unhealthy sources
+    unhealthy = [d for d in health.get("details", []) if d.get("status") == "unhealthy"]
+    if unhealthy:
+        lines.append("### Unhealthy Sources:")
+        for s in unhealthy:
+            lines.append(f"  - {s['name']}: {s.get('error', 'Unknown error')}")
+        lines.append("")
+
+    # Low precision queries
+    low_precision = [d for d in retrieval.get("details", []) if d.get("precision", 1) < 0.5]
+    if low_precision:
+        lines.append("### Low Precision Queries:")
+        for q in low_precision:
+            lines.append(f"  - \"{q['query']}\": {q['precision'] * 100:.0f}% precision")
+        lines.append("")
+
+    lines.append("\n---\nBased on these results, suggest specific improvements to raise the knowledge base quality. Focus on:\n"
+                 "1. Unhealthy or dead sources that should be replaced\n"
+                 "2. Ways to improve retrieval precision (better source selection, chunk size)\n"
+                 "3. Coverage gaps — topics that need more sources")
     return "\n".join(lines)
 
 
@@ -604,6 +655,26 @@ async def check_verification_readiness(
         ss = await SearchSet.find_one(SearchSet.uuid == item_id)
         if ss and ss.cross_field_rules and result.get("cross_field_score") is None:
             recommendations.append("Cross-field rules are defined but haven't been validated. Consider running cross-field validation.")
+    elif item_kind == "knowledge_base":
+        # KB-specific readiness checks
+        from app.models.knowledge import KnowledgeBase
+        from app.models.kb_test_query import KBTestQuery
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+        if kb:
+            if kb.total_sources < 3:
+                issues.append(f"Only {kb.total_sources} source(s). A strong knowledge base should have at least 3 sources.")
+            if kb.total_chunks < 50:
+                recommendations.append(f"Knowledge base has {kb.total_chunks} chunks. Consider adding more sources for better coverage.")
+            test_query_count = await KBTestQuery.find(
+                KBTestQuery.knowledge_base_uuid == item_id,
+            ).count()
+            if test_query_count < 3:
+                recommendations.append(f"Add at least {3 - test_query_count} more test query/queries for reliable retrieval validation.")
+
+            # Check source health from latest validation
+            source_health = result.get("source_health", {})
+            if source_health and source_health.get("ratio", 1.0) < 0.8:
+                issues.append(f"Source health is {source_health['ratio'] * 100:.0f}%. Fix unhealthy sources before submitting.")
 
     ready = len(issues) == 0
     return {"ready": ready, "issues": issues, "recommendations": recommendations}
