@@ -364,14 +364,26 @@ async def run_extraction_sync(
     if not keys:
         return []
 
-    # Pre-load document texts
-    doc_texts = []
+    # Pre-load document texts and file paths
+    import os
+    from app.config import Settings
+    upload_dir = Settings().upload_dir
+
+    doc_texts: list[str] = []
+    doc_file_paths: list[str] = []
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
         if doc and doc.raw_text:
             doc_texts.append(doc.raw_text)
+        else:
+            # Placeholder to keep indices aligned with doc_file_paths
+            doc_texts.append("")
+        if doc and doc.path:
+            doc_file_paths.append(os.path.join(upload_dir, doc.path))
+        else:
+            doc_file_paths.append("")
 
-    if not doc_texts:
+    if not any(doc_texts) and not any(doc_file_paths):
         return []
 
     # Resolve model
@@ -403,5 +415,6 @@ async def run_extraction_sync(
         doc_texts=doc_texts,
         extraction_config_override=combined_override or None,
         field_metadata=field_metadata,
+        doc_file_paths=doc_file_paths,
     )
     return result

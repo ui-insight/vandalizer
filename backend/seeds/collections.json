@@ -3,7 +3,8 @@
     {
       "slug": "pre-award",
       "title": "Pre-Award & Proposal Development",
-      "description": "Workflows for proposal preparation, budget analysis, and sponsor compliance checking."
+      "description": "Workflows for proposal preparation, budget analysis, and sponsor compliance checking.",
+      "featured": true
     },
     {
       "slug": "post-award",
@@ -23,7 +24,14 @@
     {
       "slug": "federal-agency",
       "title": "Federal Agency Templates",
-      "description": "Extraction templates for NSF, NIH, DOD, and DOE award documents."
+      "description": "Extraction templates for NSF, NIH, DOD, and DOE award documents.",
+      "featured": true
+    },
+    {
+      "slug": "reference-knowledge",
+      "title": "Reference Knowledge Bases",
+      "description": "Curated knowledge bases with federal agency guidelines, policies, and procedures for research administration.",
+      "featured": true
     }
   ]
 }

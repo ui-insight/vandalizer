@@ -4,6 +4,7 @@
 This is the canonical first-run path for Docker Compose installs:
 1. Create or update the initial admin account.
 2. Optionally create/reuse a shared default team for all new users.
+3. Seed the verified catalog (workflows, search sets, collections).
 
 Usage:
     docker compose exec -T api \
@@ -26,6 +27,7 @@ from app.config import Settings
 from app.database import init_db
 from create_admin import ensure_admin
 from setup_default_team import ensure_default_team
+from scripts.seed_catalog import seed_catalog
 
 
 def _print_usage() -> None:
@@ -37,7 +39,22 @@ def _print_usage() -> None:
     )
 
 
+def _ensure_encryption_key() -> None:
+    """Generate CONFIG_ENCRYPTION_KEY if not set, and warn the operator."""
+    if os.environ.get("CONFIG_ENCRYPTION_KEY"):
+        return
+    try:
+        from cryptography.fernet import Fernet
+        key = Fernet.generate_key().decode()
+        os.environ["CONFIG_ENCRYPTION_KEY"] = key
+        print(f"Generated CONFIG_ENCRYPTION_KEY (add to .env to persist): {key}")
+    except ImportError:
+        print("Warning: cryptography not installed — CONFIG_ENCRYPTION_KEY not generated.")
+
+
 async def main():
+    _ensure_encryption_key()
+
     settings = Settings()
     await init_db(settings)
 
@@ -61,27 +78,29 @@ async def main():
 
     if not default_team_name:
         print("No DEFAULT_TEAM_NAME set. New users will start in their personal team only.")
-        return
-
-    team, team_status, membership_status = await ensure_default_team(
-        default_team_name,
-        admin_email,
-    )
-
-    if team_status == "created":
-        print(f"Default team created: {team.name} (uuid={team.uuid})")
     else:
-        print(f"Default team reused: {team.name} (uuid={team.uuid})")
+        team, team_status, membership_status = await ensure_default_team(
+            default_team_name,
+            admin_email,
+        )
 
-    if membership_status == "created":
-        print("Bootstrap admin added to the default team as owner.")
-    elif membership_status == "updated":
-        print("Bootstrap admin role on the default team was corrected to owner.")
-    else:
-        print("Bootstrap admin already had owner access to the default team.")
+        if team_status == "created":
+            print(f"Default team created: {team.name} (uuid={team.uuid})")
+        else:
+            print(f"Default team reused: {team.name} (uuid={team.uuid})")
 
-    print("New users will auto-join the default team on first registration or SSO login.")
-    print("The bootstrap admin keeps its personal team as well; switch teams in the UI if needed.")
+        if membership_status == "created":
+            print("Bootstrap admin added to the default team as owner.")
+        elif membership_status == "updated":
+            print("Bootstrap admin role on the default team was corrected to owner.")
+        else:
+            print("Bootstrap admin already had owner access to the default team.")
+
+        print("New users will auto-join the default team on first registration or SSO login.")
+        print("The bootstrap admin keeps its personal team as well; switch teams in the UI if needed.")
+
+    # Step 3: Seed the verified catalog
+    await seed_catalog()
 
 
 if __name__ == "__main__":

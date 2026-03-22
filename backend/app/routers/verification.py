@@ -305,6 +305,16 @@ async def unverify_item(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/collections/featured")
+async def list_featured_collections(user: User = Depends(get_current_user)):
+    """List featured collections (available to all users, not just examiners)."""
+    from app.models.verification import VerifiedCollection
+    collections = await VerifiedCollection.find(
+        VerifiedCollection.featured == True,  # noqa: E712
+    ).sort("-updated_at").to_list()
+    return {"collections": [svc._collection_to_dict(c) for c in collections]}
+
+
 @router.get("/collections")
 async def list_collections(user: User = Depends(get_current_user)):
     _require_examiner_access(user)
@@ -500,10 +510,52 @@ async def try_verified_item(
 
     Lets users 'try before adopting' from the verified catalog.
     """
-    if item_kind != "search_set":
-        raise HTTPException(status_code=400, detail="Only search_set items can be tried")
+    if item_kind not in ("search_set", "knowledge_base"):
+        raise HTTPException(status_code=400, detail="Only search_set and knowledge_base items can be tried")
 
     body = await request.json()
+
+    # Knowledge base try: test retrieval with a query
+    if item_kind == "knowledge_base":
+        query = body.get("query")
+        if not query:
+            raise HTTPException(status_code=400, detail="Provide a query to test retrieval")
+
+        from app.models.knowledge import KnowledgeBase
+        from app.models.verification import VerifiedItemMetadata
+        from app.services.document_manager import DocumentManager
+        import asyncio
+
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+        if not kb or not kb.verified:
+            raise HTTPException(status_code=404, detail="Verified knowledge base not found")
+
+        meta = await VerifiedItemMetadata.find_one(
+            VerifiedItemMetadata.item_kind == "knowledge_base",
+            VerifiedItemMetadata.item_id == str(kb.id),
+        )
+        if meta and meta.organization_ids:
+            user_org_ancestry = await organization_service.get_user_org_ancestry(user) or []
+            if not set(meta.organization_ids) & set(user_org_ancestry):
+                raise HTTPException(status_code=404, detail="Verified knowledge base not found")
+
+        dm = DocumentManager()
+        results = await asyncio.to_thread(dm.query_kb, kb.uuid, query, 8)
+
+        return {
+            "kb_uuid": kb.uuid,
+            "kb_title": kb.title,
+            "query": query,
+            "results": [
+                {
+                    "text": text[:500],
+                    "source_name": meta_dict.get("source_name", "") if isinstance(meta_dict, dict) else "",
+                }
+                for text, meta_dict in (results or [])
+            ],
+        }
+
+    # Search set try: run extraction
     document_uuid = body.get("document_uuid")
     source_text = body.get("source_text")
 

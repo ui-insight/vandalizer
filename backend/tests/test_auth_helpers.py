@@ -30,7 +30,10 @@ class TestSetTokensCookieSecurity:
             assert "httponly" in header.lower()
 
     def test_secure_flag_in_production(self):
-        settings = Settings(jwt_secret_key="real-secret", environment="production")
+        settings = Settings(
+            jwt_secret_key="real-secret",
+            environment="production",
+        )
         response = Response()
         _set_tokens(response, _make_mock_user(), settings)
 

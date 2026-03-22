@@ -307,6 +307,139 @@ async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
     return True
 
 
+# --- Clone ---
+
+
+async def clone_knowledge_base(
+    source_kb: KnowledgeBase,
+    user: User,
+    new_title: str | None = None,
+) -> KnowledgeBase:
+    """Clone a knowledge base into the user's workspace.
+
+    Copies all source references and re-ingests into a new ChromaDB collection.
+    The clone is NOT verified - the user can extend and re-verify.
+    The caller is responsible for passing an already-authorized source KB.
+    """
+    team_id = str(user.current_team) if user.current_team else None
+
+    clone = KnowledgeBase(
+        title=(new_title or f"{source_kb.title} (Clone)")[:300],
+        description=source_kb.description,
+        user_id=user.user_id,
+        team_id=team_id,
+    )
+    await clone.insert()
+
+    # Copy sources and re-ingest
+    sources = await get_kb_sources(source_kb.uuid)
+    for src in sources:
+        new_src = KnowledgeBaseSource(
+            knowledge_base_uuid=clone.uuid,
+            source_type=src.source_type,
+            document_uuid=src.document_uuid,
+            url=src.url,
+            url_title=src.url_title,
+            content=src.content,  # Copy cached content for URLs
+        )
+        await new_src.insert()
+
+        if src.source_type == "document":
+            await _ingest_document_source(new_src, clone)
+        elif src.source_type == "url" and src.content:
+            # Re-use cached content instead of re-fetching
+            dm = _get_dm()
+            try:
+                chunk_count = await asyncio.to_thread(
+                    dm.add_to_kb, clone.uuid, new_src.uuid,
+                    new_src.url_title or new_src.url or "Unknown", src.content,
+                )
+                new_src.chunk_count = chunk_count
+                new_src.status = "ready"
+                new_src.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+                await new_src.save()
+            except Exception as e:
+                logger.error(f"Error cloning URL source {new_src.uuid}: {e}")
+                new_src.status = "error"
+                new_src.error_message = str(e)[:2000]
+                await new_src.save()
+        else:
+            await _ingest_url_source(new_src, clone)
+
+    await recalculate_stats(clone)
+    return clone
+
+
+# --- Suggestions ---
+
+
+async def create_suggestion(
+    kb_uuid: str,
+    user: User,
+    suggestion_type: str,
+    url: str | None = None,
+    document_uuid: str | None = None,
+    note: str | None = None,
+) -> "KBSuggestion":
+    """Create a suggestion to improve a knowledge base."""
+    from app.models.kb_suggestion import KBSuggestion
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        raise ValueError("Knowledge base not found")
+
+    if suggestion_type == "add_url" and not url:
+        raise ValueError("URL is required for add_url suggestions")
+    if suggestion_type == "add_document" and not document_uuid:
+        raise ValueError("Document UUID is required for add_document suggestions")
+
+    suggestion = KBSuggestion(
+        knowledge_base_uuid=kb_uuid,
+        suggested_by_user_id=user.user_id,
+        suggested_by_name=user.name,
+        suggestion_type=suggestion_type,
+        url=url,
+        document_uuid=document_uuid,
+        note=note,
+    )
+    await suggestion.insert()
+    return suggestion
+
+
+async def list_suggestions(
+    kb_uuid: str,
+    status: str | None = None,
+) -> list["KBSuggestion"]:
+    """List suggestions for a knowledge base."""
+    from app.models.kb_suggestion import KBSuggestion
+
+    query: dict = {"knowledge_base_uuid": kb_uuid}
+    if status:
+        query["status"] = status
+    return await KBSuggestion.find(query).sort("-created_at").to_list()
+
+
+async def review_suggestion(
+    kb: KnowledgeBase,
+    suggestion: "KBSuggestion",
+    user: User,
+    accept: bool,
+) -> "KBSuggestion":
+    """Accept or reject a suggestion that is already bound to an authorized KB."""
+    suggestion.status = "accepted" if accept else "rejected"
+    suggestion.reviewed_by_user_id = user.user_id
+    suggestion.reviewed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await suggestion.save()
+
+    if accept:
+        if suggestion.suggestion_type == "add_url" and suggestion.url:
+            await add_urls(kb, [suggestion.url])
+        elif suggestion.suggestion_type == "add_document" and suggestion.document_uuid:
+            await add_documents(kb, [suggestion.document_uuid], user)
+
+    return suggestion
+
+
 # --- Crawling ---
 
 

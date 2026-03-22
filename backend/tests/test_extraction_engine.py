@@ -363,3 +363,173 @@ class TestApplyLegacyStrategy:
         config = {"mode": "original"}
         _apply_legacy_strategy(config, "unknown_strategy")
         assert config["mode"] == "original"
+
+
+# ---------------------------------------------------------------------------
+# Multimodal helpers
+# ---------------------------------------------------------------------------
+
+class TestModelCapabilityLookup:
+    def _engine_with_models(self, models):
+        return ExtractionEngine(system_config_doc={"available_models": models})
+
+    def test_model_is_multimodal_true(self):
+        engine = self._engine_with_models([{"name": "gpt-4o", "multimodal": True}])
+        assert engine._model_is_multimodal("gpt-4o") is True
+
+    def test_model_is_multimodal_false_when_missing(self):
+        engine = self._engine_with_models([{"name": "gpt-4o"}])
+        assert engine._model_is_multimodal("gpt-4o") is False
+
+    def test_model_is_multimodal_unknown_model(self):
+        engine = self._engine_with_models([{"name": "gpt-4o", "multimodal": True}])
+        assert engine._model_is_multimodal("unknown-model") is False
+
+    def test_model_supports_pdf_true(self):
+        engine = self._engine_with_models([{"name": "claude", "supports_pdf": True}])
+        assert engine._model_supports_pdf("claude") is True
+
+    def test_model_supports_pdf_false(self):
+        engine = self._engine_with_models([{"name": "gpt-4o", "supports_pdf": False}])
+        assert engine._model_supports_pdf("gpt-4o") is False
+
+    def test_model_supports_pdf_unknown_model(self):
+        engine = self._engine_with_models([])
+        assert engine._model_supports_pdf("anything") is False
+
+
+class TestIsMultimodalContent:
+    def test_string_is_not_multimodal(self):
+        assert ExtractionEngine._is_multimodal_content("hello") is False
+
+    def test_empty_list_is_not_multimodal(self):
+        assert ExtractionEngine._is_multimodal_content([]) is False
+
+    def test_binary_content_list_is_multimodal(self):
+        from pydantic_ai import BinaryContent
+        content = [BinaryContent(data=b"fake", media_type="image/png")]
+        assert ExtractionEngine._is_multimodal_content(content) is True
+
+
+class TestDescribeContent:
+    def test_text_content(self):
+        engine = _engine()
+        assert engine._describe_content("some text") == "text"
+
+    def test_page_images(self):
+        from pydantic_ai import BinaryContent
+        engine = _engine()
+        content = [
+            BinaryContent(data=b"p1", media_type="image/png"),
+            BinaryContent(data=b"p2", media_type="image/png"),
+        ]
+        assert "page images" in engine._describe_content(content)
+
+    def test_pdf_content(self):
+        from pydantic_ai import BinaryContent
+        engine = _engine()
+        content = [BinaryContent(data=b"pdf-bytes", media_type="application/pdf")]
+        assert "PDF" in engine._describe_content(content)
+
+
+class TestBuildUserPrompt:
+    def test_text_prompt(self):
+        engine = _engine()
+        prompt = engine._build_user_prompt("some doc text", "Field A, Field B")
+        assert isinstance(prompt, str)
+        assert "Field A" in prompt
+        assert "some doc text" in prompt
+
+    def test_multimodal_prompt_returns_list(self):
+        from pydantic_ai import BinaryContent
+        engine = _engine()
+        images = [BinaryContent(data=b"img", media_type="image/png")]
+        prompt = engine._build_user_prompt(images, "Field A")
+        assert isinstance(prompt, list)
+        assert len(prompt) == 2  # text instruction + 1 image
+        assert "1 page(s)" in prompt[0]
+
+    def test_multimodal_prompt_pdf_native(self):
+        from pydantic_ai import BinaryContent
+        engine = _engine()
+        content = [BinaryContent(data=b"pdf", media_type="application/pdf")]
+        prompt = engine._build_user_prompt(content, "Field A")
+        assert isinstance(prompt, list)
+        assert "PDF document" in prompt[0]
+
+    def test_draft_hint_prepended(self):
+        engine = _engine()
+        prompt = engine._build_user_prompt("text", "Field A", draft_hint={"Field A": "val"})
+        assert "Draft extraction" in prompt
+        assert "val" in prompt
+
+    def test_fallback_mode_text(self):
+        engine = _engine()
+        prompt = engine._build_user_prompt("text", "Field A", fallback_mode=True)
+        assert "ONLY valid JSON" in prompt
+
+
+class TestFormatDraftAsText:
+    def test_basic(self):
+        result = ExtractionEngine._format_draft_as_text(
+            {"Name": "Alice", "Age": "30"}, ["Name", "Age"]
+        )
+        assert "Name: Alice" in result
+        assert "Age: 30" in result
+
+    def test_null_value(self):
+        result = ExtractionEngine._format_draft_as_text(
+            {"Name": None}, ["Name"]
+        )
+        assert "[not found]" in result
+
+
+class TestLoadFileContent:
+    """Tests for _load_file_content with real temp files."""
+
+    def test_image_file(self, tmp_path):
+        img_file = tmp_path / "test.png"
+        img_file.write_bytes(b"\x89PNG fake image data")
+        result = ExtractionEngine._load_file_content(str(img_file), model_supports_pdf=False)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0].media_type == "image/png"
+
+    def test_pdf_native(self, tmp_path):
+        pdf_file = tmp_path / "test.pdf"
+        pdf_file.write_bytes(b"%PDF-1.4 fake pdf data")
+        result = ExtractionEngine._load_file_content(str(pdf_file), model_supports_pdf=True)
+        assert result is not None
+        assert len(result) == 1
+        assert result[0].media_type == "application/pdf"
+
+    def test_unsupported_extension(self, tmp_path):
+        f = tmp_path / "test.xyz"
+        f.write_bytes(b"data")
+        result = ExtractionEngine._load_file_content(str(f), model_supports_pdf=False)
+        assert result is None
+
+    def test_missing_file(self):
+        result = ExtractionEngine._load_file_content("/nonexistent/file.png", model_supports_pdf=False)
+        assert result is None
+
+
+class TestExtractMultimodalGuard:
+    """Verify that use_images is only honoured when the model is multimodal."""
+
+    def test_non_multimodal_model_falls_back_to_text(self):
+        """When use_images=True but the model isn't multimodal, text path is used."""
+        engine = ExtractionEngine(system_config_doc={
+            "available_models": [{"name": "text-only-model"}],
+            "extraction_config": {"use_images": True, "mode": "one_pass",
+                                  "one_pass": {"thinking": False, "structured": False}},
+        })
+        # With no doc_texts and a non-multimodal model, should return []
+        # (not crash trying to load images)
+        result = engine.extract(
+            extract_keys=["Name"],
+            doc_texts=[],
+            doc_file_paths=["/fake/path.pdf"],
+            model="text-only-model",
+        )
+        assert result == []

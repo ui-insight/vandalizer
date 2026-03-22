@@ -7,6 +7,7 @@ import io
 import json
 from typing import Optional
 
+from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -560,6 +561,73 @@ async def get_workflow_suggestions(
     result_snapshot = latest.get("result_snapshot", latest)
     suggestions = await generate_improvement_suggestions("workflow", workflow_id, result_snapshot)
     return {"suggestions": suggestions}
+
+
+@router.get("/{workflow_id}/quality-status")
+async def get_workflow_quality_status(
+    workflow_id: str, user: User = Depends(get_current_user),
+):
+    """Return quality status for Quality Pulse card (mirrors extraction quality-status)."""
+    import hashlib
+    import datetime as _dt
+    from app.models.verification import VerifiedItemMetadata
+    from app.services.quality_service import get_latest_validation
+
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == "workflow",
+        VerifiedItemMetadata.item_id == workflow_id,
+    )
+    latest = await get_latest_validation("workflow", workflow_id)
+
+    if not latest and not meta:
+        return {"status": "unvalidated", "score": None, "tier": None, "config_changed": False, "stale": False, "last_validated_at": None}
+
+    score = meta.quality_score if meta else latest.get("score") if latest else None
+    tier = meta.quality_tier if meta else None
+    last_at = (meta.last_validated_at.isoformat() if meta and meta.last_validated_at else
+               latest.get("created_at") if latest else None)
+
+    # Check if workflow steps changed since last validation
+    config_changed = False
+    if latest:
+        last_config = latest.get("extraction_config", {})
+        current_steps = [{"name": s.get("name", ""), "tasks": s.get("tasks", [])} for s in (wf.get("steps_expanded", []) if isinstance(wf, dict) else [])]
+        if not current_steps:
+            # Fallback: hash validation_plan + step IDs
+            current_config = {"validation_plan": wf.validation_plan if hasattr(wf, "validation_plan") else [], "steps": [str(s) for s in (wf.steps if hasattr(wf, "steps") else [])]}
+        else:
+            current_config = current_steps
+        current_hash = hashlib.sha256(json.dumps(current_config, sort_keys=True, default=str).encode()).hexdigest()
+        last_hash = hashlib.sha256(json.dumps(last_config, sort_keys=True, default=str).encode()).hexdigest()
+        config_changed = current_hash != last_hash
+
+    # Check staleness (>14 days)
+    stale = False
+    now_utc = _dt.datetime.now(_dt.timezone.utc)
+    if meta and meta.last_validated_at:
+        lv = meta.last_validated_at
+        if lv.tzinfo is None:
+            lv = lv.replace(tzinfo=_dt.timezone.utc)
+        stale = (now_utc - lv).days > 14
+    elif latest and latest.get("created_at"):
+        from dateutil.parser import isoparse
+        created = isoparse(latest["created_at"])
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=_dt.timezone.utc)
+        stale = (now_utc - created).days > 14
+
+    return {
+        "status": "validated",
+        "score": score,
+        "tier": tier,
+        "last_validated_at": last_at,
+        "config_changed": config_changed,
+        "stale": stale,
+    }
 
 
 @router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)

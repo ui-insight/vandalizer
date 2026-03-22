@@ -14,6 +14,8 @@ class ModelInfo(BaseModel):
     tier: str = ""
     privacy: str = ""
     supports_structured: bool = True
+    multimodal: bool = False
+    supports_pdf: bool = False
 
 
 class UserConfigResponse(BaseModel):

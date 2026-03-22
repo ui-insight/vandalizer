@@ -1,0 +1,91 @@
+# Release Checklist
+
+Use this checklist before tagging a release that outside operators are expected to install or upgrade to.
+
+## 1. Prepare The Release Notes
+
+- Update the matching `## [Unreleased]` section in [CHANGELOG.md](CHANGELOG.md) with user-facing and operator-facing changes.
+- Write down any operator actions required for this release:
+  - `backend/.env` changes
+  - `compose.yaml` changes
+  - backup/restore expectations
+  - upgrade or rollback caveats
+- Review config and deployment drift since the previous release:
+
+```bash
+git diff <previous-tag>..HEAD -- backend/.env.example compose.yaml README.md DEPLOY.md OPERATIONS.md
+```
+
+## 2. Run Release Validation
+
+From a clean checkout of the release candidate:
+
+```bash
+make backend-install frontend-install
+make release-check
+```
+
+Optional but recommended while the backend static-analysis backlog is still being cleaned up:
+
+```bash
+make backend-static
+```
+
+## 3. Rehearse The Install And Bootstrap Path
+
+Use the same Docker Compose path documented for operators:
+
+```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env and set at minimum:
+#   JWT_SECRET_KEY=<strong-random-secret>
+# LLM API keys are configured per-model via System Config in the admin UI.
+
+docker compose up --build -d
+
+docker compose exec \
+  -e ADMIN_EMAIL=admin@example.edu \
+  -e ADMIN_PASSWORD='change-me-now' \
+  -e ADMIN_NAME='Initial Admin' \
+  -e DEFAULT_TEAM_NAME='Research Administration' \
+  api python bootstrap_install.py
+```
+
+Smoke checks:
+
+- `curl http://localhost:8001/api/health` returns `{"status":"ok", ...}`
+- The bootstrap admin can log in
+- The shared default team appears and is selectable
+- A newly created user joins the default team automatically when that option is configured
+
+The canonical `bootstrap_install.py` entrypoint is covered directly in the backend test suite, but an install rehearsal is still the best pre-tag confidence check for Compose releases.
+
+## 4. Confirm Backup, Restore, And Rollback Readiness
+
+- Take a fresh backup using [OPERATIONS.md](OPERATIONS.md).
+- If the release changes persistence, auth, migrations, or bootstrap behavior, run a restore drill on the candidate build.
+- Keep the previous known-good tag available for rollback.
+
+## 5. Tag And Publish
+
+When the candidate is approved:
+
+```bash
+git tag -a vX.Y.Z -m "Release vX.Y.Z"
+git push origin vX.Y.Z
+```
+
+The tagged GitHub Actions release workflow will:
+
+- rerun `make release-check`
+- publish versioned backend and frontend GHCR images
+- create the GitHub release entry for the tag
+
+## 6. Finalize Operator Notes
+
+Before announcing the release, make sure the GitHub release notes or changelog entry include:
+
+- the exact version or image tags to deploy
+- required config changes
+- any upgrade sequencing requirements
+- any restore or rollback caveats

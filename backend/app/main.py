@@ -178,14 +178,11 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 
 
 # ---------------------------------------------------------------------------
-# Prometheus metrics (optional)
+# Prometheus metrics
 # ---------------------------------------------------------------------------
-try:
-    from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator import Instrumentator
 
-    Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
-except ImportError:
-    pass
+Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 
 @app.get("/api/health")

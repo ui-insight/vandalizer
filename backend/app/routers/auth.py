@@ -3,6 +3,7 @@ import secrets
 import urllib.parse
 
 import httpx
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, Cookie, status
 from fastapi.responses import RedirectResponse
 
@@ -10,6 +11,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.rate_limit import limiter
 from app.models.system_config import SystemConfig
+from app.utils.encryption import decrypt_value
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
 from app.services import auth_service, audit_service
@@ -280,6 +282,14 @@ async def oauth_azure_login(settings: Settings = Depends(get_settings)):
             detail="Azure OAuth not configured",
         )
 
+    # Generate CSRF state token and store in Redis with 10-minute TTL
+    state = secrets.token_urlsafe(32)
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        await r.set(f"oauth_state:{state}", "1", ex=600)
+    finally:
+        await r.aclose()
+
     redirect_uri = f"{settings.frontend_url}/api/auth/oauth/azure/callback"
     params = {
         "client_id": azure["client_id"],
@@ -287,6 +297,7 @@ async def oauth_azure_login(settings: Settings = Depends(get_settings)):
         "redirect_uri": redirect_uri,
         "response_mode": "query",
         "scope": "openid profile email User.Read",
+        "state": state,
     }
     url = _AZURE_AUTHORIZE.format(tenant=azure["tenant_id"])
     return RedirectResponse(f"{url}?{urllib.parse.urlencode(params)}")
@@ -296,10 +307,24 @@ async def oauth_azure_login(settings: Settings = Depends(get_settings)):
 async def oauth_azure_callback(
     code: str | None = Query(default=None),
     error: str | None = Query(default=None),
+    state: str | None = Query(default=None),
     settings: Settings = Depends(get_settings),
 ):
     """Azure AD redirects here after the user authenticates."""
     landing = f"{settings.frontend_url}/landing"
+
+    # Validate OAuth state token to prevent CSRF
+    if not state:
+        return RedirectResponse(f"{landing}?error=oauth_state_invalid")
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        stored = await r.get(f"oauth_state:{state}")
+        if not stored:
+            return RedirectResponse(f"{landing}?error=oauth_state_invalid")
+        # Delete after validation (one-time use)
+        await r.delete(f"oauth_state:{state}")
+    finally:
+        await r.aclose()
 
     if error or not code:
         return RedirectResponse(f"{landing}?error=oauth_failed")
@@ -318,7 +343,7 @@ async def oauth_azure_callback(
                 _AZURE_TOKEN.format(tenant=azure["tenant_id"]),
                 data={
                     "client_id": azure["client_id"],
-                    "client_secret": azure["client_secret"],
+                    "client_secret": decrypt_value(azure["client_secret"]),
                     "code": code,
                     "redirect_uri": redirect_uri,
                     "grant_type": "authorization_code",

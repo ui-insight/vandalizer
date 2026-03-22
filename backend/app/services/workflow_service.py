@@ -10,6 +10,7 @@ from beanie import PydanticObjectId
 from celery.result import AsyncResult
 
 from app.celery_app import celery_app
+from app.models.document import SmartDocument
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import (
     Workflow,
@@ -479,8 +480,6 @@ async def run_workflow_batch(
 
     Returns a ``batch_id`` that can be polled via ``get_batch_status``.
     """
-    from app.models.document import SmartDocument
-
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:

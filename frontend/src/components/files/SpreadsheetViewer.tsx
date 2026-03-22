@@ -24,6 +24,19 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const url = downloadFileUrl(docUuid)
   const zoomLevel = ZOOM_LEVELS[zoom]
 
+  function loadSheet(wb: XLSX.WorkBook, index: number) {
+    const sheet = wb.Sheets[wb.SheetNames[index]]
+    const data: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+    if (data.length > 0) {
+      setHeaders(data[0].map(String))
+      setRows(data.slice(1).map(row => row.map(String)))
+    } else {
+      setHeaders([])
+      setRows([])
+    }
+    setActiveSheet(index)
+  }
+
   // Fetch and parse spreadsheet
   useEffect(() => {
     let cancelled = false
@@ -61,19 +74,6 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
 
     return () => { cancelled = true }
   }, [url])
-
-  function loadSheet(wb: XLSX.WorkBook, index: number) {
-    const sheet = wb.Sheets[wb.SheetNames[index]]
-    const data: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-    if (data.length > 0) {
-      setHeaders(data[0].map(String))
-      setRows(data.slice(1).map(row => row.map(String)))
-    } else {
-      setHeaders([])
-      setRows([])
-    }
-    setActiveSheet(index)
-  }
 
   const handleSheetChange = (index: number) => {
     if (workbook) loadSheet(workbook, index)

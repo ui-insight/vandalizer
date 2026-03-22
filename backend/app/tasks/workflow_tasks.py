@@ -106,6 +106,10 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 
     user_id = workflow_doc.get("user_id")
 
+    # Check if the user is an admin (gates code execution)
+    user_doc = db.user.find_one({"user_id": user_id}) if user_id else None
+    is_admin = bool(user_doc and user_doc.get("is_admin"))
+
     # Update result to running
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},
@@ -133,6 +137,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         model=model,
         user_id=user_id,
         system_config_doc=sys_config,
+        allow_code_execution=is_admin,
     )
 
     # Mark activity as running
@@ -446,6 +451,10 @@ def resume_workflow_after_approval(self, approval_uuid):
 
     user_id = workflow_doc.get("user_id")
 
+    # Check if the user is an admin (gates code execution)
+    user_doc = db.user.find_one({"user_id": user_id}) if user_id else None
+    is_admin = bool(user_doc and user_doc.get("is_admin"))
+
     # Get saved output from before the pause
     saved_output = approval_doc.get("data_for_review")
     initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
@@ -471,6 +480,7 @@ def resume_workflow_after_approval(self, approval_uuid):
         model=workflow_doc.get("resource_config", {}).get("model", "gpt-4o-mini"),
         user_id=user_id,
         system_config_doc=sys_config,
+        allow_code_execution=is_admin,
     )
 
     try:

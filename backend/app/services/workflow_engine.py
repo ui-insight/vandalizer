@@ -113,6 +113,50 @@ def _stringify_value(value):
     return str(value)
 
 
+def _run_sandboxed_code(code: str, input_data, result_queue) -> None:
+    """Execute sandboxed code in a child process so timeouts can be enforced."""
+    import datetime
+    import math
+
+    safe_builtins = {
+        "json": json,
+        "re": re,
+        "math": math,
+        "datetime": datetime,
+        "str": str,
+        "int": int,
+        "float": float,
+        "list": list,
+        "dict": dict,
+        "len": len,
+        "range": range,
+        "enumerate": enumerate,
+        "sorted": sorted,
+        "min": min,
+        "max": max,
+        "sum": sum,
+        "round": round,
+        "abs": abs,
+        "isinstance": isinstance,
+        "print": print,
+        "True": True,
+        "False": False,
+        "None": None,
+    }
+    local_vars = {"data": input_data, "result": None}
+
+    try:
+        exec(code, {"__builtins__": safe_builtins}, local_vars)  # noqa: S102
+    except Exception as exc:
+        result_queue.put({"error": str(exc)})
+        return
+
+    try:
+        result_queue.put({"result": local_vars.get("result", "")})
+    except Exception:
+        result_queue.put({"result": str(local_vars.get("result", ""))})
+
+
 # ---------------------------------------------------------------------------
 # LLM helper functions (sync, for nodes)
 # ---------------------------------------------------------------------------
@@ -249,6 +293,8 @@ class MultiTaskNode(Node):
         collected = []
         task_step_name = self.name
         for result in results:
+            if result.get("_approval_pause"):
+                return result
             result_output = result.get("output")
             if result_output is None:
                 continue
@@ -481,10 +527,6 @@ class CodeExecutionNode(Node):
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
         self.report_progress("Running code")
 
-        import concurrent.futures
-        import datetime
-        import math
-
         from app.utils.code_sandbox import validate_sandbox_code
 
         try:
@@ -495,38 +537,50 @@ class CodeExecutionNode(Node):
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
+        ctx = multiprocessing.get_context("spawn")
+        result_queue = ctx.Queue()
+        process = ctx.Process(
+            target=_run_sandboxed_code,
+            args=(code, inputs.get("output"), result_queue),
+            daemon=True,
+        )
 
-        safe_builtins = {
-            "json": json, "re": re, "math": math, "datetime": datetime,
-            "str": str, "int": int, "float": float, "list": list, "dict": dict,
-            "len": len, "range": range, "enumerate": enumerate, "sorted": sorted,
-            "min": min, "max": max, "sum": sum, "round": round, "abs": abs,
-            "isinstance": isinstance, "print": print,
-            "True": True, "False": False, "None": None,
-        }
-        local_vars = {"data": inputs.get("output"), "result": None}
+        try:
+            process.start()
+            process.join(timeout=self.CODE_TIMEOUT_SECONDS)
 
-        def _run_code():
-            exec(code, {"__builtins__": safe_builtins}, local_vars)  # noqa: S102
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_run_code)
-            try:
-                future.result(timeout=self.CODE_TIMEOUT_SECONDS)
-            except concurrent.futures.TimeoutError:
+            if process.is_alive():
+                process.terminate()
+                process.join(timeout=1)
                 return {
                     "output": f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds",
                     "input": inputs.get("output"),
                     "step_name": self.name,
                 }
-            except Exception as e:
+
+            if result_queue.empty():
                 return {
-                    "output": f"Code execution error: {e}",
+                    "output": None,
                     "input": inputs.get("output"),
                     "step_name": self.name,
                 }
 
-        return {"output": local_vars.get("result", ""), "input": inputs.get("output"), "step_name": self.name}
+            result = result_queue.get()
+            if "error" in result:
+                return {
+                    "output": f"Code execution error: {result['error']}",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+
+            return {
+                "output": result.get("result", ""),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+            }
+        finally:
+            result_queue.close()
+            result_queue.join_thread()
 
 
 class CrawlerNode(Node):
@@ -1026,6 +1080,7 @@ def build_workflow_engine(
     model: str,
     user_id: str | None = None,
     system_config_doc: dict | None = None,
+    allow_code_execution: bool = False,
 ) -> WorkflowEngine:
     """Build a WorkflowEngine from step data dicts.
 
@@ -1035,6 +1090,7 @@ def build_workflow_engine(
         model: LLM model name.
         user_id: User ID for extraction nodes.
         system_config_doc: Pre-fetched SystemConfig as dict.
+        allow_code_execution: If False, CodeNode tasks are rejected. Only admins should set True.
     """
     engine = WorkflowEngine()
     nodes = []
@@ -1077,6 +1133,9 @@ def build_workflow_engine(
                     n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "CodeNode":
+                    if not allow_code_execution:
+                        logger.warning("Code execution task rejected — user is not an admin")
+                        continue
                     n = CodeExecutionNode(data=task_data)
                     tasks.append(n)
                 elif task_name == "CrawlerNode":

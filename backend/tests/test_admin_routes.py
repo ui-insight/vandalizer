@@ -123,6 +123,11 @@ class TestAdminAnalyticsScoping:
     async def test_team_admin_user_leaderboard_hides_platform_role_flags(self, client):
         team_admin = _make_user("team-admin", current_team="0123456789abcdef01234567")
         cookies, headers = _auth("team-admin")
+        team = SimpleNamespace(
+            id="0123456789abcdef01234567",
+            uuid="team-uuid",
+            name="Team One",
+        )
         activity_event = SimpleNamespace(
             user_id="member-1",
             tokens_input=5,
@@ -153,11 +158,13 @@ class TestAdminAnalyticsScoping:
                 "app.routers.admin._require_admin_or_team_admin",
                 new=AsyncMock(return_value=(team_admin, "0123456789abcdef01234567")),
             ),
+            patch("app.routers.admin.Team") as MockTeam,
             patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
             patch("app.routers.admin.TeamMembership") as MockTeamMembership,
             patch("app.routers.admin.User") as MockRouteUser,
         ):
             MockUser.find_one = AsyncMock(return_value=team_admin)
+            MockTeam.find_one = AsyncMock(return_value=team)
             MockActivityEvent.find.return_value = activity_find
             MockTeamMembership.find.return_value = memberships_find
             MockRouteUser.find.return_value = users_find
@@ -278,5 +285,105 @@ class TestAdminAnalyticsScoping:
         assert query["team_id"]["$in"] == [
             "0123456789abcdef01234567",
             "team-object-id",
+            "team-uuid",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_team_admin_usage_stats_queries_both_team_identifiers(self, client):
+        team_admin = _make_user("team-admin", current_team="0123456789abcdef01234567")
+        cookies, headers = _auth("team-admin")
+        team = SimpleNamespace(
+            id="0123456789abcdef01234567",
+            uuid="team-uuid",
+            name="Team One",
+        )
+        events_find = MagicMock()
+        events_find.to_list = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "team-admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.admin._require_admin_or_team_admin",
+                new=AsyncMock(return_value=(team_admin, "0123456789abcdef01234567")),
+            ),
+            patch("app.routers.admin.Team") as MockTeam,
+            patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
+        ):
+            MockUser.find_one = AsyncMock(return_value=team_admin)
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockActivityEvent.find.return_value = events_find
+
+            resp = await client.get("/api/admin/usage", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        query = MockActivityEvent.find.call_args.args[0]
+        assert query["team_id"]["$in"] == [
+            "0123456789abcdef01234567",
+            "team-uuid",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_team_admin_can_view_own_team_detail_by_uuid(self, client):
+        team_admin = _make_user("team-admin", current_team="0123456789abcdef01234567")
+        cookies, headers = _auth("team-admin")
+        team = SimpleNamespace(
+            id="0123456789abcdef01234567",
+            uuid="team-uuid",
+            name="Team One",
+        )
+        team_membership = SimpleNamespace(user_id="member-1", role="admin")
+        target_user = SimpleNamespace(
+            user_id="member-1",
+            name="Member One",
+            email="member-1@example.com",
+        )
+
+        events_find = MagicMock()
+        events_find.to_list = AsyncMock(return_value=[])
+        recent_find = MagicMock()
+        recent_find.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+        memberships_find = MagicMock()
+        memberships_find.to_list = AsyncMock(return_value=[team_membership])
+        users_find = MagicMock()
+        users_find.to_list = AsyncMock(return_value=[target_user])
+        documents_find = MagicMock()
+        documents_find.count = AsyncMock(return_value=0)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "team-admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.admin._require_admin_or_team_admin",
+                new=AsyncMock(return_value=(team_admin, "0123456789abcdef01234567")),
+            ),
+            patch("app.routers.admin.Team") as MockTeam,
+            patch("app.routers.admin.TeamMembership") as MockTeamMembership,
+            patch("app.routers.admin.User") as MockRouteUser,
+            patch("app.routers.admin.ActivityEvent") as MockActivityEvent,
+            patch("app.routers.admin.SmartDocument") as MockSmartDocument,
+        ):
+            MockUser.find_one = AsyncMock(return_value=team_admin)
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockTeamMembership.find.return_value = memberships_find
+            MockRouteUser.find.return_value = users_find
+            MockActivityEvent.find.side_effect = [events_find, recent_find]
+            MockSmartDocument.find.return_value = documents_find
+
+            resp = await client.get(
+                "/api/admin/teams/team-uuid/detail",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        event_query = MockActivityEvent.find.call_args_list[0].args[0]
+        recent_query = MockActivityEvent.find.call_args_list[1].args[0]
+        assert event_query["team_id"]["$in"] == [
+            "0123456789abcdef01234567",
+            "team-uuid",
+        ]
+        assert recent_query["team_id"]["$in"] == [
+            "0123456789abcdef01234567",
             "team-uuid",
         ]

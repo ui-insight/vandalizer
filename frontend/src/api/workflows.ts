@@ -306,3 +306,18 @@ export function getWorkflowImprovementSuggestions(workflowId: string) {
     method: 'POST',
   })
 }
+
+// Quality status
+
+export interface WorkflowQualityStatus {
+  status: 'validated' | 'unvalidated'
+  score: number | null
+  tier: string | null
+  stale: boolean
+  config_changed: boolean
+  last_validated_at: string | null
+}
+
+export function getWorkflowQualityStatus(workflowId: string) {
+  return apiFetch<WorkflowQualityStatus>(`/api/workflows/${workflowId}/quality-status`)
+}

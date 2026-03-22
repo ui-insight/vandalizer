@@ -19,6 +19,7 @@ from beanie import PydanticObjectId
 
 from app.config import Settings
 from app.database import init_db
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.verification import VerifiedCollection, VerifiedItemMetadata
@@ -50,15 +51,19 @@ async def get_or_create_verified_library() -> Library:
     return lib
 
 
-async def ensure_collection(title: str, description: str) -> VerifiedCollection:
+async def ensure_collection(title: str, description: str, featured: bool = False) -> VerifiedCollection:
     """Get or create a VerifiedCollection by title."""
     existing = await VerifiedCollection.find_one(VerifiedCollection.title == title)
     if existing:
+        if featured and not existing.featured:
+            existing.featured = True
+            await existing.save()
         return existing
     now = datetime.datetime.now(datetime.timezone.utc)
     col = VerifiedCollection(
         title=title,
         description=description,
+        featured=featured,
         item_ids=[],
         created_by_user_id=SYSTEM_USER,
         created_at=now,
@@ -284,14 +289,79 @@ async def seed_search_set(
 
 
 # ---------------------------------------------------------------------------
+# Knowledge base seeding
+# ---------------------------------------------------------------------------
+
+async def seed_knowledge_base(
+    data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
+) -> bool:
+    """Seed a single knowledge base. Returns True if created, False if skipped."""
+    seed_id = meta["seed_id"]
+
+    # Idempotency: check if already seeded via title match
+    existing = await KnowledgeBase.find_one(
+        KnowledgeBase.title == data["items"][0]["title"],
+        KnowledgeBase.verified == True,  # noqa: E712
+    )
+    if existing:
+        return False
+
+    item = data["items"][0]
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    kb = KnowledgeBase(
+        title=item["title"],
+        description=item.get("description"),
+        user_id=SYSTEM_USER,
+        space="global",
+        verified=True,
+        status="ready",
+        created_at=now,
+        updated_at=now,
+    )
+    await kb.insert()
+
+    # Create source records (don't ingest - URLs may not be available at seed time)
+    source_count = 0
+    for src_data in item.get("sources", []):
+        src = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type=src_data.get("source_type", "url"),
+            url=src_data.get("url"),
+            url_title=src_data.get("url_title"),
+            status="pending",
+        )
+        await src.insert()
+        source_count += 1
+
+    kb.total_sources = source_count
+    await kb.save()
+
+    # Library item + metadata
+    await create_library_item(verified_lib, kb.id, LibraryItemKind.KNOWLEDGE_BASE)
+    await create_verified_metadata(
+        "knowledge_base", str(kb.id),
+        meta.get("display_name", item["title"]),
+        meta.get("description", item.get("description", "")),
+        meta.get("quality_tier", "gold"),
+    )
+
+    # Add to collections
+    for slug in meta.get("collections", []):
+        col = slug_to_collection.get(slug)
+        if col:
+            await add_to_collection(col, str(kb.id))
+
+    return True
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-async def main():
+async def seed_catalog():
+    """Seed the verified catalog. Expects Beanie to be already initialized."""
     print("Seeding verified catalog...")
-
-    settings = Settings()
-    await init_db(settings)
 
     verified_lib = await get_or_create_verified_library()
 
@@ -301,9 +371,9 @@ async def main():
     collections_data = json.loads(collections_path.read_text())
     slug_to_collection: dict[str, VerifiedCollection] = {}
     for coll in collections_data["collections"]:
-        col = await ensure_collection(coll["title"], coll["description"])
+        col = await ensure_collection(coll["title"], coll["description"], featured=coll.get("featured", False))
         slug_to_collection[coll["slug"]] = col
-        print(f"  {coll['title']}")
+        print(f"  {coll['title']}{' [featured]' if coll.get('featured') else ''}")
 
     # --- Phase 2: Workflows ---
     print("\n--- Workflows ---")
@@ -345,12 +415,40 @@ async def main():
             print(f"  = {name} (already exists)")
             ss_skipped += 1
 
+    # --- Phase 4: Knowledge Bases ---
+    print("\n--- Knowledge Bases ---")
+    kb_dir = SEEDS_DIR / "knowledge_bases"
+    kb_created = 0
+    kb_skipped = 0
+    if kb_dir.exists():
+        for kb_file in sorted(kb_dir.glob("*.json")):
+            data = json.loads(kb_file.read_text())
+            meta = data.get("_seed_meta", {})
+            if not meta.get("seed_id"):
+                print(f"  SKIP {kb_file.name}: missing _seed_meta.seed_id")
+                continue
+            created = await seed_knowledge_base(data, meta, verified_lib, slug_to_collection)
+            name = meta.get("display_name", kb_file.stem)
+            if created:
+                print(f"  + {name}")
+                kb_created += 1
+            else:
+                print(f"  = {name} (already exists)")
+                kb_skipped += 1
+
     # --- Save verified library ---
     await verified_lib.save()
 
     # --- Summary ---
     print(f"\nDone! Workflows: {wf_created} created, {wf_skipped} skipped. "
-          f"Search sets: {ss_created} created, {ss_skipped} skipped.")
+          f"Search sets: {ss_created} created, {ss_skipped} skipped. "
+          f"Knowledge bases: {kb_created} created, {kb_skipped} skipped.")
+
+
+async def main():
+    settings = Settings()
+    await init_db(settings)
+    await seed_catalog()
 
 
 if __name__ == "__main__":

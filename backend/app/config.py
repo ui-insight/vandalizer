@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     smtp_from_email: str = ""
     smtp_from_name: str = "Vandalizer"
 
+    # Encryption key for sensitive config values (API keys) stored in MongoDB.
+    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    config_encryption_key: str = ""
+
     # File storage backend ("local" or "s3")
     storage_backend: str = "local"
     s3_bucket: str = ""
@@ -43,9 +47,6 @@ class Settings(BaseSettings):
     s3_secret_access_key: str | None = None
     s3_endpoint_url: str | None = None
 
-    # LLM API keys
-    openai_api_key: str = ""
-
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":
         if self.jwt_secret_key == "change-me" and self.environment != "development":
@@ -53,15 +54,6 @@ class Settings(BaseSettings):
                 "jwt_secret_key must be changed from the default 'change-me' "
                 "in non-development environments. Generate one with: "
                 "python -c \"import secrets; print(secrets.token_urlsafe(64))\""
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _check_openai_api_key(self) -> "Settings":
-        if not self.openai_api_key and self.environment not in ("development", "test"):
-            raise ValueError(
-                "openai_api_key must be set in non-development/test environments. "
-                "Set the OPENAI_API_KEY environment variable."
             )
         return self
 

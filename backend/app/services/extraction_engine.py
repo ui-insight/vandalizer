@@ -11,10 +11,10 @@ import threading
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-from typing import Any, List, Literal, Optional
+from typing import Any, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
-from pydantic_ai import Agent
+from pydantic_ai import Agent, BinaryContent
 from app.services._json_schema_utils import inline_defs
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
@@ -24,9 +24,13 @@ from app.services.llm_service import (
     get_model_api_protocol,
 )
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
 logger = logging.getLogger(__name__)
+
+# Content that can be passed to extraction methods: plain text or page images.
+ExtractionContent = Union[str, list[BinaryContent]]
+
+# Maximum number of pages to render from a single PDF to avoid memory issues.
+MAX_PDF_PAGES_FOR_IMAGES = 50
 
 
 class ExtractionEngine:
@@ -67,6 +71,7 @@ class ExtractionEngine:
         extraction_config_override: dict | None = None,
         doc_texts: list[str] | None = None,
         field_metadata: list[dict] | None = None,
+        doc_file_paths: list[str] | None = None,
     ) -> list:
         """Run extraction. Returns list of entity dicts.
 
@@ -78,6 +83,7 @@ class ExtractionEngine:
             extraction_config_override: Per-extraction config overrides.
             doc_texts: Pre-loaded document texts.
             field_metadata: Per-field metadata (is_optional, enum_values) from search set items.
+            doc_file_paths: File paths for image-based extraction (used when use_images is enabled).
         """
         # Normalize keys
         if isinstance(extract_keys, str):
@@ -89,13 +95,38 @@ class ExtractionEngine:
         model = self._resolve_model(extraction_cfg, model)
         key_chunks = self._resolve_key_chunks(fields_to_extract, extraction_cfg)
         use_repetition = extraction_cfg.get("repetition", {}).get("enabled", False)
+        use_images = extraction_cfg.get("use_images", False)
 
         # Build metadata map
         meta_map: dict[str, dict] = {}
         if field_metadata:
             meta_map = {m["key"]: m for m in field_metadata}
 
-        # Resolve document texts
+        # Image-based extraction when enabled AND model is actually multimodal
+        if use_images and doc_file_paths and self._model_is_multimodal(model):
+            model_supports_pdf = self._model_supports_pdf(model)
+            all_results = []
+            for idx, file_path in enumerate(doc_file_paths):
+                content = self._load_file_content(file_path, model_supports_pdf)
+                if content is not None:
+                    doc_results = self._extract_document(
+                        content, key_chunks, model, extraction_cfg, use_repetition, meta_map
+                    )
+                    all_results.extend(doc_results)
+                else:
+                    # Fallback to OCR text if file can't be loaded for images
+                    texts = doc_texts or []
+                    if idx < len(texts) and texts[idx]:
+                        logger.warning(
+                            "Image loading failed for %s, falling back to text", file_path
+                        )
+                        doc_results = self._extract_document(
+                            texts[idx], key_chunks, model, extraction_cfg, use_repetition, meta_map
+                        )
+                        all_results.extend(doc_results)
+            return all_results
+
+        # Text-based extraction (default path)
         texts = doc_texts or []
         if full_text is not None:
             texts = [full_text]
@@ -105,7 +136,7 @@ class ExtractionEngine:
         all_results = []
         for doc_text in texts:
             doc_results = self._extract_document(
-                doc_text, key_chunks, model, extraction_config_override or {}, use_repetition, meta_map
+                doc_text, key_chunks, model, extraction_cfg, use_repetition, meta_map
             )
             all_results.extend(doc_results)
 
@@ -181,6 +212,21 @@ class ExtractionEngine:
             return models[0].get("name", "")
         return ""
 
+    def _get_model_config(self, model_name: str) -> dict:
+        """Look up a model's config dict from available_models."""
+        for m in self._sys_cfg.get("available_models", []):
+            if m.get("name") == model_name:
+                return m
+        return {}
+
+    def _model_is_multimodal(self, model_name: str) -> bool:
+        """Check if the given model has multimodal capability."""
+        return bool(self._get_model_config(model_name).get("multimodal", False))
+
+    def _model_supports_pdf(self, model_name: str) -> bool:
+        """Check if the given model has supports_pdf enabled."""
+        return bool(self._get_model_config(model_name).get("supports_pdf", False))
+
     def _resolve_key_chunks(self, keys: list[str], cfg: dict) -> list[list[str]]:
         chunking = cfg.get("chunking", {})
         if chunking.get("enabled") and chunking.get("max_keys_per_chunk", 0) > 0:
@@ -188,20 +234,87 @@ class ExtractionEngine:
         return [keys]
 
     # ------------------------------------------------------------------
-    # Per-document extraction
+    # File loading for multimodal extraction
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_file_content(file_path: str, model_supports_pdf: bool) -> "list[BinaryContent] | None":
+        """Load a file as multimodal content for LLM input.
+
+        Returns a list of BinaryContent (page images or a single PDF blob),
+        or None if the file cannot be loaded.
+        """
+        ext = os.path.splitext(file_path)[1].lower()
+
+        # Image files — return as-is
+        if ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff"):
+            mime_map = {
+                ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                ".gif": "image/gif", ".webp": "image/webp",
+                ".bmp": "image/bmp", ".tiff": "image/tiff",
+            }
+            try:
+                with open(file_path, "rb") as f:
+                    return [BinaryContent(data=f.read(), media_type=mime_map.get(ext, "image/png"))]
+            except Exception as e:
+                logger.error("Failed to read image file %s: %s", file_path, e)
+                return None
+
+        # PDFs
+        if ext == ".pdf":
+            # Native PDF support — send the raw file
+            if model_supports_pdf:
+                try:
+                    with open(file_path, "rb") as f:
+                        data = f.read()
+                    logger.info("Sending PDF natively: %s", file_path)
+                    return [BinaryContent(data=data, media_type="application/pdf")]
+                except Exception as e:
+                    logger.error("Failed to read PDF %s: %s", file_path, e)
+                    return None
+
+            # Image-only model — render pages to PNG
+            try:
+                import fitz  # pymupdf
+
+                doc = fitz.open(file_path)
+                total_pages = len(doc)
+                render_pages = min(total_pages, MAX_PDF_PAGES_FOR_IMAGES)
+                if total_pages > MAX_PDF_PAGES_FOR_IMAGES:
+                    logger.warning(
+                        "PDF %s has %d pages, capping at %d for image rendering",
+                        file_path, total_pages, MAX_PDF_PAGES_FOR_IMAGES,
+                    )
+                pages: list[BinaryContent] = []
+                for page in doc[:render_pages]:
+                    # 144 DPI (2x zoom) balances quality and memory
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                    pages.append(BinaryContent(data=pix.tobytes("png"), media_type="image/png"))
+                doc.close()
+                logger.info("Rendered %d/%d page(s) from %s", render_pages, total_pages, file_path)
+                return pages
+            except Exception as e:
+                logger.error("Failed to render PDF pages from %s: %s", file_path, e)
+                return None
+
+        logger.warning("Unsupported file type for multimodal extraction: %s", ext)
+        return None
+
+    # ------------------------------------------------------------------
+    # Per-document extraction (unified for text and multimodal)
     # ------------------------------------------------------------------
 
     def _extract_document(
-        self, doc_text: str, key_chunks: list[list[str]],
+        self, content: ExtractionContent, key_chunks: list[list[str]],
         model: str, cfg: dict, use_repetition: bool,
         meta_map: dict[str, dict] | None = None,
     ) -> list:
         doc_results = []
         for chunk_keys in key_chunks:
             if use_repetition:
-                chunk_result = self._extract_with_consensus(doc_text, chunk_keys, model, cfg, meta_map)
+                chunk_result = self._extract_with_consensus(content, chunk_keys, model, cfg, meta_map)
             else:
-                chunk_result = self._dispatch_extraction(doc_text, chunk_keys, model, cfg, meta_map)
+                chunk_result = self._dispatch_extraction(content, chunk_keys, model, cfg, meta_map)
             doc_results.extend(chunk_result)
 
         if len(key_chunks) > 1:
@@ -209,10 +322,10 @@ class ExtractionEngine:
         return doc_results
 
     # ------------------------------------------------------------------
-    # Dispatch layer
+    # Dispatch layer (unified for text and multimodal)
     # ------------------------------------------------------------------
 
-    def _dispatch_extraction(self, text: str, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
+    def _dispatch_extraction(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
         mode = config.get("mode", "two_pass")
 
         if mode == "one_pass":
@@ -220,22 +333,22 @@ class ExtractionEngine:
             thinking = one_pass.get("thinking", True)
             structured = one_pass.get("structured", True)
             pass_model = one_pass.get("model", "") or model_name
-            return self._execute_single_pass(text, keys, pass_model, thinking, structured, meta_map)
+            return self._execute_single_pass(content, keys, pass_model, thinking, structured, meta_map)
 
         # two_pass (default)
         two_pass = config.get("two_pass", {})
         pass_1_cfg = two_pass.get("pass_1", {})
         pass_2_cfg = two_pass.get("pass_2", {})
-        return self._execute_two_pass(text, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map)
+        return self._execute_two_pass(content, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map)
 
-    def _execute_single_pass(self, text: str, keys: list[str], model_name: str, thinking: bool, structured: bool, meta_map: dict[str, dict] | None = None) -> list:
+    def _execute_single_pass(self, content: ExtractionContent, keys: list[str], model_name: str, thinking: bool, structured: bool, meta_map: dict[str, dict] | None = None) -> list:
         if structured:
-            return self._extract_structured(text, keys, model_name, thinking_override=thinking, meta_map=meta_map)
+            return self._extract_structured(content, keys, model_name, thinking_override=thinking, meta_map=meta_map)
         else:
-            return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking, meta_map=meta_map)
+            return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking, meta_map=meta_map)
 
     def _execute_two_pass(
-        self, text: str, keys: list[str], model_name: str,
+        self, content: ExtractionContent, keys: list[str], model_name: str,
         pass_1_cfg: dict, pass_2_cfg: dict,
         meta_map: dict[str, dict] | None = None,
     ) -> list:
@@ -249,25 +362,44 @@ class ExtractionEngine:
 
         # Pass 1
         if p1_structured:
-            draft = self._extract_structured(text, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
+            draft = self._extract_structured(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
         else:
-            draft = self._extract_fallback_json(text, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
+            draft = self._extract_fallback_json(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
 
         draft_hint = self._build_draft_hint(draft)
 
-        # Pass 2
+        # Pass 2 — for multimodal two-pass, only re-send images if we have
+        # no usable draft (otherwise pass 2 uses the draft + text-only prompt
+        # to refine, which is cheaper and avoids double-sending images).
+        if draft_hint and self._is_multimodal_content(content):
+            p2_content: ExtractionContent = self._format_draft_as_text(draft_hint, keys)
+        else:
+            p2_content = content
+
         if p2_structured:
             final = self._extract_structured(
-                text, keys, p2_model,
+                p2_content, keys, p2_model,
                 thinking_override=p2_thinking,
                 draft_hint=draft_hint,
                 allow_fallback=False,
                 meta_map=meta_map,
             )
         else:
-            final = self._extract_fallback_json(text, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map)
+            final = self._extract_fallback_json(p2_content, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map)
 
         return final or draft or []
+
+    @staticmethod
+    def _format_draft_as_text(draft: dict, keys: list[str]) -> str:
+        """Convert a draft extraction to a text representation for pass 2.
+
+        This avoids re-sending all page images for the refinement pass.
+        """
+        lines = []
+        for key in keys:
+            val = draft.get(key)
+            lines.append(f"{key}: {val if val is not None else '[not found]'}")
+        return "Draft extraction results:\n" + "\n".join(lines)
 
     # ------------------------------------------------------------------
     # Chunking
@@ -291,10 +423,10 @@ class ExtractionEngine:
     # Repetition / Consensus
     # ------------------------------------------------------------------
 
-    def _extract_with_consensus(self, text: str, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
+    def _extract_with_consensus(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
         with ThreadPoolExecutor(max_workers=2) as executor:
-            future_1 = executor.submit(self._dispatch_extraction, text, keys, model_name, config, meta_map)
-            future_2 = executor.submit(self._dispatch_extraction, text, keys, model_name, config, meta_map)
+            future_1 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map)
+            future_2 = executor.submit(self._dispatch_extraction, content, keys, model_name, config, meta_map)
             result_1 = future_1.result()
             result_2 = future_2.result()
 
@@ -304,7 +436,7 @@ class ExtractionEngine:
         if norm_1 == norm_2:
             return result_1 if result_1 else result_2
 
-        result_3 = self._dispatch_extraction(text, keys, model_name, config, meta_map)
+        result_3 = self._dispatch_extraction(content, keys, model_name, config, meta_map)
         norm_3 = self._normalize_to_dict(result_3)
 
         consensus = self._majority_vote(keys, [norm_1, norm_2, norm_3])
@@ -365,6 +497,10 @@ class ExtractionEngine:
     # Prompt helpers
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _is_multimodal_content(content: ExtractionContent) -> bool:
+        return isinstance(content, list) and bool(content) and isinstance(content[0], BinaryContent)
+
     def _get_domain_supplement(self) -> str:
         """Get domain-specific prompt supplement if a domain is set."""
         if not self._domain:
@@ -401,13 +537,76 @@ class ExtractionEngine:
             parts.append(desc)
         return ", ".join(parts)
 
+    def _describe_content(self, content: ExtractionContent) -> str:
+        """Return a human label for the content type (for system prompts)."""
+        if self._is_multimodal_content(content):
+            items = content  # type: ignore[assignment]
+            if len(items) == 1 and items[0].media_type == "application/pdf":
+                return "attached PDF document"
+            return "attached document page images"
+        return "text"
+
+    def _build_user_prompt(
+        self,
+        content: ExtractionContent,
+        fields_str: str,
+        draft_hint: dict | None = None,
+        fallback_mode: bool = False,
+    ) -> Union[str, list]:
+        """Build the user prompt, handling both text and multimodal content."""
+        is_mm = self._is_multimodal_content(content)
+
+        if is_mm:
+            items: list[BinaryContent] = content  # type: ignore[assignment]
+            is_pdf = len(items) == 1 and items[0].media_type == "application/pdf"
+            if is_pdf:
+                source_desc = "the attached PDF document"
+            else:
+                source_desc = f"the attached document pages ({len(items)} page(s))"
+
+            if fallback_mode:
+                text_part = (
+                    f"Extract the following fields from {source_desc} and return them as a JSON object.\n"
+                    f"Return ONLY valid JSON, no markdown, no code blocks, no explanations.\n\n"
+                    f"Fields to extract: {fields_str}\n\n"
+                    f'Return a JSON object with these exact field names. If a field is not found, use null.\n'
+                    f'Example format: {{"Field Name 1": "value", "Field Name 2": null, ...}}'
+                )
+            else:
+                text_part = f"Extract the following fields from {source_desc}: {fields_str}"
+
+            if draft_hint:
+                draft_json = json.dumps(draft_hint, ensure_ascii=False)
+                text_part = f"Draft extraction (may be incorrect):\n{draft_json}\n\n{text_part}"
+
+            return [text_part, *items]
+
+        # Plain text
+        text: str = content  # type: ignore[assignment]
+        if fallback_mode:
+            prompt = (
+                f"Extract the following fields from the text and return them as a JSON object.\n"
+                f"Return ONLY valid JSON, no markdown, no code blocks, no explanations.\n\n"
+                f"Fields to extract: {fields_str}\n\nText:\n{text}\n\n"
+                f'Return a JSON object with these exact field names. If a field is not found, use null.\n'
+                f'Example format: {{"Field Name 1": "value", "Field Name 2": null, ...}}'
+            )
+        else:
+            prompt = f"Extract the following fields: {fields_str}\n\nText:\n{text}"
+
+        if draft_hint:
+            draft_json = json.dumps(draft_hint, ensure_ascii=False)
+            prompt = f"Draft extraction (may be incorrect):\n{draft_json}\n\n{prompt}"
+
+        return prompt
+
     # ------------------------------------------------------------------
     # Structured extraction
     # ------------------------------------------------------------------
 
     def _extract_structured(
         self,
-        text: str,
+        content: ExtractionContent,
         keys: list[str],
         model_name: str,
         thinking_override: Optional[bool] = None,
@@ -476,9 +675,10 @@ class ExtractionEngine:
         api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
         structured_retries = 3
 
+        source_label = self._describe_content(content)
         system_prompt = (
-            "You are a precise entity extraction assistant. Extract the requested information from the text. "
-            "Extract the exact text as it appears in the document. Do not infer types, do not convert numbers, "
+            f"You are a precise entity extraction assistant. Extract the requested information from the {source_label}. "
+            f"Extract the exact text as it appears in the document. Do not infer types, do not convert numbers, "
             "do not change formatting. Keep everything as strings. "
             "If a field is not found, leave it as null. "
             "Return a JSON object with an 'entities' key containing a list of extracted objects."
@@ -487,11 +687,7 @@ class ExtractionEngine:
 
         try:
             fields_str = self._build_fields_prompt(keys, meta_map)
-            prompt = f"Extract the following fields: {fields_str}\n\nText:\n{text}"
-
-            if draft_hint:
-                draft_json = json.dumps(draft_hint, ensure_ascii=False)
-                prompt = f"Draft extraction (may be incorrect):\n{draft_json}\n\n{prompt}"
+            prompt = self._build_user_prompt(content, fields_str, draft_hint=draft_hint)
 
             model_settings = None
             if api_protocol == "vllm":
@@ -532,7 +728,7 @@ class ExtractionEngine:
             if ("output validation" in error_msg or "retries" in error_msg.lower()
                     or "validation error" in error_msg.lower()):
                 if allow_fallback:
-                    return self._extract_fallback_json(text, keys, model_name, thinking_override=thinking_override, meta_map=meta_map)
+                    return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map)
                 return []
             return []
 
@@ -549,24 +745,19 @@ class ExtractionEngine:
 
     def _extract_fallback_json(
         self,
-        text: str,
+        content: ExtractionContent,
         keys: list[str],
         model_name: str,
         thinking_override: Optional[bool] = None,
         meta_map: dict[str, dict] | None = None,
     ) -> list:
         try:
+            source_label = self._describe_content(content)
             fields_str = self._build_fields_prompt(keys, meta_map)
-            prompt = (
-                f"Extract the following fields from the text and return them as a JSON object.\n"
-                f"Return ONLY valid JSON, no markdown, no code blocks, no explanations.\n\n"
-                f"Fields to extract: {fields_str}\n\nText:\n{text}\n\n"
-                f'Return a JSON object with these exact field names. If a field is not found, use null.\n'
-                f'Example format: {{"Field Name 1": "value", "Field Name 2": null, ...}}'
-            )
+            prompt = self._build_user_prompt(content, fields_str, fallback_mode=True)
 
             system_prompt = (
-                "You are a precise entity extraction assistant. Extract the requested information from the text. "
+                f"You are a precise entity extraction assistant. Extract the requested information from the {source_label}. "
                 "Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations. "
                 "If a field is not found, use null."
             )

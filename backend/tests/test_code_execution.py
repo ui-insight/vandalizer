@@ -1,5 +1,7 @@
 """Tests for CodeExecutionNode — sandbox restrictions and timeout."""
 
+import time
+
 import pytest
 
 from app.services.workflow_engine import CodeExecutionNode
@@ -150,3 +152,14 @@ class TestCodeExecutionTimeout:
         node = CodeExecutionNode({"code": "result = sum(range(1000))"})
         result = node.process({"output": None})
         assert result["output"] == 499500
+
+    def test_busy_loop_times_out_without_hanging(self):
+        node = CodeExecutionNode({"code": "while True: pass"})
+        node.CODE_TIMEOUT_SECONDS = 1
+
+        started = time.monotonic()
+        result = node.process({"output": None})
+        elapsed = time.monotonic() - started
+
+        assert "timed out" in result["output"]
+        assert elapsed < 5

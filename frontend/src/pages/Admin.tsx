@@ -2100,6 +2100,7 @@ function ConfigTab() {
   const [twoPassP2Thinking, setTwoPassP2Thinking] = useState(false)
   const [twoPassP2Structured, setTwoPassP2Structured] = useState(true)
   const [twoPassP2Model, setTwoPassP2Model] = useState('')
+  const [useImages, setUseImages] = useState(false)
 
   // Quality config
   const [requireValidation, setRequireValidation] = useState(false)
@@ -2121,7 +2122,7 @@ function ConfigTab() {
   const [showModelForm, setShowModelForm] = useState(false)
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
   const [savingModel, setSavingModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
 
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
@@ -2142,6 +2143,7 @@ function ConfigTab() {
       setChunkingEnabled(!!chunking.enabled)
       setMaxKeysPerChunk((chunking.max_keys_per_chunk as number) || 10)
       setRepetitionEnabled(!!((ec as Record<string, unknown>).repetition as Record<string, unknown>)?.enabled)
+      setUseImages(!!(ec as Record<string, unknown>).use_images)
       const onePass = (ec as Record<string, unknown>).one_pass as Record<string, unknown> || {}
       setOnePassThinking(onePass.thinking !== false)
       setOnePassStructured((onePass.structured_output ?? onePass.structured) !== false)
@@ -2189,6 +2191,7 @@ function ConfigTab() {
           },
           chunking: { enabled: chunkingEnabled, max_keys_per_chunk: maxKeysPerChunk },
           repetition: { enabled: repetitionEnabled },
+          use_images: useImages,
         },
         quality_config: {
           verification_gates: {
@@ -2246,7 +2249,7 @@ function ConfigTab() {
         res = await addModel(newModel)
       }
       if (cfg) setCfg({ ...cfg, available_models: res.models })
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
       setShowModelForm(false)
       setEditingModelIndex(null)
     } catch (e) {
@@ -2271,6 +2274,8 @@ function ConfigTab() {
       tier: m.tier || '',
       privacy: m.privacy || '',
       supports_structured: m.supports_structured !== false,
+      multimodal: !!m.multimodal,
+      supports_pdf: !!m.supports_pdf,
     })
     setEditingModelIndex(index)
     setShowModelForm(true)
@@ -2354,7 +2359,7 @@ function ConfigTab() {
           <div style={{ flex: 1 }} />
           <button
             onClick={() => {
-              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true })
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
               setEditingModelIndex(null)
               setShowModelForm(!showModelForm)
             }}
@@ -2386,6 +2391,12 @@ function ConfigTab() {
                       )}
                       {m.thinking && (
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600 }}>Thinking</span>
+                      )}
+                      {m.multimodal && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#ede9fe', color: '#5b21b6', fontWeight: 600 }}>Multimodal</span>
+                      )}
+                      {m.supports_pdf && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fce7f3', color: '#9d174d', fontWeight: 600 }}>PDF Input</span>
                       )}
                       {m.api_protocol && (
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#e0e7ff', color: '#3730a3', fontWeight: 600 }}>{m.api_protocol}</span>
@@ -2494,6 +2505,16 @@ function ConfigTab() {
                   <input type="checkbox" checked={newModel.supports_structured} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, supports_structured: v })) }} style={checkStyle} />
                   Supports Structured Output
                 </label>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={newModel.multimodal} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, multimodal: v, supports_pdf: v ? prev.supports_pdf : false })) }} style={checkStyle} />
+                  Multimodal
+                </label>
+                {newModel.multimodal && (
+                  <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={newModel.supports_pdf} onChange={e => { const v = e.target.checked; setNewModel(prev => ({ ...prev, supports_pdf: v })) }} style={checkStyle} />
+                    Supports PDF Input
+                  </label>
+                )}
               </div>
               {error && (
                 <div style={{ marginTop: 12, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
@@ -2859,6 +2880,19 @@ function ConfigTab() {
               <input type="checkbox" checked={repetitionEnabled} onChange={e => setRepetitionEnabled(e.target.checked)} style={checkStyle} />
               Enable Repetition/Consensus
             </label>
+
+            {/* Use Images (multimodal) — only shown when multimodal models exist */}
+            {cfg?.available_models?.some(m => m.multimodal) && (
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={useImages} onChange={e => setUseImages(e.target.checked)} style={checkStyle} />
+                  Use Document Images (Multimodal)
+                </label>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, paddingLeft: 24 }}>
+                  Send document files directly to multimodal LLMs instead of OCR text. Requires a multimodal model to be selected for extraction.
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

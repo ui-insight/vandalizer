@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import {
   X, Play, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
   FileText, Filter, Outdent, Globe, Image, Code,
@@ -14,12 +14,12 @@ import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow, runWorkflow, streamWorkflowStatus, createTempDocuments,
-  getWorkflowQualityHistory, getWorkflowImprovementSuggestions,
+  getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
   exportWorkflowUrl, importWorkflow,
 } from '../../api/workflows'
-import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus } from '../../api/workflows'
+import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { getModels } from '../../api/config'
 import { listContents, searchDocuments } from '../../api/documents'
@@ -31,6 +31,12 @@ import type { Document as VDoc } from '../../types/document'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
+import { QualityBadge } from '../library/QualityBadge'
+import { QualitySparkline } from '../library/QualitySparkline'
+import { useQualitySparkline } from '../../hooks/useQualitySparkline'
+import { relativeTime } from '../../utils/time'
+import { submitForVerification } from '../../api/library'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -143,6 +149,9 @@ export function WorkflowEditorPanel() {
   const [batchMode, setBatchMode] = useState(false)
   const [runElapsed, setRunElapsed] = useState(0)
   const [textInput, setTextInput] = useState('')
+  const [qualityStatus, setQualityStatus] = useState<WorkflowQualityStatus | null>(null)
+  const { scores: sparklineScores, refresh: refreshSparkline } = useQualitySparkline('workflow', openWorkflowId ?? undefined)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
@@ -165,9 +174,19 @@ export function WorkflowEditorPanel() {
     } finally {
       setLoading(false)
     }
-  }, [openWorkflowId])
+    refreshSparkline()
+    getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
+  }, [openWorkflowId, refreshSparkline])
 
   useEffect(() => { refresh() }, [refresh])
+
+  // Fetch quality status on mount
+  useEffect(() => {
+    if (!openWorkflowId) return
+    getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
+    const key = `quality-nudge-dismissed-wf-${openWorkflowId}`
+    setNudgeDismissed(!!localStorage.getItem(key))
+  }, [openWorkflowId])
 
   // --- run elapsed timer ---
 
@@ -356,6 +375,17 @@ export function WorkflowEditorPanel() {
                 {workflow.name}
               </span>
               <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              {qualityStatus?.tier && (
+                <>
+                  <QualityBadge tier={qualityStatus.tier} score={qualityStatus.score ?? null} />
+                  {sparklineScores.length >= 2 && <QualitySparkline scores={sparklineScores} />}
+                </>
+              )}
+              {qualityStatus?.last_validated_at && (
+                <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                  Validated {relativeTime(qualityStatus.last_validated_at)}
+                </span>
+              )}
             </div>
           )}
           <button
@@ -406,6 +436,13 @@ export function WorkflowEditorPanel() {
         {TABS.map(tab => {
           const TabIcon = tab.icon
           const badge = tab.key === 'input' ? inputBadge : 0
+          // Colored dot for validate tab
+          let tabDot: string | null = null
+          if (tab.key === 'validate' && qualityStatus) {
+            if (qualityStatus.status === 'unvalidated') tabDot = '#9ca3af'
+            else if (qualityStatus.stale) tabDot = '#eab308'
+            else if (qualityStatus.score != null && qualityStatus.score < 50) tabDot = '#dc2626'
+          }
           return (
             <button
               key={tab.key}
@@ -427,6 +464,12 @@ export function WorkflowEditorPanel() {
             >
               <TabIcon style={{ width: 14, height: 14 }} />
               {tab.label}
+              {tabDot && (
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  backgroundColor: tabDot, display: 'inline-block',
+                }} />
+              )}
               {badge > 0 && (
                 <span style={{
                   minWidth: 18, height: 18, borderRadius: 9, fontSize: 10, fontWeight: 700,
@@ -446,20 +489,87 @@ export function WorkflowEditorPanel() {
       {/* ===== TAB CONTENT ===== */}
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
         {activeTab === 'design' && (
-          <DesignCanvas
-            workflow={workflow}
-            selectedDocCount={selectedDocUuids.length}
-            runnerStatus={runner.status}
-            runnerRunning={runner.running}
-            runnerSessionId={runner.sessionId}
-            batchStatus={runner.batchStatus}
-            runElapsed={runElapsed}
-            showDownloadPopup={showDownloadPopup}
-            setShowDownloadPopup={setShowDownloadPopup}
-            onClickStep={setEditingStepId}
-            onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
-            onMoveStep={handleMoveStep}
-          />
+          <>
+            <DesignCanvas
+              workflow={workflow}
+              selectedDocCount={selectedDocUuids.length}
+              runnerStatus={runner.status}
+              runnerRunning={runner.running}
+              runnerSessionId={runner.sessionId}
+              batchStatus={runner.batchStatus}
+              runElapsed={runElapsed}
+              showDownloadPopup={showDownloadPopup}
+              setShowDownloadPopup={setShowDownloadPopup}
+              onClickStep={setEditingStepId}
+              onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
+              onMoveStep={handleMoveStep}
+            />
+            {/* Quality Pulse card */}
+            {qualityStatus && openWorkflowId && (
+              <div style={{ padding: '0 24px 24px' }}>
+                {qualityStatus.status === 'unvalidated' ? (
+                  workflow.num_executions > 0 ? (
+                    <div style={{
+                      padding: 16, border: '1px solid #e5e7eb',
+                      borderRadius: 8, backgroundColor: '#fafafa',
+                      display: 'flex', alignItems: 'center', gap: 12,
+                    }}>
+                      <ShieldCheck style={{ width: 20, height: 20, color: '#9ca3af', flexShrink: 0 }} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>No validation data yet</div>
+                        <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                          Run validation to check workflow output quality
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('validate')}
+                        style={{
+                          padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                          borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                          color: '#374151', cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Validate
+                      </button>
+                    </div>
+                  ) : null
+                ) : (
+                  <div style={{
+                    padding: 16,
+                    border: qualityStatus.config_changed ? '1px solid #fde68a' : '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    backgroundColor: qualityStatus.config_changed ? '#fffbeb' : '#fafafa',
+                    display: 'flex', alignItems: 'center', gap: 12,
+                  }}>
+                    <ShieldCheck style={{
+                      width: 20, height: 20, flexShrink: 0,
+                      color: qualityStatus.config_changed ? '#d97706' : qualityStatus.tier === 'excellent' ? '#16a34a' : qualityStatus.tier === 'good' ? '#2563eb' : '#d97706',
+                    }} />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <QualityBadge tier={qualityStatus.tier} score={qualityStatus.score} />
+                        {qualityStatus.last_validated_at && (
+                          <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                            {relativeTime(qualityStatus.last_validated_at)}
+                          </span>
+                        )}
+                      </div>
+                      {qualityStatus.config_changed && (
+                        <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
+                          Workflow changed since last validation — re-validate for accurate results
+                        </div>
+                      )}
+                      {qualityStatus.stale && !qualityStatus.config_changed && (
+                        <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
+                          Last validated over 2 weeks ago — consider re-validating
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         {activeTab === 'input' && <InputTab workflow={workflow} openWorkflowId={openWorkflowId} onRefresh={refresh} />}
@@ -468,9 +578,47 @@ export function WorkflowEditorPanel() {
             workflowId={openWorkflowId}
             selectedDocUuids={selectedDocUuids}
             bumpActivitySignal={bumpActivitySignal}
+            onValidated={() => {
+              refreshSparkline()
+              if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
+            }}
           />
         )}
       </div>
+
+      {/* Nudge banner for unvalidated workflows after run */}
+      {activeTab === 'design' && !nudgeDismissed && qualityStatus?.status === 'unvalidated' && runner.status?.status === 'completed' && (
+        <div style={{
+          padding: '8px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
+          display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+        }}>
+          <ShieldCheck style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#1e40af', flex: 1 }}>
+            Check output quality with validation
+          </span>
+          <button
+            onClick={() => setActiveTab('validate')}
+            style={{
+              fontSize: 12, fontWeight: 600, color: '#2563eb', background: 'none',
+              border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '2px 6px',
+            }}
+          >
+            Validate
+          </button>
+          <button
+            onClick={() => {
+              setNudgeDismissed(true)
+              if (openWorkflowId) localStorage.setItem(`quality-nudge-dismissed-wf-${openWorkflowId}`, '1')
+            }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+              color: '#9ca3af', display: 'flex',
+            }}
+          >
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        </div>
+      )}
 
       {/* ===== BOTTOM TOOLBAR (Run) ===== */}
       <div style={{ flexShrink: 0, padding: 15, backgroundColor: '#fff', boxShadow: '0 0px 23px -8px rgb(211,211,211)' }}>
@@ -3146,10 +3294,12 @@ function ValidateTab({
   workflowId,
   selectedDocUuids,
   bumpActivitySignal,
+  onValidated,
 }: {
   workflowId: string | null
   selectedDocUuids: string[]
   bumpActivitySignal: () => void
+  onValidated?: () => void
 }) {
   // Plan state
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
@@ -3185,6 +3335,31 @@ function ValidateTab({
   const [qualityHistory, setQualityHistory] = useState<QualityHistoryRun[]>([])
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
+  const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
+  const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
+  const [submittingToLibrary, setSubmittingToLibrary] = useState(false)
+
+  // Progress tracking for Run & Validate
+  const [runElapsedValidate, setRunElapsedValidate] = useState(0)
+  const runStartRef = useRef<number | null>(null)
+  const runElapsedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Track elapsed time during run & validate phases
+  useEffect(() => {
+    if (runPhase !== 'idle') {
+      if (!runStartRef.current) runStartRef.current = Date.now()
+      runElapsedTimerRef.current = setInterval(() => {
+        if (runStartRef.current) setRunElapsedValidate(Math.round((Date.now() - runStartRef.current) / 1000))
+      }, 1000)
+    } else {
+      if (runElapsedTimerRef.current) clearInterval(runElapsedTimerRef.current)
+      runElapsedTimerRef.current = null
+      runStartRef.current = null
+      setRunElapsedValidate(0)
+    }
+    return () => { if (runElapsedTimerRef.current) clearInterval(runElapsedTimerRef.current) }
+  }, [runPhase])
 
   // Debounce timers
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -3208,13 +3383,23 @@ function ValidateTab({
     }, 800)
   }, [workflowId])
 
-  // Load plan, inputs, and quality history on mount
+  // Load plan, inputs, and quality history on mount — auto-generate plan if empty
   useEffect(() => {
     if (!workflowId) return
     setPlanLoading(true)
     setInputsLoading(true)
     getValidationPlan(workflowId)
-      .then(r => setPlanChecks(r.checks))
+      .then(r => {
+        setPlanChecks(r.checks)
+        // Auto-generate plan if empty (zero-friction onboarding)
+        if (r.checks.length === 0) {
+          setGenerating(true)
+          generateValidationPlan(workflowId)
+            .then(gen => setPlanChecks(gen.checks))
+            .catch(() => {})
+            .finally(() => setGenerating(false))
+        }
+      })
       .catch(() => {})
       .finally(() => setPlanLoading(false))
     getValidationInputs(workflowId)
@@ -3257,6 +3442,15 @@ function ValidateTab({
       getWorkflowQualityHistory(workflowId)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
+      onValidated?.()
+      // Auto-fetch improvement suggestions when grade is not A
+      if (res.grade !== 'A') {
+        setLoadingSuggestions(true)
+        getWorkflowImprovementSuggestions(workflowId)
+          .then(r => setSuggestions(r.suggestions))
+          .catch(() => {})
+          .finally(() => setLoadingSuggestions(false))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Validation failed')
     } finally {
@@ -3335,6 +3529,15 @@ function ValidateTab({
       getWorkflowQualityHistory(workflowId)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
+      onValidated?.()
+      // Auto-fetch improvement suggestions when grade is not A
+      if (res.grade !== 'A') {
+        setLoadingSuggestions(true)
+        getWorkflowImprovementSuggestions(workflowId)
+          .then(r => setSuggestions(r.suggestions))
+          .catch(() => {})
+          .finally(() => setLoadingSuggestions(false))
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Run & Validate failed')
     } finally {
@@ -3385,7 +3588,7 @@ function ValidateTab({
     if (newUuids.length === 0) return
 
     // Look up titles via search
-    let titleMap: Record<string, string> = {}
+    const titleMap: Record<string, string> = {}
     try {
       const res = await searchDocuments('', 100)
       for (const doc of res.items) {
@@ -3884,41 +4087,54 @@ function ValidateTab({
           </div>
         )}
 
-        {/* ---- Quality History Chart ---- */}
-        {qualityHistory.length > 1 && (
+        {/* ---- Progress Display ---- */}
+        {runPhase !== 'idle' && (
           <div style={{
-            border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fff',
+            border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
+            backgroundColor: '#f0f5ff',
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-              <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
-              <span style={{ fontSize: 11, color: '#9ca3af' }}>({qualityHistory.length} runs)</span>
+            {/* Progress bar */}
+            <div style={{
+              height: 6, borderRadius: 3, backgroundColor: '#dbeafe',
+              marginBottom: 16, overflow: 'hidden',
+            }}>
+              <div style={{
+                height: '100%', borderRadius: 3,
+                backgroundColor: '#3b82f6',
+                width: runPhase === 'validating' ? '90%' : '50%',
+                transition: 'width 1s ease',
+              }} />
             </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 60 }}>
-              {[...qualityHistory].reverse().map((run, i) => {
-                const gc = run.grade ? (GRADE_COLORS[run.grade] || GRADE_COLORS.F) : GRADE_COLORS.F
-                const barHeight = Math.max(4, Math.round(run.score * 0.6))
-                return (
-                  <div
-                    key={run.uuid}
-                    title={`Run ${i + 1}: Grade ${run.grade || '?'} (Score ${Math.round(run.score)}) | ${run.checks_passed}/${run.checks_passed + run.checks_failed} passed | ${new Date(run.created_at).toLocaleDateString()}`}
-                    style={{
-                      flex: 1, maxWidth: 24, height: barHeight,
-                      backgroundColor: gc.text, borderRadius: 2,
-                      opacity: i === [...qualityHistory].length - 1 ? 1 : 0.6,
-                      transition: 'height 0.2s', cursor: 'default',
-                    }}
-                  />
-                )
-              })}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <Loader2 style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e40af' }}>
+                  {runPhase === 'running' ? 'Running workflow' : 'Evaluating quality checks'}
+                </div>
+                <div style={{ fontSize: 12, color: '#3b5998', marginTop: 2 }}>
+                  {runProgress}
+                </div>
+              </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>
-                {new Date(qualityHistory[qualityHistory.length - 1].created_at).toLocaleDateString()}
+
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{
+                fontSize: 11, padding: '3px 8px', borderRadius: 4,
+                backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
+              }}>
+                {inputs.length} {inputs.length === 1 ? 'input' : 'inputs'}
               </span>
-              <span style={{ fontSize: 10, color: '#9ca3af' }}>
-                {new Date(qualityHistory[0].created_at).toLocaleDateString()}
+              <span style={{
+                fontSize: 11, padding: '3px 8px', borderRadius: 4,
+                backgroundColor: '#dbeafe', color: '#1e40af', fontWeight: 500,
+              }}>
+                {planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'}
               </span>
+            </div>
+
+            <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>
+              Elapsed: {runElapsedValidate < 60 ? `${runElapsedValidate}s` : `${Math.floor(runElapsedValidate / 60)}m ${runElapsedValidate % 60}s`}
             </div>
           </div>
         )}
@@ -3951,12 +4167,12 @@ function ValidateTab({
               <div style={{
                 border: '1px solid #fde68a', borderRadius: 8, padding: 16, backgroundColor: '#fffbeb',
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (suggestions || loadingSuggestions) ? 12 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
                   </div>
-                  {!suggestions && (
+                  {!suggestions && !loadingSuggestions && (
                     <button
                       onClick={handleGetSuggestions}
                       disabled={loadingSuggestions}
@@ -3964,18 +4180,19 @@ function ValidateTab({
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                         borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
-                        color: '#92400e', cursor: loadingSuggestions ? 'not-allowed' : 'pointer',
-                        opacity: loadingSuggestions ? 0.6 : 1,
+                        color: '#92400e', cursor: 'pointer',
                       }}
                     >
-                      {loadingSuggestions ? (
-                        <><Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} /> Analyzing...</>
-                      ) : (
-                        'Get AI Suggestions'
-                      )}
+                      Get AI Suggestions
                     </button>
                   )}
                 </div>
+                {loadingSuggestions && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e' }}>
+                    <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+                    Analyzing validation results...
+                  </div>
+                )}
                 {suggestions && (
                   <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
                     {suggestions}
@@ -3983,6 +4200,187 @@ function ValidateTab({
                 )}
               </div>
             )}
+
+            {/* ---- Quality History Chart ---- */}
+            {qualityHistory.length > 1 && (() => {
+              const chartData = [...qualityHistory].reverse().map(r => ({
+                date: new Date(r.created_at).toLocaleDateString(),
+                score: Math.round(r.score),
+                grade: r.grade || '?',
+                passed: r.checks_passed,
+                failed: r.checks_failed,
+              }))
+              const latestScore = chartData.length > 0 ? chartData[chartData.length - 1].score : 0
+              const lineColor = latestScore >= 90 ? '#16a34a' : latestScore >= 70 ? '#d97706' : '#dc2626'
+              return (
+                <div style={{
+                  border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fff',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                    <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
+                    <span style={{ fontSize: 11, color: '#9ca3af' }}>({qualityHistory.length} runs)</span>
+                  </div>
+                  <div style={{ width: '100%', height: 80 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                        <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} interval="preserveStartEnd" />
+                        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
+                        <Tooltip
+                          contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
+                          formatter={(value: number | undefined, name?: string) => {
+                            if (name === 'score') return [`${value ?? 0}%`, 'Quality']
+                            return [value, name]
+                          }}
+                          labelFormatter={(label, payload) => {
+                            const item = payload?.[0]?.payload
+                            if (item) return `${label} — Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
+                            return label
+                          }}
+                        />
+                        <Line type="monotone" dataKey="score" stroke={lineColor} strokeWidth={2} dot={{ r: 2 }} name="score" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Expand toggle for run details */}
+                  <button
+                    onClick={() => setHistoryExpanded(!historyExpanded)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 4, marginTop: 8,
+                      fontSize: 11, color: '#6b7280', background: 'none', border: 'none',
+                      cursor: 'pointer', padding: '4px 0', fontFamily: 'inherit',
+                    }}
+                  >
+                    {historyExpanded
+                      ? <ChevronDown style={{ width: 12, height: 12 }} />
+                      : <ChevronRight style={{ width: 12, height: 12 }} />}
+                    {historyExpanded ? 'Hide run details' : 'Show all runs'}
+                  </button>
+
+                  {/* Collapsible run comparison table */}
+                  {historyExpanded && (
+                    <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 4 }}>
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <th style={{ width: 20, padding: '4px 2px' }} />
+                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Date</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
+                          <th style={{ textAlign: 'center', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Grade</th>
+                          <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Checks</th>
+                          <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {qualityHistory.map((run) => {
+                          const scoreColor = run.score >= 90 ? '#059669' : run.score >= 70 ? '#d97706' : '#dc2626'
+                          const gc = run.grade ? (GRADE_COLORS[run.grade] || GRADE_COLORS.F) : GRADE_COLORS.F
+                          const isExpanded = expandedRunId === run.uuid
+                          return (
+                            <React.Fragment key={run.uuid}>
+                              <tr
+                                style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
+                                onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
+                              >
+                                <td style={{ padding: '4px 2px', color: '#9ca3af' }}>
+                                  {isExpanded
+                                    ? <ChevronDown style={{ width: 12, height: 12 }} />
+                                    : <ChevronRight style={{ width: 12, height: 12 }} />}
+                                </td>
+                                <td style={{ padding: '4px 6px', color: '#374151' }}>
+                                  {new Date(run.created_at).toLocaleDateString()}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
+                                  {Math.round(run.score)}
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'center' }}>
+                                  <span style={{
+                                    display: 'inline-block', padding: '1px 6px', borderRadius: 4,
+                                    backgroundColor: gc.bg, color: gc.text, fontSize: 10, fontWeight: 700,
+                                  }}>
+                                    {run.grade || '—'}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
+                                  {run.checks_passed}/{run.checks_passed + run.checks_failed}
+                                </td>
+                                <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
+                                  {run.model || '—'}
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr>
+                                  <td colSpan={6} style={{ padding: '8px 6px 12px 24px', backgroundColor: '#f9fafb' }}>
+                                    <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6 }}>
+                                      <div><strong>Checks passed:</strong> {run.checks_passed}</div>
+                                      <div><strong>Checks failed:</strong> {run.checks_failed}</div>
+                                      <div><strong>Total checks:</strong> {run.num_checks}</div>
+                                      {run.model && <div><strong>Model:</strong> {run.model}</div>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              )
+            })()}
+
+            {/* Submit to library nudge */}
+            {(() => {
+              const latestScore = qualityHistory.length > 0 ? qualityHistory[0].score : null
+              const displayScore = latestScore ?? 0
+              if (displayScore < 80) return null
+              return (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '12px 16px', borderRadius: 8,
+                  backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
+                }}>
+                  <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
+                  <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
+                    <strong>Great results!</strong> This workflow scored {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
+                  </div>
+                  {submitLibraryResult === 'success' ? (
+                    <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+                  ) : (
+                    <button
+                      disabled={submittingToLibrary}
+                      onClick={async (e) => {
+                        e.stopPropagation()
+                        if (!workflowId) return
+                        setSubmittingToLibrary(true)
+                        try {
+                          await submitForVerification({
+                            item_kind: 'workflow',
+                            item_id: workflowId,
+                          })
+                          setSubmitLibraryResult('success')
+                        } catch {
+                          setSubmitLibraryResult('error')
+                        } finally {
+                          setSubmittingToLibrary(false)
+                        }
+                      }}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
+                        color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
+                        opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
 
             {/* Check results */}
             <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>

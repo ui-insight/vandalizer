@@ -11,8 +11,8 @@ celery = Celery(
     backend=f"redis://{settings.redis_host}:6379/1",
 )
 
-celery.conf.task_soft_time_limit = 1800
-celery.conf.task_time_limit = 1860
+celery.conf.task_soft_time_limit = 3600
+celery.conf.task_time_limit = 3660
 celery.conf.result_expires = 86400
 celery.conf.task_default_queue = "default"
 celery.conf.task_routes = {
