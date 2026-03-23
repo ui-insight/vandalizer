@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown } from 'lucide-react'
+import { Award, Headphones, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
@@ -132,6 +132,19 @@ export function TeamsDropdown() {
                 <span>Verification Management</span>
               </Link>
             </>
+          )}
+
+          {/* Support Center (admins only — support contacts check happens on the page) */}
+          {user?.is_admin && (
+            <Link
+              to="/support"
+              search={{ ticket: undefined }}
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+            >
+              <Headphones className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+              <span>Support Center</span>
+            </Link>
           )}
 
           {/* Divider */}

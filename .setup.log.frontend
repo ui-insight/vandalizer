@@ -1,0 +1,47 @@
+ Service frontend  Building
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [frontend internal] load build definition from Dockerfile
+#1 transferring dockerfile: 524B 0.0s done
+#1 DONE 0.0s
+
+#2 [frontend internal] load metadata for docker.io/library/node:22-alpine
+#2 ...
+
+#3 [frontend internal] load metadata for docker.io/library/nginx:alpine
+#3 DONE 0.4s
+
+#2 [frontend internal] load metadata for docker.io/library/node:22-alpine
+#2 DONE 0.4s
+
+#4 [frontend internal] load .dockerignore
+#4 transferring context: 99B 0.0s done
+#4 DONE 0.0s
+
+#5 [frontend builder 1/6] FROM docker.io/library/node:22-alpine@sha256:8094c002d08262dba12645a3b4a15cd6cd627d30bc782f53229a2ec13ee22a00
+#5 DONE 0.0s
+
+#6 [frontend runtime 1/3] FROM docker.io/library/nginx:alpine@sha256:f46cb72c7df02710e693e863a983ac42f6a9579058a59a35f1ae36c9958e4ce0
+#6 DONE 0.0s
+
+#7 [frontend internal] load build context
+#7 transferring context: 47.51kB 0.0s done
+#7 DONE 0.0s
+
+#8 [frontend builder 2/6] WORKDIR /app
+#8 CACHED
+
+#9 [frontend builder 3/6] COPY package.json package-lock.json ./
+#9 CACHED
+
+#10 [frontend builder 4/6] RUN npm ci
+#10 CACHED
+
+#11 [frontend builder 5/6] COPY . .
+#11 DONE 0.0s
+
+#12 [frontend builder 6/6] RUN npm run build
+#12 0.158 
+#12 0.158 > frontend@0.0.0 build
+#12 0.158 > tsc -b && vite build
+#12 0.158 

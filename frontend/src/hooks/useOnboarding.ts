@@ -56,7 +56,10 @@ function applyStatus(s: OnboardingStatus) {
 
 export interface OnboardingResult {
   pills: string[]
+  /** True until user completes core getting-started steps (upload, extraction, workflow run) */
   isNewUser: boolean
+  /** True only when user has zero activity — used for first-ever welcome message */
+  isFirstVisit: boolean
   status: OnboardingStatus | null
   loading: boolean
   refetchStatus: () => void
@@ -65,6 +68,7 @@ export interface OnboardingResult {
 export function useOnboarding(): OnboardingResult {
   const [pills, setPills] = useState<string[]>([])
   const [isNewUser, setIsNewUser] = useState(false)
+  const [isFirstVisit, setIsFirstVisit] = useState(false)
   const [status, setStatus] = useState<OnboardingStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -72,7 +76,11 @@ export function useOnboarding(): OnboardingResult {
     getOnboardingStatus()
       .then((s) => {
         setStatus(s)
-        setIsNewUser(Object.values(s).every((v) => v === false))
+        // User is "new" if they have no files and no sidebar activities
+        const hasActivity = s.has_documents || s.has_workflows || s.has_extraction_sets || s.has_knowledge_base
+        setIsNewUser(!hasActivity)
+        // First visit = absolutely zero activity (for welcome message injection)
+        setIsFirstVisit(Object.values(s).every((v) => v === false))
         setPills(applyStatus(s))
       })
       .catch(() => {
@@ -87,5 +95,5 @@ export function useOnboarding(): OnboardingResult {
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  return { pills, isNewUser, status, loading, refetchStatus: fetchStatus }
+  return { pills, isNewUser, isFirstVisit, status, loading, refetchStatus: fetchStatus }
 }

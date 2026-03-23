@@ -72,7 +72,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   } = useChat()
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB, setWorkspaceMode, workspaceMode } = useWorkspace()
-  const { pills: onboardingPills, isNewUser, status: onboardingStatus, loading: onboardingLoading, refetchStatus } = useOnboarding()
+  const { pills: onboardingPills, isNewUser, isFirstVisit, status: onboardingStatus, loading: onboardingLoading, refetchStatus } = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -90,13 +90,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   )
   const welcomeInjected = useRef(false)
 
-  // Inject synthetic welcome message for new users
+  // Inject synthetic welcome message only on first-ever visit (zero activity)
   useEffect(() => {
-    if (isNewUser && !onboardingLoading && messages.length === 0 && !welcomeInjected.current) {
+    if (isFirstVisit && !onboardingLoading && messages.length === 0 && !welcomeInjected.current) {
       welcomeInjected.current = true
       setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }])
     }
-  }, [isNewUser, onboardingLoading, messages.length, setMessages])
+  }, [isFirstVisit, onboardingLoading, messages.length, setMessages])
 
   // Refetch onboarding status when user returns to chat mode (e.g. after uploading in files mode)
   const prevMode = useRef(workspaceMode)

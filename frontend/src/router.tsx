@@ -30,7 +30,6 @@ const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const AuditLog = lazy(() => import('./pages/AuditLog'))
 const Approvals = lazy(() => import('./pages/Approvals'))
-const Catalog = lazy(() => import('./pages/Catalog'))
 const Support = lazy(() => import('./pages/Support'))
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
@@ -229,16 +228,6 @@ const verificationRoute = createRoute({
   ),
 })
 
-const catalogRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/catalog',
-  component: () => (
-    <ProtectedRoute>
-      <Catalog />
-    </ProtectedRoute>
-  ),
-})
-
 const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docs',
@@ -336,7 +325,6 @@ const routeTree = rootRoute.addChildren([
   officeRoute,
   browserAutomationRoute,
   verificationRoute,
-  catalogRoute,
   docsRoute,
   certificationRoute,
   demoRoute,

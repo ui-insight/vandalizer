@@ -2,15 +2,17 @@ import { useState } from 'react'
 import { AppLayout } from '../components/layout/AppLayout'
 import { LibraryList } from '../components/library/LibraryList'
 import { LibraryItemsPanel } from '../components/library/LibraryItemsPanel'
+import { ExploreTab } from '../components/library/ExploreTab'
 import { VerificationQueue } from '../components/library/VerificationQueue'
 import { useLibraries } from '../hooks/useLibrary'
 import { useAuth } from '../hooks/useAuth'
 import type { Library as LibraryType } from '../types/library'
 
-type Tab = 'browse' | 'submissions'
+type Tab = 'browse' | 'explore' | 'submissions'
 
 const TAB_LABELS: Record<Tab, string> = {
   browse: 'Browse',
+  explore: 'Explore',
   submissions: 'My Submissions',
 }
 
@@ -71,6 +73,10 @@ export default function Library() {
                 </>
               )}
             </>
+          )}
+
+          {tab === 'explore' && (
+            <ExploreTab />
           )}
 
           {tab === 'submissions' && (

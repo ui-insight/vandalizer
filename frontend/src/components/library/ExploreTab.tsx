@@ -3,16 +3,15 @@ import {
   Search, ShieldCheck, Beaker,
   ChevronDown, ChevronUp, FolderOpen, Star, X, Plus, ArrowUpDown, Bookmark,
 } from 'lucide-react'
-import { AppLayout } from '../components/layout/AppLayout'
-import { QualityBadge } from '../components/library/QualityBadge'
-import { AddToLibraryDialog } from '../components/library/AddToLibraryDialog'
+import { QualityBadge } from './QualityBadge'
+import { AddToLibraryDialog } from './AddToLibraryDialog'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
   tryVerifiedItem, listLibraries,
-} from '../api/library'
-import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../types/library'
-import { adoptKnowledgeBase } from '../api/knowledge'
-import { useAuth } from '../hooks/useAuth'
+} from '../../api/library'
+import { adoptKnowledgeBase } from '../../api/knowledge'
+import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
+import { useAuth } from '../../hooks/useAuth'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 type SortOption = '' | 'quality' | 'name' | 'validations'
@@ -206,8 +205,6 @@ function CatalogCard({
   )
 }
 
-// ── Sidebar collection link ──────────────────────────────────────────────
-
 function CollectionLink({
   collection,
   active,
@@ -238,9 +235,9 @@ function CollectionLink({
   )
 }
 
-// ── Main Catalog page ────────────────────────────────────────────────────
+// ── Explore Tab Component ────────────────────────────────────────────────
 
-export default function Catalog() {
+export function ExploreTab() {
   const { user } = useAuth()
 
   // Data
@@ -336,12 +333,10 @@ export default function Catalog() {
 
   const hasMore = items.length < total
 
-  // Active collection for header display
   const activeCollection = selectedCollectionId
     ? collections.find(c => c.id === selectedCollectionId) ?? null
     : null
 
-  // Clear all filters
   const clearFilters = () => {
     setSearchQuery('')
     setKindFilter('')
@@ -368,15 +363,10 @@ export default function Catalog() {
   ]
 
   return (
-    <AppLayout>
-      <div className="flex h-full -m-6">
+    <>
+      <div className="flex flex-1 min-h-0">
         {/* ── Sidebar: Collections ── */}
-        <div className="w-60 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldCheck className="h-5 w-5 text-green-600" />
-            <h2 className="text-sm font-bold text-gray-900">Catalog</h2>
-          </div>
-
+        <div className="w-56 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-3">
           {/* "All Items" link */}
           <button
             onClick={() => setSelectedCollectionId(null)}
@@ -394,7 +384,7 @@ export default function Catalog() {
 
           {/* Featured collections */}
           {featuredCollections.length > 0 && (
-            <div className="mt-4 mb-2">
+            <div className="mt-3 mb-2">
               <div className="flex items-center gap-1 px-3 mb-1">
                 <Star className="h-3 w-3 text-yellow-400 fill-current" />
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Featured</span>
@@ -412,7 +402,7 @@ export default function Catalog() {
 
           {/* All other collections */}
           {collections.filter(c => !featuredCollections.some(f => f.id === c.id)).length > 0 && (
-            <div className="mt-4 mb-2">
+            <div className="mt-3 mb-2">
               <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3">Collections</span>
               <div className="mt-1">
                 {collections
@@ -438,7 +428,7 @@ export default function Catalog() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <FolderOpen className="h-5 w-5 text-gray-400" />
-                  <h1 className="text-lg font-bold text-gray-900">{activeCollection.title}</h1>
+                  <h2 className="text-lg font-bold text-gray-900">{activeCollection.title}</h2>
                   {activeCollection.featured && (
                     <Star className="h-4 w-4 text-yellow-400 fill-current" />
                   )}
@@ -449,7 +439,7 @@ export default function Catalog() {
               </div>
             ) : (
               <div>
-                <h1 className="text-lg font-bold text-gray-900">Verified Catalog</h1>
+                <h2 className="text-lg font-bold text-gray-900">Verified Catalog</h2>
                 <p className="text-sm text-gray-500">
                   Browse validated and examiner-approved workflows, extractions, and knowledge bases
                 </p>
@@ -459,7 +449,6 @@ export default function Catalog() {
 
           {/* Search + Filters toolbar */}
           <div className="flex items-center gap-3 mb-4 flex-wrap">
-            {/* Search */}
             <div className="relative flex-1 min-w-[200px] max-w-sm">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
@@ -471,7 +460,6 @@ export default function Catalog() {
               />
             </div>
 
-            {/* Kind filter pills */}
             <div className="flex items-center gap-1.5">
               {kindFilters.map(([val, label]) => (
                 <button
@@ -488,7 +476,6 @@ export default function Catalog() {
               ))}
             </div>
 
-            {/* Quality tier dropdown */}
             <select
               value={qualityFilter}
               onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
@@ -500,7 +487,6 @@ export default function Catalog() {
               <option value="bronze">Bronze</option>
             </select>
 
-            {/* Sort dropdown */}
             <div className="flex items-center gap-1">
               <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
               <select
@@ -546,7 +532,7 @@ export default function Catalog() {
             </div>
           )}
 
-          {/* Results count (when no special filter chips shown) */}
+          {/* Results count */}
           {!hasActiveFilters && !loading && items.length > 0 && (
             <div className="text-xs text-gray-400 mb-3">
               {total} item{total !== 1 ? 's' : ''}
@@ -584,7 +570,7 @@ export default function Catalog() {
                     key={item.id}
                     item={item}
                     onTagClick={(tag) => setTagFilter(tag)}
-                    onAddToLibrary={(item) => setAddToLibraryItem(item)}
+                    onAddToLibrary={(itm) => setAddToLibraryItem(itm)}
                     onAdoptKB={async (kbUuid) => {
                       try {
                         await adoptKnowledgeBase(kbUuid)
@@ -594,7 +580,6 @@ export default function Catalog() {
                 ))}
               </div>
 
-              {/* Load more */}
               {hasMore && (
                 <div className="text-center mt-6">
                   <button
@@ -621,6 +606,6 @@ export default function Catalog() {
           onAdded={() => setAddToLibraryItem(null)}
         />
       )}
-    </AppLayout>
+    </>
   )
 }
