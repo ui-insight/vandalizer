@@ -183,6 +183,15 @@ function ItemDetailModal({
                 Add to My Knowledge Bases
               </button>
             )}
+            {item.kind === 'knowledge_base' && item.source_uuid && onTryIt && (
+              <button
+                onClick={() => onTryIt(item)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open in Chat
+              </button>
+            )}
             {item.kind !== 'knowledge_base' && (
               <button
                 onClick={() => onAddToLibrary(item)}
@@ -491,12 +500,17 @@ export function ExploreTab() {
     if (item.kind === 'workflow') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined },
+        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined },
       })
     } else if (item.kind === 'search_set') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined },
+        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined },
+      })
+    } else if (item.kind === 'knowledge_base') {
+      navigate({
+        to: '/',
+        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid },
       })
     }
   }

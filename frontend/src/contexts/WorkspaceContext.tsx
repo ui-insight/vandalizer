@@ -116,6 +116,7 @@ type WorkspaceSearchState = {
   workflow: string | undefined
   extraction: string | undefined
   automation: string | undefined
+  kb: string | undefined
 }
 
 function emptyWorkspaceSearch(): WorkspaceSearchState {
@@ -125,6 +126,7 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
     workflow: undefined,
     extraction: undefined,
     automation: undefined,
+    kb: undefined,
   }
 }
 
@@ -252,6 +254,32 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBUuid(null)
     setActiveKBTitle(null)
   }, [])
+
+  // Activate a knowledge base from URL param (e.g. /?kb=<uuid>)
+  useEffect(() => {
+    const kbParam = search.kb
+    if (!kbParam) return
+    // Clear the param from the URL, then activate
+    import('../api/knowledge').then(({ getKnowledgeBase }) => {
+      getKnowledgeBase(kbParam)
+        .then((kb) => {
+          setActiveKBUuid(kbParam)
+          setActiveKBTitle(kb.title)
+          localStorage.setItem('workspace:mode', 'chat')
+          navigate({
+            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }),
+            replace: true,
+          })
+        })
+        .catch(() => {
+          // KB not found or not accessible — just clear the param
+          navigate({
+            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined }),
+            replace: true,
+          })
+        })
+    })
+  }, [search.kb, navigate])
 
   // ── UI callbacks ────────────────────────────────────────────────────────
 
