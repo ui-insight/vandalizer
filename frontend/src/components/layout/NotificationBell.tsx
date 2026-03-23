@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
 import { relativeTime } from '../../utils/time'
+import { openSupportPanel } from '../../utils/supportPanel'
 
 const kindIcons: Record<string, typeof ShieldCheck> = {
   verification_approved: ShieldCheck,
@@ -25,6 +26,19 @@ const kindColors: Record<string, string> = {
   support_new_message: '#7c3aed',
   support_reply: '#2563eb',
   support_status: '#059669',
+}
+
+const SUPPORT_KINDS = new Set([
+  'support_new_ticket',
+  'support_new_message',
+  'support_reply',
+  'support_status',
+])
+
+function extractTicketUuid(link: string | null): string | undefined {
+  if (!link) return undefined
+  const match = link.match(/ticket=([a-f0-9]+)/)
+  return match?.[1]
 }
 
 export function NotificationBell() {
@@ -79,6 +93,15 @@ export function NotificationBell() {
       setNotifications(prev => prev.map(x => x.uuid === n.uuid ? { ...x, read: true } : x))
       setUnreadCount(prev => Math.max(0, prev - 1))
     }
+
+    // Support notifications open the chat panel instead of navigating
+    if (SUPPORT_KINDS.has(n.kind)) {
+      const ticketUuid = n.item_id || extractTicketUuid(n.link)
+      openSupportPanel(ticketUuid)
+      setOpen(false)
+      return
+    }
+
     if (n.link) {
       navigate({ to: n.link })
       setOpen(false)

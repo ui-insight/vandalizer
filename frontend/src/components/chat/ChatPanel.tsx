@@ -73,6 +73,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   } = useChat()
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB, setWorkspaceMode, workspaceMode } = useWorkspace()
+  const { toast } = useToast()
   const { pills: onboardingPills, isNewUser, isFirstVisit, status: onboardingStatus, loading: onboardingLoading, refetchStatus } = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
@@ -249,8 +250,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (result.activity_id && result.conversation_uuid) {
         setActivity(result.activity_id, result.conversation_uuid)
       }
-    } catch {
-      // Error handling
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to attach file', 'error')
     } finally {
       setAttachLoading(false)
     }
@@ -272,8 +273,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (result.activity_id && result.conversation_uuid) {
         setActivity(result.activity_id, result.conversation_uuid)
       }
-    } catch {
-      // Error handling
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to add website', 'error')
     } finally {
       setAttachLoading(false)
     }
@@ -283,8 +284,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     try {
       await removeDocument(id)
       setFileAttachments((prev) => prev.filter((a) => a.id !== id))
-    } catch {
-      // Error handling
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove file', 'error')
     }
   }
 
@@ -292,8 +293,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     try {
       await removeLink(id)
       setUrlAttachments((prev) => prev.filter((a) => a.id !== id))
-    } catch {
-      // Error handling
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove link', 'error')
     }
   }
 

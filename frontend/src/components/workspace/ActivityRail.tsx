@@ -17,6 +17,7 @@ import {
 import { useActivities } from '../../hooks/useActivities'
 import { deleteActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
 
@@ -64,14 +65,19 @@ function statusMetaClass(status: ActivityEvent['status']) {
 export function ActivityRail() {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered } = useActivities(activitySignal)
+  const { toast } = useToast()
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
       e.stopPropagation()
-      await deleteActivity(id)
+      try {
+        await deleteActivity(id)
+      } catch (err) {
+        toast(err instanceof Error ? err.message : 'Failed to delete activity', 'error')
+      }
       refresh()
     },
-    [refresh],
+    [refresh, toast],
   )
 
   const handleClick = useCallback(
@@ -188,26 +194,32 @@ export function ActivityRail() {
                     </div>
 
                     {/* Status icon */}
-                    <div className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(activity.status))}>
+                    <div
+                      className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(activity.status))}
+                      title={activity.status === 'failed' && activity.error ? activity.error : undefined}
+                    >
                       <StatusIcon status={activity.status} />
                     </div>
 
-                    {/* Delete button - appears on hover */}
+                    {/* Delete button - always visible for failed/canceled, hover for others */}
                     <button
                       onClick={(e) => handleDelete(e, activity.id)}
                       className={cn(
                         'absolute right-1 top-1/2 -translate-y-1/2 z-[1]',
                         'flex items-center justify-center',
                         'rounded p-1',
-                        'opacity-0 pointer-events-none',
-                        'group-hover:opacity-100 group-hover:pointer-events-auto',
                         'transition-[opacity,color,background-color] duration-200',
+                        activity.status === 'failed' || activity.status === 'canceled'
+                          ? 'opacity-70 pointer-events-auto hover:opacity-100'
+                          : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
                         'text-[#7a7f87] hover:text-[#444]',
                         running
                           ? 'bg-white/30 backdrop-blur-sm hover:bg-white/50'
                           : 'bg-white/90 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-white/95',
                       )}
-                      title="Delete"
+                      title={activity.status === 'failed' && activity.error
+                        ? `Delete — Error: ${activity.error}`
+                        : 'Delete'}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>
