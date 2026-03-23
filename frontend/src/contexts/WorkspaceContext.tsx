@@ -17,8 +17,10 @@ interface NavigationContextValue {
   openWorkflow: (id: string) => void
   closeWorkflow: () => void
   openExtractionId: string | null
-  openExtraction: (uuid: string) => void
+  openExtraction: (uuid: string, initialResults?: Record<string, string>) => void
   closeExtraction: () => void
+  pendingExtractionResults: Record<string, string> | null
+  consumeExtractionResults: () => Record<string, string> | null
   openAutomationId: string | null
   openAutomation: (id: string) => void
   closeAutomation: () => void
@@ -158,6 +160,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
+  const [pendingExtractionResults, setPendingExtractionResults] = useState<Record<string, string> | null>(null)
 
   const updateSearch = useCallback(
     (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
@@ -188,9 +191,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     updateSearch((prev) => ({ ...prev, workflow: undefined }))
   }, [updateSearch])
 
-  const openExtraction = useCallback((uuid: string) => {
+  const openExtraction = useCallback((uuid: string, initialResults?: Record<string, string>) => {
     updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
+    setPendingExtractionResults(initialResults ?? null)
   }, [updateSearch])
+
+  const consumeExtractionResults = useCallback((): Record<string, string> | null => {
+    const r = pendingExtractionResults
+    setPendingExtractionResults(null)
+    return r
+  }, [pendingExtractionResults])
 
   const closeExtraction = useCallback(() => {
     updateSearch((prev) => ({ ...prev, extraction: undefined }))
@@ -280,6 +290,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflow, closeWorkflow,
     openExtractionId, openExtraction, closeExtraction,
+    pendingExtractionResults, consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   }), [
@@ -287,6 +298,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflow, closeWorkflow,
     openExtractionId, openExtraction, closeExtraction,
+    pendingExtractionResults, consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   ])

@@ -91,7 +91,13 @@ export function ActivityRail() {
       } else if (activity.type === 'workflow_run' && activity.workflow_id) {
         openWorkflow(activity.workflow_id)
       } else if (activity.type === 'search_set_run' && activity.search_set_uuid) {
-        openExtraction(activity.search_set_uuid)
+        // Restore the extraction results from the activity snapshot so the
+        // editor re-opens with values rather than a blank slate.
+        const normalized = activity.result_snapshot?.normalized as Record<string, string> | undefined
+        const initialResults = normalized && typeof normalized === 'object' && Object.keys(normalized).length > 0
+          ? Object.fromEntries(Object.entries(normalized).map(([k, v]) => [k, v === null ? 'N/A' : String(v)]))
+          : undefined
+        openExtraction(activity.search_set_uuid, initialResults)
       }
     },
     [setActiveRightTab, setLoadConversationId, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation],

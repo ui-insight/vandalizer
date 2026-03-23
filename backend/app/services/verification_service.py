@@ -452,10 +452,12 @@ async def list_verified_items(
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
+    ss_map: dict[str, SearchSet] = {}
     if ss_ids:
         ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
         for ss in ssets:
             name_map[str(ss.id)] = ss.title
+            ss_map[str(ss.id)] = ss
     if kb_ids:
         kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
         for kb in kbs:
@@ -532,6 +534,16 @@ async def list_verified_items(
                 entry["sources_ready"] = kb.sources_ready
                 entry["kb_status"] = kb.status
                 entry["source_uuid"] = kb.uuid
+
+        # Search set UUID (for navigation)
+        if item.kind == LibraryItemKind.SEARCH_SET:
+            ss = ss_map.get(item_id_str)
+            if ss:
+                entry["source_uuid"] = ss.uuid
+
+        # Workflow: use MongoDB _id as source_uuid (workspace routes by _id)
+        if item.kind == LibraryItemKind.WORKFLOW:
+            entry["source_uuid"] = item_id_str
 
         results.append(entry)
 

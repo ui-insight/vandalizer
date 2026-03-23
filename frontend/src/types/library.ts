@@ -117,7 +117,7 @@ export interface VerifiedCatalogItem {
   total_chunks?: number
   sources_ready?: number
   kb_status?: string
-  source_uuid?: string  // the KB's uuid (for adopt/bookmark)
+  source_uuid?: string
 }
 
 export interface VerifiedCollection {
