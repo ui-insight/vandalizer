@@ -64,13 +64,14 @@ function ProgressWidget({ moduleProgress, lessonsCount }: {
   )
 }
 
-export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onSubmitAssessment, exercise, validating, completing, provisioning, submittingAssessment }: {
+export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onSubmitAssessment, onTabChange, exercise, validating, completing, provisioning, submittingAssessment }: {
   module: ModuleDefinition
   moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; self_assessment?: Record<string, string> } | null
   onValidate: () => void
   onComplete: () => void
   onProvision: () => void
   onSubmitAssessment: (answers: Record<string, string>) => void
+  onTabChange?: () => void
   exercise: CertExercise | null
   validating: boolean
   completing: boolean
@@ -78,6 +79,11 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   submittingAssessment: boolean
 }) {
   const [tab, setTab] = useState<'learn' | 'challenge'>('learn')
+
+  const handleTabChange = (t: 'learn' | 'challenge') => {
+    setTab(t)
+    onTabChange?.()
+  }
   const [showTips, setShowTips] = useState(false)
   const { toast } = useToast()
   const Icon = ICON_MAP[module.icon] || BookOpen
@@ -122,7 +128,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
         {/* Tabs */}
         <div className="flex gap-1 border-b border-gray-200">
           <button
-            onClick={() => setTab('learn')}
+            onClick={() => handleTabChange('learn')}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
               tab === 'learn'
@@ -137,7 +143,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             </span>
           </button>
           <button
-            onClick={() => setTab('challenge')}
+            onClick={() => handleTabChange('challenge')}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
               tab === 'challenge'

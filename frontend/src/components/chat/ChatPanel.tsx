@@ -363,46 +363,47 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            {!processingDoc && (
-              <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {(activeKBUuid ? [
-                  'Summarize the key points across all sources',
-                  'What are the most important facts and figures?',
-                  'List every topic covered',
-                ] : hasDocContext ? [
-                  'Summarize this in 5 bullet points',
-                  'Extract all names, dates, and numbers',
-                  'List every action item and deadline',
-                ] : onboardingPills).map(suggestion => (
-                  <button
-                    key={suggestion}
-                    onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext)}
-                    style={{
-                      padding: '8px 14px',
-                      fontSize: 13,
-                      fontWeight: 500,
-                      fontFamily: 'inherit',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 20,
-                      backgroundColor: '#fff',
-                      color: '#374151',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
-                      e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)'
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = '#e5e7eb'
-                      e.currentTarget.style.backgroundColor = '#fff'
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-            )}
+            <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(activeKBUuid ? [
+                'Summarize the key points across all sources',
+                'What are the most important facts and figures?',
+                'List every topic covered',
+              ] : hasDocContext ? [
+                'Summarize this in 5 bullet points',
+                'Extract all names, dates, and numbers',
+                'List every action item and deadline',
+              ] : onboardingPills).map(suggestion => (
+                <button
+                  key={suggestion}
+                  disabled={!!processingDoc}
+                  onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext)}
+                  style={{
+                    padding: '8px 14px',
+                    fontSize: 13,
+                    fontWeight: 500,
+                    fontFamily: 'inherit',
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 20,
+                    backgroundColor: '#fff',
+                    color: '#374151',
+                    cursor: processingDoc ? 'default' : 'pointer',
+                    transition: 'all 0.15s',
+                    opacity: processingDoc ? 0.5 : 1,
+                  }}
+                  onMouseEnter={e => {
+                    if (processingDoc) return
+                    e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                    e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = '#e5e7eb'
+                    e.currentTarget.style.backgroundColor = '#fff'
+                  }}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

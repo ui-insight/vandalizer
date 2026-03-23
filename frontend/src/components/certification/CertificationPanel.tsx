@@ -2,11 +2,11 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Award,
+  ChevronLeft,
   Cog,
   Flame,
   GripHorizontal,
   Maximize2,
-  Minimize2,
   PanelBottom,
   PanelLeft,
   PanelRight,
@@ -14,7 +14,6 @@ import {
   Star,
   Target,
   X,
-  Zap,
 } from 'lucide-react'
 import { useCertificationPanel, type PanelMode } from '../../contexts/CertificationPanelContext'
 import { useCertification } from '../../hooks/useCertification'
@@ -140,7 +139,6 @@ const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] =
   { mode: 'docked-left', icon: PanelLeft, label: 'Dock left' },
   { mode: 'docked-right', icon: PanelRight, label: 'Dock right' },
   { mode: 'docked-bottom', icon: PanelBottom, label: 'Dock bottom' },
-  { mode: 'collapsed', icon: Minimize2, label: 'Collapse' },
 ]
 
 // ---------------------------------------------------------------------------
@@ -148,7 +146,7 @@ const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] =
 // ---------------------------------------------------------------------------
 
 export function CertificationPanel() {
-  const { isOpen, mode, closePanel, setMode } = useCertificationPanel()
+  const { isOpen, mode, openPanel, closePanel, setMode } = useCertificationPanel()
   const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
   const { toast } = useToast()
 
@@ -162,7 +160,7 @@ export function CertificationPanel() {
   const [submittingAssessment, setSubmittingAssessment] = useState(false)
   const [exercise, setExercise] = useState<CertExercise | null>(null)
   const [tierCelebration, setTierCelebration] = useState<{ tierName: string; message: string } | null>(null)
-  const detailRef = useRef<HTMLDivElement>(null)
+  const moduleScrollRef = useRef<HTMLDivElement>(null)
 
   // Drag state for floating mode
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
@@ -242,9 +240,8 @@ export function CertificationPanel() {
 
   const handleModuleClick = (moduleId: string) => {
     if (isModuleLocked(moduleId)) return
-    setActiveModule(activeModule === moduleId ? null : moduleId)
+    setActiveModule(moduleId)
     setValidationResult(null)
-    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
   }
 
   const checkTierCompletion = useCallback((justCompletedModuleId: string) => {
@@ -268,7 +265,6 @@ export function CertificationPanel() {
         if (nextModule && !isModuleLocked(nextModule.id)) {
           setActiveModule(nextModule.id)
           toast(`Next up: ${nextModule.title}`, 'info')
-          setTimeout(() => detailRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100)
           return
         }
       }
@@ -297,26 +293,43 @@ export function CertificationPanel() {
 
   const handleDragEnd = () => { dragRef.current = null }
 
-  // Don't render anything when closed
-  if (!isOpen) return null
-
   const activeModuleDef = MODULES.find(m => m.id === activeModule)
 
-  // --- Collapsed pill ---
-  if (mode === 'collapsed') {
-    return createPortal(
-      <div
-        className="fixed bottom-4 right-4 z-[9000] flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 shadow-lg cursor-pointer hover:shadow-xl transition-all cert-panel-collapse"
-        style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-        onClick={() => setMode('floating')}
-      >
-        <Award size={16} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
-        <span className="text-sm font-semibold text-gray-900">{levelConfig.label}</span>
-        <span className="text-xs text-gray-400">{displayXp} XP</span>
-      </div>,
-      document.body,
-    )
-  }
+  // --- Always-visible badge ---
+  const isCertified = !!progress?.certified
+  const hasStarted = totalXp > 0
+
+  const badge = createPortal(
+    <div
+      className="fixed bottom-4 right-4 z-[9000] flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:shadow-xl transition-all cert-panel-collapse"
+      style={{
+        borderRadius: 'var(--ui-radius, 12px)',
+        ...(isCertified
+          ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 4px 16px rgba(234,179,8,0.25)' }
+          : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }),
+      }}
+      onClick={openPanel}
+    >
+      <Award
+        size={16}
+        style={{ color: isCertified ? '#eab308' : hasStarted ? levelConfig.color : 'var(--highlight-color)' }}
+      />
+      {isCertified ? (
+        <span className="text-sm font-semibold text-yellow-400 title-shimmer">Vandal Workflow Architect</span>
+      ) : hasStarted ? (
+        <>
+          <span className="text-sm font-semibold text-gray-900">{levelConfig.label}</span>
+          <span className="text-xs text-gray-400">{displayXp} XP</span>
+        </>
+      ) : (
+        <span className="text-sm font-semibold text-gray-700">Get Certified</span>
+      )}
+    </div>,
+    document.body,
+  )
+
+  // When panel is closed, only show badge
+  if (!isOpen) return badge
 
   // --- Container styles by mode ---
   const containerClass = cn(
@@ -347,57 +360,87 @@ export function CertificationPanel() {
             : {}),
   }
 
-  // Panel content (shared across floating / docked modes)
+  // Panel content — two views: curriculum overview and module detail
   const panelContent = loading ? (
     <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
       Loading certification progress...
     </div>
+  ) : activeModuleDef ? (
+    // MODULE VIEW — breadcrumb nav + focused, independently scrollable detail
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-gray-100 bg-gray-50/60 shrink-0">
+        <button
+          onClick={() => setActiveModule(null)}
+          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+        >
+          <ChevronLeft size={15} />
+          <span>Curriculum</span>
+        </button>
+        <span className="text-gray-300">/</span>
+        <span className="text-sm text-gray-700 font-medium truncate">
+          Module {activeModuleDef.number}: {activeModuleDef.title}
+        </span>
+      </div>
+      <div ref={moduleScrollRef} className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-4">
+        <ModuleDetail
+          module={activeModuleDef}
+          moduleProgress={progress?.modules[activeModuleDef.id] ? {
+            completed: progress.modules[activeModuleDef.id].completed,
+            stars: progress.modules[activeModuleDef.id].stars,
+            attempts: progress.modules[activeModuleDef.id].attempts,
+            provisioned_docs: progress.modules[activeModuleDef.id].provisioned_docs,
+            self_assessment: progress.modules[activeModuleDef.id].self_assessment,
+          } : null}
+          onValidate={() => handleValidate(activeModuleDef.id)}
+          onComplete={() => handleComplete(activeModuleDef.id)}
+          onProvision={() => handleProvision(activeModuleDef.id)}
+          onSubmitAssessment={(answers) => handleSubmitAssessment(activeModuleDef.id, answers)}
+          onTabChange={() => moduleScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+          exercise={exercise}
+          validating={validating}
+          completing={completing}
+          provisioning={provisioning}
+          submittingAssessment={submittingAssessment}
+        />
+        {validationResult && (
+          <ValidationResults result={validationResult} onDismiss={() => setValidationResult(null)} />
+        )}
+      </div>
+    </div>
   ) : (
-    <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-6">
-      {/* Hero Section */}
+    // CURRICULUM VIEW — compact hero + journey map + level strip
+    <div className="flex-1 overflow-y-auto overscroll-contain p-5 space-y-4">
+      {/* Compact hero */}
       {progress?.certified ? (
         <CertifiedBanner />
       ) : (
         <div
-          className="flex items-center gap-5 p-4 bg-white border border-gray-200"
+          className="flex items-center gap-4 p-4 bg-white border border-gray-200"
           style={{ borderRadius: 'var(--ui-radius, 12px)' }}
         >
           <div className="relative shrink-0">
-            <ProgressRing
-              percentage={overallPct}
-              color={levelConfig.color}
-              size={mode === 'docked-bottom' ? 80 : 100}
-              strokeWidth={mode === 'docked-bottom' ? 6 : 8}
-            />
+            <ProgressRing percentage={overallPct} color={levelConfig.color} size={72} strokeWidth={6} />
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-lg font-bold text-gray-900">{Math.round(overallPct)}%</span>
-              <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: levelConfig.color }}>
-                {levelConfig.label}
-              </span>
+              <span className="text-sm font-bold text-gray-900">{Math.round(overallPct)}%</span>
             </div>
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-bold text-gray-900 mb-0.5">Vandal Workflow Architect</h2>
-            <p className="text-xs text-gray-500 mb-3">Complete all 11 modules to earn your certification</p>
-            <XPBar current={displayXp} nextThreshold={nextLevel.xp} prevThreshold={prevLevel.xp} nextLevel={nextLevel.name} />
-            <div className="flex flex-wrap gap-2 mt-3">
-              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border border-gray-200 text-xs" style={{ borderRadius: 'var(--ui-radius, 12px)' }}>
-                <Award size={12} style={{ color: 'var(--highlight-color)' }} />
-                <span className="font-semibold text-gray-900">{completedCount}</span>
-                <span className="text-gray-500">/ 11</span>
-              </div>
-              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border border-gray-200 text-xs" style={{ borderRadius: 'var(--ui-radius, 12px)' }}>
-                <Zap size={12} style={{ color: 'var(--highlight-color)' }} />
-                <span className="font-semibold text-gray-900">{displayXp}</span>
-                <span className="text-gray-500">/ {TOTAL_XP}</span>
-              </div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: levelConfig.color }}>
+                {levelConfig.label}
+              </span>
               {(progress?.streak_days || 0) > 0 && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-orange-50 border border-orange-200 text-xs" style={{ borderRadius: 'var(--ui-radius, 12px)' }}>
-                  <Flame size={12} className="text-orange-500" />
-                  <span className="font-semibold text-orange-700">{progress?.streak_days}</span>
-                  <span className="text-orange-600">streak</span>
+                <div className="flex items-center gap-1 text-xs text-orange-600">
+                  <Flame size={11} className="text-orange-500" />
+                  <span className="font-semibold">{progress?.streak_days}</span>
+                  <span>day streak</span>
                 </div>
               )}
+            </div>
+            <XPBar current={displayXp} nextThreshold={nextLevel.xp} prevThreshold={prevLevel.xp} nextLevel={nextLevel.name} />
+            <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
+              <span><span className="font-semibold text-gray-900">{completedCount}</span> / 11 modules</span>
+              <span><span className="font-semibold text-gray-900">{displayXp}</span> / {TOTAL_XP} XP</span>
             </div>
           </div>
         </div>
@@ -415,35 +458,7 @@ export function CertificationPanel() {
         />
       </div>
 
-      {/* Active Module Detail */}
-      {activeModuleDef && (
-        <div ref={detailRef} className="space-y-4">
-          <ModuleDetail
-            module={activeModuleDef}
-            moduleProgress={progress?.modules[activeModuleDef.id] ? {
-              completed: progress.modules[activeModuleDef.id].completed,
-              stars: progress.modules[activeModuleDef.id].stars,
-              attempts: progress.modules[activeModuleDef.id].attempts,
-              provisioned_docs: progress.modules[activeModuleDef.id].provisioned_docs,
-              self_assessment: progress.modules[activeModuleDef.id].self_assessment,
-            } : null}
-            onValidate={() => handleValidate(activeModuleDef.id)}
-            onComplete={() => handleComplete(activeModuleDef.id)}
-            onProvision={() => handleProvision(activeModuleDef.id)}
-            onSubmitAssessment={(answers) => handleSubmitAssessment(activeModuleDef.id, answers)}
-            exercise={exercise}
-            validating={validating}
-            completing={completing}
-            provisioning={provisioning}
-            submittingAssessment={submittingAssessment}
-          />
-          {validationResult && (
-            <ValidationResults result={validationResult} onDismiss={() => setValidationResult(null)} />
-          )}
-        </div>
-      )}
-
-      {/* Level Map */}
+      {/* Level progression strip */}
       <div className="p-4 bg-white border border-gray-200" style={{ borderRadius: 'var(--ui-radius, 12px)' }}>
         <h3 className="text-xs font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
           <Cog size={12} /> Level Progression
@@ -480,7 +495,7 @@ export function CertificationPanel() {
       {mode === 'floating' && (
         <div
           className="fixed inset-0 z-[8999] bg-black/10 cert-fade-in"
-          onClick={() => setMode('collapsed')}
+          onClick={closePanel}
         />
       )}
 
@@ -517,7 +532,7 @@ export function CertificationPanel() {
             ))}
           </div>
 
-          <button onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Close" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
+          <button onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
             <X size={14} />
           </button>
         </div>
@@ -538,3 +553,4 @@ export function CertificationPanel() {
     document.body,
   )
 }
+
