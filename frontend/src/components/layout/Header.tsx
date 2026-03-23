@@ -5,7 +5,6 @@ import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
-import { openSupportPanel } from '../../utils/supportPanel'
 
 export function Header() {
   const navigate = useNavigate()

@@ -42,7 +42,7 @@ async def delete_activity(
 ):
     """Delete an activity event with cascade."""
     deleted = await activity_service.delete_activity(
-        PydanticObjectId(activity_id), user.user_id
+        PydanticObjectId(activity_id), user.user_id,
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Activity not found")

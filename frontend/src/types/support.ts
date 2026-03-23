@@ -45,6 +45,8 @@ export interface SupportTicketSummary {
   message_count: number
   last_message_preview: string | null
   last_message_at: string | null
+  last_message_is_support_reply: boolean | null
+  last_message_user_id: string | null
   created_at: string | null
   updated_at: string | null
   closed_at: string | null

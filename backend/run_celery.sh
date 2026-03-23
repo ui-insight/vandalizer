@@ -23,6 +23,9 @@ start_worker() {
     local queues="$2"
     local concurrency="$3"
 
+    # Clean stale PID files from previous container runs
+    rm -f "$PID_DIR/$name.pid"
+
     echo "Starting worker: $name (queues=$queues, concurrency=$concurrency)"
     celery -A "$CELERY_APP" worker \
         --queues="$queues" \
@@ -38,6 +41,9 @@ case "${1:-help}" in
     start)
         echo "Starting Celery workers for vandalizer-next..."
 
+        # Clean all stale PID files (handles container restarts)
+        rm -f "$PID_DIR"/*.pid
+
         start_worker "documents" "documents" 8
         start_worker "workflows" "workflows" 6
         start_worker "uploads"   "uploads"   4
@@ -45,6 +51,7 @@ case "${1:-help}" in
         start_worker "default"   "default"   2
 
         echo "Starting Celery Beat..."
+        rm -f "$PID_DIR/beat.pid"
         celery -A "$CELERY_APP" beat \
             --loglevel=info \
             --logfile="$LOG_DIR/beat.log" \
@@ -59,7 +66,31 @@ case "${1:-help}" in
             --logfile="$LOG_DIR/flower.log" \
             --detach 2>/dev/null || echo "Flower not installed or failed to start"
 
-        echo "All workers started. Use '$0 status' to check."
+        echo "All workers started."
+
+        # In Docker, keep the script alive so the container doesn't exit.
+        # Detached workers run as child processes — wait for any to exit.
+        if [ -f /.dockerenv ] || [ -f /proc/1/cgroup ] 2>/dev/null; then
+            echo "Running in container — staying alive to keep container running."
+            # Wait forever, monitoring worker health
+            while true; do
+                sleep 30
+                # Check if at least one worker is still running
+                alive=false
+                for pidfile in "$PID_DIR"/*.pid; do
+                    [ -f "$pidfile" ] || continue
+                    pid=$(cat "$pidfile")
+                    if kill -0 "$pid" 2>/dev/null; then
+                        alive=true
+                        break
+                    fi
+                done
+                if [ "$alive" = false ]; then
+                    echo "All workers have exited — restarting."
+                    exec "$0" start
+                fi
+            done
+        fi
         ;;
 
     stop)

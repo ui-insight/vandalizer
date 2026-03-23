@@ -87,9 +87,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   // New-user onboarding state
   const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false)
-  const [hasChatAboutDocs, setHasChatAboutDocs] = useState(
-    () => localStorage.getItem('onboarding:hasChatAboutDocs') === 'true',
-  )
+  const hasChatAboutDocs = onboardingStatus?.has_chatted_with_docs ?? false
   const welcomeInjected = useRef(false)
 
   // Inject synthetic welcome message only on first-ever visit (zero activity)
@@ -209,10 +207,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     setHasSentFirstMessage(true)
-    // Track when user chats with document context for onboarding stepper
+    // Refetch onboarding status after sending with doc context so stepper updates
     if (hasDocContext && !hasChatAboutDocs) {
-      setHasChatAboutDocs(true)
-      localStorage.setItem('onboarding:hasChatAboutDocs', 'true')
+      setTimeout(() => refetchStatus(), 2000)
     }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids)
   }
