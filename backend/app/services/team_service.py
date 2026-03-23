@@ -64,7 +64,7 @@ async def get_team_invites(team_id: PydanticObjectId) -> list[dict]:
     """Get pending invites for a team."""
     invites = await TeamInvite.find(
         TeamInvite.team == team_id,
-        TeamInvite.accepted == False,
+        TeamInvite.accepted == False,  # noqa: E712
     ).to_list()
     return [
         {
@@ -284,7 +284,7 @@ async def ensure_shared_folder(team: Team) -> SmartFolder:
     """Ensure the team has a shared root folder."""
     folder = await SmartFolder.find_one(
         SmartFolder.team_id == team.uuid,
-        SmartFolder.is_shared_team_root == True,
+        SmartFolder.is_shared_team_root == True,  # noqa: E712
     )
     if folder:
         return folder

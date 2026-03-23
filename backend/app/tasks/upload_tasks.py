@@ -1,4 +1,3 @@
-from celery import chain, signature
 
 from app.celery_app import celery
 

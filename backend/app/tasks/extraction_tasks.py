@@ -6,7 +6,6 @@ Uses pymongo (sync) for DB access.
 
 import datetime
 import logging
-import os
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path

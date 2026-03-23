@@ -69,8 +69,21 @@ class TestAuthMe:
         user = _make_user()
         token = create_access_token("testuser", _TEST_SETTINGS)
 
+        mock_response = {
+            "id": "fake-id",
+            "user_id": "testuser",
+            "email": "test@example.com",
+            "name": "Test User",
+            "is_admin": False,
+            "is_examiner": False,
+            "is_support_agent": False,
+            "current_team": None,
+            "current_team_uuid": None,
+        }
+
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
-             patch("app.dependencies.User") as MockUser:
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=mock_response):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.get(
                 "/api/auth/me",

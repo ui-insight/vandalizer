@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import datetime
 import uuid as uuid_mod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 from bson import ObjectId as BsonObjectId
@@ -397,7 +397,7 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
         user=user,
         item_id=str(new_obj_id),
         kind=item.kind.value,
-        note=f"Cloned from library item",
+        note="Cloned from library item",
         tags=list(item.tags),
     )
 
@@ -425,7 +425,7 @@ async def share_to_team(item_id: str, user: User, team_id: str) -> dict | None:
         user=user,
         item_id=str(new_obj_id),
         kind=item.kind.value,
-        note=f"Shared to team",
+        note="Shared to team",
         tags=list(item.tags),
     )
 

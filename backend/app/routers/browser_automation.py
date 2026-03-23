@@ -138,7 +138,6 @@ async def browser_automation_ws(
     4. Extension sends responses/events which are routed back via Redis.
     """
     # Authenticate via cookie before accepting the connection
-    from app.config import Settings
     from app.dependencies import get_settings
     from app.models.user import User
     from app.utils.security import decode_token

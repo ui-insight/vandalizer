@@ -278,7 +278,7 @@ async def delete_graph_subscription(
 
     subs = await GraphSubscription.find(
         GraphSubscription.intake_config == intake.id,
-        GraphSubscription.active == True,
+        GraphSubscription.active == True,  # noqa: E712
     ).to_list()
 
     client = GraphClient(user.user_id)

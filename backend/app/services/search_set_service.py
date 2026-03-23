@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid as uuid_mod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 

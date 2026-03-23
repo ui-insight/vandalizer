@@ -181,7 +181,7 @@ app.include_router(support.router, prefix="/api/support", tags=["support"])
 # ---------------------------------------------------------------------------
 # Prometheus metrics
 # ---------------------------------------------------------------------------
-from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
 
 Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 

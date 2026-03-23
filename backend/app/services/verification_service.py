@@ -1,11 +1,10 @@
 """Verification queue service  - submit, review, approve, reject."""
 
 import datetime
-from typing import Optional
 
 from beanie import PydanticObjectId
 
-from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
+from app.models.library import LibraryItem, LibraryItemKind
 from app.models.user import User
 from app.models.verification import (
     VerificationRequest,
@@ -278,7 +277,7 @@ async def get_reviewer_rubric(request_uuid: str) -> dict | None:
 
     checklist.append({
         "category": "validation",
-        "item": f"Minimum test cases (\u22653)",
+        "item": "Minimum test cases (\u22653)",
         "status": "pass" if num_tc >= 3 else "warning",
         "automated": True,
         "detail": f"{num_tc} test case(s) used",
@@ -286,7 +285,7 @@ async def get_reviewer_rubric(request_uuid: str) -> dict | None:
 
     checklist.append({
         "category": "validation",
-        "item": f"Minimum runs per test case (\u22653)",
+        "item": "Minimum runs per test case (\u22653)",
         "status": "pass" if num_runs >= 3 else "warning",
         "automated": True,
         "detail": f"{num_runs} run(s) per test case",
@@ -1011,7 +1010,7 @@ async def _notify_submitter(
         kind=cfg["kind"],
         title=cfg["title"],
         body=cfg["body"],
-        link=f"/library?tab=verification",
+        link="/library?tab=verification",
         item_kind=req.item_kind,
         item_id=str(req.item_id),
         item_name=item_name,

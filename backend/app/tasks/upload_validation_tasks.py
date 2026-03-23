@@ -39,7 +39,7 @@ def _get_compliance_rules() -> str:
 
 def _get_secure_agent():
     """Get a validation agent (uses default model)."""
-    from app.services.llm_service import create_chat_agent, get_agent_model
+    from app.services.llm_service import create_chat_agent
 
     db = _get_db()
     sys_cfg = db.system_config.find_one() or {}

@@ -5,7 +5,6 @@ import base64
 import csv
 import io
 import json
-from typing import Optional
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
