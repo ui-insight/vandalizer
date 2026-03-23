@@ -52,3 +52,6 @@ risk-plan.md
 # Setup wizard runtime log and backups
 .setup.log
 backups/
+
+# Claude Code local settings
+.claude/
