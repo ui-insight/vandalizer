@@ -891,21 +891,26 @@ function DesignCanvas({
         )}
       </div>
 
-      {/* Step cards */}
-      {workflow.steps.map((step, idx) => (
-        <div key={step.id}>
-          <ConnectionLine />
-          <StepCard
-            step={step}
-            index={idx}
-            totalSteps={workflow.steps.length}
-            isActive={runnerRunning && runnerStatus?.current_step_name === step.name}
-            onClick={() => onClickStep(step.id)}
-            onMoveUp={() => onMoveStep(idx, 'up')}
-            onMoveDown={() => onMoveStep(idx, 'down')}
-          />
-        </div>
-      ))}
+      {/* Step cards — filter out empty "Document" trigger steps (auto-prepended at execution time) */}
+      {(() => {
+        const visibleSteps = workflow.steps
+          .map((step, originalIdx) => ({ step, originalIdx }))
+          .filter(({ step }) => !(step.name === 'Document' && step.tasks.length === 0))
+        return visibleSteps.map(({ step, originalIdx }, displayIdx) => (
+          <div key={step.id}>
+            <ConnectionLine />
+            <StepCard
+              step={step}
+              index={displayIdx}
+              totalSteps={visibleSteps.length}
+              isActive={runnerRunning && runnerStatus?.current_step_name === step.name}
+              onClick={() => onClickStep(step.id)}
+              onMoveUp={() => onMoveStep(originalIdx, 'up')}
+              onMoveDown={() => onMoveStep(originalIdx, 'down')}
+            />
+          </div>
+        ))
+      })()}
 
       {/* +ADD STEP — hidden when the last step is an output step */}
       {!(workflow.steps.length > 0 && workflow.steps[workflow.steps.length - 1].is_output) && (

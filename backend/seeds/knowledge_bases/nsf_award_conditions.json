@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-nsf-ac",
+    "display_name": "NSF Award Conditions & Administrative Guide",
+    "description": "NSF general and special award conditions, research terms and conditions, and the NSF Grants & Agreements Manual.",
+    "quality_tier": "gold",
+    "collections": ["federal-agency", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "NSF Award Conditions & Administrative Guide",
+    "description": "NSF general terms and conditions, special conditions, pre-award and post-award requirements, no-cost extensions, and prior approval policies.",
+    "sources": [
+      {"source_type": "url", "url": "https://new.nsf.gov/policies/gc-1"},
+      {"source_type": "url", "url": "https://new.nsf.gov/policies/award-conditions"},
+      {"source_type": "url", "url": "https://new.nsf.gov/policies/gam"}
+    ]
+  }]
+}

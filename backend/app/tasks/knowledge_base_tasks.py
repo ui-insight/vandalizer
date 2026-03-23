@@ -101,8 +101,8 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             _recalculate_kb(db, kb_uuid)
             return
 
-        persist_dir = os.environ.get("CHROMADB_PERSIST_DIR", "../app/static/db")
-        dm = DocumentManager(persist_directory=persist_dir)
+        from app.config import Settings
+        dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
         chunk_count = dm.add_to_kb(
             kb_uuid=kb_uuid,
             source_id=source_uuid,
@@ -205,8 +205,8 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             },
         )
 
-        persist_dir = os.environ.get("CHROMADB_PERSIST_DIR", "../app/static/db")
-        dm = DocumentManager(persist_directory=persist_dir)
+        from app.config import Settings
+        dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
         chunk_count = dm.add_to_kb(
             kb_uuid=kb_uuid,
             source_id=source_uuid,

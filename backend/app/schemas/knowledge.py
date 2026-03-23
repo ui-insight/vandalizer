@@ -54,6 +54,32 @@ class KBResponse(BaseModel):
     total_chunks: int = 0
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    # Scope & ownership fields for the UI
+    user_id: Optional[str] = None
+    scope: Optional[str] = None  # "mine" | "team" | "verified" | "reference"
+    is_reference: bool = False
+    source_kb_uuid: Optional[str] = None  # set when is_reference=True
+    reference_uuid: Optional[str] = None  # the reference's own uuid
+
+
+class KBListResponse(BaseModel):
+    items: list[KBResponse] = []
+    total: int = 0
+
+
+class AdoptKBRequest(BaseModel):
+    note: Optional[str] = None
+    team_id: Optional[str] = None  # adopt to a specific team (default: personal)
+
+
+class KBReferenceResponse(BaseModel):
+    uuid: str
+    source_kb_uuid: str
+    user_id: str
+    team_id: Optional[str] = None
+    note: Optional[str] = None
+    pinned: bool = False
+    created_at: Optional[str] = None
 
 
 class KBDetailResponse(KBResponse):

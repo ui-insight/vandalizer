@@ -8,19 +8,15 @@
     "display_name": "Budget Reconciliation",
     "description": "Compares a financial report against the original budget, identifying variances and flagging categories that need sponsor approval for rebudgeting.",
     "quality_tier": "gold",
-    "collections": ["financial"]
+    "collections": [
+      "financial"
+    ]
   },
   "items": [
     {
       "name": "Budget Reconciliation",
       "description": "Extracts financial data and performs variance analysis against the original budget.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Financial Data",
           "data": {},

@@ -39,6 +39,34 @@ class KnowledgeBaseSource(Document):
             self.uuid = uuid4().hex
 
 
+class KnowledgeBaseReference(Document):
+    """A lightweight bookmark to a verified/shared KB.
+
+    Does NOT duplicate ChromaDB data — points to the original KB's collection.
+    When the user chats with a referenced KB, the system resolves to the
+    source KB's ``collection_name``.
+    """
+
+    uuid: str = ""
+    user_id: str
+    team_id: Optional[str] = None
+    source_kb_uuid: str  # the verified KB being referenced
+    note: Optional[str] = None
+    pinned: bool = False
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+
+    class Settings:
+        name = "knowledge_base_references"
+        indexes = ["uuid", "user_id", "source_kb_uuid", "team_id"]
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not self.uuid:
+            self.uuid = uuid4().hex
+
+
 class KnowledgeBase(Document):
     """A curated knowledge base built from documents and URLs."""
 

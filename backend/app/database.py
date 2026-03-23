@@ -24,7 +24,7 @@ from app.models.feedback import ChatFeedback, ExtractionQualityRecord
 from app.models.verification import VerificationRequest, VerifiedItemMetadata, VerifiedCollection
 from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
-from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
 from app.models.kb_test_query import KBTestQuery
 from app.models.kb_suggestion import KBSuggestion
 from app.models.extraction_test_case import ExtractionTestCase
@@ -72,6 +72,7 @@ ALL_MODELS = [
     WorkItem,
     Automation,
     KnowledgeBase,
+    KnowledgeBaseReference,
     KnowledgeBaseSource,
     KBTestQuery,
     KBSuggestion,

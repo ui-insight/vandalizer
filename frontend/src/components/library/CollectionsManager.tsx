@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Trash2, Pencil, X, FolderOpen, Search, ExternalLink } from 'lucide-react'
+import { Plus, Trash2, Pencil, X, FolderOpen, Search, ExternalLink, Star } from 'lucide-react'
 import {
   listCollections, createCollection, updateCollection, deleteCollection,
   addToCollection, removeFromCollection, listVerifiedItems,
@@ -39,7 +39,7 @@ export function CollectionsManager() {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [colData, itemData] = await Promise.all([listCollections(), listVerifiedItems()])
+      const [colData, itemData] = await Promise.all([listCollections(), listVerifiedItems({ limit: 200 })])
       setCollections(colData.collections)
       setVerifiedItems(itemData.items)
     } catch {
@@ -87,6 +87,11 @@ export function CollectionsManager() {
     refresh()
   }
 
+  const handleToggleFeatured = async (col: VerifiedCollection) => {
+    await updateCollection(col.id, { featured: !col.featured })
+    refresh()
+  }
+
   const startEdit = (col: VerifiedCollection) => {
     setEditingId(col.id)
     setEditTitle(col.title)
@@ -98,7 +103,7 @@ export function CollectionsManager() {
     if (verifiedItems.length === 0) {
       setLoadingItems(true)
       try {
-        const data = await listVerifiedItems()
+        const data = await listVerifiedItems({ limit: 200 })
         setVerifiedItems(data.items)
       } finally {
         setLoadingItems(false)
@@ -238,6 +243,9 @@ export function CollectionsManager() {
                           <div className="flex items-center gap-2 mb-1">
                             <FolderOpen className="h-4 w-4 text-gray-400 shrink-0" />
                             <span className="text-sm font-semibold text-gray-900">{col.title}</span>
+                            {col.featured && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-50 text-yellow-700 border border-yellow-200 font-medium">Featured</span>
+                            )}
                             <span className="text-xs text-gray-500">
                               {col.item_ids.length} item{col.item_ids.length !== 1 ? 's' : ''}
                             </span>
@@ -250,6 +258,13 @@ export function CollectionsManager() {
                     </div>
                     {!isEditing && (
                       <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => handleToggleFeatured(col)}
+                          className={`p-1.5 rounded hover:bg-yellow-50 ${col.featured ? 'text-yellow-500' : 'text-gray-400'}`}
+                          title={col.featured ? 'Remove from featured' : 'Mark as featured'}
+                        >
+                          <Star className={`h-4 w-4 ${col.featured ? 'fill-current' : ''}`} />
+                        </button>
                         <button
                           onClick={() => startEdit(col)}
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-500"

@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-far",
+    "display_name": "Federal Acquisition Regulation (FAR)",
+    "description": "Federal Acquisition Regulation — the primary regulation governing federal government procurement and contract administration.",
+    "quality_tier": "gold",
+    "collections": ["compliance", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Federal Acquisition Regulation (FAR)",
+    "description": "Covers procurement policies, cost principles, contract clauses, and subcontracting requirements relevant to sponsored research contracts.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.acquisition.gov/far"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-31"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-42"}
+    ]
+  }]
+}

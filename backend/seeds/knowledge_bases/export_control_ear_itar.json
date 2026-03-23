@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-export-control",
+    "display_name": "Export Control (EAR & ITAR)",
+    "description": "Export Administration Regulations and International Traffic in Arms Regulations relevant to university research compliance.",
+    "quality_tier": "gold",
+    "collections": ["compliance", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Export Control (EAR & ITAR)",
+    "description": "Fundamental research exclusion, deemed export rules, Commerce Control List categories, and ITAR licensing requirements for university-based research.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.bis.gov/regulations/export-administration-regulations-ear"},
+      {"source_type": "url", "url": "https://www.pmddtc.state.gov/ddtc_public/ddtc_public?id=ddtc_kb_article_page&sys_id=24d528fddbfc930044f9ff621f961987"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-734"}
+    ]
+  }]
+}

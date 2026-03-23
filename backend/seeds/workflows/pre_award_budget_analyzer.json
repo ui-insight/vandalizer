@@ -8,19 +8,16 @@
     "display_name": "Budget Analyzer",
     "description": "Extracts budget line items from a proposal or award document, checks for arithmetic errors, and flags potentially disallowed costs.",
     "quality_tier": "gold",
-    "collections": ["pre-award", "financial"]
+    "collections": [
+      "pre-award",
+      "financial"
+    ]
   },
   "items": [
     {
       "name": "Budget Analyzer",
       "description": "Extracts budget data and performs validation checks for common errors and compliance issues.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Budget Fields",
           "data": {},

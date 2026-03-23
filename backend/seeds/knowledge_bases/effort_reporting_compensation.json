@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-effort-reporting",
+    "display_name": "Effort Reporting & Compensation",
+    "description": "Federal requirements for effort certification, personnel cost charging, and compensation on sponsored awards under Uniform Guidance.",
+    "quality_tier": "silver",
+    "collections": ["financial", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Effort Reporting & Compensation",
+    "description": "Uniform Guidance compensation standards (2 CFR 200.430), effort certification methods, institutional base salary, summer salary caps, and cost sharing commitments.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E/subject-group-ECFRed1f39f9b3d4e72/section-200.430"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/senior/index.htm"},
+      {"source_type": "url", "url": "https://www.cogr.edu/resources"}
+    ]
+  }]
+}

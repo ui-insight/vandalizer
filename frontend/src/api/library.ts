@@ -204,12 +204,29 @@ export function updateVerificationStatus(
 
 // Verification - Verified Catalog
 
-export function listVerifiedItems(kind?: string, search?: string) {
-  const params = new URLSearchParams()
-  if (kind) params.set('kind', kind)
-  if (search) params.set('search', search)
-  const qs = params.toString()
-  return apiFetch<{ items: VerifiedCatalogItem[] }>(`/api/verification/verified${qs ? `?${qs}` : ''}`)
+export interface VerifiedItemsParams {
+  kind?: string
+  search?: string
+  quality_tier?: string
+  tag?: string
+  collection_id?: string
+  sort?: string
+  skip?: number
+  limit?: number
+}
+
+export function listVerifiedItems(params?: VerifiedItemsParams) {
+  const sp = new URLSearchParams()
+  if (params?.kind) sp.set('kind', params.kind)
+  if (params?.search) sp.set('search', params.search)
+  if (params?.quality_tier) sp.set('quality_tier', params.quality_tier)
+  if (params?.tag) sp.set('tag', params.tag)
+  if (params?.collection_id) sp.set('collection_id', params.collection_id)
+  if (params?.sort) sp.set('sort', params.sort)
+  if (params?.skip) sp.set('skip', String(params.skip))
+  if (params?.limit) sp.set('limit', String(params.limit))
+  const qs = sp.toString()
+  return apiFetch<{ items: VerifiedCatalogItem[]; total: number }>(`/api/verification/verified${qs ? `?${qs}` : ''}`)
 }
 
 export function getItemMetadata(itemKind: string, itemId: string) {
@@ -235,14 +252,14 @@ export function listCollections() {
   return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections')
 }
 
-export function createCollection(data: { title: string; description?: string }) {
+export function createCollection(data: { title: string; description?: string; featured?: boolean }) {
   return apiFetch<VerifiedCollection>('/api/verification/collections', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateCollection(id: string, data: { title?: string; description?: string }) {
+export function updateCollection(id: string, data: { title?: string; description?: string; featured?: boolean }) {
   return apiFetch<VerifiedCollection>(`/api/verification/collections/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(data),
@@ -270,6 +287,10 @@ export function removeFromCollection(collectionId: string, itemId: string) {
 
 export function listFeaturedCollections() {
   return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections/featured')
+}
+
+export function browseCollections() {
+  return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections/browse')
 }
 
 // Verification - Try verified item

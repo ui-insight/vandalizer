@@ -1,8 +1,36 @@
 import { apiFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
+}
+
+export function listKnowledgeBasesV2(params?: {
+  scope?: KBScope
+  search?: string
+  skip?: number
+  limit?: number
+}) {
+  const sp = new URLSearchParams()
+  if (params?.scope) sp.set('scope', params.scope)
+  if (params?.search) sp.set('search', params.search)
+  if (params?.skip) sp.set('skip', String(params.skip))
+  if (params?.limit) sp.set('limit', String(params.limit))
+  const qs = sp.toString()
+  return apiFetch<KBListResponse>(`/api/knowledge/list/v2${qs ? `?${qs}` : ''}`)
+}
+
+export function adoptKnowledgeBase(uuid: string, note?: string, teamId?: string) {
+  return apiFetch<KBReference>(`/api/knowledge/${uuid}/adopt`, {
+    method: 'POST',
+    body: JSON.stringify({ note, team_id: teamId }),
+  })
+}
+
+export function removeKBReference(refUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/knowledge/reference/${refUuid}`, {
+    method: 'DELETE',
+  })
 }
 
 export function createKnowledgeBase(title: string, description?: string) {
