@@ -51,8 +51,13 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
-        self.upload_dir = str(Path(self.upload_dir).resolve())
-        self.chromadb_persist_dir = str(Path(self.chromadb_persist_dir).resolve())
+        # Resolve relative paths against the backend directory (parent of app/)
+        # so Celery workers and FastAPI resolve identically regardless of cwd.
+        backend_dir = Path(__file__).resolve().parent.parent
+        upload = Path(self.upload_dir)
+        chroma = Path(self.chromadb_persist_dir)
+        self.upload_dir = str(upload if upload.is_absolute() else (backend_dir / upload).resolve())
+        self.chromadb_persist_dir = str(chroma if chroma.is_absolute() else (backend_dir / chroma).resolve())
         return self
 
     @model_validator(mode="after")

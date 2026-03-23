@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
   Loader2,
@@ -458,10 +459,10 @@ export function SupportChatPanel({
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       ref={panelRef}
-      className="fixed bottom-4 right-4 z-50 flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
+      className="fixed bottom-4 right-4 z-[9998] flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl"
       style={{ width: 380, height: 520 }}
     >
       {/* Title bar */}
@@ -510,6 +511,7 @@ export function SupportChatPanel({
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body,
   )
 }
