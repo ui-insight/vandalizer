@@ -6,11 +6,9 @@ import { SpreadsheetViewer } from './SpreadsheetViewer'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url'
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.mjs',
-  import.meta.url,
-).toString()
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 interface DocumentViewerProps {
   docUuid: string
@@ -47,6 +45,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
   const [isDocx, setIsDocx] = useState(false)
   const [docxText, setDocxText] = useState<string | null>(null)
+  const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const pdfDataRef = useRef<ArrayBuffer | null>(null)
@@ -57,16 +56,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
   const zoomLevel = ZOOM_LEVELS[zoom]
   const url = downloadFileUrl(docUuid)
 
-  // Fetch PDF data with credentials and detect content type
+  // Fetch file data with credentials and detect content type
   useEffect(() => {
     let cancelled = false
+    let createdBlobUrl: string | null = null
     setIsPdf(null)
     setIsSpreadsheet(false)
     setIsDocx(false)
     setDocxText(null)
+    setBlobUrl(null)
     pdfDataRef.current = null
 
-    fetch(url, { credentials: 'include', method: 'HEAD' })
+    // Fetch the full file once — avoids a second round-trip and works for all types
+    fetch(url, { credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
         const ct = resp.headers.get('content-type') || ''
@@ -74,8 +76,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
           setIsSpreadsheet(true)
           setIsPdf(false)
         } else if (ct.includes('pdf')) {
-          const fullResp = await fetch(url, { credentials: 'include' })
-          const data = await fullResp.arrayBuffer()
+          const data = await resp.arrayBuffer()
           if (cancelled) return
           pdfDataRef.current = data
           setIsPdf(true)
@@ -88,6 +89,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
             if (!cancelled) setDocxText('')
           })
         } else {
+          // Generic fallback: create a blob URL so the iframe doesn't need to
+          // re-authenticate. This also avoids X-Frame-Options blocking the iframe.
+          const blob = await resp.blob()
+          if (cancelled) return
+          createdBlobUrl = URL.createObjectURL(blob)
+          setBlobUrl(createdBlobUrl)
           setIsPdf(false)
         }
       })
@@ -95,8 +102,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
         if (!cancelled) setIsPdf(false)
       })
 
-    return () => { cancelled = true }
-  }, [url])
+    return () => {
+      cancelled = true
+      if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl)
+    }
+  }, [url, docUuid])
 
   // Re-fetch docx text when processing completes
   useEffect(() => {
@@ -511,11 +521,17 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
             height: `${100 / zoomLevel}%`,
             minHeight: '100%',
           }}>
-            <iframe
-              src={url}
-              style={{ width: '100%', height: '100%', border: 'none' }}
-              title="Document viewer"
-            />
+            {blobUrl ? (
+              <iframe
+                src={blobUrl}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                title="Document viewer"
+              />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 13 }}>
+                Loading...
+              </div>
+            )}
           </div>
         </div>
       </div>

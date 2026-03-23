@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -36,6 +36,10 @@ import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { getQualityStatus } from '../../api/extractions'
 import type { QualityStatus } from '../../api/extractions'
 import { relativeTime } from '../../utils/time'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced'
 
@@ -73,33 +77,36 @@ export function ExtractionEditorPanel() {
   const { items, loading: itemsLoading, refresh: refreshItems, add, remove, update, reorder } =
     useSearchSetItems(openExtractionId)
 
+  // Background refresh — does NOT set loading:true so ValidateTab state is preserved
   const refresh = useCallback(async () => {
     if (!openExtractionId) return
-    setLoading(true)
     try {
       const ss = await getSearchSet(openExtractionId)
       setSearchSet(ss)
     } catch {
-      setSearchSet(null)
-    } finally {
-      setLoading(false)
+      // silent — don't clear searchSet on refresh failure
     }
-    // Also refresh sparkline and quality status
     refreshSparkline()
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
   }, [openExtractionId, refreshSparkline])
 
-  useEffect(() => {
-    refresh()
-    setResults({})
-    setActiveTab('design')
-  }, [refresh])
-
-  // Fetch quality status
+  // Initial load — shows spinner and resets design-tab results
   useEffect(() => {
     if (!openExtractionId) return
+    setLoading(true)
+    setResults({})
+    setActiveTab('design')
+    getSearchSet(openExtractionId)
+      .then(setSearchSet)
+      .catch(() => setSearchSet(null))
+      .finally(() => setLoading(false))
+    refreshSparkline()
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
-    // Check localStorage for nudge dismissal
+  }, [openExtractionId, refreshSparkline])
+
+  // Nudge dismissal state
+  useEffect(() => {
+    if (!openExtractionId) return
     const key = `quality-nudge-dismissed-${openExtractionId}`
     setNudgeDismissed(!!localStorage.getItem(key))
   }, [openExtractionId])
@@ -2528,49 +2535,6 @@ function ValidateTab({
         )}
       </div>
 
-      {/* LLM Improvement Suggestions — shown above quality history */}
-      {(suggestions || loadingSuggestions || (results && (
-        (results.aggregate_accuracy !== null && results.aggregate_accuracy < 0.95) ||
-        results.aggregate_consistency < 0.95
-      ))) && (
-        <div style={{
-          border: '1px solid #fde68a', borderRadius: 8, padding: 16,
-          backgroundColor: '#fffbeb',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: suggestions ? 12 : 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
-            </div>
-            {!suggestions && !loadingSuggestions && (
-              <button
-                onClick={handleGetSuggestions}
-                disabled={loadingSuggestions}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
-                  color: '#92400e', cursor: 'pointer',
-                }}
-              >
-                Get AI Suggestions
-              </button>
-            )}
-          </div>
-          {loadingSuggestions && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e' }}>
-              <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
-              Analyzing validation results...
-            </div>
-          )}
-          {suggestions && (
-            <div style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-              {suggestions}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 3. Quality History — graph only, expandable run table */}
       {qualityHistory.length > 1 && (
         <div style={{
@@ -2711,20 +2675,23 @@ function ValidateTab({
           }}>
             <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
             <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
-              <strong>Great results!</strong> This extraction scored {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
+              <strong>Great results!</strong> This extraction has a quality score of {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
             </div>
             {submitLibraryResult === 'success' ? (
               <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
+            ) : submitLibraryResult === 'error' ? (
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', whiteSpace: 'nowrap' }}>Submission failed. Please try again.</span>
             ) : (
               <button
                 disabled={submittingToLibrary}
                 onClick={async (e) => {
                   e.stopPropagation()
                   setSubmittingToLibrary(true)
+                  setSubmitLibraryResult(null)
                   try {
                     await submitForVerification({
                       item_kind: 'search_set',
-                      item_id: searchSetUuid,
+                      item_id: searchSetUuid!,
                     })
                     setSubmitLibraryResult('success')
                   } catch {
@@ -2809,6 +2776,51 @@ function ValidateTab({
               </div>
             </div>
           </div>
+
+          {/* LLM Improvement Suggestions */}
+          {(suggestions || loadingSuggestions || (
+            (results.aggregate_accuracy !== null && results.aggregate_accuracy < 0.95) ||
+            results.aggregate_consistency < 0.95
+          )) && (
+            <div style={{
+              border: '1px solid #fde68a', borderRadius: 8, padding: '12px 16px',
+              backgroundColor: '#fffbeb',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
+                </div>
+                {!suggestions && !loadingSuggestions && (
+                  <button
+                    onClick={handleGetSuggestions}
+                    disabled={loadingSuggestions}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      borderRadius: 6, border: '1px solid #fde68a', backgroundColor: '#fff',
+                      color: '#92400e', cursor: 'pointer',
+                    }}
+                  >
+                    Get AI Suggestions
+                  </button>
+                )}
+              </div>
+              {loadingSuggestions && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e', marginTop: 8 }}>
+                  <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+                  Analyzing validation results...
+                </div>
+              )}
+              {suggestions && (
+                <div
+                  className="chat-markdown"
+                  style={{ fontSize: 13, color: '#78350f', lineHeight: 1.6, marginTop: 8 }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(suggestions) as string) }}
+                />
+              )}
+            </div>
+          )}
 
           {/* 5. Per-Run Reproducibility */}
           {results.executive_summary.per_run_reproducibility.length > 0 && (

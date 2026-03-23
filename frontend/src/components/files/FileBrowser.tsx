@@ -268,16 +268,20 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handlePanelDragEnter = useCallback((e: DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     dragCounter.current++
     if (e.dataTransfer.types.includes('Files')) setPanelDragOver(true)
   }, [])
 
   const handlePanelDragOver = useCallback((e: DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
+    if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
   }, [])
 
   const handlePanelDragLeave = useCallback((e: DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     dragCounter.current--
     if (dragCounter.current <= 0) {
       dragCounter.current = 0
@@ -287,6 +291,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handlePanelDrop = useCallback((e: DragEvent) => {
     e.preventDefault()
+    e.stopPropagation()
     dragCounter.current = 0
     setPanelDragOver(false)
     if (e.dataTransfer.files.length > 0) upload(e.dataTransfer.files)
