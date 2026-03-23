@@ -19,6 +19,7 @@ export default function WorkflowEditor() {
           workflow: id,
           extraction: undefined,
           automation: undefined,
+          kb: undefined,
         },
         replace: true,
       })

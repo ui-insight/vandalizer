@@ -17,6 +17,7 @@ export function Login() {
           workflow: undefined,
           extraction: undefined,
           automation: undefined,
+          kb: undefined,
         }}
       />
     )

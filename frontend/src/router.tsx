@@ -15,21 +15,16 @@ import { TeamSettings } from './pages/TeamSettings'
 const Landing = lazy(() => import('./pages/Landing'))
 const Workflows = lazy(() => import('./pages/Workflows'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'))
-const Library = lazy(() => import('./pages/Library'))
-const Chat = lazy(() => import('./pages/Chat'))
 const Admin = lazy(() => import('./pages/Admin'))
 const Account = lazy(() => import('./pages/Account'))
 const Automation = lazy(() => import('./pages/Automation'))
-const Office = lazy(() => import('./pages/Office'))
-const BrowserAutomation = lazy(() => import('./pages/BrowserAutomation'))
 const Verification = lazy(() => import('./pages/Verification'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
-const AuditLog = lazy(() => import('./pages/AuditLog'))
-const Approvals = lazy(() => import('./pages/Approvals'))
+
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
   const { openPanel } = useCertificationPanel()
@@ -44,6 +39,7 @@ function CertificationRedirect() {
         workflow: undefined,
         extraction: undefined,
         automation: undefined,
+        kb: undefined,
       },
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -148,24 +144,17 @@ const workflowEditorRoute = createRoute({
   ),
 })
 
+// /chat and /library now live inside the workspace — redirect old URLs
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat',
-  component: () => (
-    <ProtectedRoute>
-      <Chat />
-    </ProtectedRoute>
-  ),
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
 })
 
 const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/library',
-  component: () => (
-    <ProtectedRoute>
-      <Library />
-    </ProtectedRoute>
-  ),
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
 })
 
 const adminRoute = createRoute({
@@ -194,26 +183,6 @@ const automationRoute = createRoute({
   component: () => (
     <ProtectedRoute>
       <Automation />
-    </ProtectedRoute>
-  ),
-})
-
-const officeRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/office',
-  component: () => (
-    <ProtectedRoute>
-      <Office />
-    </ProtectedRoute>
-  ),
-})
-
-const browserAutomationRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/browser-automation',
-  component: () => (
-    <ProtectedRoute>
-      <BrowserAutomation />
     </ProtectedRoute>
   ),
 })
@@ -269,24 +238,30 @@ const organizationsRoute = createRoute({
   ),
 })
 
+// /audit and /approvals are now tabs in the Admin panel
 const auditLogRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/audit',
-  component: () => (
-    <ProtectedRoute>
-      <AuditLog />
-    </ProtectedRoute>
-  ),
+  component: () => <Navigate to="/admin" search={{}} />,
 })
 
 const approvalsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/approvals',
-  component: () => (
-    <ProtectedRoute>
-      <Approvals />
-    </ProtectedRoute>
-  ),
+  component: () => <Navigate to="/admin" search={{}} />,
+})
+
+// /office and /browser-automation are unlinked shadow routes — removed
+const officeRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/office',
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
+})
+
+const browserAutomationRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/browser-automation',
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
 })
 
 const demoStatusRoute = createRoute({

@@ -37,6 +37,8 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
+import { getApproval, approveRequest, rejectRequest } from '../../api/approvals'
+import type { ApprovalRequest } from '../../api/approvals'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -2662,7 +2664,46 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
 }) {
   const isCompleted = status?.status === 'completed'
   const isError = status?.status === 'error' || status?.status === 'failed'
+  const isPendingApproval = status?.status === 'pending_approval'
   const isDone = isCompleted || isError
+
+  const [approval, setApproval] = useState<ApprovalRequest | null>(null)
+  const [approvalComments, setApprovalComments] = useState('')
+  const [approvalProcessing, setApprovalProcessing] = useState(false)
+  const [approvalError, setApprovalError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isPendingApproval || !status?.approval_request_id) return
+    getApproval(status.approval_request_id).then(setApproval).catch(() => {})
+  }, [isPendingApproval, status?.approval_request_id])
+
+  const handleApprove = async () => {
+    if (!approval) return
+    setApprovalProcessing(true)
+    setApprovalError(null)
+    try {
+      await approveRequest(approval.uuid, approvalComments)
+      setApproval({ ...approval, status: 'approved' })
+    } catch (e) {
+      setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
+    } finally {
+      setApprovalProcessing(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!approval) return
+    setApprovalProcessing(true)
+    setApprovalError(null)
+    try {
+      await rejectRequest(approval.uuid, approvalComments)
+      setApproval({ ...approval, status: 'rejected' })
+    } catch (e) {
+      setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
+    } finally {
+      setApprovalProcessing(false)
+    }
+  }
 
   const finalOutput = status?.final_output as Record<string, unknown> | null
   const output = finalOutput?.output ?? finalOutput
@@ -2684,11 +2725,99 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
       boxShadow: '0 6px 18px rgba(0,0,0,0.05)', padding: 20,
       border: isDone
         ? (isError ? '2px solid #fca5a5' : '2px solid #86efac')
+        : isPendingApproval ? '2px solid #fbbf24'
         : '2px solid #e5e7eb',
     }}>
       <div style={{ fontWeight: 600, fontSize: 14, color: '#202124', marginBottom: 8 }}>
-        {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : 'View Output'}
+        {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
       </div>
+
+      {/* Pending approval state */}
+      {isPendingApproval && (
+        <div>
+          {approval ? (
+            <>
+              {approval.status !== 'pending' ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500,
+                  color: approval.status === 'approved' ? '#16a34a' : '#dc2626' }}>
+                  {approval.status === 'approved'
+                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved — workflow resuming</>
+                    : <><XCircle style={{ width: 16, height: 16 }} /> Rejected</>
+                  }
+                </div>
+              ) : (
+                <>
+                  <div style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
+                    <span style={{ fontWeight: 500 }}>Step:</span> {approval.step_name}
+                  </div>
+                  {approval.review_instructions && (
+                    <div style={{ fontSize: 13, color: '#374151', marginBottom: 10,
+                      backgroundColor: '#fefce8', border: '1px solid #fde68a',
+                      borderRadius: 6, padding: '8px 12px' }}>
+                      {approval.review_instructions}
+                    </div>
+                  )}
+                  {Object.keys(approval.data_for_review).length > 0 && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Data for Review</div>
+                      <pre style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb',
+                        borderRadius: 6, padding: '8px 12px', fontSize: 12,
+                        overflowX: 'auto', maxHeight: 200, overflowY: 'auto' }}>
+                        {JSON.stringify(approval.data_for_review, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                  <div style={{ marginBottom: 10 }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+                      Comments (optional)
+                    </label>
+                    <textarea
+                      value={approvalComments}
+                      onChange={e => setApprovalComments(e.target.value)}
+                      rows={2}
+                      placeholder="Add reviewer comments..."
+                      style={{ width: '100%', fontSize: 13, border: '1px solid #d1d5db',
+                        borderRadius: 6, padding: '6px 10px', fontFamily: 'inherit',
+                        resize: 'vertical', boxSizing: 'border-box' }}
+                    />
+                  </div>
+                  {approvalError && (
+                    <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{approvalError}</div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      onClick={handleApprove}
+                      disabled={approvalProcessing}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 16px', borderRadius: 6, border: 'none',
+                        backgroundColor: '#16a34a', color: '#fff',
+                        fontSize: 13, fontWeight: 600, cursor: approvalProcessing ? 'not-allowed' : 'pointer',
+                        opacity: approvalProcessing ? 0.6 : 1, fontFamily: 'inherit' }}
+                    >
+                      <CheckCircle style={{ width: 14, height: 14 }} />
+                      Approve
+                    </button>
+                    <button
+                      onClick={handleReject}
+                      disabled={approvalProcessing}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '7px 16px', borderRadius: 6, border: 'none',
+                        backgroundColor: '#dc2626', color: '#fff',
+                        fontSize: 13, fontWeight: 600, cursor: approvalProcessing ? 'not-allowed' : 'pointer',
+                        opacity: approvalProcessing ? 0.6 : 1, fontFamily: 'inherit' }}
+                    >
+                      <XCircle style={{ width: 14, height: 14 }} />
+                      Reject
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Loading approval details…</div>
+          )}
+        </div>
+      )}
 
       {/* Running state */}
       {running && (

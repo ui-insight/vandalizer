@@ -138,7 +138,7 @@ export function TeamSettings() {
     try {
       await removeMember(currentTeam.uuid, user.user_id)
       await refreshTeams()
-      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined } })
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to leave team')
     }
@@ -154,7 +154,7 @@ export function TeamSettings() {
     try {
       await deleteTeam(currentTeam.uuid)
       await refreshTeams()
-      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined } })
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete team')
     }

@@ -17,6 +17,7 @@ export function Register() {
           workflow: undefined,
           extraction: undefined,
           automation: undefined,
+          kb: undefined,
         }}
       />
     )
