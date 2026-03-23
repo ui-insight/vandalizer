@@ -32,7 +32,6 @@ async def create_folder(
     folder = SmartFolder(
         title=name,
         parent_id=parent_id,
-        space=parent_folder.space if parent_folder else user.user_id,
         user_id=user.user_id if not effective_team_id else None,
         team_id=effective_team_id,
         uuid=uuid.uuid4().hex,

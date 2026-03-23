@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { getOnboardingStatus, type OnboardingStatus } from '../api/config'
 
 interface PillDef {
@@ -42,25 +42,38 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return copy
 }
 
-export function useOnboarding(): string[] {
+function applyStatus(s: OnboardingStatus) {
+  const now = new Date()
+  const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate() + now.getHours()
+
+  const eligible = FEATURE_PILLS.filter((p) => p.gateFlag && !s[p.gateFlag])
+  const shuffledFeature = seededShuffle(eligible, seed)
+  const shuffledLearn = seededShuffle(LEARN_PILLS, seed + 1)
+
+  const combined = [...shuffledFeature, ...shuffledLearn].slice(0, 4)
+  return combined.map((p) => p.label)
+}
+
+export interface OnboardingResult {
+  pills: string[]
+  isNewUser: boolean
+  status: OnboardingStatus | null
+  loading: boolean
+  refetchStatus: () => void
+}
+
+export function useOnboarding(): OnboardingResult {
   const [pills, setPills] = useState<string[]>([])
+  const [isNewUser, setIsNewUser] = useState(false)
+  const [status, setStatus] = useState<OnboardingStatus | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchStatus = useCallback(() => {
     getOnboardingStatus()
-      .then((status) => {
-        const now = new Date()
-        const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate() + now.getHours()
-
-        // Feature-gated pills: only show if user hasn't done the thing yet
-        const eligible = FEATURE_PILLS.filter(
-          (p) => p.gateFlag && !status[p.gateFlag],
-        )
-        const shuffledFeature = seededShuffle(eligible, seed)
-        const shuffledLearn = seededShuffle(LEARN_PILLS, seed + 1)
-
-        // Prioritize feature pills, fill remaining slots with learn pills
-        const combined = [...shuffledFeature, ...shuffledLearn].slice(0, 4)
-        setPills(combined.map((p) => p.label))
+      .then((s) => {
+        setStatus(s)
+        setIsNewUser(Object.values(s).every((v) => v === false))
+        setPills(applyStatus(s))
       })
       .catch(() => {
         setPills([
@@ -69,7 +82,10 @@ export function useOnboarding(): string[] {
           'How do knowledge bases work?',
         ])
       })
+      .finally(() => setLoading(false))
   }, [])
 
-  return pills
+  useEffect(() => { fetchStatus() }, [fetchStatus])
+
+  return { pills, isNewUser, status, loading, refetchStatus: fetchStatus }
 }

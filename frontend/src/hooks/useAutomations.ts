@@ -2,26 +2,26 @@ import { useCallback, useEffect, useState } from 'react'
 import * as api from '../api/automations'
 import type { Automation } from '../types/automation'
 
-export function useAutomations(space?: string) {
+export function useAutomations() {
   const [automations, setAutomations] = useState<Automation[]>([])
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await api.listAutomations(space)
+      const data = await api.listAutomations()
       setAutomations(data)
     } catch {
       // errors handled by caller
     } finally {
       setLoading(false)
     }
-  }, [space])
+  }, [])
 
   useEffect(() => { refresh() }, [refresh])
 
-  const create = async (name: string, currentSpace?: string) => {
-    const auto = await api.createAutomation({ name, space: currentSpace })
+  const create = async (name: string) => {
+    const auto = await api.createAutomation({ name })
     setAutomations(prev => [...prev, auto])
     return auto
   }

@@ -686,12 +686,18 @@ def can_view_search_set(
     user: User,
     *,
     allow_admin: bool = False,
+    team_access: TeamAccessContext | None = None,
 ) -> bool:
     if allow_admin and user.is_admin:
         return True
     if search_set.user_id == user.user_id:
         return True
-    return bool(search_set.is_global)
+    if search_set.is_global:
+        return True
+    if search_set.team_id and team_access:
+        if search_set.team_id in team_access.team_uuids or search_set.team_id in team_access.team_object_ids:
+            return True
+    return False
 
 
 def can_manage_search_set(
@@ -699,10 +705,16 @@ def can_manage_search_set(
     user: User,
     *,
     allow_admin: bool = False,
+    team_access: TeamAccessContext | None = None,
 ) -> bool:
     if allow_admin and user.is_admin:
         return True
-    return search_set.user_id == user.user_id
+    if search_set.user_id == user.user_id:
+        return True
+    if search_set.team_id and team_access:
+        if search_set.team_id in team_access.team_uuids or search_set.team_id in team_access.team_object_ids:
+            return True
+    return False
 
 
 async def get_authorized_search_set(
@@ -718,13 +730,13 @@ async def get_authorized_search_set(
     if not ss:
         return None
 
+    team_access = await get_team_access_context(user)
     allowed = (
-        can_manage_search_set(ss, user, allow_admin=allow_admin)
+        can_manage_search_set(ss, user, allow_admin=allow_admin, team_access=team_access)
         if manage
-        else can_view_search_set(ss, user, allow_admin=allow_admin)
+        else can_view_search_set(ss, user, allow_admin=allow_admin, team_access=team_access)
     )
     if not allowed:
-        team_access = await get_team_access_context(user)
         allowed = await has_library_backed_object_access(
             "search_set",
             str(ss.id),

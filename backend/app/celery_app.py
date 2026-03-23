@@ -47,6 +47,10 @@ celery.conf.beat_schedule = {
         "task": "tasks.passive.process_pending_triggers",
         "schedule": 60.0,  # every 60 seconds
     },
+    "passive-process-scheduled-automations": {
+        "task": "tasks.passive.process_scheduled_automations",
+        "schedule": 60.0,  # every 60 seconds
+    },
     "passive-renew-graph-subscriptions": {
         "task": "tasks.passive.renew_graph_subscriptions",
         "schedule": 43200.0,  # every 12 hours

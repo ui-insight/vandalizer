@@ -18,7 +18,6 @@ async def activity_start(
     user_id: str,
     title: Optional[str] = None,
     team_id: Optional[str] = None,
-    space: Optional[str] = None,
     conversation_id: Optional[str] = None,
     search_set_uuid: Optional[str] = None,
     workflow: Optional[PydanticObjectId] = None,
@@ -33,7 +32,6 @@ async def activity_start(
         status=ActivityStatus.RUNNING.value,
         user_id=user_id,
         team_id=team_id,
-        space=space,
         conversation_id=conversation_id,
         search_set_uuid=search_set_uuid,
         workflow=workflow,
@@ -77,16 +75,24 @@ async def activity_update(activity_id: PydanticObjectId, **kwargs) -> Optional[A
 
 
 async def get_activity(
-    activity_id: PydanticObjectId, user_id: str
+    activity_id: PydanticObjectId, user_id: str, *, team_ids: list[str] | None = None,
 ) -> Optional[ActivityEvent]:
-    return await ActivityEvent.find_one(
-        ActivityEvent.id == activity_id, ActivityEvent.user_id == user_id
-    )
+    conditions: list[dict] = [{"_id": activity_id, "user_id": user_id}]
+    if team_ids:
+        conditions.append({"_id": activity_id, "team_id": {"$in": team_ids}})
+    return await ActivityEvent.find_one({"$or": conditions})
 
 
-async def list_activities(user_id: str, limit: int = 50) -> list[ActivityEvent]:
+async def list_activities(
+    user_id: str,
+    limit: int = 50,
+    team_ids: list[str] | None = None,
+) -> list[ActivityEvent]:
+    conditions: list[dict] = [{"user_id": user_id}]
+    if team_ids:
+        conditions.append({"team_id": {"$in": team_ids}})
     return (
-        await ActivityEvent.find(ActivityEvent.user_id == user_id)
+        await ActivityEvent.find({"$or": conditions})
         .sort("-started_at")
         .limit(limit)
         .to_list()

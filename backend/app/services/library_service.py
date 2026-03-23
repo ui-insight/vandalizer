@@ -668,7 +668,6 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
             user_id=user_id,
             team_id=team_id,
             created_by_user_id=user_id,
-            space=original.space,
             input_config=original.input_config,
             output_config=original.output_config,
             resource_config=original.resource_config,
@@ -709,7 +708,6 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
         new_ss = SearchSet(
             title=f"{original.title} (Copy)",
             uuid=new_uuid,
-            space=original.space,
             status=original.status,
             set_type=original.set_type,
             user_id=user_id,

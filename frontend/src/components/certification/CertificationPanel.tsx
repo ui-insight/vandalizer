@@ -425,7 +425,6 @@ export function CertificationPanel() {
               stars: progress.modules[activeModuleDef.id].stars,
               attempts: progress.modules[activeModuleDef.id].attempts,
               provisioned_docs: progress.modules[activeModuleDef.id].provisioned_docs,
-              lab_space_id: progress.modules[activeModuleDef.id].lab_space_id,
               self_assessment: progress.modules[activeModuleDef.id].self_assessment,
             } : null}
             onValidate={() => handleValidate(activeModuleDef.id)}

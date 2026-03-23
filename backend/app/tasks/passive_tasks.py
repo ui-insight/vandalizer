@@ -14,17 +14,9 @@ from uuid import uuid4
 from bson import ObjectId
 
 from app.celery_app import celery_app
-from app.tasks import TRANSIENT_EXCEPTIONS
+from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
-
-
-def _get_db():
-    from pymongo import MongoClient
-
-    from app.config import Settings
-    settings = Settings()
-    return MongoClient(settings.mongo_host)[settings.mongo_db]
 
 
 # ---------------------------------------------------------------------------
@@ -52,7 +44,7 @@ def process_pending_triggers(self) -> dict:
         evaluate_conditions,
     )
 
-    db = _get_db()
+    db = get_sync_db()
     now = datetime.now(timezone.utc)
 
     pending = list(
@@ -153,6 +145,154 @@ def process_pending_triggers(self) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Beat task: process scheduled automations (every 60s)
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.process_scheduled_automations",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=3,
+    default_retry_delay=10,
+)
+def process_scheduled_automations(self) -> dict:
+    """Evaluate schedule-based automations and create trigger events when due.
+
+    Runs every minute via Celery Beat.
+    """
+    try:
+        from croniter import croniter
+    except ImportError:
+        logger.warning("croniter not installed — schedule triggers disabled")
+        return {"processed": 0, "error": "croniter not installed"}
+
+    db = get_sync_db()
+    now = datetime.now(timezone.utc)
+    processed = 0
+
+    automations = list(db.automation.find({
+        "enabled": True,
+        "trigger_type": "schedule",
+    }))
+
+    for auto in automations:
+        try:
+            action_id = auto.get("action_id")
+            if not action_id:
+                continue
+
+            trigger_config = auto.get("trigger_config") or {}
+            cron_expr = trigger_config.get("cron_expression")
+            if not cron_expr:
+                continue
+
+            # Determine last run time for this automation
+            last_event = db.workflow_trigger_event.find_one(
+                {
+                    "trigger_context.automation_id": str(auto["_id"]),
+                    "trigger_type": "schedule",
+                },
+                sort=[("created_at", -1)],
+            )
+
+            if last_event:
+                base_time = last_event["created_at"]
+                if base_time.tzinfo is None:
+                    base_time = base_time.replace(tzinfo=timezone.utc)
+            else:
+                # First run — use automation creation time as base
+                base_time = auto.get("created_at", now - timedelta(minutes=2))
+                if base_time.tzinfo is None:
+                    base_time = base_time.replace(tzinfo=timezone.utc)
+
+            cron = croniter(cron_expr, base_time)
+            next_run = cron.get_next(datetime)
+            if next_run.tzinfo is None:
+                next_run = next_run.replace(tzinfo=timezone.utc)
+
+            if next_run > now:
+                continue  # Not due yet
+
+            # Gather documents from trigger_config
+            doc_uuids = trigger_config.get("document_uuids", [])
+            folder_id = trigger_config.get("folder_id")
+
+            doc_oids = []
+            if doc_uuids:
+                docs = list(db.smart_document.find(
+                    {"uuid": {"$in": doc_uuids}},
+                    {"_id": 1},
+                ))
+                doc_oids = [d["_id"] for d in docs]
+            elif folder_id:
+                docs = list(db.smart_document.find(
+                    {"folder": folder_id, "processing": False},
+                    {"_id": 1},
+                ))
+                doc_oids = [d["_id"] for d in docs]
+
+            if auto.get("action_type") in ("workflow", "task"):
+                event = {
+                    "uuid": uuid4().hex,
+                    "workflow": ObjectId(action_id),
+                    "trigger_type": "schedule",
+                    "status": "pending",
+                    "documents": doc_oids,
+                    "document_count": len(doc_oids),
+                    "trigger_context": {
+                        "automation_id": str(auto["_id"]),
+                        "automation_name": auto.get("name", ""),
+                        "cron_expression": cron_expr,
+                    },
+                    "created_at": now,
+                    "process_after": now,
+                    "attempt_number": 1,
+                    "max_attempts": 3,
+                    "output_delivery": {
+                        "storage_status": None,
+                        "notifications_sent": [],
+                        "webhooks_called": [],
+                        "chains_triggered": [],
+                    },
+                }
+                db.workflow_trigger_event.insert_one(event)
+                processed += 1
+                logger.info(
+                    "Created schedule trigger for automation '%s' (workflow %s)",
+                    auto.get("name"), action_id,
+                )
+
+            elif auto.get("action_type") == "extraction":
+                # Dispatch extraction via Celery task
+                doc_uuid_list = []
+                if doc_oids:
+                    docs = list(db.smart_document.find(
+                        {"_id": {"$in": doc_oids}},
+                        {"uuid": 1},
+                    ))
+                    doc_uuid_list = [d["uuid"] for d in docs]
+
+                if doc_uuid_list:
+                    process_extraction_outputs.delay(
+                        automation_id=str(auto["_id"]),
+                        search_set_uuid=action_id,
+                        document_uuids=doc_uuid_list,
+                        user_id=auto.get("user_id", ""),
+                    )
+                    processed += 1
+
+        except Exception as e:
+            logger.error(
+                "Error processing scheduled automation %s: %s",
+                auto.get("name"), e,
+            )
+
+    return {"processed": processed, "timestamp": now.isoformat()}
+
+
+# ---------------------------------------------------------------------------
 # Execute a workflow for a passive trigger
 # ---------------------------------------------------------------------------
 
@@ -165,7 +305,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
     """Execute a workflow for a passive trigger event."""
     from app.services.workflow_engine import build_workflow_engine
 
-    db = _get_db()
+    db = get_sync_db()
     event = db.workflow_trigger_event.find_one({"_id": ObjectId(trigger_event_id)})
     if not event:
         return {"error": "Trigger event not found"}
@@ -294,6 +434,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                 "duration_ms": duration_ms,
                 "result": result_id,
                 "documents_succeeded": len(doc_ids),
+                "documents_failed": 0,
                 "tokens_input": engine.usage.tokens_in,
                 "tokens_output": engine.usage.tokens_out,
                 "total_tokens": engine.usage.tokens_in + engine.usage.tokens_out,
@@ -331,6 +472,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         started_at = event.get("started_at") or now
         duration_ms = int((completed_at - started_at).total_seconds() * 1000) if started_at else 0
 
+        doc_ids = event.get("documents", [])
         db.workflow_trigger_event.update_one(
             {"_id": event["_id"]},
             {"$set": {
@@ -338,6 +480,8 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                 "completed_at": completed_at,
                 "duration_ms": duration_ms,
                 "error": str(e),
+                "documents_succeeded": 0,
+                "documents_failed": len(doc_ids),
             }},
         )
 
@@ -374,7 +518,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Process outputs (storage, notifications, webhooks)
+# Process outputs (storage, notifications, webhooks, chains)
 # ---------------------------------------------------------------------------
 
 
@@ -395,8 +539,9 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         send_workflow_notification,
         should_send_notification,
     )
+    from app.services.passive_triggers import create_chain_trigger
 
-    db = _get_db()
+    db = get_sync_db()
     result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)})
     if not result_doc:
         return {"error": "WorkflowResult not found"}
@@ -416,15 +561,13 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     if automation and automation.get("output_config"):
         output_config = automation["output_config"]
 
-    # Find associated work item (if any)
+    # Find associated trigger event and work item
     work_item = None
-    trigger_event = None
-    if result_doc.get("trigger_type") in ("m365_intake", "folder_watch"):
-        trigger_event = db.workflow_trigger_event.find_one({"result": result_doc["_id"]})
-        if trigger_event:
-            work_item = db.work_items.find_one({"trigger_event": trigger_event["_id"]})
+    trigger_event = db.workflow_trigger_event.find_one({"result": result_doc["_id"]})
+    if trigger_event:
+        work_item = db.work_items.find_one({"trigger_event": trigger_event["_id"]})
 
-    outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": []}
+    outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
     # 1. Local storage
     storage_cfg = output_config.get("storage", {})
@@ -517,7 +660,52 @@ def process_outputs(self, workflow_result_id: str) -> dict:
             wr = {"url": webhook_cfg.get("url"), "status": "failed", "error": str(e)}
             outputs["webhooks"].append(wr)
 
-    # 5. Update work item status
+    # 5. Chain triggers — dispatch to downstream workflows
+    for chain_cfg in output_config.get("chains", []):
+        target_workflow_id = chain_cfg.get("workflow_id")
+        if not target_workflow_id:
+            continue
+        try:
+            target_wf = db.workflow.find_one({"_id": ObjectId(target_workflow_id)})
+            if not target_wf:
+                logger.warning("Chain target workflow %s not found", target_workflow_id)
+                continue
+
+            # Pass the same documents to the chained workflow
+            source_doc_ids = trigger_event.get("documents", []) if trigger_event else []
+            chain_event = create_chain_trigger(
+                source_event=trigger_event or {"uuid": str(result_doc.get("_id")), "workflow": workflow["_id"]},
+                target_workflow_id=target_workflow_id,
+                document_oids=source_doc_ids,
+                automation_id=chain_cfg.get("automation_id"),
+                automation_name=chain_cfg.get("automation_name"),
+            )
+            if chain_event:
+                cr = {
+                    "target_workflow_id": target_workflow_id,
+                    "trigger_event_id": str(chain_event["_id"]),
+                    "status": "created",
+                }
+                outputs["chains"].append(cr)
+                if trigger_event:
+                    db.workflow_trigger_event.update_one(
+                        {"_id": trigger_event["_id"]},
+                        {"$push": {"output_delivery.chains_triggered": cr}},
+                    )
+            else:
+                outputs["chains"].append({
+                    "target_workflow_id": target_workflow_id,
+                    "status": "skipped",
+                    "error": "Max chain depth exceeded",
+                })
+        except Exception as e:
+            outputs["chains"].append({
+                "target_workflow_id": target_workflow_id,
+                "status": "failed",
+                "error": str(e),
+            })
+
+    # 6. Update work item status
     if work_item:
         new_status = "completed" if result_doc.get("status") == "completed" else "failed"
         db.work_items.update_one(
@@ -526,6 +714,134 @@ def process_outputs(self, workflow_result_id: str) -> dict:
         )
 
     return outputs
+
+
+# ---------------------------------------------------------------------------
+# Process extraction outputs (async, for API-triggered extractions)
+# ---------------------------------------------------------------------------
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.process_extraction_outputs",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=3,
+    default_retry_delay=10,
+)
+def process_extraction_outputs(
+    self,
+    automation_id: str,
+    search_set_uuid: str,
+    document_uuids: list[str],
+    user_id: str,
+    *,
+    results: dict | None = None,
+) -> dict:
+    """Run extraction and/or process output_config for an automation.
+
+    If *results* is None, runs the extraction first (used by schedule triggers).
+    If *results* is provided, just processes outputs (used by API triggers).
+    """
+    from app.services.output_handlers import (
+        call_webhook,
+        save_extraction_results_to_folder,
+        send_workflow_notification,
+        should_send_notification,
+    )
+
+    db = get_sync_db()
+    auto = db.automation.find_one({"_id": ObjectId(automation_id)})
+    if not auto:
+        return {"error": "Automation not found"}
+
+    # Run extraction if results not provided
+    if results is None:
+        from app.services.extraction_engine import ExtractionEngine
+
+        sys_config = db.system_config.find_one() or {}
+        models = sys_config.get("available_models", [])
+        model = models[0]["name"] if models else "gpt-4o-mini"
+
+        ss_items = list(db.search_set_item.find({
+            "searchset": search_set_uuid,
+            "searchtype": "extraction",
+        }))
+        keys = [item["searchphrase"] for item in ss_items]
+        if not keys:
+            return {"error": "No extraction keys found"}
+
+        results = {}
+        for doc_uuid in document_uuids:
+            doc = db.smart_document.find_one({"uuid": doc_uuid})
+            if not doc or not doc.get("raw_text"):
+                continue
+            try:
+                engine = ExtractionEngine(model=model, system_config=sys_config)
+                doc_results = engine.extract(doc["raw_text"], keys)
+                results[doc_uuid] = doc_results
+            except Exception as e:
+                logger.error("Extraction failed for doc %s: %s", doc_uuid, e)
+                results[doc_uuid] = {"error": str(e)}
+
+    output_config = auto.get("output_config") or {}
+    if not output_config:
+        return {"status": "completed", "results": results}
+
+    automation_dict = {
+        "name": auto.get("name"),
+        "user_id": auto.get("user_id"),
+        "trigger_type": auto.get("trigger_type"),
+        "_id": auto["_id"],
+    }
+
+    result_doc = {
+        "status": "completed",
+        "trigger_type": auto.get("trigger_type", "api"),
+        "final_output": {"output": results},
+    }
+
+    outputs = {"storage": None, "notifications": [], "webhooks": []}
+
+    # Storage
+    storage_cfg = output_config.get("storage", {})
+    if storage_cfg.get("enabled"):
+        try:
+            path = save_extraction_results_to_folder(results, automation_dict, storage_cfg)
+            outputs["storage"] = {"status": "completed", "path": path}
+        except Exception as e:
+            logger.error("Failed to save extraction results: %s", e)
+            outputs["storage"] = {"status": "failed", "error": str(e)}
+
+    # Notifications
+    for notification in output_config.get("notifications", []):
+        try:
+            if should_send_notification(result_doc, notification):
+                send_workflow_notification(result_doc, notification)
+                outputs["notifications"].append({
+                    "channel": notification.get("channel"),
+                    "status": "sent",
+                })
+        except Exception as e:
+            outputs["notifications"].append({
+                "channel": notification.get("channel"),
+                "status": "failed",
+                "error": str(e),
+            })
+
+    # Webhooks
+    for webhook_cfg in output_config.get("webhooks", []):
+        try:
+            call_webhook(result_doc, webhook_cfg)
+            outputs["webhooks"].append({"url": webhook_cfg.get("url"), "status": "sent"})
+        except Exception as e:
+            outputs["webhooks"].append({
+                "url": webhook_cfg.get("url"),
+                "status": "failed",
+                "error": str(e),
+            })
+
+    return {"status": "completed", "outputs": outputs}
 
 
 # ---------------------------------------------------------------------------
@@ -543,7 +859,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 )
 def cleanup_old_trigger_events(self) -> dict:
     """Delete completed/failed/skipped trigger events older than 30 days."""
-    db = _get_db()
+    db = get_sync_db()
     cutoff = datetime.now(timezone.utc) - timedelta(days=30)
 
     result = db.workflow_trigger_event.delete_many({

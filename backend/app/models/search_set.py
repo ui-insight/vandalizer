@@ -16,7 +16,6 @@ class SearchSetItem(Document):
     text_blocks: list[str] = []
     pdf_binding: Optional[str] = None
     user_id: Optional[str] = None
-    space_id: Optional[str] = None
     title: Optional[str] = None
     is_optional: bool = False
     enum_values: list[str] = []
@@ -31,10 +30,10 @@ class SearchSet(Document):
 
     title: str
     uuid: str
-    space: str
     status: str
     set_type: str
     user_id: Optional[str] = None
+    team_id: Optional[str] = None
     is_global: bool = False
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     user: Optional[str] = None
@@ -51,8 +50,7 @@ class SearchSet(Document):
         indexes = [
             "uuid",
             "user_id",
-            "space",
-            [("user_id", 1), ("space", 1)],
+            "team_id",
         ]
 
     async def get_items(self) -> list[SearchSetItem]:

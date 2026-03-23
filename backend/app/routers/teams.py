@@ -8,6 +8,7 @@ from app.schemas.teams import (
     CreateTeamRequest,
     InviteRequest,
     RemoveMemberRequest,
+    TransferOwnershipRequest,
     UpdateTeamNameRequest,
 )
 from app.services import team_service
@@ -137,6 +138,32 @@ async def remove_member(
         await team_service.remove_member(
             body.team_id, body.user_id, user.user_id
         )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.post("/transfer-ownership")
+async def transfer_ownership(
+    body: TransferOwnershipRequest,
+    user: User = Depends(get_current_user),
+):
+    try:
+        team = await team_service.transfer_ownership(
+            body.team_uuid, user.user_id, body.new_owner_user_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"uuid": team.uuid, "name": team.name, "owner_user_id": team.owner_user_id}
+
+
+@router.delete("/{team_uuid}")
+async def delete_team(
+    team_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    try:
+        await team_service.delete_team(team_uuid, user.user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"ok": True}

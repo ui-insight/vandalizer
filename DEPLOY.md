@@ -1,8 +1,18 @@
 # Deploying Vandalizer (FastAPI + React)
 
-## Quick Start with Docker Compose
+## Quick Start
 
-The fastest way to get Vandalizer running locally:
+The fastest way to get Vandalizer running locally is the interactive setup wizard. It walks you through environment configuration, secret generation, service startup, admin account creation, and database seeding:
+
+```bash
+git clone https://github.com/ui-insight/vandalizer.git
+cd vandalizer
+./setup.sh
+```
+
+### Manual Docker Compose Setup
+
+If you prefer to run each step yourself:
 
 ```bash
 # 1. Clone the repository
@@ -13,7 +23,7 @@ cd vandalizer
 cp backend/.env.example backend/.env
 # Edit backend/.env — at minimum set:
 #   JWT_SECRET_KEY=<generate with: python -c "import secrets; print(secrets.token_urlsafe(64))">
-# LLM API keys and endpoints are configured per-model via System Config in the admin UI.
+# LLM API keys and endpoints are configured per-model via the admin UI, not in .env.
 
 # 3. Build and start everything
 docker compose up --build -d
@@ -31,7 +41,7 @@ curl http://localhost:8001/api/health
 # → {"status":"ok","checks":{...}}
 ```
 
-The frontend is available at `http://localhost:80` and proxies API requests to the backend on port 8001.
+The frontend is available at `http://localhost` (port 80) and the API at `http://localhost:8001`. Log in with the admin credentials you provided to the bootstrap command.
 
 What the bootstrap command does:
 
@@ -103,6 +113,7 @@ MONGO_HOST=mongodb://mongo:27017/
 MONGO_DB=osp
 REDIS_HOST=redis
 JWT_SECRET_KEY=<generate-a-strong-random-secret>
+CONFIG_ENCRYPTION_KEY=<generate-a-fernet-key>
 UPLOAD_DIR=/app/static/uploads
 FRONTEND_URL=https://vandalizer.example.edu
 ENVIRONMENT=production
@@ -112,6 +123,7 @@ CHROMADB_PERSIST_DIR=../app/static/db
 Key notes:
 
 - **`JWT_SECRET_KEY`**: Generate a strong secret with `python -c "import secrets; print(secrets.token_urlsafe(64))"`. This signs all authentication tokens — keep it secret and do not reuse across environments.
+- **`CONFIG_ENCRYPTION_KEY`**: Fernet key used to encrypt LLM API keys and OAuth secrets stored in MongoDB. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. If omitted, `bootstrap_install.py` auto-generates one and prints it — copy it into `.env` to persist across restarts. Without this key, secrets are stored in plaintext.
 - **`MONGO_HOST`**: Use the Docker service name (`mongo`) if running in Docker Compose, or the hostname/IP of your MongoDB instance if externalized.
 - **`UPLOAD_DIR`**: Directory where user-uploaded documents are stored. Must be a persistent volume.
 - **`FRONTEND_URL`**: The public URL users will access. Used for CORS and redirect configuration.
@@ -137,6 +149,16 @@ This design supports any OpenAI-compatible API, including:
 - Any other provider exposing an OpenAI-compatible endpoint
 
 Models can be added, removed, or rotated at any time without restarting the application.
+
+### PDF Processing & OCR
+
+Vandalizer extracts text from PDFs using one of two approaches, both configured in the admin UI:
+
+**OCR endpoint** — Navigate to **Admin → System Config → Endpoints** and set the **OCR Endpoint** URL. This should point to an HTTP service that accepts a multipart PDF file upload and returns extracted plain text. This is the recommended approach for scanned documents. Any service implementing this interface works — self-hosted Marker, Surya, a Tesseract wrapper, or a wrapper around a cloud OCR API (Azure Document Intelligence, AWS Textract, Google Document AI).
+
+Without an OCR endpoint, Vandalizer falls back to direct text extraction via PyPDF2. This works for digitally-created PDFs but produces poor results on scanned documents.
+
+**Multimodal LLM (alternative)** — For models that support vision (e.g., GPT-4o, Claude), Vandalizer can send PDF pages as images directly to the LLM instead of using OCR. Enable this under **Admin → System Config → Extraction** by toggling **Use Document Images (Multimodal)**. This works well for visually complex documents but uses more LLM tokens.
 
 ### TLS / HTTPS
 
@@ -191,6 +213,8 @@ After deployment, confirm these are working:
 
 - [ ] `GET /api/health` returns `"status":"ok"` with populated health checks
 - [ ] Login works with the bootstrap admin credentials
+- [ ] At least one LLM provider is configured under Admin → System Config → Models
+- [ ] OCR endpoint is configured under Admin → System Config → Endpoints (if processing scanned PDFs)
 - [ ] Documents list loads in the UI
 - [ ] File upload completes successfully
 - [ ] Extraction workflow runs to completion (confirms Celery workers are connected)

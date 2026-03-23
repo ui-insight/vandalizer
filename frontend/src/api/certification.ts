@@ -14,7 +14,7 @@ export function completeModule(moduleId: string) {
 }
 
 export function provisionModule(moduleId: string) {
-  return apiFetch<{ provisioned_docs: string[]; space_id: string | null }>(
+  return apiFetch<{ provisioned_docs: string[] }>(
     `/api/certification/modules/${moduleId}/provision`,
     { method: 'POST' },
   )

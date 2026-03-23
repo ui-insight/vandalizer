@@ -266,11 +266,11 @@ function UserGuide() {
         Library. Library items can be shared across your team.
       </p>
 
-      <h3 className="text-xl font-bold text-white mt-8">Teams & Spaces</h3>
+      <h3 className="text-xl font-bold text-white mt-8">Teams</h3>
       <p className="text-gray-300 leading-relaxed">
-        Organize work into Teams and Spaces. Teams provide role-based access control
-        (owner/admin/member). Spaces scope documents, workflows, and folders for project-level
-        isolation within a team.
+        Organize work into Teams. Teams provide role-based access control
+        (owner/admin/member) and scope documents, workflows, and folders for
+        multi-tenant collaboration.
       </p>
     </div>
   )
@@ -350,10 +350,9 @@ function Architecture() {
         ,{' '}
         <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">Workflow</code>
         ,{' '}
-        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">Team</code>,
         and{' '}
-        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">Space</code>.
-        Documents, workflows, and folders are scoped by space and team for multi-tenancy.
+        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">Team</code>.
+        Documents, workflows, and folders are scoped by team for multi-tenancy.
       </p>
 
       <h3 className="text-xl font-bold text-white mt-8">LLM Layer</h3>
@@ -424,7 +423,6 @@ function ApiReference() {
           ['auth', 'Authentication & OAuth'],
           ['files', 'Document upload & management'],
           ['workflows', 'Workflow CRUD & execution'],
-          ['spaces', 'Space management'],
           ['teams', 'Team & membership management'],
           ['library', 'Shared library items'],
           ['tasks', 'Celery task status'],

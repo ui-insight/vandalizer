@@ -147,14 +147,18 @@ def _update_streak(prog: CertificationProgress) -> None:
 CERT_FOLDER_TITLE = "Certification Lab"
 
 
-async def provision_module_documents(user_id: str, module_id: str, settings) -> dict:
+async def provision_module_documents(user, module_id: str, settings) -> dict:
     """Provision sample documents for a certification module.
 
     Creates a Certification Lab folder in the user's workspace if needed,
     uploads the module's sample PDFs, and records provisioned doc UUIDs
     in CertificationProgress.
+
+    ``user`` is a ``User`` model instance.
     """
     from app.services import file_service, folder_service
+
+    user_id = user.user_id
 
     exercise = get_exercise(module_id)
     if not exercise:
@@ -162,23 +166,18 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
 
     doc_filenames = exercise.get("documents", [])
     if not doc_filenames:
-        return {"provisioned_docs": [], "space_id": None}
-
-    # Use user_id as space (matches the workspace file browser convention)
-    space = user_id
+        return {"provisioned_docs": []}
 
     # Find or create Certification Lab folder in user's workspace
     folder = await SmartFolder.find_one(
         SmartFolder.title == CERT_FOLDER_TITLE,
-        SmartFolder.space == space,
         SmartFolder.user_id == user_id,
     )
     if not folder:
         folder = await folder_service.create_folder(
             name=CERT_FOLDER_TITLE,
             parent_id="0",
-            space=space,
-            user_id=user_id,
+            user=user,
         )
 
     # Upload each document (skip if already exists)
@@ -194,7 +193,6 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
         # Check if already uploaded
         existing = await SmartDocument.find_one(
             SmartDocument.title == filename,
-            SmartDocument.space == space,
             SmartDocument.user_id == user_id,
         )
         if existing:
@@ -209,8 +207,7 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
             blob=blob,
             filename=filename,
             raw_extension="pdf",
-            space=space,
-            user_id=user_id,
+            user=user,
             settings=settings,
             folder=folder.uuid,
         )
@@ -220,12 +217,11 @@ async def provision_module_documents(user_id: str, module_id: str, settings) -> 
     prog = await get_progress(user_id)
     module_data = prog.modules.get(module_id, {})
     module_data["provisioned_docs"] = provisioned
-    module_data["lab_space_id"] = space
     prog.modules[module_id] = module_data
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await prog.save()
 
-    return {"provisioned_docs": provisioned, "space_id": space}
+    return {"provisioned_docs": provisioned}
 
 
 # ---------------------------------------------------------------------------
@@ -312,7 +308,7 @@ async def complete_module(user_id: str, module_id: str) -> dict:
         xp_earned += (stars - old_stars) * 25
 
     prog.modules[module_id] = {
-        **module_data,  # Preserve provisioned_docs, lab_space_id
+        **module_data,  # Preserve provisioned_docs
         "completed": True,
         "stars": max(stars, old_stars),
         "completed_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
@@ -698,16 +694,14 @@ async def _validate_governance(user_id: str) -> dict:
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
 
     verified_count = sum(1 for wf in workflows if wf.verified)
-    spaces_used = len(set(wf.space for wf in workflows if wf.space))
 
     checks.append({"name": "Verified workflow", "passed": verified_count >= 1, "detail": f"Have {verified_count} verified workflows (need 1+)"})
-    checks.append({"name": "Multiple spaces", "passed": spaces_used >= 2, "detail": f"Using {spaces_used} spaces (need 2+)"})
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
     if passed and verified_count >= 2:
         stars = 2
-    if passed and verified_count >= 3 and spaces_used >= 3:
+    if passed and verified_count >= 3:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}

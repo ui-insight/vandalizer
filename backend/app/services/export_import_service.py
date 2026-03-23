@@ -98,7 +98,6 @@ async def export_workflow(workflow_id: str, user_email: str) -> dict:
 async def import_workflow(
     data: dict,
     user_id: str,
-    space: str | None = None,
     team_id: str | None = None,
 ) -> dict:
     """Import a workflow from export data. Returns the new workflow dict."""
@@ -115,7 +114,6 @@ async def import_workflow(
         description=item.get("description"),
         user_id=user_id,
         team_id=team_id,
-        space=space,
         created_by_user_id=user_id,
         input_config=item.get("input_config", {}),
         output_config=item.get("output_config", {}),
@@ -201,7 +199,7 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
     return _envelope("search_set", user_email, [export_item])
 
 
-async def import_search_set(data: dict, user_id: str, space: str | None = None) -> SearchSet:
+async def import_search_set(data: dict, user_id: str, team_id: str | None = None) -> SearchSet:
     """Import a search set from export data. Returns the new SearchSet."""
     err = validate_export_data(data)
     if err:
@@ -215,7 +213,7 @@ async def import_search_set(data: dict, user_id: str, space: str | None = None) 
     clone = SearchSet(
         title=f"{item['title']} (Imported)",
         uuid=new_uuid,
-        space=space or "default",
+        team_id=team_id,
         status="active",
         set_type=item.get("set_type", "extraction"),
         user_id=user_id,
@@ -290,7 +288,6 @@ async def export_knowledge_base(kb_uuid: str, user_email: str) -> dict:
 async def import_knowledge_base(
     data: dict,
     user_id: str,
-    space: str | None = None,
     team_id: str | None = None,
 ) -> "KnowledgeBase":
     """Import a knowledge base from export data."""
@@ -309,7 +306,6 @@ async def import_knowledge_base(
         description=item.get("description"),
         user_id=user_id,
         team_id=team_id,
-        space=space,
     )
     await kb.insert()
 
@@ -451,7 +447,6 @@ async def import_catalog_items(
     data: dict,
     selected_indices: list[int],
     user_id: str,
-    space: str | None = None,
     team_id: str | None = None,
 ) -> list[dict]:
     """Import selected catalog items. Returns list of created item summaries."""
@@ -471,15 +466,15 @@ async def import_catalog_items(
 
         if item_kind == "workflow":
             wrapper = _envelope("workflow", "", [definition])
-            wf = await import_workflow(wrapper, user_id, space, team_id=team_id)
+            wf = await import_workflow(wrapper, user_id, team_id=team_id)
             results.append({"kind": "workflow", "id": wf["id"], "name": wf["name"]})
         elif item_kind == "search_set":
             wrapper = _envelope("search_set", "", [definition])
-            ss = await import_search_set(wrapper, user_id, space)
+            ss = await import_search_set(wrapper, user_id, team_id=team_id)
             results.append({"kind": "search_set", "uuid": ss.uuid, "name": ss.title})
         elif item_kind == "knowledge_base":
             wrapper = _envelope("knowledge_base", "", [definition])
-            kb = await import_knowledge_base(wrapper, user_id, space, team_id=team_id)
+            kb = await import_knowledge_base(wrapper, user_id, team_id=team_id)
             results.append({"kind": "knowledge_base", "uuid": kb.uuid, "name": kb.title})
 
     return results

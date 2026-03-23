@@ -1,4 +1,4 @@
-import { BookOpen, ClipboardCheck, Cloud, FileText, FolderOpen, Globe, MessageSquare, Shield, Users, Workflow, Zap } from 'lucide-react'
+import { BookOpen, ClipboardCheck, Cloud, FileText, Globe, MessageSquare, Shield, ShieldCheck, Users, Workflow, Zap } from 'lucide-react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
@@ -16,12 +16,12 @@ export function Sidebar() {
     { href: '/', label: 'Documents', icon: FileText },
     { href: '/chat', label: 'Chat', icon: MessageSquare },
     { href: '/library', label: 'Library', icon: BookOpen },
-    { href: '/spaces', label: 'Spaces', icon: FolderOpen },
     { href: '/workflows', label: 'Workflows', icon: Workflow },
     { href: '/automation', label: 'Automation', icon: Zap },
     { href: '/office', label: 'Office 365', icon: Cloud },
     { href: '/browser-automation', label: 'Browser', icon: Globe },
     { href: '/teams', label: 'Teams', icon: Users },
+    { href: '/catalog', label: 'Catalog', icon: ShieldCheck },
     ...(user?.is_examiner ? [{ href: '/verification', label: 'Verification', icon: ClipboardCheck }] : []),
     ...(showAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
   ] as const

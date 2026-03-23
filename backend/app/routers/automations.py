@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.automation import Automation
+from app.models.document import SmartDocument
 from app.models.passive import WorkflowTriggerEvent
 from app.models.user import User
 from app.rate_limit import limiter
@@ -72,7 +73,6 @@ def _to_response(auto) -> AutomationResponse:
         user_id=auto.user_id,
         team_id=auto.team_id,
         shared_with_team=auto.shared_with_team,
-        space=auto.space,
         output_config=auto.output_config,
         created_at=auto.created_at.isoformat(),
         updated_at=auto.updated_at.isoformat(),
@@ -84,7 +84,7 @@ async def create_automation(req: CreateAutomationRequest, user: User = Depends(g
     await _validate_action_target(req.action_type, req.action_id, user)
     team_id = str(user.current_team) if user.current_team else None
     auto = await svc.create_automation(
-        req.name, user.user_id, req.space, req.description,
+        req.name, user.user_id, req.description,
         req.trigger_type, trigger_config=req.trigger_config,
         action_type=req.action_type, action_id=req.action_id,
         team_id=team_id, shared_with_team=req.shared_with_team,
@@ -94,10 +94,10 @@ async def create_automation(req: CreateAutomationRequest, user: User = Depends(g
 
 
 @router.get("", response_model=list[AutomationResponse])
-async def list_automations(space: str | None = None, user: User = Depends(get_current_user)):
+async def list_automations(user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
     automations = await svc.list_automations(
-        user_id=user.user_id, team_id=team_id, space=space,
+        user_id=user.user_id, team_id=team_id,
     )
     return [_to_response(a) for a in automations]
 
@@ -179,7 +179,6 @@ async def get_active_automations(user: User = Depends(get_current_user)):
 
     doc_info_map: dict[str, dict] = {}  # oid_str -> {uuid, title}
     if all_doc_oids:
-        from app.models.document import SmartDocument
         docs = await SmartDocument.find({"_id": {"$in": all_doc_oids}}).to_list()
         for d in docs:
             doc_info_map[str(d.id)] = {"uuid": d.uuid, "title": d.title}
@@ -255,11 +254,14 @@ async def trigger_automation(
 ):
     """Trigger an automation via API. Accepts file uploads, existing document UUIDs, and/or plain text.
 
-    Requires `x-api-key` header. The automation must be enabled and have an action configured.
+    Requires ``x-api-key`` header. The automation must be enabled and have an action configured.
+
+    For workflow/task actions, creates a WorkflowTriggerEvent and dispatches
+    execution through the passive pipeline (with budget/throttle checks, retry,
+    and output delivery).
     """
     from app.config import Settings
-    from app.models.activity import ActivityStatus, ActivityType
-    from app.models.document import SmartDocument
+    from app.models.activity import ActivityType
     from app.services import activity_service
     from app.tasks.upload_tasks import dispatch_upload_tasks
 
@@ -294,7 +296,6 @@ async def trigger_automation(
             extension="txt",
             uuid=uid,
             user_id=user.user_id,
-            space="default",
             folder="0",
         )
         await doc.insert()
@@ -323,7 +324,6 @@ async def trigger_automation(
             extension=ext,
             uuid=uid,
             user_id=user.user_id,
-            space="default",
             folder="0",
         )
         await doc.insert()
@@ -341,34 +341,48 @@ async def trigger_automation(
 
     # Route to the appropriate action
     if auto.action_type in ("workflow", "task"):
-        from app.services import workflow_service
+        # Resolve document UUIDs to ObjectIds for the trigger event
+        doc_records = await SmartDocument.find(
+            {"uuid": {"$in": all_doc_uuids}},
+        ).to_list()
+        doc_oids = [d.id for d in doc_records]
 
+        # Create a WorkflowTriggerEvent so API triggers get the same
+        # tracking, retry, and output delivery as other trigger types
+        from app.services.passive_triggers import create_api_trigger
+
+        auto_dict = {
+            "_id": auto.id,
+            "name": auto.name,
+            "user_id": auto.user_id,
+        }
+        trigger_event = create_api_trigger(
+            automation_doc=auto_dict,
+            workflow_id=auto.action_id,
+            document_oids=doc_oids,
+        )
+
+        # Also create an Activity for the UI activity feed
         activity = await activity_service.activity_start(
             type=ActivityType.WORKFLOW_RUN,
             title=f"API: {auto.name}",
             user_id=user.user_id,
             workflow=PydanticObjectId(auto.action_id),
         )
-        try:
-            session_id = await workflow_service.run_workflow(
-                auto.action_id, all_doc_uuids, user.user_id,
-                activity_id=str(activity.id),
-                user=user,
-            )
-            return {
-                "status": "queued",
-                "activity_id": str(activity.id),
-                "session_id": session_id,
-                "action_type": auto.action_type,
-                "documents": all_doc_uuids,
-            }
-        except ValueError as e:
-            await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
-            raise HTTPException(status_code=400, detail=str(e))
+
+        # Dispatch to the passive execution pipeline
+        from app.tasks.passive_tasks import execute_workflow_passive
+        execute_workflow_passive.delay(str(trigger_event["_id"]))
+
+        return {
+            "status": "queued",
+            "trigger_event_id": str(trigger_event["_id"]),
+            "activity_id": str(activity.id),
+            "action_type": auto.action_type,
+            "documents": all_doc_uuids,
+        }
 
     elif auto.action_type == "extraction":
-        from app.services import search_set_service
-
         ss = await get_authorized_search_set(auto.action_id, user)
         if not ss:
             raise HTTPException(status_code=404, detail="Linked extraction not found")
@@ -379,77 +393,22 @@ async def trigger_automation(
             user_id=user.user_id,
             search_set_uuid=auto.action_id,
         )
-        try:
-            results = await search_set_service.run_extraction_sync(
-                search_set_uuid=auto.action_id,
-                document_uuids=all_doc_uuids,
-                user_id=user.user_id,
-            )
-            await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
 
-            # Process output_config (storage, notifications, webhooks)
-            output_config = auto.output_config or {}
-            if output_config:
-                _process_extraction_trigger_outputs(auto, results, output_config)
+        # Dispatch extraction + output processing asynchronously via Celery
+        from app.tasks.passive_tasks import process_extraction_outputs
+        process_extraction_outputs.delay(
+            automation_id=str(auto.id),
+            search_set_uuid=auto.action_id,
+            document_uuids=all_doc_uuids,
+            user_id=user.user_id,
+        )
 
-            return {
-                "status": "completed",
-                "activity_id": str(activity.id),
-                "action_type": "extraction",
-                "documents": all_doc_uuids,
-                "results": results,
-            }
-        except Exception as e:
-            await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
-            raise HTTPException(status_code=500, detail=str(e))
+        return {
+            "status": "queued",
+            "activity_id": str(activity.id),
+            "action_type": "extraction",
+            "documents": all_doc_uuids,
+        }
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported action type: {auto.action_type}")
-
-
-def _process_extraction_trigger_outputs(
-    auto: Automation, results: dict, output_config: dict
-) -> None:
-    """Process output_config for an extraction triggered via API (sync helpers)."""
-    from app.services.output_handlers import (
-        call_webhook,
-        save_extraction_results_to_folder,
-        send_workflow_notification,
-        should_send_notification,
-    )
-
-    automation_dict = {
-        "name": auto.name,
-        "user_id": auto.user_id,
-        "trigger_type": auto.trigger_type,
-        "_id": auto.id,
-    }
-
-    result_doc = {
-        "status": "completed",
-        "trigger_type": "api",
-        "final_output": {"output": results},
-    }
-
-    # Storage
-    storage_cfg = output_config.get("storage", {})
-    if storage_cfg.get("enabled"):
-        try:
-            save_extraction_results_to_folder(results, automation_dict, storage_cfg)
-        except Exception as e:
-            logger.error("API trigger: failed to save extraction results: %s", e)
-
-    # Notifications
-    for notification in output_config.get("notifications", []):
-        try:
-            if should_send_notification(result_doc, notification):
-                send_workflow_notification(result_doc, notification)
-        except Exception as e:
-            logger.error("API trigger: failed to send extraction notification: %s", e)
-
-    # Webhooks
-    for webhook_cfg in output_config.get("webhooks", []):
-        try:
-            call_webhook(result_doc, webhook_cfg)
-        except Exception as e:
-            logger.error("API trigger: failed to call extraction webhook: %s", e)

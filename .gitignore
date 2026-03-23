@@ -48,4 +48,6 @@ node_modules/
 # Internal planning docs (not for public release)
 deploy_roadmap.md
 risk-plan.md
-status.sh
+
+# Setup wizard runtime log
+.setup.log

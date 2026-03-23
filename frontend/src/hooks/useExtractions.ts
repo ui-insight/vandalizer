@@ -2,13 +2,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/extractions'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
-export function useSearchSets(space?: string) {
+export function useSearchSets() {
   const qc = useQueryClient()
-  const queryKey = ['searchSets', space] as const
+  const queryKey = ['searchSets'] as const
 
   const { data: searchSets = [], isLoading: loading } = useQuery<SearchSet[]>({
     queryKey,
-    queryFn: () => api.listSearchSets(space),
+    queryFn: () => api.listSearchSets(),
   })
 
   const refresh = () => qc.invalidateQueries({ queryKey })
@@ -29,7 +29,7 @@ export function useSearchSets(space?: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
-  const create = async (title: string, _currentSpace: string) =>
+  const create = async (title: string) =>
     createMutation.mutateAsync({ title })
 
   const remove = async (uuid: string) => {

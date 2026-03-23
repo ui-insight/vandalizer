@@ -20,7 +20,6 @@ class Automation(Document):
     user_id: str
     team_id: Optional[str] = None
     shared_with_team: bool = False
-    space: Optional[str] = None
     output_config: dict = {}
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))

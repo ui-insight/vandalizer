@@ -24,6 +24,8 @@ Start Redis, MongoDB, and ChromaDB:
 docker compose up -d redis mongo chromadb
 ```
 
+> **Note:** MongoDB is mapped to host port **27018** (not the default 27017) to avoid conflicts with any local MongoDB instance. The `.env.example` defaults already account for this.
+
 ### 2. Backend
 
 ```bash
@@ -32,17 +34,19 @@ make backend-install
 # Copy and configure environment
 cd backend
 cp .env.example .env
-# Edit .env with your settings (JWT_SECRET_KEY, etc. — LLM keys are configured in the admin UI)
+# Edit .env — at minimum, set JWT_SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
+# LLM keys are configured in the admin UI, not in .env.
 
 # Run the FastAPI dev server (port 8001)
-uvicorn app.main:app --reload --port 8001
+uv run uvicorn app.main:app --reload --port 8001
 ```
 
 ### 3. Celery Workers
 
 ```bash
 cd backend
-./run_celery.sh
+./run_celery.sh start
 ```
 
 ### 4. Frontend
@@ -54,6 +58,19 @@ npm run dev
 ```
 
 The frontend dev server runs on `http://localhost:5173` and proxies API requests to the backend.
+
+### 5. Bootstrap (first time only)
+
+Create the initial admin account and seed the verified catalog:
+
+```bash
+cd backend
+ADMIN_EMAIL=admin@example.edu ADMIN_PASSWORD=secret \
+  ADMIN_NAME='Initial Admin' DEFAULT_TEAM_NAME='Research Administration' \
+  uv run python bootstrap_install.py
+```
+
+If `CONFIG_ENCRYPTION_KEY` is not set, the bootstrap script auto-generates one and prints it. Copy it into your `.env` to persist across restarts.
 
 ## Coding Conventions
 

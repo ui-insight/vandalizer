@@ -10,9 +10,8 @@ export function createSearchSet(data: { title: string; set_type?: string; extrac
   })
 }
 
-export function listSearchSets(space?: string) {
-  const params = space ? `?space=${encodeURIComponent(space)}` : ''
-  return apiFetch<SearchSet[]>(`/api/extractions/search-sets${params}`)
+export function listSearchSets() {
+  return apiFetch<SearchSet[]>('/api/extractions/search-sets')
 }
 
 export function getSearchSet(uuid: string) {

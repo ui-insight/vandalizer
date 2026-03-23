@@ -32,7 +32,6 @@ async def upload_document(
     blob: str,
     filename: str,
     raw_extension: str,
-    space: str,
     user: User,
     settings: Settings,
     folder: str | None = None,
@@ -57,20 +56,17 @@ async def upload_document(
     target_folder = folder
     parent_folder: SmartFolder | None = None
     team_id: str | None = None
-    effective_space = user.user_id
 
     if target_folder and target_folder != "0":
         parent_folder = await access_control.get_authorized_folder(target_folder, user)
         if not parent_folder:
             raise ValueError("Folder not found.")
         team_id = parent_folder.team_id
-        effective_space = parent_folder.space or user.user_id
 
     if root_folder_name:
         new_folder = SmartFolder(
             title=root_folder_name,
             user_id=user_id if not team_id else None,
-            space=effective_space,
             parent_id=folder or "0",
             uuid=uuid.uuid4().hex,
             team_id=team_id,
@@ -93,7 +89,6 @@ async def upload_document(
         existing = await SmartDocument.find_one(
             SmartDocument.title == safe_name,
             SmartDocument.user_id == user_id,
-            SmartDocument.space == effective_space,
             SmartDocument.folder == target_folder,
             SmartDocument.soft_deleted != True,  # noqa: E712
         )
@@ -146,7 +141,6 @@ async def upload_document(
         uuid=uid,
         user_id=user_id,
         team_id=team_id,
-        space=effective_space,
         folder=target_folder,
         task_id=None,
         task_status="layout",

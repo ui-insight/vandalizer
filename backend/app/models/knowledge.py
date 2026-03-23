@@ -47,7 +47,6 @@ class KnowledgeBase(Document):
     description: Optional[str] = None
     user_id: str
     team_id: Optional[str] = None
-    space: Optional[str] = None
     shared_with_team: bool = False
     verified: bool = False
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping

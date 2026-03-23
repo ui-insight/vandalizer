@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, office, organizations, spaces, teams, verification, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, teams, verification, workflows
 
 
 @lru_cache
@@ -156,7 +156,6 @@ app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(folders.router, prefix="/api/folders", tags=["folders"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(teams.router, prefix="/api/teams", tags=["teams"])
-app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(extractions.router, prefix="/api/extractions", tags=["extractions"])
 app.include_router(workflows.router, prefix="/api/workflows", tags=["workflows"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
@@ -175,6 +174,7 @@ app.include_router(certification.router, prefix="/api/certification", tags=["cer
 app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 
 
 # ---------------------------------------------------------------------------

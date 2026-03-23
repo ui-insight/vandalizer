@@ -15,12 +15,10 @@ router = APIRouter()
 
 @router.get("/list")
 async def list_documents(
-    space: str | None = None,
     folder: str | None = None,
     team_uuid: str | None = None,
     user: User = Depends(get_current_user),
 ):
-    # `space` is retained as a legacy query parameter for backwards compatibility.
     # Use provided team_uuid, or fall back to user's current team
     if not team_uuid and user.current_team:
         team = await Team.get(user.current_team)
@@ -48,19 +46,32 @@ async def search_documents(
     user: User = Depends(get_current_user),
 ):
     """Search documents by title or content text. Returns recent docs when q is empty."""
+    # Include user's own docs and team-scoped docs
+    team_access = await access_control.get_team_access_context(user)
+    owner_conditions: list[dict] = [{"user_id": user.user_id}]
+    if team_access.team_uuids:
+        owner_conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+    if team_access.team_object_ids:
+        owner_conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+    owner_filter = {"$or": owner_conditions}
+
     if not q.strip():
         results = await SmartDocument.find(
-            {"user_id": user.user_id},
+            owner_filter,
         ).sort(-SmartDocument.created_at).limit(limit).to_list()
     else:
         regex = re.compile(re.escape(q), re.IGNORECASE)
         results = await SmartDocument.find(
             {
-                "$or": [
-                    {"title": {"$regex": regex.pattern, "$options": "i"}},
-                    {"raw_text": {"$regex": regex.pattern, "$options": "i"}},
+                "$and": [
+                    owner_filter,
+                    {
+                        "$or": [
+                            {"title": {"$regex": regex.pattern, "$options": "i"}},
+                            {"raw_text": {"$regex": regex.pattern, "$options": "i"}},
+                        ],
+                    },
                 ],
-                "user_id": user.user_id,
             }
         ).sort(-SmartDocument.created_at).limit(limit).to_list()
 

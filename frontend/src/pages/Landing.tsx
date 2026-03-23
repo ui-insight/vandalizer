@@ -258,6 +258,8 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
+  const search = useSearch({ strict: false }) as Record<string, string | undefined>
+  const inviteToken = search?.invite_token
 
   useEffect(() => {
     getAuthConfig().then(setAuthConfig)
@@ -268,6 +270,10 @@ export default function Landing() {
     return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
   }
   if (user && !demoExpired) {
+    // If user arrived here with an invite token, redirect to accept it
+    if (inviteToken) {
+      return <Navigate to="/invite" search={{ token: inviteToken }} />
+    }
     return (
       <Navigate
         to="/"

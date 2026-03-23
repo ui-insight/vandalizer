@@ -44,7 +44,6 @@ def _save_attachment_as_document(
     content_bytes: bytes,
     filename: str,
     user_id: str,
-    space: str,
 ) -> dict:
     """Persist raw bytes to disk and create a SmartDocument."""
     ext = Path(filename).suffix.lstrip(".").lower() or "bin"
@@ -64,7 +63,6 @@ def _save_attachment_as_document(
         "extension": ext,
         "uuid": doc_uuid,
         "user_id": user_id,
-        "space": space,
         "folder": "",
         "raw_text": "",
         "processing": False,
@@ -131,8 +129,6 @@ def ingest_email_message(
         logger.info("Duplicate message %s — skipping", message_id)
         return {"status": "duplicate"}
 
-    space = user_id
-
     # Download attachments
     attachment_ids = []
     if msg.get("hasAttachments"):
@@ -141,7 +137,7 @@ def ingest_email_message(
             for att in raw_attachments:
                 if att.get("@odata.type") == "#microsoft.graph.fileAttachment":
                     content = base64.b64decode(att.get("contentBytes", ""))
-                    doc = _save_attachment_as_document(db, content, att.get("name", "attachment"), user_id, space)
+                    doc = _save_attachment_as_document(db, content, att.get("name", "attachment"), user_id)
                     _trigger_text_extraction(doc)
                     attachment_ids.append(doc["_id"])
         except GraphAPIError as e:
@@ -255,8 +251,7 @@ def ingest_drive_item(
         logger.error("Failed to download drive item %s: %s", item_id, e)
         return {"error": str(e)}
 
-    space = user_id
-    doc = _save_attachment_as_document(db, content, filename, user_id, space)
+    doc = _save_attachment_as_document(db, content, filename, user_id)
     _trigger_text_extraction(doc)
 
     work_item = {

@@ -35,13 +35,12 @@ if TYPE_CHECKING:
 # Workflow CRUD
 # ---------------------------------------------------------------------------
 
-async def create_workflow(name: str, user_id: str, space: str | None = None, description: str | None = None, team_id: str | None = None) -> Workflow:
+async def create_workflow(name: str, user_id: str, description: str | None = None, team_id: str | None = None) -> Workflow:
     wf = Workflow(
         name=name,
         description=description,
         user_id=user_id,
         team_id=team_id,
-        space=space,
         created_by_user_id=user_id,
     )
     await wf.insert()
@@ -50,7 +49,6 @@ async def create_workflow(name: str, user_id: str, space: str | None = None, des
 
 async def list_workflows(
     user: User,
-    space: str | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[Workflow]:
@@ -64,8 +62,6 @@ async def list_workflows(
         conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
 
     query: dict = {"$or": conditions}
-    if space:
-        query["space"] = space
 
     return await Workflow.find(query).skip(skip).limit(limit).to_list()
 
@@ -108,7 +104,6 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "name": wf.name,
         "description": wf.description,
         "user_id": wf.user_id,
-        "space": wf.space,
         "num_executions": wf.num_executions,
         "steps": steps,
         "input_config": wf.input_config,
@@ -174,7 +169,6 @@ async def duplicate_workflow(workflow_id: str, user: User, user_id: str, team_id
         description=original.get("description"),
         user_id=user_id,
         team_id=team_id,
-        space=original.get("space"),
         created_by_user_id=user_id,
     )
     await new_wf.insert()
@@ -720,7 +714,6 @@ async def create_temp_documents_from_text(texts: list[dict], user_id: str) -> li
             extension="txt",
             uuid=uid,
             user_id=user_id,
-            space="__validation_temp__",
             folder="0",
         )
         await doc.insert()
