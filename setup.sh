@@ -391,9 +391,11 @@ build_image() {
     printf "\r  ${SYM_CROSS}  %-74s\n" "${label} build failed"
     echo ""
     echo -e "  ${DIM}     Last 10 lines of build output:${RESET}"
+    echo -e "  ${DIM}     ------${RESET}"
     tail -10 "$logfile" | while IFS= read -r errline; do
       echo -e "  ${DIM}     ${errline}${RESET}"
     done
+    echo -e "  ${DIM}     ------${RESET}"
     cat "$logfile" >> "$SETUP_LOG"
     ERRORS+=("${label} build failed — check ${SETUP_LOG}")
     rm -f "$logfile"

@@ -40,7 +40,7 @@ export function LibraryTab() {
   const teamId = user?.current_team ?? undefined
   const { libraries, loading: libLoading, error, refresh } = useLibraries(teamId)
 
-  const [scope, setScope] = useState<ScopeTab>('mine')
+  const [scope, setScope] = useState('mine' as ScopeTab)
   const [search, setSearch] = useState('')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
@@ -635,58 +635,8 @@ export function LibraryTab() {
             )
           })}
 
-          {/* Collections section — only for Explore scope */}
-          {scope === 'explore' && collections.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div
-                style={{
-                  padding: '0 12px',
-                  marginBottom: 4,
-                  fontSize: 10,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  color: '#888',
-                  letterSpacing: '0.5px',
-                }}
-              >
-                Collections
-              </div>
-              {collections.map((col) => {
-                const isActive = viewFilter === `collection:${col.id}`
-                return (
-                  <div
-                    key={col.id}
-                    onClick={() => setViewFilter(isActive ? 'all' : `collection:${col.id}`)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '7px 10px 7px 12px',
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontWeight: isActive ? 600 : 500,
-                      color: isActive ? 'var(--library-highlight-ink)' : '#4a4a4a',
-                      backgroundColor: isActive ? 'var(--library-highlight-soft)' : 'transparent',
-                      borderLeft: isActive ? '3px solid var(--library-highlight)' : '3px solid transparent',
-                      transition: 'background 0.1s',
-                    }}
-                    onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = '#f0f0f0' }}
-                    onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent' }}
-                  >
-                    <Layers style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
-                    <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {col.title}
-                    </span>
-                    <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa', fontWeight: 400 }}>
-                      {col.item_ids.length}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Folders section — only for personal and team scopes */}
-          {scope !== 'explore' && (
+          {/* Folders section — personal and team scopes */}
+          {(
             <div style={{ marginTop: 16 }}>
               {/* Folders header row */}
               <div
@@ -1018,15 +968,15 @@ export function LibraryTab() {
                 <LibraryItemRow
                   key={item.id}
                   item={item}
-                  scope={scope === 'explore' ? 'team' : scope}
+                  scope={scope}
                   onPin={handlePin}
                   onFavorite={handleFavorite}
                   onClone={handleClone}
                   onShare={handleShare}
                   onRemove={handleRemove}
                   onEdit={openEditModal}
-                  onMoveToFolder={scope !== 'explore' ? handleMoveToFolder : undefined}
-                  folders={scope !== 'explore' ? folders : undefined}
+                  onMoveToFolder={handleMoveToFolder}
+                  folders={folders}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
                   onOpen={(it) => {
