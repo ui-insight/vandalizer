@@ -1245,6 +1245,88 @@ upgrade() {
   echo -e "  ${DIM}     Branch: ${current_branch}  Commit: ${current_rev}${RESET}"
   echo ""
 
+  # Check remote URL — HTTPS repos need a credential helper or SSH switch
+  local remote_url
+  remote_url=$(git remote get-url origin 2>/dev/null || echo "")
+
+  if [[ "$remote_url" == https://* ]]; then
+    # Test if we can actually authenticate before wasting time
+    echo -e "  ${SYM_PULSE}  ${DIM}Checking remote access...${RESET}"
+    if ! git ls-remote --heads origin >/dev/null 2>&1; then
+      echo -e "  ${SYM_WARN}  ${YELLOW}Cannot authenticate to remote via HTTPS${RESET}"
+      echo -e "  ${DIM}     GitHub no longer supports password auth for HTTPS.${RESET}"
+      echo ""
+      echo -e "  ${DIM}  1)${RESET} ${CYAN}Switch to SSH${RESET}        ${DIM}— use git@github.com:... (requires SSH key)${RESET}"
+      echo -e "  ${DIM}  2)${RESET} ${CYAN}Enter a token${RESET}        ${DIM}— use a Personal Access Token for HTTPS${RESET}"
+      echo -e "  ${DIM}  3)${RESET} ${CYAN}Skip pull${RESET}            ${DIM}— just rebuild and redeploy current code${RESET}"
+      echo ""
+      echo -ne "  ${SYM_ARROW}  Select ${DIM}[1]${RESET}: "
+      local auth_choice
+      read -r auth_choice
+      auth_choice="${auth_choice:-1}"
+
+      case "$auth_choice" in
+        1)
+          # Convert https://github.com/org/repo.git → git@github.com:org/repo.git
+          local ssh_url
+          ssh_url=$(echo "$remote_url" | sed -E 's|https://github\.com/(.+)|git@github.com:\1|')
+          echo ""
+          echo -e "  ${SYM_NEURAL}  Switching origin to: ${CYAN}${ssh_url}${RESET}"
+          git remote set-url origin "$ssh_url"
+          # Verify SSH works
+          if git ls-remote --heads origin >/dev/null 2>&1; then
+            echo -e "  ${SYM_CHECK}  SSH connection works"
+          else
+            echo -e "  ${SYM_CROSS}  ${RED}SSH connection failed${RESET}"
+            echo -e "  ${DIM}     Make sure your SSH key is added to GitHub:${RESET}"
+            echo -e "  ${GRAY}       ssh-keygen -t ed25519 -C \"your-email\"${RESET}"
+            echo -e "  ${GRAY}       cat ~/.ssh/id_ed25519.pub  # add this to GitHub → Settings → SSH keys${RESET}"
+            echo -e "  ${DIM}     Then re-run: ${GRAY}./setup.sh --upgrade${RESET}"
+            # Revert
+            git remote set-url origin "$remote_url"
+            return 1
+          fi
+          ;;
+        2)
+          echo ""
+          echo -e "  ${DIM}     Create a token at: https://github.com/settings/tokens${RESET}"
+          echo -e "  ${DIM}     Scopes needed: ${BOLD}repo${RESET}"
+          echo -ne "  ${SYM_ARROW}  Paste token: "
+          local pat
+          read -rs pat
+          echo ""
+          if [[ -z "$pat" ]]; then
+            echo -e "  ${SYM_CROSS}  ${RED}No token provided${RESET}"
+            return 1
+          fi
+          # Rewrite URL with token: https://TOKEN@github.com/org/repo.git
+          local token_url
+          token_url=$(echo "$remote_url" | sed -E "s|https://|https://${pat}@|")
+          git remote set-url origin "$token_url"
+          if git ls-remote --heads origin >/dev/null 2>&1; then
+            echo -e "  ${SYM_CHECK}  Token authentication works"
+          else
+            echo -e "  ${SYM_CROSS}  ${RED}Token authentication failed — check the token scopes${RESET}"
+            git remote set-url origin "$remote_url"
+            return 1
+          fi
+          ;;
+        3)
+          echo ""
+          echo -e "  ${DIM}     Skipping pull — rebuilding from current code.${RESET}"
+          # Backup and then jump straight to redeploy
+          echo ""
+          take_backup
+          do_redeploy
+          echo ""
+          echo -e "  ${BRIGHT_GREEN}${BOLD}Redeploy complete.${RESET}"
+          return 0
+          ;;
+      esac
+      echo ""
+    fi
+  fi
+
   # Fetch and show what's available
   echo -e "  ${SYM_PULSE}  ${DIM}Fetching latest changes...${RESET}"
   git fetch --tags --quiet 2>/dev/null || true

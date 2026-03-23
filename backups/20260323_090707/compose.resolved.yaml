@@ -1,0 +1,272 @@
+name: vandalizer
+services:
+  api:
+    build:
+      context: /Users/jbrunsfeld/Documents/GitHub/vandalizer/backend
+      dockerfile: Dockerfile
+    depends_on:
+      chromadb:
+        condition: service_healthy
+        required: true
+      mongo:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    deploy:
+      resources:
+        limits:
+          cpus: 4
+          memory: "4294967296"
+    environment:
+      CHROMADB_PERSIST_DIR: /app/static/db
+      CONFIG_ENCRYPTION_KEY: gCPRlRGFrZqeY9KYpTcUaelkm1Wxl3ACLBZ7s8m3PQ8=
+      ENVIRONMENT: development
+      FRONTEND_URL: http://localhost:5173
+      INSIGHT_ENDPOINT: ""
+      JWT_SECRET_KEY: GFVrFuI8Rp9gxtDvPVrJP5xipO2E2yH1zPt_MbF0B20voNNY2aggUDBY7A63tM1Q9IpGnpoLKRqIwws7TQciTQ
+      MONGO_DB: vandalizer
+      MONGO_HOST: mongodb://mongo:27017/
+      REDIS_HOST: redis
+      SMTP_FROM_EMAIL: ""
+      SMTP_FROM_NAME: Vandalizer
+      SMTP_HOST: ""
+      SMTP_PASSWORD: ""
+      SMTP_PORT: "587"
+      SMTP_USE_TLS: "true"
+      SMTP_USER: ""
+      UPLOAD_DIR: /app/static/uploads
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 8001
+        published: "8001"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: uploads
+        target: /app/static/uploads
+        volume: {}
+      - type: volume
+        source: chroma-data
+        target: /app/static/db
+        volume: {}
+  celery:
+    build:
+      context: /Users/jbrunsfeld/Documents/GitHub/vandalizer/backend
+      dockerfile: Dockerfile
+    depends_on:
+      chromadb:
+        condition: service_healthy
+        required: true
+      mongo:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    deploy:
+      resources:
+        limits:
+          cpus: 4
+          memory: "8589934592"
+    entrypoint:
+      - sh
+      - run_celery.sh
+      - start
+    environment:
+      CHROMADB_PERSIST_DIR: /app/static/db
+      CONFIG_ENCRYPTION_KEY: gCPRlRGFrZqeY9KYpTcUaelkm1Wxl3ACLBZ7s8m3PQ8=
+      ENVIRONMENT: development
+      FRONTEND_URL: http://localhost:5173
+      INSIGHT_ENDPOINT: ""
+      JWT_SECRET_KEY: GFVrFuI8Rp9gxtDvPVrJP5xipO2E2yH1zPt_MbF0B20voNNY2aggUDBY7A63tM1Q9IpGnpoLKRqIwws7TQciTQ
+      MONGO_DB: vandalizer
+      MONGO_HOST: mongodb://mongo:27017/
+      REDIS_HOST: redis
+      SMTP_FROM_EMAIL: ""
+      SMTP_FROM_NAME: Vandalizer
+      SMTP_HOST: ""
+      SMTP_PASSWORD: ""
+      SMTP_PORT: "587"
+      SMTP_USE_TLS: "true"
+      SMTP_USER: ""
+      UPLOAD_DIR: /app/static/uploads
+    networks:
+      vandalizer: null
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: uploads
+        target: /app/static/uploads
+        volume: {}
+      - type: volume
+        source: chroma-data
+        target: /app/static/db
+        volume: {}
+  chromadb:
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: "2147483648"
+    environment:
+      ANONYMIZED_TELEMETRY: "FALSE"
+      IS_PERSISTENT: "TRUE"
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - -f
+        - http://localhost:8000/api/v1/heartbeat
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 15s
+    image: chromadb/chroma:0.6.3
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: chroma-data
+        target: /chroma/chroma
+        volume: {}
+  flower:
+    build:
+      context: /Users/jbrunsfeld/Documents/GitHub/vandalizer/backend
+      dockerfile: Dockerfile
+    depends_on:
+      redis:
+        condition: service_healthy
+        required: true
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "536870912"
+    entrypoint:
+      - celery
+      - -A
+      - app.celery_app:celery
+      - flower
+      - --port=5555
+      - --persistent=True
+      - --db=/tmp/flower.db
+    environment:
+      CHROMADB_PERSIST_DIR: ../app/static/db
+      CONFIG_ENCRYPTION_KEY: gCPRlRGFrZqeY9KYpTcUaelkm1Wxl3ACLBZ7s8m3PQ8=
+      ENVIRONMENT: development
+      FRONTEND_URL: http://localhost:5173
+      INSIGHT_ENDPOINT: ""
+      JWT_SECRET_KEY: GFVrFuI8Rp9gxtDvPVrJP5xipO2E2yH1zPt_MbF0B20voNNY2aggUDBY7A63tM1Q9IpGnpoLKRqIwws7TQciTQ
+      MONGO_DB: vandalizer
+      MONGO_HOST: mongodb://localhost:27018/
+      REDIS_HOST: redis
+      SMTP_FROM_EMAIL: ""
+      SMTP_FROM_NAME: Vandalizer
+      SMTP_HOST: ""
+      SMTP_PASSWORD: ""
+      SMTP_PORT: "587"
+      SMTP_USE_TLS: "true"
+      SMTP_USER: ""
+      UPLOAD_DIR: ../app/static/uploads
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 5555
+        published: "5555"
+        protocol: tcp
+    restart: unless-stopped
+  frontend:
+    build:
+      context: /Users/jbrunsfeld/Documents/GitHub/vandalizer/frontend
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_started
+        required: true
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "80"
+        protocol: tcp
+    restart: unless-stopped
+  mongo:
+    deploy:
+      resources:
+        limits:
+          cpus: 2
+          memory: "1073741824"
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --eval
+        - db.adminCommand('ping')
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    image: mongo:7.0.16
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 27017
+        published: "27018"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: mongo-data
+        target: /data/db
+        volume: {}
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: "536870912"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 10s
+      retries: 5
+    image: redis/redis-stack:7.4.0-v3
+    networks:
+      vandalizer: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+networks:
+  vandalizer:
+    name: vandalizer_vandalizer
+    driver: bridge
+volumes:
+  chroma-data:
+    name: vandalizer_chroma-data
+    driver: local
+  mongo-data:
+    name: vandalizer_mongo-data
+    driver: local
+  uploads:
+    name: vandalizer_uploads
+    driver: local

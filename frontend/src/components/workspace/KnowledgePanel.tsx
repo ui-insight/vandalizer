@@ -1,15 +1,24 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Plus, Loader2, ArrowLeft, Trash2, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Pencil, Check } from 'lucide-react'
-import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
 import type { Organization } from '../../api/organizations'
-import type { KnowledgeBaseDetail, KnowledgeBaseSource } from '../../types/knowledge'
+import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
+import { KBSearchBar } from '../knowledge/KBSearchBar'
+import { KBListView } from '../knowledge/KBListView'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
+
+type TabKey = 'mine' | 'team' | 'explore'
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'mine', label: 'My KBs' },
+  { key: 'team', label: 'Team' },
+  { key: 'explore', label: 'Explore' },
+]
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
   empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
@@ -28,12 +37,17 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
 export function KnowledgePanel() {
   const { activateKB } = useWorkspace()
   const { user } = useAuth()
-  const { knowledgeBases, loading, create, remove, refresh } = useKnowledgeBases()
+  const { create, remove, refresh } = useKnowledgeBases()
+  const [activeTab, setActiveTab] = useState<TabKey>('mine')
+  const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
   const [allOrgs, setAllOrgs] = useState<Organization[]>([])
   const [showOrgsModal, setShowOrgsModal] = useState(false)
   const [savingOrgs, setSavingOrgs] = useState(false)
   const [selectedOrgIds, setSelectedOrgIds] = useState<string[]>([])
+
+  // Used for adopt/removeRef in the scoped views
+  const scopedMine = useScopedKnowledgeBases({ scope: 'mine' })
 
   const isExaminerOrAdmin = !!(user?.is_examiner || user?.is_admin)
 
@@ -701,6 +715,9 @@ export function KnowledgePanel() {
     )
   }
 
+  // Determine the scope for the KBListView based on active tab
+  const listScope: KBScope = activeTab === 'explore' ? 'verified' : activeTab
+
   // List view
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
@@ -720,29 +737,68 @@ export function KnowledgePanel() {
         }}
       >
         <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '6px 14px',
-            fontSize: 13,
-            fontWeight: 600,
-            fontFamily: 'inherit',
-            color: 'var(--highlight-text-color, #000)',
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            border: 'none',
-            borderRadius: 6,
-            cursor: creating ? 'default' : 'pointer',
-            opacity: creating ? 0.6 : 1,
-          }}
-        >
-          {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
-          New
-        </button>
+        {activeTab === 'mine' && (
+          <button
+            onClick={handleCreate}
+            disabled={creating}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 14px',
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              color: 'var(--highlight-text-color, #000)',
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              border: 'none',
+              borderRadius: 6,
+              cursor: creating ? 'default' : 'pointer',
+              opacity: creating ? 0.6 : 1,
+            }}
+          >
+            {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
+            New
+          </button>
+        )}
       </div>
+
+      {/* Tabs */}
+      <div style={{
+        display: 'flex', gap: 0,
+        borderBottom: '1px solid #3a3a3a',
+        backgroundColor: '#191919',
+        flexShrink: 0,
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => { setActiveTab(tab.key); setSearch('') }}
+            style={{
+              flex: 1,
+              padding: '8px 0',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'inherit',
+              color: activeTab === tab.key ? '#fff' : '#888',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderBottom: activeTab === tab.key ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
+              cursor: 'pointer',
+              transition: 'color 0.15s',
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <KBSearchBar
+        value={search}
+        onChange={setSearch}
+        placeholder={activeTab === 'explore' ? 'Search verified knowledge bases...' : 'Search...'}
+      />
 
       {/* Error */}
       {error && (
@@ -757,122 +813,31 @@ export function KnowledgePanel() {
 
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
-            <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
-          </div>
-        ) : knowledgeBases.length === 0 ? (
-          <KnowledgeTutorial />
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {knowledgeBases.map(kb => {
-              const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
-              const isReady = kb.status === 'ready'
-              return (
-                <button
-                  key={kb.uuid}
-                  onClick={() => isReady ? activateKB(kb.uuid, kb.title) : loadDetail(kb.uuid)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    padding: '14px 16px',
-                    backgroundColor: '#2a2a2a',
-                    border: '1px solid #3a3a3a',
-                    borderRadius: 8,
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    transition: 'background-color 0.15s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#333')}
-                  onMouseLeave={e => (e.currentTarget.style.backgroundColor = '#2a2a2a')}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {kb.title}
-                    </span>
-                    {kb.shared_with_team && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                        color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
-                        whiteSpace: 'nowrap',
-                      }}>
-                        Team
-                      </span>
-                    )}
-                    {kb.verified && (
-                      <span style={{
-                        fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                        color: '#15803d', backgroundColor: '#dcfce7',
-                        display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
-                      }}>
-                        <ShieldCheck size={10} />
-                        Verified
-                      </span>
-                    )}
-                    <span
-                      style={{
-                        fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
-                        color: badge.color, backgroundColor: badge.bg,
-                      }}
-                    >
-                      {badge.label}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#999' }}>
-                    <span>{kb.total_sources} sources</span>
-                    <span>{kb.total_chunks} chunks</span>
-                  </div>
-                  {(kb.organization_ids?.length ?? 0) > 0 && (
-                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
-                      {kb.organization_ids.map(gid => {
-                        const o = allOrgs.find(x => x.uuid === gid)
-                        return (
-                          <span
-                            key={gid}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 3,
-                              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-                              color: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                            }}
-                          >
-                            <Tag size={9} />
-                            {o?.name || gid}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  )}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); loadDetail(kb.uuid) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-                        color: '#ccc', backgroundColor: 'transparent',
-                        border: '1px solid #3a3a3a', borderRadius: 4, cursor: 'pointer',
-                      }}
-                    >
-                      <Pencil size={11} />
-                      Edit
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDelete(kb.uuid) }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 4,
-                        padding: '4px 8px', fontSize: 11, fontFamily: 'inherit',
-                        color: '#888', backgroundColor: 'transparent',
-                        border: '1px solid #3a3a3a', borderRadius: 4, cursor: 'pointer',
-                      }}
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        )}
+        <KBListView
+          scope={listScope}
+          search={search}
+          allOrgs={allOrgs}
+          onSelect={loadDetail}
+          onChat={(uuid, title) => activateKB(uuid, title)}
+          onEdit={activeTab !== 'explore' ? loadDetail : undefined}
+          onDelete={activeTab === 'mine' ? handleDelete : undefined}
+          onAdopt={activeTab === 'explore' || activeTab === 'team'
+            ? async (uuid) => { await scopedMine.adopt(uuid); refresh() }
+            : undefined}
+          onRemoveRef={activeTab === 'mine'
+            ? async (refUuid) => { await scopedMine.removeRef(refUuid); refresh() }
+            : undefined}
+          onClone={activeTab === 'explore'
+            ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
+            : undefined}
+          emptyMessage={
+            activeTab === 'mine'
+              ? undefined  // will show tutorial via the component
+              : activeTab === 'team'
+                ? 'No knowledge bases shared with your team yet.'
+                : 'No verified knowledge bases available yet.'
+          }
+        />
       </div>
     </div>
   )
