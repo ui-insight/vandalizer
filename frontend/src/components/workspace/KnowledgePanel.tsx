@@ -768,6 +768,7 @@ export function KnowledgePanel() {
 
   // List view
   return (
+    <>
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
       {/* Header */}
       <div
@@ -913,5 +914,6 @@ export function KnowledgePanel() {
         }}
       />
     )}
+    </>
   )
 }
