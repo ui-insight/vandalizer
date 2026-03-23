@@ -55,6 +55,17 @@ async def _user_response(user: User) -> UserResponse:
         team = await Team.get(user.current_team)
         if team:
             current_team_uuid = team.uuid
+
+    # Resolve support agent status from system config
+    is_support_agent = False
+    if user.is_admin:
+        is_support_agent = True
+    else:
+        from app.models.system_config import SystemConfig
+        config = await SystemConfig.get_config()
+        contacts = config.support_contacts or []
+        is_support_agent = any(c.get("user_id") == user.user_id for c in contacts)
+
     return UserResponse(
         id=str(user.id),
         user_id=user.user_id,
@@ -62,6 +73,7 @@ async def _user_response(user: User) -> UserResponse:
         name=user.name,
         is_admin=user.is_admin,
         is_examiner=user.is_examiner,
+        is_support_agent=is_support_agent,
         current_team=str(user.current_team) if user.current_team else None,
         current_team_uuid=current_team_uuid,
     )

@@ -58,6 +58,9 @@ class Settings(BaseSettings):
         chroma = Path(self.chromadb_persist_dir)
         self.upload_dir = str(upload if upload.is_absolute() else (backend_dir / upload).resolve())
         self.chromadb_persist_dir = str(chroma if chroma.is_absolute() else (backend_dir / chroma).resolve())
+        # Ensure directories exist on startup
+        Path(self.upload_dir).mkdir(parents=True, exist_ok=True)
+        Path(self.chromadb_persist_dir).mkdir(parents=True, exist_ok=True)
         return self
 
     @model_validator(mode="after")

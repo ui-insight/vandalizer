@@ -16,6 +16,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
   const iconColor = isTeam ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
   const [isDragOver, setIsDragOver] = useState(false)
   const dragCounter = useRef(0)
+  const justDropped = useRef(false)
 
   return (
     <tr
@@ -30,6 +31,10 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         }
       }}
       onClick={(e) => {
+        if (justDropped.current) {
+          justDropped.current = false
+          return
+        }
         if (e.button === 0) onClick()
       }}
       onContextMenu={(e) => {
@@ -51,8 +56,10 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       }}
       onDrop={(e) => {
         e.preventDefault()
+        e.stopPropagation()
         dragCounter.current = 0
         setIsDragOver(false)
+        justDropped.current = true
         const fileUuid = e.dataTransfer.getData('text/plain')
         if (fileUuid) onDropFile?.(fileUuid, folder.uuid)
       }}

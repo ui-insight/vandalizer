@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { CircleHelp } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
+import { openSupportPanel } from '../../utils/supportPanel'
 
 export function Header() {
   const navigate = useNavigate()
   const workspace = useOptionalWorkspace()
   const [supportOpen, setSupportOpen] = useState(false)
+  const [supportTicket, setSupportTicket] = useState<string | undefined>()
 
   const handleLogoClick = () => {
     navigate({
@@ -25,6 +27,18 @@ export function Header() {
     workspace?.resetToHome()
   }
 
+  // Listen for support panel open requests from anywhere (notifications, teams dropdown, etc.)
+  const handleSupportEvent = useCallback((e: Event) => {
+    const detail = (e as CustomEvent).detail
+    setSupportTicket(detail?.ticketUuid || undefined)
+    setSupportOpen(true)
+  }, [])
+
+  useEffect(() => {
+    window.addEventListener('open-support-panel', handleSupportEvent)
+    return () => window.removeEventListener('open-support-panel', handleSupportEvent)
+  }, [handleSupportEvent])
+
   return (
     <>
       <header
@@ -36,21 +50,11 @@ export function Header() {
           padding: '0 30px',
         }}
       >
-        {/* Left: Logo images - matches Flask navbar-header */}
+        {/* Left: Logo images */}
         <div className="flex items-center">
           <button onClick={handleLogoClick} aria-label="Go to home page" className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            {/* Joe Vandal icon */}
-            <img
-              src="/images/joevandal.png"
-              alt=""
-              style={{ width: 25, height: 40, marginTop: 4 }}
-            />
-            {/* Vandalizer wordmark */}
-            <img
-              src="/images/Vandalizer_Wordmark_RGB.png"
-              alt="Vandalizer"
-              style={{ width: 200, height: 50, marginLeft: 4 }}
-            />
+            <img src="/images/joevandal.png" alt="" style={{ width: 25, height: 40, marginTop: 4 }} />
+            <img src="/images/Vandalizer_Wordmark_RGB.png" alt="Vandalizer" style={{ width: 200, height: 50, marginLeft: 4 }} />
           </button>
         </div>
 
@@ -58,7 +62,10 @@ export function Header() {
         <div className="flex items-center gap-4">
           <NotificationBell />
           <button
-            onClick={() => setSupportOpen(!supportOpen)}
+            onClick={() => {
+              setSupportTicket(undefined)
+              setSupportOpen(!supportOpen)
+            }}
             className="flex items-center gap-1.5 rounded-[30px] border border-gray-300 px-3 py-1.5 text-sm font-medium text-[#555] hover:bg-gray-100 transition-all"
           >
             <CircleHelp className="h-3.5 w-3.5" />
@@ -68,7 +75,14 @@ export function Header() {
         </div>
       </header>
 
-      <SupportChatPanel open={supportOpen} onClose={() => setSupportOpen(false)} />
+      <SupportChatPanel
+        open={supportOpen}
+        onClose={() => setSupportOpen(false)}
+        initialTicket={supportTicket}
+      />
     </>
   )
 }
+
+// Re-export for convenience
+export { openSupportPanel } from '../../utils/supportPanel'
