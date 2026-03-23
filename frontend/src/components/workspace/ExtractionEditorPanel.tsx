@@ -55,7 +55,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
-  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -90,11 +90,12 @@ export function ExtractionEditorPanel() {
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
   }, [openExtractionId, refreshSparkline])
 
-  // Initial load — shows spinner and resets design-tab results
+  // Initial load — shows spinner and restores any pending results from activity rail
   useEffect(() => {
     if (!openExtractionId) return
     setLoading(true)
-    setResults({})
+    const pending = consumeExtractionResults()
+    setResults(pending ?? {})
     setActiveTab('design')
     getSearchSet(openExtractionId)
       .then(setSearchSet)

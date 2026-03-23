@@ -2,15 +2,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import {
-  Search, ShieldCheck, Beaker, BookOpen, Workflow, FileSearch,
+  Search, ShieldCheck, BookOpen, Workflow, FileSearch,
   FolderOpen, Star, X, Plus, ArrowUpDown,
-  Bookmark, ArrowLeft, Loader2, Tag, Sparkles,
+  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink,
 } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
-  tryVerifiedItem, listLibraries,
+  listLibraries,
 } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
@@ -90,75 +91,6 @@ const TIER_STYLES = {
 } as const
 
 // ---------------------------------------------------------------------------
-// Try It Panel
-// ---------------------------------------------------------------------------
-
-function TryItPanel({ item }: { item: VerifiedCatalogItem }) {
-  const [input, setInput] = useState('')
-  const [result, setResult] = useState<Record<string, unknown> | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-
-  const handleTry = async () => {
-    if (!input.trim()) return
-    setLoading(true)
-    setError('')
-    setResult(null)
-    try {
-      const data = item.kind === 'knowledge_base'
-        ? { query: input }
-        : { source_text: input }
-      setResult(await tryVerifiedItem(item.kind, item.item_id, data))
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  return (
-    <div className="mt-4 border-t border-gray-100 pt-4">
-      <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-        {item.kind === 'knowledge_base' ? 'Test a query against this knowledge base' : 'Paste text to run this extraction on'}
-      </label>
-      <textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        rows={3}
-        placeholder={item.kind === 'knowledge_base' ? 'Enter a question...' : 'Paste document text...'}
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
-      />
-      <button
-        onClick={handleTry}
-        disabled={loading || !input.trim()}
-        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-lg bg-gray-900 text-white hover:bg-gray-800 disabled:opacity-40 transition-colors"
-      >
-        {loading ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Running...</> : <><Beaker className="h-3.5 w-3.5" /> Run</>}
-      </button>
-      {error && <p className="text-xs text-red-500 mt-2">{error}</p>}
-      {result && (
-        <div className="mt-3 bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm">
-          {item.kind === 'knowledge_base' && Array.isArray((result as Record<string, unknown>).results) ? (
-            <div className="space-y-3">
-              {((result as Record<string, unknown>).results as { text: string; source_name: string }[]).map((r, i) => (
-                <div key={i} className="border-l-2 border-sky-400 pl-3">
-                  <p className="text-gray-700">{r.text}</p>
-                  {r.source_name && <p className="text-xs text-gray-400 mt-1">{r.source_name}</p>}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <pre className="whitespace-pre-wrap text-gray-700 overflow-auto max-h-48 text-xs font-mono">
-              {JSON.stringify((result as Record<string, unknown>).extraction_result || result, null, 2)}
-            </pre>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Item Detail Modal
 // ---------------------------------------------------------------------------
 
@@ -167,14 +99,14 @@ function ItemDetailModal({
   onClose,
   onAddToLibrary,
   onAdoptKB,
+  onTryIt,
 }: {
   item: VerifiedCatalogItem
   onClose: () => void
   onAddToLibrary: (item: VerifiedCatalogItem) => void
   onAdoptKB?: (kbUuid: string) => void
+  onTryIt?: (item: VerifiedCatalogItem) => void
 }) {
-  const [showTry, setShowTry] = useState(false)
-  const canTry = item.kind === 'search_set' || item.kind === 'knowledge_base'
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
 
@@ -251,25 +183,25 @@ function ItemDetailModal({
                 Add to My Knowledge Bases
               </button>
             )}
-            <button
-              onClick={() => onAddToLibrary(item)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              Save to Library
-            </button>
-            {canTry && (
+            {item.kind !== 'knowledge_base' && (
               <button
-                onClick={() => setShowTry(!showTry)}
+                onClick={() => onAddToLibrary(item)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
               >
-                <Beaker className="h-4 w-4" />
-                {showTry ? 'Hide' : 'Try It'}
+                <Plus className="h-4 w-4" />
+                Save to Library
+              </button>
+            )}
+            {(item.kind === 'search_set' || item.kind === 'workflow') && item.source_uuid && onTryIt && (
+              <button
+                onClick={() => onTryIt(item)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Open
               </button>
             )}
           </div>
-
-          {showTry && <TryItPanel item={item} />}
         </div>
       </div>
     </div>
@@ -542,12 +474,30 @@ export function ExploreTab() {
   // Show the hero landing when no filters are active
   const showHero = !hasActiveFilters && !loading
 
+  const navigate = useNavigate()
+
   const handleAdoptKB = async (kbUuid: string) => {
     try {
       await adoptKnowledgeBase(kbUuid)
       toast('Added to your knowledge bases', 'success')
     } catch {
       toast('Already in your knowledge bases', 'info')
+    }
+  }
+
+  const handleTryIt = (item: VerifiedCatalogItem) => {
+    if (!item.source_uuid) return
+    setDetailItem(null)
+    if (item.kind === 'workflow') {
+      navigate({
+        to: '/',
+        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined },
+      })
+    } else if (item.kind === 'search_set') {
+      navigate({
+        to: '/',
+        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined },
+      })
     }
   }
 
@@ -860,6 +810,7 @@ export function ExploreTab() {
           onClose={() => setDetailItem(null)}
           onAddToLibrary={(itm) => { setDetailItem(null); setAddToLibraryItem(itm) }}
           onAdoptKB={handleAdoptKB}
+          onTryIt={handleTryIt}
         />
       )}
 
