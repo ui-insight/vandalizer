@@ -5,7 +5,6 @@ import logging
 import secrets
 from typing import Optional
 
-from beanie import PydanticObjectId
 
 from app.config import Settings
 from app.models.demo import DemoApplication, PostExperienceResponse

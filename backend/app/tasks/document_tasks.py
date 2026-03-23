@@ -299,7 +299,6 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
 
 def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
     """Process output_config for an extraction automation."""
-    from datetime import datetime, timezone
 
     from app.services.output_handlers import (
         call_webhook,
@@ -378,7 +377,6 @@ def cleanup_document(self, document_uuid: str) -> None:
 )
 def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str) -> str:
     """Chunk text and embed into ChromaDB for RAG search."""
-    import os
 
     from app.services.document_manager import DocumentManager
 

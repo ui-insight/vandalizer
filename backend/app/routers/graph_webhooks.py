@@ -3,7 +3,7 @@
 import logging
 import re
 
-from fastapi import APIRouter, HTTPException, Query, Request, Response
+from fastapi import APIRouter, HTTPException, Request, Response
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ async def graph_webhook(request: Request):
     for notification in notifications:
         client_state = notification.get("clientState", "")
         resource = notification.get("resource", "")
-        change_type = notification.get("changeType", "")
+        _change_type = notification.get("changeType", "")
 
         # Validate clientState format strictly
         if not _CLIENT_STATE_RE.match(client_state):

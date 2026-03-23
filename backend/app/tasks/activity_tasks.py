@@ -5,7 +5,6 @@ Uses pymongo (sync) for DB access.
 """
 
 import logging
-import os
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS

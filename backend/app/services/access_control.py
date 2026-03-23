@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
+
+if TYPE_CHECKING:
+    from app.models.search_set import SearchSet
+    from app.models.workflow import Workflow
 
 from app.models.automation import Automation
 from app.models.document import SmartDocument

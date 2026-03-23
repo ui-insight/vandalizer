@@ -7,7 +7,6 @@ Uses pymongo (sync) for DB access.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 

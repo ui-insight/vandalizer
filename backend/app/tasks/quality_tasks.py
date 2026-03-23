@@ -70,7 +70,7 @@ async def _quality_monitor_async():
         # Check if we already have an unacknowledged config_changed alert
         existing = await QualityAlert.find_one(
             QualityAlert.alert_type == "config_changed",
-            QualityAlert.acknowledged == False,
+            QualityAlert.acknowledged == False,  # noqa: E712
         )
         if not existing:
             await QualityAlert(
@@ -90,7 +90,7 @@ async def _quality_monitor_async():
             QualityAlert.alert_type == "stale",
             QualityAlert.item_kind == item["item_kind"],
             QualityAlert.item_id == item["item_id"],
-            QualityAlert.acknowledged == False,
+            QualityAlert.acknowledged == False,  # noqa: E712
         )
         if not existing:
             await QualityAlert(

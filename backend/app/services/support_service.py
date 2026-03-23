@@ -2,7 +2,6 @@
 
 import datetime
 import logging
-from typing import Optional
 
 from app.config import Settings
 from app.models.support import (

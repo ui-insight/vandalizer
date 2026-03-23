@@ -5,13 +5,11 @@ import datetime
 import json
 import logging
 from pathlib import Path
-from typing import Optional
 
-from beanie import PydanticObjectId
 
 from app.models.certification import CertificationProgress
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, WorkflowResult
-from app.models.search_set import SearchSet, SearchSetItem
+from app.models.search_set import SearchSetItem
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
 
@@ -264,7 +262,7 @@ async def validate_module(user_id: str, module_id: str) -> dict:
     if module_id not in MODULE_XP:
         return {"passed": False, "stars": 0, "checks": [{"name": "invalid", "passed": False, "detail": "Unknown module"}]}
 
-    prog = await get_progress(user_id)
+    _prog = await get_progress(user_id)
 
     # TEMP: prerequisite check bypassed for review
     # idx = MODULE_ORDER.index(module_id)

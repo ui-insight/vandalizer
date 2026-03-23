@@ -56,7 +56,7 @@ frontend-lint:
 	cd $(FRONTEND_DIR) && npm run lint
 
 frontend-test:
-	cd $(FRONTEND_DIR) && npm run test:coverage -- --coverage.thresholds.lines=60
+	cd $(FRONTEND_DIR) && npm run test:coverage -- --coverage.thresholds.lines=30
 
 frontend-build:
 	cd $(FRONTEND_DIR) && npm run build

@@ -1,14 +1,18 @@
 """Export / Import service for workflows, search sets, and verified catalogs."""
 
+from __future__ import annotations
+
 import datetime
-import json
 import uuid as uuid_mod
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 
+if TYPE_CHECKING:
+    from app.models.knowledge import KnowledgeBase
+
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.search_set import SearchSet, SearchSetItem
-from app.models.verification import VerifiedItemMetadata
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 from app.services import search_set_service, verification_service, workflow_service
 

@@ -17,7 +17,6 @@ from app.schemas.extractions import (
     CreateSearchSetRequest,
     CreateTestCaseRequest,
     ExportPDFRequest,
-    ExtractionStatusResponse,
     ReorderItemsRequest,
     RunExtractionSyncRequest,
     RunValidationRequest,
@@ -235,7 +234,6 @@ async def upload_pdf_template(
     user: User = Depends(get_current_user),
 ):
     """Attach a fillable PDF template; auto-generate extraction items from its form fields."""
-    import re
     from pathlib import Path
     from pydantic import BaseModel as PydanticBase
     from PyPDF2 import PdfReader

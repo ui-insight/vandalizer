@@ -8,9 +8,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-from app.models.system_config import SystemConfig
-from app.models.validation_run import ValidationRun
-from app.models.verification import VerifiedItemMetadata
+from app.models.system_config import SystemConfig  # noqa: E402
+from app.models.validation_run import ValidationRun  # noqa: E402
+from app.models.verification import VerifiedItemMetadata  # noqa: E402
 
 
 # Grade-to-score mapping for workflow validation
@@ -589,7 +589,7 @@ async def get_quality_contract_status(item_kind: str, item_id: str) -> dict:
     has_alerts = await QualityAlert.find(
         QualityAlert.item_kind == item_kind,
         QualityAlert.item_id == item_id,
-        QualityAlert.acknowledged == False,
+        QualityAlert.acknowledged == False,  # noqa: E712
     ).count() > 0
 
     monitored = monitoring.get("auto_revalidate", False)

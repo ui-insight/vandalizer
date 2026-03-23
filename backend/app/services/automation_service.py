@@ -1,7 +1,6 @@
 """Automation CRUD service."""
 
 import datetime
-from typing import Optional
 
 from beanie import PydanticObjectId
 

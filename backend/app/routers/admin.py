@@ -5,7 +5,6 @@ import math
 import re
 from typing import Optional
 
-from beanie import PydanticObjectId
 from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -19,7 +18,6 @@ from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.document import SmartDocument
-from app.models.workflow import Workflow, WorkflowResult
 
 router = APIRouter()
 
@@ -1739,7 +1737,6 @@ async def retention_dashboard(user: User = Depends(get_current_user)):
 async def update_retention_config(user: User = Depends(get_current_user)):
     """Update retention configuration."""
     await _require_admin(user)
-    from fastapi import Request
     # This endpoint is defined but config updates go through the existing config endpoints
     return {"detail": "Use PUT /api/config to update retention_config"}
 

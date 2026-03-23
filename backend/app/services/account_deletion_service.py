@@ -1,6 +1,5 @@
 """Account deletion service — removes all user-owned data."""
 
-import asyncio
 import logging
 
 from app.config import Settings

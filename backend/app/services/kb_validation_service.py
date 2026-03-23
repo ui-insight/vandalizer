@@ -1,9 +1,7 @@
 """Knowledge Base validation service - retrieval precision, source health, chunk coverage."""
 
 import asyncio
-import datetime
 import logging
-from typing import Optional
 
 import httpx
 

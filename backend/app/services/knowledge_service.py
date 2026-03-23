@@ -1,13 +1,18 @@
 """Knowledge Base service — CRUD, source management, and ChromaDB operations."""
 
+from __future__ import annotations
+
 import asyncio
 import datetime
 import logging
 import re
-from typing import Optional
+from typing import TYPE_CHECKING
 
 import httpx
 from bs4 import BeautifulSoup
+
+if TYPE_CHECKING:
+    from app.models.kb_suggestion import KBSuggestion
 
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import datetime
 import uuid as uuid_mod
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
 from celery.result import AsyncResult
 
 from app.celery_app import celery_app
 from app.models.document import SmartDocument
-from app.models.search_set import SearchSet, SearchSetItem
+from app.models.search_set import SearchSetItem
 from app.models.workflow import (
     Workflow,
     WorkflowAttachment,
@@ -802,7 +802,6 @@ async def delete_expected_output(workflow_id: str, expected_id: str, user: User)
 
 async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     """Use an LLM to auto-generate quality check definitions from the workflow structure."""
-    import json as _json
     from app.services.llm_service import create_chat_agent
     from app.models.system_config import SystemConfig
 
@@ -1176,7 +1175,6 @@ def _compare_outputs(
     For text output, does normalized text similarity.
     Returns comparison metrics that can feed into the quality score.
     """
-    import json as _json
 
     comparisons = []
     for expected in expected_outputs:

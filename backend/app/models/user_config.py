@@ -1,6 +1,5 @@
 """UserModelConfig model for per-user LLM settings."""
 
-from typing import Optional
 
 from beanie import Document
 

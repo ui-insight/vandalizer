@@ -3,11 +3,9 @@
 import asyncio
 import logging
 import time
-from typing import Optional
 
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.system_config import SystemConfig
-from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
 from app.services.extraction_validation_service import (
     _is_not_found,
@@ -16,7 +14,6 @@ from app.services.extraction_validation_service import (
 from app.services.search_set_service import (
     get_extraction_field_metadata,
     get_extraction_keys,
-    get_search_set,
 )
 
 logger = logging.getLogger(__name__)

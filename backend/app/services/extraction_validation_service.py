@@ -196,7 +196,7 @@ async def run_validation(
     for tcr in tc_results:
         # Per-run correct counts
         # We need run_results for this - add them to the test case output
-        per_run_correct = tcr.get("per_run_correct", [])
+        _per_run_correct = tcr.get("per_run_correct", [])
         for fr in tcr.get("fields", []):
             # Error type classification
             exp = fr.get("expected")

@@ -15,14 +15,14 @@ import re
 import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import NoReturn, Optional
+from typing import NoReturn
 from urllib.parse import urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
 
 from app.services.extraction_engine import ExtractionEngine
-from app.services.llm_service import create_chat_agent, get_agent_model
+from app.services.llm_service import create_chat_agent
 
 logger = logging.getLogger(__name__)
 
@@ -938,7 +938,7 @@ class KnowledgeBaseQueryNode(Node):
         if not query:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
-        self.report_progress(f"Querying knowledge base…")
+        self.report_progress("Querying knowledge base…")
 
         dm = DocumentManager()
         results = dm.query_kb(kb_uuid, query, k=k)

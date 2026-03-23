@@ -5,8 +5,6 @@ from copy import deepcopy
 from app.models.system_config import (
     DEFAULT_EXTRACTION_CONFIG,
     SystemConfig,
-    _apply_legacy_strategy,
-    _deep_merge,
 )
 from app.models.user_config import UserModelConfig
 

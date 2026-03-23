@@ -30,7 +30,6 @@ from app.services.config_service import (
     get_llm_model_by_name,
     get_llm_models,
     reconcile_user_model_config,
-    resolve_model_name,
 )
 from app.services import workflow_service
 
